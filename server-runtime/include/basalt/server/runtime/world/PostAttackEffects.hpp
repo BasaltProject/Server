@@ -13,18 +13,11 @@
 
 namespace basalt::server::runtime::world {
 
-/// What the enchantments on both sides of a hit do once it has landed.
-///
-/// parity: `EnchantmentHelper.doPostAttackEffectsWithItemSource` over each enchantment's
-/// `minecraft:post_attack` entries: the victim's worn and held items first, for the entries it is
-/// `enchanted` as (thorns), then the weapon, for the attacker's (fire aspect, bane of arthropods).
+/// parity: `doPostAttackEffectsWithItemSource`.
 namespace postAttack {
 
-/// Which side of the hit an effect lands on. `damaging_entity` is the attacker for a melee blow.
 enum class Side : std::uint8_t { kVictim, kAttacker };
 
-/// A stack worn or held, and the equipment slot it is in: `mainhand`, `offhand`, `feet`, `legs`,
-/// `chest`, `head` or `body`.
 struct Equipped {
     std::int32_t slot = 0;
     std::string_view equipmentSlot;
@@ -70,7 +63,6 @@ struct Explosion {
     std::string sound;
 };
 
-/// Everything the entries that passed their requirements asked for, in the order they ran.
 struct Outcome {
     std::vector<Ignite> ignites;
     std::vector<Damage> damages;
@@ -80,14 +72,11 @@ struct Outcome {
 };
 
 struct Hit {
-    /// The victim's equipment, in `EquipmentSlot` order.
     std::vector<Equipped> victimEquipment;
     std::optional<Equipped> weapon;
-    /// The victim as `entity_properties` on `this` reads it.
     const weaponDamage::Victim* victim = nullptr;
     /// parity: `DamageSource.isDirect`, which a melee blow is.
     bool direct = true;
-    /// The attacker as `entity_properties` on `attacker` and `direct_attacker` reads it.
     double attackerFallDistance = 0.0;
     bool attackerFlying = false;
 };

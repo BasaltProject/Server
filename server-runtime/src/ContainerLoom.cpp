@@ -21,7 +21,7 @@ using wire::protocol::play::OpenScreenPacket;
 using wire::protocol::play::SoundSource;
 using wire::text::Component;
 
-/// parity: `BannerPatternTags.NO_ITEM_REQUIRED`, what a loom offers with nothing in its third slot.
+/// parity: `BannerPatternTags.NO_ITEM_REQUIRED`.
 constexpr std::string_view kFreePatterns = "minecraft:no_item_required";
 
 } // namespace
@@ -76,7 +76,7 @@ void ContainerMenuController::recomputeLoomResult() {
             offered.push_back(one.toString());
         }
     }
-    // parity: the pick follows the pattern it was on rather than its place, and a list of one picks
+    // parity: the pick follows the pattern it was on rather than its place, and a list of one picks.
     // itself.
     const std::string was = loomPattern_ >= 0 && static_cast<std::size_t>(loomPattern_) < loomPatterns_.size()
                                 ? loomPatterns_[static_cast<std::size_t>(loomPattern_)]
@@ -124,7 +124,7 @@ void ContainerMenuController::selectLoomPattern(const std::int32_t button) {
 }
 
 void ContainerMenuController::takeLoomResult() {
-    // parity: `LoomMenu.ResultSlot.onTake`: one banner and one dye go, the pattern item stays, and
+    // parity: `LoomMenu.ResultSlot.onTake`.
     // the loom is heard once per turn.
     const auto eat = [this](const std::int32_t slot) {
         std::optional<storage::StoredItemStack>& held = loomSlots_[static_cast<std::size_t>(slot)];

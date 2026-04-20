@@ -45,8 +45,6 @@ std::optional<std::int32_t> ageOf(std::int32_t stateId) {
     std::int32_t age = 0;
     const char* first = found->second.data();
     const char* last = first + found->second.size();
-    // Whole-string, as everywhere else a property is read as a number: an age is always digits, so
-    // this only ever matters for a state written by something that is not this server.
     const std::from_chars_result result = std::from_chars(first, last, age);
     if (result.ec != std::errc{} || result.ptr != last) {
         return std::nullopt;

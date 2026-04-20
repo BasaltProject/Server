@@ -20,7 +20,6 @@ constexpr std::int32_t kGroveScanSteps = 8;
     return block == nullptr ? std::string{} : block->path();
 }
 
-/// Nested `pine_on_snow` and `spruce_on_snow`: scan up through at most eight powder snow blocks.
 [[nodiscard]] std::optional<DecorationPos> grovePosition(const Chunk& chunk, const DecorationPos& origin) {
     static const std::set<std::string, std::less<>> supportPaths = {"snow_block", "powder_snow"};
     const ChunkHeight bounds = chunk.verticalBounds();
@@ -181,8 +180,7 @@ const std::map<std::string, treeDecoration::Selector, std::less<>>& treeDecorati
         std::map<std::string, Selector, std::less<>> selectors;
         selectors.emplace("trees_plains",
                           Selector{.entries = {{0.33333334F, tree(treeConfigs::fancyOakBees005())},
-                                               // Only this entry is `fallen_oak_tree`, which carries its own
-                                               // would_survive.
+                                               // Only `fallen_oak_tree` carries its own would_survive.
                                                {0.0125F, checkedFallen(fallenTreeConfigs::oak(), "oak_sapling")}},
                                    .defaultCandidate = tree(treeConfigs::oakBees005())});
         selectors.emplace(
@@ -258,8 +256,7 @@ const std::map<std::string, treeDecoration::Selector, std::less<>>& treeDecorati
         selectors.emplace("trees_mangrove",
                           Selector{.entries = {{0.85F, checkedTree(treeConfigs::tallMangrove(), "mangrove_propagule")}},
                                    .defaultCandidate = checkedTree(treeConfigs::mangrove(), "mangrove_propagule")});
-        // parity: `trees_dappled_forest`, the only weighted tree selector. Every entry carries its own
-        // would_survive filter, checked after the pick.
+        // parity: `trees_dappled_forest` is the only weighted tree selector.
         selectors.emplace(
             "trees_dappled_forest",
             Selector{.weighted = {{200, checkedTree(treeConfigs::redPoplarLeafLitter(), "poplar_sapling")},

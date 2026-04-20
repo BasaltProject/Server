@@ -37,7 +37,7 @@ constexpr std::array kWaterCreatures{"cod"sv,    "dolphin"sv, "glow_squid"sv, "p
 /// parity: the zombie family, where a baby is worth two and a half times as much.
 constexpr std::array kZombies{"drowned"sv, "husk"sv, "zombie"sv, "zombie_villager"sv, "zombified_piglin"sv};
 
-/// parity: `EquipmentSlot.VALUES` up to the saddle, which `canIncreaseExperience` leaves out.
+/// parity: `EquipmentSlot.VALUES` up to the saddle.
 constexpr std::array kExperienceSlots{"mainhand"sv, "offhand"sv, "feet"sv, "legs"sv, "chest"sv, "head"sv, "body"sv};
 
 /// parity: `DropChances.DEFAULT_EQUIPMENT_DROP_CHANCE` and `PRESERVE_ITEM_DROP_CHANCE_THRESHOLD`.
@@ -79,7 +79,7 @@ constexpr double kBabyZombieFactor = 2.5;
     return 0;
 }
 
-/// parity: `Mob.getBaseExperienceReward`, a little more for each item it wears and would not keep.
+/// parity: `Mob.getBaseExperienceReward`.
 [[nodiscard]] std::int32_t withEquipment(const ServerEntity& entity, std::int32_t reward,
                                          random::RandomSource& random) {
     if (reward <= 0 || !entity.sourceNbt.has_value()) {

@@ -42,7 +42,7 @@ constexpr double kSlopePush = static_cast<double>(0.0078125F);
 
 [[nodiscard]] double distanceSqr(const Vec& a, const Vec& b) { return lengthSqr(sub(a, b)); }
 
-/// parity: `Vec3.normalize`, which gives the zero vector for anything shorter than 1.0E-5.
+/// parity: `Vec3.normalize`.
 [[nodiscard]] Vec normalize(const Vec& a) {
     const double l = length(a);
     return l < 1.0E-5 ? Vec{} : Vec{a[0] / l, a[1] / l, a[2] / l};

@@ -25,8 +25,7 @@ constexpr double kPandaLazySpeed = 0.07000000029802322;
 }
 
 [[nodiscard]] double horseSpeed(random::RandomSource& random) {
-    // parity: the float literal is a float in vanilla and the three rolls are doubles, so the sum
-    // starts from a float and the widening happens where vanilla's does.
+    // parity: the float literal is a float in vanilla and the three rolls are doubles, so the sum.
     return (static_cast<double>(0.45F) + random.nextDouble() * 0.3 + random.nextDouble() * 0.3 +
             random.nextDouble() * 0.3) *
            0.25;
@@ -46,8 +45,7 @@ constexpr double kPandaLazySpeed = 0.07000000029802322;
 void writePanda(const NbtCompound& data, std::map<std::string, double>& attributes) {
     const PandaGene main = geneNamed(data, "MainGene");
     const PandaGene hidden = geneNamed(data, "HiddenGene");
-    // parity: a recessive gene only shows when both copies agree, which is what makes brown pandas
-    // rare rather than merely uncommon.
+    // parity: a recessive gene only shows when both copies agree, which is what makes brown pandas.
     const PandaGene expressed = pandaGeneRecessive(main) && main != hidden ? PandaGene::Normal : main;
     if (expressed == PandaGene::Weak) {
         attributes[std::string{kMaxHealth}] = kPandaWeakHealth;
@@ -56,7 +54,6 @@ void writePanda(const NbtCompound& data, std::map<std::string, double>& attribut
     }
 }
 
-/// The compounds of a list-valued key, copied out so the caller can rewrite the whole list.
 [[nodiscard]] std::vector<NbtCompound> compoundsAt(const NbtCompound& data, std::string_view key) {
     std::vector<NbtCompound> entries;
     const NbtTag* found = data.find(key);
@@ -143,7 +140,7 @@ PandaGene pandaGene(std::int32_t roll) {
     default:
         break;
     }
-    // parity: every other roll inside the range is `weak`, and anything outside it is `normal`.
+    // parity: every other roll inside the range is `weak`.
     return roll >= 0 && roll <= 8 ? PandaGene::Weak : PandaGene::Normal;
 }
 

@@ -33,29 +33,21 @@ namespace basalt::server::runtime {
 
 class ClientSession;
 
-/// One item a plugin drew into a window it opened.
 struct PluginMenuItem {
     std::string id;
     std::int32_t count = 1;
-    /// MiniMessage on the plugin's side, parsed into a component when the window is drawn.
     std::optional<std::string> name;
-    /// One line each, the same way.
     std::vector<std::string> lore;
 };
 
-/// Container, menu, inventory and crafting state: every window this player can have open, and what
-/// a click, a shift-click or a drag does to it. One class because every slot operation switches on
-/// the same mutually exclusive "which window is open" fields.
 class ContainerMenuController {
 public:
     /// parity: the four grid cells of a player's own inventory, and the nine of a table.
     static constexpr std::int32_t kMaxGridSize = 9;
 
-    /// What a plugin gets a say in. Unset means nobody objects.
     struct Hooks {
         std::function<bool(std::string_view kind, const std::optional<wire::protocol::play::BlockPos>& pos)>
             openAllowed;
-        /// The slot, the button and the mode, plus what is in that slot when it is a player's own.
         std::function<bool(std::int32_t slot, std::int32_t button, std::string_view mode,
                            const std::optional<std::string>& item)>
             clickAllowed;
@@ -64,7 +56,6 @@ public:
             pickAllowed;
     };
 
-    /// The rolls opening and dropping make.
     struct Options {
         std::function<double()> nextDouble;
         std::function<float()> nextFloat;
@@ -73,20 +64,15 @@ public:
 
     explicit ContainerMenuController(ClientSession& owner, Hooks hooks = {}, Options options = {});
 
-    /// The window this player has open. Their own inventory unless they opened a block's.
     player::Menu openMenu = player::Menu::playerInventory();
 
-    /// The last container id handed out, so a freshly opened window never reuses the previous one.
     std::int32_t nextContainerId = 1;
 
-    /// The block whose window is open, and the other half of a double chest.
     std::optional<wire::protocol::play::BlockPos> openBlock;
     std::optional<wire::protocol::play::BlockPos> openBlockSecond;
 
-    /// How many slots the open block has, which is what a click is bounds-checked against.
     std::int32_t openBlockSize = world::furnaces::kSize;
 
-    /// The lectern whose page this player is turning, if that is what is open.
     std::optional<wire::protocol::play::BlockPos> openLecternAt;
 
     void openCraftingTable(player::PlayerSession& session);
@@ -96,12 +82,10 @@ public:
 
     void openEnderChest(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
-    /// parity: `ContainerEntity.interactWithContainerVehicle`: a chest boat's or chest minecart's
-    /// twenty-seven slots, kept on the entity itself.
+    /// parity: `ContainerEntity.interactWithContainerVehicle`.
     void openEntityChest(player::PlayerSession& session, entity::ServerEntity& vehicle);
 
-    /// parity: `ServerPlayer.openHorseInventory`: the saddle, the body armour and any chest a mount
-    /// carries, in `ClientboundMountScreenOpenPacket`'s window.
+    /// parity: `ServerPlayer.openHorseInventory`.
     void openMountMenu(player::PlayerSession& session, entity::ServerEntity& mount);
 
     void openChest(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, const std::string& block);
@@ -122,25 +106,21 @@ public:
 
     void openBrewingStand(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
-    /// parity: `MerchantMenu`, whose three trading slots belong to the villager's trade window.
+    /// parity: `MerchantMenu`.
     void openMerchantMenu(player::PlayerSession& session);
 
-    /// Whether the open window is a brewing stand's, which is read off the block it belongs to.
     [[nodiscard]] bool brewingStandOpen() const;
 
-    /// parity: `BeaconMenu.updateEffects`, which takes the payment and writes both choices onto the
-    /// block. Either effect is the mob effect's registry id, or nothing for "none".
+    /// parity: `BeaconMenu.updateEffects`.
     void setBeaconEffects(const std::optional<std::int32_t>& primary, const std::optional<std::int32_t>& secondary);
 
-    /// parity: `ServerboundRenameItemPacket`, which arrives on every keystroke and works the result
-    /// out again each time.
+    /// parity: `ServerboundRenameItemPacket`.
     void setAnvilName(const std::string& name);
 
     void openStonecutterMenu(player::PlayerSession& session);
 
     void openCrafter(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
-    /// Opens a window a plugin drew. The plugin bridge's entry point, so the shape stays exact.
     void openPluginMenu(const std::string& title, std::int32_t rows,
                         const std::map<std::int32_t, PluginMenuItem>& items, std::function<void(std::int32_t)> onClick);
 
@@ -150,27 +130,21 @@ public:
 
     void closeOpenMenu(player::PlayerSession& session);
 
-    /// parity: `ContainerButtonClick`, which is how a lectern's page and a stonecutter's choice
-    /// arrive.
+    /// parity: `ContainerButtonClick`.
     void clickContainerButton(std::int32_t button);
 
-    /// parity: `handleContainerSlotStateChanged`, which only the crafter listens to: it switches one
-    /// of its nine slots on or off, and a comparator counts a slot that is off as a full one.
+    /// parity: `handleContainerSlotStateChanged`.
     void setSlotState(std::int32_t slot, bool enabled);
 
-    /// Re-sends whatever the open block holds, for a change made on the server side.
     void syncOpenContainer();
 
-    /// The two progress bars a furnace window draws.
     void sendFurnaceBars();
 
-    /// parity: `BrewingStandBlockEntity.dataAccess`'s four: brew time, fuel, and their two totals.
+    /// parity: `BrewingStandBlockEntity.dataAccess`'s four.
     void sendBrewingBars();
 
-    /// The brewing stand's own `syncOpenContainer`: its bars and whichever slots moved.
     void syncBrewingStand();
 
-    /// Empties the crafting grid back into the player.
     void returnCraftingGrid(player::PlayerSession& session);
 
     void handleContainerClick(const wire::protocol::play::ServerboundContainerClickPacket& packet);
@@ -192,7 +166,6 @@ private:
 
     [[nodiscard]] std::optional<storage::StoredItemStack> readBlockSlot(std::int32_t index) const;
 
-    /// A slot of the open entity's chest, and a write to it.
     [[nodiscard]] std::optional<storage::StoredItemStack> entityContainerSlot(std::int32_t index) const;
     void writeEntityContainerSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack);
 
@@ -201,7 +174,7 @@ private:
     /// parity: `HorseInventoryMenu`'s `ArmorSlot.mayPlace`, and anything in the chest.
     [[nodiscard]] bool mountAccepts(std::int32_t index, const storage::StoredItemStack& stack) const;
 
-    /// parity: `AbstractMountInventoryMenu.quickMoveStack`, armour first, then the saddle, then the chest.
+    /// parity: `AbstractMountInventoryMenu.quickMoveStack`.
     void quickMoveMount(player::PlayerSession& session, const player::MenuSlot& slot,
                         const storage::StoredItemStack& stack);
 
@@ -227,17 +200,15 @@ private:
 
     void recomputeSmithingResult();
 
-    /// parity: `ResultSlot.checkTakeAchievements`, which hands the criteria the recipe the result
-    /// slot was filled from.
+    /// parity: `ResultSlot.checkTakeAchievements`.
     void awardRecipeCrafted();
 
-    /// parity: `ServerPlayer.awardRecipes` over `ServerRecipeBook.addRecipes`: the ones not yet
-    /// known are learnt, fire `recipe_unlocked` and go to the client's book together.
+    /// parity: `ServerPlayer.awardRecipes`.
     void awardRecipes(player::PlayerSession& session, const std::vector<wire::common::Identifier>& ids);
 
     void takeSmithingResult();
 
-    /// parity: `EnchantmentMenu.slotsChanged`, which rolls all three rows off the player's seed.
+    /// parity: `EnchantmentMenu.slotsChanged`.
     void rollEnchantmentOffers();
 
     /// parity: `EnchantmentMenu.clickMenuButton`, the row they pressed.
@@ -248,7 +219,7 @@ private:
     /// parity: `BeaconMenu`'s three data slots: the pyramid and the two effects it is set to.
     void sendBeaconNumbers();
 
-    /// parity: `LoomMenu.slotsChanged`, which works out what it may offer and what it would weave.
+    /// parity: `LoomMenu.slotsChanged`.
     void recomputeLoomResult();
 
     /// parity: `LoomMenu.clickMenuButton`, whose button is a place in the patterns on offer.
@@ -262,13 +233,11 @@ private:
     /// parity: the result slot's `onTake`, both inputs spent and the table's sound.
     void takeCartographyResult();
 
-    /// parity: `MapItem.onCraftedPostProcess` for whatever just left a result slot: a map carrying
-    /// `map_post_processing`, on the cursor or already moved into the inventory, becomes its new map.
+    /// parity: `MapItem.onCraftedPostProcess`.
     void settleCraftedMaps(player::PlayerSession& session);
 
     void sendLoomNumbers();
 
-    /// What the beacon this window belongs to has on it right now.
     [[nodiscard]] world::beacons::Stored beaconState() const;
 
     void recomputeGrindstoneResult();
@@ -279,12 +248,12 @@ private:
 
     void takeAnvilResult(player::PlayerSession& session);
 
-    /// parity: `AnvilBlock.damage`, the eight chances in a hundred that an anvil survives a use.
+    /// parity: `AnvilBlock.damage`.
     void wearAnvil();
 
     void sendAnvilCost();
 
-    /// parity: `Slot.mayPickup`: an anvil's result is only picked up by somebody who can pay for it.
+    /// parity: `Slot.mayPickup`.
     [[nodiscard]] bool mayPickup(const player::MenuSlot& slot) const;
 
     void selectStonecutterRecipe(std::int32_t button);
@@ -314,25 +283,21 @@ private:
 
     [[nodiscard]] std::optional<world::brewingStands::State> brewingState() const;
 
-    /// parity: `BrewingStandMenu.quickMoveStack` from the player's side: fuel first, then the
-    /// ingredient, then one bottle into the first free bottle slot.
+    /// parity: `BrewingStandMenu.quickMoveStack`.
     void quickMoveIntoBrewingStand(player::PlayerSession& session, const player::MenuSlot& from,
                                    const storage::StoredItemStack& stack);
 
-    /// The most a slot holds. parity: `PotionSlot.getMaxStackSize`, one, and every other slot's 64.
+    /// parity: `PotionSlot.getMaxStackSize`, one, and every other slot's 64.
     [[nodiscard]] std::int32_t slotCapacity(const player::MenuSlot& slot) const;
 
-    /// parity: `Slot.getMaxStackSize(ItemStack)`, the slot's limit and the stack's own, whichever is lower.
+    /// parity: `Slot.getMaxStackSize(ItemStack)`.
     [[nodiscard]] std::int32_t slotCapacity(const player::MenuSlot& slot, const storage::StoredItemStack& stack) const;
 
-    /// Gives the taker the experience a furnace has banked. parity:
-    /// `AbstractFurnaceBlockEntity.awardUsedRecipesAndPopExperience`.
     void payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity);
 
     /// parity: `BrewingStandMenu.PotionSlot.onTake`'s trigger, for a bottle just taken out.
     void awardBrewed(const server::world::loot::ItemStack& bottle);
 
-    /// Which half of a double chest a menu slot belongs to, and where in it.
     [[nodiscard]] std::optional<std::pair<wire::protocol::play::BlockPos, std::int32_t>>
     halfFor(std::int32_t index) const;
 
@@ -342,8 +307,6 @@ private:
     Hooks hooks_;
     Options options_;
 
-    /// Vanilla's optimistic-locking counter for container changes: bumped on every window write so
-    /// the client can tell a click made against the current contents from a stale one.
     std::int32_t containerStateId_ = 0;
 
     std::array<std::optional<storage::StoredItemStack>, kMaxGridSize> craftingGrid_;
@@ -351,9 +314,7 @@ private:
     std::optional<storage::StoredItemStack> carriedItem_;
 
     bool openEnderChest_ = false;
-    /// The chest boat, chest raft or chest minecart whose slots the open menu shows.
     std::optional<std::int32_t> openEntity_;
-    /// Whether that entity is a mount, whose first two slots are its saddle and body armour.
     bool openMount_ = false;
     std::optional<std::vector<std::optional<storage::StoredItemStack>>> pluginMenu_;
     std::function<void(std::int32_t)> pluginMenuClick_;
@@ -370,13 +331,9 @@ private:
 
     bool openEnchantment_ = false;
     std::array<std::optional<storage::StoredItemStack>, 2> enchantmentSlots_;
-    /// What each of the three rows costs, and what it is hinting at: the enchantment's protocol id
-    /// and the level it would come at, or -1 for a row with nothing behind it.
     std::array<std::int32_t, 3> enchantmentCosts_{0, 0, 0};
     std::array<std::int32_t, 3> enchantmentClues_{-1, -1, -1};
     std::array<std::int32_t, 3> enchantmentLevels_{-1, -1, -1};
-    /// How much power the open table had when its rows were rolled, so taking one works the same
-    /// row out again rather than a different one.
     std::int32_t shelvesAround_ = 0;
 
     bool openBeacon_ = false;
@@ -384,8 +341,7 @@ private:
 
     bool openLoom_ = false;
     std::array<std::optional<storage::StoredItemStack>, 4> loomSlots_;
-    /// What the screen may offer right now, in the order its buttons are numbered by, and which of
-    /// them is picked. parity: `selectablePatterns` and `selectedBannerPatternIndex`.
+    /// parity: `selectablePatterns` and `selectedBannerPatternIndex`.
     std::vector<std::string> loomPatterns_;
     std::int32_t loomPattern_ = -1;
 
@@ -397,24 +353,19 @@ private:
 
     bool openGrindstone_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> grindstoneSlots_;
-    /// What the two things in it were worth at a table, which is what grinding them hands back.
     std::int32_t grindstoneWorth_ = 0;
 
     bool openAnvil_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> anvilSlots_;
-    /// What the player has typed into the name box. Nothing means they have typed nothing, which is
-    /// not the same as having emptied it.
     std::optional<std::string> anvilName_;
     std::int32_t anvilCost_ = 0;
-    /// How many of the addition a repair is going to eat, which is not always all of them.
     std::int32_t anvilMaterials_ = 0;
-    /// parity: `onlyRenaming`, which is what leaves the addition where it is and lifts the wall.
+    /// parity: `onlyRenaming`.
     bool anvilOnlyRenaming_ = false;
 
     std::array<std::int32_t, 4> openBlockData_{-1, -1, -1, -1};
     std::array<std::optional<storage::StoredItemStack>, 5> shownBlockSlots_;
 
-    /// The click-and-drag gesture in progress, if any.
     bool quickCraftActive_ = false;
     std::int32_t quickCraftType_ = 0;
     std::vector<std::int32_t> quickCraftSlots_;

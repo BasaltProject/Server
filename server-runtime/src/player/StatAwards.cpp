@@ -13,7 +13,7 @@ std::optional<std::string_view> openStatOf(std::string_view path) {
     if (path == "trapped_chest") {
         return "trigger_trapped_chest";
     }
-    // parity: `CopperChestBlock` extends `ChestBlock`, so every copper chest counts as a chest.
+    // parity: `CopperChestBlock` extends `ChestBlock`.
     if (path == "chest" || path.ends_with("copper_chest")) {
         return "open_chest";
     }
@@ -61,7 +61,7 @@ std::optional<std::string_view> ridingStatOf(const wire::common::Identifier& veh
     if (path == "pig") {
         return "pig_one_cm";
     }
-    // parity: `AbstractHorse`, the horses, donkeys, mules, llamas, camels and the undead horses.
+    // parity: `AbstractHorse`.
     if (path == "horse" || path == "donkey" || path == "mule" || path == "llama" || path == "trader_llama" ||
         path == "camel" || path == "camel_husk" || path == "skeleton_horse" || path == "zombie_horse") {
         return "horse_one_cm";

@@ -32,7 +32,6 @@ const Identifier& textDisplay() {
     return kType;
 }
 
-/// Anything alive that is not a player, read back out of the world it lives in.
 class WorldEntityRef : public PluginEntityRef {
 public:
     WorldEntityRef(world::LoadedWorld& world, std::int32_t entityId, std::string type)
@@ -107,7 +106,6 @@ private:
     std::string type_;
 };
 
-/// Floating text, through the same entity the client draws.
 class HologramRef final : public PluginHologramRef {
 public:
     HologramRef(world::LoadedWorld& world, std::int32_t entityId, std::string type)
@@ -167,7 +165,6 @@ public:
     }
 
 private:
-    /// The same lookup the inner handle does, since a hologram is an entity like any other.
     class Access : public WorldEntityRef {
     public:
         using WorldEntityRef::entity;
@@ -205,7 +202,6 @@ public:
         if (rule == nullptr) {
             return false;
         }
-        // Typed on the way in, so a rule cannot be left holding something `/gamerule` would refuse.
         if (rule->kind == world::GameRule::Kind::Boolean) {
             if (value != "true" && value != "false") {
                 return false;
@@ -241,8 +237,7 @@ public:
         if (!stateId.has_value() || !world_->state().setBlockState(x, y, z, *stateId)) {
             return false;
         }
-        // Told to everyone in this world, because a block that only the server knows about is one
-        // nobody can see: a client draws from the copy it was sent and never asks again.
+        // Told to everyone in this world: a block only the server knows about is invisible, clients never ask again.
         if (players_) {
             for (const player::PlayerSession* player : players_()) {
                 if (player->worldName == world_->name()) {
@@ -305,7 +300,6 @@ public:
             std::move(npc), *hooks_.npcs,
             [players](
                 const std::string& playerName) -> std::optional<std::pair<std::string, std::optional<std::string>>> {
-                // The textures of a connected player, which is where an NPC's face comes from.
                 for (const player::PlayerSession* session : players()) {
                     if (session->name().size() != playerName.size() ||
                         !std::ranges::equal(session->name(), playerName, [](char left, char right) {
@@ -354,8 +348,7 @@ std::shared_ptr<PluginWorldRef> LoadedWorlds::defaultWorld() const {
 
 std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std::string_view dimension,
                                                      std::string_view type, std::optional<std::int64_t> seed) {
-    // Named rather than numbered, and refused rather than guessed: a typo that quietly made an
-    // overworld where a nether was asked for is a world somebody has to delete by hand.
+    // Named and refused rather than guessed: a typo that quietly made an overworld is a world to delete by hand.
     std::string dimensionName{dimension};
     if (dimensionName.starts_with("minecraft:")) {
         dimensionName = dimensionName.substr(std::string_view{"minecraft:"}.size());
@@ -371,8 +364,6 @@ std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std:
 
 server::plugins::PluginHandle RegistryPlaceholders::registerPlaceholder(std::string_view pluginId,
                                                                         std::string_view name, Value value) {
-    // `%arena_wins%`: the plugin's id is the identifier and the rest is the parameter, which is how
-    // the registry already splits every other one.
     const std::string identifier = std::string{pluginId} + "_" + std::string{name};
     server::plugins::PluginPlayers* players = players_;
     registry_->registerProvider(

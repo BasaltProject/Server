@@ -29,8 +29,7 @@ using wire::nbt::NbtTag;
     return value;
 }
 
-/// parity: `BedRule`. A bed that cannot be used where it stands is destroyed on use, and a straw
-/// bed also when its sleeper leaves it.
+/// parity: `BedRule`.
 [[nodiscard]] NbtCompound bedRule(std::string_view canSetSpawn, std::string_view canSleep, bool destroyOnUse,
                                   bool destroyOnLeave = false) {
     NbtCompound value;
@@ -143,7 +142,6 @@ struct DimensionShape {
 
 [[nodiscard]] NbtCompound dimensionType(DimensionShape shape) {
     NbtCompound value;
-    // Written only when true, the way the codec's default leaves it out.
     if (shape.hasFixedTime) {
         value.putBoolean("has_fixed_time", true);
     }

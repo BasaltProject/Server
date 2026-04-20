@@ -7,7 +7,6 @@
 #include <utility>
 
 namespace basalt::server::plugins {
-
 void PluginChannelHost::listenOn(LoadedPlugin& plugin, const std::string& channel, lua::LuaRef fn) {
     const std::int64_t id = nextId_++;
     channels_[channel].push_back(ChannelListener{.plugin = &plugin, .fn = std::move(fn), .id = id});
@@ -50,7 +49,6 @@ void PluginChannelHost::channelMessage(PluginHost& host, const std::string& chan
                                            pushPlayer(args, player, &host.services().storage(), plugin->manifest.id,
                                                       &plugin->text);
                                        }
-                                       // One-based, like every other list in Lua.
                                        args.pushTable();
                                        std::int64_t position = 1;
                                        for (const std::uint8_t byte : bytes) {
@@ -62,5 +60,4 @@ void PluginChannelHost::channelMessage(PluginHost& host, const std::string& chan
                                    {}));
     }
 }
-
 } // namespace basalt::server::plugins

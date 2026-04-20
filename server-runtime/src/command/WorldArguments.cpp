@@ -30,7 +30,6 @@ using wire::text::Component;
     return CommandSyntaxError{.component = std::move(message), .input = reader.string(), .cursor = reader.cursor()};
 }
 
-/// One SNBT value, read from where the reader stands.
 [[nodiscard]] Parsed<NbtTag> parseTag(StringReader& reader) {
     const std::int32_t start = reader.cursor();
     const std::expected<wire::nbt::SnbtValue, wire::nbt::NbtError> value =
@@ -43,14 +42,12 @@ using wire::text::Component;
     return value->tag;
 }
 
-/// A block or `#tag` with the properties written next to it, before anything is resolved.
 struct ParsedBlock {
     Identifier id;
     std::optional<Identifier> tag;
     std::map<std::string, std::string> properties;
     std::int32_t start = 0;
 
-    /// Resolves to a concrete state, or fails naming what could not be resolved.
     [[nodiscard]] Parsed<BlockInput> asState(StringReader& reader) const {
         const std::optional<std::int32_t> stateId = reg::blocks::stateIdOf(id, properties);
         if (!stateId.has_value()) {
@@ -133,7 +130,6 @@ struct ParsedBlock {
     return NbtTag::ofCompound(std::move(normalised));
 }
 
-/// `[a=1, b={c:2}]`, each value SNBT. Keys are normalised to their full id, as the wire writes them.
 [[nodiscard]] Parsed<NbtCompound> parseComponents(StringReader& reader) {
     NbtCompound components;
     if (!reader.canRead() || reader.peek() != '[') {
@@ -306,7 +302,7 @@ public:
         return ArgumentParser{parserId::kScoreHolder, ArgumentParser::ScoreHolderProperties{.multiple = true}};
     }
 
-    /// parity: `ScoreHolderArgument.SUGGEST_SCORE_HOLDERS`, which is where fake players come from.
+    /// parity: `ScoreHolderArgument.SUGGEST_SCORE_HOLDERS`.
     [[nodiscard]] SuggestionProvider suggestions() const override {
         return SuggestionProvider{[](const SuggestionContext& context) {
             const scoreboard::Scoreboard* board = context.environment().options().scoreboard;

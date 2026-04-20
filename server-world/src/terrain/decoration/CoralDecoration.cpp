@@ -146,8 +146,7 @@ bool placeCoralBlock(Chunk& chunk, random::RandomSource& random, const Decoratio
     }
 
     setBlock(chunk, position, stateId);
-    // parity: `coral/block_decoration`'s weighted pick above the block: a coral 20, a sea pickle 3,
-    // nothing 57, each placed where it survives, which on top of the coral block it always does.
+    // parity: `coral/block_decoration` weighted pick: coral 20, sea pickle 3, nothing 57.
     const std::int32_t decoration = random.nextInt(80);
     if (decoration < 20) {
         setBlock(chunk, up(position),
@@ -256,8 +255,7 @@ void placeClaw(Chunk& chunk, random::RandomSource& random, const DecorationPos& 
     }
 }
 
-/// parity: the 26.3 coral mushroom, a `cuboid` shell sunk by an `offset`, each face block kept at nine
-/// in ten and then placed through the coral block's own filter.
+/// parity: the 26.3 coral mushroom, a `cuboid` shell sunk by an `offset`.
 void placeMushroom(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin, std::int32_t stateId) {
     const std::int32_t sink = random.nextInt(3) - 3;
     const std::int32_t height = random.nextInt(3) + 3;
@@ -300,8 +298,7 @@ const std::set<std::string, std::less<>>& coralDecoration::placedIds() {
 }
 
 void coralDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
-    // parity: one `simple_random_selector` over fifteen entries, tree, claw and mushroom for each of
-    // the five colours in turn.
+    // parity: one `simple_random_selector` over fifteen entries (tree.
     const std::int32_t choice = random.nextInt(15);
     const std::int32_t feature = choice % 3;
     const std::int32_t coralState = coralBlocks()[static_cast<std::size_t>(choice / 3)];

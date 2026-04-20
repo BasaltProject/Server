@@ -14,12 +14,12 @@ namespace {
 
 /// parity: `BaseSpawner.EVENT_SPAWN`, the only event the block answers.
 constexpr std::int32_t kEventSpawn = 1;
-/// parity: `ServerLevel.runBlockEvents`, which tells the players within sixty-four blocks.
+/// parity: `ServerLevel.runBlockEvents`.
 constexpr double kBlockEventRange = 64.0;
 
 constexpr std::string_view kSpawnerBlock = "spawner";
 
-/// parity: `SpawnerBlockEntity.getUpdateTag`, the saved fields without the list of potentials.
+/// parity: `SpawnerBlockEntity.getUpdateTag`.
 [[nodiscard]] wire::nbt::NbtCompound updateTagOf(const wire::nbt::NbtCompound& data) {
     wire::nbt::NbtCompound tag = data;
     for (const std::string_view key : {"id", "x", "y", "z", "components", "SpawnPotentials"}) {
@@ -39,12 +39,12 @@ bool RedstoneTickSystem::tickSpawner(world::LoadedWorld& world, wire::nbt::NbtCo
     bool resend = false;
     const bool changed = options_.mobSpawners->tick(
         world, data, pos,
-        // parity: `level.blockEvent(pos, Blocks.SPAWNER, id, 0)`, run with the other block events.
+        // parity: `level.blockEvent(pos, Blocks.SPAWNER, id, 0)`.
         [&world, &pos](std::int32_t eventId) {
             world.state().queueBlockEvent(world::BlockEvent{
                 .x = pos[0], .y = pos[1], .z = pos[2], .block = std::string{kSpawnerBlock}, .first = eventId});
         },
-        // parity: `SpawnerBlockEntity.setNextSpawnData`, whose `sendBlockUpdated` resends the block
+        // parity: `SpawnerBlockEntity.setNextSpawnData`.
         // entity; sent once the turn has written its data back.
         [&resend] { resend = true; });
     if (!resend) {
@@ -71,7 +71,7 @@ bool RedstoneTickSystem::runSpawnerEvent(world::LoadedWorld& world, const world:
     if (event.block != kSpawnerBlock) {
         return false;
     }
-    // parity: `doBlockEvent` drops an event whose square no longer holds a spawner, and
+    // parity: `doBlockEvent` drops an event whose square no longer holds a spawner, and.
     // `SpawnerBlockEntity.triggerEvent` answers only its own event.
     const std::optional<std::int32_t> stateId = world.state().blockState(event.x, event.y, event.z);
     const wire::common::Identifier* block =

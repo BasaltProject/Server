@@ -36,7 +36,6 @@ template <typename Range>
     return NbtTag::ofList(NbtList{NbtType::String, std::move(elements)});
 }
 
-/// The block entity at a position, or null when its chunk is not loaded or it holds none.
 [[nodiscard]] server::world::ChunkBlockEntity* blockEntityAt(const CommandContext& context,
                                                              const std::array<std::int32_t, 3>& pos) {
     const Parsed<world::LoadedWorld*> world = context.world();
@@ -85,7 +84,7 @@ NbtCompound entityNbtOf(const player::PlayerSession& player) {
 }
 
 NbtCompound entityNbtOf(const entity::ServerEntity& entity) {
-    // parity: `NbtPredicate.getEntityTagData` is `saveWithoutId`, the save codec minus the type.
+    // parity: `NbtPredicate.getEntityTagData` is `saveWithoutId`.
     NbtCompound tag = entity::entityNbt::encode(entity);
     tag.remove("id");
     return tag;
@@ -140,8 +139,6 @@ void CommandStorage::save() const {
     for (const auto& [id, value] : compounds_) {
         root.set(id.toString(), NbtTag::ofCompound(value));
     }
-    // The directory may not exist yet: the server writes this beside `worlds/`, which is created on
-    // demand, and a test points it inside `build/`.
     if (const std::size_t slash = path_.rfind('/'); slash != std::string::npos && slash > 0) {
         static_cast<void>(wire::io::fileIO::createDirectories(path_.substr(0, slash)));
     }
@@ -206,7 +203,6 @@ std::optional<CommandSyntaxError> writeEntityData(const DataHolderRef::Entity& h
     if (loaded == nullptr) {
         return CommandSyntaxError{.component = wire::text::Component::translatable("commands.data.entity.invalid")};
     }
-    // What one entity's save does not carry: its links to others and a dragon's fight.
     loaded->vehicleId = mob.vehicleId;
     loaded->passengerIds = mob.passengerIds;
     loaded->leashHolderId = mob.leashHolderId;

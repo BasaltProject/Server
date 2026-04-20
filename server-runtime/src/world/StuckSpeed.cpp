@@ -11,11 +11,10 @@ namespace {
 /// parity: `checkInsideBlocks` deflates the box at the target before asking who it touches.
 constexpr double kSlack = 1.0e-5;
 
-/// parity: `WebBlock.entityInside`. The weaving effect widens it, and nothing here has effects.
+/// parity: `WebBlock.entityInside`.
 constexpr Multiplier kCobweb{.x = 0.25, .y = 0.05, .z = 0.25};
 
-/// parity: `PowderSnowBlock.entityInside`, which catches anything that is **not** alive with no
-/// further questions. Its vertical share is over one, so a fall through it is a shove down.
+/// parity: `PowderSnowBlock.entityInside`.
 constexpr Multiplier kPowderSnow{.x = 0.9, .y = 1.5, .z = 0.9};
 
 [[nodiscard]] std::optional<Multiplier> multiplierOf(std::string_view path) {
@@ -52,8 +51,7 @@ std::optional<Multiplier> caughtBy(const entity::entityCollision::BlockAt& block
                 if (block == nullptr) {
                     continue;
                 }
-                // parity: every block the walk visits calls `makeStuckInBlock` in turn, so the last
-                // one wins. Two of these in one box is a corner nobody builds.
+                // parity: every block the walk visits calls `makeStuckInBlock` in turn, so the last.
                 if (const std::optional<Multiplier> caught = multiplierOf(block->path()); caught.has_value()) {
                     found = caught;
                 }

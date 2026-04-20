@@ -24,7 +24,6 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kBlockNeighbours{
 
 enum class PlacementPhase : std::uint8_t { Root, Log, Leaf, Decoration };
 
-/// Watches the tree's own writes so the decorators can work off what actually landed.
 class TreePlacementRecorder {
 public:
     explicit TreePlacementRecorder(const Chunk& chunk) : chunk_(&chunk) {}
@@ -93,9 +92,7 @@ private:
     return maxTreeHeight;
 }
 
-/// parity: `LeavesBlock.getOptionalDistanceAt` answers 0 for anything in `PREVENTS_NEARBY_LEAF_DECAY`,
-/// a tag that is exactly `#minecraft:logs`. That is how the pass walks into a trunk this tree never
-/// placed and starts counting again from it.
+/// parity: `LeavesBlock.getOptionalDistanceAt` answers 0 for `PREVENTS_NEARBY_LEAF_DECAY` (`#minecraft:logs`).
 [[nodiscard]] std::optional<std::int32_t> optionalDistanceAt(std::int32_t stateId) {
     if (treeBlockRules::isLogState(stateId)) {
         return 0;
@@ -103,7 +100,7 @@ private:
     return registry::blockStateFamilies::leafDistance(stateId);
 }
 
-/// parity: `TreeFeature.updateLeaves`, distance buckets 0 through 6 and six-direction propagation.
+/// parity: `TreeFeature.updateLeaves`.
 void updateLeaves(Chunk& chunk, const TreeDecoratorContext& context) {
     std::vector<BlockPos> boundsPositions = context.roots;
     boundsPositions.insert(boundsPositions.end(), context.logs.begin(), context.logs.end());
@@ -130,8 +127,7 @@ void updateLeaves(Chunk& chunk, const TreeDecoratorContext& context) {
         return pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY && pos.z >= minZ && pos.z <= maxZ;
     };
 
-    // parity: the leaf buckets are `Sets.newHashSet()`, so which of two paths reaches a leaf
-    // second, and therefore which distance it keeps, is decided by that hash order.
+    // parity: leaf buckets are `Sets.newHashSet()`.
     std::array<JavaHashSetOrder<BlockPos>, kMaxLeafDistance> toCheck;
     for (const BlockPos& log : context.logs) {
         toCheck[0].add(log);
@@ -152,10 +148,7 @@ void updateLeaves(Chunk& chunk, const TreeDecoratorContext& context) {
             continue;
         }
 
-        // parity: the jar sets the distance and *then* fills the shape, and it never skips a position
-        // that is already filled. A leaf reached at two distances is therefore written twice, and the
-        // second write wins even when it is the larger number. That is the jar's bug, and skipping
-        // the second write moves leaves.
+        // parity: the jar sets the distance then fills the shape, so a twice-reached leaf is rewritten, last wins.
         if (smallestDistance != 0) {
             const std::int32_t currentStateId = chunk.decorationBlockStateId(pos.x, pos.y, pos.z);
             const std::optional<std::int32_t> updatedStateId =
@@ -213,8 +206,7 @@ bool placeConfigured(Chunk& chunk, random::RandomSource& random, std::int32_t or
     const std::int32_t foliageHeight = config.foliagePlacer.foliageHeight(random, treeHeight);
     const std::int32_t trunkHeight = treeHeight - foliageHeight;
     const std::int32_t leafRadius = config.foliagePlacer.foliageRadius(random, trunkHeight);
-    // parity: the trunk origin rises above the origin when a root placer is present, sampled after
-    // the foliage radius exactly like the real jar; both origins feed the bounds check.
+    // parity: the trunk origin rises with a root placer, sampled after the foliage radius; both feed the bounds check.
     const std::int32_t trunkOriginY =
         config.rootPlacer.has_value() ? config.rootPlacer->trunkOriginY(random, originY) : originY;
     const ChunkHeight bounds = chunk.verticalBounds();

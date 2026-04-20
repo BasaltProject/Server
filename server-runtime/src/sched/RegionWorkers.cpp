@@ -30,9 +30,7 @@ void RegionWorkers::workerLoop() {
         const std::function<void(Region&)>* work = nullptr;
         const FailureHandler* onFailure = nullptr;
         {
-            // Everything about a turn is read under the same lock that writes it: a worker that
-            // read the list without it kept a turn that was already over and ticked a region a
-            // second time, which looked like a corrupted world rather than like a scheduling bug.
+            // A turn is read under the lock that writes it: unlocked reads kept finished turns and ticked twice.
             std::unique_lock<std::mutex> lock{mutex_};
             wake_.wait(lock, [this] { return !running_ || claimed_ < turn_.size(); });
             if (!running_) {
@@ -42,8 +40,7 @@ void RegionWorkers::workerLoop() {
             work = work_;
             onFailure = onFailure_;
         }
-        // Claiming it again from the same worker would be the same store, and this is once a tick
-        // per region: worth the load to skip it.
+        // Claiming again from the same worker would be the same store; once per region per tick, so skip it.
         if (!region->owner().isCurrent()) {
             region->owner().bindToCurrentThread();
         }
@@ -85,8 +82,7 @@ void RegionWorkers::runTurn(const std::vector<Region*>& regions, const FailureHa
         onFailure_ = nullptr;
     }
     if (timedOut) {
-        // Never expected: a region that does not finish holds up every other one, so it is worth a
-        // line saying how many did rather than a tick that is silently thirty seconds long.
+        // Never expected: a region that does not finish holds up all others, so say how many did.
         onFailure(std::runtime_error{"A turn timed out: " + std::to_string(finished) + " of " +
                                      std::to_string(regions.size()) + " region(s) finished"});
     }

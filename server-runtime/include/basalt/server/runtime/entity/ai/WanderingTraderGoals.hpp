@@ -8,7 +8,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `WanderingTrader.WanderToPositionGoal`, driven by the meeting point its own spawner picks.
+/// parity: `WanderingTrader.WanderToPositionGoal`.
 class WanderingTraderWanderGoal final : public Goal {
 public:
     explicit WanderingTraderWanderGoal(double stopDistance = 2.0, double speedModifier = 0.35);

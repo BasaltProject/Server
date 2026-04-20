@@ -23,7 +23,7 @@ void CombatHandler::spinAttack(PlayerSession& session, double toX, double toY, d
     if (world == nullptr || session.autoSpinTicks <= 0) {
         return;
     }
-    // parity: `LivingEntity.checkAutoSpinAttack` over the box swept from where it was to where it is,
+    // parity: `LivingEntity.checkAutoSpinAttack` over the box swept from.
     // the spin attack pose being six tenths of a block every way.
     constexpr double kHalf = 0.3;
     constexpr double kHeight = 0.6;

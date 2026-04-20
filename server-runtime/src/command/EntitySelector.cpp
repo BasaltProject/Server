@@ -211,8 +211,7 @@ bool EntitySelector::withinBox(const CommandTarget& target, double x, double y, 
     if (!parts_.deltaX.has_value() && !parts_.deltaY.has_value() && !parts_.deltaZ.has_value()) {
         return true;
     }
-    // parity: `AABB.intersects`, with the box built by `EntitySelectorParser.createAabb` and moved
-    // to the anchor.
+    // parity: `AABB.intersects`.
     const double dx = parts_.deltaX.value_or(0.0);
     const double dy = parts_.deltaY.value_or(0.0);
     const double dz = parts_.deltaZ.value_or(0.0);
@@ -222,8 +221,6 @@ bool EntitySelector::withinBox(const CommandTarget& target, double x, double y, 
     const double maxX = x + (dx < 0.0 ? 0.0 : dx) + 1.0;
     const double maxY = y + (dy < 0.0 ? 0.0 : dy) + 1.0;
     const double maxZ = z + (dz < 0.0 ? 0.0 : dz) + 1.0;
-    // A target this build has no dimensions for is a point, and vanilla's strict intersection test
-    // can never contain one, so it is asked the containment question instead.
     if (target.width() == 0.0 && target.height() == 0.0) {
         return target.x() >= minX && target.x() <= maxX && target.y() >= minY && target.y() <= maxY &&
                target.z() >= minZ && target.z() <= maxZ;

@@ -15,7 +15,6 @@ namespace {
 
 [[nodiscard]] bool aboveGround(const MonumentRoom& room) { return room.index() / 25 > 0; }
 
-/// Design 0: a lantern set into each of the four corners, and a lintel over every closed side.
 void simpleCorners(const MonumentBrush& brush, const MonumentRoom& room) {
     const std::int32_t light = monumentPalette::baseLight();
     const std::int32_t gray = monumentPalette::baseGray();
@@ -70,7 +69,6 @@ void simpleCorners(const MonumentBrush& brush, const MonumentRoom& room) {
     }
 }
 
-/// Design 1: four free-standing lantern columns, and a solid wall wherever there is no doorway.
 void simpleColumns(const MonumentBrush& brush, const MonumentRoom& room) {
     const std::int32_t light = monumentPalette::baseLight();
     const std::int32_t gray = monumentPalette::baseGray();
@@ -121,7 +119,6 @@ void simpleColumns(const MonumentBrush& brush, const MonumentRoom& room) {
     }
 }
 
-/// Design 2 and the shell of the top room: three courses, the middle one dark.
 void bandedShell(const MonumentBrush& brush) {
     const std::int32_t light = monumentPalette::baseLight();
     const std::int32_t black = monumentPalette::baseBlack();

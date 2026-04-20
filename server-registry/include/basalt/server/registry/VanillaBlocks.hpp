@@ -6,8 +6,6 @@
 #include <utility>
 
 namespace basalt::server::registry {
-
-/// One row of the generated hardness table.
 struct BlockHardnessEntry {
     std::string_view path;
     float destroyTime;
@@ -15,28 +13,11 @@ struct BlockHardnessEntry {
     float explosionResistance;
 };
 
-/// Every block's default state id, straight from the real 26.3 server jar's own data generator
-/// (`net.minecraft.data.Main --reports`, the `blocks.json` report): authoritative, not decompiled
-/// or guessed.
 [[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> defaultBlockStatesTable();
 
-/// Every block's id in the `minecraft:block` registry, which is *not* its block state id.
-///
-/// Both exist and they are different numbers: chunk data and block updates carry state ids, while
-/// anything naming a block itself (a tag's members, most notably) carries these. Sending one where
-/// the other belongs is silently wrong rather than an error, which is why they are two tables.
 [[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> blockIdsTable();
 
-/// Every block with more than one state: `<first state id>|<block>|<property>=<values>;...`.
-///
-/// The ids of a block run through its properties as nested loops, the first property here being
-/// the outermost, so a state id and a set of property values convert into each other with
-/// arithmetic instead of a table of thirty thousand entries.
 [[nodiscard]] std::span<const std::string_view> blockStatePropertiesTable();
 
-/// Every block's destroy time and whether it needs the correct tool to drop anything. The data
-/// generator does not report these, so they come from a harness run against the jar's own classes.
-/// A destroy time of -1 means unbreakable (bedrock, portal frames).
 [[nodiscard]] std::span<const BlockHardnessEntry> blockHardnessTable();
-
 } // namespace basalt::server::registry

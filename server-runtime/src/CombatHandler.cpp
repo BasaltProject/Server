@@ -51,8 +51,7 @@ using wire::text::Component;
 /// parity: `Entity.getEyeHeight` and the lift a dismount gives.
 constexpr double kDismountLift = 0.5;
 
-/// parity: `LivingEntity.getEffectiveGravity`, the least fall speed that bounces, and
-/// `getBlockPosBelowThatAffectsMyMovement`'s depth.
+/// parity: `LivingEntity.getEffectiveGravity`.
 constexpr double kBounceGravity = 0.08;
 constexpr double kBounceProbeDepth = 0.500001;
 
@@ -104,8 +103,7 @@ void CombatHandler::dismount(PlayerSession& session) {
                                                 [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         }
     }
-    // The client puts itself back on the ground, but the server's own copy of where they are came
-    // from the cart, so it is told the same thing rather than left a tick behind.
+    // The server's copy of the position came from the cart, so it is told the same rather than left a tick behind.
     if (spot.has_value()) {
         owner_->teleportTo((*spot)[0], (*spot)[1], (*spot)[2], session.yaw, session.pitch);
         return;
@@ -127,7 +125,7 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
     if (cancelled) {
         resetFall(session);
         session.fallDistance = 0.0;
-        // parity: `handleMovePlayer` lets go of the impulse in liquid, on a ladder or as a spectator.
+        // parity: `handleMovePlayer` lets go of the impulse in liquid.
         player::impulse::tryReset(session);
         return;
     }
@@ -137,8 +135,7 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
     // parity: `trackStartFallingPosition`, where the player is once any fall is counted.
     if (fallDistance > 0.0 && !fallStart.has_value()) {
         fallStart = std::array<double, 3>{session.x, y, session.z};
-        // parity: `trackStartFallingPosition`'s `FALL_AFTER_EXPLOSION`, a fall starting at or above
-        // where the last blast caught them.
+        // parity: `trackStartFallingPosition`.
         world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
         world::LoadedWorld* world = owner_->currentWorld();
         if (session.explosionImpact.has_value() && (*session.explosionImpact)[1] <= y && triggers != nullptr &&
@@ -156,10 +153,7 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
         session.explosionCause.reset();
     }
     if (onGround && !session.onGround) {
-        // parity: `Entity.checkFallDamage` raises `HIT_GROUND` at the landing whenever anything was
-        // fallen, before the damage and whatever the fall-damage rule says. A landing that this build
-        // cancelled the fall for (flying, creative, water, a ladder) has nothing counted and so makes
-        // no event, where the jar counts the distance for everyone and only spares the damage.
+        // parity: `Entity.checkFallDamage`.
         if (fallDistance > 0.0) {
             if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
                 world::vibrations::emit(
@@ -191,8 +185,7 @@ void CombatHandler::resetFall(const PlayerSession& session) {
 }
 
 void CombatHandler::bounceOn(PlayerSession& session, world::LoadedWorld& world, double landingY) {
-    // parity: `restituteMovementAfterCollisions` bounces only a fall faster than gravity, never a
-    // sneaking one; of what bounces, only `ShelfMushroomBlock.bounceOn` makes a sound.
+    // parity: `restituteMovementAfterCollisions`.
     if (session.sneaking || fallDistance <= kBounceGravity) {
         return;
     }
@@ -219,7 +212,7 @@ void CombatHandler::applyFallDamage(PlayerSession& session, const double landing
     if (world != nullptr && !world->gameRules().get(world::gameRules::kFallDamage)) {
         return;
     }
-    // parity: `Entity.checkFallDamage` hands the fall to the block under the feet, `Block.fallOn`.
+    // parity: `Entity.checkFallDamage` hands the fall to the block under the feet.
     const std::optional<std::int32_t> under =
         world == nullptr ? std::nullopt
                          : world->state().blockState(
@@ -242,7 +235,6 @@ void CombatHandler::applyFallDamage(PlayerSession& session, const double landing
     owner_->hurt(static_cast<float>(damage), "fall", world::damageTypes::kFall);
 }
 
-/// The context the edition-agnostic damage needs, built from what this connection knows.
 player::DamageContext CombatHandler::damageContext() const {
     player::DamageContext context;
     context.registry = owner_->options().playerRegistry;
@@ -305,9 +297,7 @@ void CombatHandler::die(std::string_view deathMessageId, const std::optional<Com
     if (session == nullptr) {
         return;
     }
-    // The death itself is the same on every edition, so it lives where a player who never had one
-    // of these connections can reach it. What is left here is only which plugins to tell and where
-    // to write the line.
+    // The death is shared across editions; this only picks which plugins to tell and where to write the line.
     player::DeathContext context;
     context.registry = owner_->options().playerRegistry;
     context.logger = owner_->logger();

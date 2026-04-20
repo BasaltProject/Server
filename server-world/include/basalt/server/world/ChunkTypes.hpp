@@ -10,28 +10,18 @@
 
 namespace basalt::server::world {
 
-/// How a generated write decides whether it is still allowed to land.
-///
-/// Decoration is placed after the terrain it grew from, and by then a neighbouring chunk may have
-/// written over the spot. Each policy is the guard vanilla's own feature uses.
 enum class GeneratedBlockWritePolicy : std::uint8_t {
     Exact,
     Tree,
-    /// An ore or stone blob, guarded by its own target predicate rather than by one exact block.
     OreBaseStone,
     OreStone,
     OreDeepslate,
-    /// An amethyst geode, which replaces anything outside `#minecraft:features_cannot_replace`.
     Geode,
 };
 
 /// How far a chunk got through generation. parity: `ChunkStatus`, reduced to the three stages a chunk
-/// is kept at: its terrain done, decorated (`features` to `spawn`), and full.
 enum class ChunkStage : std::uint8_t { Full, Terrain, Decorated };
 
-/// One block entity of a chunk: where it sits, what kind it is, and the NBT it carries. The type
-/// is the *block entity type*; a block id is accepted and translated on construction (a copper
-/// chest's type is not its block's name, and without a protocol id it never reaches the client).
 class ChunkBlockEntity {
 public:
     ChunkBlockEntity(std::int32_t localX, std::int32_t y, std::int32_t localZ, const wire::common::Identifier& type,
@@ -47,10 +37,8 @@ public:
 
     [[nodiscard]] const wire::nbt::NbtCompound& data() const noexcept { return data_; }
 
-    /// The tag to write through, for the container blocks that change their own contents in place.
     [[nodiscard]] wire::nbt::NbtCompound& data() noexcept { return data_; }
 
-    /// The same block entity carrying different NBT, which is what a `/data` write leaves behind.
     [[nodiscard]] ChunkBlockEntity withData(wire::nbt::NbtCompound data) const;
 
     friend bool operator==(const ChunkBlockEntity&, const ChunkBlockEntity&) = default;
@@ -63,7 +51,7 @@ private:
     wire::nbt::NbtCompound data_;
 };
 
-/// parity: `SavedTick`, owned by one chunk; x and z are local until it is written to disk.
+/// parity: `SavedTick`.
 struct ChunkScheduledTick {
     wire::common::Identifier type;
     std::int32_t localX = 0;
@@ -72,18 +60,13 @@ struct ChunkScheduledTick {
     std::int32_t delay = 0;
     /// parity: `TickPriority`, which runs from -3 to 3.
     std::int32_t priority = 0;
-    /// parity: `ScheduledTick.subTickOrder`, the count of everything booked before this one. It
-    /// breaks ties between two turns of the same priority, and it counts across the whole world, so
-    /// it cannot live in the chunk. Not written to disk: vanilla does not write it either.
+    /// parity: `ScheduledTick.subTickOrder`.
     std::int64_t order = 0;
 
     friend bool operator==(const ChunkScheduledTick&, const ChunkScheduledTick&) = default;
 };
 
-/// Entity emitted by world generation and waiting for the runtime entity layer to materialize it.
 struct ChunkGeneratedEntity {
-    /// The default is never a real entity: every one of these is built field by field, and a type
-    /// that has to be given makes an unset one impossible to store by accident.
     wire::common::Identifier type{"minecraft", "marker"};
     double x = 0.0;
     double y = 0.0;
@@ -96,8 +79,6 @@ struct ChunkGeneratedEntity {
     friend bool operator==(const ChunkGeneratedEntity&, const ChunkGeneratedEntity&) = default;
 };
 
-/// A generated decoration write whose target lies outside the chunk that produced it.
-/// A block a structure placed whose shape depends on its neighbours, so it has to be recomputed once
 /// they exist. parity: `StructurePiece.placeBlock` marks these with `markPosForPostProcessing`.
 struct ChunkShapeUpdate {
     std::int32_t x = 0;
@@ -142,8 +123,6 @@ struct ChunkGeneratedBlockTick {
     friend bool operator==(const ChunkGeneratedBlockTick&, const ChunkGeneratedBlockTick&) = default;
 };
 
-/// Whether these coordinates sit inside a chunk of those bounds. A block entity or a tick outside it
-/// is a caller bug, and the chunk refuses it rather than storing something it cannot write back.
 [[nodiscard]] bool isInsideChunk(std::int32_t localX, std::int32_t y, std::int32_t localZ, ChunkHeight bounds);
 
 } // namespace basalt::server::world

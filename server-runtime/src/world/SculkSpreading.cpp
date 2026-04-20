@@ -274,7 +274,7 @@ public:
         return spreadAll(state, pos, false) > 0;
     }
 
-    /// parity: `SculkVeinBlock.onDischarged`, faces against sculk given up and an empty vein gone.
+    /// parity: `SculkVeinBlock.onDischarged`.
     void dischargeVein(const Pos& pos, std::int32_t state) {
         if (pathOf(state) != "sculk_vein") {
             return;
@@ -327,7 +327,7 @@ public:
         return false;
     }
 
-    /// parity: `SculkBlock.canPlaceGrowth`: open above, and at most two inhibitors in the box.
+    /// parity: `SculkBlock.canPlaceGrowth`.
     [[nodiscard]] bool canPlaceGrowth(const Pos& pos) const {
         const std::int32_t above = at(offset(pos, 1));
         if (!registry::blocks::isAir(above) && pathOf(above) != "water") {
@@ -594,7 +594,6 @@ void update(WorldState& world, std::vector<Cursor>& cursors, const Pos& origin, 
     }
     Spreader spreader{world, random, tagged, steps};
     std::vector<Cursor> processed;
-    // Where each surviving cursor stands, the one that merges there, and the charge summed per square.
     std::vector<std::pair<Pos, std::size_t>> mergeable;
     std::vector<std::pair<Pos, std::int32_t>> charges;
     for (Cursor cursor : cursors) {

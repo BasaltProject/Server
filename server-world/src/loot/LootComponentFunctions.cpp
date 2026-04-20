@@ -54,7 +54,7 @@ constexpr std::int32_t kMaxWritablePages = 100;
     return elements;
 }
 
-/// parity: `NbtOps.createList`, which packs a list of only bytes, ints or longs into an array.
+/// parity: `NbtOps.createList`.
 [[nodiscard]] NbtTag listTag(const std::vector<NbtTag>& elements) {
     if (!elements.empty() && std::ranges::all_of(elements, [](const NbtTag& e) { return e.type() == NbtType::Int; })) {
         std::vector<std::int32_t> ints;
@@ -129,8 +129,6 @@ void merge(NbtCompound& into, const NbtCompound& from) {
     return facts->has_value() ? &**facts : nullptr;
 }
 
-/// The modifiers an item carries before any patch. parity: the `attribute_modifiers` its own
-/// component file writes, which `update` starts from: a weapon's hand and a piece of armour's slot.
 [[nodiscard]] std::vector<NbtTag> prototypeModifiers(const Identifier& item) {
     std::vector<NbtTag> modifiers;
     const auto add = [&modifiers](std::string_view type, std::string_view id, double amount, std::string_view slot) {
@@ -396,7 +394,7 @@ ItemStack applyComponentEdit(const ComponentEdit& edit, ItemStack stack, random:
     }
     case ComponentEdit::Op::SetCustomModelData:
         return setCustomModelData(edit, std::move(stack), random, context);
-    // parity: `SetLoreFunction.updateLore`; an empty lore is every item's own, so the patch drops it.
+    // parity: `SetLoreFunction.updateLore`.
     case ComponentEdit::Op::SetLore: {
         const std::vector<NbtTag> lines =
             edit.operation.apply(elementsOf(stack.components.find(kLore)), edit.values, kMaxLore);

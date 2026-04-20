@@ -113,7 +113,6 @@ TEST_CASE("an angle wraps rather than being refused") {
     // parity: `AngleArgument` wraps into -180..180, so 540 is 180 which is -180.
     CHECK(fixture.parse<float>(*command::angleArgument(), "540") == doctest::Approx(-180.0F));
     CHECK(fixture.parse<float>(*command::angleArgument(), "-90") == doctest::Approx(-90.0F));
-    // A bare `~` is the angle it already had, which is zero to this type.
     CHECK(fixture.parse<float>(*command::angleArgument(), "~") == doctest::Approx(0.0F));
     CHECK(fixture.parse<float>(*command::angleArgument(), "~45") == doctest::Approx(45.0F));
     CHECK(fixture.refuses(*command::angleArgument(), ""));
@@ -150,7 +149,6 @@ TEST_CASE("a time below what the command allows is refused") {
     CHECK(fixture.parse<std::int32_t>(*atLeastOne, "1") == 1);
     CHECK(fixture.refuses(*atLeastOne, "0"));
 
-    // `wire()` answers by value, so the parser is kept alive rather than pointed into.
     const ArgumentParser parser = atLeastOne->wire();
     const auto* properties = parser.as<ArgumentParser::TimeProperties>();
     REQUIRE(properties != nullptr);
@@ -197,8 +195,6 @@ TEST_CASE("a world is found by name and refused when it is not loaded") {
     REQUIRE(parsed->as<LoadedWorld*>() != nullptr);
     CHECK(*parsed->as<LoadedWorld*>() == &world);
 
-    // Its level key names it too, and it carries a colon: a reader that stops there would take
-    // "minecraft" for the whole argument and refuse a world that is right in front of it.
     StringReader byKey{world.levelKey()};
     const Parsed<ArgumentValue> keyed = command::worldArgument()->parse(byKey, console, environment);
     REQUIRE(keyed.has_value());
@@ -207,7 +203,6 @@ TEST_CASE("a world is found by name and refused when it is not loaded") {
 
     StringReader missing{"nowhere"};
     CHECK_FALSE(command::worldArgument()->parse(missing, console, environment).has_value());
-    // The cursor is back at the name so the marker points at it.
     CHECK(missing.cursor() == 0);
 }
 

@@ -20,8 +20,7 @@ constexpr std::int32_t kUndergroundStructuresStep = 3;
 constexpr std::int32_t kReachChunks = 6;
 constexpr std::size_t kCacheCapacity = 64;
 
-/// Second and third of the five structures of `underground_structures`, in registry order.
-/// parity: the two are separate structures in the registry, and a start says which one it is.
+/// parity: separate registry structures, and a start says which one it is.
 constexpr std::string_view kNormalName = "mineshaft";
 constexpr std::string_view kMesaName = "mineshaft_mesa";
 
@@ -64,9 +63,7 @@ std::optional<structure::MineshaftType> MineshaftStructureGenerator::typeAt(std:
 
 bool MineshaftStructureGenerator::accepts(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
                                           structure::MineshaftType type) const {
-    // parity: the biome is read at the structure's own start, not at sea level, and vanilla builds
-    // that position out of the chunk's middle x but its minimum z. A shaft that ends up in a cave
-    // biome is kept on that biome's tag even when the surface above it is ocean.
+    // parity: the biome is read at the start (chunk middle x, minimum z), not at sea level.
     const std::shared_ptr<const structure::mineshaftLayout::Assembly> assembly = assemblyOf(seed, chunkX, chunkZ, type);
     const BiomeAt& biomeAt = startBiomeAt_ ? startBiomeAt_ : biomeAt_;
     return allows(type, biomeAt(chunkX * 16 + 8, assembly->stubY, chunkZ * 16));
@@ -99,18 +96,13 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
     const structure::StructureBoundingBox clip{chunk.chunkX() * 16,     kOverworldHeight.minY(),
                                                chunk.chunkZ() * 16,     chunk.chunkX() * 16 + 15,
                                                kOverworldHeight.maxY(), chunk.chunkZ() * 16 + 15};
-    // parity: the two mineshafts are separate entries of `underground_structures`, so each gets its
-    // own feature seed and one random shared by every start of that entry in this chunk. Seeding per
-    // start, or off `setLargeFeatureSeed`, puts every roll inside the shaft (rails, cobwebs,
-    // torches) on a stream vanilla never uses.
+    // parity: each mineshaft entry has its own feature seed and one random shared by all its starts in the chunk.
     for (const auto& [index, wanted] : kEntries) {
         random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
         const std::int64_t decorationSeed =
             random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
         random::setFeatureSeed(random, decorationSeed, index, kUndergroundStructuresStep);
-        // parity: `StructureManager.startsForStructure` walks the chunk's references, a `LongOpenHashSet`
-        // filled x outermost with every start whose box reaches the chunk. Its hash order decides which
-        // shaft draws from the shared random first.
+        // parity: `StructureManager.startsForStructure` iterates a `LongOpenHashSet`.
         std::vector<std::pair<std::int32_t, std::int32_t>> references;
         for (std::int32_t startX = chunk.chunkX() - kReachChunks; startX <= chunk.chunkX() + kReachChunks; ++startX) {
             for (std::int32_t startZ = chunk.chunkZ() - kReachChunks; startZ <= chunk.chunkZ() + kReachChunks;
@@ -151,17 +143,11 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
                     reachesHere = true;
                     structure::mineshaftFill::place(piece, blocks, chunk, clip, random, biomeAt_);
                 }
-                // The blocks alone are not the whole structure: without the start the chunk cannot
-                // say what it holds, so `/locate` never finds it and nothing knows a position is
-                // inside one. parity: the start belongs to the chunk the shaft begins in.
+                // parity: the start belongs to the chunk the shaft begins in.
                 if (reachesHere) {
                     const std::string_view name = *type == structure::MineshaftType::Mesa ? kMesaName : kNormalName;
                     if (std::optional<structure::StructureStartRecord> start =
                             structure::StructureStartRecord::of(std::string{name}, startX, startZ, boxes)) {
-                        // The full box is the whole shaft, but the pieces kept here are only the ones
-                        // this chunk holds: every question a chunk is asked is about a position inside
-                        // it, and a piece that misses the chunk cannot answer one. A shaft crosses
-                        // dozens of chunks and carries some hundred and fifty pieces into each.
                         std::erase_if(start->pieces, [&clip](const structure::StructureBoundingBox& piece) {
                             return !piece.intersects(clip);
                         });
@@ -192,8 +178,7 @@ void MineshaftStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::
     const structure::StructureBoundingBox clip{chunk.chunkX() * 16,     kOverworldHeight.minY(),
                                                chunk.chunkZ() * 16,     chunk.chunkX() * 16 + 15,
                                                kOverworldHeight.maxY(), chunk.chunkZ() * 16 + 15};
-    // parity: the placed shaft draws from the same per-chunk, per-entry stream worldgen gives a
-    // chunk that holds it, so its content matches a naturally generated one.
+    // parity: a placed shaft draws from the same per-chunk, per-entry stream as worldgen.
     std::int32_t index = 1;
     for (const auto& [entryIndex, entryType] : kEntries) {
         if (entryType == type) {

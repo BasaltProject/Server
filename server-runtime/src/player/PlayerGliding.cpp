@@ -12,12 +12,11 @@
 namespace basalt::server::runtime::player::gliding {
 namespace {
 
-/// Where the chest piece is worn, head first from the armour start.
 constexpr std::int32_t kChestSlot = PlayerInventory::kArmourStart + 1;
 /// parity: `updateFallFlying`: a check every ten ticks and a point of wear every twenty.
 constexpr std::int32_t kCheckInterval = 10;
 
-/// parity: `LivingEntity.canGlideUsing`: a glider worn where it is worn, and not one hit from breaking.
+/// parity: `LivingEntity.canGlideUsing`.
 [[nodiscard]] bool gliderIn(const std::optional<storage::StoredItemStack>& stack) {
     if (!stack.has_value()) {
         return false;
@@ -45,8 +44,7 @@ bool canGlide(const PlayerSession& player) {
 }
 
 void startFallFlying(PlayerSession& player) {
-    // parity: `isInLiquid` is the client's to know here; a glide started in water ends on its next
-    // turn when the client lands it.
+    // parity: `isInLiquid`.
     player.fallFlying = !player.fallFlying && canGlide(player);
 }
 

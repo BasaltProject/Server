@@ -8,13 +8,11 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// Exact step-9 placement for the three Overworld firefly-bush patches.
 namespace fireflyBushPatchDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
               ExternalStateReader externalBlockState = nullptr, BlockWriteObserver observer = nullptr);
 
-/// One named patch on its own, for `/place feature`.
 void decorateFeature(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
                      std::string_view name, ExternalStateReader externalBlockState = nullptr,
                      BlockWriteObserver observer = nullptr);

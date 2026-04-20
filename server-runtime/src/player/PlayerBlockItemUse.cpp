@@ -54,7 +54,6 @@ constexpr std::int32_t kGrowthSparkles = 15;
         }};
 }
 
-/// One off the stack in hand, and the slot said out loud. Creative spends nothing.
 void spendOne(const BreakContext& context, PlayerSession& player, const std::int32_t heldSlot,
               const storage::StoredItemStack& held) {
     if (player.gamemode == Gamemode::Creative) {
@@ -68,7 +67,6 @@ void spendOne(const BreakContext& context, PlayerSession& player, const std::int
     }
 }
 
-/// A block written by hand: the state, the particles it draws, the neighbours and the sensor.
 void reshapeBlock(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
                   const std::int32_t z, const std::int32_t stateId, const std::int32_t effect) {
     world.state().setBlockState(x, y, z, stateId);
@@ -79,18 +77,17 @@ void reshapeBlock(const BreakContext& context, world::LoadedWorld& world, const 
     if (context.blocks != nullptr) {
         context.blocks->announceBlock(playersIn(context, world.name()), change);
     }
-    // parity: `setBlock(pos, state, 11)`, which does tell the neighbours, and `GameEvent.BLOCK_CHANGE`.
+    // parity: `setBlock(pos, state, 11)`.
     notifyAround(context, world, x, y, z, std::nullopt);
     heardBySculk(context, world, "block_change", x, y, z);
 }
 
-/// The item that id names, or nothing when it is not one this build knows how to read.
 [[nodiscard]] std::optional<wire::common::Identifier> parsedOrNothing(const std::string& id) {
     const auto parsed = wire::common::Identifier::parse(id);
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// parity: `Block.popResource`, which scatters what it pops a quarter of a block either way.
+/// parity: `Block.popResource`.
 constexpr double kPopJitter = 0.25;
 
 [[nodiscard]] double popJitter(const BreakContext& context) {
@@ -126,7 +123,7 @@ void dropTransformLoot(const BreakContext& context, world::LoadedWorld& world, c
     };
     for (const server::world::loot::ItemStack& stack : rolled->generate(random, 0.0F, std::nullopt, loot)) {
         constexpr double kHalf = 0.125;
-        // parity: `Block.popResource`, from the middle, with the jitter a broken block drops with.
+        // parity: `Block.popResource`.
         if (!fromFace) {
             spawnDroppedItem(context, world, stack.item, stack.count, x + 0.5 + popJitter(context),
                              y + 0.5 + popJitter(context) - kHalf, z + 0.5 + popJitter(context), between(-0.1, 0.1),
@@ -144,13 +141,11 @@ void dropTransformLoot(const BreakContext& context, world::LoadedWorld& world, c
     }
 }
 
-/// The comparators beside a block whose reading just changed.
 void notifyComparators(world::LoadedWorld& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
     world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z,
                                                          world::comparatorReading::of(world.state()));
 }
 
-/// One point off whatever is in hand, and the slot said out loud when it changed.
 void wearOne(const BreakContext& context, PlayerSession& player, const std::int32_t heldSlot,
              const storage::StoredItemStack& held) {
     random::RandomSource wear = random::RandomSource::legacy(seedOf(context));
@@ -181,8 +176,7 @@ bool useBoneMealFor(const BreakContext& context, PlayerSession& player, world::L
                     const std::int32_t y, const std::int32_t z, const std::int32_t heldSlot,
                     const storage::StoredItemStack& held) {
     const std::optional<std::int32_t> existing = world.state().blockState(x, y, z);
-    // parity: `BoneMealItem.growCrop` spends the item on a valid target whether or not the growth
-    // roll did anything, and answers no on anything else so the click falls through.
+    // parity: `BoneMealItem.growCrop` spends the item on a valid target whether or not growth did anything.
     if (!existing.has_value() || !world::boneMeal::grows(*existing)) {
         return false;
     }
@@ -216,8 +210,7 @@ bool useHoneycombFor(const BreakContext& context, PlayerSession& player, world::
 void primeTntFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, const std::int32_t x,
                  const std::int32_t y, const std::int32_t z, const std::int32_t heldSlot,
                  const storage::StoredItemStack& held, const bool wears) {
-    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off, and then nothing at
-    // all happens: the block stays and the item is not spent.
+    // parity: `TntBlock.prime` answers false with `tnt_explodes` off.
     if (!world.gameRules().get(world::gameRules::kTntExplodes)) {
         return;
     }
@@ -246,8 +239,7 @@ void igniteFor(const BreakContext& context, PlayerSession& player, world::Loaded
     if (!existing.has_value() || !server::registry::blocks::isAir(*existing)) {
         return;
     }
-    // parity: `BaseFireBlock.onPlace` checks the frame, not the item, which is why any fire in the
-    // right place opens a portal and why the portal replaces the fire rather than burning next to it.
+    // parity: `BaseFireBlock.onPlace` checks the frame.
     if (const std::optional<server::world::portal::PortalShape> shape = world::netherPortals::light(world, x, y, z);
         shape.has_value()) {
         const std::int32_t portal = server::world::portal::PortalShape::portalState(shape->axis());
@@ -297,7 +289,7 @@ bool transformBlockFor(const BreakContext& context, PlayerSession& player, world
                        const std::int32_t x, const std::int32_t y, const std::int32_t z,
                        const wire::protocol::play::Direction face, const std::int32_t /*heldSlot*/,
                        const storage::StoredItemStack& held) {
-    // parity: `playerHasBlockingItemUseIntent`: a shield in the other hand wins unless sneaking.
+    // parity: `playerHasBlockingItemUseIntent`.
     const std::optional<storage::StoredItemStack>& offhand = player.inventory.at(PlayerInventory::kOffhandSlot);
     if (offhand.has_value() && offhand->id == "minecraft:shield" && !player.sneaking) {
         return false;
@@ -333,7 +325,7 @@ bool transformBlockFor(const BreakContext& context, PlayerSession& player, world
             : transform.particle == world::RealBlockTransformers::Particle::WaxOn  ? world::blockEffect::Effect::kWaxOn
                                                                                    : 0;
         reshapeBlock(context, world, x, y, z, *turned, effect);
-        // parity: `level.playSound(player, ...)`: everyone but the one who used it, who heard it already.
+        // parity: `level.playSound(player, ...)`.
         if (!transform.sound.empty() && context.blocks != nullptr) {
             std::vector<PlayerSession*> others = playersIn(context, world.name());
             std::erase(others, &player);
@@ -355,9 +347,7 @@ bool useComposterFor(const BreakContext& context, PlayerSession& player, world::
     if (!level.has_value() || context.blocks == nullptr) {
         return false;
     }
-    // parity: `useWithoutItem` on a ready composter hands out the bone meal whatever is in the hand,
-    // and `useItemOn` only looks at the item while there is room. Both end in a level change, which
-    // is what the comparator beside it reads.
+    // parity: `useWithoutItem`.
     if (*level == world::composters::kReady) {
         const std::optional<world::BlockChange> emptied = world::composters::empty(world.state(), x, y, z);
         if (!emptied.has_value()) {
@@ -385,8 +375,7 @@ bool useComposterFor(const BreakContext& context, PlayerSession& player, world::
     }
     random::RandomSource random = random::RandomSource::legacy(seedOf(context));
     const std::optional<world::BlockChange> filled = world::composters::addItem(world.state(), x, y, z, *item, random);
-    // parity: `levelEvent(1500, pos, changed ? 1 : 0)`, which is what makes the client play the
-    // success sound and the sparkles rather than the plain fill.
+    // parity: `levelEvent(1500, pos, changed ? 1 : 0)` makes the client play the success sound and sparkles.
     const std::vector<world::BlockEffect> fill{world::blockEffect::Effect{
         .type = world::blockEffect::Effect::kComposterFill, .data = filled.has_value() ? 1 : 0}};
     context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, filled.has_value() ? filled->stateId : 0,

@@ -46,7 +46,6 @@ namespace shriekers = world::sculkShriekers;
     }
 }
 
-/// Whether a mob wears something in an equipment slot, as saved.
 [[nodiscard]] bool wears(const entity::ServerEntity& mob, std::string_view slot) {
     const wire::nbt::NbtCompound* equipment =
         mob.sourceNbt.has_value() ? mob.sourceNbt->getCompound("equipment") : nullptr;
@@ -59,8 +58,7 @@ namespace shriekers = world::sculkShriekers;
     return (main.has_value() && main->id == item) || (off.has_value() && off->id == item);
 }
 
-/// parity: `getControllingPassenger` of the vehicles a player can steer; a plain mob only lets a
-/// mob steer it.
+/// parity: `getControllingPassenger`.
 [[nodiscard]] bool steers(const entity::ServerEntity& vehicle, const PlayerSession& rider) {
     const std::string_view path = vehicle.type().path();
     if (path.ends_with("_boat") || path.ends_with("_raft")) {
@@ -219,7 +217,7 @@ void ShriekerSystem::shriek(world::LoadedWorld& world, const PlayerSession& play
                                      .effects = {world::blockEffect::Effect{.type = shriekers::kShriekEvent}}});
     world.state().scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("sculk_shrieker"),
                                     shriekers::kShriekTicks);
-    // parity: `GameEvent.SHRIEK`, which no sensor weighs but a warden in earshot hears as the player.
+    // parity: `GameEvent.SHRIEK`.
     world::vibrations::emit(world.state(), "shriek", x + 0.5, y + 0.5, z + 0.5, world.gameTime(),
                             {.entity = player.uuid()});
 }

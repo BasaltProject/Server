@@ -29,8 +29,6 @@ namespace terrain = server::world::terrain;
 
 using server::world::Chunk;
 
-/// A world's own key when it is not the default one: its name, with anything a resource location
-/// cannot carry replaced.
 [[nodiscard]] std::string levelKeyOf(const config::WorldDeclaration& declaration, bool vanillaKey) {
     if (vanillaKey || declaration.isDefault) {
         return config::dimensionRegistryKey(declaration.dimension);
@@ -130,13 +128,8 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     weather_.thundering = metadata_.thundering;
     weather_.thunderTime = metadata_.thunderTime;
     weather_.clearWeatherTime = metadata_.clearWeatherTime;
-    // parity: `TicketType.FORCED` persists, so a `/forceload` is still in force after a restart.
-    // Without this the world came back with nothing forced, and with nobody connected that means
-    // nothing is simulated at all: a sculk sensor with a noise still on its way never delivered it.
+    // parity: `TicketType.FORCED` persists.
     forcedChunks_.insert(metadata_.forcedChunks.begin(), metadata_.forcedChunks.end());
-    // The same as the command does when it forces one: there now, not on the next visit. The
-    // simulated list names a forced chunk whether or not it is in memory, and an absent one ticks
-    // nothing.
     for (const std::int64_t key : forcedChunks_) {
         generationQueue_.request(ChunkGenerationQueue::unpackX(key), ChunkGenerationQueue::unpackZ(key), 0);
     }
@@ -153,8 +146,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     if (overworldRouter_ != nullptr && declaration_.dimension == config::WorldDimension::Overworld) {
         biomeSource_ = std::make_unique<terrain::OverworldBiomeSource>(*overworldRouter_, biomeZoomSeed_);
     }
-    // parity: `ServerLevel`'s constructor ends on `updateSkyBrightness()`, so a world that has not
-    // ticked yet already has a reading.
+    // parity: `ServerLevel`'s constructor ends on `updateSkyBrightness()`.
     updateSkyBrightness();
 }
 
@@ -201,17 +193,14 @@ void LoadedWorld::updateSkyBrightness() {
 }
 
 bool LoadedWorld::tickTime(random::RandomSource& random) {
-    // parity: `MinecraftServer.tickChildren` moves the day clock before any level ticks, so the sky
-    // reading sees this turn's clock. Only a dimension with a clock of its own advances it.
+    // parity: `MinecraftServer.tickChildren` moves the day clock before any level ticks.
     const bool advanced =
         config::hasClock(declaration_.dimension) && clock_.tick(gameRules_.get(gameRules::kAdvanceTime));
-    // parity: `ServerLevel.advanceWeatherCycle` runs only where the dimension can have weather, and
-    // the game rule stops the counters inside it, not the whole thing: the levels keep ramping.
+    // parity: `ServerLevel.advanceWeatherCycle` runs only.
     if (config::canHaveWeather(declaration_.dimension)) {
         weather_.tick(random, gameRules_.get(gameRules::kAdvanceWeather));
     }
-    // parity: `ServerLevel.tick` takes the reading after the weather and before `tickTime()`, so it
-    // is the clock of this turn and the weather of this turn both.
+    // parity: `ServerLevel.tick` takes the reading after the weather and before `tickTime()`.
     updateSkyBrightness();
     gameTime_++;
     return advanced;
@@ -264,8 +253,6 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
         default:
             break;
         }
-        // Nothing to generate a real Nether or End with, and a noise approximation of one would be
-        // a different world rather than a cheaper one.
         return server::world::noiseWorldGenerator::generate(chunkX, chunkZ);
     }();
     timings_.of("world.generate")
@@ -287,11 +274,8 @@ std::optional<Chunk> LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::
     }
     Chunk chunk = stored.has_value() ? std::move(*stored) : generateChunk(chunkX, chunkZ);
     chunk.setStage(server::world::ChunkStage::Full);
-    // What a chunk in memory says about its portals is always the truth; the index only has to
-    // remember the chunks that are not.
     portals_.scan(chunk);
     // Off the tick thread, and once: from here on a leaf knows its own distance. parity: not in a debug
-    // world, whose grid keeps every state as it was listed.
     if (declaration_.type != config::WorldType::Debug) {
         server::world::leafDistances::assign(chunk);
     }
@@ -325,24 +309,20 @@ std::array<double, 3> LoadedWorld::spawnBlock(std::int32_t chunkX, std::int32_t 
 }
 
 void LoadedWorld::warmSpawnArea() {
-    // parity: `MinecraftServer.prepareLevels` prepares the overworld and nothing else, so no other
-    // dimension has a chunk generated before whatever asks for one first. Its spawn is the recorded
-    // one, which needs no chunk to answer.
+    // parity: `MinecraftServer.prepareLevels` prepares the overworld and nothing else.
     if (declaration_.dimension != config::WorldDimension::Overworld) {
         spawn_ = {metadata_.spawnX + 0.5, static_cast<double>(metadata_.spawnY), metadata_.spawnZ + 0.5};
         return;
     }
     const bool fixedSpawn = declaration_.type == config::WorldType::Void || movedSpawn_;
-    // parity: vanilla keeps no spawn chunks. The only chunks it makes full before anyone joins are
-    // the ones the spawn search reads, and each of those decorates its own 3x3 first.
+    // parity: vanilla keeps no spawn chunks. The only chunks it makes full before anyone joins are.
     const std::pair<std::int32_t, std::int32_t> centre = fixedSpawn ? std::pair{0, 0} : climateSpawnChunk();
     if (fixedSpawn) {
         spawn_ = {metadata_.spawnX + 0.5, static_cast<double>(metadata_.spawnY), metadata_.spawnZ + 0.5};
         return;
     }
     spawn_ = spawnBlock(centre.first, centre.second);
-    // parity: `setInitialSpawn` writes the climate search's answer into the level data, so a world picks
-    // its spawn once and every later boot reads it back instead of searching the same terrain again.
+    // parity: `setInitialSpawn` writes the climate search's answer into the level data.
     spawnOverride_ = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(spawn_[0])),
                                                  static_cast<std::int32_t>(spawn_[1]),
                                                  static_cast<std::int32_t>(std::floor(spawn_[2]))};
@@ -351,8 +331,7 @@ void LoadedWorld::warmSpawnArea() {
 void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {
     for (Chunk* chunk : chunks) {
         const std::vector<entity::ServerEntity*> entities = state_.entitiesIn(chunk->chunkX(), chunk->chunkZ());
-        // parity: `ItemEntity` is saved with the chunk it stands in like anything else. What is
-        // lying on the floor is half of what a farm is, and without this it went with the chunk.
+        // parity: `ItemEntity` is saved with the chunk it stands in like anything else. What is.
         std::vector<wire::nbt::NbtCompound> dropped;
         for (const DroppedItem& item : state_.items()) {
             if ((static_cast<std::int32_t>(std::floor(item.x)) >> 4) == chunk->chunkX() &&
@@ -397,15 +376,11 @@ void LoadedWorld::save(const std::vector<Chunk*>& chunks) {
 }
 
 void LoadedWorld::saveDirty() {
-    // A mob walking across a chunk nothing else touched still has to be written down, so the chunks
-    // holding entities join whatever the blocks made dirty.
     std::vector<Chunk*> chunks = state_.dirtyChunks();
     std::set<std::pair<std::int32_t, std::int32_t>> already;
     for (const Chunk* chunk : chunks) {
         already.emplace(chunk->chunkX(), chunk->chunkZ());
     }
-    // A chunk that carried a mob last time has to be written again once it walks away, or the old
-    // copy on disk comes back beside the one that moved.
     for (Chunk* chunk : state_.chunksWithStashedEntities()) {
         if (already.emplace(chunk->chunkX(), chunk->chunkZ()).second) {
             chunks.push_back(chunk);
@@ -450,8 +425,6 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
     if (candidates.empty()) {
         return 0;
     }
-    // Entities go to disk with the chunk they stand in, and then out of memory with it: leaving
-    // them behind would spawn a second copy when the chunk came back.
     std::vector<Chunk*> withEntities;
     std::vector<Chunk*> toSave;
     for (Chunk* chunk : candidates) {
@@ -478,8 +451,6 @@ void LoadedWorld::stopGenerating(std::int64_t drainTimeoutMillis) {
     if (protoChunks_ != nullptr) {
         protoChunks_->persistAll();
     }
-    // Whatever the workers handed over on their way out still belongs in the world, so it is run
-    // rather than dropped: a chunk installed here is one the save below writes out.
     static_cast<void>(owner().runPending([this](const std::exception& failure) {
         logger_.error(
             [&] { return "A task for world '" + declaration_.name + "' failed while stopping: " + failure.what(); });

@@ -44,7 +44,6 @@ constexpr std::string_view kSpyglass = "spyglass";
 /// parity: `SpyglassItem.USE_DURATION`, a minute.
 constexpr std::int32_t kSpyglassUseTicks = 1200;
 
-/// A stored stack's id as an identifier, or nothing when the row holds something unparseable.
 std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
@@ -60,9 +59,7 @@ bool ItemUseTimers::startEating(PlayerSession& session, const Identifier& item, 
     if (food == nullptr) {
         return false;
     }
-    // A click on a block and the click that follows it are one mouthful, not two: the client sends
-    // `use_item_on` and then `use_item` for the same press, and restarting the timer on the second
-    // one meant a held button never finished a single one.
+    // `use_item_on` and `use_item` are one press; restarting the timer on the second never let a held button finish.
     if (eatingSlot_ == slot) {
         return true;
     }
@@ -71,9 +68,7 @@ bool ItemUseTimers::startEating(PlayerSession& session, const Identifier& item, 
         return false;
     }
     if (!food->canAlwaysEat && session.food.foodLevel() >= player::FoodData::kMaxFood) {
-        // parity: `ServerPlayerGameMode.useItem` sends the whole inventory back whenever the use
-        // never started. Without it a client that had already predicted the mouthful kept the
-        // animation and the missing item for good.
+        // parity: `ServerPlayerGameMode.useItem`.
         owner_->sendInventoryAll();
         owner_->syncHealth();
         return true;
@@ -100,7 +95,6 @@ void ItemUseTimers::tickEating(PlayerSession& session) {
         const std::optional<Identifier> id = parsedOrNothing(held->id);
         food = id.has_value() ? server::registry::itemFood::of(*id) : nullptr;
     }
-    // Anything that moved the stack under them (dropping it, a click, swapping slots) stops it.
     if (food == nullptr || eatingSlot_ != PlayerInventory::kHotbarStart + session.inventory.heldSlot()) {
         stopEating();
         return;
@@ -129,8 +123,7 @@ void ItemUseTimers::tickEating(PlayerSession& session) {
 }
 
 bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item, std::int32_t slot) {
-    // parity: `CrossbowItem.use`: a loaded crossbow fires at once, an empty one starts charging if
-    // there is anything to load it with.
+    // parity: `CrossbowItem.use`.
     if (item.path() == kCrossbow) {
         const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
         world::LoadedWorld* world = owner_->currentWorld();
@@ -165,8 +158,7 @@ bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item,
     if (item.path() != kBow) {
         return false;
     }
-    // parity: `BowItem.use`, which refuses without an arrow unless the player has infinite
-    // materials, and otherwise just starts the draw: the shot happens on release.
+    // parity: `BowItem.use`.
     if (session.gamemode != Gamemode::Creative && !session.inventory.arrowSlot().has_value()) {
         return true;
     }
@@ -215,7 +207,7 @@ void ItemUseTimers::releaseBow() {
     const std::int32_t slot = drawingSlot_;
     const std::int32_t drawn = drawingTicks_;
     const std::optional<storage::StoredItemStack>& drawnItem = session->inventory.at(slot);
-    // parity: `CrossbowItem.releaseUsing` only ends the use; the load happened while charging.
+    // parity: `CrossbowItem.releaseUsing` only ends the use.
     const bool crossbow = drawnItem.has_value() && player::crossbow::isCrossbow(*drawnItem);
     const bool trident = drawnItem.has_value() && player::trident::isTrident(*drawnItem);
     stopDrawing();
@@ -302,7 +294,7 @@ void ItemUseTimers::tickUsingTrigger(PlayerSession& session) {
 }
 
 void ItemUseTimers::playAroundExceptSelf(const PlayerSession& session, std::string_view sound) {
-    // parity: `Player.playSound`, which everyone but the player hears: their own client plays it.
+    // parity: `Player.playSound`.
     const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
     for (const PlayerSession* other : owner_->playersInSameWorld()) {
         if (other->entityId() != session.entityId()) {
@@ -372,8 +364,7 @@ void ItemUseTimers::tickBlocking(PlayerSession& session) {
 }
 
 void ItemUseTimers::raiseUseVibration(std::string_view event, const Identifier& item) {
-    // parity: `Item.Properties.spear` is the one builder that turns `interact_vibrations` off; every
-    // other item carries the common component, whose default is on.
+    // parity: `Item.Properties.spear`.
     if (item.path().ends_with("spear")) {
         return;
     }
@@ -385,8 +376,7 @@ void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item,
         return;
     }
     usingItem_ = usingItem;
-    // parity: `startUsingItem` and `stopUsingItem` each end in `causeUseVibration`, and the second
-    // only when something really was being used, which is what the check above already is.
+    // parity: `startUsingItem`.
     if (usingItem && item.has_value()) {
         usedItem_ = item;
         raiseUseVibration("item_interact_start", *item);
@@ -398,8 +388,7 @@ void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item,
     if (session == nullptr) {
         return;
     }
-    // The tracker sends the living flags from here to everyone, the owner included: the owner's
-    // `LocalPlayer.isUsingItem` is only cleared by that metadata coming back.
+    // The tracker sends living flags to the owner too, whose `isUsingItem` clears only from that metadata.
     session->usingItem = usingItem;
     session->usingOffhand = usingItem && offhand;
 }

@@ -15,8 +15,7 @@ using wire::common::JsonValue;
 
 namespace {
 
-/// parity: `BlockPredicate`'s `matching_blocks`, `matching_block_tag`, `all_of`, `any_of` and `not`,
-/// each at its own offset. `Unknown` is one this build does not read, and never matches.
+/// parity: `BlockPredicate`'s `matching_blocks`.
 struct Predicate {
     enum class Kind : std::uint8_t { Blocks, Tag, AllOf, AnyOf, Not, True, Unknown };
     Kind kind = Kind::Unknown;
@@ -28,8 +27,7 @@ struct Predicate {
 
 } // namespace
 
-/// parity: `RuleBasedStateProvider` and the two providers it hands out: a fixed state, or
-/// `copy_properties`, the new block wearing whatever properties the old one shares with it.
+/// parity: `RuleBasedStateProvider` and the two providers it hands out: a fixed state, or.
 struct RealBlockTransformers::Provider {
     enum class Kind : std::uint8_t { Simple, CopyProperties, RuleBased, Unknown };
     Kind kind = Kind::Unknown;
@@ -70,7 +68,6 @@ using Provider = RealBlockTransformers::Provider;
     return ids;
 }
 
-/// A block state as 26.3 writes it in data: `{"id": ..., "properties": {...}}`.
 [[nodiscard]] std::optional<std::int32_t> stateOf(const JsonObject& object) {
     const std::optional<std::string> name = textOf(object.find("id"));
     const auto id = name.has_value() ? Identifier::parse(*name) : std::unexpected(wire::common::IdentifierError{});
@@ -136,7 +133,6 @@ using Provider = RealBlockTransformers::Provider;
     }
     const std::optional<std::string> type = textOf(object->find("type"));
     if (!type.has_value() || *type == "minecraft:simple_state_provider") {
-        // A bare state stands for itself, which is how the files write the simple provider.
         const JsonObject* state = type.has_value() ? objectOf(object->find("state")) : object;
         provider->kind = Provider::Kind::Simple;
         provider->state = state == nullptr ? std::nullopt : stateOf(*state);

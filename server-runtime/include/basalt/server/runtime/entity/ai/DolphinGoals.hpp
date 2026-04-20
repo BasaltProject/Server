@@ -8,7 +8,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `BreathAirGoal`, the swim up for air once less than seven seconds of it are left.
+/// parity: `BreathAirGoal`.
 class BreathAirGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
@@ -80,7 +80,7 @@ private:
     bool breached_ = false;
 };
 
-/// parity: `Dolphin.DolphinSwimWithPlayerGoal`, which keeps up with a swimmer and lends it grace.
+/// parity: `Dolphin.DolphinSwimWithPlayerGoal`.
 class DolphinSwimWithPlayerGoal final : public Goal {
 public:
     explicit DolphinSwimWithPlayerGoal(double speedModifier);

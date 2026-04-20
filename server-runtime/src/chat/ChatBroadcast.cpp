@@ -25,7 +25,7 @@ Component displayName(const player::PlayerSession& player, const scoreboard::Tea
     const scoreboard::Team* team = teams == nullptr ? nullptr : teams->teamOf(player.name());
     Component name = Component::text(player.name());
     if (team != nullptr) {
-        // parity: `PlayerTeam.getFormattedName`, the colour over prefix, name and suffix together.
+        // parity: `PlayerTeam.getFormattedName`.
         name = Component::empty().append(team->prefix).append(name).append(team->suffix);
         if (team->color.has_value()) {
             name = name.color(scoreboard::textColorOf(*team->color));

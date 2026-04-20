@@ -7,14 +7,12 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 [[nodiscard]] std::string_view withoutTrailingSlash(std::string_view text) {
     while (text.ends_with('/')) {
         text.remove_suffix(1);
     }
     return text;
 }
-
 } // namespace
 
 std::optional<std::string> packageLayout::moduleFile(std::string_view module) {
@@ -29,8 +27,6 @@ std::optional<std::string> packageLayout::moduleFile(std::string_view module) {
             path.push_back(letter);
             continue;
         }
-        // A dot separates, so an empty part is `a..b` or a leading or trailing dot, and `..` as a
-        // part would be a way out of `src/`.
         if (index == 0 || index + 1 == module.size() || module[index - 1] == '.') {
             return std::nullopt;
         }
@@ -114,8 +110,6 @@ std::expected<std::vector<std::unique_ptr<PluginPackage>>, PluginLoadError>
 discoverPackages(const std::string& directory) {
     std::vector<std::unique_ptr<PluginPackage>> found;
     if (!wire::io::fileIO::isDirectory(directory)) {
-        // Made even when empty: an operator who sees no folder concludes the server has no plugins,
-        // and the folder is the whole instruction for how to install one.
         wire::io::fileIO::createDirectories(directory);
         return found;
     }
@@ -145,5 +139,4 @@ discoverPackages(const std::string& directory) {
     }
     return found;
 }
-
 } // namespace basalt::server::plugins

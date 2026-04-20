@@ -19,7 +19,7 @@ using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 using wire::nbt::NbtType;
 
-/// parity: `SharedConstants.WORLD_VERSION` of 26.3, stamped on every chunk vanilla writes.
+/// parity: `SharedConstants.WORLD_VERSION` of 26.3.
 constexpr std::int32_t kDataVersion = 5023;
 
 [[nodiscard]] std::string regionName(std::int32_t regionX, std::int32_t regionZ, std::string_view extension) {
@@ -83,7 +83,7 @@ void PoiManager::readChunkLocked(std::int32_t chunkX, std::int32_t chunkZ, const
             continue;
         }
         Section& target = chunk.sections[static_cast<std::size_t>(slot)].emplace();
-        // parity: `Valid` defaults to false, so a section written without it is rebuilt from blocks.
+        // parity: `Valid` defaults to false.
         target.valid = section->getBoolean("Valid", false);
         const NbtList* records = section->getList("Records");
         if (records == nullptr) {

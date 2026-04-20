@@ -21,7 +21,6 @@ class PlayerRegistry;
 
 namespace basalt::server::runtime::plugins {
 
-/// Plugin work, on the owner's own queue: the same one the server's own tasks go through.
 class OwnerTasks final : public server::plugins::PluginTasks {
 public:
     OwnerTasks(sched::Owner& owner, std::function<std::int64_t()> currentTick)
@@ -31,10 +30,6 @@ public:
 
     server::plugins::PluginHandle after(std::int32_t delayTicks, std::function<void()> task) override;
 
-    /// Repeats by scheduling the next one as it runs.
-    ///
-    /// The owner has no repeating task of its own, and giving it one for this would mean a second
-    /// kind of queue entry to cancel and to drain at shutdown. Rescheduling keeps one kind.
     server::plugins::PluginHandle every(std::int32_t delayTicks, std::int32_t periodTicks,
                                         std::function<void()> task) override;
 
@@ -43,10 +38,8 @@ private:
     std::function<std::int64_t()> currentTick_;
 };
 
-/// Plugin commands, in the server's own tree, so they complete on the client like any other.
 class DispatcherCommands final : public server::plugins::PluginCommands {
 public:
-    /// `console` is who a plugin's `run` acts as. Unset before there is one.
     DispatcherCommands(sched::Owner& owner, command::CommandDispatcher& dispatcher,
                        std::function<const command::CommandSource*()> console)
         : owner_(&owner), dispatcher_(&dispatcher), console_(std::move(console)) {}
@@ -57,7 +50,6 @@ public:
 
     bool runAsConsole(std::string_view command) override;
 
-    /// Registers everything again, after a rebuild threw the whole tree away.
     void refresh();
 
 private:
@@ -73,11 +65,9 @@ private:
     sched::Owner* owner_;
     command::CommandDispatcher* dispatcher_;
     std::function<const command::CommandSource*()> console_;
-    /// Held by pointer so an entry's address survives the list growing: a handle captures it.
     std::vector<std::unique_ptr<Entry>> entries_;
 };
 
-/// Where the packages and the folders being worked on live.
 class RootPaths final : public server::plugins::PluginPaths {
 public:
     explicit RootPaths(std::string root);
@@ -92,7 +82,6 @@ private:
     std::string packages_;
 };
 
-/// The real packet sender: finds the connection and writes the bytes with the right id in front.
 class SessionPackets final : public server::plugins::PluginPacketSender {
 public:
     explicit SessionPackets(player::PlayerRegistry& registry) : registry_(&registry) {}
@@ -108,7 +97,6 @@ private:
     player::PlayerRegistry* registry_;
 };
 
-/// The real channel sender: a custom payload down that player's own connection.
 class SessionChannels final : public server::plugins::PluginChannelSender {
 public:
     explicit SessionChannels(player::PlayerRegistry& registry) : registry_(&registry) {}
@@ -120,15 +108,8 @@ private:
     player::PlayerRegistry* registry_;
 };
 
-/// The server, as much of it as the plugin host is allowed to borrow.
-///
-/// Everything a plugin runs is put on one owner: the global one, which is the only owner that exists
-/// in both scheduler modes and is a single thread in both. That is what makes this stage's single
-/// lane true rather than hopeful. When lanes follow regions, this is the seam that changes, and
-/// nothing above it does.
 class ServerPluginServices final : public server::plugins::PluginServices {
 public:
-    /// What the server hands over, each piece optional so a test can stand one up without a world.
     struct Parts {
         server::plugins::PluginPlayers* players = nullptr;
         server::plugins::PluginWorlds* worlds = nullptr;
@@ -137,8 +118,6 @@ public:
         server::plugins::PluginMenus* menus = nullptr;
         server::plugins::PluginPacketSender* packets = nullptr;
         server::plugins::PluginChannelSender* channels = nullptr;
-        /// Who owns a position: the seam `at()` is built on. Unset answers "nobody", and it runs
-        /// where it was called.
         std::function<sched::Owner*(const std::string& world, double x, double z)> ownerAt;
     };
 
@@ -162,10 +141,6 @@ public:
 
     bool at(std::string_view world, double x, double z, std::function<void()> task) override;
 
-    /// Puts the plugin commands back after the tree was rebuilt.
-    ///
-    /// Rebuilding is how the command configuration is applied, and it starts from the commands
-    /// registered in code, which plugin ones are not.
     void refreshCommands() { commands_.refresh(); }
 
 private:

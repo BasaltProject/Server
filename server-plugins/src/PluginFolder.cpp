@@ -8,8 +8,6 @@
 
 namespace basalt::server::plugins {
 namespace {
-
-/// Extensions whose file name is an address: those are the ones that have to be unique.
 [[nodiscard]] bool isAddressedByName(std::string_view path) {
     const std::size_t dot = path.find_last_of('.');
     if (dot == std::string_view::npos) {
@@ -39,7 +37,6 @@ void walk(const std::string& directory, std::vector<std::string>& into) {
         }
     }
 }
-
 } // namespace
 
 bool PluginFolder::isPrivate(std::string_view relative) const {
@@ -57,8 +54,6 @@ bool PluginFolder::isPrivate(std::string_view relative) const {
 
 void PluginFolder::materialize(const Report& report) const {
     wire::io::fileIO::createDirectories(root_);
-    // A folder being worked on is already its own folder: copying it next to itself would give the
-    // plugin two of every file, which is exactly what the one-name rule below forbids.
     if (package_->workingFolder().has_value()) {
         return;
     }
@@ -115,5 +110,4 @@ std::expected<std::map<std::string, std::string, std::less<>>, PluginLoadError> 
     }
     return index;
 }
-
 } // namespace basalt::server::plugins

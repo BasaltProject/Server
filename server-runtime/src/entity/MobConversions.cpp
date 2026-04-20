@@ -53,8 +53,7 @@ constexpr std::array kPlaceKeys{"Pos"sv,      "Motion"sv,   "Rotation"sv,  "fall
 } // namespace
 
 std::optional<std::uint8_t> shakingIndexOf(std::string_view typePath) {
-    // parity: `Zombie.DATA_DROWNED_CONVERSION_ID` after its baby and special type flags, and
-    // `Skeleton.DATA_STRAY_CONVERSION_ID` right after `Mob`'s own.
+    // parity: `Zombie.DATA_DROWNED_CONVERSION_ID` and `Skeleton.DATA_STRAY_CONVERSION_ID`.
     if (typePath == "zombie" || typePath == "husk") {
         return 18;
     }
@@ -121,8 +120,7 @@ std::optional<Conversion> tick(ServerEntity& mob, const Around& around) {
         }
         return std::nullopt;
     }
-    // parity: `Tadpole.aiStep` counts its age up every turn, AI or not, and `setAge` turns it into a
-    // frog at twenty minutes. The frog is persistent: one that grew up is not despawned.
+    // parity: `Tadpole.aiStep` ages every turn.
     if (path == "tadpole") {
         if (alive && ++mob.conversionClock >= kTadpoleTicks) {
             return Conversion{.into = Identifier::vanilla("frog"),
@@ -140,8 +138,7 @@ std::optional<Conversion> tick(ServerEntity& mob, const Around& around) {
         mob.conversionClock = converting ? mob.conversionClock + 1 : 0;
         if (mob.conversionClock > kZombifyTicks) {
             const bool hoglin = path == "hoglin";
-            // parity: `Piglin` and `PiglinBrute.playConvertedSound`, silent in peace, and the hoglin's
-            // `makeSound`, which is not.
+            // parity: `Piglin`.
             return Conversion{.into = Identifier::vanilla(hoglin ? "zoglin" : "zombified_piglin"),
                               .keepCanPickUpLoot = !hoglin,
                               .nausea = true,

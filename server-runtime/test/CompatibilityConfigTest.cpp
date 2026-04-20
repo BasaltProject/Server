@@ -67,7 +67,6 @@ private:
     return *config;
 }
 
-/// What the gate is asked in the end: whether that protocol may through, however it does it.
 [[nodiscard]] bool accepts(const multiversion::ProtocolGate& gate, std::int32_t protocol) {
     return gate.supported().contains(protocol);
 }
@@ -77,8 +76,6 @@ private:
 TEST_CASE("the commented default lets old clients in and keeps new ones out") {
     const CompatibilityConfig config = compatibility("compat-default", kServerDefaultToml);
     CHECK(config.backwards().all);
-    // A newer client cannot finish joining, so it is turned away with an explanation rather than
-    // let in to disconnect halfway through with a decoding error.
     CHECK(config.futureProtocols() == multiversion::UnknownProtocolPolicy::Refuse);
     CHECK(config.snapshots() == multiversion::UnknownProtocolPolicy::Refuse);
     CHECK(config.nameSubstitutes());
@@ -93,8 +90,6 @@ TEST_CASE("what the door is built from is what this build can actually translate
     CHECK(accepts(gate, 766));
     CHECK_FALSE(accepts(gate, 700));
 
-    // A list is exactly the list, plus the native version, which is never off: a server its own
-    // clients cannot join is not a configuration anybody meant to write.
     const CompatibilityConfig some = compatibility("compat-list", "[network.java]\nbackwards = [765]\n");
     CHECK_FALSE(some.backwards().all);
     CHECK(some.backwards().protocols == std::set<std::int32_t>{765});
@@ -103,10 +98,8 @@ TEST_CASE("what the door is built from is what this build can actually translate
     CHECK_FALSE(accepts(chosen, 766));
     CHECK(accepts(chosen, versions::kNative));
 
-    // However it was written: the word is a word, not a spelling.
     CHECK(compatibility("compat-caps", "[network.java]\nbackwards = \"  ALL  \"\n").backwards().all);
 
-    // An empty list is not "all": it is somebody saying only the native version.
     const CompatibilityConfig none = compatibility("compat-empty", "[network.java]\nbackwards = []\n");
     CHECK_FALSE(none.backwards().all);
     const multiversion::ProtocolGate bare = none.gate(translatable);
@@ -136,8 +129,6 @@ TEST_CASE("a word that is neither a policy nor a list stops the server") {
     const std::expected<CompatibilityConfig, std::string> word =
         CompatibilityConfig::load(written("compat-word", "server.toml", "[network.java]\nbackwards = \"none\"\n"));
     REQUIRE_FALSE(word.has_value());
-    // "none" and "775" are both someone meaning something specific, and reading either as "all"
-    // is the worst answer available.
     CHECK(word.error().ends_with(": backwards must be \"all\" or a list of protocol numbers"));
 
     const std::expected<CompatibilityConfig, std::string> policy = CompatibilityConfig::load(
@@ -158,7 +149,6 @@ TEST_CASE("a file with nothing in it is every default") {
     CHECK(config.snapshots() == multiversion::UnknownProtocolPolicy::Refuse);
     CHECK(config.nameSubstitutes());
 
-    // A `[java]` table that says nothing is the same as no table at all.
     const CompatibilityConfig bare = compatibility("compat-empty-java", "[network.java]\n");
     CHECK(bare.backwards().all);
     CHECK(bare.nameSubstitutes());
@@ -175,7 +165,6 @@ TEST_CASE("a file with nothing in it is every default") {
 TEST_CASE("which bedrock versions may in, which is all of them unless somebody says otherwise") {
     const CompatibilityConfig defaults = compatibility("compat-bedrock-default", "# nothing\n");
 
-    // The window of live protocols, and what happens past its top end.
     CHECK_FALSE(defaults.bedrock().protocols.has_value());
     CHECK(defaults.bedrock().futureProtocols == basalt::wire::bedrock::BedrockFuturePolicy::Warn);
 
@@ -210,7 +199,6 @@ aliases = ["tpa", "tp"]
 [commands.seed]
 enabled = false
 )");
-    // Written however the operator capitalized it, asked for however the caller spells it.
     const CommandOverride& teleport = config.get("teleport");
     REQUIRE(teleport.permission.has_value());
     CHECK(*teleport.permission == "basalt.command.moderator");
@@ -218,7 +206,6 @@ enabled = false
     CHECK(teleport.aliases == std::vector<std::string>{"tpa", "tp"});
     CHECK(config.get("TELEPORT").aliases.size() == 2);
 
-    // Off means it stops existing rather than existing and refusing.
     CHECK_FALSE(config.get("seed").enabled);
     CHECK_FALSE(config.get("seed").permission.has_value());
 }
@@ -240,21 +227,17 @@ permission = "basalt.command.empty"
     REQUIRE(config.custom().size() == 2);
     const CustomCommand& discord = config.custom()[0];
     CHECK(discord.name == "discord");
-    // Without one of its own, the permission is the one every command has by default.
     CHECK(discord.permission == "basalt.command.discord");
     CHECK(discord.message == std::vector<std::string>{"Join us at", "example.invalid"});
     CHECK(discord.aliases == std::vector<std::string>{"dc"});
 
-    // One string is cut at its newlines, so a short answer needs no list.
     const CustomCommand& rules = config.custom()[1];
     CHECK(rules.name == "rules");
     CHECK(rules.permission == "basalt.command.rules");
     CHECK(rules.message == std::vector<std::string>{"one", "two"});
 
-    // A command with nothing to say is a half-written entry: skipped and named, not fatal.
     CHECK(log.saidSomethingWith("Custom command 'empty'"));
     CHECK(log.saidSomethingWith("has no message; skipping it"));
-    // And what did load is counted, so an operator can see their file took effect.
     CHECK(log.saidSomethingWith("Loaded 2 custom command(s) from"));
 }
 
@@ -270,8 +253,6 @@ TEST_CASE("what a command says instead of what it says by default") {
     CHECK(config.message("command.missing") == nullptr);
     CHECK(config.messages().size() == 2);
 
-    // A message that is not text is not a message: it is left out rather than turned into an
-    // empty line the operator never wrote.
     const CommandsConfig odd = commands("commands-odd-message", R"(
 [messages]
 "command.unknown" = 5
@@ -285,8 +266,6 @@ TEST_CASE("a file with no commands of its own says nothing about them") {
     const CapturedLog log;
     const CommandsConfig config = commands("commands-quiet", "[commands.help]\nenabled = true\n");
     CHECK(config.custom().empty());
-    // Neither "loaded 0 custom commands" nor "disabled none of them": a line saying nothing
-    // happened is a line to read on every start.
     CHECK_FALSE(log.saidSomethingWith("custom command"));
     CHECK_FALSE(log.saidSomethingWith("Disabled by"));
 }
@@ -302,7 +281,6 @@ enabled = false
 enabled = true
 )");
     CHECK_FALSE(config.get("seed").enabled);
-    // Named and in a fixed order, because "some commands are missing" is the report otherwise.
     CHECK(log.saidSomethingWith("Disabled by "));
     CHECK(log.saidSomethingWith(": gamemode, seed."));
 }

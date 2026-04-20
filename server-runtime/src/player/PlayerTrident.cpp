@@ -93,7 +93,7 @@ void release(const BreakContext& context, PlayerSession& player, world::LoadedWo
                                   .value_or(std::string{kThrowSound});
     statAwards::used(player, held->id);
     const bool creative = player.gamemode == Gamemode::Creative;
-    // parity: `hurtWithoutBreaking(1)`, never past one short of breaking, nothing for a creative hand.
+    // parity: `hurtWithoutBreaking(1)`.
     storage::StoredItemStack worn = *held;
     if (!creative) {
         random::RandomSource wear = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
@@ -114,7 +114,7 @@ void release(const BreakContext& context, PlayerSession& player, world::LoadedWo
         }
     }
     if (riptide > 0.0F) {
-        // parity: `startAutoSpinAttack(20, 8.0F, stack)`; the push and the lift are the client's own.
+        // parity: `startAutoSpinAttack(20, 8.0F, stack)`.
         player.autoSpinTicks = kSpinTicks;
         player.autoSpinDamage = kBaseDamage;
         player.autoSpinItem = worn;

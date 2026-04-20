@@ -27,7 +27,6 @@ using wire::common::JsonValue;
     return id.find(':') == std::string_view::npos ? "minecraft:" + std::string{id} : std::string{id};
 }
 
-/// A required number field, or an error naming it.
 [[nodiscard]] std::expected<double, std::string> required(const JsonObject& object, std::string_view field) {
     const std::optional<double> value = number(object.find(field));
     if (!value.has_value()) {

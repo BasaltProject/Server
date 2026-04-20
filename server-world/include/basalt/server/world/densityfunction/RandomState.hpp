@@ -17,8 +17,7 @@ class Noise;
 
 namespace basalt::server::world::densityfunction {
 
-/// parity: `RandomState`. The seeded half of a dimension's worldgen: every noise instance, every
-/// named positional random and the compiled density samplers, built once per world.
+/// parity: `RandomState`.
 class RandomState {
 public:
     RandomState(std::int64_t seed, bool legacyRandomSource, std::shared_ptr<DensityFunctionLoader> loader);
@@ -31,7 +30,6 @@ public:
     /// parity: `RandomState.getOrCreateRandomFactory`.
     [[nodiscard]] random::PositionalRandomFactory randomFactory(std::string_view name) const;
 
-    /// The dimension's positional random itself, as `RandomState.random`.
     [[nodiscard]] const random::PositionalRandomFactory& random() const noexcept { return random_; }
 
     [[nodiscard]] Sampler sampler(const Function& function) { return compiler_->sampler(function); }

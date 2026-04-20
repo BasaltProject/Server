@@ -37,13 +37,11 @@ using wire::protocol::play::Gamemode;
 /// parity: `MinecartItem.useOn`, a sixteenth of a block above the rail.
 constexpr double kMinecartRestHeight = 0.0625;
 
-/// The square a click lands on, which is the block itself or the one beyond the face.
 [[nodiscard]] std::array<std::int32_t, 3> beyond(const BlockHit& hit) {
     const wire::protocol::play::BlockPos at = wire::protocol::play::BlockPos{hit.x, hit.y, hit.z}.offset(hit.direction);
     return {at.x, at.y, at.z};
 }
 
-/// Puts one of these in the world and takes one off the stack that made it.
 [[nodiscard]] bool spawnFromItem(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                                  const Identifier& type, const std::int32_t heldSlot,
                                  const storage::StoredItemStack& held, const double x, const double y, const double z) {
@@ -80,7 +78,6 @@ bool placeMinecartFor(const BreakContext& context, PlayerSession& player, world:
         return false;
     }
     const double slope = shape->second.starts_with("ascending") ? 0.5 : 0.0;
-    // The item and the entity share a name except for the plain cart, whose entity keeps the suffix.
     const std::string path{item.path()};
     const Identifier type =
         path == "minecart"
@@ -189,8 +186,7 @@ bool hangFrameFor(const BreakContext& context, PlayerSession& player, world::Loa
     const std::array<std::int32_t, 3> at = beyond(hit);
     // The two enums are both in vanilla's `Direction` order, which is what makes this a cast.
     const auto facing = static_cast<reg::BlockFace>(static_cast<std::uint8_t>(hit.direction));
-    // parity: `PaintingItem.useOn` picks the art rather than the player: the biggest that fits the
-    // wall, at random among ties, and nothing at all when none does.
+    // parity: `PaintingItem.useOn` picks the biggest art that fits.
     if (type.path() == "painting") {
         random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
         const std::optional<registry::vanillaRegistryData::Painting> art =
@@ -228,8 +224,7 @@ bool hangFrameFor(const BreakContext& context, PlayerSession& player, world::Loa
         std::make_unique<entity::ServerEntity>(context.registry->allocateEntityId(), wire::common::Uuid::random(), type,
                                                entry->protocolId, hangs[0], hangs[1], hangs[2]);
     frame->sourceNbt = world::itemFrames::freshTag(facing);
-    // parity: the spawn packet carries the face a hanging entity is on, which is what the client
-    // draws it against.
+    // parity: the spawn packet carries the face a hanging entity is on, which the client draws it against.
     frame->objectData = static_cast<std::int32_t>(facing);
     world.state().spawnEntity(std::move(frame));
     // parity: `GameEvent.ENTITY_PLACE` from where the frame ended up.
@@ -259,8 +254,7 @@ bool placeCushionFor(const BreakContext& context, PlayerSession& player, world::
     };
     bool onTop = hit.direction == wire::protocol::play::Direction::Up;
     double clickY = hit.y + static_cast<double>(hit.clickY);
-    // parity: `recalculateContextForSpecialCollisionShapes`: a hollow block is aimed at through its
-    // collision, so a cushion goes down inside a cauldron rather than on its rim.
+    // parity: `recalculateContextForSpecialCollisionShapes`.
     const Identifier* clickedBlock = reg::blockStateDefinitions::blockOf(*clicked);
     if (clickedBlock != nullptr && tagged("minecraft:cushion_uses_collision_shape", *clickedBlock)) {
         const std::array<double, 3> eye{player.x, player.y + world::fluids::eyeHeight(player.sneaking), player.z};

@@ -294,8 +294,7 @@ const TreeConfiguration& treeConfigs::tallMangrove() {
 }
 
 const TreeConfiguration& treeConfigs::cherry() {
-    // parity: TreeFeatures.cherry. branchCount is the real WeightedListInt over ConstantInt(1/2/3),
-    // one weight each.
+    // parity: `TreeFeatures.cherry` branchCount is a WeightedListInt over ConstantInt(1/2/3).
     static const TreeConfiguration config{
         .trunkStateId = state("cherry_log"),
         .trunkPlacer = TrunkPlacer::cherry(7, 1, 0, IntProvider::weighted({{1, 1}, {2, 1}, {3, 1}}),
@@ -310,7 +309,7 @@ const TreeConfiguration& treeConfigs::cherry() {
 
 namespace {
 
-/// parity: `TreeFeatures.poplar`, the three dappled forest trees that differ only by leaf colour.
+/// parity: `TreeFeatures.poplar`.
 [[nodiscard]] TreeConfiguration poplar(std::string_view leaves) {
     return TreeConfiguration{
         .trunkStateId = state("poplar_log"),
@@ -323,7 +322,6 @@ namespace {
         .ignoreVines = true};
 }
 
-/// The poplar with the two leaf litter carpets laid before its shelf mushrooms.
 [[nodiscard]] TreeConfiguration poplarLeafLitter(std::string_view leaves) {
     TreeConfiguration config = poplar(leaves);
     config.decorators = leafLitterDecorators();
@@ -363,7 +361,6 @@ const TreeConfiguration& treeConfigs::yellowPoplarLeafLitter() {
     return config;
 }
 
-// The same trees again with a different decorator list, which is all these registrations are.
 const TreeConfiguration& treeConfigs::oakLeafLitter() {
     static const TreeConfiguration config = withDecorators(oak(), leafLitterDecorators());
     return config;

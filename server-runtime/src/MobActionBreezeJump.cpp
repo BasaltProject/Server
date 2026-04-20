@@ -73,7 +73,7 @@ constexpr float kJumpVelocityPerRange = 0.058333334F;
     return lit != properties.end() && lit->second == "true";
 }
 
-/// parity: `LongJump.snapToSurface`: the ground up to ten below, else the ceiling up to ten above.
+/// parity: `LongJump.snapToSurface`.
 [[nodiscard]] std::optional<kit::Block> snapToSurface(world::WorldState& world, const kit::Vec& target) {
     for (const double direction : {-10.0, 10.0}) {
         if (const std::optional<entity::BlockHit> hit = entity::blockRay::cast(
@@ -165,7 +165,7 @@ bool MobActionSystem::breezeCanJump(entity::ai::MobContext& context, BreezeState
     if (static_cast<float>(distance) - 4.0F <= 0.0F) {
         return false;
     }
-    // parity: `canJumpFromCurrentPosition`: off anything but honey, with four clear squares above.
+    // parity: `canJumpFromCurrentPosition`.
     const kit::Block own{mth::floor(breeze.x), mth::floor(breeze.y), mth::floor(breeze.z)};
     if (const wire::common::Identifier* block = blockAt(context.world, own);
         block != nullptr && block->path() == "honey_block") {

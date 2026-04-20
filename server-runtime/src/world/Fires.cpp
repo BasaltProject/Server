@@ -71,8 +71,7 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     if (chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking) > y) {
         return false;
     }
-    // parity: `Level.isRainingAt` also asks the biome, which neither precipitates in the desert nor
-    // rains where it is cold enough to snow: a dry or snowy biome leaves the fire alone.
+    // parity: `Level.isRainingAt` also asks the biome.
     const server::world::ChunkHeight bounds = chunk->verticalBounds();
     const std::int32_t localQuartY = std::clamp((y >> 2) - (bounds.minY() >> 2), 0, bounds.height() / 4 - 1);
     const server::registry::Biome* biome =
@@ -103,9 +102,7 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     return difficulty == "normal" ? 2 : 3;
 }
 
-/// parity: `FireBlock.getStateForPlacement`. Fire standing on something that burns, or on a solid
-/// face, is the plain default state and shows no sides at all; only fire with neither under it
-/// reaches for its neighbours. There is no `down` property, which is the null the loop there skips.
+/// parity: `FireBlock.getStateForPlacement`.
 [[nodiscard]] std::map<std::string, std::string> fireSides(const WorldState& world, std::int32_t x, std::int32_t y,
                                                            std::int32_t z) {
     const std::int32_t below = stateAt(world, x, y - 1, z);
@@ -123,10 +120,7 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
             {"east", burns(stateAt(world, x + 1, y, z))}};
 }
 
-/// Soul fire where the ground calls for it, ordinary fire everywhere else.
-///
-/// parity: `BaseFireBlock.getState`, and the state id comes from the block's **default**, not from
-/// the first of its palette: the five sides of a fire are `false` by default and `true` first.
+/// parity: `BaseFireBlock.getState`.
 [[nodiscard]] std::optional<std::int32_t> fireFor(const WorldState& world, std::int32_t x, std::int32_t y,
                                                   std::int32_t z, std::int32_t age) {
     if (registry::blockConnections::isSoulFireBase(stateAt(world, x, y - 1, z))) {
@@ -138,7 +132,7 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     return registry::blocks::stateIdOf(wire::common::Identifier::vanilla("fire"), properties);
 }
 
-/// parity: `FireBlock.getIgniteOdds(level, pos)`: the best of the six around an empty block.
+/// parity: `FireBlock.getIgniteOdds(level, pos)`.
 [[nodiscard]] std::int32_t igniteOddsAround(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     if (stateAt(world, x, y, z) != registry::blocks::air().stateId) {
         return 0;
@@ -152,7 +146,7 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     return odds;
 }
 
-/// parity: `FireBlock.isValidFireLocation`, which is any of the six being flammable at all.
+/// parity: `FireBlock.isValidFireLocation`.
 [[nodiscard]] bool hasSomethingToBurn(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     for (const std::int32_t neighbour :
          {stateAt(world, x, y - 1, z), stateAt(world, x, y + 1, z), stateAt(world, x, y, z - 1),
@@ -164,7 +158,7 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     return false;
 }
 
-/// parity: the dimension's `infiniburn` tag, which in the Nether is what keeps fire alight.
+/// parity: the dimension's `infiniburn` tag.
 [[nodiscard]] bool burnsForever(const WorldState& world, const Surroundings& surroundings, std::int32_t x,
                                 std::int32_t y, std::int32_t z) {
     const wire::common::Identifier* below = registry::blockStateDefinitions::blockOf(stateAt(world, x, y - 1, z));
@@ -175,7 +169,7 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     return path == "netherrack" || path == "magma_block" || (surroundings.bedrockBurnsForever && path == "bedrock");
 }
 
-/// parity: `FireBlock.checkBurnOut`, which either takes the block or leaves fire in its place.
+/// parity: `FireBlock.checkBurnOut`.
 void burnOut(WorldState& world, const WorldWeather& weather, const Surroundings& surroundings, std::int32_t x,
              std::int32_t y, std::int32_t z, std::int32_t chance, random::RandomSource& random, std::int32_t age,
              std::vector<BlockChange>& changes) {
@@ -305,15 +299,14 @@ std::vector<BlockChange> tick(WorldState& world, const WorldWeather& weather, st
         return {};
     }
     std::vector<BlockChange> changes;
-    // parity: `FireBlock.tick` books its next turn before anything else, so that roll comes first.
+    // parity: `FireBlock.tick` books its next turn before anything else.
     schedule(world, x, y, z, random);
     if (!surroundings.canSpread) {
         return changes;
     }
     const std::int32_t age = ageOf(*stateId);
 
-    // parity: a fire that cannot stand is removed, and the turn carries on regardless: a fire that
-    // then ages is written back with its new age.
+    // parity: a fire that cannot stand is removed, and the turn carries on regardless: a fire that.
     if (!blockSurvival::isSupported(world, x, y, z, *stateId, scaffoldingHasFallen, hasSkylight)) {
         put(world, x, y, z, registry::blocks::air().stateId, changes);
     }

@@ -11,15 +11,12 @@
 
 namespace basalt::server::registry {
 namespace {
-
 using wire::common::Identifier;
 
 [[nodiscard]] Identifier vanilla(std::string_view path) { return Identifier::vanilla(std::string{path}); }
-
 } // namespace
 
 namespace biomes {
-
 const Registry<Biome>& registry() {
     static const Registry<Biome> built = [] {
         Registry<Biome> registry;
@@ -36,11 +33,9 @@ const Biome& plains() {
     static const Biome& biome = *registry().byName(Identifier::vanilla("plains"));
     return biome;
 }
-
 } // namespace biomes
 
 namespace customStats {
-
 std::optional<std::int32_t> idOf(std::string_view name) {
     const auto found = std::ranges::find(customStatsTable(), name);
     return found == customStatsTable().end()
@@ -56,12 +51,10 @@ std::optional<std::string_view> nameOf(std::int32_t id) {
 }
 
 std::size_t count() { return customStatsTable().size(); }
-
 } // namespace customStats
 
 namespace blockMovement {
 namespace {
-
 [[nodiscard]] const BlockMovementEntry* entryOf(std::int32_t stateId) {
     static const std::unordered_map<Identifier, const BlockMovementEntry*> table = [] {
         std::unordered_map<Identifier, const BlockMovementEntry*> built;
@@ -77,7 +70,6 @@ namespace {
     const auto found = table.find(*block);
     return found == table.end() ? nullptr : found->second;
 }
-
 } // namespace
 
 float frictionOf(std::int32_t stateId) {
@@ -99,11 +91,9 @@ float bouncinessOf(std::int32_t stateId) {
     const BlockMovementEntry* entry = entryOf(stateId);
     return entry == nullptr ? kDefaultBounciness : entry->bounciness;
 }
-
 } // namespace blockMovement
 
 namespace blockSounds {
-
 const BlockSoundTypeEntry& of(std::int32_t stateId) {
     static const std::unordered_map<Identifier, std::int32_t> table = [] {
         std::unordered_map<Identifier, std::int32_t> built;
@@ -116,12 +106,10 @@ const BlockSoundTypeEntry& of(std::int32_t stateId) {
     const auto found = block == nullptr ? table.end() : table.find(*block);
     return blockSoundTypesTable()[found == table.end() ? 0 : static_cast<std::size_t>(found->second)];
 }
-
 } // namespace blockSounds
 
 namespace noteBlockInstruments {
 namespace {
-
 [[nodiscard]] const std::vector<NoteBlockInstrument>& all() {
     static const std::vector<NoteBlockInstrument> built = [] {
         std::vector<NoteBlockInstrument> instruments;
@@ -147,7 +135,6 @@ namespace {
     }();
     return built;
 }
-
 } // namespace
 
 const NoteBlockInstrument* byName(std::string_view name) {
@@ -162,11 +149,9 @@ const NoteBlockInstrument& of(const Identifier& block) {
 }
 
 float pitchOf(std::int32_t note) { return static_cast<float>(std::pow(2.0, (note - 12) / 12.0)); }
-
 } // namespace noteBlockInstruments
 
 namespace pointsOfInterest {
-
 std::vector<Identifier> ids() {
     std::vector<Identifier> types;
     for (const auto& [type, block] : poiBlocksTable()) {
@@ -187,12 +172,10 @@ std::vector<Identifier> blocksOf(const Identifier& type) {
     }
     return blocks;
 }
-
 } // namespace pointsOfInterest
 
 namespace fireOdds {
 namespace {
-
 struct Table {
     std::vector<std::int32_t> ignite;
     std::vector<std::int32_t> burn;
@@ -216,8 +199,6 @@ struct Table {
     return built;
 }
 
-/// The table is written in block registry ids, and a waterlogged block answers zero whatever it is
-/// made of.
 [[nodiscard]] std::int32_t oddsOf(const std::vector<std::int32_t>& odds, std::int32_t stateId) {
     if (blockSupport::holdsWater(stateId)) {
         return 0;
@@ -228,13 +209,10 @@ struct Table {
     }
     return odds[static_cast<std::size_t>(block)];
 }
-
 } // namespace
 
 std::int32_t igniteOdds(std::int32_t stateId) { return oddsOf(table().ignite, stateId); }
 
 std::int32_t burnOdds(std::int32_t stateId) { return oddsOf(table().burn, stateId); }
-
 } // namespace fireOdds
-
 } // namespace basalt::server::registry

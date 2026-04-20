@@ -14,8 +14,7 @@ class RandomSource;
 
 namespace basalt::server::world::noise {
 
-/// parity: `synth.Noise`. Every sampler answers in float; the volume path accumulates into a
-/// buffer and may round differently from the point path, which is why both exist.
+/// parity: `synth.Noise`.
 class Noise {
 public:
     virtual ~Noise() = default;
@@ -86,7 +85,7 @@ public:
         return perms_[static_cast<std::size_t>(static_cast<std::uint32_t>(x) & 255U)];
     }
 
-    /// parity: `GradientNoise.wrap`, which folds far coordinates back instead of losing precision.
+    /// parity: `GradientNoise.wrap`.
     [[nodiscard]] static double wrap(double x) noexcept;
 
 protected:
@@ -126,7 +125,7 @@ protected:
                                       float relativeZ, float originalRelativeY) const noexcept;
 };
 
-/// parity: `synth.SmearedPerlinNoise`, the y-fudged octave the legacy terrain noise still uses.
+/// parity: `synth.SmearedPerlinNoise`.
 class SmearedPerlinNoise final : public PerlinNoise {
 public:
     SmearedPerlinNoise(random::RandomSource& random, double fudgeYScale)
@@ -149,7 +148,7 @@ private:
     double fudgeYScale_;
 };
 
-/// parity: `synth.SimplexNoise`. The arithmetic stays in double and only the answer is float.
+/// parity: `synth.SimplexNoise`.
 class SimplexNoise final : public GradientNoise {
 public:
     SimplexNoise(random::RandomSource& random, bool discardNoiseOffset)
@@ -162,8 +161,7 @@ public:
     [[nodiscard]] float get(double x, double y, double z) const override;
 };
 
-/// parity: `synth.NoiseStack`, octaves as layers with a frequency and a float amplitude, summed in
-/// insertion order.
+/// parity: `synth.NoiseStack`.
 class NoiseStack final : public Noise {
 public:
     struct Layer {

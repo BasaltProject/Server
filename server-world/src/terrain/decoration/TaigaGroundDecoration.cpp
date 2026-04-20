@@ -20,8 +20,7 @@ namespace {
     return found->stateId;
 }
 
-// The 26.2 state definition orders age=0..3 contiguously. The generated default-state table
-// identifies age=0; the configured berry_bush feature explicitly requests age=3.
+// The state definition orders age=0..3 contiguously; berry_bush requests age=3.
 [[nodiscard]] std::int32_t sweetBerryAge3StateId() { return stateIdOf("sweet_berry_bush") + 3; }
 
 [[nodiscard]] PlacementModifier grassBelowFilter() {

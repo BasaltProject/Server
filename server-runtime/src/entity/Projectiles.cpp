@@ -18,7 +18,7 @@ constexpr double kSpreadPerUncertainty = 0.0172275;
 
 constexpr double kDegrees = 180.0 / std::numbers::pi;
 
-/// parity: `AbstractHurtingProjectile.INITAL_ACCELERATION_POWER`, the misspelling included.
+/// parity: `AbstractHurtingProjectile.INITAL_ACCELERATION_POWER`.
 constexpr double kAcceleration = 0.1;
 
 [[nodiscard]] Kind make(std::string_view path, double gravity, double drag, bool sticks, double acceleration = 0.0) {
@@ -27,22 +27,20 @@ constexpr double kAcceleration = 0.1;
                 .drag = drag,
                 .sticks = sticks,
                 .acceleration = acceleration,
-                // parity: which of the three `tick` bodies it has. An arrow is the one that sticks,
-                // and a fireball the one that accelerates.
+                // parity: which of the three `tick` bodies it has.
                 .flight = sticks ? Flight::Arrow : (acceleration != 0.0 ? Flight::Hurting : Flight::Thrown)};
 }
 
-/// parity: `AbstractArrow.onHitBlock` scales by a `0.05F`, and the float widened to a double is not
-/// the same number as `0.05`. The arrow ends up a fraction off otherwise.
+/// parity: `AbstractArrow.onHitBlock` scales by the float `0.05F`.
 constexpr double kStuckBackoff = static_cast<double>(0.05F);
 
 /// parity: `AbstractArrow.tickDespawn`'s twelve hundred turns.
 constexpr std::int32_t kDespawnTicks = 1200;
 
-/// parity: `Vec3.normalize`, which answers zero rather than dividing when the vector is this short.
+/// parity: `Vec3.normalize`.
 constexpr double kNormalizeFloor = 1.0E-4;
 
-/// parity: `Math.signum`, which is what vanilla backs the arrow off along and not the direction.
+/// parity: `Math.signum`.
 [[nodiscard]] double signum(double value) { return value > 0.0 ? 1.0 : (value < 0.0 ? -1.0 : 0.0); }
 
 /// parity: the two `atan2` calls that turn the movement into a yaw and a pitch.
@@ -52,8 +50,7 @@ void aimAlongMovement(ServerEntity& entity) {
     entity.pitch = static_cast<float>(std::atan2(entity.velocityY, horizontal) * kDegrees);
 }
 
-/// parity: `AbstractArrow.tick`'s first block, `aabb.move(blockPos).contains(position)` over every
-/// box of the collision shape. `AABB.contains` is half open on each axis.
+/// parity: `AbstractArrow.tick`'s `aabb.move(blockPos).contains(position)`.
 [[nodiscard]] bool insideCollision(world::WorldState& world, double x, double y, double z) {
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
@@ -75,8 +72,7 @@ void aimAlongMovement(ServerEntity& entity) {
     return false;
 }
 
-/// parity: `AbstractArrow.shouldFall`, `noCollision(new AABB(position, position).inflate(0.06))`: a
-/// stuck arrow lets go the moment nothing collides with the little box around its point.
+/// parity: `AbstractArrow.shouldFall`.
 [[nodiscard]] bool nothingHolds(world::WorldState& world, double x, double y, double z) {
     constexpr double kGrip = 0.06;
     constexpr double kUnits = 16.0;
@@ -131,20 +127,16 @@ std::span<const Kind> all() {
         make("trident", 0.05, 0.99, true), snowball(), make("egg", 0.03, 0.99, false),
         make("ender_pearl", 0.03, 0.99, false), make("experience_bottle", 0.07, 0.99, false),
         make("potion", 0.05, 0.99, false), fireball(), make("small_fireball", 0.0, 0.95, false, kAcceleration),
-        // parity: `AbstractWindCharge` neither slows down nor speeds up: inertia one, acceleration
-        // zeroed in its constructor.
+        // parity: `AbstractWindCharge` has inertia one and acceleration zeroed in its constructor.
         make("wind_charge", 0.0, 1.0, false), make("breeze_wind_charge", 0.0, 1.0, false),
         make("dragon_fireball", 0.0, 0.95, false, kAcceleration), make("wither_skull", 0.0, 0.95, false, kAcceleration),
-        // parity: `LlamaSpit.getDefaultGravity` and `getAirDrag`, the drag a float widened. Its own
-        // tick is `CombatSystem`'s, not the thrown one.
+        // parity: `LlamaSpit.getDefaultGravity` and `getAirDrag` (a float widened).
         make("llama_spit", 0.06, static_cast<double>(0.99F), false)};
     return kinds;
 }
 
 std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
-    /// parity: the items `DispenseItemBehavior.bootStrap` registers a projectile behaviour for, each
-    /// with the `createDispenseConfig` its item overrides. The ones this build has no entity for
-    /// (fireworks and lingering potions) are not here and fall back to being thrown.
+    /// parity: `DispenseItemBehavior.bootStrap`.
     struct Entry {
         std::string_view item;
         std::string_view kind;
@@ -158,8 +150,7 @@ std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
     /// parity: `ThrowablePotionItem.createDispenseConfig`, a quarter harder and half as wide.
     constexpr float kPotionPower = kDispenserPower * 1.25F;
     constexpr float kPotionUncertainty = kDispenserUncertainty * 0.5F;
-    /// parity: `FireChargeItem.createDispenseConfig` and `WindChargeItem`'s, the same numbers: a
-    /// whole block out with no lift at all.
+    /// parity: `FireChargeItem.createDispenseConfig` and `WindChargeItem`'s.
     constexpr double kChargeReach = 1.0;
     constexpr float kChargePower = 1.0F;
     constexpr float kChargeUncertainty = 6.6666665F;
@@ -234,8 +225,7 @@ void shoot(ServerEntity& entity, double dirX, double dirY, double dirZ, float po
 
 std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, const Kind& kind) {
     ++entity.age;
-    // parity: `AbstractArrow.tick` without physics: straight through everything, slowed and never
-    // falling, facing back along the way it came.
+    // parity: `AbstractArrow.tick` without physics.
     if (kind.sticks && entity.noPhysics) {
         entity.onGround = false;
         entity.inGroundTime = 0;
@@ -252,10 +242,7 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
         return std::nullopt;
     }
     if (entity.onGround) {
-        // parity: `AbstractArrow.tick` asks every turn whether what it is stuck in is still there,
-        // and `startFalling` lets it go: an arrow in a block a piston took away falls rather than
-        // hanging in the air. The movement it leaves with is its own times a random fraction, and
-        // a stuck arrow's is zero, so it drops straight down.
+        // parity: `AbstractArrow.tick`.
         if (!kind.sticks) {
             return std::nullopt;
         }
@@ -269,15 +256,11 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
             ++entity.inGroundTime;
             return std::nullopt;
         }
-        // parity: the whole in-ground branch ends the turn, so the tick an arrow lets go on is a
-        // tick it does not move: it starts falling on the next one.
+        // parity: the in-ground branch ends the turn, so the tick an arrow lets go on it does not move.
         entity.onGround = false;
         return std::nullopt;
     }
-    // parity: `AbstractArrow.tick` looks at the block the arrow stands in first, and an arrow whose
-    // point is inside one of its collision boxes stops dead without telling the block: one shot
-    // point blank out of a dispenser sticks in the target and never fires it. Only an arrow does
-    // this; a thrown projectile hits from inside a shape like anything else.
+    // parity: `AbstractArrow.tick`.
     if (kind.sticks && insideCollision(world, entity.x, entity.y, entity.z)) {
         entity.velocityX = 0.0;
         entity.velocityY = 0.0;
@@ -293,22 +276,18 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
         entity.velocityY *= drag;
         entity.velocityZ *= drag;
     };
-    // parity: `Entity.applyGravity` returns at once when `isNoGravity`, so a projectile with the tag
-    // flies dead straight. Measured in `botonflecha`, where a flecha that should hang at half a
-    // block fell into the button and pressed it.
+    // parity: `Entity.applyGravity` returns early when `isNoGravity`.
     const auto fall = [&entity, &kind] {
         if (!entity.noGravity) {
             entity.velocityY -= kind.gravity;
         }
     };
-    // parity: `ThrowableProjectile.tick` is `applyGravity` then `applyInertia` and only then the
-    // move, so the tick it is thrown on already falls.
+    // parity: `ThrowableProjectile.tick` applies gravity then inertia before the move.
     if (kind.flight == Flight::Thrown) {
         fall();
         slow();
     }
-    // parity: `AbstractHurtingProjectile.applyInertia` adds the acceleration back along the way it
-    // is going before the drag, so a fireball settles at a speed rather than stopping.
+    // parity: `AbstractHurtingProjectile.applyInertia`.
     if (kind.flight == Flight::Hurting) {
         const double speed = std::sqrt((entity.velocityX * entity.velocityX) + (entity.velocityY * entity.velocityY) +
                                        (entity.velocityZ * entity.velocityZ));
@@ -328,10 +307,7 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
         entity.y = hit->y;
         entity.z = hit->z;
         if (kind.sticks) {
-            // parity: `AbstractArrow.onHitBlock` backs the arrow off by a twentieth of a block along
-            // each axis it was moving on, **signum and not the normalized direction**, so it ends up
-            // in the square in front of what it hit rather than on its face. Measured in
-            // `flechavibra`, where ours stuck one square further along than the jar's.
+            // parity: `AbstractArrow.onHitBlock`.
             entity.x -= signum(entity.velocityX) * kStuckBackoff;
             entity.y -= signum(entity.velocityY) * kStuckBackoff;
             entity.z -= signum(entity.velocityZ) * kStuckBackoff;
@@ -347,8 +323,7 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
     entity.x += entity.velocityX;
     entity.y += entity.velocityY;
     entity.z += entity.velocityZ;
-    // parity: an arrow moves with what it had and slows down and falls **after**, which is why the
-    // first tick of its flight goes the whole way the bow sent it.
+    // parity: an arrow moves first and slows and falls after, so its first tick goes the whole way the bow sent it.
     if (kind.flight == Flight::Arrow) {
         slow();
         fall();

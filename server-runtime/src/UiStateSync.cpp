@@ -101,8 +101,7 @@ void UiStateSync::sendEffectRemoved(const Identifier& effect) {
     if (!id.has_value()) {
         return;
     }
-    // parity: `AbsorptionMobEffect.onEffectRemoved` takes back exactly what it gave, and here
-    // nothing else gives any, so the pool empties.
+    // parity: `AbsorptionMobEffect.onEffectRemoved`.
     if (effect == world::mobEffects::absorption()) {
         session->absorption = 0.0F;
     }
@@ -144,7 +143,6 @@ void UiStateSync::syncHeldAttributes() {
             changed.push_back(snapshot);
         }
     }
-    // One that lost every modifier goes back to its bare base, which the client has to be told too.
     for (const auto& [id, snapshot] : sentAttributes_) {
         if (!now.contains(id)) {
             changed.push_back(Snapshot{.attribute = id, .base = snapshot.base, .modifiers = {}});
@@ -167,7 +165,6 @@ void UiStateSync::tickUi() {
         return;
     }
     const ClientSession::PluginHooks& plugins = owner_->options().plugins;
-    // A plugin holding a surface is reason enough to draw, even with all the files switched off.
     const bool anyEnabled = owner_->options().ui && owner_->options().ui().anyEnabled();
     const bool pluginDraws = (plugins.surfaces.holdsSidebar && plugins.surfaces.holdsSidebar()) ||
                              (plugins.surfaces.holdsBossBar && plugins.surfaces.holdsBossBar());
@@ -187,9 +184,7 @@ void UiStateSync::sendTime(const world::LoadedWorld& world) {
 
 void UiStateSync::sendWeather(const world::WorldWeather& weather) {
     using wire::protocol::play::GameEventPacket;
-    // parity: `PlayerList.sendLevelInfo`, which announces rain as a start or stop event *and* the
-    // two levels: the events swap the client's weather renderer, the levels set how heavy it is,
-    // and a client sent only one of the two shows the wrong thing.
+    // parity: `PlayerList.sendLevelInfo`.
     owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         GameEventPacket{.event = weather.raining ? GameEventPacket::kStartRaining : GameEventPacket::kStopRaining,
                         .param = 0.0F}
@@ -257,8 +252,7 @@ void UiStateSync::sendPermissionLevel() {
     if (session == nullptr || dispatcher == nullptr) {
         return;
     }
-    // The client parses commands locally against this: below gamemaster it refuses selectors, so
-    // without it `/tellraw @a ...` is underlined in red even though the server runs it fine.
+    // The client parses commands locally: below gamemaster it refuses selectors, underlining `/tellraw @a` in red.
     const std::int32_t level =
         command::PlayerCommandSource{*session, dispatcher->environment().groups()}.permissionLevel();
     const wire::protocol::play::EntityEventPacket packet =
@@ -275,7 +269,7 @@ void UiStateSync::sendStats() {
     using wire::protocol::play::AwardStatsPacket;
     using wire::protocol::play::StatCounter;
     std::vector<StatCounter> stats;
-    // parity: `ClientboundAwardStatsPacket`, each counter as its type and the id of what it counts.
+    // parity: `ClientboundAwardStatsPacket`.
     const auto itemId = [](std::string_view name) -> std::optional<std::int32_t> {
         const std::expected<Identifier, wire::common::IdentifierError> item = Identifier::parse(name);
         const server::registry::Item* entry =

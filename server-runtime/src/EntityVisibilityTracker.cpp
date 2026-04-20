@@ -35,7 +35,7 @@ using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SetEquipmentPacket;
 using wire::protocol::play::SpawnEntityPacket;
 
-/// parity: `ServerEntity.sendChanges`, which sends nothing at all for one that has not moved.
+/// parity: `ServerEntity.sendChanges`.
 constexpr double kPositionEpsilon = 0.0001;
 constexpr double kRotationEpsilon = 0.5;
 
@@ -44,7 +44,7 @@ constexpr std::uint8_t kTextDisplayTextIndex = 23;
 constexpr std::uint8_t kDisplayBillboardIndex = 15;
 constexpr std::int8_t kBillboardCenter = 3;
 
-/// parity: the attributes `Attribute.setSyncable` marks, which a client moves and draws with.
+/// parity: the attributes `Attribute.setSyncable` marks.
 [[nodiscard]] bool syncable(std::string_view name) {
     static constexpr std::array<std::string_view, 32> kSynced{"air_drag_modifier",
                                                               "armor",
@@ -82,8 +82,7 @@ constexpr std::int8_t kBillboardCenter = 3;
     return std::ranges::find(kSynced, path) != kSynced.end();
 }
 
-/// parity: `ServerEntity.sendPairingData`'s `ClientboundUpdateAttributesPacket`, for the synced
-/// attributes that differ from what the client builds the mob with on its own.
+/// parity: `ServerEntity.sendPairingData`.
 [[nodiscard]] std::vector<wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot>
 pairingAttributes(const ServerEntity& entity) {
     using Packet = wire::protocol::play::UpdateAttributesPacket;
@@ -121,7 +120,6 @@ pairingAttributes(const ServerEntity& entity) {
     return out;
 }
 
-/// The equipment slots a player is drawn wearing, in the order they are read off the inventory.
 constexpr std::array<SetEquipmentPacket::SlotType, 6> kEquipmentSlots{
     SetEquipmentPacket::SlotType::MainHand, SetEquipmentPacket::SlotType::OffHand, SetEquipmentPacket::SlotType::Feet,
     SetEquipmentPacket::SlotType::Legs,     SetEquipmentPacket::SlotType::Chest,   SetEquipmentPacket::SlotType::Head};
@@ -162,8 +160,6 @@ void EntityVisibilityTracker::syncSummonedEntities() {
         if (entity->removed) {
             continue;
         }
-        // An entity somebody else can see and this player cannot: taken away if they were already
-        // shown it, and skipped if they were not.
         if (!visibleTo(*entity, me)) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
@@ -289,8 +285,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                            std::abs(last->second[2] - entity->z) > kPositionEpsilon ||
                            std::abs(last->second[3] - static_cast<double>(entity->yaw)) > kRotationEpsilon ||
                            std::abs(last->second[4] - static_cast<double>(entity->headYaw)) > kRotationEpsilon;
-        // parity: `ServerEntity.handleMinecartPosRot` under `minecart_improvements`: the cart's turn as
-        // the steps it went through, or where it is now when it took none.
+        // parity: `ServerEntity.handleMinecartPosRot`.
         if (entity->cart != nullptr && entity->cart->experimental && !entity->vehicleId.has_value()) {
             world::LoadedWorld* here = owner_->currentWorld();
             const bool fresh = here != nullptr && entity->cart->lerpStepsTick == here->gameTime();
@@ -332,8 +327,6 @@ void EntityVisibilityTracker::syncSummonedEntities() {
         lastEntityPositions_.insert_or_assign(
             entity->entityId(), std::array<double, 5>{entity->x, entity->y, entity->z, static_cast<double>(entity->yaw),
                                                       static_cast<double>(entity->headYaw)});
-        // parity: the position *sync*, which the client interpolates towards: a teleport every tick
-        // snaps, which is what made a falling block judder down.
         owner_->sendPlayPacket(wire::protocol::play::EntityPositionSyncPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::EntityPositionSyncPacket{.entityId = entity->entityId(),
                                                            .x = entity->x,
@@ -434,8 +427,7 @@ void EntityVisibilityTracker::sendDisplayText(std::int32_t entityId, const std::
             .entries = {SetEntityDataPacket::Entry{
                             .index = kTextDisplayTextIndex,
                             .value = SetEntityDataPacket::TextValue{.value = wire::text::miniMessage::parse(text)}},
-                        // Turned to face whoever is reading it. A display left as it spawned is
-                        // drawn flat in the world, so from the other side it reads backwards.
+                        // Turned to face the reader: a display left as it spawned reads backwards from the other side.
                         SetEntityDataPacket::Entry{.index = kDisplayBillboardIndex,
                                                    .value = SetEntityDataPacket::ByteValue{.value = kBillboardCenter}}}}
             .write(buffer);
@@ -458,8 +450,6 @@ void EntityVisibilityTracker::syncPlayers() {
         if (!trackedPlayers_.insert(other->entityId()).second) {
             continue;
         }
-        // parity: the tab-list entry always precedes the entity. The client matches the two by
-        // profile uuid to find the skin, and an entity that arrives first is drawn bald and grey.
         owner_->sendPlayPacket(wire::protocol::play::PlayerInfoUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::PlayerInfoUpdatePacket::initializing(
                 {wire::protocol::play::PlayerInfoEntry{.uuid = other->uuid(),
@@ -541,8 +531,7 @@ void EntityVisibilityTracker::syncEquipmentOf(const PlayerSession& other) {
     }
     const bool first = tracked == trackedEquipment_.end();
     trackedEquipment_.insert_or_assign(other.entityId(), worn);
-    // parity: `ServerEntity.sendPairingData` sends nothing for an entity carrying nothing, so an
-    // empty-handed player costs no packet at all.
+    // parity: `ServerEntity.sendPairingData`.
     if (first && std::ranges::none_of(worn, [](const auto& stack) { return stack.has_value(); })) {
         return;
     }

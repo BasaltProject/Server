@@ -23,7 +23,7 @@ ChunkTracker::Delta ChunkTracker::update(const std::int32_t centerX, const std::
         throw std::invalid_argument{"radius must be non-negative"};
     }
 
-    // parity: `Positioned.forEach`, the square one past the view distance filtered by `contains`.
+    // parity: `Positioned.forEach`.
     std::set<ChunkPos> desired;
     for (std::int32_t x = centerX - radius - 1; x <= centerX + radius + 1; ++x) {
         for (std::int32_t z = centerZ - radius - 1; z <= centerZ + radius + 1; ++z) {

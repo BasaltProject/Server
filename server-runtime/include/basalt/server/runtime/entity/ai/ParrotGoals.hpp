@@ -4,8 +4,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `LandOnOwnersShoulderGoal`: a tamed parrot not told to sit lands on its owner's shoulder
-/// when their boxes meet, as long as the owner is on foot, dry and not flying.
+/// parity: `LandOnOwnersShoulderGoal`.
 class LandOnOwnersShoulderGoal final : public Goal {
 public:
     [[nodiscard]] bool canUse(MobContext& mob) override;

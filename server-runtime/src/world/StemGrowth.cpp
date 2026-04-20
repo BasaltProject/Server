@@ -14,7 +14,6 @@
 namespace basalt::server::runtime::world {
 namespace {
 
-/// Which stem grows what, and what it turns into once it has.
 constexpr std::array<std::pair<std::string_view, std::string_view>, 2> kFruitOf{
     {{"pumpkin_stem", "pumpkin"}, {"melon_stem", "melon"}}};
 
@@ -93,8 +92,6 @@ void cocoaGrowth::cocoa(WorldState& world, std::int32_t x, std::int32_t y, std::
     if (random.nextInt(kOdds) != 0) {
         return;
     }
-    // The cap says the same thing the block's own states do, since a pod has no fourth age; it is
-    // here because the number is what vanilla writes, not the shape of the state table.
     growthSupport::grow(world, x, y, z, stateId, kMaxAge, changes);
 }
 

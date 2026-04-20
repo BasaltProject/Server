@@ -23,7 +23,6 @@ namespace {
 
 namespace reg = server::registry;
 
-/// The noise a block makes under a hand, to everyone in that world at once.
 void playBlockSound(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
                     const std::int32_t z, const std::int32_t stateId, const std::string& sound, const float volume,
                     const float pitch) {
@@ -42,7 +41,7 @@ std::string axisOf(const std::string_view direction) {
     return direction == "north" || direction == "south" ? "z" : "x";
 }
 
-/// parity: `ItemFrame`'s own direction numbering, which a block event reuses for the bell.
+/// parity: `ItemFrame`'s own direction numbering.
 std::int32_t frameDirectionData(const std::string_view facing) {
     if (facing == "south") {
         return 0;
@@ -63,8 +62,7 @@ bool tuneNoteBlockFor(const BreakContext& context, world::LoadedWorld& world, co
         return false;
     }
     announceBlock(context, world.name(), x, y, z, change->stateId);
-    // parity: a note block writes with flag **three**, unlike every other block a bare hand cycles,
-    // so moving the note tells the neighbours. Without this a comparator beside one never hears it.
+    // parity: a note block writes with flag three, unlike other blocks a bare hand cycles, so a comparator hears it.
     notifyAround(context, world, x, y, z, std::nullopt);
     if (context.blocks != nullptr) {
         context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, change->stateId, change->effects);
@@ -102,7 +100,7 @@ bool ringBellFor(const BreakContext& context, world::LoadedWorld& world, const s
                                   .volume = 2.0F,
                                   .pitch = 1.0F}};
     context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId, effects);
-    // parity: `BellBlockEntity.triggerEvent` over `updateEntities`, every villager in earshot.
+    // parity: `BellBlockEntity.triggerEvent` over `updateEntities`.
     VillagerWorldSystem::alertVillagers(world, x, y, z);
     if (player != nullptr) {
         statAwards::award(*player, "bell_ring");
@@ -118,8 +116,7 @@ bool toggleBlockFor(const BreakContext& context, world::LoadedWorld& world, cons
     if (!toggled.has_value()) {
         return false;
     }
-    // parity: `ButtonBlock.press` schedules its own release. Everything else stays put until
-    // something touches it again.
+    // parity: `ButtonBlock.press` schedules its own release.
     if (const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(before.value_or(0));
         pressed.has_value()) {
         if (const wire::common::Identifier* button = reg::blockStateDefinitions::blockOf(before.value_or(0));
@@ -130,9 +127,7 @@ bool toggleBlockFor(const BreakContext& context, world::LoadedWorld& world, cons
     for (const world::BlockChange& change : toggled->changes) {
         announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
     }
-    // parity: `LeverBlock.updateNeighbours`, twice over: the block itself and whatever it is stuck
-    // to, or a torch on the far side of the wall never hears the flip. A door, a trapdoor or a gate
-    // writes without `UPDATE_NEIGHBORS`, so a hand on one of those only redraws the shapes.
+    // parity: `LeverBlock.updateNeighbours`.
     const bool tells = world::blockInteractions::handToggleTellsNeighbours(before.value_or(0));
     for (const world::BlockChange& change : toggled->changes) {
         if (!tells) {
@@ -147,9 +142,7 @@ bool toggleBlockFor(const BreakContext& context, world::LoadedWorld& world, cons
         }
     }
     playBlockSound(context, world, x, y, z, before.value_or(0), toggled->sound, 1.0F, 1.0F);
-    // parity: `LeverBlock.pull` and `ButtonBlock.press` raise `BLOCK_ACTIVATE` or `BLOCK_DEACTIVATE`
-    // by the new `powered`, and a door, a trapdoor or a gate raise `BLOCK_OPEN` or `BLOCK_CLOSE` by
-    // the new `open`. A sculk sensor beside one hears the flip.
+    // parity: `LeverBlock.pull`.
     if (const std::optional<std::int32_t> after = world.state().blockState(x, y, z); after.has_value()) {
         const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*after);
         if (const auto open = properties.find("open"); open != properties.end()) {
@@ -171,8 +164,7 @@ bool cycleBlockFor(const BreakContext& context, world::LoadedWorld& world, const
     announceBlock(context, world.name(), x, y, z, cycled->stateId);
     const wire::common::Identifier* cycledBlock = reg::blockStateDefinitions::blockOf(cycled->stateId);
     const bool detector = cycledBlock != nullptr && cycledBlock->path() == "daylight_detector";
-    // parity: `DaylightDetectorBlock.useWithoutItem` writes `inverted` telling nobody and then lets
-    // `updateSignalStrength` write the reading, which is the write that carries.
+    // parity: `DaylightDetectorBlock.useWithoutItem`.
     const std::optional<world::BlockChange> reread =
         world::daylightDetectors::update(world.state(), world.clock(), world.skyDarken(), x, y, z,
                                          config::dimensionFacts(world.declaration().dimension).hasSkylight,
@@ -180,9 +172,7 @@ bool cycleBlockFor(const BreakContext& context, world::LoadedWorld& world, const
     if (reread.has_value()) {
         announceBlock(context, world.name(), x, y, z, reread->stateId);
     }
-    // parity: a repeater writes with flag three, so cycling its delay tells the neighbours. The
-    // detector's own `inverted` goes in with flag two and only `updateSignalStrength` carries, and
-    // that one writes nothing at all when the reading did not move.
+    // parity: `inverted`.
     if (detector && !reread.has_value()) {
         reshapeAround(context, world, x, y, z);
     } else {

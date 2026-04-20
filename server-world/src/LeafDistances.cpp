@@ -112,7 +112,6 @@ std::int32_t leafDistances::assign(Chunk& chunk) {
         current = next;
     }
 
-    // A canopy is a handful of distinct states, so resolving each one once covers the chunk.
     std::map<std::int32_t, DistanceStates> statesByDistance;
     std::int32_t corrected = 0;
     for (std::size_t cell = 0; cell < cells.size(); ++cell) {

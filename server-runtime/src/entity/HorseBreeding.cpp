@@ -17,7 +17,7 @@ constexpr std::string_view kMovementSpeed = "minecraft:movement_speed";
 constexpr std::int32_t kVariants = 7;
 constexpr std::int32_t kMarkings = 5;
 
-/// parity: the ends of `generateMaxHealth`, `generateJumpStrength` and `generateSpeed`, as floats.
+/// parity: the ends of `generateMaxHealth`.
 constexpr double kMinHealth = 15.0;
 constexpr double kMaxHealthBound = 30.0;
 const double kMinJump = static_cast<double>(static_cast<float>(static_cast<double>(0.4F)));

@@ -14,8 +14,6 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// The bee: its hive and flower, the nectar it carries, its sting and its anger.
-///
 /// parity: `Bee` and the `NeutralMob` half of it.
 namespace bees {
 
@@ -46,7 +44,6 @@ inline constexpr float kPathLength = 48.0F;
 
 using Pos = std::array<std::int32_t, 3>;
 
-/// What a bee keeps beyond the entity itself.
 struct BeeState {
     std::optional<Pos> hive;
     std::optional<Pos> flower;
@@ -63,7 +60,7 @@ struct BeeState {
     /// parity: `NeutralMob`'s end time and `persistentAngerTarget`.
     std::int64_t angerEndTime = -1;
     std::optional<wire::common::Uuid> angryAt;
-    /// parity: the old `AngerTime`, ticks from whenever the bee was loaded; settled on its first turn.
+    /// parity: the old `AngerTime`.
     std::optional<std::int32_t> legacyAngerTime;
     /// parity: `BeePollinateGoal.pollinating`, which the navigation and the hive both read.
     bool pollinating = false;
@@ -73,10 +70,9 @@ struct BeeState {
 
 [[nodiscard]] bool isBee(const wire::common::Identifier& type);
 
-/// The bee's state, made on first use from what it saved. `random` rolls the flower cooldown.
 [[nodiscard]] BeeState& stateOf(ServerEntity& bee, random::RandomSource& random);
 
-/// Writes the state into a saved entity. parity: `addAdditionalSaveData` and `addPersistentAngerSaveData`.
+/// parity: `addAdditionalSaveData` and `addPersistentAngerSaveData`.
 void write(const ServerEntity& bee, wire::nbt::NbtCompound& tag);
 
 [[nodiscard]] std::int8_t flagsOf(const BeeState& state);
@@ -100,7 +96,7 @@ void dropFlower(BeeState& state, random::RandomSource& random);
 /// parity: `Vec3i.closerThan` from the bee's block.
 [[nodiscard]] bool closerThan(const ServerEntity& bee, const Pos& target, double distance);
 
-/// parity: `BeehiveBlockEntity.IGNORED_BEE_TAGS`, stripped going in and coming out of a hive.
+/// parity: `BeehiveBlockEntity.IGNORED_BEE_TAGS`.
 void stripHiveTags(wire::nbt::NbtCompound& tag);
 
 } // namespace bees

@@ -16,8 +16,7 @@ namespace {
     attributes.emplace_back(
         "minecraft:audio/background_music",
         BiomeAttribute::music({{"default", MusicTrack{"minecraft:music.nether." + musicPath, 12000, 24000}}}));
-    // The particles go between the music and the fog, not after them: the order is what the codec
-    // reads back, so a biome with no particles is not the same shape with a gap in it.
+    // Particles go between the music and the fog: the codec reads that order back, so a gap changes the shape.
     if (particle.has_value()) {
         attributes.emplace_back("minecraft:visual/ambient_particles", BiomeAttribute::ambientParticles({*particle}));
     }

@@ -10,12 +10,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// The features that are a shape rather than a scattered patch: springs, the dungeon, the End's own
-/// platforms, lakes and the lush cave floors, each at the position it was handed.
-///
-/// Generation reaches them through its own steps; this is the door `/place feature` comes in by. A
-/// multi-block body writes the intersection this chunk can own, and block entities stay beside those
-/// local blocks.
 namespace standaloneFeatures {
 
 [[nodiscard]] const std::set<std::string, std::less<>>& placedIds();

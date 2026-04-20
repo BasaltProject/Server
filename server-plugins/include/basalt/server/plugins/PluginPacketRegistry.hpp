@@ -12,18 +12,10 @@
 #include <vector>
 
 namespace basalt::server::plugins {
-
 class LoadedPlugin;
 
-/// Who is watching which packet.
-///
-/// The same two verbs as the event bus and the same five priorities: one kind decides and may
-/// cancel, the other only looks. What is different is the promise underneath: with nobody listening
-/// to a name, `listening` is a map lookup and the packet is never opened, never copied and never
-/// handed to Lua. That is the whole reason this can sit on the path every packet takes.
 class PluginPacketRegistry final : public PluginPacketBus {
 public:
-    /// Hands one packet to one listener, on its own state and its own budget.
     using Deliver = std::function<void(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPacket& packet)>;
 
     explicit PluginPacketRegistry(Deliver deliver) : deliver_(std::move(deliver)) {}
@@ -51,5 +43,4 @@ private:
     PluginPacket reusable_;
     std::int64_t nextId_ = 0;
 };
-
 } // namespace basalt::server::plugins

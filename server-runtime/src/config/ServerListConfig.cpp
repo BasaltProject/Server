@@ -10,7 +10,6 @@ namespace {
 
 using wire::common::toml::TomlTable;
 
-/// The two greetings the shipped file carries, replaced together when a vanilla MOTD is imported.
 constexpr std::string_view kModernMotdBlock =
     R"(motd = [
     "              <bold><gradient:gray:white>BASALT SERVER</gradient></bold> <gray>[1.8-26.2]</gray>",
@@ -136,7 +135,6 @@ std::string serverListDefaultContents(const std::optional<std::string>& legacyMo
         });
     }
 
-    // `\n` as a vanilla properties file writes it, which is two characters and not a newline.
     std::string text = *legacyMotd;
     replaceAll(text, "\\n", "\n");
     std::string lines = "[\n";
@@ -175,8 +173,7 @@ std::expected<ServerListConfig, std::string> ServerListConfig::load(const Config
         return std::unexpected(read.error());
     }
 
-    // The one switched on by hand, if any, named at startup: a server showing its maintenance
-    // message because somebody left a flag on is a confusing thing to debug from the outside.
+    // Named at startup: a server showing its maintenance message because a flag was left on is hard to debug.
     const ServerListProfile* active = nullptr;
     for (const ServerListProfile& profile : read->first) {
         if (profile.header.isActive && (active == nullptr || profile.header.priority > active->header.priority)) {

@@ -21,7 +21,7 @@ constexpr std::size_t kInput = static_cast<std::size_t>(kInputSlot);
 constexpr std::size_t kFuel = static_cast<std::size_t>(kFuelSlot);
 constexpr std::size_t kResult = static_cast<std::size_t>(kResultSlot);
 
-/// parity: `AbstractFurnaceBlockEntity`'s own save keys, ints since 26.3 where 26.2 wrote shorts.
+/// parity: `AbstractFurnaceBlockEntity`'s own save keys.
 constexpr std::string_view kLitRemainingKey = "lit_time_remaining";
 constexpr std::string_view kLitTotalKey = "lit_total_time";
 constexpr std::string_view kCookedKey = "cooking_time_spent";
@@ -29,8 +29,7 @@ constexpr std::string_view kCookTotalKey = "cooking_total_time";
 constexpr std::string_view kRecipesUsedKey = "RecipesUsed";
 constexpr std::string_view kSpeedKey = "speed_multiplier";
 
-/// parity: `cooking/fast_burn_time_reduction_factor` and `cooking/fast_speed_multiplier`, what the
-/// `block/fast_cooking` predicate (a smoker or a blast furnace) picks over the plain 1.
+/// parity: `cooking/fast_burn_time_reduction_factor` and `cooking/fast_speed_multiplier`.
 constexpr std::int32_t kFastBurnDivisor = 2;
 constexpr float kFastSpeed = 2.0F;
 
@@ -67,8 +66,7 @@ constexpr std::array<std::pair<std::string_view, Cooker>, 3> kCookers = {{
     return left;
 }
 
-/// parity: `canBurn`: an empty result slot always takes it, a matching one takes it while it fits
-/// under both the furnace's ceiling and the result item's own.
+/// parity: `canBurn`.
 [[nodiscard]] bool canBurn(const State& state, std::int32_t maxStackSize, const ItemStack& result) {
     const std::optional<ItemStack>& inResult = state.items[kResult];
     if (!inResult.has_value()) {
@@ -87,16 +85,14 @@ void burn(State& state, const ItemStack& ingredient, const ItemStack& result) {
     } else {
         state.items[kResult] = result;
     }
-    // parity: the fuel slot is read as it stands now, so a lava bucket eaten this same tick leaves
-    // the bucket the sponge then fills.
+    // parity: the fuel slot is read as it stands now, so a lava bucket eaten this same tick leaves.
     if (ingredient.item == wetSponge() && state.items[kFuel].has_value() && state.items[kFuel]->item == bucket()) {
         state.items[kFuel] = ItemStack{.item = waterBucket(), .count = 1};
     }
     state.items[kInput] = shrink(ingredient);
 }
 
-/// parity: `consumeFuel`: the remainder takes the slot when the fuel runs out, and is dropped at
-/// the furnace when there is still fuel left.
+/// parity: `consumeFuel`.
 void consumeFuel(State& state, const ItemStack& fuel, const DropRemainder& drop) {
     std::optional<ItemStack> left = shrink(fuel);
     const wire::common::Identifier* remainder = registry::craftingRemainders::of(fuel.item);
@@ -111,7 +107,7 @@ void consumeFuel(State& state, const ItemStack& fuel, const DropRemainder& drop)
     state.items[kFuel] = std::move(left);
 }
 
-/// parity: `getTotalCookTime(recipe, entity)`, the recipe's time divided by the furnace's speed.
+/// parity: `getTotalCookTime(recipe, entity)`.
 [[nodiscard]] std::int32_t atSpeed(std::int32_t cookingTime, float speed) {
     if (speed <= 0.0F) {
         return cookingTime;
@@ -119,8 +115,7 @@ void consumeFuel(State& state, const ItemStack& fuel, const DropRemainder& drop)
     return static_cast<std::int32_t>(std::ceil(static_cast<double>(static_cast<float>(cookingTime) / speed)));
 }
 
-/// parity: `getIntOr`, which since 26.3 reads the counters as ints; a 26.2 save wrote shorts, and
-/// the jar's data fixers widen those, so either is taken.
+/// parity: `getIntOr`.
 [[nodiscard]] std::int32_t counterOf(const wire::nbt::NbtCompound& data, std::string_view key) {
     const wire::nbt::NbtTag* tag = data.find(key);
     if (tag == nullptr) {
@@ -150,8 +145,7 @@ FuelEffect fuelEffect(const wire::common::Identifier& fuel, Cooker cooker) {
     if (plain <= 0) {
         return FuelEffect{};
     }
-    // parity: `cooking/time_*` is `div(ticks, conditional(block/fast_cooking, 2, 1))`, int division,
-    // and `cooking/speed_default` the same condition over 2.0 and 1.0.
+    // parity: `cooking/time_*` is `div(ticks.
     const bool fast = cooker != Cooker::Smelting;
     return FuelEffect{.burnTicks = fast ? plain / kFastBurnDivisor : plain,
                       .speedMultiplier = fast ? kFastSpeed : 1.0F};
@@ -176,10 +170,7 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
     }
     const std::optional<ItemStack>& fuel = state.items[kFuel];
     const std::optional<ItemStack>& ingredient = state.items[kInput];
-    // parity: `setItem` sets `cookingTotalTime` and zeroes the progress. The slots here are written
-    // from a hopper, a command and a dispenser without going through anything furnace-shaped, so the
-    // invariant is kept here: with an input, the total is that input's time. An empty input keeps
-    // the last one's, as in vanilla, because taking the last item out goes through `shrink`.
+    // parity: `setItem` sets `cookingTotalTime` and zeroes the progress.
     if (ingredient.has_value()) {
         const std::int32_t wanted = cookTimeFor(state, recipeFor);
         if (state.cookingTotalTime != wanted) {
@@ -192,16 +183,14 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
     if (isLit || (fuel.has_value() && ingredient.has_value())) {
         if (ingredient.has_value()) {
             const Recipe* recipe = recipeFor ? recipeFor(*ingredient) : nullptr;
-            // parity: an input nothing cooks leaves the progress where it stands. Only a recipe
-            // whose result does not fit walks it back to zero.
+            // parity: an input nothing cooks leaves the progress where it stands. Only a recipe.
             if (recipe != nullptr) {
                 if (recipe->result.count > 0 && canBurn(state, maxStackSize, recipe->result)) {
                     if (!isLit && fuel.has_value()) {
                         const FuelEffect effect = fuelEffect(fuel->item, cooker);
                         state.litTimeRemaining = effect.burnTicks;
                         state.litTotalTime = effect.burnTicks;
-                        // parity: 26.3 takes the new fuel's speed even when it does not burn, and
-                        // stretches or shrinks the cook in hand keeping how far along it was.
+                        // parity: 26.3 takes the new fuel's speed even when it does not burn, and.
                         if (state.speedMultiplier != effect.speedMultiplier) {
                             moved = true;
                         }
@@ -250,8 +239,6 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
                 }
             }
         } else {
-            // Nothing in the input and the fire still on, which is the only way here, so whatever
-            // the progress was the tick above already counts as movement.
             state.cookingTimer = 0;
         }
     } else if (state.cookingTimer > 0) {
@@ -260,8 +247,7 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize,
         state.cookingTimer = stepped < 0 ? 0 : std::min(stepped, state.cookingTotalTime);
         moved = true;
     }
-    // parity: `wasLit != isLit` is the third and last thing that sets `changed`, and it is also what
-    // writes the block's own `lit`.
+    // parity: `wasLit != isLit` is the third and last thing that sets `changed`.
     return Ticked{.moved = moved, .changed = changed || wasLit != isLit};
 }
 

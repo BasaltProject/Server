@@ -15,7 +15,6 @@ namespace {
 
 using wire::text::Component;
 
-/// Ranges rather than a list of fifty numbers: what an operator wants to read is the span.
 [[nodiscard]] std::string describe(const std::set<std::int32_t>& protocols) {
     if (protocols.empty()) {
         return "none";

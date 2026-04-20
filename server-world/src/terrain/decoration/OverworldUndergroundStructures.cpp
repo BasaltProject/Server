@@ -20,7 +20,6 @@ using structure::StructureRuleTest;
 constexpr std::int32_t kRarity = 64;
 constexpr std::int32_t kMaxEmptyCorners = 4;
 constexpr std::int32_t kUndergroundStructuresStep = 3;
-/// `below_top 0`, the highest block the world can generate.
 constexpr std::int32_t kBelowTop = 319;
 
 [[nodiscard]] std::string_view biomePath(std::string_view id) {
@@ -85,7 +84,6 @@ const std::vector<FossilSpec>& fossils(std::int32_t worldMinY) {
             BlockRot{.integrity = 0.1F},
             protectedStates()};
         std::vector<FossilSpec> specs;
-        // `fossil_upper`: absolute 0 up to `below_top 0`, with the coal overlay.
         specs.push_back(FossilSpec{.index = 0,
                                    .minY = 0,
                                    .maxY = kBelowTop,
@@ -94,7 +92,6 @@ const std::vector<FossilSpec>& fossils(std::int32_t worldMinY) {
                                                                .fossilProcessors = rot,
                                                                .overlayProcessors = coal,
                                                                .maxEmptyCornersAllowed = kMaxEmptyCorners}});
-        // `fossil_lower`: `above_bottom 0` up to y -8, where the coal becomes diamond.
         specs.push_back(FossilSpec{.index = 1,
                                    .minY = worldMinY,
                                    .maxY = -8,
@@ -108,8 +105,7 @@ const std::vector<FossilSpec>& fossils(std::int32_t worldMinY) {
     return built;
 }
 
-/// parity: the only three biomes whose generation settings list the two fossils. The monster rooms
-/// share the step but not the biomes, which is why this is not the rooms' own set.
+/// parity: the only three biomes listing the two fossils.
 const std::set<std::string, std::less<>>& fossilBiomes() {
     static const std::set<std::string, std::less<>> biomes = {"desert", "swamp", "mangrove_swamp"};
     return biomes;
@@ -122,8 +118,7 @@ struct RoomSpec {
     std::int32_t maxY;
 };
 
-/// parity: `fossil_upper` and `fossil_lower`, whose chain is a rarity filter and not a count: one
-/// attempt in 64 chunks, and the draws below only happen in that chunk.
+/// parity: `fossil_upper`/`fossil_lower` use a rarity filter, one chunk in 64.
 void decorateFossil(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
                     const FossilSpec& fossil, const fossilFeature::TemplateLookup& templates,
                     const fossilFeature::OceanFloorAt& externalOceanFloorHeight) {
@@ -144,8 +139,7 @@ void decorateFossil(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleE
         chunk, random, structure::StructurePos{x, y, z}, fossil.spec, templates,
         [&chunk, &externalOceanFloorHeight](std::int32_t columnX, std::int32_t columnZ) -> std::optional<std::int32_t> {
             if ((columnX >> 4) == chunk.chunkX() && (columnZ >> 4) == chunk.chunkZ()) {
-                // parity: the fossil reads `OCEAN_FLOOR_WG`, the frozen map, not the live one: an
-                // ore blob or another fossil placed first must not raise the floor it buries to.
+                // parity: the fossil reads the frozen `OCEAN_FLOOR_WG`.
                 return chunk.worldgenHeightAt(columnX & 15, columnZ & 15, HeightmapType::OceanFloor);
             }
             return externalOceanFloorHeight ? externalOceanFloorHeight(columnX, columnZ) : std::nullopt;
@@ -182,7 +176,6 @@ void overworldUndergroundStructures::decorate(Chunk& chunk, const std::int64_t s
     }
     const std::vector<RoomSpec> rooms{
         RoomSpec{.index = 2, .count = 10, .minY = 0, .maxY = kBelowTop},
-        // `above_bottom 6` up to y -1, the deep pass.
         RoomSpec{.index = 3, .count = 4, .minY = chunk.verticalBounds().minY() + 6, .maxY = -1}};
     for (const RoomSpec& spec : rooms) {
         decorateRoom(chunk, seed, environment, spec);

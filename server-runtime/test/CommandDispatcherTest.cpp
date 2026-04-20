@@ -32,7 +32,6 @@ namespace suggestionProviders = basalt::server::runtime::command::suggestionProv
 
 namespace {
 
-/// A whole number, which is enough of an argument to test the tree with.
 class IntArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
@@ -50,7 +49,6 @@ public:
     }
 };
 
-/// One word, with a fixed list of completions, so the suggestion walk has something to answer.
 class WordArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
@@ -70,7 +68,6 @@ public:
     }
 };
 
-/// A source that may use nothing it is not told about, so permission filtering can be seen.
 class LimitedSource final : public CommandSource {
 public:
     explicit LimitedSource(std::vector<std::string> granted) : granted_(std::move(granted)) {}
@@ -97,7 +94,6 @@ private:
     std::vector<std::string> granted_;
 };
 
-/// A command built from a lambda, so a test declares one in three lines.
 class TestCommand final : public Command {
 public:
     TestCommand(std::string name, std::function<void(const CommandNodeBuilder&)> build,
@@ -155,7 +151,6 @@ TEST_CASE("an argument reaches the command already parsed") {
 
     CHECK(fixture.dispatcher.execute(fixture.console, "give 42") == 1);
     CHECK(seen == 42);
-    // Asking for a name the tree never declared answers nothing rather than misreading it.
     CHECK(fixture.dispatcher.execute(fixture.console, "give notanumber") == 0);
 }
 
@@ -178,8 +173,7 @@ TEST_CASE("an argument of the wrong type is not misread") {
 }
 
 TEST_CASE("a branch that fails is backtracked out of and the next one tried") {
-    // parity: brigadier's own backtracking, which `/teleport <destination>` against
-    // `/teleport <targets> <location>` depends on.
+    // parity: brigadier backtracking (`/teleport <destination>` vs `<targets> <location>`).
     Fixture fixture;
     std::string took;
     const auto word = std::make_shared<WordArgument>();
@@ -409,9 +403,6 @@ TEST_CASE("unregistering takes the command and its aliases with it") {
 }
 
 TEST_CASE("registering a name twice replaces it rather than offering it twice") {
-    // The server does this on purpose: a plain `/whitelist` goes in with the rest, and the one that
-    // can reach the running server replaces it once there is a server to reach. Two root children
-    // with one name is a tree a Bedrock client refuses outright.
     Fixture fixture;
     const auto plain = [](const CommandNodeBuilder& builder) {
         builder.executes([](const CommandContext&) { return Parsed<std::int32_t>{1}; });
@@ -428,7 +419,6 @@ TEST_CASE("registering a name twice replaces it rather than offering it twice") 
 }
 
 TEST_CASE("every argument that can complete is one the client will ask about") {
-    // The invariant: a provider nobody will ever call is a completion the player never sees.
     Fixture fixture;
     const auto word = std::make_shared<WordArgument>();
     fixture.dispatcher.registerNode("say", [&word](const CommandNodeBuilder& builder) {
@@ -442,7 +432,6 @@ TEST_CASE("every argument that can complete is one the client will ask about") {
 
     CHECK(fixture.dispatcher.unreachableSuggestions().empty());
 
-    // One that answers but never says so is exactly what the report is for.
     fixture.dispatcher.registerNode("whisper", [&word](const CommandNodeBuilder& builder) {
         builder.argument("message", word, [](const CommandNodeBuilder& argument) {
             argument.suggests([](const basalt::server::runtime::command::SuggestionContext&) {
@@ -473,8 +462,6 @@ TEST_CASE("a command that needs a player says so rather than crashing") {
 TEST_CASE("the second registration of a name is the one that stays alive") {
     Fixture fixture;
 
-    // The tree keeps references into the command object it was built from, so the object has to
-    // outlive the nodes: a dropped one leaves every run of that command reading freed memory.
     struct Watched final : Command {
         Watched(std::shared_ptr<bool> alive, std::int32_t answer)
             : Command("count", 0), alive_(std::move(alive)), answer_(answer) {}

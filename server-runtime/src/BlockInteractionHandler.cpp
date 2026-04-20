@@ -70,7 +70,7 @@ std::optional<Identifier> parsedOrNothing(const std::string& id) {
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// parity: the `attack_animation` every item carries, which is the default but for the spears.
+/// parity: the `attack_animation` every item carries.
 play::SwingAnimation attackAnimationOf(std::string_view itemId) {
     static constexpr std::array<std::pair<std::string_view, std::int32_t>, 7> kSpears = {{
         {"minecraft:wooden_spear", 13},
@@ -278,7 +278,6 @@ void BlockInteractionHandler::dropHeldItem(bool all) {
     }
     const std::int32_t dropCount = all ? held->count : 1;
     if (hooks_.dropAllowed && !hooks_.dropAllowed(*session, held->id)) {
-        // The client has already taken it out of its own hand.
         owner_->sendInventorySlot(heldSlot);
         return;
     }
@@ -292,14 +291,12 @@ void BlockInteractionHandler::dropHeldItem(bool all) {
     if (!item.has_value()) {
         return;
     }
-    // parity: `Player.drop` throws it forward from eye height along the look direction, rather than
-    // dropping it on the player's own feet where they would instantly walk back into it.
+    // parity: `Player.drop`.
     const double yaw = static_cast<double>(session->yaw) * std::numbers::pi / 180.0;
     const double pitch = static_cast<double>(session->pitch) * std::numbers::pi / 180.0;
     const double tossAngle = nextDouble() * 2 * std::numbers::pi;
     const double tossSpread = kTossSpread * nextDouble();
-    // parity: `createItemStackToDrop`, from the hand three tenths under the eyes, the stack whole and
-    // the thrower kept.
+    // parity: `createItemStackToDrop`.
     spawnDroppedItem(*item, dropCount, session->x,
                      session->y + world::fluids::eyeHeight(session->sneaking) - kHandBelowEyes, session->z,
                      (-std::sin(yaw) * std::cos(pitch) * kThrowSpeed) + (std::cos(tossAngle) * tossSpread),
@@ -319,7 +316,7 @@ void BlockInteractionHandler::handlePunch() {
     const std::optional<storage::StoredItemStack>& held = session->inventory.heldItem();
     const play::SwingAnimationPacket packet{
         .entityId = session->entityId(), .hand = 0, .animation = attackAnimationOf(held.has_value() ? held->id : "")};
-    // The swinging client animates its own arm, which is why this goes to the others and not back.
+    // The swinging client animates its own arm, so this goes to the others.
     for (const PlayerSession* other : owner_->playersInSameWorld()) {
         if (other->entityId() == session->entityId()) {
             continue;
@@ -373,8 +370,7 @@ void BlockInteractionHandler::tickDigging(PlayerSession& session) {
         return;
     }
     diggingTicks_++;
-    // parity: 26.3 `ServerPlayerGameMode.tick`: every tick of mining shows its dust off the face, and
-    // every fourth one its sound, to everyone around including the one mining.
+    // parity: `ServerPlayerGameMode.tick`.
     constexpr std::int32_t kDestroyDust = 2019;
     constexpr std::int32_t kDestroyDustAndSound = 2020;
     constexpr double kLevelEventRange = 64.0;
@@ -388,8 +384,6 @@ void BlockInteractionHandler::tickDigging(PlayerSession& session) {
             watcher->connection().sendLevelEvent(event, pos.x, pos.y, pos.z, diggingDirection_);
         }
     }
-    // The same progress the break itself uses, so the cracks run at the speed the tool really mines
-    // at rather than a guess.
     const float perTick = destroyProgressPerTick(*block, reg::blocks::hardnessOf(*block));
     if (perTick <= 0.0F) {
         return;
@@ -450,8 +444,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
         break;
     }
 
-    // The cracks everyone else sees. The digger draws its own, which is why this never goes back to
-    // them. parity: `ServerPlayerGameMode.destroyAndAck` and its `destroyProgress`.
+    // The cracks everyone else sees.
     if (action.action == Action::StartDestroyBlock) {
         // parity: `NoteBlock.attack`, which plays the note without moving it on.
         if (world::LoadedWorld* loaded = owner_->currentWorld(); loaded != nullptr) {
@@ -471,8 +464,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
                 striker != nullptr && struckBlock != nullptr && struckBlock->path() == "note_block") {
                 player::statAwards::award(*striker, "play_noteblock");
             }
-            // parity: `RedStoneOreBlock.attack` runs the same `interact` a right click does, so an
-            // ore lights whichever button was pressed on it.
+            // parity: `RedStoneOreBlock.attack`.
             if (const std::optional<world::BlockChange> glow =
                     world::miscGrowth::lightRedstoneOre(loaded->state(), action.pos.x, action.pos.y, action.pos.z);
                 glow.has_value()) {
@@ -499,12 +491,9 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
     if (gamemode == Gamemode::Creative) {
         breaksOn = Action::StartDestroyBlock;
     } else if (gamemode == Gamemode::Survival) {
-        // A block that comes apart in one tick is destroyed by the client the moment the dig starts,
-        // and it never sends the end of one: waiting for `Stop` there is why flowers, grass and
-        // leaves could not be broken in survival at all.
+        // A one-tick break is destroyed by the client at dig start with no end sent; waiting for `Stop` broke flowers.
         breaksOn = breaksInOneTick(targetBlock, targetHardness) ? Action::StartDestroyBlock : Action::StopDestroyBlock;
     }
-    // Bedrock and the portal frames stay put for anyone who is not in creative.
     if (gamemode == Gamemode::Survival && targetHardness != nullptr && targetHardness->isUnbreakable()) {
         ack();
         return;
@@ -514,9 +503,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
         return;
     }
 
-    // From here the block simply goes, which is the same everywhere and lives where a player with
-    // no `ClientSession` can reach it. What stays here is the clock this door runs and the answer
-    // this door owes.
+    // The block simply goes, shared with players that have no `ClientSession`; the clock and answer stay here.
     world::LoadedWorld* world = owner_->currentWorld();
     if (session == nullptr || world == nullptr) {
         ack();

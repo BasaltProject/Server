@@ -42,14 +42,11 @@ constexpr double kEyeHeight = 1.62;
     return found == nullptr ? none : *found;
 }
 
-/// The one target a `single = true` selector matched, or null when it matched nobody.
 [[nodiscard]] const CommandTarget* only(const CommandContext& context, std::string_view name) {
     const std::vector<CommandTarget>& matched = targetsOf(context, name);
     return matched.size() == 1 ? &matched.front() : nullptr;
 }
 
-/// Who is riding what, to everybody in the world. The edition with no packet for a whole load is
-/// told one link at a time, which is what the hook is for; the other one is sent the load itself.
 void tellTheWorldWhoIsOn(const CommandContext& context, std::int32_t vehicleId,
                          const std::vector<std::int32_t>& riders) {
     const Parsed<world::LoadedWorld*> world = context.world();
@@ -128,10 +125,7 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
         const auto* coordinates = positioned ? context.get<Coordinates>("pos") : nullptr;
         const std::array<double, 3> at =
             coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source());
-        // parity: an item on the floor is an `ItemEntity`, not something generic. Here it is its own
-        // kind, so summoning one has to build that kind: as a plain entity it never fell, never
-        // merged and no plate or hopper saw it, because those all read the world's item list.
-        // Measured in `placas`, where the jar's items landed on the plate and ours hung in the air.
+        // parity: an item on the floor is an `ItemEntity`, not something generic.
         const wire::nbt::NbtCompound tag = tagFor(context, *id, at, withNbt);
         if (*id == wire::common::Identifier::vanilla("item")) {
             const std::optional<world::DroppedItem> dropped =
@@ -145,16 +139,12 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
                             true);
             return 1;
         }
-        // parity: `SummonCommand` builds the entity **through the save codec**
-        // (`EntityType.loadEntityRecursive`), so every tag a saved entity understands works here too.
-        // Doing it by hand read two fields out of thirty: measured in `flechavibra`, where an arrow
-        // summoned with `Motion` simply hung in the air because nothing applied it.
+        // parity: `SummonCommand` builds the entity **through the save codec** (`EntityType.loadEntityRecursive`).
         std::unique_ptr<entity::ServerEntity> entity = entity::entityNbt::decode(
             tag, players_->allocateEntityIds(entity::enderDragon::idSpan(type->id)), type->protocolId);
         if (entity == nullptr) {
             return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.summon.failed")}};
         }
-        // `CustomName` is a text component on the way in and plain text once it is an entity's name.
         if (const std::string_view named = tag.getString("CustomName"); !named.empty()) {
             entity->customName = plainName(named);
         }
@@ -192,8 +182,7 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
                                            std::nullopt);
             }
         } else if (entity::ServerEntity* what = target->entity(); what != nullptr) {
-            // parity: `/damage ... by <entity>` builds a source with that entity in it, so the hit is
-            // remembered and the kill is credited to a player who dealt it.
+            // parity: `/damage ...
             if (const CommandTarget* by = only(context, "entity"); by != nullptr) {
                 if (const player::PlayerSession* dealt = by->player(); dealt != nullptr) {
                     entity::entityCombat::rememberPlayer(*what, dealt->uuid());
@@ -207,8 +196,7 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
                 (reg::entityAttributes::isLiving(what->type()) ? what->dying : what->removed) = true;
             }
         }
-        // parity: an item entity takes damage from fire and explosions, neither of which this
-        // reaches: `/damage` on one does nothing rather than pretending.
+        // parity: an item entity takes damage from fire and explosions, neither of which this reaches.
         context.success(Component::translatable("commands.damage.success", {Component::text(std::to_string(*amount)),
                                                                             Component::text(target->name())}),
                         true);
@@ -225,8 +213,6 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
                         return context.matchingIds(damageTypes_ ? damageTypes_() : std::vector<Identifier>{});
                     });
                     type.executes(damage);
-                    // Where it came from and who dealt it. The place is accepted and not acted on;
-                    // who dealt it is remembered, which is what decides the kill credit.
                     type.literal("at", [damage](const CommandNodeBuilder& at) {
                         at.argument("location", vec3Argument(),
                                     [damage](const CommandNodeBuilder& location) { location.executes(damage); });
@@ -314,8 +300,7 @@ RotateCommand::RotateCommand() : Command("rotate", permissionLevel::kGamemasters
 
 namespace {
 
-/// parity: `Entity.lookAt`, which measures from the feet unless an anchor says otherwise, and whose
-/// yaw is measured from +Z and grows clockwise.
+/// parity: `Entity.lookAt`, which measures from the feet unless an anchor says otherwise.
 [[nodiscard]] std::pair<float, float> anglesTowards(const CommandTarget& target, double x, double y, double z) {
     const double dx = x - target.x();
     const double dy = y - target.y();
@@ -393,7 +378,7 @@ void RotateCommand::build(const CommandNodeBuilder& root) const {
 SwingCommand::SwingCommand() : Command("swing", permissionLevel::kGamemasters) {}
 
 void SwingCommand::build(const CommandNodeBuilder& root) const {
-    // parity: 26.3 `SwingCommand`: `SwingAnimation.DEFAULT`, a whack of six ticks, unless named.
+    // parity: 26.3 `SwingCommand`.
     const auto swing = [](const CommandContext& context, bool offhand) -> Parsed<std::int32_t> {
         play::SwingAnimation animation;
         if (const auto* type = context.get<std::string>("animation"); type != nullptr) {

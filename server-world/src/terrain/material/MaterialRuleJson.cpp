@@ -56,7 +56,7 @@ using wire::common::JsonValue;
     return std::nullopt;
 }
 
-/// parity: `MaterialRuleContext.LazyYCondition` and `LazyXZCondition`, memoised per update stamp.
+/// parity: `MaterialRuleContext.LazyYCondition` and `LazyXZCondition`.
 [[nodiscard]] ConditionEvaluator lazy(MaterialRuleContext& context, bool perColumn, std::function<bool()> compute) {
     struct State {
         std::int64_t stamp;
@@ -313,7 +313,7 @@ private:
     std::shared_ptr<const MaterialRule> rule_;
 };
 
-/// parity: `OreVeinRule`, which since 26.3 runs in the surface pass rather than during the fill.
+/// parity: `OreVeinRule`.
 class OreVeinRule final : public MaterialRule {
 public:
     OreVeinRule(std::int32_t ore, std::int32_t rawOre, std::int32_t filler, float rawOreChance,

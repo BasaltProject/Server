@@ -30,9 +30,7 @@ MessageSignature signatureOf(std::string_view hex) {
     return signature;
 }
 
-// Throwaway keys made with openssl for this test: a 2048-bit player key, a services key that signed
-// it for kProfile, and the player's signatures over two messages whose payloads were laid out by
-// hand from `PlayerChatMessage.updateSignature`.
+// Throwaway openssl keys; signatures cover payloads laid out by hand from `PlayerChatMessage.updateSignature`.
 constexpr Uuid kProfile{0x0123456789abcdefULL, 0x0fedcba987654321ULL};
 constexpr Uuid kSession{0x1111111111111111ULL, 0x2222222222222222ULL};
 constexpr std::int64_t kExpiresAt = 4102444800000;
@@ -108,7 +106,6 @@ TEST_CASE("signed messages chain, acknowledge each other and break on the first 
     REQUIRE(first.has_value());
     CHECK(first->index == 0);
 
-    // The server relays it back, so the client has something to acknowledge.
     std::vector<play::PlayerChatPacket> sent;
     const auto capture = [&sent](const play::PlayerChatPacket& packet) { sent.push_back(packet); };
     CHECK(chat.send(*first, BoundChatType{}, capture));
@@ -131,7 +128,6 @@ TEST_CASE("signed messages chain, acknowledge each other and break on the first 
     REQUIRE(second.has_value());
     CHECK(second->index == 1);
     CHECK(chat.send(*second, BoundChatType{}, capture));
-    // What the client already holds goes out as a cache index.
     REQUIRE(sent.size() == 2);
     REQUIRE(sent[1].lastSeen.size() == 1);
     CHECK(sent[1].lastSeen[0].id == 0);

@@ -12,25 +12,19 @@
 
 namespace basalt::server::runtime::world {
 
-/// 26.3's cushion: an entity put on top of a block that a player sits on.
-///
-/// parity: `CushionItem.useOn` and `Cushion`. What it rests on is read off collision boxes, where
-/// vanilla asks the outline shape, which only differs for blocks that have an outline and no
-/// collision (a flower, tall grass).
+/// parity: `CushionItem.useOn` and `Cushion`.
 namespace cushions {
 
-/// parity: `EntityTypes.CUSHION`'s `sized(1.0F, 0.25F)`.
 inline constexpr double kWidth = 1.0;
 inline constexpr double kHeight = 0.25;
 
-/// parity: `Cushion.DATA_COLOR`, right after `Entity`'s eight fields; `DyeColor` goes as its id.
+/// parity: `Cushion.DATA_COLOR`.
 inline constexpr std::uint8_t kColorDataIndex = 8;
 
 [[nodiscard]] const wire::common::Identifier& type();
 
 [[nodiscard]] bool isCushion(const wire::common::Identifier& type);
 
-/// The dye of a `<colour>_cushion` item, or nothing for any other item.
 [[nodiscard]] std::optional<std::string_view> colourOfItem(const wire::common::Identifier& item);
 
 /// parity: `DyeColor`'s ids, `white` being zero.
@@ -42,25 +36,21 @@ inline constexpr std::uint8_t kColorDataIndex = 8;
 /// The item it drops. parity: `Cushion.getCushionItemStackWithData`.
 [[nodiscard]] wire::common::Identifier itemOf(const entity::ServerEntity& cushion);
 
-/// Whether a block tag holds a block, for `causes_suffocation` and `cushion_uses_collision_shape`.
 using Tagged = std::function<bool(std::string_view tag, const wire::common::Identifier& block)>;
 
-/// parity: `Cushion.canBePlacedAt` for the box whose bottom middle is `x, y, z`: something to rest
-/// on below, a resting slice not buried in collision, and not wholly inside suffocating blocks.
+/// parity: `Cushion.canBePlacedAt`.
 [[nodiscard]] bool canBePlacedAt(const WorldState& world, double x, double y, double z, const Tagged& tagged);
 
 /// parity: `Cushion.wouldSurviveAt`, what the check interval asks of one already down.
 [[nodiscard]] bool survivesAt(const WorldState& world, double x, double y, double z, const Tagged& tagged);
 
-/// parity: `serverLevel.getEntitiesOfClass(Cushion.class, spawnAABB)`: one cushion per spot.
+/// parity: `serverLevel.getEntitiesOfClass(Cushion.class, spawnAABB)`.
 [[nodiscard]] bool occupied(const WorldState& world, double x, double y, double z);
 
-/// parity: `Direction.fromYRot(rotation).toYRot()`, the quarter turn a new cushion is laid at.
+/// parity: `Direction.fromYRot(rotation).toYRot()`.
 [[nodiscard]] float snappedYaw(float yaw);
 
-/// Where a ray from `from` to `to` first meets a block's collision boxes: the face it crossed and
-/// the height it met it at. parity: `VoxelShape.clip`, including its answer for a ray that starts
-/// inside, which is used by `CushionItem.recalculateContextForSpecialCollisionShapes`.
+/// parity: `VoxelShape.clip`.
 struct Clip {
     bool up = false;
     double y = 0.0;

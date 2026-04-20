@@ -91,17 +91,14 @@ bool GroupsConfig::resolve(std::optional<std::string_view> groupName, std::strin
     const PermissionGroup* current = &get(groupName);
     std::vector<std::string_view> seen;
 
-    // `load` refuses a cycle, so this guard is for a configuration built in code rather than read
-    // from a file, where an infinite walk would be the first symptom.
+    // `load` refuses a cycle; this guard is for configurations built in code.
     while (current != nullptr && std::ranges::find(seen, std::string_view{current->name}) == seen.end()) {
         seen.emplace_back(current->name);
         for (const PermissionRule& rule : current->rules) {
             if (!rule.matches(node)) {
                 continue;
             }
-            // The depth half only says out loud what the walk already does: a group is read
-            // before what it inherits, so at equal specificity the one found first is the nearer
-            // one. It stays because the rule it states is the one a reader has to know.
+            // A group is read before what it inherits, so at equal specificity the one found first is nearer.
             const bool better = best == nullptr || rule.specificity() > best->specificity() ||
                                 (rule.specificity() == best->specificity() && depth < bestDepth);
             if (better) {
@@ -167,7 +164,6 @@ std::expected<GroupsConfig, std::string> GroupsConfig::load(const ConfigDirector
             return std::unexpected("Group '" + group.name + "' inherits from '" + *group.inherits +
                                    "', which does not exist.");
         }
-        // A cycle would otherwise be an infinite walk the first time anyone is checked.
         std::vector<std::string_view> seen{group.name};
         const PermissionGroup* current = byName(*group.inherits);
         while (current != nullptr) {
@@ -180,9 +176,7 @@ std::expected<GroupsConfig, std::string> GroupsConfig::load(const ConfigDirector
         }
     }
 
-    // Exactly one of each, because "which group does a new player get" and "which one does `op`
-    // put them in" are questions with one answer, and a file with two of either is a file whose
-    // author meant something the server cannot guess.
+    // Exactly one of each: a file with two default or op groups is one whose author meant something unguessable.
     const auto countOf = [&groups](bool PermissionGroup::* flag) {
         std::size_t found = 0;
         std::size_t at = 0;

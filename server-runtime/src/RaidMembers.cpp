@@ -43,7 +43,6 @@ constexpr std::int64_t kJoinInterval = 20;
 }
 
 void sendBar(PlayerSession& player, const Raid& raid, BossEventPacket::Operation operation) {
-    // A client that draws bars its own way is told what the bar says rather than handed Java's packet.
     if (player.connection().showBossBar) {
         const bool removing = std::holds_alternative<BossEventPacket::Remove>(operation);
         player.connection().showBossBar(raid.barId, removing ? wire::text::Component::empty() : raid.barName,
@@ -217,7 +216,6 @@ void RaidSystem::updatePlayers(world::LoadedWorld& world, Raid& raid) {
             sendBar(*player, raid, BossEventPacket::Remove{});
         }
     }
-    // Whoever left the world is gone from the bar with them.
     std::erase_if(raid.barPlayers, [&inRaid](std::int32_t id) { return !inRaid.contains(id); });
 }
 
@@ -313,7 +311,7 @@ void RaidSystem::tickRaider(world::LoadedWorld& world, ServerEntity& raider) {
     if (raider.raidId.has_value() && raid == nullptr && !raider.raidStale) {
         raider.raidId.reset();
     }
-    // parity: `readAdditionalSaveData`'s `addWaveMob` without health, for a raider loaded back in.
+    // parity: `readAdditionalSaveData`'s `addWaveMob` without health.
     if (raid != nullptr && !raid->has(raider.entityId())) {
         raid->addWaveMob(raider.raidWave, raider.entityId());
         if (raider.patrolLeader) {

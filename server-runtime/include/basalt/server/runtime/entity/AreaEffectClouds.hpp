@@ -11,10 +11,7 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// A lingering cloud: a dragon's breath, and whatever a lingering potion leaves.
-///
-/// parity: `AreaEffectCloud`. Its settings live in the entity's own tag under vanilla's keys, which
-/// is also where vanilla saves them.
+/// parity: `AreaEffectCloud`.
 namespace areaEffectClouds {
 
 /// parity: `DATA_RADIUS`, `DATA_WAITING` and `DATA_PARTICLE`.
@@ -32,14 +29,12 @@ inline constexpr std::int32_t kTimeBetweenApplications = 5;
 
 [[nodiscard]] bool isCloud(const wire::common::Identifier& type);
 
-/// One effect the cloud hands out.
 struct Effect {
     wire::common::Identifier id = wire::common::Identifier::vanilla("instant_damage");
     std::int32_t amplifier = 0;
     std::int32_t duration = 1;
 };
 
-/// Everything a cloud is, as vanilla saves it.
 struct Cloud {
     float radius = kDefaultRadius;
     std::int32_t duration = -1;
@@ -49,11 +44,9 @@ struct Cloud {
     float radiusOnUse = 0.0F;
     float radiusPerTick = 0.0F;
     float potionDurationScale = 1.0F;
-    /// The custom particle's type and, for `dragon_breath`, its power.
     std::optional<std::string> particle;
     float particlePower = 1.0F;
     std::optional<Effect> effect;
-    /// Who made it, as a uuid tag.
     std::optional<wire::nbt::NbtTag> owner;
 };
 

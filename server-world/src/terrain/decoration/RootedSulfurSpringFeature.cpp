@@ -151,8 +151,6 @@ const std::set<std::string, std::less<>>& rootReplaceable() {
     return DecorationPos{.x = position.x, .y = y, .z = position.z};
 }
 
-/// The read and write view: a spring reaches past the chunk it started in, and the write keeps the
-/// state it observed as the delivery guard.
 class Region {
 public:
     Region(Chunk& chunk, const rootedSulfurSpringFeature::BlockStateAt& blockAt) : chunk_(&chunk), blockAt_(&blockAt) {}
@@ -201,7 +199,6 @@ private:
     return variants().back();
 }
 
-/// Required air column plus the four level probes at eight blocks out.
 [[nodiscard]] bool spaceForSpring(const Region& region, const DecorationPos& candidate) {
     for (std::int32_t distance = 1; distance <= kRequiredVerticalSpace; ++distance) {
         const std::int32_t stateId = region.get(offsetBy(candidate, 0, distance, 0));
@@ -222,7 +219,6 @@ private:
     return true;
 }
 
-/// A weighted selector followed by the selected sequence feature.
 bool placeSulfurSpring(const Region& region, random::RandomSource& random, const DecorationPos& origin,
                        const structure::TemplateLoader& templates) {
     const Variant& variant = weightedVariant(random);

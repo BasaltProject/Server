@@ -26,11 +26,8 @@
 
 namespace basalt::server::world::terrain {
 
-/// Every structure generator a chunk may run, none of them required. A world that has not built one
-/// leaves its slot null and the step is skipped.
 struct TerrainStructureGenerators {
     VillageStructureGenerator* village = nullptr;
-    /// The 26.3 `abandoned_camp` set, the same multi-structure generator as the villages.
     VillageStructureGenerator* camp = nullptr;
     MineshaftStructureGenerator* mineshaft = nullptr;
     RuinedPortalStructureGenerator* ruinedPortal = nullptr;
@@ -50,13 +47,9 @@ struct TerrainStructureGenerators {
     JigsawStructureGenerator* trialChamber = nullptr;
 };
 
-/// Chunk shape from an `NoiseRouter`'s final density through `DensityChunkSampler`, then
-/// surface rules, structures and independently seeded decoration dispatchers, in that order.
-/// parity: `ChunkGenerator.applyBiomeDecoration`, whose decoration seed is the plain world seed.
-/// Build the router once per world. Gap: decoration only for the biomes ported so far.
+/// parity: `ChunkGenerator.applyBiomeDecoration`.
 namespace realTerrainGenerator {
 
-/// A chunk carrying everything a configured feature may read before decoration runs.
 class GeneratedTerrain {
 public:
     GeneratedTerrain(Chunk chunk, std::unique_ptr<densityfunction::SamplerContext> cache,
@@ -73,34 +66,25 @@ public:
 
 private:
     Chunk chunk_;
-    /// The cache outlives the environment that reads it, so both travel with the chunk.
     std::unique_ptr<densityfunction::SamplerContext> cache_;
     std::unique_ptr<surface::SurfaceRuleEnvironment> environment_;
 };
 
-/// parity: `NoiseBasedChunkGenerator`'s biomes, noise, surface and carver steps for any dimension,
-/// with `beardifier` bound into the chunk's sampler context.
+/// parity: `NoiseBasedChunkGenerator`'s biomes.
 [[nodiscard]] GeneratedTerrain buildTerrain(const NoiseRouter& router,
                                             const surface::SurfaceRuleEnvironment& environment, Chunk chunk,
                                             densityfunction::Sampler beardifier);
 
-/// Everything a chunk holds before its own decoration: noise shape, surface rules, carvers and
-/// structures. A neighbour is generated only this far when a feature needs to read across the chunk
-/// edge, so reading one never recurses back into decoration.
 [[nodiscard]] GeneratedTerrain generateTerrain(const NoiseRouter& router,
                                                const surface::SurfaceRuleEnvironment& environment, std::int32_t chunkX,
                                                std::int32_t chunkZ, std::int64_t seed = 0,
                                                const TerrainStructureGenerators& generators = {});
 
-/// The decoration steps of one already-generated terrain, in their official order.
 void decorate(GeneratedTerrain& terrain, std::int64_t seed = 0, const NeighbourTerrain* neighbours = nullptr,
               const TerrainStructureGenerators& generators = {}, const structure::TemplateLoader& templates = nullptr);
 
-/// A chunk read back from disk before it decorated, wrapped so it can decorate now. The biome cache
-/// starts empty, which changes nothing but speed.
 [[nodiscard]] GeneratedTerrain adopt(const surface::SurfaceRuleEnvironment& environment, Chunk chunk);
 
-/// One chunk on its own, decorated without neighbours: whatever it writes past its edge is deferred.
 [[nodiscard]] Chunk generate(const NoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
                              std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed = 0,
                              const TerrainStructureGenerators& generators = {},

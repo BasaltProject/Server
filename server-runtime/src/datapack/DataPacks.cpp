@@ -13,7 +13,7 @@ DataPacks::DataPacks(Options options, wire::common::Logger logger)
                                                                                    : options_.worldRoot + "/datapacks"},
                   logger_) {
     const std::optional<WorldDataConfiguration> saved = WorldDataConfiguration::read(options_.worldRoot);
-    // parity: a save without `level.dat` is a new world, configured from the server's properties; one
+    // parity: a save without `level.dat` is a new world.
     // written before packs were saved reads the codec's defaults, vanilla alone.
     const bool initMode = !saved.has_value() && !wire::io::fileIO::exists(options_.worldRoot + "/level.nbt");
     WorldDataConfiguration initial;

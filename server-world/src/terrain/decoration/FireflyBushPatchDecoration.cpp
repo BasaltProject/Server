@@ -156,8 +156,7 @@ void decorateSpecs(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEn
     const ChunkHeight bounds = chunk.verticalBounds();
     for (const PatchSpec* spec : chosen) {
         random::setFeatureSeed(random, decorationSeed, spec->index, kVegetalDecorationStep);
-        // parity: the rarity filter sits outside the outer loop here, unlike the mushroom patches
-        // where it is drawn once per attempt. One draw decides the whole spec.
+        // parity: the rarity filter sits outside the outer loop, unlike the mushroom patches.
         if (spec->rarity.has_value() && random.nextFloat() >= 1.0F / static_cast<float>(*spec->rarity)) {
             continue;
         }

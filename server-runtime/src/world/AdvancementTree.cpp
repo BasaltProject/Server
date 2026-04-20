@@ -9,7 +9,7 @@ namespace {
 
 using wire::common::Identifier;
 
-/// parity: `TreeNodePosition`, the Walker layout, in an arena so a parent can hold indices.
+/// parity: `TreeNodePosition`.
 class Layout {
 public:
     Layout(const std::map<Identifier, AdvancementTree::Node>& nodes, const RealAdvancements& advancements)
@@ -214,7 +214,7 @@ private:
 } // namespace
 
 AdvancementTree::AdvancementTree(const RealAdvancements& advancements, const wire::common::Logger& logger) {
-    // parity: `AdvancementTree.addAll`: keep inserting whatever has its parent in, until nothing moves.
+    // parity: `AdvancementTree.addAll`.
     std::vector<Identifier> pending = advancements.ids();
     while (!pending.empty()) {
         const std::size_t before = pending.size();

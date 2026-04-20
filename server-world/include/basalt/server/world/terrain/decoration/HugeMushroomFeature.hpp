@@ -7,8 +7,7 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// parity: `AbstractHugeMushroomFeature` plus `HugeBrownMushroomFeature` and
-/// `HugeRedMushroomFeature`. Cap and stem blocks keep their exact six visible-face properties.
+/// parity: `AbstractHugeMushroomFeature` plus `HugeBrownMushroomFeature` and.
 namespace hugeMushroomFeature {
 
 enum class Kind : std::uint8_t { Brown, Red };

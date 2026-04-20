@@ -9,8 +9,6 @@
 #include <vector>
 
 namespace basalt::server::storage {
-
-/// Where one player respawns, as `/spawnpoint` set it.
 struct StoredSpawnPoint {
     std::string uuid;
     std::string world;
@@ -24,7 +22,6 @@ enum class BanKind : std::uint8_t { Player, Ip };
 
 [[nodiscard]] std::string_view storedNameOf(BanKind kind);
 
-/// One ban, whether it names a player or an address.
 struct BanRecord {
     std::string subject;
     BanKind kind = BanKind::Player;
@@ -42,8 +39,6 @@ struct WhitelistEntry {
     std::int64_t addedAtEpochSeconds = 0;
 };
 
-/// Who may connect. Reads happen on the login path, so every query here is indexed and answers
-/// without a scan.
 class AccessRepository {
 public:
     explicit AccessRepository(sql::Database& database) : database_(&database) {}
@@ -60,7 +55,6 @@ public:
 
     void ban(const BanRecord& record);
 
-    /// True when something was actually removed, which is what `/pardon` reports on.
     bool pardon(std::string_view subject, BanKind kind);
 
     [[nodiscard]] std::vector<WhitelistEntry> whitelist();
@@ -76,5 +70,4 @@ public:
 private:
     sql::Database* database_;
 };
-
 } // namespace basalt::server::storage

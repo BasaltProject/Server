@@ -7,10 +7,7 @@
 
 namespace basalt::server::runtime::world {
 
-/// What the block a fall ends on does to it.
-///
-/// parity: `Block.fallOn` and its overrides: 26.3's `fallDistanceReduction` property (beds and the
-/// shelf mushroom), the hay and honey blocks' fifth, slime's bounce, and a stalagmite's spike.
+/// parity: `Block.fallOn`.
 namespace fallLanding {
 
 /// parity: `Entity.getOnPosLegacy`, the block a fifth of a block under the feet.
@@ -27,16 +24,14 @@ struct Landing {
     bool stalagmite = false;
 };
 
-/// The landing on `stateId`. `suppressingBounce` is a sneaking player, whom slime does not spare.
+/// `suppressingBounce` is a sneaking player, whom slime does not spare.
 [[nodiscard]] Landing of(std::int32_t stateId, bool suppressingBounce);
 
-/// parity: `LivingEntity.calculateFallDamage`: the power past the safe distance, times the multiplier,
-/// floored.
+/// parity: `LivingEntity.calculateFallDamage`.
 [[nodiscard]] std::int32_t damage(double fallDistance, const Landing& landing, double safeFallDistance,
                                   double fallDamageMultiplier = 1.0);
 
-/// parity: `ShelfMushroomBlock.bounceOn`, whose bounce sound leaves out exactly the two entities it
-/// checks for, the item entity and primed tnt.
+/// parity: `ShelfMushroomBlock.bounceOn`.
 [[nodiscard]] bool isSilentBouncer(const wire::common::Identifier& entityType);
 
 } // namespace fallLanding

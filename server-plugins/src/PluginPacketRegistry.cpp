@@ -6,15 +6,12 @@
 #include <utility>
 
 namespace basalt::server::plugins {
-
 PluginHandle PluginPacketRegistry::add(LoadedPlugin& plugin, const std::string& name, lua::LuaRef fn,
                                        PluginEventPriority priority, bool observer) {
     const std::int64_t id = nextId_++;
     std::vector<Listener>& list = listeners_[name];
     list.push_back(
         Listener{.plugin = &plugin, .fn = std::move(fn), .priority = priority, .observer = observer, .id = id});
-    // The same order the event bus uses: deciders first in priority order, observers after, so
-    // whoever only looks sees what was settled.
     std::ranges::stable_sort(list, [](const Listener& left, const Listener& right) {
         if (left.observer != right.observer) {
             return !left.observer;
@@ -60,5 +57,4 @@ bool PluginPacketRegistry::fire(PluginPacket& packet) {
     }
     return !packet.cancelled;
 }
-
 } // namespace basalt::server::plugins

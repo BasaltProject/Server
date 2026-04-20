@@ -11,13 +11,11 @@ namespace {
 
 constexpr double kUnits = 32.0;
 
-/// How far it is from `from` to the next block boundary in the direction it is going.
 [[nodiscard]] double boundary(double from, double delta) {
     const double block = std::floor(from);
     return delta > 0 ? block + 1.0 - from : block - from;
 }
 
-/// The face a ray going this way enters through, which is the one it is coming at.
 [[nodiscard]] registry::BlockFace faceOf(std::int32_t axis, bool positive) {
     if (axis == 0) {
         return positive ? registry::BlockFace::West : registry::BlockFace::East;
@@ -108,7 +106,6 @@ std::optional<BlockHit> cast(world::WorldState& world, double fromX, double from
     const std::int32_t stepX = dx > 0 ? 1 : -1;
     const std::int32_t stepY = dy > 0 ? 1 : -1;
     const std::int32_t stepZ = dz > 0 ? 1 : -1;
-    // How far along the line one whole block of each axis is, and how far to the next boundary.
     const double deltaX = dx == 0.0 ? std::numeric_limits<double>::max() : std::abs(1.0 / dx);
     const double deltaY = dy == 0.0 ? std::numeric_limits<double>::max() : std::abs(1.0 / dy);
     const double deltaZ = dz == 0.0 ? std::numeric_limits<double>::max() : std::abs(1.0 / dz);

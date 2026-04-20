@@ -28,9 +28,7 @@ random::RandomSource& RandomSequences::of(const wire::common::Identifier& name) 
     if (found != streams_.end()) {
         return found->second;
     }
-    // parity: `RandomSequence.createSequence`: the world seed upgraded but **not** mixed, xored with
-    // the md5 of the name, and only then mixed. The salt is zero and both flags are on, which is
-    // what a world that nobody has touched with `/random reset` carries.
+    // parity: `RandomSequence.createSequence`.
     const random::Seed128bit seed =
         random::upgradeSeedTo128bitUnmixed(worldSeed_).xorWith(random::seedFromHashOf(name.toString())).mixed();
     return streams_.emplace(name, random::RandomSource::xoroshiro(seed)).first->second;
@@ -72,8 +70,7 @@ void RandomSequences::save(const std::string_view worldRoot) {
     }
     wire::nbt::NbtCompound root;
     for (const auto& [name, stream] : streams_) {
-        // parity: `Xoroshiro128PlusPlus.CODEC`, the two longs of the generator and nothing more. A
-        // gaussian drawn half way is not written down in vanilla either, so it starts over.
+        // parity: `Xoroshiro128PlusPlus.CODEC`.
         const random::Seed128bit seed = stream.xoroshiroState();
         root.putLongArray(name.toString(), std::vector<std::int64_t>{seed.lo, seed.hi});
     }

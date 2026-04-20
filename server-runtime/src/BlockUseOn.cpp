@@ -139,8 +139,7 @@ bool BlockInteractionHandler::chargeAnchor(PlayerSession& session, const BlockPo
         return false;
     }
     broadcastBlockUpdate(pos, charged->stateId);
-    // parity: `setBlock(pos, state, 3)` plus `GameEvent.BLOCK_CHANGE`, and the comparator beside it
-    // reads the charge, so the neighbours have to hear about it.
+    // parity: `setBlock(pos, state, 3)`.
     notifyNeighbours(pos);
     heardBySculk("block_change", pos);
     if (session.gamemode == Gamemode::Creative) {
@@ -218,25 +217,20 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     }
 
     const play::BlockHitResult& hit = useItemOn.blockHit;
-    // parity: a client whose main hand did nothing asks again with the off hand, and then it is that
-    // stack that goes down. The block has already been offered the main hand's click.
     const bool mainHand = useItemOn.hand == play::Hand::MainHand;
     const std::int32_t heldSlot =
         mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;
     const std::optional<storage::StoredItemStack> held = session->inventory.at(heldSlot);
     const std::optional<std::int32_t> clickedState = owner_->world().blockState(hit.pos.x, hit.pos.y, hit.pos.z);
-    // parity: `DEFAULT_BLOCK_USE` from `ServerPlayerGameMode.useItemOn` and `ANY_BLOCK_USE` from
-    // `handleUseItemOn`, for a block's own use that took the click.
+    // parity: `DEFAULT_BLOCK_USE`.
     const auto blockUsed = [&] {
         awardBlockUse(*session, hit.pos, clickedState, std::nullopt, true);
         awardBlockUse(*session, hit.pos, clickedState, held, false);
         ack();
     };
-    // Asked before the click does anything at all: opening a chest, using a door and placing a block
-    // are all this one question.
+    // The interact hook runs before the click does anything: chests, doors and placement are this one question.
     if (hooks_.interactAllowed &&
         !hooks_.interactAllowed(*session, hit.pos.x, hit.pos.y, hit.pos.z, held.has_value() ? held->id : "")) {
-        // The client predicted whatever it was about to do: put the block and the hand back.
         owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             play::ClientboundBlockUpdatePacket{.pos = hit.pos, .blockStateId = clickedState.value_or(0)}.write(buffer);
         });
@@ -245,8 +239,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         return;
     }
 
-    // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it considers the item
-    // as something to place, and sneaking overrides that and places instead.
+    // parity: `ServerPlayerGameMode.useItemOn`.
     if (!session->sneaking && mainHand) {
         const Identifier* clicked =
             clickedState.has_value() ? reg::blockStateDefinitions::blockOf(*clickedState) : nullptr;
@@ -259,9 +252,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
                 player::statAwards::award(*session, *stat);
             }
         };
-        // parity: `RedStoneOreBlock.useItemOn` lights the ore and then answers `PASS` whenever the
-        // held item is a block that could go down, so the ore lights **and** the block is placed.
-        // This is why it falls through rather than acking here.
+        // parity: `RedStoneOreBlock.useItemOn`.
         if (path == "redstone_ore" || path == "deepslate_redstone_ore") {
             if (world::LoadedWorld* lit = owner_->currentWorld(); lit != nullptr) {
                 if (const std::optional<world::BlockChange> glow =
@@ -302,7 +293,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (!path.empty() && world::containers::isPlain(path)) {
             owner_->menus().openChest(*session, hit.pos, path);
             awardOpened();
-            // parity: `ChestBlock`, `BarrelBlock` and `ShulkerBoxBlock`, which anger the piglins that see it.
+            // parity: `ChestBlock`.
             if (path != "hopper" && path != "dispenser" && path != "dropper" && owner_->options().mobs != nullptr &&
                 owner_->currentWorld() != nullptr) {
                 owner_->options().mobs->angerNearbyPiglins(*owner_->currentWorld(), *session, true);
@@ -315,10 +306,8 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             blockUsed();
             return;
         }
-        // parity: `CommandBlock.useWithoutItem`, which is `player.openCommandBlock(entity)` for
-        // anyone allowed to and nothing at all for anyone else. The client opens the screen itself,
-        // so what the server owes it is the block entity's own data.
-        // parity: `StructureBlockEntity.usedBy`, the same: the client opens its own screen.
+        // parity: `CommandBlock.useWithoutItem`.
+        // parity: `StructureBlockEntity.usedBy`.
         if (world::commandBlocks::modeOf(path).has_value() || path == "structure_block") {
             if (mayUseGameMasterBlocks(*session)) {
                 sendBlockEntity(hit.pos);
@@ -326,28 +315,24 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
                 return;
             }
         }
-        // parity: `RespawnAnchorBlock.useItemOn`, which takes a piece of glowstone until the fourth
-        // charge. Clicking it with anything else is the spawn point, which is not this.
+        // parity: `RespawnAnchorBlock.useItemOn`.
         if (path == "respawn_anchor" && held.has_value() &&
             parsedOrNothing(held->id) == Identifier::vanilla("glowstone") &&
             chargeAnchor(*session, hit.pos, heldSlot, *held)) {
             blockUsed();
             return;
         }
-        // parity: `JukeboxBlock.useItemOn`/`useWithoutItem`: a disc goes in, and clicking a playing
-        // one takes it back out.
+        // parity: `JukeboxBlock.useItemOn`.
         if (path == "jukebox" && useJukebox(*session, hit.pos)) {
             blockUsed();
             return;
         }
-        // parity: `LecternBlock.useItemOn`, which takes a book, and `useWithoutItem`, which opens
-        // the one already there.
+        // parity: `LecternBlock.useItemOn`.
         if (path == "lectern" && useLectern(*session, hit.pos)) {
             blockUsed();
             return;
         }
-        // parity: `ComposterBlock.useItemOn` and `useWithoutItem`: one compostable item in, or the
-        // bone meal out once it is ready.
+        // parity: `ComposterBlock.useItemOn`.
         if (path == "composter" && useComposter(*session, hit.pos)) {
             blockUsed();
             return;
@@ -361,7 +346,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
                 return;
             }
         }
-        // parity: `CampfireBlock.useItemOn`, one piece of food and nothing a campfire cannot cook.
+        // parity: `CampfireBlock.useItemOn`.
         if (world::campfires::isCampfire(path) && placeOnCampfire(*session, hit.pos)) {
             blockUsed();
             return;
@@ -379,10 +364,8 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             blockUsed();
             return;
         }
-        // parity: `AnvilBlock.useWithoutItem`, whose three slots belong to the screen and whose
-        // block wears out under it.
-        // parity: `EnchantingTableBlock.useWithoutItem`, whose two slots belong to the screen and
-        // whose offers come off the shelves around it.
+        // parity: `AnvilBlock.useWithoutItem`.
+        // parity: `EnchantingTableBlock.useWithoutItem`.
         if (path == "enchanting_table") {
             owner_->menus().openEnchantmentMenu(*session, hit.pos);
             blockUsed();
@@ -490,15 +473,12 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             blockUsed();
             return;
         }
-        // parity: `RepeaterBlock.useWithoutItem` and `ComparatorBlock.useWithoutItem`. The statue is
-        // the one that answers PASS to an axe, and the axe branch is further down, so it has to let
-        // that hand through rather than turn a pose.
+        // parity: `RepeaterBlock.useWithoutItem`.
         const std::optional<Identifier> inHand = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
         const bool axeInHand = inHand.has_value() && inHand->path().ends_with("_axe");
         const wire::common::Identifier* clickedBlock =
             clickedState.has_value() ? reg::blockStateDefinitions::blockOf(*clickedState) : nullptr;
-        // parity: `WeatheringCopperGolemStatueBlock.useItemOn`: an axe on one that never weathered
-        // wakes the golem, and a honeycomb is left to wax it.
+        // parity: `WeatheringCopperGolemStatueBlock.useItemOn`.
         if (axeInHand && clickedBlock != nullptr && clickedBlock->path() == "copper_golem_statue") {
             MobActionSystem* mobs = owner_->options().mobs;
             world::LoadedWorld* here = owner_->currentWorld();
@@ -517,7 +497,6 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             blockUsed();
             return;
         }
-        // Clicking a sign that is not waxed opens it for editing again.
         if (clickedState.has_value() && world::signs::isSign(*clickedState) && editSign(hit.pos)) {
             blockUsed();
             return;
@@ -535,11 +514,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     }
 
     const std::optional<Identifier> heldBlock = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    // Flint and steel is not a block, so it has to be answered before the "is this placeable" check
-    // below throws the click away. parity: `FlintAndSteelItem.useOn`.
-    // parity: `TntBlock.useItemOn` runs before anything a flint and steel would do to the square
-    // beside it: the block is primed on the spot and taken away, and no fire is ever placed. A fire
-    // charge does the same and is spent instead of worn.
+    // parity: `TntBlock.useItemOn`.
     const bool lighter = held.has_value() && heldBlock == Identifier::vanilla("flint_and_steel");
     const bool charge = held.has_value() && heldBlock == Identifier::vanilla("fire_charge");
     if ((lighter || charge) && clickedState.has_value() &&
@@ -554,15 +529,14 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // parity: `BoneMealItem.useOn`, which acts on the block clicked rather than the square beside it.
+    // parity: `BoneMealItem.useOn`.
     if (held.has_value() && heldBlock == Identifier::vanilla("bone_meal") &&
         useBoneMeal(*session, hit.pos, heldSlot, *held)) {
         player::statAwards::used(*session, held->id);
         ack();
         return;
     }
-    // parity: `ItemFrameItem.useOn` and `PaintingItem.useOn`, which hang on the face clicked rather
-    // than putting a block.
+    // parity: `ItemFrameItem.useOn`.
     if (held.has_value() && heldBlock.has_value() &&
         (heldBlock->path().ends_with("item_frame") || heldBlock->path() == "painting") &&
         hangFrame(*session, hit, heldSlot, *held, *heldBlock)) {
@@ -570,9 +544,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // parity: `HoneycombItem.useOn` and `AxeItem.useOn`, both of which change the block clicked.
-    // Both raise the criterion **before** writing the new state, so what it reads is the block the
-    // player clicked: waxing is earned on the bare copper, not on the waxed one it becomes.
+    // parity: `HoneycombItem.useOn`.
     if (held.has_value() && heldBlock == Identifier::vanilla("honeycomb") &&
         useHoneycomb(*session, hit.pos, heldSlot, *held)) {
         awardItemUsedOn(*session, hit.pos, clickedState, held);
@@ -580,7 +552,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // parity: `Item.useOn` over the `block_transformer` a hoe or a shovel carries: tilling and paths.
+    // parity: `Item.useOn` over the `block_transformer` a hoe or a shovel carries.
     if (held.has_value() && heldBlock.has_value() && owner_->options().blockTransformers != nullptr &&
         (heldBlock->path().ends_with("_hoe") || heldBlock->path().ends_with("_shovel"))) {
         const std::optional<Identifier> transformer = world::RealBlockTransformers::defaultFor(*heldBlock);
@@ -625,8 +597,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // parity: `ServerPlayerGameMode.useItemOn` falls through to using the item itself, which is what
-    // lets anyone eat while looking at the ground rather than only at the sky.
+    // parity: `ServerPlayerGameMode.useItemOn`.
     if (owner_->itemUseTimers().startEating(*session, *heldBlock, heldSlot)) {
         ack();
         return;
@@ -645,7 +616,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // parity: `CushionItem.useOn`, which answers `FAIL` rather than placing anything on a miss.
+    // parity: `CushionItem.useOn`.
     if (const std::optional<std::string_view> colour = world::cushions::colourOfItem(*heldBlock); colour.has_value()) {
         if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
             static_cast<void>(player::placeCushionFor(breakContext(), *session, *world, *colour, heldSlot, *held,
@@ -660,7 +631,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // parity: `EndCrystalItem.useOn`, and in a world with a dragon fight, `tryRespawn` after it.
+    // parity: `EndCrystalItem.useOn`.
     if (heldBlock == Identifier::vanilla("end_crystal")) {
         if (world::LoadedWorld* world = owner_->currentWorld();
             world != nullptr &&
@@ -684,16 +655,13 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // A bucket aimed at a block: the client only sends `use_item` when nothing is in the way, so
-    // without this, water poured anywhere near a wall went nowhere.
+    // The client sends `use_item` only when nothing is in the way, so a bucket aimed at a block needs this.
     if (world::buckets::isBucket(*heldBlock)) {
         useBucketOn(*session, *heldBlock, heldSlot, *held, hit);
         ack();
         return;
     }
 
-    // From here the block simply goes down, which is the same everywhere and lives where a player
-    // with no `ClientSession` can reach it.
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
         ack();
@@ -726,8 +694,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
 }
 
 void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket& useItem) {
-    // The ack comes first and unconditionally: the client already changed its own copy, and the ack
-    // is what undoes it when the server disagrees.
+    // The ack comes first and unconditionally: it is what undoes the client's prediction when the server disagrees.
     owner_->sendCompressed(play::BlockChangedAckPacket::kId, [&useItem](wire::io::ByteBuffer& buffer) {
         play::BlockChangedAckPacket{.sequence = useItem.sequence}.write(buffer);
     });
@@ -736,8 +703,6 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     if (session == nullptr || world == nullptr || session->gamemode == Gamemode::Spectator) {
         return;
     }
-    // parity: a client that got nothing from the main hand asks again with the off hand, and the
-    // rod or the shield is what answers there.
     if (useItem.hand != play::Hand::MainHand) {
         const std::optional<storage::StoredItemStack> offhand = session->inventory.at(PlayerInventory::kOffhandSlot);
         const std::optional<Identifier> other = offhand.has_value() ? parsedOrNothing(offhand->id) : std::nullopt;
@@ -783,8 +748,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         owner_->broadcastSound("minecraft:entity.lead.break", session->x, session->y, session->z,
                                play::SoundSource::Neutral);
     }
-    // parity: `ItemCooldowns.isOnCooldown`, which refuses the use outright rather than letting it
-    // through and greying the slot afterwards.
+    // parity: `ItemCooldowns.isOnCooldown`.
     if (owner_->itemUseTimers().onCooldown(*item) || owner_->itemUseTimers().startEating(*session, *item, heldSlot) ||
         owner_->itemUseTimers().startDrawing(*session, *item, heldSlot) ||
         owner_->itemUseTimers().throwEnderPearl(*session, *item, heldSlot) ||

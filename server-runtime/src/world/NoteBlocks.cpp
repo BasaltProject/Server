@@ -88,8 +88,7 @@ std::vector<BlockEffect> playNote(const WorldState& world, std::int32_t x, std::
         return {};
     }
     std::vector<BlockEffect> effects{blockEffect::Event{.b0 = 0, .b1 = 0}};
-    // parity: `triggerEvent` gives up on a head whose own sound it cannot find, and we never have
-    // one: the swing goes out, the sound does not.
+    // parity: `triggerEvent` gives up on a head whose own sound it cannot find.
     if (instrument.serializedName() == "custom_head") {
         return effects;
     }

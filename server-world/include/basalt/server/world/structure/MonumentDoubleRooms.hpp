@@ -5,7 +5,6 @@
 
 namespace basalt::server::world::structure {
 
-/// The five rooms that span two lattice cells, all the same shape: floors, cap, shell, then a
 /// doorway per side that kept one. parity: `OceanMonumentDouble{X,XY,Y,YZ,Z}Room`.
 namespace monumentDoubleRooms {
 

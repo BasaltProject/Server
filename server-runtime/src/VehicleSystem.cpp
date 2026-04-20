@@ -36,7 +36,7 @@ using wire::common::Identifier;
 namespace mth = wire::common::mth;
 namespace carts = entity::minecarts;
 
-/// parity: `VehicleEntity.hurtServer`: ten points of damage a point, destroyed past forty.
+/// parity: `VehicleEntity.hurtServer`.
 constexpr float kDamagePerPoint = 10.0F;
 constexpr float kBreakDamage = 40.0F;
 constexpr std::int32_t kHurtTicks = 10;
@@ -45,7 +45,7 @@ constexpr std::int8_t kPrimeEvent = 70;
 /// parity: the speed past which a tnt cart hit sideways, or broken, goes off.
 constexpr double kTntSpeed = static_cast<double>(0.01F);
 
-/// parity: `getDropItem`: the cart's own item, but a plain minecart for command blocks and spawners.
+/// parity: `getDropItem`.
 [[nodiscard]] Identifier dropItemOf(const ServerEntity& vehicle) {
     const std::string_view path = vehicle.type().path();
     if (path == "command_block_minecart" || path == "spawner_minecart") {
@@ -81,7 +81,7 @@ bool VehicleSystem::typeIn(const Identifier& damageType, std::string_view tag) c
 }
 
 bool VehicleSystem::ignitesTnt(const Hit& hit) const {
-    // parity: `MinecartTNT.damageSourceIgnitesTnt`: a projectile only when it burns, anything else
+    // parity: `MinecartTNT.damageSourceIgnitesTnt`.
     // when it is fire or an explosion.
     if (hit.burningProjectile || hit.burningArrow) {
         return true;
@@ -145,7 +145,7 @@ void VehicleSystem::ejectPassengers(world::LoadedWorld& world, ServerEntity& veh
 }
 
 bool VehicleSystem::board(world::LoadedWorld& world, ServerEntity& vehicle, ServerEntity& mob) {
-    // parity: `Entity.startRiding`: room aboard, not already its vehicle, not riding it the other
+    // parity: `Entity.startRiding`.
     // way round, and `canRide`'s boarding cooldown.
     const std::int32_t room = entity::boats::isBoat(vehicle.type()) ? entity::boats::maxPassengers(vehicle.type()) : 1;
     if (mob.vehicleId == vehicle.entityId() || static_cast<std::int32_t>(vehicle.passengerIds.size()) >= room ||
@@ -214,7 +214,7 @@ bool VehicleSystem::hurt(world::LoadedWorld& world, ServerEntity& vehicle, const
 }
 
 void VehicleSystem::destroy(world::LoadedWorld& world, ServerEntity& vehicle, const Hit& hit) {
-    // parity: `MinecartTNT.destroy`: moving or struck by fire it is lit instead, on a short fuse.
+    // parity: `MinecartTNT.destroy`.
     if (vehicle.type().path() == "tnt_minecart" && !hit.creativePlayer) {
         const double speedSqr = (vehicle.velocityX * vehicle.velocityX) + (vehicle.velocityZ * vehicle.velocityZ);
         if (ignitesTnt(hit) || speedSqr >= kTntSpeed) {
@@ -253,7 +253,7 @@ void VehicleSystem::destroy(world::LoadedWorld& world, ServerEntity& vehicle, co
                                                        .components = std::move(components)});
         }
     }
-    // parity: `AbstractChestBoat.remove` and `AbstractMinecartContainer.remove` spill what is inside
+    // parity: `AbstractChestBoat.remove` and `AbstractMinecartContainer.remove` spill what is inside.
     // whatever the rules say, a creative player's discard included.
     const std::string_view path = vehicle.type().path();
     const bool container =
@@ -296,7 +296,7 @@ void VehicleSystem::primeTnt(world::LoadedWorld& world, ServerEntity& cart, std:
 }
 
 void VehicleSystem::explodeTnt(world::LoadedWorld& world, ServerEntity& cart, double speedSqr) {
-    // parity: `MinecartTNT.explode`: the base power plus what the speed adds, up to five of it.
+    // parity: `MinecartTNT.explode`.
     const bool primed = cart.fuse > -1;
     if (!world.gameRules().get(world::gameRules::kTntExplodes)) {
         if (primed) {
@@ -330,7 +330,7 @@ void VehicleSystem::program(world::LoadedWorld& world, ServerEntity& cart, const
     if (!cart.sourceNbt.has_value()) {
         cart.sourceNbt = wire::nbt::NbtCompound{};
     }
-    // parity: `handleSetCommandMinecart`: the command, the output switch, and a cleared output when
+    // parity: `handleSetCommandMinecart`.
     // it stops being tracked.
     cart.sourceNbt->putString("Command", command);
     cart.sourceNbt->putBoolean("TrackOutput", trackOutput);
@@ -341,7 +341,7 @@ void VehicleSystem::program(world::LoadedWorld& world, ServerEntity& cart, const
 
 bool VehicleSystem::touchesFluid(world::LoadedWorld& world, double x, double y, double z, double width, double height,
                                  bool lava) {
-    // parity: `updateFluidHeightAndDoFluidPushing`: the box shrunk by a thousandth, and a fluid whose
+    // parity: `updateFluidHeightAndDoFluidPushing`.
     // surface reaches its bottom.
     constexpr double kDeflate = 0.001;
     const double half = (width / 2.0) - kDeflate;

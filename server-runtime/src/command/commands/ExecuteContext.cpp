@@ -31,7 +31,6 @@ constexpr std::array<std::string_view, 8> kRelations{"attacker", "controller", "
 
 using Sources = std::vector<std::shared_ptr<const CommandSource>>;
 
-/// One source per target, which is what makes a clause fork.
 [[nodiscard]] Sources perTarget(const CommandContext& context, std::string_view name,
                                 const std::function<ExecutionSource::Changes(const CommandTarget&)>& change) {
     Sources built;
@@ -78,7 +77,7 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
         });
     });
 
-    /// parity: `at`, which takes the target's position, rotation and world, but not its identity.
+    /// parity: `at`.
     root.literal("at", [&execute](const CommandNodeBuilder& form) {
         form.argument("targets", optionalEntitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
             targets.redirectTo(execute, true, [](const CommandContext& context) {
@@ -236,8 +235,7 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
     });
 
     root.literal("on", [&execute](const CommandNodeBuilder& form) {
-        // parity: the eight relations `/execute on` accepts. None of them exist in this build, so
-        // each yields nobody and the rest of the line does not run.
+        // parity: the eight relations `/execute on` accepts.
         for (const std::string_view relation : kRelations) {
             form.literal(std::string{relation}, [&execute](const CommandNodeBuilder& one) {
                 one.redirectTo(execute, true, [](const CommandContext&) { return Sources{}; });

@@ -20,8 +20,6 @@ constexpr std::int32_t kSeaLevel = 63;
 constexpr std::int32_t kBeardRadius = 12;
 constexpr std::int32_t kSurfaceStructuresStep = 4;
 
-/// 64 candidate cells is over 2000 chunks of travel at the villages grid spacing; a full re-assembly
-/// after an overflow costs about a second per nearby candidate.
 constexpr std::size_t kAssemblyCacheCapacity = 64;
 
 [[nodiscard]] StructureBoundingBox chunkClip(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t margin) {
@@ -34,7 +32,6 @@ constexpr std::size_t kAssemblyCacheCapacity = 64;
     return (value % divisor != 0 && ((value < 0) != (divisor < 0))) ? quotient - 1 : quotient;
 }
 
-/// The biome name without its namespace, which is what the village tags are written against.
 [[nodiscard]] std::string withoutNamespace(std::string_view biome) {
     const std::size_t colon = biome.find(':');
     return std::string{colon == std::string_view::npos ? biome : biome.substr(colon + 1)};
@@ -134,9 +131,7 @@ std::int32_t VillageStructureGenerator::surfaceHeightAt(std::int32_t x, std::int
     while (y >= kOverworldHeight.minY() && found->second.sample(x & 15, y, z & 15) <= 0.0) {
         --y;
     }
-    // parity: `NoiseBasedChunkGenerator.getFirstFreeHeight` samples the generated base column, not
-    // density alone. The Overworld's global aquifer fills open columns through y 62, so
-    // `WORLD_SURFACE_WG` is at least sea level even when the solid ocean floor is lower.
+    // parity: `NoiseBasedChunkGenerator.getFirstFreeHeight` samples the base column.
     return std::max(y + 1, kSeaLevel);
 }
 
@@ -146,9 +141,7 @@ const VillageStructureGenerator::Variant* VillageStructureGenerator::selectVaria
                                                                                    Samplers& samplers) const {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
-    // parity: `Structure.isValidBiome` reads the biome at the generation stub, which
-    // `JigsawPlacement.addPieces` puts at the centre of the start piece's box, projected to the
-    // surface. Each variant draws its own start piece from its own copy of the structure random.
+    // parity: `Structure.isValidBiome` reads the biome at the start piece's box centre projected to the surface.
     const auto inBiome = [&](const Variant& variant) {
         const structure::StructureTemplatePool* pool = poolLookup_(variant.startPool);
         if (pool == nullptr) {
@@ -293,9 +286,7 @@ void VillageStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, 
             if (start->variant != variant) {
                 continue;
             }
-            // Without the start the chunk cannot say it holds a village, however many houses of it
-            // are standing here. parity: the start belongs to the chunk the village began in, and
-            // each biome's village is its own structure in the registry.
+            // parity: the start belongs to the chunk the village began in, one structure per biome.
             std::vector<StructureBoundingBox> boxes;
             boxes.reserve(start->pieces.size());
             for (const PlacedStructurePiece& piece : start->pieces) {
@@ -303,8 +294,6 @@ void VillageStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, 
             }
             if (std::optional<structure::StructureStartRecord> record = structure::StructureStartRecord::of(
                     std::string{variant->id.path()}, start->chunkX, start->chunkZ, boxes)) {
-                // The full box covers the whole village; the pieces kept are the ones this chunk
-                // holds, which is all a question about a position inside it can need.
                 std::erase_if(record->pieces,
                               [&clip](const StructureBoundingBox& piece) { return !piece.intersects(clip); });
                 chunk.structures().add(std::move(*record));

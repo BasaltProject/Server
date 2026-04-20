@@ -12,9 +12,6 @@
 namespace basalt::server::world::terrain::decoration::tree {
 
 /// parity: the `net.minecraft.world.level.levelgen.feature.trunkplacers` shapes.
-///
-/// One kind-tagged value type rather than a hierarchy: this build has RTTI off, the variants differ
-/// by at most three extra fields, and a tree config copies its placer around by value.
 class TrunkPlacer {
 public:
     /// parity: `StraightTrunkPlacer`, one column of logs.
@@ -50,8 +47,7 @@ public:
                                                       float placeBranchPerLogProbability,
                                                       IntProvider extraBranchLength);
 
-    /// parity: `CherryTrunkPlacer`. The second branch's start offset is not configured: vanilla
-    /// derives it in the constructor as `UniformInt.of(min, max - 1)`, so this takes the bounds.
+    /// parity: `CherryTrunkPlacer`.
     [[nodiscard]] static TrunkPlacer cherry(std::int32_t baseHeight, std::int32_t heightRandA, std::int32_t heightRandB,
                                             IntProvider branchCount, IntProvider branchHorizontalLength,
                                             std::int32_t branchStartOffsetMin, std::int32_t branchStartOffsetMax,
@@ -86,8 +82,7 @@ private:
         Poplar,
     };
 
-    /// parity: `TrunkPlacer.validTreePos`. Kind-dispatched because specialized placers widen the
-    /// accepted blocks rather than replacing the rule.
+    /// parity: `TrunkPlacer.validTreePos`.
     [[nodiscard]] bool validTreePos(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) const;
 
     bool placeLog(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t trunkStateId) const;
@@ -98,7 +93,6 @@ private:
                                                             std::int32_t originY, std::int32_t originZ,
                                                             std::int32_t trunkStateId) const;
 
-    /// Defined beside the cherry placer, in TreeBranchingTrunkPlacers.cpp.
     [[nodiscard]] std::vector<FoliageAttachment> placeUpwardsBranchingTrunk(Chunk& chunk, random::RandomSource& random,
                                                                             std::int32_t treeHeight,
                                                                             std::int32_t originX, std::int32_t originY,
@@ -121,7 +115,6 @@ private:
                          std::int32_t sidewaysStateId, HorizontalDirection branchDirection,
                          std::int32_t offsetFromOrigin, bool middleContinuesUpwards) const;
 
-    /// The placing form ignores the result, so this is deliberately not `[[nodiscard]]`.
     bool makeLimb(Chunk& chunk, std::int32_t startX, std::int32_t startY, std::int32_t startZ, std::int32_t endX,
                   std::int32_t endY, std::int32_t endZ, bool checkOnly, std::int32_t trunkStateId) const;
 

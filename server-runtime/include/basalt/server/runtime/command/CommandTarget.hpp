@@ -12,12 +12,6 @@
 
 namespace basalt::server::runtime::command {
 
-/// Whatever a selector can point at: a player, a summoned entity, or an item on the floor. Commands
-/// that work on anything (`/kill`, `/damage`, `/tag`) take this, and every filter question is
-/// answered here so the filters need not know which of the three they hold.
-///
-/// A value holding one of three pointers rather than a hierarchy: without RTTI a caller cannot ask
-/// what a base pointer really is.
 class CommandTarget {
 public:
     /// parity: `EntityTypes.ITEM` and its own quarter-block box.
@@ -25,7 +19,7 @@ public:
     static constexpr double kItemWidth = 0.25;
     static constexpr double kItemHeight = 0.25;
 
-    /// parity: `EntityTypes.PLAYER`'s dimensions, which is what a `dx=` box is tested against.
+    /// parity: `EntityTypes.PLAYER`'s dimensions.
     static constexpr double kPlayerWidth = 0.6;
     static constexpr double kPlayerHeight = 1.8;
 
@@ -35,10 +29,8 @@ public:
 
     CommandTarget(const world::DroppedItem& item, std::string worldName = {});
 
-    /// The player this points at, or null when it points at something else.
     [[nodiscard]] player::PlayerSession* player() const;
 
-    /// The entity this points at, or null for a player or an item.
     [[nodiscard]] entity::ServerEntity* entity() const;
 
     [[nodiscard]] std::string name() const;
@@ -65,11 +57,9 @@ public:
 
     [[nodiscard]] bool alive() const;
 
-    /// How the scoreboard knows it. parity: `Entity.getScoreboardName`, a player's name and
-    /// anything else's UUID.
+    /// parity: `Entity.getScoreboardName`.
     [[nodiscard]] std::string scoreboardName() const;
 
-    /// Its collision box, for `dx/dy/dz`.
     [[nodiscard]] double width() const;
 
     [[nodiscard]] double height() const;

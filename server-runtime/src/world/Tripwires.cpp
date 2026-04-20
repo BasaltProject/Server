@@ -18,7 +18,6 @@ using Properties = std::map<std::string, std::string>;
 
 constexpr std::array<BlockFace, 4> kHorizontal{BlockFace::North, BlockFace::South, BlockFace::West, BlockFace::East};
 
-/// How far below the block a thing still counts as crossing it, since a wire lies on the floor.
 constexpr double kCrossingSlack = 0.0625;
 
 [[nodiscard]] std::string_view nameOf(BlockFace face) {
@@ -39,8 +38,7 @@ constexpr double kCrossingSlack = 0.0625;
     return found == properties.end() ? std::string{} : found->second;
 }
 
-/// parity: `Level.gameEvent(source, event, pos)`, from the middle of the square. The index of sensors
-/// is asked first because a tripwire on a busy corridor raises one of these on every crossing.
+/// parity: `Level.gameEvent(source, event, pos)`.
 void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32_t y, std::int32_t z,
            std::int64_t gameTime) {
     if (event.empty() || !world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
@@ -80,8 +78,7 @@ const wire::common::Identifier& hookBlock() {
 bool crosses(const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t stateId,
              const double entityX, const double entityY, const double entityZ, const double halfWidth,
              const double height) {
-    // parity: the two shapes are full width and differ only in how tall they are. A strung wire is a
-    // tripwire you walk through at ankle height; a loose one fills half the block.
+    // parity: the two shapes are full width and differ only in how tall they are. A strung wire is a.
     const bool attached = valueOf(registry::blockStateDefinitions::propertiesOf(stateId), "attached") == "true";
     const double low = attached ? 1.0 / 16.0 : 0.0;
     const double high = attached ? 2.5 / 16.0 : 8.0 / 16.0;
@@ -98,7 +95,7 @@ bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX
            entityY <= y + 1;
 }
 
-/// parity: `TripWireBlock.shouldConnectTo`: another string, or a hook whose face points back at us.
+/// parity: `TripWireBlock.shouldConnectTo`.
 bool connectsTo(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                 const BlockFace towards) {
     const std::optional<std::int32_t> beside =
@@ -122,8 +119,7 @@ std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int3
     if (!isWire(stateId)) {
         return std::nullopt;
     }
-    // parity: only a horizontal neighbour draws anything; from above or below the string is left as
-    // it is.
+    // parity: only a horizontal neighbour draws anything; from above or below the string is left as.
     Properties wanted;
     if (towards.has_value()) {
         if (registry::axisOf(*towards) == 1) {
@@ -151,7 +147,7 @@ bool hookFalls(const WorldState& world, std::int32_t x, std::int32_t y, std::int
         return false;
     }
     const BlockFace facing = *found;
-    // parity: `canSurvive`, which wants the block it hangs on to have a sturdy face towards it.
+    // parity: `canSurvive`.
     const BlockFace behind = registry::opposite(facing);
     const std::optional<std::int32_t> wall =
         world.blockState(x + registry::stepX(behind), y + registry::stepY(behind), z + registry::stepZ(behind));
@@ -189,14 +185,10 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
         if (world.setBlockState(x, y, z, *turned)) {
             changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
         }
-        // parity: `TripWireBlock.checkPressed` ends in `updateSource` with the wire's **new** state,
-        // which is how the hook learns what happened without reading the square again.
+        // parity: `TripWireBlock.checkPressed` ends in `updateSource` with the wire's **new** state.
         updateSource(world, x, y, z, *turned, gameTime, changes);
     }
-    // parity: `checkPressed` books ten ticks while something is on it, which is what notices the
-    // thing leaving, and a **zero** when it has just been let go, which is one last look on the very
-    // next turn. That second one changes nothing on its own and is booked anyway, so the list of
-    // pending ticks matches the jar's.
+    // parity: `checkPressed` books ten ticks while something is on it.
     if (occupied) {
         world.scheduleBlockTick(x, y, z, wireBlock(), kRecheckTicks);
     } else if (wasPressed) {
@@ -207,8 +199,7 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
 void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
                    std::vector<BlockChange>& changes, std::int32_t wireSource,
                    std::optional<std::int32_t> wireSourceState, std::optional<std::int32_t> destroyedState) {
-    // parity: `isBeingDestroyed`. With the hook already out of the world the state it had is what is
-    // worked with, its square is not rewritten, and the whole line comes out loose.
+    // parity: `isBeingDestroyed`.
     const bool beingDestroyed = destroyedState.has_value();
     const std::optional<std::int32_t> stateId = beingDestroyed ? destroyedState : world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -229,9 +220,7 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
     bool attached = !beingDestroyed;
     bool powered = false;
     std::int32_t receiver = 0;
-    // parity: `BlockState[] wireStates`, the states the scan **read**, which is what the pass writes
-    // back at the end: a square the caller handed over as a state of its own is written from that
-    // state and not from whatever the world holds by then.
+    // parity: `BlockState[] wireStates`.
     std::map<std::int32_t, std::int32_t> scanned;
     for (std::int32_t step = 1; step < kMaxLength; ++step) {
         const std::int32_t tx = x + (registry::stepX(*direction) * step);
@@ -248,8 +237,7 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             }
             break;
         }
-        // parity: the square the caller named is read from the state it handed over, whatever the
-        // world says is there now. That is how a string already gone still counts on this pass.
+        // parity: the square the caller named is read from the state it handed over, whatever the.
         const bool isSource = step == wireSource;
         if (!isSource && (along == nullptr || *along != wireBlock())) {
             attached = false;
@@ -272,9 +260,7 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
     attached = attached && receiver > 1;
     powered = powered && attached;
 
-    // parity: `TripWireHookBlock.emitState`, an else-if chain, so a hook raises **one** event even
-    // when both its properties moved: the click wins over the catch. Both ends of the line raise it,
-    // and both read the near hook's own old state, which is what vanilla passes them.
+    // parity: `TripWireHookBlock.emitState`.
     const bool wasAttached = valueOf(properties, "attached") == "true";
     const bool wasPowered = valueOf(properties, "powered") == "true";
     std::string_view event;
@@ -288,8 +274,7 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
         event = "block_detach";
     }
 
-    // parity: the jar writes the hook at the **other** end first and its own last, with the two
-    // events in between. The order matters because of the guard below, which sits between them.
+    // parity: the jar writes the hook at the **other** end first and its own last, with the two.
     if (receiver > 0) {
         const std::int32_t ox = x + (registry::stepX(*direction) * receiver);
         const std::int32_t oz = z + (registry::stepZ(*direction) * receiver);
@@ -303,9 +288,6 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
         }
         write(world, ox, y, oz, *otherId, *other, attached, powered, changes);
         // parity: `if (!level.getBlockState(pos).is(Blocks.TRIPWIRE_HOOK)) { onRemoved(...); return; }`.
-        // With the near hook already gone this walk stops here, so the string in the middle keeps the
-        // `attached` it had instead of being rewritten. Measured in `ganchoquitado3`, where the jar
-        // leaves the line taut after one hook goes and we were slackening it.
         const std::optional<std::int32_t> stillHere = world.blockState(x, y, z);
         if (!stillHere.has_value() || !isHook(*stillHere)) {
             return;
@@ -316,9 +298,7 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
     if (!beingDestroyed) {
         write(world, x, y, z, *stateId, *block, attached, powered, changes);
     }
-    // parity: the wires themselves follow the pair, which is what draws them taut, and the jar does
-    // this **only when `attached` moved**: a line that was already taut is left alone, however out of
-    // step a single string in it may be.
+    // parity: the wires themselves follow the pair, which is what draws them taut, and the jar does.
     if (wasAttached == attached) {
         return;
     }
@@ -333,24 +313,19 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
         if (!alongId.has_value()) {
             continue;
         }
-        // parity: the square has to hold a string **or a hook** for the write to land, and what is
-        // written is the state the scan read.
+        // parity: the square has to hold a string **or a hook** for the write to land, and what is.
         const wire::common::Identifier* along = registry::blockStateDefinitions::blockOf(*alongId);
         if (along == nullptr || (*along != wireBlock() && *along != hookBlock())) {
             continue;
         }
         write(world, tx, y, tz, read->second, *along, attached, std::nullopt, changes);
-        // parity: that `setBlock` redraws the string's neighbours, not the string: measured with
-        // `cuerdasola`, where the jar leaves the string beside the hook exactly as the command wrote
-        // it. Redrawing it here joined it to the hook, which the jar does not do.
+        // parity: that `setBlock` redraws the string's neighbours, not the string: measured with.
     }
 }
 
 void updateSource(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t wireStateId,
                   std::int64_t gameTime, std::vector<BlockChange>& changes) {
-    // parity: `TripWireBlock.updateSource` walks **south and west** and nothing else. It does not
-    // need the other two: `calculateHook` writes both ends of the line, so finding the hook at the
-    // lower end is finding both.
+    // parity: `TripWireBlock.updateSource` walks **south and west** and nothing else.
     for (const BlockFace face : {BlockFace::South, BlockFace::West}) {
         for (std::int32_t step = 1; step < kMaxLength; ++step) {
             const std::int32_t tx = x + (registry::stepX(face) * step);

@@ -21,7 +21,6 @@ using player::Difficulty;
 using wire::text::Component;
 using world::WorldWeather;
 
-/// The four names, in the order the packet numbers them.
 constexpr std::array<std::string_view, 4> kDifficulties{"peaceful", "easy", "normal", "hard"};
 
 [[nodiscard]] bool sameName(std::string_view left, std::string_view right) {
@@ -31,16 +30,13 @@ constexpr std::array<std::string_view, 4> kDifficulties{"peaceful", "easy", "nor
     });
 }
 
-/// Which of the four a world is on, defaulting to peaceful for a name nobody recognises, which is
-/// also what the packet would carry.
 [[nodiscard]] std::int32_t difficultyOrdinal(std::string_view name) {
     const auto found =
         std::ranges::find_if(kDifficulties, [name](std::string_view known) { return sameName(known, name); });
     return found == kDifficulties.end() ? 0 : static_cast<std::int32_t>(found - kDifficulties.begin());
 }
 
-/// parity: `WeatherCommand.setClear`, `setRain` and `setThunder`, which differ only in the range
-/// they sample and in which of the two countdowns they set.
+/// parity: `WeatherCommand.setClear`, `setRain` and `setThunder`.
 [[nodiscard]] std::int32_t setWeather(const CommandContext& context, std::string_view kind,
                                       const std::int32_t* duration) {
     const Parsed<world::LoadedWorld*> world = context.world();
@@ -79,8 +75,7 @@ void MsgCommand::build(const CommandNodeBuilder& root) const {
                 if (found == nullptr || found->empty()) {
                     return 0;
                 }
-                // parity: `MsgCommand.sendMessage`, the sender shown each target and each target the
-                // sender.
+                // parity: `MsgCommand.sendMessage`.
                 const CommandEnvironment& environment = context.environment();
                 const chat::PlayerChatMessage sent = messageArguments::resolveChatMessage(context, "message");
                 const chat::BoundChatType incoming =

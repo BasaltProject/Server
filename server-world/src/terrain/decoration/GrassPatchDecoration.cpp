@@ -152,8 +152,7 @@ void placePatch(PatchRegion& region, random::RandomSource& random, const Decorat
         if (target.y < bounds.minY() || target.y > bounds.maxY() || !registry::blocks::isAir(region.get(target))) {
             continue;
         }
-        // parity: the podzol rejection is tested before the provider draws, and the general support
-        // test after it. A candidate on podzol consumes no value; one on plain stone consumes one.
+        // parity: the podzol rejection precedes the provider draw, the support test follows it.
         if (spec.rejectPodzol && pathOf(region.get(DecorationPos{target.x, target.y - 1, target.z})) == "podzol") {
             continue;
         }
@@ -197,9 +196,7 @@ void grassPatchDecoration::decorateFeature(std::int32_t index, Chunk& chunk, std
     for (std::int32_t outer = 0; outer < outerCount; ++outer) {
         const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);
         const std::int32_t z = chunk.chunkZ() * 16 + random.nextInt(16);
-        // parity: every `patch_grass_*` names `WORLD_SURFACE_WG`, which stops moving after the
-        // carvers. Read live it lands on the canopy of a tree the same step placed earlier, and the
-        // whole patch then falls in the air.
+        // parity: `patch_grass_*` use `WORLD_SURFACE_WG`, which stops moving after the carvers.
         const DecorationPos origin{x, chunk.worldgenHeightAt(x & 15, z & 15, HeightmapType::WorldSurface), z};
         if (std::ranges::find(spec->biomes, biomePath(environment.biomeAt(origin.x, origin.y, origin.z))) !=
             spec->biomes.end()) {
@@ -210,8 +207,7 @@ void grassPatchDecoration::decorateFeature(std::int32_t index, Chunk& chunk, std
 
 void grassPatchDecoration::decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
                                     ExternalStateReader externalBlockState, BlockWriteObserver observer) {
-    // parity: each spec re-seeds from the world seed rather than sharing one stream, so the loop
-    // hands the readers down per spec instead of building a region once.
+    // parity: each spec re-seeds from the world seed.
     for (const GrassSpec& spec : specs()) {
         decorateFeature(spec.index, chunk, seed, environment, externalBlockState, observer);
     }

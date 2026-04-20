@@ -49,8 +49,7 @@ RandomCommand::RandomCommand(std::function<std::int64_t()> worldSeed)
     : Command("random", permissionLevel::kAll), worldSeed_(std::move(worldSeed)) {}
 
 void RandomCommand::build(const CommandNodeBuilder& root) const {
-    /// parity: `RandomSequence.createSequence`: the world seed upgraded but not mixed, xored with the
-    /// md5 of the name and mixed after, over xoroshiro. The same stream a loot table rolls on.
+    /// parity: `RandomSequence.createSequence`: the world seed upgraded but not mixed.
     const auto sequenceFor = [this](const Identifier& sequence) -> random::RandomSource& {
         const auto found = sequences_.find(sequence);
         if (found != sequences_.end()) {
@@ -127,11 +126,6 @@ void RandomCommand::build(const CommandNodeBuilder& root) const {
         return count;
     };
 
-    /// `seed <n> [includeWorldSeed] [includeSequenceId]`, which reseeds rather than forgets.
-    ///
-    /// Sequences here are forgotten and rebuilt from the world seed on the next draw, so a seed
-    /// given by hand resets them the same way: the flags decide what vanilla mixes in, and this
-    /// build has nothing else to mix.
     const auto seeded = [](const CommandNodeBuilder& node, const CommandExecutor& run) {
         node.argument("seed", integerArgument(), [run](const CommandNodeBuilder& seed) {
             seed.executes(run);

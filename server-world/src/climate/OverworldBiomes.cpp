@@ -444,8 +444,7 @@ std::vector<std::pair<ParameterPoint, BiomeName>> build() {
     std::vector<std::pair<ParameterPoint, BiomeName>> values;
     const Emit emit = [&values](const ParameterPoint& point, BiomeName biome) { values.emplace_back(point, biome); };
 
-    // The order is vanilla's own, and it is semantically significant: ties between equally good
-    // points go to whichever was registered first.
+    // The order is vanilla's own, and it is semantically significant.
     tables.addOffCoastBiomes(emit);
     tables.addMidSlice(emit, parameterSpan(-1.0F, -0.93333334F));
     tables.addHighSlice(emit, parameterSpan(-0.93333334F, -0.7666667F));

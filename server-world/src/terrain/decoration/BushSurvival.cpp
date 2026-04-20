@@ -29,7 +29,7 @@ constexpr std::int32_t kTooBright = 13;
     return path == "brown_mushroom" || path == "red_mushroom";
 }
 
-/// parity: block tag `overrides_mushroom_light_requirement`, which skips the brightness test.
+/// parity: block tag `overrides_mushroom_light_requirement`.
 [[nodiscard]] bool overridesLight(std::int32_t stateId) {
     static const std::set<std::string, std::less<>> paths = {"mycelium", "podzol", "crimson_nylium", "warped_nylium"};
     return paths.contains(pathOf(stateId));
@@ -49,8 +49,7 @@ constexpr std::int32_t kTooBright = 13;
 
 namespace {
 
-/// parity: `DoublePlantBlock.updateShape`, which turns a half whose partner is not the other half of
-/// the same plant into air. A tree that grows over one half after the patch ran leaves exactly that.
+/// parity: `DoublePlantBlock.updateShape` turns a half with a mismatched partner into air.
 void settleDoublePlants(Chunk& chunk) {
     const ChunkHeight bounds = chunk.verticalBounds();
     const std::int32_t air = registry::blocks::air().stateId;

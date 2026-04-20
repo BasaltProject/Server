@@ -108,7 +108,7 @@ constexpr std::int32_t kIntMax = std::numeric_limits<std::int32_t>::max();
     return toIntLikeJava(std::floor(static_cast<double>(value) + 0.5));
 }
 
-/// parity: `WeightedList.getRandomOrThrow`: `nextInt(total)`, then the first whose weight covers it.
+/// parity: `WeightedList.getRandomOrThrow`.
 template <typename Value>
 [[nodiscard]] const Value* pickWeighted(const std::vector<Value>& values, const std::vector<std::int32_t>& weights,
                                         random::RandomSource& random) {
@@ -356,7 +356,7 @@ std::optional<std::int32_t> IntProvider::tryGet(random::RandomSource& random, co
                    ? longToInt(static_cast<std::int64_t>(operands->first) - static_cast<std::int64_t>(operands->second))
                    : std::nullopt;
     }
-    // parity: Java's `/` and `%` throw only for a zero divisor; `MIN_VALUE / -1` wraps to itself.
+    // parity: Java's `/` and `%` throw only for a zero divisor.
     case Kind::Quotient:
     case Kind::Modulus: {
         const auto operands = both();
@@ -625,7 +625,7 @@ std::optional<float> FloatProvider::tryGet(random::RandomSource& random, const L
         }
         return kind_ == Kind::Difference ? operands->first - operands->second : operands->first / operands->second;
     }
-    // parity: `Modulus` reads the divisor first and answers NaN for zero, the dividend unread.
+    // parity: `Modulus` reads the divisor first and answers NaN for zero.
     case Kind::Modulus: {
         const std::optional<float> right = floats[1].tryGet(random, context);
         if (!right.has_value()) {

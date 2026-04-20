@@ -99,9 +99,6 @@ const PathSet& liquidBlockPaths() {
     return block == nullptr ? std::string{} : block->path();
 }
 
-/// These two read and write in world coordinates through the chunk's own decoration view. A lake is
-/// 16 wide and a monster room 11, so both all but always cross an edge: reading outside as air made
-/// a lake reject itself. A write outside is deferred, guarded by the very block it replaces.
 [[nodiscard]] std::int32_t stateAt(const Chunk& chunk, const DecorationPos& position) {
     return chunk.decorationBlockStateId(position.x, position.y, position.z);
 }
@@ -135,7 +132,7 @@ void set(Chunk& chunk, const DecorationPos& position, std::int32_t stateId) {
     return std::max(std::abs(x1 - x2), std::abs(z1 - z2));
 }
 
-/// parity: `SpringFeature`, which counts the rocks and the holes around the origin before writing.
+/// parity: `SpringFeature`.
 bool placeSpring(Chunk& chunk, const DecorationPos& origin, std::string_view validBlock, std::int32_t fluidStateId,
                  std::int32_t rockCount, std::int32_t holeCount) {
     if (pathOf(stateAt(chunk, offset(origin, 0, 1, 0))) != validBlock) {
@@ -184,7 +181,7 @@ bool placeSpring(Chunk& chunk, const DecorationPos& origin, std::string_view val
     throw std::logic_error{"unknown horizontal direction"};
 }
 
-/// parity: `StructurePiece.reorient`, including its adjacent-chest and multi-wall fallbacks.
+/// parity: `StructurePiece.reorient`.
 [[nodiscard]] std::string reorientDungeonChest(const Chunk& chunk, const DecorationPos& position) {
     const HorizontalDirection* solidDirection = nullptr;
     for (const HorizontalDirection& direction : kHorizontalDirections) {
@@ -262,7 +259,7 @@ void placeDungeonSpawner(Chunk& chunk, random::RandomSource& random, const Decor
                                           wire::common::Identifier::vanilla("mob_spawner"), std::move(data)});
 }
 
-/// parity: `MonsterRoomFeature`: protected carve, up to two loot chests, and a populated spawner.
+/// parity: `MonsterRoomFeature`.
 bool placeMonsterRoom(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
     const std::int32_t radiusX = random.nextInt(2) + 2;
     const std::int32_t radiusZ = random.nextInt(2) + 2;
@@ -345,7 +342,7 @@ bool placeMonsterRoom(Chunk& chunk, random::RandomSource& random, const Decorati
     return true;
 }
 
-/// parity: `EndPlatformFeature.createEndPlatform`: a 5x5 obsidian slab with three air layers over it.
+/// parity: `EndPlatformFeature.createEndPlatform`.
 bool placeEndPlatform(Chunk& chunk, const DecorationPos& origin) {
     for (std::int32_t dz = -2; dz <= 2; ++dz) {
         for (std::int32_t dx = -2; dx <= 2; ++dx) {
@@ -357,7 +354,7 @@ bool placeEndPlatform(Chunk& chunk, const DecorationPos& origin) {
     return true;
 }
 
-/// parity: `VoidStartPlatformFeature`: a fixed (8,8) centre, three blocks above the supplied y.
+/// parity: `VoidStartPlatformFeature`.
 bool placeVoidPlatform(Chunk& chunk, const DecorationPos& origin) {
     if (checkerboardDistance(origin.x >> 4, origin.z >> 4, kPlatformChunkX, kPlatformChunkZ) > 1) {
         return true;
@@ -435,8 +432,7 @@ bool placeGateway(Chunk& chunk, const DecorationPos& origin) {
            !tree::treeBlockRules::isLogState(stateId);
 }
 
-/// parity: `LakeFeature`: a union of four to seven ellipsoids in its fixed 16x8 mask, including the
-/// boundary preflight, the cave-air and fluid carve, and the probabilistic solid barrier.
+/// parity: `LakeFeature`.
 bool placeLake(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin, std::int32_t fluid,
                std::int32_t barrier, std::string_view forbiddenBoundaryBlock = {}) {
     if (origin.y <= chunk.verticalBounds().minY() + 4) {
@@ -521,8 +517,7 @@ bool placeLake(Chunk& chunk, random::RandomSource& random, const DecorationPos& 
         }
     }
 
-    // `lake_lava` never enters LakeFeature's water-freeze branch, and sulfur caves are temperature
-    // 0.8, so sulfur_pool does not freeze in its actual biome placement either.
+    // `lake_lava` never enters the water-freeze branch and sulfur caves are temperature 0.8.
     return true;
 }
 
@@ -531,7 +526,7 @@ bool placeLake(Chunk& chunk, random::RandomSource& random, const DecorationPos& 
     return registry::blockFluids::hasWaterFluid(stateId) && !(stateId > water && stateId <= water + 15);
 }
 
-/// parity: sulfur_pool's `SequenceFeature`: a water lake, then the four-step downward wet vent.
+/// parity: sulfur_pool's `SequenceFeature`.
 bool placeSulfurPool(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
     if (!placeLake(chunk, random, origin, registry::blocks::water().stateId, state("sulfur"), "sulfur_spike")) {
         return false;

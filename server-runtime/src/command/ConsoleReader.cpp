@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/command/ConsoleReader.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/common/logging/LogOutput.hpp>
+#include <basalt/wire/io/ConsoleInput.hpp>
 #include <basalt/wire/io/Platform.hpp>
 
 #include <atomic>
@@ -27,28 +28,20 @@ constexpr int kDown = 66;
 constexpr int kRight = 67;
 constexpr int kLeft = 68;
 
-/// Below this are control characters, which this editor does not act on.
 constexpr int kFirstPrintable = 32;
 
-/// Enough to scroll back through a session's worth of commands without growing without bound.
 constexpr std::size_t kMaxHistory = 100;
 
 constexpr std::chrono::milliseconds kPoll{25};
 
-/// Long enough to cover a restart and a cold start; past it, something is wrong and saying so beats
-/// hanging.
+/// Long enough to cover a restart and a cold start; past it, something is wrong and saying so beats hanging.
 constexpr std::chrono::milliseconds kMaxWait{60000};
 
 std::atomic<bool> running{false};
 std::jthread reader;
 
-/// How the log hook puts the prompt back. Set while a line is being edited and cleared between
-/// lines, so a log line arriving with nothing half-typed prints on its own.
 std::function<void()> redrawPrompt;
 
-/// A byte from standard input, or -1 when input ended or the reader was told to stop. Waiting in
-/// slices is what lets `stop` be noticed: a plain read parks inside the call until input arrives,
-/// and stdin held open by a supervisor or a fifo never delivers any.
 [[nodiscard]] int readByteOrStop() {
     while (running.load()) {
         if (wire::io::terminal::waitForInput(kPoll)) {
@@ -58,22 +51,13 @@ std::function<void()> redrawPrompt;
     return -1;
 }
 
-/// One line, edited in place: printable characters, backspace, left and right, and up and down
-/// through the history. Answers nothing at end of input.
-///
-/// Deliberately small. This is not a readline implementation and does not try to be: no completion,
-/// no word motions, no search, no multi-line. It covers what an operator actually reaches for at a
-/// server console, which is recalling the last command and fixing a typo in it.
 [[nodiscard]] std::optional<std::string> readEditedLine(const std::vector<std::string>& history) {
     std::string line;
     std::size_t cursor = 0;
-    // Where up and down currently are in the history. Past the end means "the line being typed",
-    // which is what coming back down from the history has to restore.
     std::size_t historyIndex = history.size();
     std::string draft;
 
     const auto redraw = [&line, &cursor] {
-        // Carriage return, the prompt, the line, then clear whatever the old line left behind.
         std::fputs(("\r> " + line + "\033[K").c_str(), stdout);
         if (cursor < line.size()) {
             std::fputs(("\033[" + std::to_string(line.size() - cursor) + "D").c_str(), stdout);
@@ -104,7 +88,6 @@ std::function<void()> redrawPrompt;
             continue;
         }
         if (byte == kEscape) {
-            // An arrow is escape, then a bracket, then a letter. Anything else is left alone.
             if (wire::io::terminal::readByte() != kBracket) {
                 continue;
             }
@@ -140,7 +123,6 @@ std::function<void()> redrawPrompt;
     }
 }
 
-/// Waits for a server to exist, since one is either starting or being replaced right now.
 [[nodiscard]] CommandDispatcher* awaitDispatcher(const std::function<CommandDispatcher*()>& current) {
     std::chrono::milliseconds waited{0};
     while (waited < kMaxWait && running.load()) {
@@ -153,18 +135,20 @@ std::function<void()> redrawPrompt;
     return current();
 }
 
-void readLoop(const std::function<CommandDispatcher*()>& current, bool editing) {
+void readLoop(const std::function<CommandDispatcher*()>& current, bool editing, std::stop_token stop) {
+    wire::io::ConsoleInput input{65536};
     std::vector<std::string> history;
     while (running.load()) {
         std::optional<std::string> line;
         if (editing) {
             line = readEditedLine(history);
         } else {
-            while (running.load() && !wire::io::terminal::waitForInput(kPoll)) {
-            }
-            std::string read;
-            if (running.load() && std::getline(std::cin, read)) {
-                line = read;
+            auto read = input.readLine(stop);
+            if (read) {
+                line = std::move(*read);
+            } else if (read.error() == wire::io::ConsoleInputError::kTooLong) {
+                std::cout << "Console command exceeds 65536 bytes; line discarded.\n";
+                continue;
             }
         }
         if (!line.has_value()) {
@@ -180,8 +164,6 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing) 
         if (command.empty()) {
             continue;
         }
-        // Kept as typed, and never twice in a row: a history full of repeated `list` is a history
-        // you have to scroll past rather than one you can use.
         if (history.empty() || history.back() != command) {
             history.push_back(command);
         }
@@ -193,10 +175,7 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing) 
             std::cout << "No server is running, so '" << command << "' was not run.\n";
             continue;
         }
-        // A command from the console reaches the world, so it runs on whoever owns it rather than on
-        // this thread. With nothing loaded there is nobody to ask, and it runs here. The owner holds
-        // it for the turn's console point, not its start: the jar runs console input after the
-        // levels and before `playerList.tick`.
+        // A command from the console reaches the world, so it runs on whoever owns it rather than on this thread.
         const CommandEnvironment& environment = dispatcher->environment();
         const auto named = environment.options().worlds.find(environment.options().defaultWorldName);
         world::LoadedWorld* defaultWorld = named == environment.options().worlds.end() ? nullptr : named->second;
@@ -204,8 +183,6 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing) 
             wire::common::Logger{"Console"}, environment.lang(), [defaultWorld]() -> std::array<double, 3> {
                 return defaultWorld == nullptr ? std::array<double, 3>{0.0, 0.0, 0.0} : defaultWorld->spawn();
             });
-        // The plugin is asked *inside* the task, not here: a decider answers where plugins run, and
-        // this thread is the one reading standard input.
         const std::function<void()> run = [dispatcher, source, command, &environment] {
             std::string line = command;
             server::plugins::PluginEventBus* bus = environment.pluginEvents();
@@ -239,13 +216,10 @@ void start(std::function<CommandDispatcher*()> current) {
     if (!running.compare_exchange_strong(expected, true)) {
         return;
     }
-    reader = std::jthread([current = std::move(current)] {
-        // Raw mode is what makes an arrow key reach this program at all; without a terminal it is
-        // unavailable and unnecessary, and plain line reading is used instead.
+    reader = std::jthread([current = std::move(current)](std::stop_token stop) {
         const bool editing = wire::io::terminal::enableRawMode();
         if (editing) {
-            // Log lines and the prompt share one terminal. Wipe the prompt before a line is written
-            // and draw it again after, or every log line leaves a copy of it behind.
+            // Log lines and the prompt share one terminal.
             wire::common::logOutput::setAroundConsoleLine([](const std::function<void()>& write) {
                 std::fputs("\r\033[K", stdout);
                 write();
@@ -255,7 +229,7 @@ void start(std::function<CommandDispatcher*()> current) {
                 wire::io::flushConsole();
             });
         }
-        readLoop(current, editing);
+        readLoop(current, editing, stop);
         wire::common::logOutput::setAroundConsoleLine({});
         wire::io::terminal::restoreMode();
     });
@@ -263,6 +237,7 @@ void start(std::function<CommandDispatcher*()> current) {
 
 void stop() {
     running.store(false);
+    reader.request_stop();
     if (reader.joinable()) {
         reader.join();
     }

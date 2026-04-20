@@ -13,16 +13,11 @@
 
 namespace basalt::server::world::terrain {
 
-/// parity: `MultiNoiseBiomeSource`, specialised to the Overworld preset. Samples the router's six
-/// climate functions at quart resolution and takes the closest registered climate region.
-///
-/// Holds no cache on purpose: one instance is shared by every chunk worker. Memoisation belongs one
-/// level up, in a per-chunk single-threaded cache.
+/// parity: `MultiNoiseBiomeSource`.
 class OverworldBiomeSource {
 public:
     explicit OverworldBiomeSource(const NoiseRouter& router, std::optional<std::int64_t> biomeZoomSeed = std::nullopt);
 
-    /// Direct noise-biome lookup from block coordinates, without the biome manager's zoom.
     [[nodiscard]] climate::BiomeName biomeAt(std::int32_t x, std::int32_t y, std::int32_t z,
                                              densityfunction::SamplerContext* cache = nullptr) const;
 

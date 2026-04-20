@@ -40,22 +40,16 @@ using namespace basalt::server::runtime;
 
 namespace {
 
-/// Exit codes an orchestrator can tell apart, the same way the EULA already has one.
-///
-/// A configuration mistake is the failure an operator actually hits (a typo in a world type, a
-/// malformed table), and it deserves one readable line rather than a crash.
+// Exit code for a configuration mistake, distinct from a crash so orchestrators can tell them apart.
 constexpr int kConfigExitCode = 2;
 constexpr int kBindExitCode = 3;
 constexpr int kDatabaseExitCode = 4;
 
 constexpr std::string_view kLogRoot = "./.basalt/logs";
 
-/// Where a crash report goes. The server's own, not the project's: the proxy has its own tracker and
-/// its own half of the code.
 constexpr std::string_view kIssuesUrl = "https://github.com/BasaltProject/Server/issues";
 
-// Raw string, and deliberately not indented: the art is full of backslashes, and every leading
-// space in it is significant.
+// Raw string, deliberately not indented: every leading space in the art is significant.
 constexpr std::string_view kBanner = R"(
   ____                  _ _      _____
  |  _ \                | | |    / ____|
@@ -80,8 +74,6 @@ constexpr std::string_view kBanner = R"(
     return false;
 }
 
-/// Everything one instance of the server owns that outlives its constructor. A restart drops the
-/// whole thing and builds another from the files as they are then.
 struct Instance {
     config::BasaltConfig config;
     config::WorldsConfig worlds;
@@ -105,14 +97,12 @@ template <typename T>
     return std::move(*loaded);
 }
 
-/// parity: `--safeMode`, which loads the vanilla data pack alone whatever the world saved.
+/// parity: `--safeMode`.
 bool gSafeMode = false;
 
-/// Builds one server from the configuration as it stands right now. Called again on every restart.
 [[nodiscard]] std::unique_ptr<Instance> buildServer() {
     const wire::common::Logger configLogger{"Config"};
-    // Read again on every start, so a restart really does pick up an edited server.toml: the port,
-    // the game mode and the log level are all decided here.
+    // Read on every start, so a restart picks up an edited server.toml.
     auto instance = std::make_unique<Instance>(Instance{
         .config = orExit(config::BasaltConfig::load(config::ConfigDirectory{}, "server.properties", configLogger),
                          configLogger),
@@ -123,8 +113,7 @@ bool gSafeMode = false;
     });
     wire::common::Logger::setDefaultMinLevel(instance->config.logLevel);
 
-    // Downloading is the fallback, not the path: once a version's data is unpacked the source below
-    // is never asked, so a warm install resolves no metadata and contacts no network.
+    // Downloading is the fallback: once a version is unpacked, a warm install contacts no network.
     const wire::common::Logger assetsLogger{"Assets"};
     const std::string dataRoot = "./.basalt/assets/" + std::string{buildInfo::kMinecraftVersion};
     std::expected<server::assets::ServerJarAssets, server::assets::AssetError> jar =
@@ -164,8 +153,7 @@ bool gSafeMode = false;
         });
     }
 
-    // The packs come before anything that reads data: the world generators read the worldgen of the
-    // selected packs, as vanilla loads its world registries from them.
+    // The packs load before anything that reads data: the world generators read the selected packs' worldgen.
     datapack::DataPacks::Options packOptions{
         .jar = VanillaGameData::jarFilesOf(instance->serverJar.get()),
         .worldRoot = std::string{config::WorldsConfig::kDefaultWorldsRoot} + "/" + instance->worlds.defaultWorld().name,
@@ -177,8 +165,6 @@ bool gSafeMode = false;
     if (const std::vector<datapack::ElementError> errors = datapack::invalidElements(
             *instance->datapacks->resources(), datapack::builtInPackIds(instance->datapacks->repository()), true);
         !errors.empty()) {
-        // parity: vanilla refuses to start here. Starting on vanilla alone, without saving that
-        // choice, is the one way that neither crashes nor loses the operator's pack list.
         const wire::common::Logger packLogger{"Datapacks"};
         datapack::logElementErrors(errors, packLogger);
         packLogger.error([] {
@@ -190,7 +176,6 @@ bool gSafeMode = false;
         instance->datapacks = std::make_unique<datapack::DataPacks>(packOptions);
     }
     const VanillaGameData::Jar jarHooks = VanillaGameData::jarOf(instance->datapacks->resources());
-    // The synchronised registries are world registries: laid over by the packs once, here.
     {
         std::vector<wire::protocol::configuration::RegistryDataPacket> registries =
             registry::vanillaConfigurationRegistries::packets();
@@ -208,8 +193,6 @@ bool gSafeMode = false;
         std::make_unique<world::VanillaWorldGeneratorFactory>(world::VanillaWorldGeneratorFactory::Jar{
             .readText = jarHooks.readText, .readEntry = jarHooks.readEntry, .dataIds = jarHooks.dataIds});
 
-    // The MOTD is the one thing the server list takes from a vanilla server.properties, and only
-    // while generating the file for the first time.
     static_cast<void>(orExit(
         config::ServerListConfig::load(config::ConfigDirectory{}, config::BasaltConfig::legacyMotd(), configLogger),
         configLogger));
@@ -222,15 +205,12 @@ bool gSafeMode = false;
     options.generators = instance->generators.get();
     options.compatibility =
         orExit(config::CompatibilityConfig::load(config::ConfigDirectory{}, configLogger), configLogger);
-    // A forwarding proxy has already authenticated everyone, so the session exchange never runs
-    // here: keeping it would cost every player a second login they cannot answer.
+    // A forwarding proxy already authenticated everyone, so the session exchange is skipped.
     if (instance->config.onlineMode && !instance->config.forwarding.enabled()) {
         instance->keyPair = wire::auth::SessionKeyPair::generate();
         instance->sessions = std::make_unique<wire::auth::MojangSessionService>();
         options.keyPair = instance->keyPair.has_value() ? &*instance->keyPair : nullptr;
         options.sessionService = instance->sessions.get();
-        // parity: authlib fetches Mojang's public keys once at start; without them no chat
-        // session can be checked and secure chat is not enforced.
         instance->servicesKeys = std::make_unique<wire::auth::ServicesKeySet>(wire::auth::ServicesKeySet::fetch());
         if (!instance->servicesKeys->canValidateProfileKeys()) {
             wire::common::Logger{"Auth"}.warn(
@@ -238,8 +218,6 @@ bool gSafeMode = false;
         }
         options.servicesKeys = instance->servicesKeys.get();
     }
-    // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
-    // server.jar as everything else, so this costs no extra download.
     options.lang = server::assets::langAssets::loadCachedOrEmpty(dataRoot);
 
     instance->server =
@@ -254,27 +232,22 @@ int main(int argc, char** argv) {
     std::puts(std::string{kBanner}.c_str());
     std::puts(versionLine().c_str());
 
-    // Before anything that could fail: a crash from here on says what it was and where, instead of
-    // leaving the operator with one line from their shell.
+    // Installed before anything that can fail, so a crash says what it was and where.
     wire::common::panic::install("Basalt Server", std::string{buildInfo::kVersion}, std::string{kIssuesUrl});
 
     gSafeMode = hasFlag(argc, argv, "--safeMode");
 
     // No prompts and no TTY detection: identical behaviour interactive, headless or containerized.
-    // `--accept-eula` is a deliberate operator act, not a fallback.
     if (server::assets::eulaFile::check(hasFlag(argc, argv, "--accept-eula"), wire::common::Logger{"Eula"}) !=
         server::assets::eulaFile::Outcome::Accepted) {
         return server::assets::eulaFile::kRejectedExitCode;
     }
 
-    // Escape codes are a terminal affordance; piped or redirected output gets none. Applied before
-    // the config is read so that loading it is itself coloured, then again once the operator's own
-    // choice is known.
+    // Escape codes only on a terminal; applied before the config is read, then again with the operator's choice.
     const bool attachedToTerminal = wire::io::isConsoleInteractive();
     wire::common::logOutput::setUseColor(attachedToTerminal);
 
-    // Read once for the things that cannot be redone per instance: the log file would archive itself
-    // on every restart, and colour is a property of the terminal, not of the server.
+    // Read once: the log file would archive itself on every restart.
     const wire::common::Logger configLogger{"Config"};
     const std::expected<config::BasaltConfig, std::string> boot =
         config::BasaltConfig::load(config::ConfigDirectory{}, "server.properties", configLogger, false);
@@ -298,20 +271,15 @@ int main(int argc, char** argv) {
         static_cast<void>(wire::io::logFile::install(std::string{kLogRoot}, boot->logKeepDays, versionLine()));
     }
 
-    // Installed once for the process, not once per server: a second handler would leave the first
-    // one pointing at an instance that has already stopped.
+    // Installed once per process: a second handler would point at an instance that has already stopped.
     wire::io::shutdownSignal::install();
 
-    // The console outlives the server, since `/restart` replaces it while this thread blocks on stdin.
-    // It gets an atomic, not the instance: a plain pointer here races with building a new server.
+    // The console outlives the server, so it gets an atomic, not the instance, to avoid racing a rebuild.
     std::unique_ptr<Instance> running;
     std::atomic<command::CommandDispatcher*> live{nullptr};
     command::consoleReader::start([&live] { return live.load(std::memory_order_acquire); });
 
-    // One instance per turn around this loop. A restart is not a re-exec and not a new process: the
-    // old instance winds itself down exactly as `/stop` does, and then a new one is built from the
-    // files as they are now. That is what makes server.toml and worlds.toml applicable, which
-    // `/reload` deliberately cannot do.
+    // A restart winds the old instance down like `/stop` and builds a new one from the files as they are.
     int exitCode = 0;
     bool first = true;
     while (true) {
@@ -334,10 +302,7 @@ int main(int argc, char** argv) {
         }
         running.reset();
     }
-    // Told to stop and waited for here, not left to a destructor at exit: standard input held open
-    // by a supervisor, a pipe or a fifo never ends, so a reader nobody stops keeps the process alive
-    // long after the server is gone. It puts the terminal back on its way out, and this is a second
-    // go for the case where it never started.
+    // Stopped and joined here: a stdin held open by a supervisor would keep the process alive after the server.
     command::consoleReader::stop();
     wire::io::terminal::restoreMode();
     return exitCode;

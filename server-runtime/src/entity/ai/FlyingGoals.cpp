@@ -22,7 +22,6 @@ namespace {
 
 constexpr float kAttackLookSpeed = 30.0F;
 
-/// The guardian's own push along the line to its target, until it has a swim control of its own.
 void nudge(ServerEntity& mob, double x, double y, double z, double step) {
     const double dx = x - mob.x;
     const double dy = y - mob.y;
@@ -56,7 +55,6 @@ void nudge(ServerEntity& mob, double x, double y, double z, double step) {
     return target.entity != nullptr ? mobBreathing::eyeHeightOf(*target.entity) : static_cast<double>(1.62F);
 }
 
-/// The hit itself, which every one of the flying attacks lands the same way.
 void strike(MobContext& mob, const TargetView& target) {
     mob.actions.swing(mob.mob);
     const float damage = entityCombat::attackDamageOf(mob.mob);
@@ -81,8 +79,7 @@ bool GhastFloatGoal::canUse(MobContext& mob) {
 }
 
 void GhastFloatGoal::start(MobContext& mob) {
-    // parity: `getSuitableFlyToPosition` with no distance to blocks: the first roll inside the home
-    // is taken as it is, and a mob without a home takes the first roll of all.
+    // parity: `getSuitableFlyToPosition` with no distance to blocks.
     constexpr std::int32_t kAttempts = 64;
     constexpr float kRange = 16.0F;
     const auto roll = [&mob] {

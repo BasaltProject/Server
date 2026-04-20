@@ -16,10 +16,7 @@
 namespace basalt::server::runtime::world {
 namespace {
 
-/// parity: `CactusBlock.entityInside`, one point of damage per square of cactus the box touches, and
-/// `ItemEntity.hurtServer`, which spends the item's health without any invulnerable window: five
-/// turns against a cactus and the stack is gone. Nothing else here spends that health, because fire
-/// and lava go through the fire clock and the stack's own `damage_resistant` component.
+/// parity: `CactusBlock.entityInside`.
 [[nodiscard]] std::int32_t cactusDamage(const entity::entityCollision::BlockAt& blocks, const DroppedItem& item) {
     constexpr double kEdgeSlack = 1.0e-7;
     const double half = DroppedItemPhysics::kItemWidth / 2.0;
@@ -50,7 +47,7 @@ constexpr double kLavaFluidDrag = 0.95;
 constexpr double kFloatLift = 5.0e-4;
 constexpr double kFloatLiftBelow = 0.06;
 
-/// parity: `ItemEntity.setFluidMovement`, which slows it sideways and nudges it up while it sinks.
+/// parity: `ItemEntity.setFluidMovement`.
 void floatIn(DroppedItem& item, double drag) {
     item.velocityX *= static_cast<double>(static_cast<float>(drag));
     item.velocityY += item.velocityY < static_cast<double>(static_cast<float>(kFloatLiftBelow))
@@ -66,19 +63,15 @@ void floatIn(DroppedItem& item, double drag) {
     return dx * dx + dy * dy + dz * dz;
 }
 
-/// Two stacks only merge when they carry the same extras, which for now means neither carries any.
 [[nodiscard]] bool sameComponents(const wire::nbt::NbtCompound& first, const wire::nbt::NbtCompound& second) {
     return first.size() == 0 && second.size() == 0;
 }
 
-/// parity: `PowderSnowBlock.NUM_BLOCKS_TO_FALL_INTO_BLOCK`, past which the snow is something to land
-/// on, and `FALLING_COLLISION_SHAPE`, the lid that is nine tenths of a block high.
+/// parity: `PowderSnowBlock.NUM_BLOCKS_TO_FALL_INTO_BLOCK`.
 constexpr double kSnowCatchesAfter = 2.5;
 constexpr double kSnowLidHeight = 0.9;
 
-/// parity: `PowderSnowBlock.getCollisionShape` seen by a dropped item, which is neither a falling
-/// block nor anything that can walk on powder snow: the lid while it is still falling fast, and
-/// nothing at all once it has stopped.
+/// parity: `PowderSnowBlock.getCollisionShape` seen by a dropped item.
 [[nodiscard]] entity::entityCollision::ShapeFor snowLidFor(const DroppedItem& item) {
     if (item.fallDistance <= kSnowCatchesAfter) {
         return {};
@@ -104,7 +97,6 @@ constexpr double kSnowLidHeight = 0.9;
 
 DroppedItem& DroppedItemPhysics::spawnItem(DroppedItem dropped) {
     const WorldWriteLock lock{*mutex_};
-    // It has not moved yet, so where it was and where it is are the same square.
     dropped.previousX = dropped.x;
     dropped.previousY = dropped.y;
     dropped.previousZ = dropped.z;
@@ -190,8 +182,6 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
     std::vector<std::int32_t> despawned;
     for (std::size_t index = 0; index < droppedItems_.size();) {
         DroppedItem& item = droppedItems_[index];
-        // An item belongs to whoever owns the ground it is lying on. With the world in one piece
-        // that is everybody, and this is always true.
         if (region != nullptr && !region->ownsPosition(item.x, item.z)) {
             ++index;
             continue;
@@ -210,14 +200,11 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
             droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
             continue;
         }
-        // parity: `ItemEntity.tick` lets the current in twice: `super.tick()`'s `baseTick` before the
-        // move, and its own `updateFluidInteraction` after it.
+        // parity: `ItemEntity.tick` lets the current in twice.
         carryByFluid(item);
         moveItem(item);
         carryByFluid(item);
-        // parity: `applyEffectsFromBlocks` runs on every tick of an item, on the resting branch as
-        // much as on the moving one, so a stack lying against a cactus is pricked four times in
-        // four ticks and not once.
+        // parity: `applyEffectsFromBlocks` runs on every tick of an item.
         item.health -= cactusDamage(blockAt_, item);
         if (item.health <= 0) {
             despawned.push_back(item.entityId);
@@ -227,14 +214,10 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         ++index;
     }
 
-    // parity: `ItemEntity.mergeWithNeighbours`, asked every other tick while an item is moving and
-    // every two seconds once it has settled. Without it a broken tree leaves six stacks of one log
-    // on the floor where vanilla leaves one.
+    // parity: `ItemEntity.mergeWithNeighbours`.
     std::vector<std::int32_t> absorbed;
     for (std::size_t index = 0; index < droppedItems_.size(); ++index) {
         const DroppedItem& item = droppedItems_[index];
-        // Everything absorbed is erased on the spot, so this only guards against a merge that
-        // learns to leave its leftovers behind.
         if (std::ranges::find(absorbed, item.entityId) != absorbed.end()) {
             continue;
         }
@@ -263,8 +246,7 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
         }
         DroppedItem& candidate = droppedItems_[other];
         DroppedItem& item = droppedItems_[index];
-        // parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to
-        // fit in one stack.
+        // parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to.
         if (candidate.item != item.item || candidate.count <= 0 ||
             !sameComponents(candidate.components, item.components) || item.count + candidate.count > maxOf(candidate) ||
             std::abs(candidate.x - item.x) > kMergeRange || std::abs(candidate.z - item.z) > kMergeRange ||
@@ -333,8 +315,7 @@ void DroppedItemPhysics::carryByFluid(DroppedItem& item) const {
 }
 
 void DroppedItemPhysics::moveItem(DroppedItem& item) {
-    // parity: `ItemEntity.tick`: water over a tenth of the box floats the item and lava does too,
-    // more slowly; anything else is gravity, applied before the move on every tick.
+    // parity: `ItemEntity.tick`.
     if (fluidHeight(item, FluidKind::Water) > kFloatDepth) {
         floatIn(item, kWaterFluidDrag);
     } else if (fluidHeight(item, FluidKind::Lava) > kFloatDepth) {
@@ -343,18 +324,14 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
         item.velocityY -= kGravity;
     }
 
-    // parity: `ItemEntity.tick` only moves an item that is standing still on one tick in four, and
-    // the drag below is inside that same branch. It is not an optimisation to skip: an item resting
-    // on the lid powder snow offers a falling thing is held up by a shape that is gone the moment it
-    // stops falling, and it is this fourth tick that lets it through. Measured in `nievepolvo`.
+    // parity: `ItemEntity.tick` only moves an item that is standing still on one tick in four.
     const bool horizontallyStill =
         (item.velocityX * item.velocityX) + (item.velocityZ * item.velocityZ) <= kRestingSpeedSquared;
     if (item.onGround && horizontallyStill && (item.age + item.entityId) % kRestingMoveEvery != 0) {
         return;
     }
 
-    // parity: `Entity.move` spends what caught it last tick on **this** move and then drops the
-    // speed to nothing. What holds the item is asked again after the move, not here.
+    // parity: `Entity.move` spends what caught it last tick on **this** move and then drops the.
     double wantX = item.velocityX;
     double wantY = item.velocityY;
     double wantZ = item.velocityZ;
@@ -377,18 +354,17 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
     item.x += moved[0];
     item.y += moved[1];
     item.z += moved[2];
-    // parity: `ItemEntity.tick` compares the floors, so drifting inside one square is not "moved".
+    // parity: `ItemEntity.tick` compares the floors.
     item.crossedBlock = std::floor(wasX) != std::floor(item.x) || std::floor(wasY) != std::floor(item.y) ||
                         std::floor(wasZ) != std::floor(item.z);
 
-    // parity: `getBlockPosBelowThatAffectsMyMovement`, the block whose friction an item feels.
+    // parity: `getBlockPosBelowThatAffectsMyMovement`.
     const std::optional<std::int32_t> under =
         blockAt_(wire::common::mth::floor(item.x), wire::common::mth::floor(item.y - kFrictionProbeDepth),
                  wire::common::mth::floor(item.z));
     const std::int32_t underState = under.value_or(registry::blocks::air().stateId);
 
-    // parity: `Entity.restituteMovementAfterCollisions` with no bounce: a stopped axis is zeroed.
-    // It compares against what the move **asked** for, which a cobweb has already cut down.
+    // parity: `Entity.restituteMovementAfterCollisions` with no bounce.
     const bool onGround = moved[1] != wantY && wantY < 0.0;
     const float bounciness = onGround ? registry::blockMovement::bouncinessOf(underState) * kItemBounceShare : 0.0F;
     if (moved[0] != wantX) {
@@ -401,27 +377,23 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
         item.velocityY = bounciness > 0.0F ? -item.velocityY * static_cast<double>(bounciness) : 0.0;
     }
 
-    // parity: `Entity.checkFallDamage`, which runs inside the move and before `checkInsideBlocks`:
-    // landing puts the count back to zero, and falling adds what the move actually managed.
+    // parity: `Entity.checkFallDamage`.
     if (onGround) {
         item.fallDistance = 0.0;
     } else if (moved[1] < 0.0) {
         item.fallDistance -= moved[1];
     }
 
-    // parity: `checkInsideBlocks`, which runs inside the move and leaves behind what the next one
-    // gets multiplied by.
+    // parity: `checkInsideBlocks`.
     if (const std::optional<stuckSpeed::Multiplier> caught =
             stuckSpeed::caughtBy(blockAt_, box.move(moved[0], moved[1], moved[2]), moved[0], moved[1], moved[2]);
         caught.has_value()) {
         item.stuck = *caught;
-        // parity: `Entity.makeStuckInBlock` starts with `resetFallDistance`, which is what lets an
-        // item that has just landed on powder snow sink into it on the very next tick.
+        // parity: `Entity.makeStuckInBlock` starts with `resetFallDistance`.
         item.fallDistance = 0.0;
     }
 
-    // parity: `ItemEntity.tick`'s own drag: the air takes its share every tick, and the block
-    // underneath takes its friction on top of that.
+    // parity: `ItemEntity.tick`'s own drag: the air takes its share every tick, and the block.
     double horizontalDrag = kAirDrag;
     if (onGround) {
         horizontalDrag *= static_cast<double>(registry::blockMovement::frictionOf(underState));
@@ -429,23 +401,16 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
     item.velocityX *= horizontalDrag;
     item.velocityY *= kAirDrag;
     item.velocityZ *= kAirDrag;
-    // parity: `if (onGround) { if (movement.y < 0.0) multiply(1, -0.5, 1); }`. It never fires
-    // here: landing has just replaced the downward speed with zero or with the bounce, which is
-    // upward. It is kept because it is the line vanilla runs, and because the day something
-    // lands with speed left over is the day it matters.
+    // parity: `if (onGround) { if (movement.y < 0.0) multiply(1, -0.5, 1); }`. It never fires.
     if (onGround && item.velocityY < 0.0) {
         item.velocityY *= kBounceDamping;
     }
 
-    // parity: the check that lets vanilla skip a settled item's physics, plus the vertical half of
-    // it. Here it also stops the movement packets, which is what makes a floor covered in drops
-    // free to look at; an item still bouncing off slime is not settled and keeps moving.
+    // parity: the check that lets vanilla skip a settled item's physics, plus the vertical half of.
     item.onGround = onGround;
     item.resting = onGround &&
                    item.velocityX * item.velocityX + item.velocityZ * item.velocityZ <= kRestingSpeedSquared &&
                    std::abs(item.velocityY) <= kRestingSpeed;
-    // Already zero by the arithmetic above wherever this is true; written out so that what a
-    // settled item carries is a decision rather than a rounding result.
     if (item.resting) {
         item.velocityX = 0.0;
         item.velocityY = 0.0;

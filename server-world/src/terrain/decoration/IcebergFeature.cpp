@@ -142,8 +142,7 @@ void carve(std::int32_t radius, std::int32_t yOffset, const DecorationPos& globa
     const std::int32_t c = std::min(radius - 3, 3) + ellipseC / 2 - 1;
     for (std::int32_t xOffset = -a; xOffset < a; ++xOffset) {
         for (std::int32_t zOffset = -a; zOffset < a; ++zOffset) {
-            // parity: a zero minor axis makes the distance NaN, and vanilla's `< 0.0` rejects it.
-            // The inverted `>= 0.0` would let it through.
+            // parity: a zero minor axis makes the distance NaN, which vanilla's `< 0.0` rejects.
             if (!(signedDistanceEllipse(xOffset, zOffset, localOrigin, a, c, angle) < 0.0)) {
                 continue;
             }

@@ -6,7 +6,6 @@ namespace basalt::server::runtime::world {
 
 class WorldState;
 
-/// Village-section queries shared by the custom spawners, answered by the world's points of interest.
 namespace villageProximity {
 
 /// parity: `ServerLevel.isCloseToVillage` over `PoiManager.sectionsToVillage`.

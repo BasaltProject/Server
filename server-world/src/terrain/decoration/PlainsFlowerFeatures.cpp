@@ -42,7 +42,7 @@ const std::vector<std::int32_t>& lowFlowerStates() {
     return ids;
 }
 
-/// parity: the `flower_plain` provider's own noise: one parity octave off the legacy seed 2345.
+/// parity: the `flower_plain` provider's own noise.
 const noise::Noise& flowerNoise() {
     static const std::shared_ptr<const noise::NoiseStack> built = [] {
         random::RandomSource source = random::RandomSource::legacy(2345LL);
@@ -55,7 +55,7 @@ const noise::Noise& flowerNoise() {
 } // namespace
 
 std::int32_t plainsDecoration::flowerStateId(random::RandomSource& random, const DecorationPos& origin) {
-    // parity: `NoiseThresholdProvider`, whose float scale and threshold are widened to double.
+    // parity: `NoiseThresholdProvider`.
     constexpr auto kScale = static_cast<double>(0.005F);
     const auto noiseValue =
         static_cast<double>(flowerNoise().get(origin.x * kScale, origin.y * kScale, origin.z * kScale));
@@ -81,8 +81,7 @@ void plainsDecoration::placeFlowerPlainAt(Chunk& chunk, random::RandomSource& ra
 }
 
 std::int32_t forestFloorDecoration::flowerBedStateId(std::int32_t defaultStateId, std::int32_t choice) {
-    // parity: amount 1 through 4 crossed with the horizontal plane order north, east, south, west,
-    // and those facings are not four consecutive state ids.
+    // parity: the weighted provider's facings are not four consecutive state ids.
     static constexpr std::array<std::int32_t, 4> kHorizontalFacingStateOffsets = {0, 12, 4, 8};
     const std::int32_t amountOffset = choice / 4;
     const std::int32_t facingOffset = kHorizontalFacingStateOffsets[static_cast<std::size_t>(choice % 4)];
@@ -100,7 +99,7 @@ void forestFloorDecoration::placeWildflowersAt(Chunk& chunk, random::RandomSourc
 
 namespace {
 
-/// parity: the leaf litter patch's own `block_predicate_filter`, which wants grass block below.
+/// parity: the leaf litter patch's own `block_predicate_filter`.
 [[nodiscard]] PlacementModifier blockBelowFilter(std::int32_t stateId) {
     return filter([stateId](const PlacementContext& context, random::RandomSource&, const DecorationPos& origin) {
         return context.chunk().blockStateId(origin.x & 15, origin.y - 1, origin.z & 15) == stateId;

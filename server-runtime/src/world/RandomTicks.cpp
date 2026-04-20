@@ -33,10 +33,8 @@
 namespace basalt::server::runtime::world {
 namespace {
 
-/// The blocks that grow by `CropBlock`'s own rule. Melons and pumpkins bring their stems later.
 constexpr std::array<std::string_view, 5> kCrops{"wheat", "carrots", "potatoes", "beetroots", "torchflower_crop"};
 
-/// The two that keep their parent's rate down to a third of it.
 constexpr std::array<std::string_view, 2> kSlowCrops{"beetroots", "torchflower_crop"};
 
 /// parity: the four `GrowingPlantHeadBlock` subclasses and their own odds.
@@ -118,7 +116,6 @@ constexpr std::int32_t kFarmlandReach = 1;
     return found == properties.end() ? std::nullopt : std::optional{found->second};
 }
 
-/// Melting, drying and going out: the block is being taken away rather than moved on.
 [[nodiscard]] bool isFading(std::int32_t from, std::int32_t to) {
     const std::string_view before = pathOf(from);
     const std::string_view after = pathOf(to);
@@ -129,8 +126,6 @@ constexpr std::int32_t kFarmlandReach = 1;
     return before != after && taken;
 }
 
-/// Everything a random tick in this file does ends here, so this is where a plugin gets asked:
-/// growing, melting, drying and spreading are all one block becoming another.
 void set(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
          std::vector<BlockChange>& changes) {
     const std::int32_t from = stateAt(context.world, x, y, z);
@@ -144,12 +139,10 @@ void set(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = stateId});
 }
 
-/// parity: `CropBlock.randomTick`: light nine or better, then a roll against the growth speed.
+/// parity: `CropBlock.randomTick`.
 void growCrop(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
               const wire::common::Identifier& block, random::RandomSource& random, std::vector<BlockChange>& changes) {
-    // parity: `BeetrootBlock.randomTick` and `TorchflowerCropBlock.randomTick`, both of which throw
-    // away one turn in three before asking their parent anything. Without this they grow three
-    // times as fast as vanilla's.
+    // parity: `BeetrootBlock.randomTick` and `TorchflowerCropBlock.randomTick`.
     if (std::ranges::contains(kSlowCrops, block.path()) && random.nextInt(kSlowCropOdds) == 0) {
         return;
     }
@@ -177,9 +170,6 @@ void growCrop(const randomTicks::Context& context, std::int32_t x, std::int32_t 
 }
 
 /// parity: `PitcherCropBlock.randomTick` and its `grow`.
-///
-/// Only the lower half ever ticks, and from age three up the crop is two blocks tall, so growing
-/// into that age writes the upper half as well.
 void growPitcher(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::int32_t stateId, const wire::common::Identifier& block, random::RandomSource& random,
                  std::vector<BlockChange>& changes) {
@@ -192,8 +182,7 @@ void growPitcher(const randomTicks::Context& context, std::int32_t x, std::int32
         return;
     }
     const std::int32_t grown = std::min(*age + 1, kPitcherMaxAge);
-    // parity: `PitcherCropBlock.canGrow`, which asks for light eight and not the nine a crop needs
-    // to grow at all, and for room above once the crop is tall.
+    // parity: `PitcherCropBlock.canGrow`.
     if (*age >= kPitcherMaxAge) {
         return;
     }
@@ -229,7 +218,7 @@ void growPitcher(const randomTicks::Context& context, std::int32_t x, std::int32
     }
 }
 
-/// parity: `NetherWartBlock.randomTick`, which asks for no light at all and rolls one in ten.
+/// parity: `NetherWartBlock.randomTick`.
 void growNetherWart(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                     std::int32_t stateId, const wire::common::Identifier& block, random::RandomSource& random,
                     std::vector<BlockChange>& changes) {
@@ -244,8 +233,7 @@ void growNetherWart(const randomTicks::Context& context, std::int32_t x, std::in
     }
 }
 
-/// parity: `SugarCaneBlock.randomTick`: count the stalk under it, and at age fifteen put another
-/// block on top and start again from zero.
+/// parity: `SugarCaneBlock.randomTick`.
 void growStalk(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                std::int32_t stateId, const wire::common::Identifier& block, std::vector<BlockChange>& changes) {
     if (stateAt(context.world, x, y + 1, z) != airState()) {
@@ -293,9 +281,7 @@ void growSapling(const randomTicks::Context& context, std::int32_t x, std::int32
     changes.insert(changes.end(), grown.begin(), grown.end());
 }
 
-/// parity: `CactusBlock.randomTick`, which is the same shape as sugar cane with two twists: at age
-/// eight it may flower instead, and a stalk that has reached three keeps ageing rather than
-/// stopping, so a cactus at fifteen and three tall does nothing at all.
+/// parity: `CactusBlock.randomTick`.
 void growCactus(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                 std::int32_t stateId, const wire::common::Identifier& block, random::RandomSource& random,
                 std::vector<BlockChange>& changes) {
@@ -341,8 +327,7 @@ void growCactus(const randomTicks::Context& context, std::int32_t x, std::int32_
     }
 }
 
-/// parity: `SpreadingSnowyBlock.canStayAlive`: a single snow layer is fine, a full fluid is not, and
-/// anything else has to let light through.
+/// parity: `SpreadingSnowyBlock.canStayAlive`.
 [[nodiscard]] bool staysGrass(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::int32_t above = stateAt(world, x, y + 1, z);
     if (pathOf(above) == "snow" && propertyOf(above, "layers") == "1") {
@@ -354,11 +339,7 @@ void growCactus(const randomTicks::Context& context, std::int32_t x, std::int32_
     return registry::blockShapes::dampening(above) < worldLight::kMaxLevel;
 }
 
-/// parity: `SpreadingSnowyBlock.randomTick`: grass under something opaque turns back to dirt, and
-/// otherwise tries four times to spread onto a nearby dirt block.
-///
-/// The four attempts are four rolls of the world's random whether they land anywhere or not, which
-/// is what keeps a field of grass spreading at vanilla's own pace.
+/// parity: `SpreadingSnowyBlock.randomTick`.
 void spreadGrass(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::int32_t stateId, random::RandomSource& random, std::vector<BlockChange>& changes) {
     if (!staysGrass(context.world, x, y, z)) {
@@ -400,8 +381,7 @@ void spreadGrass(const randomTicks::Context& context, std::int32_t x, std::int32
     return false;
 }
 
-/// parity: `FarmlandBlock.randomTick`: away from water it dries a step at a time, and at zero it
-/// goes back to dirt unless something growing on it holds it.
+/// parity: `FarmlandBlock.randomTick`.
 void dryFarmland(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::int32_t stateId, std::vector<BlockChange>& changes) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -434,14 +414,10 @@ void dryFarmland(const randomTicks::Context& context, std::int32_t x, std::int32
     set(context, x, y, z, dirtState(), changes);
 }
 
-/// parity: `LeavesBlock.randomTick`, which drops leaves that are seven blocks from any trunk.
-///
-/// A canopy still on its trunk is within seven blocks of it and stays; one that has been felled is
-/// not, and goes.
+/// parity: `LeavesBlock.randomTick`.
 void decay(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
            std::vector<BlockChange>& changes) {
-    // parity: `LeavesBlock.decaying`, which only reads the state. The stored distance is right
-    // because `LeafDistances` stamps it when the chunk arrives and `updateShape` keeps it so.
+    // parity: `LeavesBlock.decaying`.
     if (propertyOf(stateId, "persistent") == "true") {
         return;
     }
@@ -451,7 +427,7 @@ void decay(const randomTicks::Context& context, std::int32_t x, std::int32_t y, 
     set(context, x, y, z, airState(), changes);
 }
 
-/// parity: `IceBlock` and `SnowLayerBlock`, both of which go by the light the blocks give off.
+/// parity: `IceBlock` and `SnowLayerBlock`.
 void melt(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
           std::int32_t becomes, std::vector<BlockChange>& changes) {
     if (worldLight::blockLight(context.world, x, y, z) <= kMeltLight - registry::blockShapes::dampening(stateId)) {
@@ -460,7 +436,6 @@ void melt(const randomTicks::Context& context, std::int32_t x, std::int32_t y, s
     set(context, x, y, z, becomes, changes);
 }
 
-/// What a state with a turn does with it. A state with no case here does nothing.
 void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
          random::RandomSource& random, std::vector<BlockChange>& changes) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -482,8 +457,7 @@ void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
         decay(context, x, y, z, stateId, changes);
     } else if (saplingGrowth::isSapling(stateId)) {
         growSapling(context, x, y, z, stateId, random, changes);
-        // parity: `SpreadingSnowyBlock`, whose two blocks are grass and mycelium. Podzol is a plain
-        // `SnowyBlock` and does not tick at all.
+        // parity: `SpreadingSnowyBlock`.
     } else if (path == "grass_block" || path == "mycelium") {
         spreadGrass(context, x, y, z, stateId, random, changes);
     } else if (path == "farmland") {
@@ -507,7 +481,6 @@ void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
         bambooGrowth::bambooSapling(context.world, x, y, z, random, changes);
     } else if (path == "nether_portal") {
         if (context.allocateEntityId) {
-            // The piglin it may spawn is the caller's to place; nothing here has anywhere to put it.
             (void)netherPortalGrowth::netherPortal(context.world, context.gameRules, context.difficulty,
                                                    context.spawnsPortalPiglins, x, y, z, random,
                                                    context.allocateEntityId);
@@ -536,8 +509,7 @@ void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
     } else if (registry::weathering::weathers(path)) {
         weatheringGrowth::weather(context.world, x, y, z, stateId, random, changes);
     } else if (path == "ice") {
-        // parity: `IceBlock.melt`, which removes the ice rather than watering a dimension that
-        // boils it away.
+        // parity: `IceBlock.melt`, which removes the ice rather than watering a dimension that.
         melt(context, x, y, z, stateId, context.evaporates ? airState() : registry::blocks::water().stateId, changes);
     } else if (path == "snow") {
         melt(context, x, y, z, stateId, airState(), changes);
@@ -606,9 +578,7 @@ std::vector<BlockChange> RandomTicks::tick(const randomTicks::Context& context,
         const std::int32_t minX = position[0] << 4;
         const std::int32_t minZ = position[1] << 4;
         for (std::size_t index = 0; index < chunk->sectionCount(); index++) {
-            // parity: `LevelChunkSection.isRandomlyTicking`. Skipping the sections that hold nothing
-            // is not only cheaper: the walk below is shared, so how many sections are visited is
-            // part of which positions come up at all.
+            // parity: `LevelChunkSection.isRandomlyTicking`. Skipping the sections that hold nothing.
             if (!chunk->section(index).mayContain(registry::blockSupport::ticksRandomly)) {
                 continue;
             }

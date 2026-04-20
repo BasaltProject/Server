@@ -22,7 +22,7 @@ constexpr std::array<std::string_view, 16> kTeamColors{
     "black",     "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple",  "gold",   "gray",
     "dark_gray", "blue",      "green",      "aqua",      "red",      "light_purple", "yellow", "white"};
 
-/// parity: `StatType.getRegistry`: a statistic names something that registry holds, or nothing.
+/// parity: `StatType.getRegistry`.
 [[nodiscard]] bool inStatRegistry(std::string_view type, std::string_view value) {
     // parity: `Identifier.bySeparator(name, '.')`, which splits at the first dot.
     std::string id{value};
@@ -65,7 +65,7 @@ const std::vector<std::string>& Objective::criteria() {
 
 namespace {
 
-/// parity: `Identifier.bySeparator`, the default namespace when the separator is missing or first.
+/// parity: `Identifier.bySeparator`.
 [[nodiscard]] std::string fullName(std::string_view name) {
     const std::size_t separator = name.find('.');
     if (separator == std::string_view::npos) {
@@ -272,7 +272,7 @@ void Scoreboard::resetScore(std::string_view holder, std::optional<std::string_v
     }
     const std::string_view wanted = *objectiveName;
     std::erase_if(at->scores, [wanted](const std::pair<std::string, Score>& score) { return score.first == wanted; });
-    // parity: a holder with nothing left stops being tracked, rather than staying on as an empty
+    // parity: a holder with nothing left stops being tracked, rather than staying on as an empty.
     // row that `/scoreboard players list` would still print.
     if (at->scores.empty()) {
         holders_.erase(at);

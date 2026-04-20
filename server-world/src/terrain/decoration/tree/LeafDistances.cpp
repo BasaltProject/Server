@@ -24,8 +24,6 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kSides{
 
 void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    // Only the sections that hold a leaf or a log are worth walking: a chunk keeps two dozen and a
-    // forest touches two of them, so the whole column would be twenty times the work for nothing.
     std::int32_t lowSection = -1;
     std::int32_t highSection = -1;
     for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
@@ -52,11 +50,9 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
         return ((x + 1) * kSpan + (z + 1)) * height + y;
     };
 
-    // Only leaves and logs matter, and only they are kept: a full copy of the column would be a
-    // megabyte per chunk on the install thread.
+    // Only leaves and logs are kept, a full column copy would be a megabyte per chunk.
     std::vector<std::uint8_t> kind(static_cast<std::size_t>(kSpan) * kSpan * static_cast<std::size_t>(height), 0);
-    // parity: LeavesBlock.updateDistanceAt relaxes against whatever the neighbour already says, so a
-    // leaf in the ring carries the reach of a trunk that stands further out than this window sees.
+    // parity: `LeavesBlock.updateDistanceAt` relaxes against the neighbour.
     std::vector<std::uint8_t> outside(kind.size(), kMaxLeafDistance);
     bool anyLeaf = false;
     for (std::int32_t x = -1; x <= 16; ++x) {

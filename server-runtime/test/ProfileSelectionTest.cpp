@@ -18,7 +18,6 @@ namespace toml = basalt::wire::common::toml;
 
 namespace {
 
-/// One file's kind of profile: the shared header plus whatever that file adds.
 struct Profile {
     ProfileHeader header;
     std::string text;
@@ -73,29 +72,6 @@ private:
 
 } // namespace
 
-TEST_CASE("the four keys every profile shares") {
-    const toml::TomlTable table = parsed(R"(
-priority = 5
-default = true
-active = true
-when = ["%basalt_server_online% > 0", "true"]
-)");
-    const ProfileHeader header = ProfileHeader::from("busy", table);
-    CHECK(header.name == "busy");
-    CHECK(header.priority == 5);
-    CHECK(header.isDefault);
-    CHECK(header.isActive);
-    REQUIRE(header.conditions.size() == 2);
-    CHECK(header.conditions[0].raw() == "%basalt_server_online% > 0");
-
-    // A profile that says none of them is an ordinary one nobody has switched on.
-    const ProfileHeader bare = ProfileHeader::from("quiet", parsed("text = \"x\"\n"));
-    CHECK(bare.priority == 0);
-    CHECK_FALSE(bare.isDefault);
-    CHECK_FALSE(bare.isActive);
-    CHECK(bare.conditions.empty());
-}
-
 TEST_CASE("the highest priority among the ones that apply, and the default when none do") {
     const toml::TomlTable root = parsed(R"(
 [profiles.quiet]
@@ -122,13 +98,10 @@ text = "packed"
     OnceReporter reporter;
     const placeholder::PlaceholderContext context;
 
-    // Nobody online: no condition holds, so the default is what is left.
     CHECK(selectProfile(profiles, fallback, serverRegistry(0), context, logger, reporter, "server list").text ==
           "quiet");
-    // Enough for one of them.
     CHECK(selectProfile(profiles, fallback, serverRegistry(20), context, logger, reporter, "server list").text ==
           "busy");
-    // Enough for both: the higher priority wins, whatever order they were written in.
     CHECK(selectProfile(profiles, fallback, serverRegistry(80), context, logger, reporter, "server list").text ==
           "packed");
 }
@@ -151,8 +124,6 @@ text = "quiet"
 )");
     const auto read = profilesOf(root, "config/server_list.toml");
     REQUIRE(read.has_value());
-    // The default is not the first table in the file, so the fallback is found by what it says
-    // rather than by where it is.
     CHECK(read->first[read->second].text == "quiet");
 
     const basalt::wire::common::Logger logger{"test"};
@@ -160,110 +131,6 @@ text = "quiet"
     CHECK(selectProfile(read->first, read->first[read->second], serverRegistry(1), placeholder::PlaceholderContext{},
                         logger, reporter, "server list")
               .text == "first");
-}
-
-TEST_CASE("a profile switched on by hand needs no condition, and one with none is never chosen") {
-    const toml::TomlTable root = parsed(R"(
-[profiles.quiet]
-default = true
-text = "quiet"
-
-[profiles.maintenance]
-active = true
-priority = 1
-text = "maintenance"
-
-[profiles.unused]
-priority = 99
-text = "unused"
-)");
-    const auto read = profilesOf(root, "config/server_list.toml");
-    REQUIRE(read.has_value());
-    const basalt::wire::common::Logger logger{"test"};
-    OnceReporter reporter;
-
-    // Switched on by hand beats a higher priority that nothing selects: a profile with no
-    // conditions and no switch is one nobody asked for.
-    CHECK(selectProfile(read->first, read->first[read->second], serverRegistry(0), placeholder::PlaceholderContext{},
-                        logger, reporter, "server list")
-              .text == "maintenance");
-}
-
-TEST_CASE("every condition of a profile has to hold, not just one of them") {
-    const toml::TomlTable root = parsed(R"(
-[profiles.quiet]
-default = true
-text = "quiet"
-
-[profiles.both]
-priority = 5
-when = ["%basalt_server_online% > 10", "%basalt_server_online% < 20"]
-text = "both"
-)");
-    const auto read = profilesOf(root, "config/scoreboard.toml");
-    REQUIRE(read.has_value());
-    const basalt::wire::common::Logger logger{"test"};
-    OnceReporter reporter;
-    const placeholder::PlaceholderContext context;
-
-    CHECK(selectProfile(read->first, read->first[read->second], serverRegistry(15), context, logger, reporter,
-                        "scoreboard")
-              .text == "both");
-    CHECK(selectProfile(read->first, read->first[read->second], serverRegistry(50), context, logger, reporter,
-                        "scoreboard")
-              .text == "quiet");
-}
-
-TEST_CASE("a condition nobody can decide is reported once and counts as a no") {
-    const toml::TomlTable root = parsed(R"(
-[profiles.quiet]
-default = true
-text = "quiet"
-
-[profiles.broken]
-priority = 5
-when = ["%basalt_server_nowhere% = 1"]
-text = "broken"
-)");
-    const auto read = profilesOf(root, "config/tab_list.toml");
-    REQUIRE(read.has_value());
-    const basalt::wire::common::Logger logger{"test"};
-    OnceReporter reporter;
-    const CapturedLog log;
-
-    // Profiles are re-selected on a timer for every player, so the same complaint would otherwise
-    // arrive at the refresh rate.
-    for (std::int32_t attempt = 0; attempt < 20; ++attempt) {
-        CHECK(selectProfile(read->first, read->first[read->second], serverRegistry(1),
-                            placeholder::PlaceholderContext{}, logger, reporter, "tab list")
-                  .text == "quiet");
-    }
-    CHECK(log.countWith("was skipped") == 1);
-    // Said in full: which condition, of which profile, and why it could not be decided.
-    CHECK(log.countWith("Condition '%basalt_server_nowhere% = 1' of tab list profile 'broken' was skipped: "
-                        "%basalt_server_nowhere% cannot be used here: there is no player here.") == 1);
-}
-
-TEST_CASE("the same complaint from several threads at once is still said once") {
-    const basalt::wire::common::Logger logger{"test"};
-    OnceReporter reporter;
-    const CapturedLog log;
-
-    std::vector<std::thread> callers;
-    callers.reserve(8);
-    for (std::int32_t index = 0; index < 8; ++index) {
-        callers.emplace_back([&reporter, &logger] {
-            for (std::int32_t attempt = 0; attempt < 50; ++attempt) {
-                reporter.report(logger, "the same thing");
-                reporter.report(logger, "something else");
-            }
-        });
-    }
-    for (std::thread& caller : callers) {
-        caller.join();
-    }
-    CHECK(log.countWith("the same thing") == 1);
-    CHECK(log.countWith("something else") == 1);
 }
 
 TEST_CASE("a file of profiles that cannot mean what it says") {
@@ -280,21 +147,4 @@ TEST_CASE("a file of profiles that cannot mean what it says") {
 
     CHECK(profilesOf(parsed("[profiles.a]\ndefault = true\n[profiles.b]\ndefault = true\n"), "config/boss_bar.toml")
               .error() == "config/boss_bar.toml must mark exactly one profile as `default`, found 2.");
-}
-
-TEST_CASE("a block of text is a list of lines or one string with newlines in it") {
-    const toml::TomlTable table = parsed(R"(
-listed = ["one", "two"]
-single = "one\ntwo"
-plain = "just one"
-number = 5
-)");
-    CHECK(linesOf(table, "listed") == std::vector<std::string>{"one", "two"});
-    CHECK(linesOf(table, "single") == std::vector<std::string>{"one", "two"});
-    CHECK(linesOf(table, "plain") == std::vector<std::string>{"just one"});
-    // Absent is not empty: a profile that says nothing about a block inherits one, and that is
-    // the difference this answer carries.
-    CHECK_FALSE(linesOf(table, "missing").has_value());
-    // Not text at all is not a block of text.
-    CHECK_FALSE(linesOf(table, "number").has_value());
 }

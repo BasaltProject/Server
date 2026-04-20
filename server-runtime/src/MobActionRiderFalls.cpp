@@ -17,7 +17,7 @@ namespace basalt::server::runtime {
 
 void MobActionSystem::propagateFall(world::LoadedWorld& world, entity::ServerEntity& vehicle, double fallen,
                                     const world::fallLanding::Landing& landing) {
-    // parity: `Entity.propagateFallToPassengers`, the vehicle's fall and its block's modifier handed
+    // parity: `Entity.propagateFallToPassengers`.
     // to everyone on it, each through its own `causeFallDamage`.
     const std::vector<std::int32_t> riders = vehicle.passengerIds;
     for (const std::int32_t id : riders) {

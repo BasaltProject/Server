@@ -10,12 +10,10 @@ using structureSpawnOverrides::Bounds;
 using structureSpawnOverrides::Override;
 using structureSpawnOverrides::SpawnEntry;
 
-/// A uniform `count` range.
 [[nodiscard]] SpawnEntry entry(std::string_view type, std::int32_t weight, std::int32_t min, std::int32_t max) {
     return SpawnEntry{.type = "minecraft:" + std::string{type}, .weight = weight, .minCount = min, .maxCount = max};
 }
 
-/// A constant `count`.
 [[nodiscard]] SpawnEntry entry(std::string_view type, std::int32_t weight, std::int32_t count) {
     return SpawnEntry{.type = "minecraft:" + std::string{type},
                       .weight = weight,

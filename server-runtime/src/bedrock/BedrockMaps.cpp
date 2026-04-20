@@ -14,8 +14,7 @@ struct Icon {
     std::uint32_t color = 0xFFFFFFFFU;
 };
 
-/// Bedrock's icon for each Java decoration type, by Java registry id. The five 26.3 added have no
-/// Bedrock icon yet and show as the treasure cross.
+/// The five 26.3 decorations have no Bedrock icon yet and show as the treasure cross.
 constexpr std::array<Icon, 40> kIcons{{
     {0},
     {7},
@@ -59,7 +58,6 @@ constexpr std::array<Icon, 40> kIcons{{
     {4},
 }};
 
-/// The aux value Bedrock tells explorer maps apart by, where Java has an item each.
 constexpr std::array<std::pair<std::string_view, std::int32_t>, 15> kExplorerData{{
     {"minecraft:ocean_monument_map", 3},
     {"minecraft:woodland_mansion_map", 4},
@@ -78,7 +76,6 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 15> kExplorerDat
     {"minecraft:warm_ocean_ruins_map", 26},
 }};
 
-/// ARGB to the ABGR a Bedrock map pixel is.
 [[nodiscard]] std::uint32_t abgrOf(std::uint8_t packed) {
     const std::uint32_t argb = server::registry::mapColors::argbOf(packed);
     return (argb & 0xFF00FF00U) | ((argb >> 16U) & 0xFFU) | ((argb & 0xFFU) << 16U);

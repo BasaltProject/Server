@@ -21,11 +21,6 @@ namespace {
 
 [[nodiscard]] std::int32_t uncachedOpacity(std::int32_t stateId) { return registry::blockShapes::dampening(stateId); }
 
-/// One answer per block state, worked out once.
-///
-/// The chain behind it costs a lookup and a handful of calls, and a light pass asks it a few hundred
-/// thousand times: as a table it measured two orders of magnitude cheaper, which is the same reason
-/// the heightmaps have one.
 [[nodiscard]] const std::vector<std::int32_t>& table() {
     static const std::vector<std::int32_t> built = [] {
         std::vector<std::int32_t> table(static_cast<std::size_t>(registry::blocks::stateCount()));
@@ -57,8 +52,7 @@ std::vector<SectionLight> compute(const LightWindow& window) {
     const std::int32_t bottomY = std::clamp(lowestSurface - kMax - 1, window.minY(), topY);
     LightSpread pass{window, bottomY, topY, kMax};
 
-    // parity: `ChunkSkyLightSources`: a column is a source at full strength down to the first block
-    // that dampens light at all. Everything above that floor is simply fifteen.
+    // parity: `ChunkSkyLightSources`.
     std::vector<std::int32_t> floor(static_cast<std::size_t>(LightWindow::kWidth) * LightWindow::kWidth);
     for (std::int32_t z = 0; z < LightWindow::kWidth; ++z) {
         for (std::int32_t x = 0; x < LightWindow::kWidth; ++x) {
@@ -74,8 +68,6 @@ std::vector<SectionLight> compute(const LightWindow& window) {
         }
     }
 
-    // Only the edge of that lit region goes in the queue. A block of open sky with open sky all
-    // round it has nothing to give anyone, and queueing it was most of the cost of a light pass.
     for (std::int32_t z = 0; z < LightWindow::kWidth; ++z) {
         for (std::int32_t x = 0; x < LightWindow::kWidth; ++x) {
             const std::int32_t lowest = floor[static_cast<std::size_t>(z * LightWindow::kWidth + x)];
@@ -105,12 +97,9 @@ std::vector<SectionLight> compute(const LightWindow& window) {
 namespace blockLight {
 namespace {
 
-/// parity: `Blocks`'s own `lightLevel(...)`, one entry per block state and not per block: a good
-/// part of the list reads a property. A table by block lit a wall torch in one of its four facings
-/// and lit an unlit redstone ore, because what it marked was each block's default state.
+/// parity: `Blocks`'s own `lightLevel(...)`.
 [[nodiscard]] const std::vector<std::int32_t>& table() {
     static const std::vector<std::int32_t> built = [] {
-        /// The same light whatever the state says.
         const std::array<std::pair<std::int32_t, std::vector<std::string_view>>, 10> flat = {{
             {15,
              {"beacon", "conduit", "copper_lantern", "end_gateway", "end_portal", "fire", "glowstone", "jack_o_lantern",
@@ -133,7 +122,6 @@ namespace {
             {10, {"soul_campfire"}},
             {9, {"deepslate_redstone_ore", "redstone_ore"}},
         }};
-        /// The single-state ones that only come in one, kept apart so the list above stays readable.
         const std::array<std::pair<std::int32_t, std::vector<std::string_view>>, 2> one = {{
             {7, {"redstone_torch", "redstone_wall_torch"}},
             {1,
@@ -144,8 +132,7 @@ namespace {
         const auto eachState = [&table](const std::string_view name, const auto& answer) {
             const wire::common::Identifier block = wire::common::Identifier::vanilla(std::string{name});
             const registry::blockStateDefinitions::Definition* definition = registry::blockStateDefinitions::of(block);
-            // A block with a single state is not in the definitions at all, so its own default is
-            // the whole of it. Reading that as "unknown block" left glowstone dark.
+            // A block with a single state is not in the definitions at all, so its own default is the whole of it.
             const std::int32_t first = definition != nullptr ? definition->firstStateId()
                                                              : registry::blocks::registry().idOf(block).value_or(-1);
             if (first < 0) {
@@ -187,8 +174,7 @@ namespace {
         for (const auto& [level, names] : one) {
             for (const std::string_view name : names) {
                 eachState(name, [level, &valueOf](const std::map<std::string, std::string>& properties) {
-                    // parity: the two redstone torches are `litBlockEmission(7)` as well; the rest of
-                    // this group has no `lit` to read, so an absent property answers the level.
+                    // parity: the two redstone torches are `litBlockEmission(7)` as well.
                     const std::string text = valueOf(properties, "lit");
                     return text.empty() || text == "true" ? level : 0;
                 });
@@ -210,9 +196,7 @@ namespace {
         everyBlockEnding("candle_cake", [&valueOf](const std::map<std::string, std::string>& properties) {
             return valueOf(properties, "lit") == "true" ? 3 : 0;
         });
-        // parity: `COPPER_BULB`, registered through a weathering collection with
-        // `litBlockEmission` and a level per stage. The waxed ones are the same block with the
-        // weathering turned off, so they give the same light.
+        // parity: `COPPER_BULB`.
         const std::array<std::pair<std::int32_t, std::string_view>, 4> bulbs{{{15, "copper_bulb"},
                                                                               {12, "exposed_copper_bulb"},
                                                                               {8, "weathered_copper_bulb"},
@@ -225,8 +209,7 @@ namespace {
                           });
             }
         }
-        // parity: `GlowLichenBlock.emission(7)`, which answers nothing at all for a lichen with no
-        // face left, and `CaveVines.emission(14)`, which is the berries.
+        // parity: `GlowLichenBlock.emission(7)`.
         eachState("glow_lichen", [&valueOf](const std::map<std::string, std::string>& properties) {
             static constexpr std::array<std::string_view, 6> kFaces{"down", "up", "north", "south", "west", "east"};
             return std::ranges::any_of(
@@ -244,7 +227,7 @@ namespace {
         eachState("sea_pickle", [&valueOf, &numberOf](const std::map<std::string, std::string>& properties) {
             return valueOf(properties, "waterlogged") == "true" ? 3 + (3 * numberOf(properties, "pickles")) : 0;
         });
-        // parity: `RespawnAnchorBlock.getScaledChargeLevel(state, 15)`, a quarter of fifteen per charge.
+        // parity: `RespawnAnchorBlock.getScaledChargeLevel(state, 15)`.
         eachState("respawn_anchor", [&numberOf](const std::map<std::string, std::string>& properties) {
             return static_cast<std::int32_t>(static_cast<float>(numberOf(properties, "charges")) / 4.0F * 15.0F);
         });
@@ -252,7 +235,7 @@ namespace {
         eachState("light", [&numberOf](const std::map<std::string, std::string>& properties) {
             return numberOf(properties, "level");
         });
-        // parity: `TrialSpawnerState.lightLevel` and `VaultState.lightLevel`, one number per state name.
+        // parity: `TrialSpawnerState.lightLevel` and `VaultState.lightLevel`.
         eachState("trial_spawner", [&valueOf](const std::map<std::string, std::string>& properties) {
             const std::string state = valueOf(properties, "trial_spawner_state");
             if (state == "waiting_for_players") {

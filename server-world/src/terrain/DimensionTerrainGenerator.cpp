@@ -21,7 +21,6 @@ namespace {
 
 using QuartBiome = std::function<std::string_view(std::int32_t, std::int32_t, std::int32_t)>;
 
-/// A biome source as the terrain pipeline reads it, the names interned so references stay valid.
 class BiomeSourceEnvironment final : public surface::SurfaceRuleEnvironment {
 public:
     BiomeSourceEnvironment(QuartBiome quart, QuartBiome block) : quart_(std::move(quart)), block_(std::move(block)) {}
@@ -82,8 +81,6 @@ Chunk netherTerrain(const NoiseRouter& router, const NetherBiomeSource& biomeSou
 void decorateNether(Chunk& chunk, const NetherBiomeSource& biomeSource, std::int64_t seed,
                     const NeighbourTerrain* neighbours) {
     generationMetrics::measure(generationMetrics::Phase::Decoration, [&] {
-        // One reader for the whole phase, like the Overworld's. Without it a body reaching past the
-        // edge sees nothing.
         const Chunk::ExternalStateScope scope{
             chunk, [neighbours](std::int32_t x, std::int32_t y, std::int32_t z) -> std::optional<std::int32_t> {
                 return neighbours == nullptr ? std::nullopt : neighbours->blockStateIdAt(x, y, z);

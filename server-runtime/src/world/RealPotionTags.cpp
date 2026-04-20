@@ -12,9 +12,7 @@ using wire::common::Identifier;
 } // namespace
 
 TagMembers load(const JarReader& jar, const wire::common::Logger& logger) {
-    // parity: `TagLoader.loadTagsForExistingRegistries` for the potion registry. The jar ships no
-    // potion tag, so nothing but a datapack ever resolves here; entries bind by name, as there is no
-    // potion registry in this build to check them against.
+    // parity: `TagLoader.loadTagsForExistingRegistries` for the potion registry.
     const registry::tags::ElementExists exists = [](const Identifier&) { return true; };
     return datapack::resolveTags(jar.entriesUnder, jar.readText, "potion", exists, logger);
 }

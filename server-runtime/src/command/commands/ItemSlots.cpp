@@ -29,7 +29,6 @@ constexpr std::int32_t kMainSize = 27;
 /// parity: `SlotRanges`' own `container.0` to `container.53`, a double chest's worth.
 constexpr std::int32_t kContainerSlots = 54;
 
-/// The number after a `hotbar.`/`inventory.` prefix, when the whole tail is one and it is in range.
 [[nodiscard]] std::optional<std::int32_t> indexIn(std::string_view tail, std::int32_t count) {
     std::int32_t value = 0;
     const char* first = tail.data();
@@ -40,7 +39,6 @@ constexpr std::int32_t kContainerSlots = 54;
     return value;
 }
 
-/// A container's `Items`, as the compounds it really holds.
 [[nodiscard]] std::vector<NbtCompound> itemsOf(const NbtCompound& data) {
     std::vector<NbtCompound> entries;
     const NbtTag* items = data.find("Items");
@@ -56,9 +54,7 @@ constexpr std::int32_t kContainerSlots = 54;
     return entries;
 }
 
-/// parity: `ItemStackWithSlot`'s codec reads `Slot` as an unsigned byte, and that is what every
-/// other reader in this server expects too: writing it as an int leaves a container that `/item`
-/// filled looking empty to the dispenser that owns it.
+/// parity: `ItemStackWithSlot`'s codec reads `Slot` as an unsigned byte.
 [[nodiscard]] std::int32_t slotIn(const NbtCompound& entry) {
     return entry.contains("Slot") ? entry.getByte("Slot", -1) : -1;
 }
@@ -74,7 +70,7 @@ std::optional<std::int32_t> resolve(const std::string& name, const bool containe
         if (container) {
             return *index;
         }
-        // parity: on a player `container.N` is `Inventory` slot N, whose hotbar is the first nine.
+        // parity: on a player `container.N` is `Inventory` slot N.
         if (*index < kHotbarSize) {
             return player::PlayerInventory::kHotbarStart + *index;
         }
@@ -105,8 +101,6 @@ std::optional<std::int32_t> resolve(const std::string& name, const bool containe
     if (name == "weapon.offhand") {
         return kOffhand;
     }
-    // `weapon` and `weapon.mainhand` mean "whatever is held", which moves with the held slot rather
-    // than being a slot of its own, so they are refused here instead of resolving to the wrong one.
     return std::nullopt;
 }
 
@@ -201,7 +195,6 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         }
     }
     for (const auto& [slot, stack] : written) {
-        // A write of nothing empties the slot, which dropping it above already did.
         if (stack.count <= 0 || stack.id.empty()) {
             continue;
         }
@@ -209,16 +202,13 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         entry.putByte("Slot", static_cast<std::int8_t>(slot));
         entry.set("id", NbtTag::ofString(stack.id));
         entry.set("count", NbtTag::ofInt(stack.count));
-        // parity: the components the command named travel with the item, exactly as `ItemStack.CODEC`
-        // writes them: without this an enchanted sword put in a chest by command came out plain.
+        // parity: the components the command named travel with the item.
         if (stack.components.size() > 0) {
             entry.set("components", NbtTag::ofCompound(stack.components));
         }
         entries.push_back(NbtTag::ofCompound(entry));
     }
-    // parity: `ContainerHelper.saveAllItems` walks the slots in order, so the list on disk is in
-    // slot order however the slots were filled. Appending what the command wrote left a brewing
-    // stand whose four items were listed backwards.
+    // parity: `ContainerHelper.saveAllItems` walks the slots in order.
     std::ranges::sort(entries, [](const NbtTag& one, const NbtTag& other) {
         const NbtCompound* first = one.get<NbtCompound>();
         const NbtCompound* second = other.get<NbtCompound>();
@@ -226,8 +216,7 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
     });
     NbtCompound data = existing->data();
     if (world::blockInventory::holdsOneItem(existing->type().path())) {
-        // parity: a decorated pot keeps its one stack under `item`, so writing a list here would
-        // leave a tag vanilla never wrote and lose what the command put in.
+        // parity: a decorated pot keeps its one stack under `item`.
         world::blockInventory::Slots one(1);
         for (const auto& [slot, stack] : written) {
             if (slot == 0) {
@@ -243,10 +232,7 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
     } else {
         data.set("Items", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(entries)}));
     }
-    // parity: `AbstractFurnaceBlockEntity.setItem`, which sets the cooking time from the ingredient
-    // it was handed and puts the progress back to zero. Every write to a furnace's slots goes through
-    // it, a command's included, so the invariant it leaves behind is kept here: while there is an
-    // input, the total is that input's own cooking time.
+    // parity: `AbstractFurnaceBlockEntity.setItem`.
     if (const std::optional<server::world::crafting::Cooker> cooker =
             world::furnaces::cookerFor(existing->type().path());
         cooker.has_value() && recipes != nullptr) {
@@ -263,8 +249,6 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
             }
         }
     }
-    // Only the containers that say so: a hopper filled by command leaves its comparator none the
-    // wiser, and a furnace speaks only for the slot it cooks from.
     const std::vector<NbtCompound> before = itemsOf(existing->data());
     const std::string_view path = existing->type().path();
     const bool tells = std::ranges::any_of(written, [&](const auto& one) {
@@ -274,9 +258,7 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
     });
     const bool shelf = world::chiseledBookshelves::isBookshelf(existing->type().path());
     chunk->setBlockEntity(existing->withData(std::move(data)));
-    // parity: `ChiseledBookShelfBlockEntity.updateState`, which every write to a shelf runs: the six
-    // `slot_N_occupied` come from what is inside and the shelf remembers the slot that was touched.
-    // It goes after the write, because it reads back what was written.
+    // parity: `ChiseledBookShelfBlockEntity.updateState`, which every write to a shelf runs.
     if (shelf) {
         static_cast<void>(world::chiseledBookshelves::slotsChanged(
             (*world)->state(), at[0], at[1], at[2], written.empty() ? -1 : written.back().first, (*world)->gameTime()));

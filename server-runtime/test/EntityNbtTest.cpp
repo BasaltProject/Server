@@ -33,7 +33,6 @@ namespace {
     return ServerEntity{entityId, Uuid{0x1234, 0x5678}, Identifier::vanilla(type), 7, 1.5, 64.0, -2.5, 90.0F, 10.0F};
 }
 
-/// Everything a decode needs of a world: fresh ids and a protocol number for every type.
 [[nodiscard]] entityNbt::AllocateEntityId ids(std::shared_ptr<std::int32_t> next) {
     return [next] { return (*next)++; };
 }
@@ -107,7 +106,7 @@ TEST_CASE("a saved uuid is kept, and a broken one is replaced rather than refuse
 }
 
 TEST_CASE("the mobs that keep a boolean baby flag are read through it") {
-    // parity: `AgeableMob` writes an age, but the ones that are babies by flag write `IsBaby`.
+    // parity: `AgeableMob` writes an age.
     REQUIRE(ageableMobs::usesBooleanBabyFlag("zombie"));
     NbtCompound tag;
     tag.putString("id", "minecraft:zombie");
@@ -131,9 +130,7 @@ TEST_CASE("the mobs that keep a boolean baby flag are read through it") {
 }
 
 TEST_CASE("an entity is saved with the fields its own class has and no others") {
-    // parity: `Health` is `LivingEntity`, `Age` is `AgeableMob`, the three mob flags are `Mob` and
-    // `Sitting` is `TamableAnimal`. Writing them on everything left an arrow carrying a Health that
-    // the client then read off index 9 as its pierce level.
+    // parity: `Health` is LivingEntity.
     const NbtCompound arrow = entityNbt::encode(entityOf("arrow"));
     CHECK(arrow.contains("Air"));
     CHECK_FALSE(arrow.contains("Health"));
@@ -149,7 +146,6 @@ TEST_CASE("an entity is saved with the fields its own class has and no others") 
     CHECK(cow.contains("InLove"));
     CHECK_FALSE(cow.contains("Sitting"));
 
-    // An armor stand is alive without being a mob, and a wolf is the one that can be told to sit.
     const NbtCompound stand = entityNbt::encode(entityOf("armor_stand"));
     CHECK(stand.contains("Health"));
     CHECK_FALSE(stand.contains("NoAI"));
@@ -161,12 +157,11 @@ TEST_CASE("primed tnt keeps its fuse under the name vanilla gives it") {
     tnt.fuse = 40;
 
     const NbtCompound tag = entityNbt::encode(tnt);
-    // parity: `PrimedTnt.TAG_FUSE`. `Fuse` with a capital is a creeper's swell time, another field.
+    // parity: `PrimedTnt.TAG_FUSE`.
     CHECK(tag.getShort("fuse") == 40);
     CHECK_FALSE(tag.contains("Fuse"));
     CHECK(entityNbt::decode(tag, 1, 1)->fuse == 40);
 
-    // Nothing else carries one, and a tag without it leaves the entity unprimed rather than at zero.
     CHECK_FALSE(entityNbt::encode(entityOf("cow")).contains("fuse"));
     CHECK(entityNbt::decode(entityNbt::encode(entityOf("cow")), 1, 1)->fuse == ServerEntity::kNoFuse);
 }
@@ -183,7 +178,6 @@ TEST_CASE("a cube's size is written one lower than it is kept") {
     REQUIRE(back != nullptr);
     CHECK(back->cubeSize == 4);
 
-    // Anything that is not a cube keeps the default and writes no size at all.
     const NbtCompound cow = entityNbt::encode(entityOf("cow"));
     CHECK_FALSE(cow.contains("Size"));
     CHECK(entityNbt::decode(cow, 1, 1)->cubeSize == cubeMobs::kDefaultSize);
@@ -254,7 +248,6 @@ TEST_CASE("a wandering trader keeps its delay and where it was headed") {
     REQUIRE(back->wanderTarget.has_value());
     CHECK((*back->wanderTarget)[2] == 3);
 
-    // A llama travelling with one keeps the delay and nothing else.
     ServerEntity llama = entityOf("trader_llama");
     llama.despawnDelay = 100;
     const NbtCompound tag = entityNbt::encode(llama);
@@ -278,8 +271,6 @@ TEST_CASE("a trapped skeleton horse remembers that it is one") {
 
 TEST_CASE("a leashed mob remembers who is holding it") {
     ServerEntity cow = entityOf("cow");
-    // A real uuid and not a label: `Leashable.LeashData.CODEC` writes four ints, so anything that
-    // is not one goes out as nothing at all.
     const std::string holder = basalt::wire::common::Uuid{0x0123456789abcdefULL, 0xfedcba9876543210ULL}.toString();
     cow.leashHolderUuid = holder;
 
@@ -297,8 +288,7 @@ TEST_CASE("what is on fire comes back on fire") {
     const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(arrow), 1, 1);
 
     REQUIRE(back != nullptr);
-    // parity: `Entity`'s own `Fire` short. Measured in `flechatnt`: a burning arrow lights the tnt
-    // it lands in and a plain one does not, so this is not just the flame the client draws.
+    // parity: `Entity` `Fire` short: a burning arrow lights the tnt it lands in.
     CHECK(back->fireTicks == 200);
 }
 
@@ -309,8 +299,7 @@ TEST_CASE("what hangs in the air comes back hanging") {
     const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(arrow), 1, 1);
 
     REQUIRE(back != nullptr);
-    // parity: `NoGravity` decides where a projectile goes, so losing it on the way in moves the
-    // entity. Measured in `botonflecha`, where the arrow fell into the button and pressed it.
+    // parity: `NoGravity` decides where a projectile goes.
     CHECK(back->noGravity);
 }
 
@@ -339,7 +328,6 @@ TEST_CASE("a villager's own memories go out and come back") {
     CHECK(brain::stateOf(*back).memories.lastSlept.value == std::optional<std::int64_t>{12345});
     CHECK(brain::stateOf(*back).memories.golemDetectedRecently.ttl == 600);
 
-    // With nothing detected the memory is left out rather than written as a zero.
     ServerEntity quiet = entityOf("villager");
     static_cast<void>(brain::stateOf(quiet));
     const NbtCompound tag = entityNbt::encode(quiet);

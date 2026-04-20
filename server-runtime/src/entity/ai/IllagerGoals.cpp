@@ -135,7 +135,7 @@ void CastSpellGoal::stop(MobContext& mob) {
 }
 
 void CastSpellGoal::tick(MobContext& mob) {
-    /// parity: `EvokerSummonSpellGoal`, three vexes a cast, and the blindness an illusioner gives.
+    /// parity: `EvokerSummonSpellGoal`.
     constexpr std::int32_t kVexCount = 3;
     constexpr std::int32_t kBlindnessTicks = 400;
 

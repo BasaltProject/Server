@@ -57,7 +57,7 @@ using wire::text::Component;
     return quoted + "\"";
 }
 
-/// parity: `FileUtil.isValidPathSegment` and `isPathPartPortable`, near enough: one plain segment.
+/// parity: `FileUtil.isValidPathSegment` and `isPathPartPortable`.
 [[nodiscard]] bool validSegment(std::string_view id) {
     return !id.empty() && id != "." && id != ".." && id.find_first_of("/\\:*?\"<>|") == std::string_view::npos &&
            std::ranges::none_of(id, [](char c) { return static_cast<unsigned char>(c) < ' '; });

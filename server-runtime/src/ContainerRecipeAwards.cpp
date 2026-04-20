@@ -21,7 +21,7 @@ void ContainerMenuController::awardRecipes(player::PlayerSession& session,
     std::vector<wire::common::Identifier> learnt;
     for (const wire::common::Identifier& id : ids) {
         const server::world::crafting::Recipe* recipe = recipes->recipeFor(id);
-        // parity: `Recipe.isSpecial`, true for the custom and brewing recipes, which never enter the book.
+        // parity: `Recipe.isSpecial`.
         if (recipe == nullptr || recipe->kind == server::world::crafting::RecipeKind::Special ||
             recipe->kind == server::world::crafting::RecipeKind::Brewing || !progress->learn(uuid, id)) {
             continue;

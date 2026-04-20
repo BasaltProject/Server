@@ -51,7 +51,6 @@ using wire::nbt::NbtTag;
         const bool isTag = name->starts_with('#');
         const std::expected<Identifier, wire::common::IdentifierError> id =
             Identifier::parse(isTag ? std::string_view{*name}.substr(1) : std::string_view{*name});
-        // A name that is not an identifier at all names nothing, so it tests nothing.
         if (!id.has_value()) {
             continue;
         }
@@ -97,8 +96,7 @@ bool matches(const NbtCompound* requirements, const Identifier* damageType, cons
     if (requirements == nullptr) {
         return true;
     }
-    // parity: 26.3 dispatches a condition on `type`, and a term may be a named predicate, which is
-    // a string here and so no compound: counted as unmet below.
+    // parity: 26.3 dispatches a condition on `type`.
     const std::string_view condition = requirements->getString("type");
     if (condition == "minecraft:all_of") {
         return allTermsMatch(*requirements, damageType, sources);
@@ -109,8 +107,6 @@ bool matches(const NbtCompound* requirements, const Identifier* damageType, cons
     if (condition == "minecraft:damage_source_properties") {
         return matchesSource(*requirements, damageType, sources);
     }
-    // A condition this does not know is treated as unmet: counting protection that vanilla would
-    // not is worse than missing some, since it would make armour stronger than real.
     return false;
 }
 

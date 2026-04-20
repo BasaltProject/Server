@@ -10,8 +10,7 @@
 
 namespace basalt::server::world::structure {
 
-/// parity: `WoodlandMansionPieces.SimpleGrid`. Reads outside its bounds answer `valueIfOutside`
-/// instead of failing, which the mansion layout leans on constantly.
+/// parity: `WoodlandMansionPieces.SimpleGrid`.
 class SimpleGrid {
 public:
     SimpleGrid(std::int32_t width, std::int32_t height, std::int32_t valueIfOutside)
@@ -37,9 +36,7 @@ private:
     std::vector<std::int32_t> cells_;
 };
 
-/// parity: `WoodlandMansionPieces.MansionGrid`, the floor plan on an eleven by eleven board, packed
-/// into one int per cell with the room's size, id and flags. The second coordinate is called `y`
-/// here as in the jar, but it is the Z axis.
+/// parity: `WoodlandMansionPieces.MansionGrid`.
 class MansionGrid {
 public:
     static constexpr std::int32_t kSize = 11;
@@ -72,7 +69,6 @@ public:
 
     [[nodiscard]] bool isRoomId(std::int32_t x, std::int32_t y, std::size_t floor, std::int32_t roomId) const;
 
-    /// The neighbour a 1x2 room extends into, or nothing when the cell is not part of one.
     [[nodiscard]] std::optional<StructureDirection> roomDirection1x2(std::int32_t x, std::int32_t y, std::size_t floor,
                                                                      std::int32_t roomId) const;
 
@@ -88,12 +84,8 @@ public:
 private:
     void recursiveCorridor(SimpleGrid& grid, std::int32_t x, std::int32_t y, StructureDirection heading,
                            std::int32_t depth);
-    /// Fills in the dents an L of corridors leaves, until nothing changes.
     [[nodiscard]] static bool cleanEdges(SimpleGrid& grid);
-    /// The tower: one 1x2 room of the second floor grows a staircase and a short corridor.
     void setupThirdFloor();
-    /// Groups the free cells into rooms of 1x1, 1x2 or 2x2 and gives each an id and a door. The
-    /// shuffle is what makes two mansions differ, so it has to be vanilla's own.
     void identifyRooms(const SimpleGrid& fromGrid, SimpleGrid& roomGrid);
     /// parity: `Util.shuffle`, which walks from the end and swaps into the tail.
     void shuffle(std::vector<std::pair<std::int32_t, std::int32_t>>& list);

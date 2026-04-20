@@ -9,10 +9,7 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// Named stopwatches, kept in memory and read back by id.
-///
-/// parity: `Stopwatches`, which counts wall-clock milliseconds rather than ticks, so a frozen or
-/// lagging server does not change what one reads.
+/// parity: `Stopwatches`.
 class Stopwatches {
 public:
     explicit Stopwatches(std::function<std::int64_t()> nowMillis) : nowMillis_(std::move(nowMillis)) {}
@@ -25,7 +22,6 @@ public:
 
     bool remove(const wire::common::Identifier& id);
 
-    /// Seconds since it was created or last restarted, or nothing for one nobody made.
     [[nodiscard]] std::optional<double> elapsedSeconds(const wire::common::Identifier& id) const;
 
 private:

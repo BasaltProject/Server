@@ -16,7 +16,6 @@ constexpr double kPlacementOffset = 0.15;
     return held.has_value() && held->id == "minecraft:firework_rocket";
 }
 
-/// One rocket off the stack, as the entity carries it.
 [[nodiscard]] wire::nbt::NbtCompound rocketOf(const storage::StoredItemStack& held) {
     wire::nbt::NbtCompound item;
     item.putString("id", held.id);

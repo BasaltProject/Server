@@ -13,8 +13,7 @@ const PathSet& normalMushroomBiomes() {
     return paths;
 }
 
-/// parity: the mushroom's own placement rule, which accepts a handful of blocks whatever the light
-/// is and everything else only if it is solid.
+/// parity: the mushroom's own placement rule accepts a few blocks whatever the light.
 [[nodiscard]] bool supportsMushroom(const std::string& path) {
     static const PathSet lightOverride = {"mycelium", "podzol", "crimson_nylium", "warped_nylium"};
     static const PathSet solidSupport = {

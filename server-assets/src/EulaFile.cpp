@@ -6,10 +6,7 @@
 
 namespace basalt::server::assets::eulaFile {
 namespace {
-
 [[nodiscard]] std::string defaultFileContent(bool accepted) {
-    // The timestamp is a comment, so its shape is ours rather than vanilla's: what it records is
-    // when the operator's server first asked, which is what an audit of the file wants to know.
     return std::format("# By changing the setting below to true you are indicating your agreement to our EULA\n"
                        "# https://www.minecraft.net/en-us/eula\n"
                        "# {0:%FT%TZ}\n"
@@ -17,7 +14,6 @@ namespace {
                        std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now()),
                        accepted ? "true" : "false");
 }
-
 } // namespace
 
 bool isAccepted(std::string_view content) {
@@ -83,5 +79,4 @@ Outcome check(bool acceptFlag, const wire::common::Logger& logger) {
     });
     return Outcome::JustCreated;
 }
-
 } // namespace basalt::server::assets::eulaFile

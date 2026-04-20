@@ -154,8 +154,7 @@ ItemStack LootFunction::apply(ItemStack stack, random::RandomSource& random, std
         blasted.explosionRadius = explosionRadius;
         return apply(std::move(stack), random, std::nullopt, blasted);
     }
-    // parity: `LootItemConditionalFunction.apply`, which runs its condition first and hands the
-    // stack back untouched when it says no.
+    // parity: `LootItemConditionalFunction.apply`.
     for (const LootCondition& condition : conditions) {
         if (!condition.test(random, context)) {
             return stack;
@@ -168,8 +167,7 @@ ItemStack LootFunction::run(ItemStack stack, random::RandomSource& random, std::
                             const LootContext& context) const {
     const Parts& part = parts();
     switch (kind_) {
-    // parity: `EnchantedCountIncreaseFunction`: the attacker's level times the roll, rounded, then
-    // the optional cap; nothing at all, the roll included, without a living attacker or the level.
+    // parity: `EnchantedCountIncreaseFunction`.
     case Kind::EnchantedCountIncrease: {
         const std::int32_t level =
             context.attacker.has_value() ? levelIn(context.attackerEnchantments, part.enchantment) : 0;
@@ -198,7 +196,7 @@ ItemStack LootFunction::run(ItemStack stack, random::RandomSource& random, std::
         stack.count = kept;
         return stack;
     }
-    // parity: `ApplyBonusCount`, by the level of the enchantment on the tool, and only with a tool.
+    // parity: `ApplyBonusCount`.
     case Kind::ApplyBonus: {
         if (!context.tool.has_value()) {
             return stack;
@@ -223,7 +221,7 @@ ItemStack LootFunction::run(ItemStack stack, random::RandomSource& random, std::
         }
         return stack;
     }
-    // parity: `SmeltItemFunction`, the recipe's result times the input count, capped at a stack.
+    // parity: `SmeltItemFunction`.
     case Kind::Smelt: {
         if (stack.count <= 0 || !context.smelt) {
             return stack;
@@ -253,7 +251,7 @@ ItemStack LootFunction::run(ItemStack stack, random::RandomSource& random, std::
         return stack;
     case Kind::EditComponents:
         return edit_ == nullptr ? stack : applyComponentEdit(*edit_, std::move(stack), random, context);
-    // parity: `ExplorationMapFunction.run`, which needs an origin and leaves an empty stack alone.
+    // parity: `ExplorationMapFunction.run`.
     case Kind::ExplorationMap:
         if (stack.count > 0 && context.origin.has_value() && context.explorationMap) {
             context.explorationMap(stack, part.exploration);

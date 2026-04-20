@@ -13,7 +13,6 @@ namespace {
 using wire::common::Identifier;
 namespace crafting = server::world::crafting;
 
-/// The item tag graph, flattened.
 [[nodiscard]] std::map<Identifier, std::set<Identifier>> loadItemTags(const RealRecipes::Jar& jar,
                                                                       const wire::common::Logger& logger) {
     return datapack::resolveTags(
@@ -72,8 +71,6 @@ void RealRecipes::load(const Jar& jar) {
     for (const auto& [id, entry] : entries) {
         ids_.insert(id);
         const std::optional<std::string> text = jar.readText(entry);
-        // A type with no model here, or a file this build could not read: both are named, because a
-        // silent skip is how a whole family of recipes went missing without anyone noticing.
         if (!text.has_value()) {
             logger_.debug([&] { return "Skipped " + entry + ": no such entry"; });
             ++skipped;
@@ -153,11 +150,7 @@ const Identifier* RealRecipes::nameOf(const crafting::Recipe* recipe) const {
 
 std::optional<RealRecipes::Match> RealRecipes::recipeMatching(const crafting::CraftingInput& input) const {
     for (std::size_t index = 0; index < recipes_.size(); ++index) {
-        // parity: `RecipeManager.getRecipeFor(RecipeType.CRAFTING, ...)`. Everything the jar ships
-        // lives in one folder, cooking and stonecutting included, and only the grid's own types may
-        // answer here. Without the filter a log in a crafting grid came out as **charcoal**, because
-        // `charcoal.json` sorts before `oak_planks.json` and a smelting recipe takes one ingredient
-        // just as happily. Found by the bench circuit `crafter`.
+        // parity: `RecipeManager.getRecipeFor(RecipeType.CRAFTING, ...)`.
         const crafting::RecipeKind kind = recipes_[index].kind;
         if (kind != crafting::RecipeKind::Shaped && kind != crafting::RecipeKind::Shapeless &&
             kind != crafting::RecipeKind::Special) {

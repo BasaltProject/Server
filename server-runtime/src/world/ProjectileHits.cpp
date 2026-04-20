@@ -55,11 +55,9 @@ constexpr double kMaxSignal = 15.0;
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, air, {}};
 }
 
-/// parity: `TntBlock.onProjectileHit` into `TntBlock.prime`: the block goes and the entity that
-/// takes its place is what counts down.
+/// parity: `TntBlock.onProjectileHit` into `TntBlock.prime`.
 [[nodiscard]] std::optional<BlockChange> primeTnt(WorldState& world, const entity::BlockHit& hit, bool tntExplodes) {
-    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off, and `onProjectileHit`
-    // only removes the block when it answered true.
+    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off.
     if (!tntExplodes) {
         return std::nullopt;
     }
@@ -71,9 +69,7 @@ constexpr double kMaxSignal = 15.0;
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, air, {}};
 }
 
-/// parity: `AbstractCandleBlock.onProjectileHit` and `CampfireBlock.onProjectileHit`: both want a
-/// projectile that is **alight** and a block that is not lit already. A candle also refuses while it
-/// is waterlogged, and so does a campfire.
+/// parity: `AbstractCandleBlock.onProjectileHit` and `CampfireBlock.onProjectileHit`.
 [[nodiscard]] std::optional<BlockChange> light(WorldState& world, const entity::BlockHit& hit, std::int32_t stateId,
                                                const wire::common::Identifier& block) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
@@ -92,7 +88,6 @@ constexpr double kMaxSignal = 15.0;
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, *turned, {}};
 }
 
-/// The face that name stands for, or nothing for a name that is not one.
 [[nodiscard]] std::optional<registry::BlockFace> faceNamed(std::string_view name) {
     static constexpr std::array<std::pair<std::string_view, registry::BlockFace>, 6> kNames{
         {{"down", registry::BlockFace::Down},
@@ -112,9 +107,7 @@ constexpr double kMaxSignal = 15.0;
 /// parity: `isProperHit`'s own `0.8124F`: the top fifth of the bell does not ring it.
 constexpr double kBellTopEdge = static_cast<double>(0.8124F);
 
-/// parity: `BellBlock.isProperHit`. A bell only rings when it is struck on the right side, and which
-/// side that is depends on how it hangs: a floor bell along the axis it faces, a wall bell across it,
-/// a ceiling bell from anywhere. Never from above or below, and never on the top fifth of it.
+/// parity: `BellBlock.isProperHit`.
 [[nodiscard]] bool properBellHit(const std::map<std::string, std::string>& properties, const entity::BlockHit& hit) {
     if (registry::axisOf(hit.face) == 1) {
         return false;
@@ -157,14 +150,11 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
     if (path == "target") {
         return hitTarget(world, hit, *stateId, *block, byArrow);
     }
-    // parity: `TntBlock.onProjectileHit`, one of the few ways tnt goes off with no redstone and no
-    // hand: the projectile has to be alight, and then the block is gone and the entity is ticking.
+    // parity: `TntBlock.onProjectileHit`.
     if (path == "tnt") {
         return burning ? primeTnt(world, hit, tntExplodes) : std::nullopt;
     }
-    // parity: `ChorusFlowerBlock` and `DecoratedPotBlock`, which both end in `destroyBlock` with its
-    // drop flag on. The pot writes `cracked` first, and that is the state its loot table reads: a
-    // cracked pot leaves its four sherds instead of the pot itself.
+    // parity: `ChorusFlowerBlock` and `DecoratedPotBlock`.
     if (path == "chorus_flower" || path == "decorated_pot") {
         std::int32_t broken = *stateId;
         if (path == "decorated_pot") {
@@ -172,21 +162,17 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
                 registry::blockStateDefinitions::stateIdOf(*block, {{"cracked", "true"}}, *stateId);
             broken = cracked.value_or(*stateId);
         }
-        // parity: the crack is written first and `destroyBlock` rolls the drops **before** the block
-        // goes, which is what lets the pot's own block entity hand over its sherds.
+        // parity: the crack is written first and `destroyBlock` rolls the drops **before** the block.
         if (destroyed) {
             destroyed(broken, hit.blockX, hit.blockY, hit.blockZ);
         }
         return shatter(world, hit);
     }
-    // parity: a lit candle or campfire is a light source and a block state, so a flaming arrow that
-    // sets one going is as visible as one that sets off tnt.
+    // parity: a lit candle or campfire is a light source and a block state, so a flaming arrow that.
     if (burning && (path.ends_with("candle") || path.ends_with("candle_cake") || path.ends_with("campfire"))) {
         return light(world, hit, *stateId, *block);
     }
-    // parity: `BellBlock.onProjectileHit`, which rings it through the same `onHit` a hand uses and
-    // with the same "was it a proper hit" rule. The block state does not move; what comes out is the
-    // ring itself, which a sculk sensor hears as eleven.
+    // parity: `BellBlock.onProjectileHit`.
     if (path == "bell") {
         const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
         if (!properBellHit(properties, hit)) {
@@ -198,8 +184,7 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
         return BlockChange{hit.blockX, hit.blockY, hit.blockZ, *stateId, {}};
     }
     if (path == "big_dripleaf") {
-        // parity: `BigDripleafBlock.onProjectileHit` tips it right over **and books the hundred
-        // ticks it lies flat**, which is what brings it back up.
+        // parity: `BigDripleafBlock.onProjectileHit` tips it right over **and books the hundred.
         return dripleaves::setTilt(world, hit.blockX, hit.blockY, hit.blockZ, "full", gameTime);
     }
     return std::nullopt;

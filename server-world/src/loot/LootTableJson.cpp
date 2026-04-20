@@ -47,7 +47,6 @@ using wire::common::JsonValue;
     return id.has_value() ? Parsed<Identifier>{*id} : std::unexpected(missing(what));
 }
 
-/// The composite entry types and how they combine their children.
 [[nodiscard]] std::optional<LootEntry::Composite> compositeOf(std::string_view type) {
     if (type == "minecraft:alternatives") {
         return LootEntry::Composite::Alternatives;
@@ -150,7 +149,7 @@ Parsed<LootEntry> Reader::entry(const JsonObject& object) {
         built.empty = true;
         return built;
     }
-    // parity: 26.3 `TagEntry` reads an item holder set from `items`, a `#tag` or ids written out.
+    // parity: 26.3 `TagEntry` reads an item holder set from `items`.
     if (*type == "minecraft:tag") {
         const std::vector<std::string> items = idsOrTag(object.find("items"));
         if (items.empty()) {
@@ -173,8 +172,7 @@ Parsed<LootEntry> Reader::entry(const JsonObject& object) {
         }
         return built;
     }
-    // parity: 26.3 `NestedLootTable` reads a loot table holder set: ids, tables written in place, or
-    // a `#tag`.
+    // parity: 26.3 `NestedLootTable` reads a loot table holder set.
     if (*type == "minecraft:loot_table") {
         const JsonValue* value = object.find("value");
         if (value == nullptr) {
@@ -254,7 +252,7 @@ Parsed<LootPool> Reader::pool(const JsonObject& object) {
         return std::unexpected(functions.error());
     }
     built.functions = std::move(*functions);
-    // parity: `rolls` is required and an int provider, `bonus_rolls` optional and a float one.
+    // parity: `rolls` is required and an int provider.
     const JsonValue* rolls = object.find("rolls");
     if (rolls == nullptr) {
         return std::unexpected(missing("pool rolls"));
@@ -289,8 +287,7 @@ Parsed<LootTable> Reader::table(const JsonObject& object) {
             built.pools.push_back(std::move(*parsed));
         }
     }
-    // parity: `LootTable.randomSequence`, the name of the stream this table rolls on. Every table
-    // the game ships carries one; a datapack's may not, and then it rolls on the level's own random.
+    // parity: `LootTable.randomSequence`, the name of the stream this table rolls on.
     if (const std::optional<std::string> sequence = asString(object.find("random_sequence")); sequence.has_value()) {
         if (const Parsed<Identifier> name = identifierOf(sequence, "random sequence"); name.has_value()) {
             built.randomSequence = *name;

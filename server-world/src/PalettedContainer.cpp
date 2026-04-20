@@ -10,8 +10,6 @@ namespace {
 
 constexpr std::size_t kInitialPaletteCapacity = 4;
 
-/// Matching vanilla's own floor for an indirect palette: narrower entries save so little that they
-/// are not worth the extra widths to handle.
 constexpr int kMinBitsPerEntry = 4;
 
 [[nodiscard]] int bitsFor(std::size_t entries) {

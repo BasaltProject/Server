@@ -9,16 +9,13 @@
 
 namespace basalt::server::registry {
 namespace {
-
 using wire::common::Identifier;
 using wire::protocol::play::ParticleOptionShape;
 
 [[nodiscard]] Identifier vanilla(std::string_view path) { return Identifier::vanilla(std::string{path}); }
-
 } // namespace
 
 namespace items {
-
 const Registry<Item>& registry() {
     static const Registry<Item> built = [] {
         Registry<Item> registry;
@@ -30,12 +27,10 @@ const Registry<Item>& registry() {
     }();
     return built;
 }
-
 } // namespace items
 
 namespace entityTypes {
 namespace {
-
 struct Table {
     std::vector<EntityTypeEntry> byProtocolId;
     std::unordered_map<Identifier, std::size_t> byName;
@@ -56,7 +51,6 @@ struct Table {
     }();
     return built;
 }
-
 } // namespace
 
 std::span<const EntityTypeEntry> all() { return table().byProtocolId; }
@@ -67,8 +61,6 @@ const EntityTypeEntry* of(const Identifier& id) {
 }
 
 const EntityTypeEntry* byProtocolId(std::int32_t protocolId) {
-    // The list is sorted by id but the ids are not contiguous, so this is a search rather than an
-    // index.
     const auto found = std::ranges::lower_bound(table().byProtocolId, protocolId, {}, &EntityTypeEntry::protocolId);
     if (found == table().byProtocolId.end() || found->protocolId != protocolId) {
         return nullptr;
@@ -80,13 +72,11 @@ const Identifier& player() {
     static const Identifier id = Identifier::vanilla("player");
     return id;
 }
-
 } // namespace entityTypes
 
 namespace particleTypes {
 namespace {
-
-/// parity: `ParticleTypes`' own registrations. A type not named here carries no options.
+// parity: `ParticleTypes`' own registrations.
 constexpr std::array<std::pair<std::string_view, ParticleOptionShape>, 23> kShapes = {{
     {"block", ParticleOptionShape::BlockState},
     {"block_marker", ParticleOptionShape::BlockState},
@@ -136,7 +126,6 @@ struct Table {
     }();
     return built;
 }
-
 } // namespace
 
 std::span<const ParticleType> all() { return table().byProtocolId; }
@@ -145,12 +134,10 @@ const ParticleType* of(const Identifier& id) {
     const auto found = table().byName.find(id);
     return found == table().byName.end() ? nullptr : &table().byProtocolId[found->second];
 }
-
 } // namespace particleTypes
 
 namespace dataComponents {
 namespace {
-
 struct Table {
     std::unordered_map<Identifier, std::int32_t> byName;
     std::unordered_map<std::int32_t, Identifier> byId;
@@ -170,7 +157,6 @@ struct Table {
     }();
     return built;
 }
-
 } // namespace
 
 std::optional<std::int32_t> idOf(const Identifier& name) {
@@ -184,12 +170,10 @@ const Identifier* nameOf(std::int32_t id) {
 }
 
 const std::vector<Identifier>& all() { return table().names; }
-
 } // namespace dataComponents
 
 namespace blockEntityTypes {
 namespace {
-
 struct Table {
     std::unordered_map<std::string_view, std::int32_t> idsByName;
     std::unordered_map<Identifier, Identifier> typesByBlock;
@@ -209,7 +193,6 @@ struct Table {
     }();
     return built;
 }
-
 } // namespace
 
 std::optional<std::int32_t> idOf(const Identifier& identifier) {
@@ -226,7 +209,5 @@ const Identifier* ofBlock(const Identifier& block) {
 }
 
 std::size_t size() { return blockEntityTypeNamesTable().size(); }
-
 } // namespace blockEntityTypes
-
 } // namespace basalt::server::registry

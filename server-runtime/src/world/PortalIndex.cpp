@@ -22,7 +22,6 @@ constexpr std::int32_t kSectionWidth = 16;
     return (static_cast<std::int64_t>(chunkX) << 32) | (static_cast<std::int64_t>(chunkZ) & 0xFFFFFFFFLL);
 }
 
-/// 26 bits of x and z, 12 of y: the same shape a block position takes on the wire.
 [[nodiscard]] std::int64_t pack(std::int32_t x, std::int32_t y, std::int32_t z) {
     return ((static_cast<std::int64_t>(x) & 0x3FFFFFF) << 38) | ((static_cast<std::int64_t>(z) & 0x3FFFFFF) << 12) |
            (static_cast<std::int64_t>(y) & 0xFFF);
@@ -65,7 +64,6 @@ void PortalIndex::scan(const server::world::Chunk& chunk) {
     std::vector<std::int64_t> found;
     for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
         const server::world::ChunkSection& section = chunk.section(index);
-        // A section whose palette holds no portal block at all is skipped without reading one.
         if (!section.mayContain(
                 [](std::int32_t state) { return server::world::portal::PortalShape::isPortal(state); })) {
             continue;

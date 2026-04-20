@@ -24,8 +24,6 @@ void applyGeneratedBlockEntityWrite(Chunk& chunk, const ChunkGeneratedBlockEntit
     }
     const std::int32_t localX = write.x & 15;
     const std::int32_t localZ = write.z & 15;
-    // The block it belongs to has to still be the one that was generated: anything else means the
-    // world moved on, and a chest with no chest under it is worse than no chest.
     if (chunk.blockStateId(localX, write.y, localZ) != write.expectedStateId) {
         return;
     }
@@ -113,8 +111,6 @@ PendingChunkDecorations::generatedEntities(const std::function<std::int32_t()>& 
                     result.push_back(existing->second);
                     continue;
                 }
-                // The identity is handed out once and kept: a client that sees the same mob twice
-                // in two ticks would draw two of it.
                 GeneratedWorldEntity identity{.entityId = allocateEntityId(),
                                               .uuid = wire::common::Uuid::random(),
                                               .descriptor = entities[index]};

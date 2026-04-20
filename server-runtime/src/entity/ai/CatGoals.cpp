@@ -110,7 +110,7 @@ void MoveToBlockGoal::start(MobContext& mob) {
 }
 
 void MoveToBlockGoal::tick(MobContext& mob) {
-    // parity: `Vec3i.closerToCenterThan`, measured from the middle of the block above the target.
+    // parity: `Vec3i.closerToCenterThan`.
     const double x = static_cast<double>(blockPos_[0]) + 0.5;
     const double y = static_cast<double>(blockPos_[1] + 1) + 0.5;
     const double z = static_cast<double>(blockPos_[2]) + 0.5;
@@ -226,8 +226,7 @@ bool CatSitOnBlockGoal::isValidTarget(MobContext& mob, std::int32_t x, std::int3
 
 namespace {
 
-/// parity: `EnvironmentAttributes.CAT_WAKING_UP_GIFT_CHANCE` on the overworld day, a constant 0.7
-/// from tick 23667 to tick 362 and nothing the rest of the day, and nothing where there is no day.
+/// parity: `EnvironmentAttributes.CAT_WAKING_UP_GIFT_CHANCE`.
 [[nodiscard]] float giftChance(const MobContext& mob) {
     constexpr std::int64_t kDay = 24000;
     constexpr std::int64_t kFrom = 23667;

@@ -32,9 +32,9 @@ using entity::ServerEntity;
 namespace mth = wire::common::mth;
 namespace steps = entity::mobSteps;
 
-/// A move this long is a teleport, which makes no sound and starts no fall.
+// A move this long is a teleport: no sound and no fall.
 constexpr double kTeleportSquared = 64.0;
-/// parity: `getOnPos` and `getOnPosLegacy`, the squares a hair and a fifth under the feet.
+/// parity: `getOnPos` and `getOnPosLegacy`.
 constexpr double kSupportDepth = static_cast<double>(1.0E-5F);
 constexpr double kEffectDepth = static_cast<double>(0.2F);
 
@@ -91,11 +91,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         }
     }
     world::vibrations::emit(world.state(), "hit_ground", mob.x, mob.y, mob.z, world.gameTime(), {.entity = mob.uuid()});
-    // parity: `restituteMovementAfterCollisions` with `ShelfMushroomBlock.bounceOn`: a fall faster
-    // than gravity onto the shelf mushroom bounces, and the bounce sounds from the block for every
-    // entity but an item entity and primed tnt. The bounce itself happens in the colliding move,
-    // which this build leaves to the client for players and does not restitute for mobs; the sound
-    // is the part a watcher can be told.
+    // parity: `restituteMovementAfterCollisions`.
     constexpr double kBounceMinFall = 0.08;
     constexpr double kBounceProbeDepth = 0.500001;
     const Pos bounceAt = below(mob, kBounceProbeDepth);
@@ -129,11 +125,11 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         path == "horse" || path == "donkey" || path == "mule" || path == "skeleton_horse" || path == "zombie_horse";
     const bool camel = path == "camel" || path == "camel_husk";
     const bool mount = horse || camel || path == "llama" || path == "trader_llama";
-    // parity: `LivingEntity.causeFallDamage` hands the fall on before anything, a mount only once hurt.
+    // parity: `LivingEntity.causeFallDamage` hands the fall on before anything.
     if (!mount) {
         propagateFall(world, mob, fallen, landing);
     }
-    // parity: `AbstractHorse.causeFallDamage`, shared by the camel, whose land sound is the horse's.
+    // parity: `AbstractHorse.causeFallDamage`.
     if ((horse || camel) && distance > 1.0) {
         movementSound(world, mob, mob.age < 0 ? "entity.horse.land_baby" : "entity.horse.land", 0.4F, 1.0F);
     }
@@ -154,7 +150,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         movementSound(world, mob, steps::fallSound(mob.type(), damage), 1.0F, 1.0F);
     }
     const auto blockFallSound = [&] {
-        // parity: `playBlockFallSound`, the block under the feet at half its volume and three quarters its pitch.
+        // parity: `playBlockFallSound`.
         if (!server::registry::blocks::isAir(onState)) {
             const server::registry::BlockSoundTypeEntry& sound = server::registry::blockSounds::of(onState);
             movementSound(world, mob, sound.fallSound, sound.volume * 0.5F, sound.pitch * 0.75F);
@@ -163,7 +159,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
     if (!mount) {
         blockFallSound();
     }
-    // parity: `Llama.causeFallDamage` hurts nobody below six blocks, though the block still sounds.
+    // parity: `Llama.causeFallDamage` hurts nobody below six blocks.
     if (llama && fallen < 6.0) {
         blockFallSound();
         return;
@@ -178,8 +174,7 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
                                    result.died);
     }
     if (mount) {
-        // parity: `AbstractHorse.causeFallDamage` and the llama's: hurt, hand the fall to the riders,
-        // then sound the block landed on.
+        // parity: `AbstractHorse.causeFallDamage`.
         propagateFall(world, mob, fallen, landing);
         blockFallSound();
     }
@@ -199,8 +194,7 @@ void MobActionSystem::emitMovement(world::LoadedWorld& world, ServerEntity& mob)
     }
     world::WorldState& state = world.state();
     const bool inWater = entity::ai::inWater(state, mob);
-    // parity: `Entity.checkFallDamage`, before the steps: water and a ladder forget the fall, and so do
-    // slow falling and levitation.
+    // parity: `Entity.checkFallDamage`.
     if (steps::countsFalls(mob.type()) && !mob.dying) {
         const Pos feet{mth::floor(mob.x), mth::floor(mob.y), mth::floor(mob.z)};
         const std::int32_t feetState = state.blockState(feet[0], feet[1], feet[2]).value_or(0);
@@ -243,7 +237,7 @@ void MobActionSystem::emitMovement(world::LoadedWorld& world, ServerEntity& mob)
     const std::int32_t effectState = state.blockState(effect[0], effect[1], effect[2]).value_or(0);
     const bool sounds = emission == steps::Emission::All;
     const bool events = emission != steps::Emission::None;
-    // parity: `vibrationAndSoundEffectsFromBlock`: on the ground or a ladder the square steps.
+    // parity: `vibrationAndSoundEffectsFromBlock`.
     const auto sideEffects = [&](const Pos& at, std::int32_t stateId, bool sound, bool vibrate) {
         if (server::registry::blocks::isAir(stateId) || (!mob.onGround && !climbable(stateId))) {
             return false;
@@ -328,8 +322,7 @@ void MobActionSystem::emitPlayerMovement(world::LoadedWorld& world,
         const double dy = player->y - (*from)[1];
         const double dz = player->z - (*from)[2];
         player->knownMovement = {dx, dy, dz};
-        // parity: `Player.getMovementEmission`: nothing flying or crouched on the ground, and a
-        // spectator's `noPhysics` move emits nothing either.
+        // parity: `Player.getMovementEmission`.
         if ((dx * dx) + (dy * dy) + (dz * dz) > kTeleportSquared || player->flying ||
             (player->onGround && player->sneaking) || player->gamemode == wire::protocol::play::Gamemode::Spectator ||
             player->vehicleId.has_value()) {
@@ -370,8 +363,7 @@ void MobActionSystem::emitPlayerMovement(world::LoadedWorld& world,
                 return true;
             }
             const server::registry::BlockSoundTypeEntry& own = server::registry::blockSounds::of(stateId);
-            // parity: in water, `waterSwimSound` scaled by a server player's own motion, which the client
-            // moves and never sets, so it is heard at nothing, and the step muffled under it.
+            // parity: `waterSwimSound`.
             if (inWater) {
                 sound(own.stepSound, own.volume * 0.05F, own.pitch * 0.8F);
             } else {

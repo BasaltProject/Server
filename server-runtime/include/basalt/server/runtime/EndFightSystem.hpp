@@ -26,18 +26,12 @@ class BlockChangeBroadcaster;
 class CombatSystem;
 class ExplosionSystem;
 
-/// The ender dragon's turn in the world: its flight, what its wings and head do to whoever is in
-/// the way, the blocks it flies through and its long death.
-///
-/// parity: the half of `EnderDragon.aiStep` and `tickDeath` that reaches outside the dragon. The
-/// flight itself is `entity::enderDragon`.
+/// parity: the half of `EnderDragon.aiStep` and `tickDeath` that reaches outside the dragon.
 class EndFightSystem {
 public:
     struct Options {
         std::function<std::int64_t()> nextSeed;
-        /// `dragon_immune` and `dragon_transparent`, which decide what a dragon flies through.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
-        /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;
     };
@@ -45,32 +39,25 @@ public:
     EndFightSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster, CombatSystem& combat,
                    ExplosionSystem& explosions, AreaEffectCloudSystem& clouds, Options options);
 
-    /// One turn of one dragon. `living` is this tick's snapshot of the world's entities.
     void tickDragon(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                     const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& dragon);
 
-    /// The End's own turn at its fight, before any entity moves. parity: `EnderDragonFight.tick`.
-    /// parity: `EnderDragon.kill`: the dragon alone is removed where it stands instead of playing
-    /// out its death, and the fight is told it was killed. False for anything that is not one.
+    /// parity: `EnderDragonFight.tick`.
     [[nodiscard]] bool killOutright(world::LoadedWorld& world, entity::ServerEntity& entity);
 
     void tickFight(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                    const std::vector<entity::ServerEntity*>& living);
 
-    /// A crystal was destroyed, by that player if one was behind it.
-    ///
     /// parity: `EnderDragonFight.onCrystalDestroyed` and `EnderDragon.onCrystalDestroyed`.
     void crystalDestroyed(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                           const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer);
 
-    /// A crystal was set down; four round the exit portal call the dragon back.
     /// parity: `EnderDragonFight.tryRespawn`.
     void tryRespawn(world::LoadedWorld& world);
 
 private:
     [[nodiscard]] entity::enderDragon::DragonState& stateOf(entity::ServerEntity& dragon);
 
-    /// The players in this world, for what a respawn shows them.
     [[nodiscard]] std::vector<player::PlayerSession*> watchersIn(const world::LoadedWorld& world) const;
 
     /// parity: `DragonRespawnStage.tick`, one turn of the stage the respawn is at.
@@ -88,11 +75,9 @@ private:
     void levelEvent(const std::vector<player::PlayerSession*>& watchers, std::int32_t event, std::int32_t x,
                     std::int32_t y, std::int32_t z);
 
-    /// Rebuilds one pillar with an invulnerable crystal beaming at the summoning point.
     void rebuildSpike(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                       std::size_t index);
 
-    /// The fight a dragon belongs to, or null for one it does not.
     [[nodiscard]] static world::DragonFight* fightOf(world::LoadedWorld& world, const entity::ServerEntity& dragon);
 
     void updatePlayers(world::LoadedWorld& world, world::DragonFight& fight,
@@ -108,8 +93,7 @@ private:
     void findOrCreateDragon(world::LoadedWorld& world, world::DragonFight& fight,
                             const std::vector<entity::ServerEntity*>& living);
 
-    /// parity: `EnderDragonFight.tick`'s `removeTicketWithRadius(TicketType.DRAGON, ...)`, the
-    /// arena going when the last fighter leaves.
+    /// parity: `EnderDragonFight.tick`'s `removeTicketWithRadius(TicketType.DRAGON, ...)`.
     void releaseDragonTicket(world::LoadedWorld& world, world::DragonFight& fight);
 
     /// parity: `EnderDragonFight.createNewDragon`.
@@ -144,7 +128,7 @@ private:
                 const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& dragon,
                 entity::enderDragon::DragonState& state);
 
-    /// parity: `EnderDragon.checkWalls`. Answers whether something it cannot break stopped it.
+    /// parity: `EnderDragon.checkWalls`.
     bool checkWalls(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                     entity::enderDragon::DragonState& state, const std::array<double, 6>& box);
 

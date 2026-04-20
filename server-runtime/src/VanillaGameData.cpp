@@ -11,7 +11,6 @@ namespace {
 
 using wire::common::Identifier;
 
-/// The two-callback reader every tag namespace takes, built from the four this holds.
 template <typename Reader>
 [[nodiscard]] Reader readerOf(const VanillaGameData::Jar& jar) {
     return Reader{.entriesUnder = jar.entriesUnder, .readText = jar.readText};
@@ -83,8 +82,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
     lootTables.useRegistries(&lootRegistries);
     villagerTrades.useLootTables(&lootTables);
     useBrewingRecipes();
-    // Loud on purpose: a client whose overworld timeline tag is empty renders a sky that never
-    // moves, and nothing else in the log would say why.
+    // Loud on purpose: an empty overworld timeline tag renders a sky that never moves, and nothing else would say why.
     const std::set<Identifier>& overworld =
         world::realTimelineTags::membersOf(timelineTags, Identifier::vanilla("in_overworld"));
     if (overworld.empty()) {

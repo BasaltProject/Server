@@ -130,8 +130,6 @@ DialogCommand::DialogCommand(const world::RealDialogs& dialogs)
 void DialogCommand::build(const CommandNodeBuilder& root) const {
     root.literal("show", [this](const CommandNodeBuilder& show) {
         show.argument("targets", playersArgument(false), [this](const CommandNodeBuilder& targets) {
-            // No completions of our own: `minecraft:dialog` is a synced registry, so the client
-            // completes it from the same list this server sent it.
             targets.argument("dialog", dialogArgument(), [this](const CommandNodeBuilder& named) {
                 named.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
                     const auto* id = context.get<Identifier>("dialog");
@@ -153,8 +151,6 @@ void DialogCommand::build(const CommandNodeBuilder& root) const {
                                 {Component::text(id->toString()), Component::text("minecraft:dialog")})}};
                     }
                     const std::vector<player::PlayerSession*>& targets = targetsOf(context);
-                    // The door that has no dialogs of its own builds a screen out of this, so the
-                    // registry is read here once rather than by each connection.
                     const world::RealDialogs& registry = *dialogs_;
                     const std::optional<world::dialogs::Dialog> dialog = world::dialogs::read(
                         registry.entries()[static_cast<std::size_t>(*dialogId)].second,
@@ -259,9 +255,6 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
         return runAll(context, selected);
     };
 
-    /// The `<numberOfTimes> [<untilFailed>] [<rotationSteps>] [<testsPerRow>]` tail several forms
-    /// share. The arguments that lay tests out in the world are read and ignored: there are no test
-    /// structures in this build, only function tests.
     const auto repeats = [](const CommandNodeBuilder& node, const CommandExecutor& run) {
         node.argument("numberOfTimes", integerArgument(0), [run](const CommandNodeBuilder& times) {
             times.executes(run);
@@ -348,7 +341,6 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
         root.literal(std::string{name}, [clear](const CommandNodeBuilder& form) { form.executes(clear); });
     }
 
-    /// Nothing is laid out in the world, so there is nothing to reset, locate or clear there.
     const CommandExecutor nothingPlaced = [](const CommandContext& context) -> Parsed<std::int32_t> {
         context.success(Component::translatable("commands.test.error.no_test_instances"));
         return 0;

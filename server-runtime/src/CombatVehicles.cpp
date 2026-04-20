@@ -59,7 +59,7 @@ constexpr std::int64_t kResetIntervalTicks = 20;
            std::isnan(at.xRot) || std::isinf(at.xRot);
 }
 
-/// parity: `Entity.isEyeInFluid(WATER)` for a boat, its eyes at 85 hundredths of its height.
+/// parity: `Entity.isEyeInFluid(WATER)` for a boat.
 [[nodiscard]] bool eyeInWater(world::LoadedWorld& world, const ServerEntity& boat) {
     constexpr double kEyeShare = 0.85;
     const std::optional<std::int32_t> state =
@@ -69,7 +69,6 @@ constexpr std::int64_t kResetIntervalTicks = 20;
     return state.has_value() && world::fluids::of(*state) == world::Submersion::Water;
 }
 
-/// The top of a block's collision shape, or nothing for an empty one.
 [[nodiscard]] std::optional<double> shapeTop(std::int32_t stateId) {
     const std::span<const std::int32_t> boxes = server::registry::blockShapes::collisionBoxes(stateId);
     std::optional<double> top;
@@ -81,8 +80,7 @@ constexpr std::int64_t kResetIntervalTicks = 20;
     return top;
 }
 
-/// parity: `BlockGetter.getBlockFloorHeight`: the top of this square's shape, or of the one below
-/// less a block when this one is empty, or infinitely far down.
+/// parity: `BlockGetter.getBlockFloorHeight`.
 [[nodiscard]] double floorHeight(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     if (const std::optional<double> top = shapeTop(world.state().blockState(x, y, z).value_or(0)); top.has_value()) {
         return *top;
@@ -91,8 +89,7 @@ constexpr std::int64_t kResetIntervalTicks = 20;
     return below >= 1.0 ? below - 1.0 : -std::numeric_limits<double>::infinity();
 }
 
-/// parity: `AbstractBoat.getDismountLocationForPassenger`: the square beside the boat the player
-/// faces, on its floor or the one under it, standing, crouching or swimming; else on top of the boat.
+/// parity: `AbstractBoat.getDismountLocationForPassenger`.
 [[nodiscard]] std::array<double, 3> boatDismount(world::LoadedWorld& world, const ServerEntity& boat,
                                                  const PlayerSession& player) {
     constexpr double kPlayerWidth = 0.6;
@@ -133,9 +130,7 @@ constexpr std::int64_t kResetIntervalTicks = 20;
     return {boat.x, boat.y + boat.height(), boat.z};
 }
 
-/// parity: `AbstractHorse.getDismountLocationInDirection`: from the mount's feet up to three
-/// quarters of a block over its back, the first floor the player fits on standing, crouching or
-/// swimming.
+/// parity: `AbstractHorse.getDismountLocationInDirection`.
 [[nodiscard]] std::optional<std::array<double, 3>> horseDismountToward(world::LoadedWorld& world,
                                                                        const ServerEntity& horse, float degrees) {
     constexpr double kPlayerWidth = 0.6;
@@ -177,8 +172,7 @@ constexpr std::int64_t kResetIntervalTicks = 20;
     return std::nullopt;
 }
 
-/// parity: `AbstractHorse.getDismountLocationForPassenger`: the main arm's side, then the other, then
-/// where the mount stands, the arm being the one the client's settings name.
+/// parity: `AbstractHorse.getDismountLocationForPassenger`.
 [[nodiscard]] std::array<double, 3> horseDismount(world::LoadedWorld& world, const ServerEntity& horse,
                                                   const PlayerSession& rider) {
     const float quarterTurn = rider.mainArm == 1 ? 90.0F : -90.0F;
@@ -209,8 +203,7 @@ std::optional<std::array<double, 3>> CombatHandler::dismountSpot(const PlayerSes
 }
 
 bool CombatHandler::controls(const PlayerSession& session, const ServerEntity& vehicle) const {
-    // parity: `AbstractBoat.getControllingPassenger`, the first passenger when it is a player, and
-    // `AbstractHorse`'s, which also wants a saddle.
+    // parity: `AbstractBoat.getControllingPassenger`.
     if (vehicle.passengerIds.empty() || vehicle.passengerIds.front() != session.entityId()) {
         return false;
     }
@@ -225,8 +218,7 @@ bool CombatHandler::boardBoat(PlayerSession& session, ServerEntity& boat) {
     if (world == nullptr) {
         return false;
     }
-    // parity: `AbstractBoat.interact` and `canAddPassenger`: not crouching, a boat still in control,
-    // room aboard and its eyes above the water.
+    // parity: `AbstractBoat.interact`.
     if (session.sneaking || boat.boatOutOfControl >= entity::boats::kOutOfControlTicks) {
         return false;
     }
@@ -268,8 +260,6 @@ void CombatHandler::handleMoveVehicle(const play::ServerboundMoveVehiclePacket& 
                                [&back](wire::io::ByteBuffer& buffer) { back.write(buffer); });
     };
     if (!controls(*session, *vehicle)) {
-        // parity: a passenger whose client moves a vehicle it does not drive is told where it is,
-        // at most once a second unless it strayed more than a block.
         const double dx = packet.movingTo.x - vehicle->x;
         const double dy = packet.movingTo.y - vehicle->y;
         const double dz = packet.movingTo.z - vehicle->z;

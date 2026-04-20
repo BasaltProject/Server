@@ -12,9 +12,7 @@ namespace reg = server::registry;
 using server::world::Chunk;
 using server::world::HeightmapType;
 
-/// parity: `PlayerSpawnFinder.getLevelRespawnPos`. A column whose world surface stands above both
-/// the motion-blocking top and the ocean floor is refused outright; otherwise it is walked down and
-/// the first full upward face under open air wins, unless fluid gets there first.
+/// parity: `PlayerSpawnFinder.getLevelRespawnPos`.
 [[nodiscard]] std::optional<std::array<std::int32_t, 3>> respawnPos(const Chunk& chunk, std::int32_t localX,
                                                                     std::int32_t localZ) {
     const std::int32_t minY = chunk.verticalBounds().minY();

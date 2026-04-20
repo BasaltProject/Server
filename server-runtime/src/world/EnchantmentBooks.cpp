@@ -18,7 +18,6 @@ using wire::nbt::NbtTag;
     return value == nullptr ? nullptr : value->get<std::string>();
 }
 
-/// Whether a selector written as `#tag` or as a plain name covers this candidate.
 [[nodiscard]] bool selects(const std::string* selector, const Identifier& candidate,
                            const std::map<Identifier, std::set<Identifier>>* tags) {
     if (selector == nullptr) {

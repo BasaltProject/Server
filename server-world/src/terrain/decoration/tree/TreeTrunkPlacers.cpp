@@ -57,8 +57,7 @@ const PathSet& leafBlockPaths() {
     return registry::blocks::isAir(stateId) || leafBlockPaths().find(pathOf(stateId)) != leafBlockPaths().end();
 }
 
-/// parity: `FancyTrunkPlacer.treeShape`. Vanilla computes the square root before deciding whether it
-/// wanted it, so the negative-radicand case is a discarded NaN rather than a branch.
+/// parity: `FancyTrunkPlacer.treeShape` computes the square root before deciding it was needed (discarded NaN).
 [[nodiscard]] float treeShape(const std::int32_t height, const std::int32_t y) {
     if (static_cast<float>(y) < static_cast<float>(height) * 0.3F) {
         return -1.0F;
@@ -76,7 +75,7 @@ const PathSet& leafBlockPaths() {
     return static_cast<double>(localY) >= static_cast<double>(height) * 0.2;
 }
 
-/// parity: `FancyTrunkPlacer.getLogAxis`, encoded as the offset from the upright state id.
+/// parity: `FancyTrunkPlacer.getLogAxis`.
 [[nodiscard]] std::int32_t axisStateId(const std::int32_t defaultStateId, const std::int32_t startX,
                                        const std::int32_t startZ, const std::int32_t x, const std::int32_t z) {
     const std::int32_t xDifference = std::abs(x - startX);
@@ -88,8 +87,7 @@ const PathSet& leafBlockPaths() {
     return xDifference == largest ? defaultStateId - 1 : defaultStateId + 1;
 }
 
-/// parity: `Direction.allShuffled` over the six directions in declaration order (down, up, north,
-/// south, west, east), then only the horizontal ones kept.
+/// parity: `Direction.allShuffled` over down.
 [[nodiscard]] std::vector<HorizontalDirection> shuffledHorizontalDirections(random::RandomSource& random) {
     struct Direction {
         HorizontalDirection step;
@@ -349,8 +347,7 @@ std::vector<FoliageAttachment> TrunkPlacer::placeTrunk(Chunk& chunk, random::Ran
         const std::int32_t trunkHeight =
             static_cast<std::int32_t>(std::floor(static_cast<double>(height) * kTrunkHeightScale));
         placeBelowTrunkBlock(chunk, originX, originY - 1, originZ);
-        // parity: `min`, not `max`. The summand is never below one, so the fancy oak really does cap
-        // itself at a single cluster per level.
+        // parity: `min`, not `max`, so the fancy oak caps at one cluster per level.
         const std::int32_t clustersPerY = std::min(
             1, static_cast<std::int32_t>(std::floor(kClusterDensityMagic + (static_cast<double>(height) / 13.0) *
                                                                                (static_cast<double>(height) / 13.0))));
@@ -537,9 +534,7 @@ std::vector<FoliageAttachment> TrunkPlacer::placeTrunk(Chunk& chunk, random::Ran
             std::int32_t branchX = 0;
             std::int32_t branchZ = 0;
             for (std::int32_t step = 0; step < 5; ++step) {
-                // parity: this placer reads Mth's 65536-entry sine table rather than real
-                // trigonometry, and truncates straight after, so the two disagree at boundaries. The
-                // fancy oak above really does use exact sine, hence the two ways here.
+                // parity: this placer uses Mth's 65536-entry sine table, the fancy oak above uses exact sine.
                 branchX = static_cast<std::int32_t>(1.5F + wire::common::mth::cos(angle) * static_cast<float>(step));
                 branchZ = static_cast<std::int32_t>(1.5F + wire::common::mth::sin(angle) * static_cast<float>(step));
                 placeLog(chunk, originX + branchX, originY + branchHeight - 3 + step / 2, originZ + branchZ,

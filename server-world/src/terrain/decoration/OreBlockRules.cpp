@@ -16,7 +16,7 @@ const BlockSet& stoneReplaceables() { return stoneBlockTags::stoneOreReplaceable
 
 const BlockSet& deepslateReplaceables() { return stoneBlockTags::deepslateOreReplaceables(); }
 
-/// parity: block tag `features_cannot_replace`, the only thing a geode refuses to carve through.
+/// parity: block tag `features_cannot_replace`.
 const BlockSet& geodeCannotReplace() {
     static const BlockSet blocks = {"bedrock", "spawner",      "chest", "end_portal_frame", "reinforced_deepslate",
                                     "vault",   "trial_spawner"};
@@ -83,7 +83,6 @@ GeneratedBlockWritePolicy oreBlockRules::policyFor(const std::set<std::string, s
     if (containsAll(replaceable, baseStone())) {
         return GeneratedBlockWritePolicy::OreBaseStone;
     }
-    // Disks and anything else keep the strict guard they had.
     return GeneratedBlockWritePolicy::Exact;
 }
 

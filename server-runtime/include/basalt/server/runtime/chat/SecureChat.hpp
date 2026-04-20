@@ -16,11 +16,7 @@
 
 namespace basalt::server::runtime::chat {
 
-/// One connection's secure chat: the session its client registered, the chain its messages are
-/// checked against, and the acknowledgement window and signature cache of what it was sent.
-///
-/// parity: the chat half of `ServerGamePacketListenerImpl`. Outgoing messages may come from any
-/// thread, so that half writes the packet under a lock: the global index must leave in order.
+/// parity: the chat half of `ServerGamePacketListenerImpl`.
 class SecureChat {
 public:
     /// parity: the pending count past which `sendPlayerChatMessage` disconnects.
@@ -28,7 +24,6 @@ public:
 
     enum class SessionResult : std::uint8_t {
         Accepted,
-        /// The same key again: nothing changes.
         Unchanged,
         /// parity: "Ignoring chat session ... due to missing Services public key".
         Ignored,
@@ -55,22 +50,21 @@ public:
 
     [[nodiscard]] bool enforcesSecureProfile() const noexcept { return enforceSecureProfile_; }
 
-    /// parity: `unpackAndApplyLastSeen`. An error disconnects with `chat_validation_failed`.
+    /// parity: `unpackAndApplyLastSeen`.
     [[nodiscard]] std::expected<std::vector<MessageSignature>, std::string>
     applyLastSeen(const wire::protocol::play::LastSeenUpdate& update);
 
     /// parity: `handleChatAck`.
     [[nodiscard]] std::expected<void, std::string> applyAck(std::int32_t offset);
 
-    /// parity: `SignedMessageChain.Decoder.unpack`. The error is the translation key the player is
-    /// told in red.
+    /// parity: `SignedMessageChain.Decoder.unpack`.
     [[nodiscard]] std::expected<PlayerChatMessage, std::string> unpack(const std::optional<MessageSignature>& signature,
                                                                        SignedBody body, std::int64_t now);
 
-    /// parity: `Decoder.setChainBroken`. Nothing more from this session verifies.
+    /// parity: `Decoder.setChainBroken`.
     void breakChain() noexcept { nextIndex_.reset(); }
 
-    /// parity: `sendPlayerChatMessage`. Answers false once too many messages wait unacknowledged.
+    /// parity: `sendPlayerChatMessage`.
     [[nodiscard]] bool send(const PlayerChatMessage& message, const BoundChatType& chatType,
                             const std::function<void(const wire::protocol::play::PlayerChatPacket&)>& write);
 
@@ -91,8 +85,7 @@ private:
     std::int32_t nextChatIndex_ = 0;
 };
 
-/// parity: `TickThrottler`: each message adds a step, each tick takes one back, and a count at the
-/// threshold is spam. Atomic because the connection counts and the tick forgives.
+/// parity: `TickThrottler`.
 class ChatThrottle {
 public:
     /// parity: `chat-spam-threshold-seconds` and `command-spam-threshold-seconds`, both ten.
@@ -113,7 +106,6 @@ private:
     std::atomic<std::int32_t> count_{0};
 };
 
-/// The disconnect reason for a session result, or none when the player stays.
 [[nodiscard]] std::optional<std::string> disconnectKeyOf(SecureChat::SessionResult result);
 
 } // namespace basalt::server::runtime::chat

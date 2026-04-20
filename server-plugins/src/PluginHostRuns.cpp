@@ -9,7 +9,6 @@
 #include <utility>
 
 namespace basalt::server::plugins {
-
 std::int64_t PluginWatchdog::nowMillis() const {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started_).count();
 }
@@ -89,8 +88,6 @@ std::int32_t PluginAnnouncements::emit(PluginHost& host, const std::string& name
         if (plugin == nullptr || plugin->disabled || plugin->instances.empty()) {
             continue;
         }
-        // The payload crosses by copy, the same as a service: what reaches each listener is its own,
-        // so two plugins cannot end up holding the same mutable table.
         const bool ran = host.ask(*plugin, *handler, "emit " + name,
                                   [&payload](lua::LuaArgs& lua) {
                                       payload.push(lua);
@@ -157,8 +154,6 @@ void PluginHost::enter(LoadedPlugin& plugin, PluginInstance& instance, const lua
     lua::LuaArgs lua{instance.sandbox->state()};
     fn.push(lua);
     const std::int32_t argumentCount = pushArguments ? pushArguments(lua) : 0;
-    // A turn that pauses picks itself back up: what the host has to do is keep the failure inside
-    // this plugin's own turn, whenever it arrives.
     const std::string reason{why};
     LoadedPlugin* target = &plugin;
     static_cast<void>(lua::LuaCall::start(*instance.sandbox, argumentCount,
@@ -261,5 +256,4 @@ void PluginHost::deliverPacket(LoadedPlugin& plugin, const lua::LuaRef& fn, Plug
                           },
                           {}));
 }
-
 } // namespace basalt::server::plugins

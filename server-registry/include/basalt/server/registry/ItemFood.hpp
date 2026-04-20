@@ -8,8 +8,7 @@
 #include <vector>
 
 namespace basalt::server::registry {
-
-/// What eating something does to whoever ate it. parity: `Consumable.onConsumeEffects`.
+// parity: `Consumable.onConsumeEffects`.
 class ConsumeEffect {
 public:
     struct Apply {
@@ -31,7 +30,7 @@ public:
         friend bool operator==(const ClearAll&, const ClearAll&) = default;
     };
 
-    /// parity: `TeleportRandomlyConsumeEffect`, the chorus fruit's jump.
+    // parity: `TeleportRandomlyConsumeEffect`, the chorus fruit's jump.
     struct TeleportRandomly {
         float diameter = 16.0F;
 
@@ -55,27 +54,23 @@ private:
     Payload payload_;
 };
 
-/// What eating one of these is worth. parity: the `minecraft:food` and `minecraft:consumable`
-/// components.
+// parity: the `minecraft:food` and `minecraft:consumable`.
 struct FoodValue {
     std::int32_t nutrition = 0;
     float saturation = 0.0F;
     bool canAlwaysEat = false;
     float consumeSeconds = 0.0F;
     std::vector<ConsumeEffect> effects;
-    /// parity: `minecraft:use_remainder`: the bowl, the bottle or the bucket left in hand.
+    // parity: `minecraft:use_remainder`: the bowl, the bottle or the bucket left in hand.
     std::optional<wire::common::Identifier> remainder;
 
-    /// parity: `Consumable.getConsumeTicks`, which is the seconds at twenty ticks each.
+    // parity: `Consumable.getConsumeTicks`, which is the seconds at twenty ticks each.
     [[nodiscard]] std::int32_t consumeTicks() const noexcept {
         return static_cast<std::int32_t>(consumeSeconds * 20.0F);
     }
 };
 
 namespace itemFood {
-
 [[nodiscard]] const FoodValue* of(const wire::common::Identifier& item);
-
 } // namespace itemFood
-
 } // namespace basalt::server::registry

@@ -19,8 +19,6 @@ constexpr std::int32_t kFeatureIndex = 94;
 
 struct Direction {
     registry::BlockFace face;
-    /// The bit that is cleared from the default state to turn that face on: vanilla's vine states
-    /// count down from all-faces-set, so a face is enabled by subtracting its false bit.
     std::int32_t falseBit;
 };
 

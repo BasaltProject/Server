@@ -3,8 +3,6 @@
 #include <cmath>
 #include <cstdint>
 
-/// The handful of `java.lang.Math` semantics the float worldgen depends on and the C++ library
-/// spells differently: NaN propagation and signed zero in min and max, floored division.
 namespace basalt::server::world::noise::javaMath {
 
 [[nodiscard]] inline float fmin(float a, float b) noexcept {
@@ -45,7 +43,6 @@ namespace basalt::server::world::noise::javaMath {
     return x - floorDiv(x, y) * y;
 }
 
-/// `(int) f` in Java: truncation that saturates instead of being undefined.
 [[nodiscard]] inline std::int32_t toInt(double value) noexcept {
     if (std::isnan(value)) {
         return 0;

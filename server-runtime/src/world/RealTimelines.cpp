@@ -50,7 +50,7 @@ constexpr auto kSyncableAttributes = std::to_array<std::string_view>({"audio/amb
                                                                       "visual/water_fog_end_distance",
                                                                       "visual/water_fog_start_distance"});
 
-/// parity: `Timeline.filterSyncableTracks`, which is the only thing `NETWORK_CODEC` changes.
+/// parity: `Timeline.filterSyncableTracks`.
 [[nodiscard]] NbtCompound syncable(const NbtCompound& root) {
     const NbtCompound* tracks = root.getCompound("tracks");
     if (tracks == nullptr) {
@@ -76,7 +76,6 @@ constexpr auto kSyncableAttributes = std::to_array<std::string_view>({"audio/amb
     return result;
 }
 
-/// One entry as the registry packet wants it, or why it cannot travel as NBT.
 [[nodiscard]] std::expected<NbtCompound, std::string> convert(const std::optional<std::string>& text) {
     if (!text.has_value()) {
         return std::unexpected(std::string{"no such entry"});

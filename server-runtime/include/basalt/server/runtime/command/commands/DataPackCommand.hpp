@@ -9,11 +9,9 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// What `/reload` and `/datapack` need of the server's packs.
 struct DataPackControl {
     datapack::DataPacks* packs = nullptr;
-    /// parity: `MinecraftServer.reloadResources`: loads the selection and makes it current,
-    /// answering whether it loaded. A failed load leaves everything as it was.
+    /// parity: `MinecraftServer.reloadResources`.
     std::function<bool(const std::vector<std::string>& selected)> reload;
 };
 

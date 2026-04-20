@@ -26,14 +26,10 @@ namespace {
 using server::world::loot::LootTable;
 using wire::common::Identifier;
 
-/// Where a table's file lives: `data/<namespace>/loot_table/<path>.json`.
 [[nodiscard]] std::string fileOf(const Identifier& id) {
     return "data/" + id.namespaceName() + "/loot_table/" + id.path() + ".json";
 }
 
-/// The block a wall-mounted one drops as, or nothing when it is not one of them. parity:
-/// `Blocks.wallVariant` gives it the standing block's loot table, so the jar carries no
-/// `blocks/redstone_wall_torch.json` at all. Dropping the `wall_` segment is the whole mapping.
 [[nodiscard]] std::optional<std::string> standingForm(const Identifier& block) {
     if (block.namespaceName() != Identifier::kVanillaNamespace) {
         return std::nullopt;
@@ -48,8 +44,7 @@ using wire::common::Identifier;
     return standing;
 }
 
-/// parity: `BlockState.getFluidState`: a source is `water` or `lava`, anything else flowing with its
-/// amount and whether it falls.
+/// parity: `BlockState.getFluidState`.
 void fluidOf(std::int32_t state, server::world::loot::PlaceFacts& place) {
     const Submersion kind = fluids::of(state);
     if (kind == Submersion::None) {
@@ -79,8 +74,7 @@ void fluidOf(std::int32_t state, server::world::loot::PlaceFacts& place) {
     return lit != properties.end() && lit->second == "true";
 }
 
-/// parity: `CampfireBlock.isSmokeyPos`: a lit campfire up to five below, the smoke stopped by any
-/// collision crossing the middle four pixels of the column.
+/// parity: `CampfireBlock.isSmokeyPos`.
 [[nodiscard]] bool smokeyAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     constexpr std::int32_t kReach = 5;
     constexpr double kPostMin = 6.0 / 16.0;
@@ -115,8 +109,7 @@ void fluidOf(std::int32_t state, server::world::loot::PlaceFacts& place) {
 
 namespace {
 
-/// parity: 26.3 loot data names `predicate`, `item_modifier` and the two `context_*_provider`
-/// registries by id, and those live beside the tables in the same packs.
+/// parity: 26.3 loot data names `predicate`.
 [[nodiscard]] server::world::loot::LootReferences::ReadEntry referencesOf(const RealLootTables::ReadText& read) {
     return [read](std::string_view registry, const Identifier& id) -> std::optional<std::string> {
         if (!read) {

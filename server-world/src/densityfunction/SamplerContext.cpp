@@ -16,8 +16,7 @@ namespace {
     return static_cast<std::int64_t>((ux << 38) | (uz << 12) | uy);
 }
 
-/// parity: `DfRewriteRule.SliceUniformAxes`. A subtree that ignores an axis its parent uses is
-/// sampled at coordinate zero on that axis.
+/// parity: `DfRewriteRule.SliceUniformAxes`.
 class SliceUniformAxes final : public RewriteRule {
 public:
     explicit SliceUniformAxes(std::int32_t parentAxes) : parentAxes_(parentAxes) {}

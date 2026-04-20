@@ -6,7 +6,6 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 const PluginEventValue& nothing() {
     static const PluginEventValue absent{};
     return absent;
@@ -24,7 +23,6 @@ const PluginEventValue& nothing() {
     }
     return true;
 }
-
 } // namespace
 
 std::string_view priorityName(PluginEventPriority priority) {
@@ -111,7 +109,6 @@ void PluginEvent::clear() {
 
 void PluginHandle::remove() {
     if (remove_) {
-        // Moved out first, so calling this twice removes once.
         const Remove once = std::move(remove_);
         remove_ = nullptr;
         once();
@@ -174,8 +171,6 @@ PluginHandle PluginEventBus::add(const PluginEventType& type, std::string plugin
                            .wantsCancelled = wantsCancelled,
                            .filters = std::move(filters),
                            .call = std::move(call)});
-    // Deciders first, in priority order, then the observers: the answer is settled before anyone is
-    // told about it. Stable, so two handlers at the same priority run in the order they registered.
     std::stable_sort(list.begin(), list.end(), [](const Handler& left, const Handler& right) {
         if (left.observer != right.observer) {
             return !left.observer;
@@ -206,14 +201,10 @@ void PluginEventBus::removeAll(std::string_view pluginId) {
 bool PluginEventBus::fire(PluginEvent& event) {
     const auto found = handlers_.find(event.type().name());
     if (found == handlers_.end() || found->second.empty()) {
-        // Cleared even with nobody listening: the event is reused, so leaving last time's answer in
-        // it would cancel something at random the next time one is fired.
         event.clear();
         return true;
     }
     event.begin();
-    // Indexed rather than iterated: a handler that unregisters another during dispatch would
-    // invalidate an iterator, and that is a plugin's right.
     std::size_t index = 0;
     while (true) {
         const auto list = handlers_.find(event.type().name());
@@ -231,5 +222,4 @@ bool PluginEventBus::fire(PluginEvent& event) {
     event.end();
     return !event.cancelled();
 }
-
 } // namespace basalt::server::plugins

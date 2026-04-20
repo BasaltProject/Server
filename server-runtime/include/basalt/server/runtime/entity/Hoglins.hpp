@@ -8,8 +8,6 @@
 
 namespace basalt::server::runtime::entity {
 
-/// The hoglin: its fear of warped fungus, its herd, its charge and the throw at the end of it.
-///
 /// parity: `Hoglin`, `HoglinAi` and `HoglinBase`.
 namespace hoglins {
 

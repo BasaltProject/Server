@@ -24,8 +24,7 @@ constexpr std::int64_t kGeyserSalt = -904011478LL;
 /// The countdown ticker only looks every twenty ticks, so the wait is counted in those.
 constexpr std::int32_t kCountdownStep = 20;
 
-/// parity: `PotentSulfurBlockEntity.waitingCountdown` starts at minus one, which is what a geyser
-/// that has never waited carries on disk.
+/// parity: `PotentSulfurBlockEntity.waitingCountdown` starts at minus one.
 constexpr std::int32_t kNoCountdown = -1;
 
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, std::string_view name) {
@@ -58,14 +57,12 @@ constexpr std::int32_t kNoCountdown = -1;
     return propertyOf(*stateId, "waterlogged") == "true";
 }
 
-/// Flowing lava or water, which vanilla will not let drive a geyser.
 [[nodiscard]] bool isFlowing(std::int32_t stateId) {
     const std::string level = propertyOf(stateId, "level");
     return !level.empty() && level != "0";
 }
 
-/// parity: `findNoxiousGasSourceBlock`: up through the water over the block, at most four of it, to
-/// the open block on top. Nothing when something caps it, which is a geyser that does nothing.
+/// parity: `findNoxiousGasSourceBlock`.
 [[nodiscard]] std::optional<std::int32_t> gasSourceY(WorldState& world, std::int32_t x, std::int32_t y,
                                                      std::int32_t z) {
     const std::int32_t maxY = y + kAllowedWaterBlocksAbove + 1;
@@ -100,9 +97,7 @@ constexpr std::int32_t kNoCountdown = -1;
         return "continuous";
     }
     if (registry::blockConnections::eruptsPeriodically(*below) && stillOrSolid) {
-        // parity: `validBlockState` calls `resetCountdown()` on the block entity when what was here
-        // was **not** a geyser yet, so a geyser that has just been built starts its wait from
-        // scratch instead of carrying whatever number it had from an earlier life.
+        // parity: `validBlockState` calls `resetCountdown()` on the block entity when what was here.
         if (current != "erupting" && current != "dormant") {
             if (server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
                 if (server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
@@ -116,11 +111,7 @@ constexpr std::int32_t kNoCountdown = -1;
     return "wet";
 }
 
-/// parity: `PotentSulfurBlock.onPlace` for a geyser that is going: a block event with two zeroes
-/// and the sound of it starting. The event is what tells a client **when** it started, because
-/// `triggerEvent` writes `eruptionTick` and the client's own plume ticker counts from there; without
-/// it the plume comes out of step with the sound. Neither reaches the world: the field is not saved
-/// and nothing on this side reads it.
+/// parity: `PotentSulfurBlock.onPlace` for a geyser that is going.
 [[nodiscard]] std::vector<BlockEffect> startingEffects(const std::string& state) {
     if (state != "erupting" && state != "continuous") {
         return {};
@@ -152,9 +143,7 @@ std::optional<std::int32_t> validState(WorldState& world, std::int64_t gameTime,
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    // parity: `Level.setBlock` runs `onPlace` on every write, the state moving inside the same block
-    // included, and `PotentSulfurBlock.onPlace` raises `BLOCK_ACTIVATE` for a geyser that is going.
-    // Measured in `geiser`, where the jar's sensor hears the water land on it.
+    // parity: `Level.setBlock` runs `onPlace` on every write.
     if ((wanted == "erupting" || wanted == "continuous") &&
         world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         vibrations::emit(world, "block_activate", x + 0.5, y + 0.5, z + 0.5, gameTime);
@@ -164,8 +153,7 @@ std::optional<std::int32_t> validState(WorldState& world, std::int64_t gameTime,
 
 std::optional<BlockChange> countdownTick(WorldState& world, std::int64_t seed, std::int64_t gameTime, std::int32_t x,
                                          std::int32_t y, std::int32_t z) {
-    // parity: the ticker runs every tick and does nothing on nineteen out of every twenty, so the
-    // whole wait is counted in twenties.
+    // parity: the ticker runs every tick and does nothing on nineteen out of every twenty, so the.
     if (gameTime % kCountdownStep != 0) {
         return std::nullopt;
     }
@@ -174,9 +162,7 @@ std::optional<BlockChange> countdownTick(WorldState& world, std::int64_t seed, s
         return std::nullopt;
     }
     const std::string state = propertyOf(*stateId, kStateProperty);
-    // parity: `PotentSulfurBlock.getTicker` hands the countdown only to a geyser that is waiting or
-    // going off. A dry one has no ticker at all, a wet one only breathes, and a continuous one never
-    // stops.
+    // parity: `PotentSulfurBlock.getTicker` hands the countdown only to a geyser that is waiting or.
     if (state != "dormant" && state != "erupting") {
         return std::nullopt;
     }
@@ -192,8 +178,7 @@ std::optional<BlockChange> countdownTick(WorldState& world, std::int64_t seed, s
     std::int32_t countdown = entity->data().getInt("countdown", kNoCountdown);
     if (countdown <= 0) {
         const std::int32_t waterBlocks = *sourceY - y - 1;
-        // parity: `geyserPositional`, the world seed salted and forked at this very square, so two
-        // geysers side by side keep their own rhythm and the same world always keeps the same one.
+        // parity: `geyserPositional`.
         random::RandomSource root = random::RandomSource::xoroshiro(seed ^ kGeyserSalt);
         random::RandomSource source = root.forkPositional().at(x, y, z);
         if (state == "dormant") {
@@ -207,8 +192,7 @@ std::optional<BlockChange> countdownTick(WorldState& world, std::int64_t seed, s
     if (countdown > 0) {
         --countdown;
     }
-    // parity: `waitingCountdown--` is written without `setChanged`, so the chunk stays as clean as
-    // it was: what reaches the disk is whatever it held the last time something else wrote it.
+    // parity: `waitingCountdown--` is written without `setChanged`.
     entity->data().putInt("countdown", countdown);
     if (countdown != 0) {
         return std::nullopt;
@@ -219,9 +203,7 @@ std::optional<BlockChange> countdownTick(WorldState& world, std::int64_t seed, s
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    // parity: the ticker raises `BLOCK_DEACTIVATE` itself when the geyser goes back to sleep, and
-    // the write that starts it raises `BLOCK_ACTIVATE` through `onPlace`, which `Level.setBlock`
-    // runs on every write and not only when the block changes.
+    // parity: the ticker raises `BLOCK_DEACTIVATE` itself when the geyser goes back to sleep.
     if (world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         vibrations::emit(world, turnedTo == "dormant" ? "block_deactivate" : "block_activate", x + 0.5, y + 0.5,
                          z + 0.5, gameTime);

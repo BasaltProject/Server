@@ -8,10 +8,9 @@
 
 namespace basalt::server::registry::itemTools {
 namespace {
-
 using wire::common::Identifier;
 
-/// parity: the four steps `MobEffects.MINING_FATIGUE` multiplies by.
+// parity: `MobEffects.MINING_FATIGUE` step multipliers.
 [[nodiscard]] float fatigueScale(std::int32_t amplifier) {
     switch (amplifier) {
     case 0:
@@ -34,7 +33,6 @@ constexpr float kWrongToolDivisor = 100.0F;
 [[nodiscard]] const std::unordered_map<Identifier, std::vector<Rule>>& table() {
     static const std::unordered_map<Identifier, std::vector<Rule>> built = [] {
         std::unordered_map<Identifier, std::vector<Rule>> table;
-        // The rows of one item are contiguous, and their order is the order the rules are tried in.
         for (const ToolRule& rule : itemToolsTable()) {
             table[Identifier::vanilla(std::string{rule.item})].push_back(
                 {rule.blockTag, rule.correctForDrops, rule.speed});
@@ -44,7 +42,6 @@ constexpr float kWrongToolDivisor = 100.0F;
     return built;
 }
 
-/// The first rule whose tag holds the block, which is the one vanilla answers from.
 [[nodiscard]] const Rule* firstMatch(const Identifier* item, const Identifier& block, const TagContains& tagContains) {
     if (item == nullptr) {
         return nullptr;
@@ -53,7 +50,6 @@ constexpr float kWrongToolDivisor = 100.0F;
     const auto found = std::ranges::find_if(rules, [&](const Rule& rule) { return tagContains(rule.blockTag, block); });
     return found == rules.end() ? nullptr : &*found;
 }
-
 } // namespace
 
 std::span<const Rule> rulesFor(const Identifier& item) {
@@ -80,8 +76,7 @@ float destroyProgressPerTick(const Identifier* item, const Identifier& block, fl
         return std::numeric_limits<float>::max();
     }
     float speed = miningSpeed(item, block, tagContains);
-    // parity: the enchantment only helps a tool that is already faster than a bare hand, and its
-    // `minecraft:mining_efficiency` amount is `levels_squared` with one added.
+    // parity: the enchantment only helps a tool that is already faster than a bare hand.
     if (speed > 1.0F && conditions.efficiencyLevel > 0) {
         speed += static_cast<float>(conditions.efficiencyLevel * conditions.efficiencyLevel) + 1.0F;
     }
@@ -91,8 +86,7 @@ float destroyProgressPerTick(const Identifier* item, const Identifier& block, fl
     if (conditions.miningFatigueAmplifier >= 0) {
         speed *= fatigueScale(conditions.miningFatigueAmplifier);
     }
-    // parity: `Player.getDestroySpeed`: under water without the aqua affinity attribute it is a
-    // fifth, and off the ground it is a fifth again.
+    // parity: `Player.getDestroySpeed`.
     if (conditions.underwater) {
         speed *= kSubmergedMiningSpeed;
     }
@@ -102,5 +96,4 @@ float destroyProgressPerTick(const Identifier* item, const Identifier& block, fl
     const bool correct = !requiresCorrectTool || isCorrectForDrops(item, block, tagContains);
     return speed / hardness / (correct ? kCorrectToolDivisor : kWrongToolDivisor);
 }
-
 } // namespace basalt::server::registry::itemTools

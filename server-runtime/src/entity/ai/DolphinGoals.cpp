@@ -34,8 +34,7 @@ constexpr double kDegrees = 180.0 / std::numbers::pi;
     return state.has_value() && swimPath::holdsWater(*state);
 }
 
-/// parity: `DefaultRandomPos.getPos(mob, 10, 7)`: ten rolls, the first square that is neither solid
-/// nor blocked kept, since a swimmer weighs every target the same.
+/// parity: `DefaultRandomPos.getPos(mob, 10, 7)`.
 [[nodiscard]] std::optional<Position> defaultRandomPos(MobContext& mob, std::int32_t horizontal,
                                                        std::int32_t vertical) {
     const Position at = blockPosition(mob.mob);
@@ -147,8 +146,7 @@ DolphinJumpGoal::DolphinJumpGoal(std::int32_t interval) : interval_((interval + 
 
 namespace {
 
-/// parity: `Entity.getMotionDirection` over `Direction.getApproximateNearest`: the face with the
-/// largest positive dot, north when nothing moves. Only the horizontal step matters here.
+/// parity: `Entity.getMotionDirection` over `Direction.getApproximateNearest`.
 [[nodiscard]] std::array<std::int32_t, 2> motionSteps(const ServerEntity& mob) {
     constexpr std::array<std::array<std::int32_t, 3>, 6> kFaces{
         {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}};
@@ -179,7 +177,7 @@ bool DolphinJumpGoal::canUse(MobContext& mob) {
     for (const std::int32_t step : {0, 1, 4, 5, 6, 7}) {
         const std::int32_t x = at[0] + (stepX * step);
         const std::int32_t z = at[2] + (stepZ * step);
-        // parity: 26.3 `DolphinJumpGoal.waterIsClear`: water, and nothing in `blocks_dolphin_jump`.
+        // parity: 26.3 `DolphinJumpGoal.waterIsClear`.
         const bool water = [&mob, x, z, y = at[1]] {
             const std::optional<std::int32_t> state = mob.world.blockState(x, y, z);
             const wire::common::Identifier* block =
@@ -263,7 +261,7 @@ void DolphinSwimWithPlayerGoal::tick(MobContext& mob) {
     if (player == nullptr) {
         return;
     }
-    // parity: `getMaxHeadYRot() + 20` and `getMaxHeadXRot()`, twenty-one and one for a dolphin.
+    // parity: `getMaxHeadYRot() + 20` and `getMaxHeadXRot()`.
     lookControl::lookAt(mob.mob, player->x, player->y + (player->height * 0.85), player->z, 21.0F, 1.0F);
     if (mob.distanceSquaredTo(player->x, player->y, player->z) < 6.25) {
         navigation::stop(mob.mob);

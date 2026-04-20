@@ -7,7 +7,6 @@
 namespace basalt::server::runtime::world::mushroomGrowth {
 namespace {
 
-/// Whether a mushroom may sit here: empty, and something it can survive on.
 [[nodiscard]] bool fits(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                         const blockSurvival::ScaffoldingHasFallen& scaffoldingHasFallen, bool hasSkylight) {
     if (world.blockState(x, y, z) != registry::blocks::air().stateId) {
@@ -40,8 +39,6 @@ void mushroom(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
     }
 
     // parity: four hops, each from the last place that would hold a mushroom.
-    // The first hop is drawn exactly like the three that follow it; the only thing that makes it
-    // special is that it starts from the mushroom itself.
     std::int32_t hopX = x + random.nextInt(3) - 1;
     std::int32_t hopY = y + random.nextInt(2) - random.nextInt(2);
     std::int32_t hopZ = z + random.nextInt(3) - 1;

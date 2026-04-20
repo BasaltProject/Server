@@ -42,7 +42,6 @@ using player::PlayerSession;
 using wire::protocol::play::Gamemode;
 using wire::text::Component;
 
-/// Seconds since the epoch, which is what a saved row is stamped with.
 std::int64_t nowEpochSeconds() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
@@ -70,10 +69,7 @@ void PlayerLifecycle::checkEquipment(player::PlayerSession& session) {
         if ((*before)[slot] == worn[slot]) {
             continue;
         }
-        // parity: the jar asks the **new** stack for its `equippable` component, so taking a piece
-        // off is `UNEQUIP` and putting one on is `EQUIP`. An item that is not wearable at all in an
-        // armour slot, which only a command or creative can manage, is `UNEQUIP` there and `EQUIP`
-        // here: this build has no equippable component to ask.
+        // parity: `equippable`.
         world::vibrations::emit(world->state(), worn[slot].has_value() ? "equip" : "unequip", session.x, session.y,
                                 session.z, world->gameTime(), {.entity = session.uuid()});
     }
@@ -123,8 +119,7 @@ void PlayerLifecycle::tickPlayer() {
 void PlayerLifecycle::fireEffectsChanged(PlayerSession& session, world::AdvancementTriggers& triggers) {
     const std::string name{session.name()};
     const std::string uuid = session.uuid().toString();
-    // parity: `ServerPlayer.onEffectAdded` and `onEffectUpdated` pass the entity `addEffect` named;
-    // a removal, and an effect nothing put there, pass none.
+    // parity: `ServerPlayer.onEffectAdded`.
     std::vector<std::optional<std::int32_t>> sources = session.effectSources;
     std::ranges::sort(sources);
     sources.erase(std::ranges::unique(sources).begin(), sources.end());
@@ -158,7 +153,7 @@ void PlayerLifecycle::tickTriggers(PlayerSession& session) {
     for (const auto& [id, active] : session.effects) {
         const std::string key = id.toString();
         const auto before = seenEffects_.find(key);
-        // parity: a refresh or a stronger dose is `onEffectUpdated`; the clock running down is not.
+        // parity: a refresh or a stronger dose is `onEffectUpdated`.
         changed = changed || before == seenEffects_.end() || before->second.first != active.amplifier ||
                   (active.remainingTicks > before->second.second && !active.infinite());
         now.emplace(key, std::pair{active.amplifier, active.remainingTicks});
@@ -176,8 +171,7 @@ void PlayerLifecycle::tickTriggers(PlayerSession& session) {
     }
     session.effectSources.clear();
     triggers->fire("tick", name, uuid);
-    // parity: `trackEnteredOrExitedLavaOnVehicle`: where the vehicle went into lava, and each turn it
-    // is still in it, `ride_entity_in_lava` from there.
+    // parity: `trackEnteredOrExitedLavaOnVehicle`.
     world::LoadedWorld* world = owner_->currentWorld();
     const entity::ServerEntity* vehicle =
         world == nullptr || !session.vehicleId.has_value() ? nullptr : world->state().entity(*session.vehicleId);
@@ -209,7 +203,7 @@ void PlayerLifecycle::rideTick(PlayerSession& session) {
     if (vehicle == nullptr || vehicle->removed) {
         return;
     }
-    // parity: `positionRider`, the vehicle's passenger point less the player's own vehicle point.
+    // parity: `positionRider`.
     const double x = vehicle->x;
     const double y = vehicle->y + vehicle->height() - kPlayerVehicleAttachment;
     const double z = vehicle->z;
@@ -222,9 +216,7 @@ void PlayerLifecycle::rideTick(PlayerSession& session) {
 
 void PlayerLifecycle::checkAdvancements(PlayerSession& session) {
     world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
-    // parity: `ServerPlayer.inventoryMenu.broadcastChanges`, which is where vanilla checks it too:
-    // once per tick after everything has moved, not once per item, so crafting a stack does not
-    // check the same advancement sixty-four times.
+    // parity: `ServerPlayer.inventoryMenu.broadcastChanges`.
     if (triggers == nullptr || !session.inventory.changed()) {
         return;
     }
@@ -237,13 +229,11 @@ void PlayerLifecycle::respawn() {
     if (session == nullptr) {
         return;
     }
-    // parity: `handleClientCommand` returns without doing anything if the player is still alive, so
-    // a client that sends this spuriously cannot teleport itself to spawn.
+    // parity: `handleClientCommand`.
     if (session->health() > 0.0F) {
         return;
     }
-    // parity: `ServerPlayer.findRespawnPositionAndUseSpawnBlock`, minus the bed and anchor checks:
-    // what `/spawnpoint` set wins, and the world spawn is the fallback.
+    // parity: `ServerPlayer.findRespawnPositionAndUseSpawnBlock`.
     storage::PlayerStore* store = owner_->options().playerStore;
     const std::optional<storage::StoredSpawnPoint> stored =
         store != nullptr && store->isOpen() ? store->access().spawnPointOf(session->uuid().toString()) : std::nullopt;
@@ -273,7 +263,6 @@ void PlayerLifecycle::respawn() {
         wire::protocol::play::RespawnPacket{.spawnInfo = owner_->spawnInfo(session->gamemode), .dataToKeep = 0}.write(
             buffer);
     });
-    // The client's new player starts from bare attributes, so everything goes out again.
     owner_->uiState().forgetSentAttributes();
     owner_->sendPlayerPosition(session->x, session->y, session->z, session->yaw, session->pitch);
     // parity: `PlayerList.sendLevelInfo` again, which is what a respawn goes through too.
@@ -346,9 +335,7 @@ void PlayerLifecycle::setGamemode(Gamemode mode) {
             .write(buffer);
     });
     owner_->uiState().sendAbilities();
-    // Broadcast to everyone, this player included, because the game event above only moves the HUD:
-    // a client reads its *own* tab-list entry to decide whether it is a spectator, and that is what
-    // turns off collision and hides it from other players.
+    // Broadcast to everyone including this player: the client reads its own tab-list entry to decide it is a spectator.
     player::PlayerRegistry* registry = owner_->options().playerRegistry;
     if (registry == nullptr) {
         return;
@@ -441,9 +428,7 @@ void PlayerLifecycle::teleportTo(double x, double y, double z, float yaw, float 
     owner_->sendPlayerPosition(x, y, z, yaw, pitch);
     // parity: `Entity.teleportTo` clears the fall, so arriving is never a landing.
     owner_->combat().resetFall(*session);
-    // Straight to updatePosition rather than waiting for the client to confirm: the world has to
-    // agree the player is there now, so chunks around the destination start generating immediately
-    // instead of one round trip later.
+    // Straight to updatePosition: chunks around the destination must start generating now, not a round trip later.
     owner_->updatePosition(x, y, z, yaw, pitch, false);
 }
 
@@ -453,14 +438,13 @@ void PlayerLifecycle::leavePlayIfPresent() {
     if (session == nullptr || registry == nullptr) {
         return;
     }
-    // Leaving while asleep would otherwise leave the bed occupied for ever.
+    // Leaving while asleep would leave the bed occupied forever.
     owner_->wakeUp();
-    // And leaving with a chest open would leave its lid up and a trapped chest powered.
+    // Leaving with a chest open would leave its lid up.
     owner_->menus().closeOpenMenu(*session);
     // parity: `PlayerList.remove` awards it before the player is saved.
     player::statAwards::award(*session, "leave_game");
-    // Before removing them from the registry, so a save triggered elsewhere cannot race this one
-    // into writing a player who is already half gone.
+    // Before leaving the registry, so a save elsewhere cannot write a half-gone player.
     savePlayerState();
     registry->remove(session->uuid());
     if (owner_->options().progress != nullptr) {
@@ -474,7 +458,7 @@ void PlayerLifecycle::leavePlayIfPresent() {
         hooks_.quit(*session,
                     owner_->currentWorld() == nullptr ? std::nullopt : std::optional{owner_->currentWorld()->name()});
     }
-    // parity: `ServerGamePacketListenerImpl.onDisconnect`, the other half of the join message.
+    // parity: `ServerGamePacketListenerImpl.onDisconnect`.
     owner_->broadcastToEveryone(Component::translatable("multiplayer.player.left", {Component::text(session->name())})
                                     .color(wire::text::kYellow));
     for (PlayerSession* other : registry->snapshot()) {
@@ -486,8 +470,7 @@ void PlayerLifecycle::leavePlayIfPresent() {
                 wire::protocol::play::PlayerInfoRemovePacket{.players = {session->uuid()}}.write(buffer);
             });
     }
-    // Handed over rather than left to die with this connection: the tick loop may be halfway
-    // through a list of players that still has this one in it, on its own thread.
+    // Retired rather than dropped: the tick loop may be mid-way through a list that still holds this player.
     registry->retire(owner_->takePlayerSession());
 }
 
@@ -498,14 +481,12 @@ void PlayerLifecycle::savePlayerState() {
         return;
     }
     if (!store->isOpen()) {
-        // The server is shutting down and already saved everyone before disconnecting them. This
-        // connection's own thread is just catching up.
+        // Shutdown already saved everyone; this thread is just catching up.
         owner_->logger().debug([&] { return "Skipping " + session->name() + "'s save: the database is closed."; });
         return;
     }
     store->players().save(player::playerPersistence::toStored(
         *session, owner_->worldName(), owner_->firstSeenEpochSeconds, owner_->playTimeTicks, nowEpochSeconds()));
-    // After the save, because there has to be a row to update.
     const std::optional<std::string> address = owner_->rememberAddress();
     if (!owner_->addressRecorded && address.has_value()) {
         store->players().setLastIp(session->uuid().toString(), *address);

@@ -1,7 +1,6 @@
 #include <basalt/server/storage/Schema.hpp>
 
 namespace basalt::server::storage::schema {
-
 std::string_view ddl() {
     return R"(
 -- One row per player, keyed by UUID, in a database that lives outside every world directory.
@@ -136,5 +135,4 @@ CREATE TABLE IF NOT EXISTS plugin_data (
 CREATE INDEX IF NOT EXISTS plugin_data_by_plugin ON plugin_data(plugin);
 )";
 }
-
 } // namespace basalt::server::storage::schema

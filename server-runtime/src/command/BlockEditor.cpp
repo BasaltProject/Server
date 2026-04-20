@@ -30,8 +30,7 @@ namespace neighbourUpdates = runtime::world::neighbourUpdates;
 
 using wire::text::Component;
 
-/// parity: `Level.destroyBlock` writes `fluidState.createLegacyBlock()`, not air, so breaking a
-/// waterlogged block leaves the water it was logged with.
+/// parity: `Level.destroyBlock` writes `fluidState.createLegacyBlock()`, not air.
 [[nodiscard]] std::int32_t leftBehindBy(std::int32_t stateId) {
     const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(stateId);
     const auto logged = properties.find("waterlogged");
@@ -78,8 +77,6 @@ bool BlockEditor::write(std::int32_t x, std::int32_t y, std::int32_t z, std::int
     if (!world_->state().setBlockState(x, y, z, stateId, sideEffects)) {
         return false;
     }
-    // The cascade needs the old state and not only the new one: it decides what changed, what the
-    // state that left was still feeding, and whether the square counts as an arrival at all.
     replaced_.insert_or_assign(std::array<std::int32_t, 3>{x, y, z}, before);
     record(x, y, z, stateId);
     written_.push_back({x, y, z});
@@ -89,9 +86,7 @@ bool BlockEditor::write(std::int32_t x, std::int32_t y, std::int32_t z, std::int
 
 void BlockEditor::bendRail(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                            std::optional<std::int32_t> before) {
-    // parity: `BaseRailBlock.onPlace`, which runs on **every** write and not only on a player's, so a
-    // rail dropped by command bends towards its neighbours there and then. Its guard is the block and
-    // not the state: a rail rewritten with another shape is left alone.
+    // parity: `BaseRailBlock.onPlace`.
     if (!world::rails::isRail(stateId)) {
         return;
     }
@@ -114,8 +109,7 @@ void BlockEditor::record(std::int32_t x, std::int32_t y, std::int32_t z, std::in
 }
 
 bool BlockEditor::set(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
-    // parity: commands write with `Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`, so replacing a chest
-    // by command destroys what it held instead of dropping it.
+    // parity: commands write with `Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`.
     return write(x, y, z, stateId, world::WorldState::SideEffects::kSkip);
 }
 
@@ -127,8 +121,7 @@ bool BlockEditor::destroy(std::int32_t x, std::int32_t y, std::int32_t z) {
     if (environment_->options().dropBrokenBlock) {
         environment_->options().dropBrokenBlock(*world_, x, y, z, *old);
     }
-    // parity: `SetBlockCommand` in `destroy` mode runs `level.destroyBlock(pos, true)` **before** the
-    // write, and that one carries flags 3, so this square is owed the removal side effects.
+    // parity: `SetBlockCommand` in `destroy` mode runs `level.destroyBlock(pos.
     destroyed_.insert({x, y, z});
     return write(x, y, z, leftBehindBy(*old), world::WorldState::SideEffects::kRun);
 }
@@ -142,10 +135,7 @@ void BlockEditor::createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t
     if (chunk == nullptr || chunk->blockEntityAt(x & 15, y, z & 15) != nullptr) {
         return;
     }
-    // parity: a block entity is not an empty bag. A command block's writes out seven fields whether or
-    // not anybody set them, so one created empty is a different block entity: a world of ours would
-    // open in vanilla with a command block that has no `TrackOutput` and no `UpdateLastExecution`, and
-    // the second of those decides whether it can run twice in a tick.
+    // parity: a block entity is not an empty bag.
     wire::nbt::NbtCompound data = world::blockEntityDefaults::of(*block, stateId);
     chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, std::move(data)});
 }
@@ -154,8 +144,7 @@ void BlockEditor::notifyNeighbours() {
     if (written_.empty()) {
         return;
     }
-    // parity: in strict mode none of this runs. All flag `2` leaves on is the write itself and the
-    // packet to the clients, and `flush` is what does that.
+    // parity: in strict mode none of this runs.
     if (strict_) {
         written_.clear();
         written_properties_.clear();
@@ -172,13 +161,11 @@ void BlockEditor::notifyNeighbours() {
         .minY = bounds_.minY(),
         .maxY = bounds_.maxY(),
         .random = random,
-        // parity: the `water_evaporates` attribute, which `WetSpongeBlock.onPlace` reads. Only the
-        // Nether carries it: water stays put in the End, so `!hasSkylight` is the wrong test.
+        // parity: the `water_evaporates` attribute, which `WetSpongeBlock.onPlace` reads.
         .evaporates = world_->declaration().dimension == config::WorldDimension::Nether,
         .hasSkylight = facts.hasSkylight,
         .ultrawarm = world_->declaration().dimension == config::WorldDimension::Nether,
-        // parity: a `/setblock` of water is a block change like any other, and what makes water
-        // flow is a block change. Without this it stood where the command put it for ever.
+        // parity: a `/setblock` of water is a block change like any other.
         .wakeFluids =
             [this, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
                 const world::fluidFlow::Context flow{.world = world_->state(),
@@ -197,23 +184,19 @@ void BlockEditor::notifyNeighbours() {
                                                                   config::WorldDimension::Nether};
                 world::fluidFlow::onArrived(flow, x, y, z);
             },
-        // parity: `PotentSulfurBlock.updateShape` is `validBlockState`, which reads the water above
-        // and the block below to say what the geyser is doing now.
+        // parity: `PotentSulfurBlock.updateShape` is `validBlockState`.
         .geyser =
             [this](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
                 return world::geysers::validState(world_->state(), world_->gameTime(), x, y, z, stateId);
             },
-        // parity: `CarvedPumpkinBlock.trySpawnGolem`, which a `/setblock` of a pumpkin sets off just
-        // as a player placing one does.
+        // parity: `CarvedPumpkinBlock.trySpawnGolem`.
         .summonGolem =
             [this](world::golemPatterns::Golem kind, double gx, double gy, double gz) {
                 if (environment_->options().summonGolem) {
                     environment_->options().summonGolem(*world_, world::golemPatterns::entityTypeOf(kind), gx, gy, gz);
                 }
             },
-        // parity: `#minecraft:copper`, which is the copper golem's body. Looked up once and kept:
-        // `blockTagMembers` answers with a copy of the whole tag, and the pattern asks a few hundred
-        // times for one pumpkin.
+        // parity: `#minecraft:copper`, which is the copper golem's body.
         .isCopper =
             [this, members = std::optional<std::set<wire::common::Identifier>>{},
              asked = false](std::int32_t stateId) mutable {
@@ -228,16 +211,12 @@ void BlockEditor::notifyNeighbours() {
             },
         .gameTime = world_->gameTime(),
         .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes),
-        // parity: `/setblock` and `/fill` write with `2 | 256`, no `UPDATE_NEIGHBORS`, so the state
-        // that left gets no `affectNeighborsAfterRemoval`.
+        // parity: `/setblock` and `/fill` write with `2 | 256`, no `UPDATE_NEIGHBORS`.
         .railArrivalTells = false};
     for (const std::array<std::int32_t, 3>& at : positions) {
         std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
-        // parity: `BlockInput.place` settles the state before it writes it, so the pre-shape runs
-        // here and not after the write, where undoing it was a one-shot the wire settle could spend.
+        // parity: `BlockInput.place` settles the state before it writes it.
         if (written.has_value() && *written != reg::blocks::air().stateId) {
-            // The pre-shape belongs to the write, so `replaced_` has to keep what was there before
-            // it: `set` would rewrite it and the arrival gates would read a dust replacing a dust.
             const auto beforeShaping = replaced_.find(at);
             const bool hadEntry = beforeShaping != replaced_.end();
             const std::optional<std::int32_t> wasThere = hadEntry ? beforeShaping->second : std::nullopt;
@@ -256,11 +235,6 @@ void BlockEditor::notifyNeighbours() {
             } else {
                 replaced_.erase(at);
             }
-            // The pre-shape is part of what the command asks for, so what lands is measured against
-            // the shaped state: `Level.setBlock` is handed the state `updateFromNeighbourShapes`
-            // already settled. Comparing against the unshaped one skipped the whole tail of the
-            // write for every block the pre-shape moved, and a dust then never told the dust beside
-            // it to draw a line. Measured in `vibraorden`.
             written = world_->state().blockState(at[0], at[1], at[2]);
         }
         const auto replacedHere = replaced_.find(at);
@@ -268,16 +242,10 @@ void BlockEditor::notifyNeighbours() {
             context, at[0], at[1], at[2], replacedHere == replaced_.end() ? std::nullopt : replacedHere->second,
             [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) { record(x, y, z, stateId); });
         if (world_->state().blockState(at[0], at[1], at[2]) != written) {
-            // The jar skips the shape updates and the packet here, but `updateNeighboursOnBlockSet`
-            // still tells the neighbours from the command's own tail. This build's cascade does the
-            // two together, so skipping it skips both: measured green on `senalvieja`, where there is
-            // nothing to tell, and left as the one thing this shortcut gets wrong.
             written_properties_.erase(at);
             continue;
         }
-        // parity: `BlockInput.place` keeps what the command wrote when the **shape** update leaves
-        // air, but a block that nothing holds up is a real removal and stays removed. That is the
-        // difference between half a door, which stays, and a dust with nothing under it, which goes.
+        // parity: `BlockInput.place` keeps what the command wrote when the **shape** update leaves air.
         bool shapedToAir = false;
         bool unsupported = false;
         const auto wasHere = replaced_.find(at);
@@ -302,43 +270,28 @@ void BlockEditor::notifyNeighbours() {
                 }
                 static_cast<void>(set(x, y, z, stateId));
                 // parity: `overwriteWithDefinedProperties` only beats the block's **own** shaping.
-                // What the neighbours' cascade changes afterwards stands: that is why a string put
-                // down by command naming `west=false` still ends up joined to the string beside it,
-                // through that neighbour's own reshape coming back around.
                 if (x == at[0] && y == at[1] && z == at[2]) {
                     keepNamedProperties(at);
                     written_properties_.erase(at);
                 }
             },
             neighbourUpdates::ArrivedShape::AlreadyShaped,
-            // parity: `BlockInput.place` settles the state it is going to write, shaping and named
-            // properties both, and only then does the block land and set off whatever it sets off.
-            // Doing this after the reactions instead undid them: a hopper written `enabled=true`
-            // beside a lit block came back enabled, and a tnt that had already primed itself was put
-            // back on the ground.
+            // parity: `BlockInput.place` settles the state it is going to write.
             [this, &at, &written, &shapedToAir, &unsupported, &wasHere] {
                 if (shapedToAir && !unsupported && written.has_value() && *written != reg::blocks::air().stateId &&
                     world_->state().blockState(at[0], at[1], at[2]) == reg::blocks::air().stateId) {
                     static_cast<void>(set(at[0], at[1], at[2], *written));
                 }
-                // The overwrite happens **once**, where vanilla does it: when the block lands. A
-                // second pass over the same square is the cascade coming back, and there the command
-                // has no say: leaving the entry in put the named shape back on top of the rail's own
-                // bend, which is the one thing `onPlace` had just decided.
+                // The overwrite happens **once**, where vanilla does it: when the block lands.
                 keepNamedProperties(at);
                 written_properties_.erase(at);
-                // parity: `onPlace` runs **after** `overwriteWithDefinedProperties`, so a rail bends
-                // even when the command spelled its shape out: `BaseRailBlock.onPlace` has the last
-                // word. Bending at write time instead let the named shape undo it.
+                // parity: `onPlace` runs **after** `overwriteWithDefinedProperties`.
                 if (const std::optional<std::int32_t> now = world_->state().blockState(at[0], at[1], at[2]);
                     now.has_value()) {
                     bendRail(at[0], at[1], at[2], *now, wasHere == replaced_.end() ? std::nullopt : wasHere->second);
                 }
             });
-        // parity: `Level.updateNeighboursOnBlockSet` ends in `updateNeighbourForOutputSignal` for a
-        // block that has an analog output, and that one reaches **two** squares through anything that
-        // conducts. Without it a chest or a command block put down by command never told the
-        // comparator reading it from behind a wall.
+        // parity: `Level.updateNeighboursOnBlockSet` ends in `updateNeighbourForOutputSignal` for a block that has.
         if (world::comparatorReading::at(world_->state(), at[0], at[1], at[2], {}).has_value()) {
             world::redstoneComponents::scheduleComparatorsAround(world_->state(), world_->name(), at[0], at[1], at[2],
                                                                  world::comparatorReading::of(world_->state()));
@@ -351,9 +304,7 @@ void BlockEditor::notifyNeighbours() {
 }
 
 void BlockEditor::keepNamedProperties(const std::array<std::int32_t, 3>& at) {
-    // parity: `BlockInput.place` ends in `overwriteWithDefinedProperties`, so a property the command
-    // named beats whatever the shape update decided. Without it a note block placed as a harp over
-    // glass came out a hat, and the jar leaves it a harp until the block below changes.
+    // parity: `BlockInput.place` ends in `overwriteWithDefinedProperties`.
     const auto named = written_properties_.find(at);
     if (named == written_properties_.end() || named->second.empty()) {
         return;
@@ -401,8 +352,6 @@ void BlockEditor::flush() {
                 packet.changes.push_back({.position = position, .blockStateId = stateId});
             }
             for (const player::PlayerSession* player : watchers) {
-                // One packet for a whole section where the edition has one, and the same changes one
-                // at a time where it has not: a Bedrock client has no way to hear them together.
                 if (player->connection().sendPlayPacket) {
                     player->connection().sendPlayPacket(
                         play::SectionBlocksUpdatePacket::kId,

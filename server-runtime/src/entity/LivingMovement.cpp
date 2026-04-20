@@ -21,22 +21,19 @@ constexpr double kWaterDrag = 0.8;
 constexpr double kVerticalWaterDrag = 0.8;
 constexpr double kSinkShare = 16.0;
 
-/// parity: `getFrictionInfluencedSpeed`'s own constant, which is 0.6 cubed to seven decimals. The
-/// two branches below therefore agree at the default friction, and only slippery ground diverges.
+/// parity: `getFrictionInfluencedSpeed`'s constant, 0.6 cubed to seven decimals.
 constexpr double kFrictionSpeed = 0.21600002;
 
 /// parity: `getFlyingSpeed`, what steering in mid-air is worth.
 constexpr double kFlyingSpeed = 0.02;
 
-/// parity: `getBlockPosBelowThatAffectsMyMovement`, which looks half a block under the feet.
+/// parity: `getBlockPosBelowThatAffectsMyMovement`.
 constexpr double kFrictionProbeDepth = 0.5;
 
 /// parity: `Mth.equal`, the slack every collision comparison in vanilla is made with.
 constexpr double kEqualEpsilon = 1.0e-5;
 
-/// parity: the hundred-thousandth of slack `Entity.move` compares with. Comparing exactly called a
-/// stopped rounding error a wall, so every mob hopped its way across flat ground and spent its life
-/// in the air at flying speed.
+/// parity: the 1e-5 slack `Entity.move` compares with.
 [[nodiscard]] bool nearlyEqual(double one, double other) { return std::abs(other - one) < kEqualEpsilon; }
 
 [[nodiscard]] std::int32_t blockUnder(world::WorldState& world, const ServerEntity& entity) {
@@ -51,7 +48,7 @@ constexpr double kEqualEpsilon = 1.0e-5;
     return [&world](std::int32_t x, std::int32_t y, std::int32_t z) { return world.blockState(x, y, z); };
 }
 
-/// parity: `getFrictionInfluencedSpeed`: slippery ground asks for more, so the drag cancels less.
+/// parity: `getFrictionInfluencedSpeed`.
 [[nodiscard]] double frictionInfluencedSpeed(const ServerEntity& entity, double speed, double blockFriction) {
     if (!entity.onGround) {
         return kFlyingSpeed;
@@ -62,7 +59,7 @@ constexpr double kEqualEpsilon = 1.0e-5;
     return speed;
 }
 
-/// parity: `Entity.getInputVector`, which turns the input into world axes through the yaw.
+/// parity: `Entity.getInputVector`.
 void addInput(ServerEntity& entity, double forward, double strafe, double speed) {
     const double length = (forward * forward) + (strafe * strafe);
     if (length < 1.0e-7) {
@@ -144,8 +141,7 @@ void travelAir(world::WorldState& world, ServerEntity& entity, const Input& inpu
 
 void travelFlying(world::WorldState& world, ServerEntity& entity, const Input& input, float airSpeed,
                   world::Submersion in, bool noPhysics) {
-    // parity: `LivingEntity.travelFlying`: the water's 0.02 and 0.8, lava's 0.02 and 0.5, the air's
-    // own speed and 0.91.
+    // parity: `LivingEntity.travelFlying`.
     constexpr double kFluidInput = static_cast<double>(0.02F);
     constexpr double kWaterKept = static_cast<double>(0.8F);
     constexpr double kLavaKept = static_cast<double>(0.5F);

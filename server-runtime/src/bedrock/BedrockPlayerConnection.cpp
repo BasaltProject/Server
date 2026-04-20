@@ -39,27 +39,20 @@ namespace basalt::server::runtime::bedrock {
 
 namespace {
 
-/// parity: a waypoint with no colour of its own is drawn in one taken from its uuid, exactly as
-/// `UUID.hashCode` builds it and with the top byte thrown away.
+/// parity: `UUID.hashCode`.
 [[nodiscard]] std::int32_t waypointColourOf(const wire::common::Uuid& uuid) {
     const std::uint64_t folded = uuid.high() ^ uuid.low();
     const auto hashed = static_cast<std::uint32_t>(folded ^ (folded >> 32U));
     return static_cast<std::int32_t>(hashed & 0xFFFFFFU);
 }
 
-/// parity: `Attributes.MOVEMENT_SPEED`'s default for a player, which is what vanilla sends.
+/// parity: `Attributes.MOVEMENT_SPEED`'s default for a player.
 constexpr float kWalkSpeed = 0.1F;
 
-/// What this connection knows about the scoreboard it has drawn.
-///
-/// The other edition names nothing: a line is a number it was given, so the numbers have to be kept
-/// to take a line away again. One per connection, because the ids are the client's own.
+// Lines are numbers this edition was given, kept to take a line away again; one per connection.
 struct DrawnScoreboard {
-    /// The title each objective was made with, which its slot needs when it is put on screen.
     std::map<std::string, std::string, std::less<>> titles;
-    /// Which objective each slot shows.
     std::map<std::string, std::string, std::less<>> slots;
-    /// The line each holder was given, by objective.
     std::map<std::string, std::map<std::string, std::int64_t, std::less<>>, std::less<>> lines;
     std::int64_t nextLine = 1;
 };
@@ -81,11 +74,7 @@ struct DrawnScoreboard {
 
 namespace {
 
-/// What a client will take as the line under a command in its suggestion list. Since 1.21.130 it
-/// refuses a description past a thousand characters, and it refuses the whole packet rather than
-/// the one command: a `gamerule` usage naming every rule is nearly three thousand on its own, and
-/// it took the command tree, the join and the player with it. A line break is cut for the same
-/// reason Geyser cuts one, which is that the list is unreadable after it.
+// Since 1.21.130 a description past a thousand characters makes the client refuse the whole packet; breaks are cut.
 [[nodiscard]] std::string fitsInACommandTip(std::string usage) {
     constexpr std::size_t kMostCharacters = 950;
     if (const std::size_t breaksAt = usage.find('\n'); breaksAt != std::string::npos) {
@@ -100,25 +89,17 @@ namespace {
 
 using wire::text::Component;
 
-/// How many turns of the world go by between two readings of an open window's contents. Half a
-/// second: long enough that a chest costs nothing, short enough that nobody sees the wait.
+// Half a second: long enough that a chest costs nothing, short enough that nobody sees the wait.
 constexpr std::int32_t kWindowReadTurns = 10;
 
 } // namespace
 
-/// Everything this player can be told, in the only terms a Bedrock client understands.
-///
-/// Its own file because it is the whole of that translation and nothing else: the lifecycle, the
-/// world around the player and what the client says back stay in `BedrockPlayer.cpp`.
 player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::Joining& joining) {
     player::PlayerConnection connection;
-    // Bedrock has its own numbering, and nothing may read this as a Java protocol version. Zero is
-    // what the rest of the server already treats as "no version was announced".
+    // Bedrock has its own numbering; zero is what the rest of the server treats as no version announced.
     connection.protocolVersion = 0;
     connection.connectedHost = joining.address;
     connection.address = joining.address;
-    // The only thing this connection can do so far. Everything else is unset, and every caller
-    // already checks before it sends: a Bedrock player is simply told nothing it cannot be told.
     connection.sendSystemMessage = [mailbox = joining.mailbox, lang = context_.lang](const Component& message) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeText(body, wire::bedrock::TextType::Raw, "",
@@ -128,13 +109,11 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     connection.disconnect = [mailbox = joining.mailbox, lang = context_.lang](const Component& reason) {
         wire::io::ByteBuffer body;
-        // Plain, not legacy: the screen a client draws when it is turned away prints the section
-        // signs rather than acting on them, so the colour arrives as litter in front of the words.
+        // Plain, not legacy: the disconnect screen prints section signs instead of acting on them.
         wire::bedrock::writeDisconnect(body, wire::text::toPlainText(wire::text::resolveComponent(reason, lang)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Disconnect), body.toVector(), true);
     };
-    // The scoreboard, which the other edition draws out of different packets: it has none for an
-    // objective nobody is shown, and its lines are numbered rather than named.
+    // That edition has no packet for an objective nobody sees, and its lines are numbered rather than named.
     const auto board = std::make_shared<DrawnScoreboard>();
     const auto showObjective = [mailbox = joining.mailbox, board](const std::string& slot,
                                                                   const std::string& objective) {
@@ -158,7 +137,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
         board->titles[objective] =
             title.has_value() ? wire::text::toLegacyText(wire::text::resolveComponent(*title, lang)) : objective;
-        // A title that changed is only worth sending again where it is already on screen.
         for (const auto& [slot, shown] : board->slots) {
             if (shown == objective) {
                 showObjective(slot, objective);
@@ -181,7 +159,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
         board->slots[where] = objective;
         showObjective(where, objective);
-        // Every score it already holds, because a client is told them only once its objective is up.
+        // A client is told scores only once its objective is up.
         const auto held = board->lines.find(objective);
         if (held == board->lines.end()) {
             return;
@@ -241,8 +219,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         wire::bedrock::writeSetSpawnPosition(body, dimension, x, y, z);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetSpawnPosition), body.toVector());
     };
-    // parity: that edition names a mixer and this one cannot, so stopping one mixer stops the lot.
-    // A stop that names a sound is the only one it can be exact about.
     connection.stopSound = [mailbox = joining.mailbox](const std::optional<std::string>& sound,
                                                        const std::optional<wire::protocol::play::SoundSource>&) {
         wire::io::ByteBuffer body;
@@ -250,8 +226,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         wire::bedrock::writeStopSound(body, named, named.empty());
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::StopSound), body.toVector());
     };
-    // parity: the two that edition drives itself go by their bare name; everything else keeps the
-    // whole one, which is what `ClientboundCooldownPacket` carries.
+    // parity: `ClientboundCooldownPacket`.
     connection.startItemCooldown = [mailbox = joining.mailbox](const wire::common::Identifier& item,
                                                                const std::int32_t durationTicks) {
         const bool bare = item.path() == "goat_horn" || item.path() == "shield";
@@ -260,9 +235,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayerStartItemCooldown),
                       body.toVector());
     };
-    // parity: this edition has no steps of cracking. It is given a pace and draws the animation
-    // itself, which is why what goes out is how much of the block comes off in a turn rather than
-    // how far along the break is.
     connection.sendBlockDestruction = [mailbox = joining.mailbox](std::int32_t, const std::int32_t x,
                                                                   const std::int32_t y, const std::int32_t z,
                                                                   const std::int32_t stage, const float perTick) {
@@ -272,8 +244,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (!stopping && (perTick <= 0.0F || perTick >= 1.0F)) {
             return;
         }
-        // How many whole turns it takes, and the range shared out over them: a block that needs
-        // three and a half of them needs four.
+        // The range is shared out over whole ticks: a block needing three and a half needs four.
         const auto ticks = stopping ? 1 : static_cast<std::int32_t>(std::ceil(1.0F / perTick));
         wire::io::ByteBuffer body;
         wire::bedrock::writeLevelEvent(body,
@@ -296,9 +267,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                                      wire::bedrock::kActionBarTicks, 0);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTitle), body.toVector());
     };
-    // parity: the other door sends a packet per piece and this edition one kind with a type, so
-    // the two lists line up one for one. Its action bar lasts as long as it is told rather than a
-    // fixed while, which is why the one with no times of its own carries vanilla's.
     connection.sendTitlePiece = [mailbox = joining.mailbox, lang = context_.lang](
                                     const player::TitlePiece piece, const Component& text, const std::int32_t fadeIn,
                                     const std::int32_t stay, const std::int32_t fadeOut) {
@@ -337,7 +305,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             wire::bedrock::writeSetTitle(body, type, text, in, hold, out);
             mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTitle), body.toVector());
         };
-        // The timings first, as on the other edition: they are read for the title that follows.
+        // Timings first, as on the other edition: they are read for the title that follows.
         send(wire::bedrock::TitleType::Times, "", fadeIn, stay, fadeOut);
         const std::string under = wire::text::toLegacyText(wire::text::resolveComponent(subtitle, lang));
         if (!under.empty()) {
@@ -365,17 +333,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (session_ != nullptr) {
             session_->gamemode = mode;
         }
-        // What the hands may do changes with the mode, and this edition is told in two packets:
-        // without them a client keeps whatever it was granted when it arrived.
+        // Without these a client keeps whatever it was granted when it arrived.
         sendAbilities();
         wire::io::ByteBuffer body;
         wire::bedrock::writeSetPlayerGameType(body, static_cast<std::int32_t>(mode));
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetPlayerGameType), body.toVector());
     };
 
-    // Rain and thunder are two events rather than a state, and the strength rides along as the
-    // whole range of an unsigned short. Thunder is only sent while it is raining: a client told to
-    // thunder in clear weather starts raining by itself.
+    // Thunder is only sent while raining: a client told to thunder in clear weather starts raining itself.
     connection.sendWeather = [mailbox = joining.mailbox](const world::WorldWeather& weather) {
         const auto send = [&mailbox](const wire::bedrock::LevelEventType type, const float strength) {
             wire::io::ByteBuffer body;
@@ -393,8 +358,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
     };
 
-    // Bedrock draws the death screen itself once health reaches zero; this is only the sentence on
-    // it. The way back is the client pressing the button, which arrives as a respawn of its own.
     connection.sendCombatDeath = [mailbox = joining.mailbox, lang = context_.lang](const Component& message) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeDeathInfo(body, wire::text::toLegacyText(wire::text::resolveComponent(message, lang)));
@@ -419,8 +382,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
     };
 
-    // Bedrock paints the flash off an entity event rather than off a damage type, so the type is
-    // read only for whether there is one at all. Its own hearts come off the attributes.
+    // Bedrock paints the flash off an entity event, so the damage type is read only for whether there is one.
     connection.showDamage = [this](const std::int32_t entityId, std::int32_t, std::int32_t) {
         const std::uint64_t runtime =
             session_ != nullptr && entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
@@ -429,8 +391,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::EntityEvent), body.toVector());
     };
 
-    // What a command's block change asks the whole world to hear. One connection carries it for
-    // everybody, which is why it cannot be this door's own mailbox.
+    // One connection carries this for everybody, which is why it cannot be this door's own mailbox.
     connection.broadcastEffects = [this](const std::int32_t x, const std::int32_t y, const std::int32_t z,
                                          const std::int32_t stateId, const std::vector<world::BlockEffect>& effects) {
         if (session_ != nullptr && context_.blockEffects) {
@@ -438,15 +399,13 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
     };
 
-    // Morning, or a plugin, getting this player up. The world owns the bed and the pose, so this
-    // only asks: the answer comes back as the packet above.
+    // The world owns the bed and the pose, so this only asks; the answer comes back as a packet.
     connection.wakeUp = [this] {
         if (session_ != nullptr && context_.wakeUp) {
             context_.wakeUp(*session_);
         }
     };
 
-    // The book again, after a trade has been taken out of it.
     connection.sendMapData = [this](const wire::protocol::play::MapItemDataPacket& update) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeMapItemData(body, bedrockMapOf(update, static_cast<std::uint8_t>(dimension_)), protocol_);
@@ -455,21 +414,15 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     };
     connection.sendTrades = [this] { sendTrades(); };
 
-    // The three rows of an open enchanting table, which that edition draws from its own packet.
     connection.sendEnchantOptions = [this] { sendEnchantOptions(); };
 
-    // Somebody's emote, which only this edition's clients can draw.
     connection.showEmote = [this](const std::int32_t entityId, const std::string& emoteId, const std::int32_t duration,
                                   const std::uint8_t flags) { showEmote(entityId, emoteId, duration, flags); };
 
-    // Somebody lying down or standing up, which this edition draws off a flag and the bed's own
-    // square rather than off a pose.
     connection.showSleeping = [this](const std::int32_t entityId,
                                      const std::optional<std::array<std::int32_t, 3>> bed) {
         const bool itself = session_ != nullptr && entityId == session_->entityId();
         const std::uint64_t runtime = itself ? kRuntimeEntityId : runtimeIdFor(entityId);
-        // The second word of flags carries the sleeping bit. Only this player's own carries anything
-        // else, so everybody else's is that bit and nothing more.
         std::uint64_t moreFlags =
             itself ? wire::bedrock::flagBit2(wire::bedrock::EntityFlag::PushTowardsClosestSpace) : 0ULL;
         if (bed.has_value()) {
@@ -481,8 +434,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
     };
 
-    // The shove. Bedrock turns the red on the screen itself from where the motion came, so the
-    // angle the Java animation carries has nowhere to go here.
+    // Bedrock turns the screen red from where the motion came, so the Java animation angle has nowhere to go.
     connection.pushBack = [this](const double velocityX, const double velocityY, const double velocityZ, float) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeSetEntityMotion(body, kRuntimeEntityId, static_cast<float>(velocityX),
@@ -490,8 +442,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityMotion), body.toVector());
     };
 
-    // One column again, for a change too big to patch block by block. Bedrock carries the biomes
-    // inside the column, so asking for new biomes is asking for the column: the two share a call.
+    // Biomes live inside the column here, so asking for new biomes is asking for the column.
     connection.resendChunk = [this](const std::int32_t chunkX, const std::int32_t chunkZ) {
         sendColumn(chunkX, chunkZ);
     };
@@ -501,9 +452,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
     };
 
-    // The bubbles and the flames. Bedrock draws both off entity metadata rather than off a packet
-    // of their own, and the flags have to go out whole every time: a field left out is not a field
-    // left alone, it is a field the client keeps at whatever it last heard.
+    // Flags must go out whole every time: a field left out is kept by the client at whatever it last heard.
     connection.syncSubmersion = [this] {
         if (session_ == nullptr) {
             return;
@@ -513,8 +462,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                               wire::bedrock::flagBit(wire::bedrock::EntityFlag::Breathing) |
                               wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanShowName) |
                               wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanClimb);
-        // Pushed out of a block over a moment rather than thrown out of it at once, which is what a
-        // player who spawns inside one should feel. It lives in the second field, past the 64th.
+        // Pushed out of a block over a moment, as a player spawning inside one should feel; lives past the 64th bit.
         const std::uint64_t moreFlags = wire::bedrock::flagBit2(wire::bedrock::EntityFlag::PushTowardsClosestSpace);
         if (session_->fireTicks > 0) {
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::OnFire);
@@ -532,8 +480,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
     };
 
-    // parity: Geyser's own wall, which is the only way to show a border to a client that has none:
-    // a patch of refusal particles at the face the player is near, six wide and five tall.
     connection.showBorder = [this](const double minX, const double maxX, const double minZ, const double maxZ,
                                    const std::int32_t warningBlocks, const bool withWall) {
         if (session_ == nullptr) {
@@ -543,7 +489,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (!withWall) {
             return;
         }
-        /// How close to a face counts as near it, on top of the border's own warning distance.
         constexpr double kCloseToBorder = 5.0;
         constexpr std::int32_t kHalfWidth = 3;
         constexpr std::int32_t kHeight = 5;
@@ -588,13 +533,8 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     connection.setCamera = [this](const std::int32_t entityId) { setCamera(entityId); };
 
-    // parity: Geyser's own dialog cache, which turns a dialog into the only screen this edition
-    // has for one: a title, the text, and a button per action.
     connection.showDialog = [this](std::int32_t, const world::dialogs::Dialog& dialog) { showDialog(dialog); };
 
-    // parity: Geyser's own waypoint cache. The other edition draws its bar from a list of its own
-    // rather than from one packet per waypoint, and the dot's icon is picked here from how far
-    // away the viewer is instead of by the client from a style it was given.
     connection.sendWaypoint = [this](const wire::common::Uuid& waypoint, const std::int32_t entityId,
                                      const std::string&, const std::optional<std::int32_t>& color, const double x,
                                      const double y, const double z, const bool tracked) {
@@ -603,8 +543,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
         const std::uint64_t runtime = entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
         wire::io::ByteBuffer body;
-        // Below 944 there is no bar packet at all: the bar is built out of the player list, so
-        // only somebody already listed can be pointed at, and it is hidden while nothing is on it.
+        // Below 944 there is no bar packet: the bar is built from the player list, so only listed players can be shown.
         if (protocol_ < wire::bedrock::kLocatorBarProtocol) {
             if (tracked) {
                 waypoints_.insert(waypoint);
@@ -635,8 +574,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             .colour = color.value_or(waypointColourOf(waypoint)),
             .distance = static_cast<float>(std::sqrt((awayX * awayX) + (awayY * awayY) + (awayZ * awayZ))),
             .entityId = static_cast<std::int64_t>(runtime)};
-        // A waypoint the client already has is moved rather than added again, which is what keeps
-        // it from flickering while somebody walks.
+        // A waypoint the client already has is moved, not re-added, which avoids flicker while somebody walks.
         const bool known = tracked && !waypoints_.insert(waypoint).second;
         if (!tracked) {
             waypoints_.erase(waypoint);
@@ -648,8 +586,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LocatorBar), body.toVector());
     };
 
-    // parity: the other edition's client builds the name over a head out of the team packet. This
-    // one has no teams at all, so it is told the line already built.
     connection.sendNameTag = [this](const std::int32_t entityId, const wire::text::Component& nameTag) {
         const std::uint64_t runtime =
             session_ != nullptr && entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
@@ -658,8 +594,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
     };
 
-    // Everything they carry. Bedrock numbers its own inventory the other way round from Java: the
-    // hotbar is the first nine slots there and the last nine here.
+    // Bedrock numbers its inventory the other way round: the hotbar is the first nine slots there, the last nine here.
     connection.sendInventoryAll = [this] {
         if (session_ == nullptr) {
             return;
@@ -685,17 +620,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         sendWindow(kOffhandContainer, other, wire::bedrock::BedrockContainerSlot::Offhand);
     };
 
-    // The hotbar is the first nine slots there, so the number is the same one either edition sends
-    // back when the player moves their own hand.
+    // The hotbar is the first nine slots there, so the number is what either edition sends back.
     connection.setHeldSlot = [mailbox = joining.mailbox](const std::int32_t slot) {
         wire::io::ByteBuffer body;
         wire::bedrock::writePlayerHotbar(body, slot);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayerHotbar), body.toVector());
     };
 
-    // Another world is another dimension as far as a Bedrock client is concerned: the sky, the fog
-    // and the chunk cache all hang off it. What the world means by "somewhere else" stays with the
-    // caller; this only draws the arrival.
+    // Another world is another dimension to a Bedrock client: sky, fog and the chunk cache hang off it.
     connection.switchWorld = [this](world::LoadedWorld& target, const double x, const double y,
                                     const double z) -> bool {
         if (session_ == nullptr || !context_.changeWorld) {
@@ -710,8 +642,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         session_->x = x;
         session_->y = y;
         session_->z = z;
-        // Everybody drawn so far was in the world just left, so the next turn draws the new one
-        // from nothing rather than moving people who are no longer there.
+        // Everybody drawn so far was in the world just left, so the next turn draws from nothing.
         others_.clear();
 
         wire::io::ByteBuffer body;
@@ -722,8 +653,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         return true;
     };
 
-    // A sound, under the name its own edition knows it by. One that Bedrock has no name for is not
-    // played rather than played wrong: a wrong sound is worse than a silent one.
+    // A sound Bedrock has no name for is not played: a wrong sound is worse than a silent one.
     connection.playSound = [mailbox = joining.mailbox,
                             protocol = joining.protocol](const std::string_view sound, const double x, const double y,
                                                          const double z, const float volume, const float pitch) {
@@ -734,8 +664,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), body.toVector());
             return;
         }
-        // A sound with no name of its own is a numbered event over there, which is how the hits of
-        // a fight reach that client at all: none of the three has a name.
+        // A sound with no name is a numbered event there, which is how the hits of a fight reach that client.
         const std::int32_t event = wire::bedrock::bedrockSoundEvent(sound, protocol);
         if (event < 0) {
             return;
@@ -746,8 +675,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelSoundEvent), body.toVector());
     };
 
-    // A particle, under the name its own edition knows it by. One that Bedrock only draws from a
-    // numbered event has no name to send, so it is left undrawn rather than drawn as something else.
+    // A particle Bedrock only draws from a numbered event has no name to send, so it is left undrawn.
     connection.showParticle = [this](const std::string_view particle, const double x, const double y, const double z) {
         const std::string_view named = wire::bedrock::bedrockParticleName(particle);
         if (named.empty()) {
@@ -759,8 +687,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SpawnParticleEffect), body.toVector());
     };
 
-    // What a block asked to be done with it. The two numbers are the same on both editions, so
-    // the only thing this does is write them where that one reads them.
     connection.sendBlockEvent = [mailbox = joining.mailbox](const std::int32_t x, const std::int32_t y,
                                                             const std::int32_t z, const std::int32_t,
                                                             const std::int32_t b0, const std::int32_t b1) {
@@ -769,9 +695,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BlockEvent), body.toVector());
     };
 
-    // One of the numbered one-off effects. That edition splits what Java's single number carries
-    // into an effect and a sound, and has no answer at all for most of them: one it cannot draw is
-    // left undrawn rather than drawn as something else.
+    // One Bedrock cannot draw is left undrawn rather than drawn as something else.
     const auto records = std::make_shared<BedrockRecords>(
         joining.protocol, [mailbox = joining.mailbox](wire::bedrock::BedrockPacket id, std::vector<std::uint8_t> body) {
             mailbox->post(static_cast<std::uint16_t>(id), std::move(body));
@@ -779,8 +703,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     connection.sendLevelEvent = [mailbox = joining.mailbox, protocol = joining.protocol, records, lang = context_.lang](
                                     const std::int32_t type, const std::int32_t x, const std::int32_t y,
                                     const std::int32_t z, const std::int32_t data) {
-        // parity: Geyser's `SOUND_PLAY_JUKEBOX_SONG` and `SOUND_STOP_JUKEBOX_SONG`, with the popup
-        // Java draws itself sent as a jukebox line.
+        // parity: `SOUND_PLAY_JUKEBOX_SONG`.
         if (type == world::blockEffect::Effect::kStopJukeboxSong) {
             records->stopped(x, y, z);
             return;
@@ -825,17 +748,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), sound.toVector());
     };
 
-    // The numbers of an open furnace, once per turn of the world. It carries the windows rather
-    // than the player because it runs where the world runs, and by then this player may be gone.
+    // Carries the windows, not the player: it runs where the world runs, when the player may be gone.
     connection.syncOpenWindow = [mailbox = joining.mailbox, protocol = joining.protocol,
                                  windows = windows_](world::LoadedWorld& world) {
-        // A window with none of the block's own slots has nothing the world can change under it:
-        // a table's grid is the player's, and so is an ender chest. Both only move when they do.
+        // A table's grid and an ender chest are the player's, so nothing under them changes by itself.
         if (!windows->open.has_value() || windows->open->size == 0 || windows->open->playerOwned) {
             return;
         }
-        // What it holds, for the turns nobody touched it: a furnace fills its own result slot, and
-        // somebody else may be in the same chest. Not every turn: see `sinceRead`.
+        // Read only periodically: a furnace fills its own result slot and others may use the same chest (`sinceRead`).
         if (++windows->sinceRead >= kWindowReadTurns) {
             windows->sinceRead = 0;
             std::vector<std::optional<storage::StoredItemStack>> slots = readWindow(world, *windows->open, nullptr);
@@ -863,8 +783,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     connection.showBossBar = [this](const wire::common::Uuid& id, const Component& title, const float progress,
                                     const bool show) {
-        // One entity id per bar, taken from the uuid: over here a bar belongs to something in the
-        // world rather than to an id of its own, and two bars may not share one.
+        // One entity id per bar, from the uuid: a bar belongs to a world thing there, and two may not share one.
         const auto bossId = static_cast<std::int64_t>((id.high() ^ id.low()) | 1U);
         wire::io::ByteBuffer body;
         const bool drawn = shownBars_.contains(bossId);
@@ -900,8 +819,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             wire::bedrock::writeSetEntityLink(body, vehicle, rider, how, true);
             mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityLink), body.toVector());
         };
-        // Whoever was on it and is not any more has to be taken off by name: this edition has no
-        // packet that says "these are all of them now".
+        // Whoever left must be taken off by name: there is no packet saying these are all of them now.
         std::vector<std::int32_t>& before = (*seen)[vehicleId];
         for (const std::int32_t was : before) {
             if (std::ranges::find(riders, was) == riders.end()) {
@@ -913,7 +831,6 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             if (std::ranges::find(before, riders[at]) != before.end()) {
                 continue;
             }
-            // The first one steers; anybody after that is along for the trip.
             post(static_cast<std::int64_t>(runtimeIdFor(vehicleId)),
                  static_cast<std::int64_t>(runtimeIdFor(riders[at])),
                  at == 0 ? wire::bedrock::BedrockRide::Rider : wire::bedrock::BedrockRide::Passenger);
@@ -944,8 +861,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     };
 
     connection.sendSwing = [mailbox = joining.mailbox](const std::int32_t entityId, bool) {
-        // One arm on Bedrock: there is no packet for the other hand, and drawing the wrong arm is
-        // worse than drawing the one everybody expects.
+        // One arm on Bedrock: there is no packet for the other hand, and the wrong arm is worse than the expected one.
         wire::io::ByteBuffer body;
         wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::SwingArm);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Animate), body.toVector());
@@ -975,16 +891,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), sound.toVector());
     };
 
-    // A block that changed under somebody's feet. Only reaches a client that already has the
-    // column: one that does not will get it whole when it comes into range.
+    // Only reaches a client that already has the column; one that does not gets it whole when in range.
     connection.sendBlockChange = [mailbox = joining.mailbox,
                                   protocol = joining.protocol](const std::int32_t x, const std::int32_t y,
                                                                const std::int32_t z, const std::int32_t stateId) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeUpdateBlock(body, x, y, z, stateId, protocol);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateBlock), body.toVector());
-        // A bed that was just put down is one block over there and sixteen here, so the colour
-        // travels behind the block rather than in it.
+        // A bed is one block there and sixteen here, so the colour travels behind the block.
         if (const auto colour = bedColourOf(stateId); colour) {
             wire::io::ByteBuffer bed;
             wire::bedrock::writeBedData(bed, x, y, z, *colour);
@@ -1046,8 +960,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AvailableCommands), body.toVector());
     };
 
-    // The three effect callbacks are the same packet with a different word in it, so they share a
-    // writer. An effect Bedrock has no number for is not sent: a wrong icon is worse than none.
+    // An effect Bedrock has no number for is not sent: a wrong icon is worse than none.
     connection.addEffect = [this](const wire::common::Identifier& effect, const std::int32_t durationTicks,
                                   const std::int32_t amplifier) {
         sendEffect(effect, wire::bedrock::BedrockEffectEvent::Add, durationTicks, amplifier, false, true);
@@ -1060,8 +973,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         sendEffect(effect, wire::bedrock::BedrockEffectEvent::Remove, 0, 0, false, false);
     };
 
-    // Bedrock draws its hearts and haunches from attributes, and is told the range of each one:
-    // where Java hardcodes the bounds in the client, here the server states them.
+    // Bedrock states the range of each attribute where Java hardcodes the bounds in the client.
     connection.syncHealth = [this] {
         if (session_ == nullptr) {
             return;
@@ -1071,8 +983,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             {"minecraft:player.hunger", 0.0F, 20.0F, static_cast<float>(session_->food.foodLevel()), 20.0F},
             {"minecraft:player.saturation", 0.0F, 20.0F, session_->food.saturationLevel(), 20.0F},
             {"minecraft:absorption", 0.0F, 1024.0F, session_->absorption, 0.0F},
-            // How fast they walk. Bedrock takes this from the attribute and not from the speed in
-            // the ability layer, and a client never told it walks at a pace of its own choosing.
+            // Walk speed comes from the attribute, not the ability layer; a client never told it walks at its own pace.
             {"minecraft:movement", 0.0F, 1024.0F, kWalkSpeed, kWalkSpeed},
         }};
         wire::io::ByteBuffer body;
@@ -1093,13 +1004,11 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateAttributes), body.toVector());
     };
 
-    // A window of items is a list of buttons over here, and the plugin never learns the difference.
     connection.openPluginMenu =
         [this](const std::string& title, std::int32_t, const std::map<std::int32_t, server::plugins::PluginItem>& items,
                std::function<void(std::int32_t)> onClick) { showMenu(title, items, std::move(onClick)); };
     connection.refreshPluginMenu = [this](const std::map<std::int32_t, server::plugins::PluginItem>& items) {
-        // Drawn again rather than patched: a form is not a window, and a client redraws whole the
-        // one it is given.
+        // Drawn again rather than patched: a form is not a window, and a client redraws whole the one it is given.
         std::function<void(std::int32_t)> onClick;
         std::string title;
         {
@@ -1118,9 +1027,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ClientboundCloseForm), {});
     };
 
-    // What players.db already knows, asked for before a single packet goes out: the client is told
-    // its position and its game mode as it arrives, so restoring afterwards would announce one
-    // state and then correct it.
+    // Asked before any packet: the client is told position and game mode on arrival, so later means correcting.
     connection.storedSnapshot = [this]() -> std::optional<storage::StoredPlayer> {
         if (session_ == nullptr) {
             return std::nullopt;

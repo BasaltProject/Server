@@ -14,16 +14,12 @@ constexpr std::string_view kNone = "none";
 constexpr std::string_view kLow = "low";
 constexpr std::string_view kTall = "tall";
 
-/// parity: `WallBlock.TEST_SHAPE_POST` and `TEST_SHAPES_WALL`, in units of a thirty-second: the
-/// middle two-sixteenths column, and a two-wide strip from each edge to the middle.
+/// parity: `WallBlock.TEST_SHAPE_POST` and `TEST_SHAPES_WALL`.
 constexpr std::int32_t kMiddleFrom = 14;
 constexpr std::int32_t kMiddleTo = 18;
 constexpr std::int32_t kHalf = 18;
 constexpr std::int32_t kFull = 32;
 
-/// A cobblestone wall's own state, used only to borrow the fence rule below.
-///
-/// The rule it borrows asks what the *neighbour* is, so which wall this is does not matter.
 [[nodiscard]] std::int32_t wallLikeFence() {
     static const std::int32_t instance =
         registry::blockStateDefinitions::stateIdOf(wire::common::Identifier::vanilla("oak_fence"), {}, std::nullopt)
@@ -31,8 +27,7 @@ constexpr std::int32_t kFull = 32;
     return instance;
 }
 
-/// parity: `WallBlock.connectsTo`, which is the fence rule plus every wall and every pane, whether
-/// or not their faces are sturdy.
+/// parity: `WallBlock.connectsTo`.
 [[nodiscard]] bool connects(std::int32_t neighbour, BlockFace face) {
     return registry::blockConnections::isWall(neighbour) || registry::blockConnections::isPanes(neighbour) ||
            registry::blockConnections::connectsTo(wallLikeFence(), neighbour, face);
@@ -60,7 +55,7 @@ constexpr std::int32_t kFull = 32;
     return std::string{covered ? kTall : kLow};
 }
 
-/// parity: `WallBlock.shouldRaisePost`: a corner always keeps its post, a straight run may not.
+/// parity: `WallBlock.shouldRaisePost`.
 [[nodiscard]] bool raisesPost(const std::map<std::string, std::string>& sides, std::int32_t above,
                               bool aboveOverridesPost) {
     if (registry::blockConnections::isWall(above)) {

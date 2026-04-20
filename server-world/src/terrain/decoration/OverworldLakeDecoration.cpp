@@ -18,7 +18,6 @@ namespace {
 
 constexpr std::int32_t kLakesStep = 1;
 
-/// `VerticalAnchor.belowTop(0)`, the top block the world can generate.
 constexpr std::int32_t kBelowTop = 319;
 
 using PathSet = std::set<std::string, std::less<>>;
@@ -131,9 +130,7 @@ void decorateSpec(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnv
         if (spec.biomes->find(biome) == spec.biomes->end()) {
             return;
         }
-        // parity: `rooted_sulfur_spring` needs the structure templates, so this door only runs the
-        // features a chunk can finish on its own. Its placement still draws, which is what keeps the
-        // rest of the step aligned.
+        // parity: `rooted_sulfur_spring` needs templates, so only its placement draw runs here.
         static_cast<void>(standaloneFeatures::placeAt(chunk, random, position, spec.name));
     });
 }

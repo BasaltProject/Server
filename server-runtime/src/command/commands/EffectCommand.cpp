@@ -32,7 +32,6 @@ constexpr std::int32_t kMaxAmplifier = 255;
 /// parity: `HealOrHarmMobEffect`, three hearts' worth doubled by each level.
 constexpr float kInstantAmount = 6.0F;
 
-/// The targets: players, and the living mobs, which carry effects of their own.
 struct Targets {
     std::vector<player::PlayerSession*> players;
     std::vector<entity::ServerEntity*> mobs;
@@ -66,7 +65,6 @@ struct Targets {
     return targets;
 }
 
-/// The name a report uses: the one target, or how many there were.
 [[nodiscard]] Component whoOf(const Targets& targets) {
     return targets.size() == 1 ? Component::text(targets.firstName) : Component::text(std::to_string(targets.size()));
 }
@@ -194,7 +192,6 @@ void EffectCommand::build(const CommandNodeBuilder& root) const {
         });
     });
 
-    /// The two duration forms below hang the same three depths off whichever length they name.
     const auto lengths = [](const CommandNodeBuilder& node,
                             const std::function<std::int32_t(const CommandContext&)>& ticks) {
         node.executes([ticks](const CommandContext& context) { return give(context, ticks(context), 0, true); });
@@ -268,11 +265,6 @@ namespace {
     return static_cast<std::int32_t>(worlds.size());
 }
 
-/// Puts the targets in the world, at its spawn, or where they already stand.
-///
-/// Keeping the coordinates is the vanilla dimension change (`/execute in <dim> run tp @s ~ ~ ~`)
-/// and what the bare `/world <name>` does; the spawn is what `spawn` names, since the same x/z in
-/// another world is as likely to be inside a mountain as anywhere else.
 [[nodiscard]] Parsed<std::int32_t> sendTo(const CommandContext& context,
                                           const std::vector<player::PlayerSession*>& targets, world::LoadedWorld& world,
                                           bool atSpawn) {
@@ -324,10 +316,9 @@ void WorldCommand::build(const CommandNodeBuilder& root) const {
                 const world::LoadedWorld& world = **found;
                 const std::array<double, 3>& spawn = world.spawn();
                 const std::vector<std::string> lines{
-                    "world: " + world.name(), "type: " + std::string{config::worldTypeName(world.declaration().type)},
+                    "world: " + world.name(),
+                    "type: " + std::string{config::worldTypeName(world.declaration().type)},
                     "dimension: " + std::string{config::dimensionName(world.declaration().dimension)},
-                    // Which set of dimensions this world belongs to, which is what decides where its
-                    // portals come out. Blank for an overworld, which is a set of its own.
                     "linked to: " + world.declaration().linkedTo.value_or("-"),
                     "seed: " + std::to_string(world.metadata().seed),
                     "spawn: " + std::to_string(spawn[0]) + ", " + std::to_string(spawn[1]) + ", " +
@@ -341,8 +332,6 @@ void WorldCommand::build(const CommandNodeBuilder& root) const {
             });
         });
     });
-    // `/world <name>` moves whoever ran it keeping their coordinates, the way vanilla changes
-    // dimension with `/execute in <dim> run tp @s ~ ~ ~`; `spawn` lands on the world spawn instead.
     root.argument("world", worldArgument(), [](const CommandNodeBuilder& named) {
         named.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
             const Parsed<player::PlayerSession*> self = context.requirePlayer();

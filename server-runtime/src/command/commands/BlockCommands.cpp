@@ -17,7 +17,6 @@ namespace reg = server::registry;
 
 using wire::text::Component;
 
-/// The five words `/setblock` and `/fill` share, minus the ones only one of them takes.
 enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
 
 [[nodiscard]] std::array<std::int32_t, 3> resolve(const CommandContext& context, std::string_view name) {
@@ -59,8 +58,7 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
     return 1;
 }
 
-/// parity: DESTROY breaks the old block first, so the count includes a position whose new state
-/// happens to equal the old one.
+/// parity: DESTROY breaks the old block first, so the count includes a position whose new state happens to equal the.
 [[nodiscard]] bool writeOne(BlockEditor& editor, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                             Mode mode) {
     if (mode == Mode::Destroy) {
@@ -155,9 +153,7 @@ void SetBlockCommand::build(const CommandNodeBuilder& root) const {
             block.literal("keep", [](const CommandNodeBuilder& form) {
                 form.executes([](const CommandContext& context) { return setBlock(context, Mode::Keep); });
             });
-            // parity: `strict` places the state exactly as written, and every other form runs
-            // `Block.updateFromNeighbourShapes` on it first, which is what draws a dust put beside
-            // a dust as a line instead of a stub.
+            // parity: `strict` places the state exactly as written.
             for (const auto& [word, placesExactly] :
                  std::array<std::pair<std::string_view, bool>, 2>{{{"replace", false}, {"strict", true}}}) {
                 block.literal(std::string{word}, [exact = placesExactly](const CommandNodeBuilder& form) {
@@ -183,9 +179,7 @@ void FillCommand::build(const CommandNodeBuilder& root) const {
                             form.executes([mode](const CommandContext& context) { return fill(context, mode, false); });
                         });
                     }
-                    // parity: `FillCommand.wrapWithMode` hangs `strict` beside the three modes, but it
-                    // is REPLACE with the strict flag, not a mode of its own. Folded into the list the
-                    // word parsed and did nothing.
+                    // parity: `FillCommand.wrapWithMode` hangs `strict` beside the three modes.
                     node.literal("strict", [](const CommandNodeBuilder& form) {
                         form.executes(
                             [](const CommandContext& context) { return fill(context, Mode::Replace, false, true); });

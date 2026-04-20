@@ -60,7 +60,7 @@ bool StateMatcher::test(const std::map<std::string, std::string>& state) const {
 
 namespace {
 
-/// parity: `EnchantmentsPredicate`, every requirement met by some enchantment on the item.
+/// parity: `EnchantmentsPredicate`.
 [[nodiscard]] bool meets(const std::vector<EnchantmentRequirement>& requirements,
                          const std::map<std::string, std::int32_t, std::less<>>& held, const TagLookup& tags) {
     return std::ranges::all_of(requirements, [&](const EnchantmentRequirement& requirement) {
@@ -128,7 +128,7 @@ bool DistancePredicate::test(const std::array<double, 3>& from, const std::array
 
 namespace {
 
-/// parity: `LocationPredicate.matches` at a point: the square it falls in, and the point itself.
+/// parity: `LocationPredicate.matches` at a point.
 [[nodiscard]] bool locatedAt(const LocationPredicate& predicate, const EntityFacts& entity,
                              const std::array<double, 3>& point, const TagLookup& tags) {
     if (!entity.placeAt) {
@@ -166,7 +166,7 @@ bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLo
         (!entity->position.has_value() || !locatedAt(*location, *entity, *entity->position, tags))) {
         return false;
     }
-    // parity: `SteppingOnPredicate`, only on the ground and at the centre of the square underfoot.
+    // parity: `SteppingOnPredicate`.
     if (steppingOn != nullptr) {
         if (!entity->position.has_value() || !flagOf(*entity, "is_on_ground")) {
             return false;

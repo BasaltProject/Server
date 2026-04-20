@@ -78,15 +78,11 @@ std::vector<PlacedStructurePiece> JigsawStructureGenerator::buildStart(std::int3
     if (forPlacement || grid_.isStructureChunk(seed, candidateChunkX, candidateChunkZ)) {
         random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
         random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
-        // parity: a drawn start height is a uniform provider, so it costs a draw before the
-        // assembly's own; a fixed height or the surface costs none.
+        // parity: a drawn start height is a uniform provider and costs a draw before the assembly's own.
         const std::int32_t startY = settings_.heightSource == JigsawHeightSource::Drawn
                                         ? settings_.startY + random.nextInt(settings_.startYMax - settings_.startY + 1)
                                         : settings_.startY;
-        // parity: `PoolAliasLookup.create(poolAliases, startPos, seed)`, which is
-        // `RandomSource.create(seed).forkPositional().at(pos)`. The fork matters: it seeds the
-        // factory with a draw off the world seed, not with the world seed itself. Its draws are
-        // separate from the assembly's own random, so they cost nothing to the sequence below.
+        // parity: `PoolAliasLookup.create` forks a positional factory.
         std::map<std::string, std::string, std::less<>> resolvedAliases;
         if (!settings_.poolAliases.empty()) {
             random::RandomSource aliasRandom = random::RandomSource::legacy(seed).forkPositional().at(
@@ -120,8 +116,7 @@ std::vector<PlacedStructurePiece> JigsawStructureGenerator::buildStart(std::int3
                                      .maxDepth = settings_.maxDepth,
                                      .projectStartToHeightmap = settings_.projectStartToHeightmap,
                                      .maxDistanceFromCenter = settings_.maxDistanceFromCenter,
-                                     // parity: `max_distance_from_center` is written as one number, and
-                                     // `MaxDistance(int)` gives that number to both axes.
+                                     // parity: `MaxDistance(int)` gives one number to both axes.
                                      .maxVerticalDistanceFromCenter = settings_.maxDistanceFromCenter,
                                      .dimensionPaddingBottom = settings_.dimensionPadding,
                                      .dimensionPaddingTop = settings_.dimensionPadding,
@@ -132,8 +127,7 @@ std::vector<PlacedStructurePiece> JigsawStructureGenerator::buildStart(std::int3
                                      .poolAliases = std::move(resolvedAliases),
                                      .acceptStart =
                                          [this, forPlacement](const StructurePos& stub) {
-                                             // parity: `/place structure` passes an always-true biome
-                                             // predicate; generation tests the structure's own tag.
+                                             // parity: `/place structure` passes an always-true biome predicate.
                                              return forPlacement || biomes_.contains(biomeAt_(stub.x, stub.y, stub.z));
                                          }},
             random);
@@ -297,8 +291,7 @@ void JigsawStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, s
 
 void JigsawStructureGenerator::addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ,
                                         std::int64_t seed) {
-    // The starts are filtered with the inflated box, not the chunk itself: a chunk with no piece of
-    // its own still gets the beard of the pieces within twelve blocks of it.
+    // Filtered with the inflated box so a chunk without its own piece still gets the beard.
     const StructureBoundingBox nearClip = chunkClip(chunkX, chunkZ, kBeardRadius);
     const std::int32_t chunkMinX = chunkX * 16;
     const std::int32_t chunkMinZ = chunkZ * 16;
@@ -309,8 +302,7 @@ void JigsawStructureGenerator::addBeard(StructureBeard& beard, std::int32_t chun
             if (!piece.boundingBox.intersects(nearClip)) {
                 continue;
             }
-            // parity: a junction contributes whatever the piece's own projection is, so these are
-            // collected without the rigid-only test the boxes get.
+            // parity: a junction contributes the piece's own projection, without the rigid-only test.
             for (const structure::PlacedJigsawJunction& junction : piece.junctions) {
                 if (junction.sourceX > chunkMinX - kBeardRadius && junction.sourceX < chunkMinX + 15 + kBeardRadius &&
                     junction.sourceZ > chunkMinZ - kBeardRadius && junction.sourceZ < chunkMinZ + 15 + kBeardRadius) {

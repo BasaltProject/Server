@@ -21,13 +21,8 @@ constexpr double kDensitySlope = 0.08;
 constexpr std::int32_t kSurfaceDepth = 4;
 constexpr std::int32_t kCellHeight = 4;
 
-/// How much a world coordinate is scaled before sampling the height noise: higher means a shorter
-/// wavelength, so more distinct hills per loaded chunk instead of one broad slope spanning the whole
-/// loaded area. Kept low, with a small height variation, for gentle rolling ground.
 constexpr double kHeightNoiseScale = 0.25;
 
-/// See the note above on skipping the 3D noise far from the surface. The theoretical maximum is
-/// much larger, but real samples across the whole verified test suite never exceeded roughly 0.5.
 constexpr double kSkipThreshold = 2.0;
 
 constexpr std::int32_t kMaxTreesPerChunk = 2;
@@ -60,8 +55,6 @@ void generateColumn(Chunk& chunk, std::int32_t x, std::int32_t z, std::int32_t w
     double cellBase3d = 0.0;
     for (std::int32_t y = worldHeight::kMinY; y <= worldHeight::kMaxY; ++y) {
         const double depthTerm = (surfaceY - y) * kDensitySlope;
-        // The two skips are an optimisation, not a rule: past the threshold the depth term alone
-        // already decides the sign, and no sample of the noise is large enough to overturn it.
         bool solid = false;
         if (depthTerm > kSkipThreshold) {
             solid = true;
@@ -80,18 +73,13 @@ void generateColumn(Chunk& chunk, std::int32_t x, std::int32_t z, std::int32_t w
     }
     chunk.setBlockStateId(x, worldHeight::kMinY, z, registry::blocks::bedrock().stateId);
 
-    // Surface pass: from the top down, turn the topmost contiguous run of stone into dirt and
-    // grass, the same shape as vanilla's own surface builder, just without its per-biome rules.
     const std::int32_t stone = registry::blocks::stone().stateId;
     const std::int32_t grass = registry::blocks::named("grass_block")->stateId;
     const std::int32_t dirt = registry::blocks::named("dirt")->stateId;
-    // Down to one above the floor, so the bedrock below is never turned into dirt. It would be
-    // safe either way today, since bedrock is not stone and the loop stops at it.
+    // Down to one above the floor, so the bedrock below is never turned into dirt.
     std::int32_t depth = 0;
     for (std::int32_t y = worldHeight::kMaxY; y > worldHeight::kMinY; --y) {
         if (chunk.blockStateId(x, y, z) != stone) {
-            // Stops at the first gap below the surface run. Nothing here digs one yet, so this
-            // only matters the day caves do: without it a cave roof would grow its own lawn.
             if (depth > 0) {
                 break;
             }
@@ -111,15 +99,11 @@ void placeCanopy(Chunk& chunk, std::int32_t trunkX, std::int32_t trunkTopY, std:
         const std::int32_t radius = dy == 0 ? 1 : 2;
         for (std::int32_t dx = -radius; dx <= radius; ++dx) {
             for (std::int32_t dz = -radius; dz <= radius; ++dz) {
-                // The trunk's own column, which the air check below would also refuse: two
-                // guards for one thing, and either alone is enough.
                 if (dx == 0 && dz == 0 && dy < 0) {
                     continue;
                 }
                 const std::int32_t px = trunkX + dx;
                 const std::int32_t pz = trunkZ + dz;
-                // Canopy that would cross into a neighbouring chunk is skipped, not placed there:
-                // see the note on this generator's tree-placement gaps.
                 if (px < 0 || px > 15 || pz < 0 || pz > 15) {
                     continue;
                 }
@@ -132,8 +116,7 @@ void placeCanopy(Chunk& chunk, std::int32_t trunkX, std::int32_t trunkTopY, std:
     }
 }
 
-/// Not vanilla's own per-chunk feature seed, just a stand-in hash: see the note on this generator's
-/// tree-placement gaps.
+/// Not vanilla's own per-chunk feature seed, just a stand-in hash.
 [[nodiscard]] std::int64_t chunkSeed(std::int32_t chunkX, std::int32_t chunkZ) {
     return static_cast<std::int64_t>(static_cast<std::uint64_t>(static_cast<std::int64_t>(chunkX)) *
                                      0x9E3779B97F4A7C15ULL) ^
@@ -150,15 +133,11 @@ void placeTrees(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ) {
     for (std::int32_t tree = 0; tree < treeCount; ++tree) {
         const std::int32_t x = rolls.nextInt(16);
         const std::int32_t z = rolls.nextInt(16);
-        // Asked again for every tree, not once for the chunk: the first tree raises the ground it
-        // stands on, and the second has to see that rather than the height before it existed.
         const std::int32_t topY = chunk.heightmap()[static_cast<std::size_t>(x + z * 16)];
         if (chunk.blockStateId(x, topY - 1, z) != grass) {
             continue;
         }
         const std::int32_t trunkHeight = kMinTrunkHeight + rolls.nextInt(kTrunkHeightVariation + 1);
-        // The roof of the world, which ground around sea level never comes near: it is here so a
-        // taller generator does not write outside the chunk.
         if (topY + trunkHeight + 1 > worldHeight::kMaxY) {
             continue;
         }

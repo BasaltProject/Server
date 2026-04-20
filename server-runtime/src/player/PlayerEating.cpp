@@ -39,7 +39,7 @@ constexpr std::int32_t kOminousBottleTicks = 120000;
 constexpr std::int32_t kTeleportAttempts = 16;
 constexpr std::int32_t kTeleportParticlesEvent = 2017;
 constexpr std::int32_t kPackRadius = 127;
-/// parity: the Nether's `logical_height`, the one dimension shorter than its build height.
+/// parity: the Nether's `logical_height`.
 constexpr std::int32_t kCeilingLogicalHeight = 128;
 
 /// parity: `BlockUtil.clampedPackDifferenceInPosition` with 127 on every axis.
@@ -51,8 +51,7 @@ constexpr std::int32_t kCeilingLogicalHeight = 128;
     return (axis(fromX, toX) << 16) | (axis(fromY, toY) << 8) | axis(fromZ, toZ);
 }
 
-/// parity: 26.3 `TeleportRandomlyConsumeEffect.apply` for a player, avoiding
-/// `consumable_does_not_teleport_to`.
+/// parity: 26.3 `TeleportRandomlyConsumeEffect.apply` for a player.
 void teleportRandomly(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, float diameter) {
     if (!player.connection().teleportTo || (player.vehicleId.has_value() && !context.dismount)) {
         return;
@@ -163,15 +162,14 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
     }
     const storage::StoredItemStack eaten = *held;
 
-    // parity: `Consumable.onConsume` raises `DRINK` for the four the jar builds with the drinking
-    // animation and `EAT` for everything else.
+    // parity: `Consumable.onConsume` raises `DRINK` for the four drinking-animation items and `EAT` otherwise.
     static constexpr std::array<std::string_view, 4> kDrunk{"milk_bucket", "potion", "honey_bottle", "ominous_bottle"};
     const bool drunk = std::ranges::find(kDrunk, id->path()) != kDrunk.end();
     world::vibrations::emit(world.state(), drunk ? "drink" : "eat", player.x, player.y, player.z, world.gameTime());
     statAwards::used(player, eaten.id);
 
     player.food.eat(food->nutrition, food->saturation);
-    // parity: `OminousBottleAmplifier.onConsume`, Bad Omen for 100 minutes at the bottle's level.
+    // parity: `OminousBottleAmplifier.onConsume`.
     if (id->path() == "ominous_bottle") {
         const world::ActiveEffect omen{.effect = world::mobEffects::badOmen(),
                                        .amplifier = eaten.components.getInt("minecraft:ominous_bottle_amplifier"),
@@ -188,7 +186,7 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
             teleportRandomly(context, player, world, teleport->diameter);
         }
     }
-    // parity: `ItemStack.applyAfterUseComponentSideEffects`, the chorus fruit's `use_cooldown`.
+    // parity: `ItemStack.applyAfterUseComponentSideEffects`.
     startCooldownFor(player, *id, world.gameTime());
     if (player.gamemode != Gamemode::Creative) {
         const std::int32_t remaining = eaten.count - 1;
@@ -209,8 +207,7 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
         if (context.slotChanged) {
             context.slotChanged(player, slot);
         }
-        // A stack of two bowls of stew leaves the second bowl looking for a slot of its own, and on
-        // the floor when there is none.
+        // A stack of two bowls leaves the second bowl looking for a slot, else on the floor.
         if (remaining > 0 && leftover.has_value()) {
             if (player.inventory.add(*leftover) > 0) {
                 if (const std::optional<Identifier> spare = parsedOrNothing(leftover->id); spare.has_value()) {

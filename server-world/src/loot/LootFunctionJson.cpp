@@ -12,9 +12,6 @@ namespace {
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
-/// The functions that only carry something over from the block entity. What
-/// they carry is put on by the caller that knows the block, so the drop itself is right without
-/// them, none of them draws from the random, and refusing the whole table left it dropping nothing.
 [[nodiscard]] bool copiesOnly(std::string_view type) {
     return type == "minecraft:copy_components" || type == "minecraft:copy_custom_data" ||
            type == "minecraft:copy_state" || type == "minecraft:copy_name";
@@ -182,7 +179,7 @@ Parsed<LootFunction> Reader::typedCountFunction(const std::string& type, const J
         }
         return LootFunction::setEnchantments(std::move(entries), add);
     }
-    // parity: `LimitCount` over an `IntLimit`, either end an int provider and neither required.
+    // parity: `LimitCount` over an `IntLimit`.
     if (type == "minecraft:limit_count") {
         const JsonObject* limit = asObject(object.find("limit"));
         if (limit == nullptr) {

@@ -26,14 +26,11 @@ namespace registry = basalt::server::registry;
     case HeightmapType::MotionBlocking:
         return registry::blockShapes::blocksMotion(stateId) || registry::blockFluids::hasFluid(stateId);
     default:
-        // The leaves question comes from the block family table rather than a range of state ids:
-        // checked against the arithmetic it replaces, the two agree on all 32,366 states.
         return !registry::blockConnections::isLeaves(stateId) &&
                (registry::blockShapes::blocksMotion(stateId) || registry::blockFluids::hasFluid(stateId));
     }
 }
 
-/// One answer per state id per heightmap, built once.
 struct HeightmapTables {
     std::int32_t stateCount = 0;
     std::array<std::vector<bool>, kHeightmapCount> matches;
@@ -55,10 +52,7 @@ struct HeightmapTables {
     return built;
 }
 
-/// parity: `LevelChunk.setBlockState`, which drops the block entity only when the *block* changes.
-///
-/// A furnace lighting up, a campfire being put out or a chest taking on water keeps its own: they
-/// are the same block in another state, and what is inside them does not fall out.
+/// parity: `LevelChunk.setBlockState`.
 [[nodiscard]] bool changesBlock(std::int32_t oldStateId, std::int32_t newStateId) {
     if (oldStateId == newStateId) {
         return false;
@@ -68,8 +62,7 @@ struct HeightmapTables {
     if (before == nullptr || after == nullptr) {
         return before != after;
     }
-    // parity: `shouldChangedStateKeepBlockEntity`, which is why waxing a copper chest does not
-    // empty it.
+    // parity: `shouldChangedStateKeepBlockEntity`.
     return *before != *after && !registry::weathering::keepsBlockEntity(before->path(), after->path());
 }
 
@@ -77,7 +70,6 @@ struct HeightmapTables {
 
 bool heightmapMatches(HeightmapType type, std::int32_t stateId) {
     const HeightmapTables& built = tables();
-    // A state id past what the tables were sized with falls back rather than reading off the end.
     if (stateId < 0 || stateId >= built.stateCount) {
         return matchesUncached(type, stateId);
     }
@@ -120,8 +112,6 @@ bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std:
         return true;
     }
 
-    // An observed write reports the attempt whether or not it changed anything, which is what a
-    // feature that records what it placed needs to see.
     const std::int32_t oldStateId = section.blockStateId(x, y & 15, z);
     section.setBlockStateId(x, y & 15, z, stateId);
     const bool changed = oldStateId != stateId;
@@ -179,11 +169,7 @@ void Chunk::increaseInhabitedTime(std::int64_t delta) {
     if (delta == 0) {
         return;
     }
-    // parity: `ChunkAccess.incrementInhabitedTime` adds and nothing else. Marking the chunk dirty
-    // here made **every simulated chunk dirty on every tick**, so each save rewrote the whole
-    // region: that is what made a comparator's level reach the disk two ticks before the jar's did,
-    // and it is the answer to why a tolva's chunk was written every tick. What the jar risks losing
-    // is the local difficulty gained since the last real write, and it accepts that.
+    // parity: `ChunkAccess.incrementInhabitedTime` adds and nothing else.
     inhabitedTime_ += delta;
 }
 
@@ -282,11 +268,7 @@ void Chunk::scheduleTick(std::vector<ChunkScheduledTick>& ticks, const ChunkSche
         return;
     }
     ticks.push_back(tick);
-    // parity: `LevelChunkTicks.schedule` does not mark the chunk unsaved, and nothing listens to its
-    // `onTickAdded` for that either. Marking it here rewrote the region on every turn a component
-    // booked, so the level a comparator had just written reached the disk when the jar's had not:
-    // measured as a two-tick difference in `comparadorcofre` that was never a difference in the game.
-    // What causes a tick to be booked is almost always a block change, and that does mark it.
+    // parity: `LevelChunkTicks.schedule` does not mark the chunk unsaved.
 }
 
 void Chunk::advanceBlockTicks(std::vector<ChunkScheduledTick>& due) { advance(blockTicks_, due); }
@@ -370,8 +352,7 @@ void Chunk::updateHeights(std::int32_t x, std::int32_t y, std::int32_t z, std::i
     if (!heightsValid_) {
         return;
     }
-    // parity: Heightmap.update. A block at or above the recorded height raises it; removing the one
-    // *at* it is the only case that has to look downwards, and only within that column.
+    // parity: Heightmap.update.
     const auto column = static_cast<std::size_t>((x & 15) + (z & 15) * 16);
     for (std::size_t i = 0; i < kHeightmapCount; ++i) {
         const auto type = static_cast<HeightmapType>(i);
@@ -392,7 +373,6 @@ void Chunk::updateHeights(std::int32_t x, std::int32_t y, std::int32_t z, std::i
 }
 
 void Chunk::rebuildHeights() const {
-    // All four in one downward pass per column, skipping the sections that hold only air.
     constexpr std::uint32_t allPending = (1U << kHeightmapCount) - 1;
     for (std::vector<std::int32_t>& map : heights_) {
         std::ranges::fill(map, bounds_.minY());
@@ -428,9 +408,6 @@ void Chunk::rebuildHeights() const {
 
 namespace {
 
-/// Finds an existing deferred write for that block. The lists stay in insertion order because
-/// delivery order is observable, so this is a scan rather than a map lookup; a feature defers a
-/// handful of blocks, not thousands.
 template <typename Write>
 [[nodiscard]] Write* findWrite(std::vector<Write>& writes, std::int32_t x, std::int32_t y, std::int32_t z) {
     for (Write& write : writes) {
@@ -448,7 +425,7 @@ void Chunk::markFluidUpdate(std::int32_t worldX, std::int32_t y, std::int32_t wo
 }
 
 void Chunk::markShapeUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
-    // parity: `level.getChunk(pos).markPosForPostProcessing`, the chunk that holds the position.
+    // parity: `level.getChunk(pos).markPosForPostProcessing`.
     if (region_ != nullptr && ((worldX >> 4) != chunkX_ || (worldZ >> 4) != chunkZ_)) {
         if (Chunk* owner = region_->chunkAt(worldX >> 4, worldZ >> 4); owner != nullptr) {
             owner->markShapeUpdate(worldX, y, worldZ);
@@ -528,8 +505,6 @@ void Chunk::setDecorationBlockStateId(std::int32_t worldX, std::int32_t y, std::
     }
     const std::int32_t expected = expectedExternalStateId.value_or(registry::blocks::air().stateId);
     ChunkGeneratedBlockWrite* previous = findWrite(generatedBlockWrites_, worldX, y, worldZ);
-    // What is really out there beats what the caller assumed: a feature replacing stone rather than
-    // air would otherwise defer with an air guard and have the write refused on delivery.
     std::optional<std::int32_t> observed;
     if (externalDecorationState_) {
         observed = externalDecorationState_(worldX, y, worldZ);

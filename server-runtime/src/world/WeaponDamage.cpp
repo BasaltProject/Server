@@ -62,8 +62,7 @@ using wire::nbt::NbtTag;
     return damage;
 }
 
-/// parity: the `entity_properties` requirement on `this` that the damage enchantments carry: an
-/// entity type or a tag of them. Any other requirement is not something this knows how to read.
+/// parity: the `entity_properties` requirement on `this` that the damage enchantments carry.
 [[nodiscard]] bool meets(const NbtCompound* requirement, const weaponDamage::Victim* victim) {
     if (requirement == nullptr) {
         return true;

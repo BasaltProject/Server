@@ -19,15 +19,11 @@ constexpr std::int64_t kDayTicks = 24000;
 constexpr std::int64_t kNoon = 6000;
 constexpr float kDegrees = 360.0F;
 
-/// parity: `WeatherAttributes.RAIN` and `THUNDER` modify `SKY_LIGHT_LEVEL` with
-/// `FloatModifier.ALPHA_BLEND`, which is `lerp(alpha, value, 4.0)`. They do **not** multiply: 26.2
-/// moved the old five sixteenths into an alpha that lands on the same number in full daylight and on
-/// a different one everywhere else, because the blend has a floor and the product does not.
+/// parity: `WeatherAttributes.RAIN` and `THUNDER` modify `SKY_LIGHT_LEVEL` with.
 constexpr float kNightSkyLightLevel = 4.0F;
 constexpr float kRainAlpha = 0.3125F;
 constexpr float kThunderAlpha = 0.52734375F;
 
-/// One of the two cubic curves a `EasingType.CubicBezier` is made of.
 struct CubicCurve {
     float a;
     float b;
@@ -47,8 +43,7 @@ struct CubicCurve {
     return (3.0F * curve.a * t + 2.0F * curve.b) * t + curve.c;
 }
 
-/// parity: `symmetricCubicBezier(0.362, 0.241)`, which is `cubicBezier(x1, y1, 1 - x1, 1 - y1)`, the
-/// easing every angle track in `Timelines.bootstrap` is built with.
+/// parity: `symmetricCubicBezier(0.362, 0.241)`.
 constexpr float kSkyEaseX = 0.362F;
 constexpr float kSkyEaseY = 0.241F;
 constexpr CubicCurve kSkyEaseXCurve = curveFrom(kSkyEaseX, 1.0F - kSkyEaseX);
@@ -57,7 +52,7 @@ constexpr float kEaseTolerance = 1.0e-5F;
 constexpr float kEaseMaxStep = 0.25F;
 constexpr std::int32_t kEaseIterations = 4;
 
-/// parity: `EasingType.CubicBezier.solveT`, Newton-Raphson with a bounded step and a bisection behind it.
+/// parity: `EasingType.CubicBezier.solveT`.
 [[nodiscard]] float solveEaseT(float x) {
     float t = x;
     for (std::int32_t attempt = 0; attempt < kEaseIterations; ++attempt) {
@@ -91,8 +86,6 @@ constexpr std::int32_t kEaseIterations = 4;
 [[nodiscard]] float skyEase(float x) { return sampleCurve(kSkyEaseYCurve, solveEaseT(x)); }
 
 /// The sun's angle in degrees. parity: 26.2 put this on the `SUN_ANGLE` timeline track, two
-/// keyframes at the same tick over a 24000 period. `bakeSegments` turns them into one segment from
-/// noon to noon a day later, so the whole thing collapses to easing the fraction of the day.
 [[nodiscard]] float sunAngleDegrees(const WorldClock& clock) {
     const std::int64_t looped = ((clock.totalTicks() % kDayTicks) + kDayTicks) % kDayTicks;
     const std::int64_t from = looped < kNoon ? kNoon - kDayTicks : kNoon;
@@ -101,9 +94,6 @@ constexpr std::int32_t kEaseIterations = 4;
 }
 
 /// The share of the full sky light the time of day allows. parity: 26.2 put this on a
-/// `FloatModifier.MULTIPLY` track with four keyframes and no easing, so it is linear. `bakeSegments`
-/// wraps the ends, leaving two ramps of 1803 ticks: one down from 11867 and one up from 22330
-/// through midnight. Fifteen times 0.26666668 is the four of `NIGHT_SKY_LIGHT_LEVEL`.
 constexpr float kNightShare = 0.26666668F;
 constexpr std::int64_t kDuskStart = 11867;
 constexpr std::int64_t kDuskEnd = 13670;
@@ -114,7 +104,6 @@ constexpr float kRampTicks = 1803.0F;
 [[nodiscard]] float skyLightShare(const WorldClock& clock) {
     const std::int64_t looped = ((clock.totalTicks() % kDayTicks) + kDayTicks) % kDayTicks;
     if (looped < kDawnEnd) {
-        // The tail of the ramp that started at 22330 and crosses midnight.
         const float alpha = static_cast<float>(looped + (kDayTicks - kDawnStart)) / kRampTicks;
         return wire::common::mth::lerp(alpha, kNightShare, 1.0F);
     }
@@ -132,14 +121,12 @@ constexpr float kRampTicks = 1803.0F;
     return wire::common::mth::lerp(alpha, kNightShare, 1.0F);
 }
 
-/// parity: `Math.round(float)`, which is `floor(x + 0.5)` and not the away-from-zero rounding of
-/// `lround`: the two differ on every negative half.
+/// parity: `Math.round(float)`.
 [[nodiscard]] std::int32_t roundLikeJava(float value) {
     return static_cast<std::int32_t>(std::floor(static_cast<double>(value) + 0.5));
 }
 
-/// parity: `LevelReader.getEffectiveSkyBrightness`, the sky light above the block minus the world's
-/// stored `skyDarken`.
+/// parity: `LevelReader.getEffectiveSkyBrightness`.
 [[nodiscard]] std::int32_t skyBrightness(WorldState& world, std::int32_t darken, std::int32_t x, std::int32_t y,
                                          std::int32_t z, bool hasSkylight) {
     return std::clamp(worldLight::skyLight(world, x, y + 1, z, hasSkylight) - darken, 0, kMax);
@@ -148,12 +135,9 @@ constexpr float kRampTicks = 1803.0F;
 } // namespace
 
 std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather, const Sky sky) {
-    // parity: the dimension's own `SKY_LIGHT_LEVEL` is the starting value and the day timeline is a
-    // `FloatModifier.MULTIPLY` track on top of it. Where that timeline is not tagged there is nothing
-    // to multiply by, so the constant stands.
+    // parity: the dimension's own `SKY_LIGHT_LEVEL` is the starting value and the day timeline is a.
     float value = sky.dayTimeline ? sky.level * skyLightShare(clock) : sky.level;
-    // parity: `WeatherAttributes.addLayer` takes the thunder level **off** the rain level before
-    // blending, so a full thunderstorm skips the rain layer altogether instead of stacking on it.
+    // parity: `WeatherAttributes.addLayer` takes the thunder level **off** the rain level before.
     const float thunder = weather.thunderLevel();
     const float rain = weather.rainLevel() - thunder;
     if (rain > 0.0F) {
@@ -163,9 +147,7 @@ std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather, con
         value =
             wire::common::mth::lerp(thunder, value, wire::common::mth::lerp(kThunderAlpha, value, kNightSkyLightLevel));
     }
-    // parity: `Level.updateSkyBrightness` writes
-    // `skyDarken = (int)(15.0F - environmentAttributes().getDimensionValue(SKY_LIGHT_LEVEL))`, and
-    // that `(int)` truncates towards zero.
+    // parity: `Level.updateSkyBrightness` writes.
     return static_cast<std::int32_t>(static_cast<float>(kMax) - value);
 }
 
@@ -175,8 +157,7 @@ std::int32_t signalFor(WorldState& world, const WorldClock& clock, std::int32_t 
     if (inverted) {
         target = kMax - target;
     } else if (target > 0) {
-        // parity: `DaylightDetectorBlock.updateSignalStrength` reads `SUN_ANGLE` off the track and
-        // turns it into radians, then pulls it towards zero or towards a full turn by a fifth.
+        // parity: `DaylightDetectorBlock.updateSignalStrength` reads `SUN_ANGLE` off the track and.
         float angle = (sunMoves ? sunAngleDegrees(clock) : 0.0F) * (std::numbers::pi_v<float> / 180.0F);
         const float offset = angle < std::numbers::pi_v<float> ? 0.0F : std::numbers::pi_v<float> * 2.0F;
         angle += (offset - angle) * 0.2F;

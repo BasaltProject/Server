@@ -14,11 +14,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// The global step-9 placement for the large tree and forest features.
-///
-/// Each placed feature owns its official seed and index and applies the biome filter at the
-/// randomized origin, not at the chunk centre. A tree may still grow across a biome boundary, which
-/// is what vanilla does; only its origin decides whether the placed feature runs.
 namespace treePatchDecoration {
 
 struct FeatureSpec {
@@ -34,7 +29,6 @@ using PlacementObserver = std::function<void(std::string_view, const DecorationP
 
 void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment);
 
-/// One spec on its own, addressed by the placed feature's name.
 void decorateFeature(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
                      std::string_view name, PlacementObserver observer = nullptr);
 

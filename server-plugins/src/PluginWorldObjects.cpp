@@ -7,14 +7,8 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
 
-/// What goes over an NPC's head: one line or several.
-///
-/// A list is joined with newlines, which is what a text display draws, so
-/// `name = { "<gold>Shop", "<gray>right click" }` is two lines with colour in both. It is not the
-/// profile name, which could hold neither.
 [[nodiscard]] std::string nameLines(LuaArgs& lua, std::int32_t index) {
     if (lua.isString(index)) {
         return lua.toText(index);
@@ -32,7 +26,6 @@ using lua::LuaArgs;
     return out;
 }
 
-/// Players or uuids, since a plugin has one or the other to hand.
 [[nodiscard]] std::vector<std::string> uuidsFrom(LuaArgs& lua, std::int32_t index) {
     std::vector<std::string> out;
     if (index > lua.count() || !lua.isTable(index)) {
@@ -55,7 +48,6 @@ using lua::LuaArgs;
     return out;
 }
 
-/// One string field of the table at `index`, or nothing when it is absent.
 [[nodiscard]] std::optional<std::string> stringField(LuaArgs& lua, std::int32_t index, std::string_view key) {
     lua.pushField(index, key);
     std::optional<std::string> value;
@@ -66,11 +58,9 @@ using lua::LuaArgs;
     return value;
 }
 
-/// The audience of a hologram or an NPC, which is a list of uuids or nothing at all for everybody.
 [[nodiscard]] PluginValue audienceOf(const std::optional<std::vector<std::string>>& audience) {
     return audience.has_value() ? PluginValue{*audience} : PluginValue{};
 }
-
 } // namespace
 
 void pushNpc(LuaArgs& lua, std::shared_ptr<PluginNpcRef> npc) {
@@ -87,7 +77,6 @@ void pushNpc(LuaArgs& lua, std::shared_ptr<PluginNpcRef> npc) {
         .writes("name", [npc](LuaArgs& args, std::int32_t index) { npc->setName(args.checkString(index)); })
         .method("skin",
                 [npc](LuaArgs& args) {
-                    // `npc:skin(texture, signature)` or `npc:skin(player)`, which wears theirs.
                     const std::int32_t base = firstArgument(args);
                     if (args.isTable(base)) {
                         args.pushBoolean(npc->skinFrom(stringField(args, base, "name").value_or("")));
@@ -204,8 +193,6 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
         .reads("rules", [world] { return PluginValue{world->gameRules()}; })
         .method("block",
                 [world](LuaArgs& args) {
-                    // `w:block(pos)` or `w:block(x, y, z)`; the second one is why this cannot use
-                    // `firstArgument`, since three numbers and self are four arguments either way.
                     const std::optional<PluginPoint> point = pointFrom(args, args.count() >= 2 ? 2 : 1);
                     std::optional<std::string> block;
                     if (point.has_value()) {
@@ -244,7 +231,6 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
                 })
         .method("rule",
                 [world](LuaArgs& args) {
-                    // `w:rule("doDaylightCycle")` reads it, `w:rule("doDaylightCycle", false)` sets it.
                     const std::int32_t base = firstArgument(args);
                     const std::string name = args.checkString(base);
                     if (args.isNil(base + 1)) {
@@ -271,7 +257,6 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
                 })
         .method("npc",
                 [world, shared, resolve](LuaArgs& args) {
-                    // `w:npc{ name = "Bob", pos = ..., skin = ..., on_click = function(p) end }`.
                     const std::int32_t options = firstArgument(args);
                     if (!args.isTable(options)) {
                         args.raise("world:npc{ name = ..., pos = ... } takes a table");
@@ -314,7 +299,6 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
                 })
         .method("hologram",
                 [world, resolve](LuaArgs& args) {
-                    // `w:hologram("<gold>Shop", pos)` or `w:hologram(text, x, y, z)`.
                     const std::int32_t base = firstArgument(args);
                     const std::string text = resolve(args.checkString(base));
                     const std::optional<PluginPoint> point = pointFrom(args, base + 1);
@@ -346,5 +330,4 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
         });
     std::move(object).push(lua);
 }
-
 } // namespace basalt::server::plugins

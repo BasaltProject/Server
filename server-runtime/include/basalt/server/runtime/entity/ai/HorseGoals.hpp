@@ -9,8 +9,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `RunAroundLikeCrazyGoal`: a wild horse with somebody on it bolts about, and now and then
-/// either takes to its rider or throws them off.
+/// parity: `RunAroundLikeCrazyGoal`.
 class RunAroundLikeCrazyGoal final : public Goal {
 public:
     explicit RunAroundLikeCrazyGoal(double speedModifier);
@@ -30,7 +29,7 @@ private:
     std::optional<std::array<double, 3>> wanted_;
 };
 
-/// parity: `RandomStandGoal`: the odds of rearing climb each tick past the ambient interval.
+/// parity: `RandomStandGoal`.
 class RandomStandGoal final : public Goal {
 public:
     RandomStandGoal();

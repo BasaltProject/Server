@@ -57,7 +57,7 @@ template <std::size_t N>
     return block == nullptr ? std::string_view{} : block->path();
 }
 
-/// parity: `Block.hasDynamicShape`, set on these and the shulker boxes, whose shape is not their own.
+/// parity: `Block.hasDynamicShape`.
 [[nodiscard]] bool dynamicShape(std::string_view path) {
     static constexpr std::array<std::string_view, 6> kDynamic{
         "moving_piston", "bamboo", "scaffolding", "powder_snow", "pointed_dripstone", "sulfur_spike"};

@@ -9,14 +9,9 @@
 
 namespace basalt::server::runtime::world {
 
-/// The chiseled bookshelf: six slots, one book each, chosen by where the click landed.
-///
-/// parity: `ChiseledBookShelfBlock` over `ChiseledBookShelfBlockEntity`. What a comparator reads is
-/// not how full it is but *which* slot was touched last, plus one, which is what makes it the only
-/// container that can address six different signals.
+/// parity: `ChiseledBookShelfBlock`.
 namespace chiseledBookshelves {
 
-/// parity: `MAX_BOOKS_IN_STORAGE`, laid out two rows of three.
 inline constexpr std::int32_t kSize = 6;
 inline constexpr std::int32_t kRows = 2;
 inline constexpr std::int32_t kColumns = 3;
@@ -25,32 +20,25 @@ inline constexpr std::int32_t kColumns = 3;
 
 [[nodiscard]] bool isBookshelf(std::string_view path);
 
-/// Which slot a click at these coordinates lands on, or nothing when it was not on the front.
 [[nodiscard]] std::optional<std::int32_t> slotAt(std::int32_t stateId, std::string_view face, float clickX,
                                                  float clickY, float clickZ);
 
-/// What a book being put in or taken out leaves behind: the state, and what it sounded like.
 struct Interaction {
     BlockChange change;
     std::optional<wire::common::Identifier> taken;
 };
 
-/// parity: `addBook`, which only takes a book into a slot that is empty, and marks that slot as the
-/// one a comparator reads.
+/// parity: `addBook` only fills an empty slot and marks it as the one a comparator reads.
 [[nodiscard]] std::optional<Interaction> putBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                  std::int32_t slot, const wire::common::Identifier& book);
 
-/// parity: `removeBook`, the other half, which hands the book back.
 [[nodiscard]] std::optional<Interaction> takeBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t slot);
 
-/// parity: `getAnalogOutputSignal`, the last slot touched plus one, so an untouched shelf reads
-/// nothing.
+/// parity: `getAnalogOutputSignal`.
 [[nodiscard]] std::int32_t comparatorSignal(const wire::nbt::NbtCompound& data);
 
-/// parity: `ChiseledBookShelfBlockEntity.updateState`, which **every** write to a shelf's slots runs:
-/// it remembers the slot that was touched and redraws the six `slot_N_occupied` from what is inside.
-/// A command that writes a slot owes it as much as a hand does. Answers the state it left behind.
+/// parity: `ChiseledBookShelfBlockEntity.updateState` runs on every slot write.
 [[nodiscard]] std::optional<std::int32_t> slotsChanged(WorldState& world, std::int32_t x, std::int32_t y,
                                                        std::int32_t z, std::int32_t touchedSlot, std::int64_t gameTime);
 

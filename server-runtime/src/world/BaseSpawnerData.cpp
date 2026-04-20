@@ -47,7 +47,7 @@ constexpr LightLimit kFullLightRange{};
     return value.has_value() ? static_cast<std::int16_t>(static_cast<std::uint16_t>(*value & 0xFFFF)) : fallback;
 }
 
-/// parity: `ExtraCodecs.intervalCodec`: one number, a pair, or `min_inclusive`/`max_inclusive`.
+/// parity: `ExtraCodecs.intervalCodec`.
 [[nodiscard]] std::optional<LightLimit> readInterval(const NbtTag& tag) {
     std::optional<std::int32_t> low;
     std::optional<std::int32_t> high;
@@ -83,8 +83,7 @@ constexpr LightLimit kFullLightRange{};
     return NbtTag::ofCompound(std::move(object));
 }
 
-/// parity: `CustomSpawnRules.lightLimit`: lenient, so an unreadable window is the full one, and then
-/// validated, so a window reaching outside zero to fifteen fails the whole record.
+/// parity: `CustomSpawnRules.lightLimit`.
 [[nodiscard]] std::optional<LightLimit> readLightLimit(const NbtCompound& rules, std::string_view key) {
     const NbtTag* tag = rules.find(key);
     const LightLimit limit = tag == nullptr ? kFullLightRange : readInterval(*tag).value_or(kFullLightRange);
@@ -124,7 +123,7 @@ constexpr LightLimit kFullLightRange{};
     return value.has_value() ? std::optional{static_cast<float>(*value)} : std::nullopt;
 }
 
-/// parity: `EquipmentTable.DROP_CHANCES_CODEC`, one chance for every slot or a map of them.
+/// parity: `EquipmentTable.DROP_CHANCES_CODEC`.
 [[nodiscard]] std::optional<std::vector<std::pair<std::string, float>>> readDropChances(const NbtTag& tag) {
     std::vector<std::pair<std::string, float>> chances;
     if (const std::optional<float> all = floatValue(tag); all.has_value()) {
@@ -307,8 +306,7 @@ BaseSpawnerState load(const NbtCompound& data) {
     if (const NbtTag* next = data.find("SpawnData"); next != nullptr) {
         state.nextSpawnData = readSpawnData(*next);
     }
-    // parity: a list keeps the entries that decode, the codec's partial result; anything else
-    // falls back to the next spawn alone.
+    // parity: a list keeps the entries that decode, the codec's partial result; anything else.
     const NbtTag* potentials = data.find("SpawnPotentials");
     if (const auto* list = potentials == nullptr ? nullptr : potentials->get<NbtList>(); list != nullptr) {
         for (const NbtTag& element : *list) {

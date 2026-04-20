@@ -14,13 +14,9 @@
 
 namespace basalt::server::world::terrain::decoration::tree {
 
-/// The tree-scoped `foliageSetter.isSet`: leaves this tree placed, not leaves already standing.
 using FoliagePositions = std::set<std::tuple<std::int32_t, std::int32_t, std::int32_t>>;
 
 /// parity: the `net.minecraft.world.level.levelgen.feature.foliageplacers` shapes.
-///
-/// Kind-tagged like `TrunkPlacer`, and for the same reason: RTTI is off and a config holds one by
-/// value.
 class FoliagePlacer {
 public:
     /// parity: `BlobFoliagePlacer` (oak, birch, jungle).
@@ -54,20 +50,17 @@ public:
     [[nodiscard]] static FoliagePlacer randomSpread(IntProvider radius, IntProvider offset, IntProvider foliageHeight,
                                                     std::int32_t leafPlacementAttempts);
 
-    /// The azalea's random spread, whose foliage provider picks between two states by weight.
     [[nodiscard]] static FoliagePlacer weightedRandomSpread(IntProvider radius, IntProvider offset,
                                                             IntProvider foliageHeight,
                                                             std::int32_t leafPlacementAttempts,
                                                             std::vector<std::pair<std::int32_t, std::int32_t>> states);
 
-    /// parity: `CherryFoliagePlacer`. Take `cornerHoleChance` from the bootstrap code, never a
-    /// datapack dump: vanilla's codec reads `wide_bottom_layer_hole_chance` for `corner_hole_chance`,
-    /// so the serialized cherry reports 0.25 where the object built at runtime holds 0.5.
+    /// parity: `CherryFoliagePlacer`.
     [[nodiscard]] static FoliagePlacer cherry(IntProvider radius, IntProvider offset, IntProvider height,
                                               float wideBottomLayerHoleChance, float cornerHoleChance,
                                               float hangingLeavesChance, float hangingLeavesExtensionChance);
 
-    /// parity: `PoplarFoliagePlacer`, a tall rhombus crown with holes in its sides and a log core.
+    /// parity: `PoplarFoliagePlacer`.
     [[nodiscard]] static FoliagePlacer poplar(IntProvider radius, IntProvider offset, IntProvider height,
                                               float sideHoleChance);
 
@@ -101,8 +94,7 @@ private:
     [[nodiscard]] bool shouldSkipLocation(random::RandomSource& random, std::int32_t dx, std::int32_t y,
                                           std::int32_t dz, std::int32_t currentRadius, bool doubleTrunk) const;
 
-    /// parity: `FoliagePlacer.shouldSkipLocationSigned`, which the dark oak replaces outright rather
-    /// than extending.
+    /// parity: `FoliagePlacer.shouldSkipLocationSigned`.
     [[nodiscard]] bool shouldSkipLocationSigned(random::RandomSource& random, std::int32_t dx, std::int32_t y,
                                                 std::int32_t dz, std::int32_t currentRadius, bool doubleTrunk) const;
 

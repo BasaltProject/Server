@@ -10,7 +10,6 @@ namespace {
 
 using wire::protocol::play::Gamemode;
 
-/// The name a death by hunger is looked up by, which is the word and not the whole key.
 constexpr std::string_view kDeathStarve = "starve";
 
 } // namespace
@@ -56,8 +55,7 @@ void tickVitals(PlayerSession& player, const VitalsContext& context) {
             player.food.set(*wanted, player.food.saturationLevel());
         }
     }
-    // Only when something actually moved: a health packet every tick is twenty a second per player
-    // for a bar that changes a few times a minute.
+    // Only when something moved: a health packet every tick is twenty a second per player.
     if (player.health() != healthBefore || player.food.foodLevel() != foodBefore ||
         player.food.saturationLevel() != saturationBefore) {
         if (player.connection().syncHealth) {

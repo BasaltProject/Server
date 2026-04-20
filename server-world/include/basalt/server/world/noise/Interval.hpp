@@ -6,10 +6,7 @@
 
 namespace basalt::server::world::noise {
 
-/// parity: `net.minecraft.util.Interval`, float bounds with an explicit "not an interval" value.
-///
-/// The bounds are not decoration: min and max nodes fold on them, so they follow vanilla's float
-/// arithmetic to the bit.
+/// parity: `net.minecraft.util.Interval`.
 class Interval {
 public:
     [[nodiscard]] static Interval notAnInterval() noexcept { return Interval{kNaN, kNaN, true}; }

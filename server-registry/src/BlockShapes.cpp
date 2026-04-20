@@ -9,7 +9,6 @@
 
 namespace basalt::server::registry::blockShapes {
 namespace {
-
 constexpr std::string_view kIndexAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 constexpr std::uint32_t kFullRow = 0xFFFFFFFFU;
 
@@ -19,7 +18,6 @@ constexpr std::uint32_t kFullRow = 0xFFFFFFFFU;
     return value;
 }
 
-/// One `1` per face that is set, in `BlockFace` order.
 [[nodiscard]] std::int32_t faceBits(std::string_view flags) {
     std::int32_t mask = 0;
     for (std::size_t face = 0; face < flags.size(); ++face) {
@@ -30,7 +28,6 @@ constexpr std::uint32_t kFullRow = 0xFFFFFFFFU;
     return mask;
 }
 
-/// Everything one shape says about itself, parsed once out of its encoded row.
 struct Shape {
     std::int32_t dampening = 0;
     bool blocksMotion = false;
@@ -41,7 +38,6 @@ struct Shape {
     std::int32_t centre = 0;
     std::int32_t rigid = 0;
     std::int32_t occlusionFull = 0;
-    /// Flattened, six numbers to a box.
     std::vector<std::int32_t> boxes;
     bool full = false;
 };
@@ -51,11 +47,6 @@ using FaceMask = std::array<std::uint32_t, kUnits>;
 struct Table {
     std::vector<Shape> shapes;
     std::vector<std::int32_t> byState;
-    /// Every face of every shape rasterised, one 32-bit row mask per unit.
-    ///
-    /// Worked out up front rather than on demand: five hundred shapes by six faces is a few hundred
-    /// kilobytes once, and it keeps the table immutable, which is what lets several region threads
-    /// ask about a shape at the same time without a lock between them.
     std::vector<FaceMask> faces;
 };
 
@@ -72,11 +63,6 @@ struct Table {
     }
 }
 
-/// The columns a box covers, clipped to the face.
-///
-/// The clip is not defensive: a shape may reach outside its own cube (a door is forty eight units
-/// tall, a piston head sticks eight into the next block) and 196 of the boxes that touch a face run
-/// off it. Only the part lying on the face can cover any of it.
 [[nodiscard]] std::uint32_t columnBits(std::int32_t from, std::int32_t to) {
     std::uint32_t bits = 0;
     for (std::int32_t column = std::max(from, 0); column < std::min(to, kUnits); ++column) {
@@ -85,10 +71,6 @@ struct Table {
     return bits;
 }
 
-/// One face of one shape, as row masks.
-///
-/// Only a box actually reaching that side of the cube contributes, the way slicing the last layer of
-/// a voxel shape does.
 [[nodiscard]] FaceMask rasterise(const Shape& shape, BlockFace face) {
     FaceMask mask{};
     const int axis = axisOf(face);
@@ -98,7 +80,6 @@ struct Table {
         if (shape.boxes[offset + edge] != boundary) {
             continue;
         }
-        // The two axes that are not the face's own: rows and columns of its rectangle.
         const auto rowAxis = static_cast<std::size_t>(axis == 1 ? 2 : 1);
         const auto columnAxis = static_cast<std::size_t>(axis == 0 ? 2 : 0);
         const std::uint32_t columns =
@@ -181,7 +162,6 @@ struct Table {
 [[nodiscard]] const FaceMask& faceMask(std::size_t shape, BlockFace face) {
     return table().faces[shape * kBlockFaceCount + static_cast<std::size_t>(face)];
 }
-
 } // namespace
 
 std::int32_t dampening(std::int32_t stateId) { return table().shapes[shapeOf(stateId)].dampening; }
@@ -254,5 +234,4 @@ bool faceCovers(std::int32_t stateId, BlockFace face, std::int32_t minRow, std::
     }
     return true;
 }
-
 } // namespace basalt::server::registry::blockShapes

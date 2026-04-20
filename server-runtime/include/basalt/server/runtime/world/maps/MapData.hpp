@@ -23,11 +23,9 @@ using BlockPos = std::array<std::int32_t, 3>;
 /// A banner someone marked on a map. parity: `MapBanner`.
 struct MapBanner {
     BlockPos pos{};
-    /// The dye colour's serialized name.
     std::string color = "white";
     std::optional<wire::text::Component> name;
 
-    /// parity: `MapBanner.getId`.
     [[nodiscard]] std::string id() const;
 
     friend bool operator==(const MapBanner&, const MapBanner&) = default;
@@ -39,7 +37,6 @@ struct MapFrame {
     std::int32_t rotation = 0;
     std::int32_t entityId = 0;
 
-    /// parity: `MapFrame.frameId`.
     [[nodiscard]] static std::string idOf(const BlockPos& pos);
 
     friend bool operator==(const MapFrame&, const MapFrame&) = default;
@@ -61,11 +58,9 @@ class MapData {
 public:
     static constexpr std::int32_t kSize = 128;
     static constexpr std::int32_t kMaxScale = 4;
-    /// parity: `MapItemSavedData.TRACKED_DECORATION_LIMIT`.
     static constexpr std::int32_t kTrackedDecorationLimit = 256;
 
-    /// parity: `MapItemSavedData.HoldingPlayer`: the dirty rectangle and decorations one player has
-    /// still to be sent, and the column the colour scan is on for them.
+    /// parity: `MapItemSavedData.HoldingPlayer`.
     struct Holder {
         wire::common::Uuid player;
         std::int32_t entityId = 0;
@@ -88,7 +83,7 @@ public:
     /// parity: `MapItemSavedData.locked`, a copy that no longer draws.
     [[nodiscard]] MapData locked() const;
 
-    /// parity: `MapItemSavedData.scaled`, a blank map one scale out centred on the same point.
+    /// parity: `MapItemSavedData.scaled`.
     [[nodiscard]] MapData scaled() const;
 
     [[nodiscard]] std::int32_t centerX() const noexcept { return centerX_; }
@@ -112,12 +107,10 @@ public:
 
     void setColor(std::int32_t x, std::int32_t y, std::uint8_t color);
 
-    /// parity: `addDecoration`. `gameTime` stands for the level: without one a Nether map's markers
-    /// point where they were told rather than spin.
+    /// parity: `addDecoration`.
     void addDecoration(std::int32_t type, std::optional<std::int64_t> gameTime, const std::string& key, double x,
                        double z, double yRot, std::optional<wire::text::Component> name);
 
-    /// parity: `removeDecoration`.
     void removeDecoration(std::string_view key);
 
     [[nodiscard]] bool hasDecoration(std::string_view key) const;
@@ -128,24 +121,20 @@ public:
         return decorations_;
     }
 
-    /// parity: `toggleBanner`. `banner` is what `MapBanner.fromWorld` found at the clicked square.
+    /// parity: `toggleBanner`.
     [[nodiscard]] bool toggleBanner(const std::optional<MapBanner>& banner, const BlockPos& pos,
                                     std::optional<std::int64_t> gameTime);
 
-    /// parity: `checkBanners`: markers in this column whose banner is gone or changed are dropped.
+    /// parity: `checkBanners`.
     void checkBanners(std::int32_t x, std::int32_t z,
                       const std::function<std::optional<MapBanner>(const BlockPos&)>& bannerAt);
 
-    /// The frame half of `tickCarriedBy`: this map hangs in `frame`.
     void trackFrame(const MapFrame& frame, std::optional<std::int64_t> gameTime);
 
-    /// parity: `removedFromFrame`.
     void removedFromFrame(const BlockPos& pos, std::int32_t entityId);
 
-    /// The static half of `tickCarriedBy`: the stack's `map_decorations` not on the map yet.
     void addStaticDecorations(const wire::nbt::NbtCompound& stackDecorations, std::optional<std::int64_t> gameTime);
 
-    /// parity: `isTrackedCountOverLimit`.
     [[nodiscard]] bool trackedCountOverLimit(std::int32_t limit) const noexcept {
         return trackedDecorationCount_ > limit;
     }
@@ -163,7 +152,6 @@ public:
     [[nodiscard]] std::optional<wire::protocol::play::MapItemDataPacket> nextUpdate(std::int32_t mapId,
                                                                                     Holder& holder) const;
 
-    /// Whether anything saved changed since the last `clearDirty`. parity: `SavedData.setDirty`.
     [[nodiscard]] bool isDirty() const noexcept { return dirty_; }
 
     void clearDirty() noexcept { dirty_ = false; }

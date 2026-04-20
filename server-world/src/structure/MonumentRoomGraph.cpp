@@ -7,7 +7,7 @@
 namespace basalt::server::world::structure {
 namespace {
 
-/// parity: `Direction.values` / `get3DDataValue`, which is down, up, north, south, west, east.
+/// parity: `Direction.values` / `get3DDataValue`.
 constexpr std::array<StructureDirection, 6> kOrder{StructureDirection::Down,  StructureDirection::Up,
                                                    StructureDirection::North, StructureDirection::South,
                                                    StructureDirection::West,  StructureDirection::East};
@@ -99,8 +99,7 @@ MonumentRoomGraph generateMonumentRoomGraph(random::RandomSource& random) {
                     if (neighbour == nullptr) {
                         continue;
                     }
-                    // parity: a neighbour on the Z axis is linked through the opposite face. It reads
-                    // like a slip and it is not one: the lattice is built with it.
+                    // parity: a neighbour on the Z axis is linked through the opposite face.
                     room->connect(nz == z ? direction : opposite(direction), *neighbour);
                 }
             }

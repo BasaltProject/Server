@@ -18,7 +18,6 @@
 
 namespace basalt::server::world::terrain {
 
-/// Places exact procedural End City starts and their template pieces before End decoration.
 class EndCityStructureGenerator {
 public:
     using SurfaceHeightOverride = std::function<std::int32_t(std::int32_t, std::int32_t)>;
@@ -29,17 +28,12 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
-    /// parity: `PlaceCommand.placeStructure`: the bounds of the city started at this chunk with the
-    /// grid and biome checks skipped, or nothing when its own conditions (the y 60 floor) reject the
-    /// chunk or the assembly came up empty.
+    /// parity: `PlaceCommand.placeStructure`.
     [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
                                                                                std::int32_t chunkZ);
 
-    /// Writes the part of the city started at (chunkX, chunkZ) that lands in `chunk`, like the
-    /// worldgen pass does, but without the grid and biome checks and without recording a start.
     void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
 
-    /// The city that starts in a candidate chunk, assembled once and kept.
     [[nodiscard]] const std::vector<endCityPieces::Piece>& cityAt(std::int64_t seed, std::int32_t candidateChunkX,
                                                                   std::int32_t candidateChunkZ);
 
@@ -73,8 +67,6 @@ private:
 
     [[nodiscard]] DensityChunkSampler& samplerAt(std::int32_t x, std::int32_t z);
 
-    /// The city a start at this chunk assembles into. `forPlacement` skips the biome check and is
-    /// never cached, so it can differ from what worldgen holds for the same chunk.
     [[nodiscard]] std::vector<endCityPieces::Piece> buildCity(std::int64_t seed, std::int32_t candidateChunkX,
                                                               std::int32_t candidateChunkZ, bool forPlacement);
 

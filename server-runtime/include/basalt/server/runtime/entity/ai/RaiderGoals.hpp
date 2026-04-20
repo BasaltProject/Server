@@ -11,8 +11,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `Raider.ObtainRaidLeaderBannerGoal`: a raider whose wave lost its captain walks to a
-/// dropped ominous banner and puts it on.
+/// parity: `Raider.ObtainRaidLeaderBannerGoal`.
 class ObtainRaidLeaderBannerGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -33,8 +32,7 @@ private:
     std::array<double, 3> bannerAt_{};
 };
 
-/// parity: `PathfindToRaidGoal`: out of the village, walk towards its centre and pull idle raiders
-/// along into the raid.
+/// parity: `PathfindToRaidGoal`.
 class PathfindToRaidGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -49,7 +47,7 @@ private:
     std::int32_t recruitmentTick_ = 0;
 };
 
-/// parity: `Raider.RaiderMoveThroughVillageGoal`: from house to house, three remembered at a time.
+/// parity: `Raider.RaiderMoveThroughVillageGoal`.
 class RaiderMoveThroughVillageGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -70,7 +68,7 @@ private:
     bool stuck_ = false;
 };
 
-/// parity: `Raider.RaiderCelebration`: a raid the village lost, cheered with sounds and hops.
+/// parity: `Raider.RaiderCelebration`.
 class RaiderCelebrationGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }

@@ -31,7 +31,6 @@ constexpr std::string_view kFollowRange = "minecraft:follow_range";
 constexpr std::string_view kStepHeight = "minecraft:step_height";
 /// parity: `PathNavigation.requiredPathLength`'s sixteen.
 constexpr float kRequiredPathLength = 16.0F;
-/// The overworld's floor, for a creaking whose chunk is somehow not loaded.
 constexpr std::int32_t kFallbackMinY = -64;
 
 [[nodiscard]] std::int32_t floorOf(double value) { return static_cast<std::int32_t>(std::floor(value)); }
@@ -57,7 +56,7 @@ constexpr std::int32_t kFallbackMinY = -64;
            creaking.vehicleId.has_value();
 }
 
-/// parity: `GroundPathNavigation.getTempMobPos`, the feet or, afloat, the surface above them.
+/// parity: `GroundPathNavigation.getTempMobPos`.
 [[nodiscard]] Vec tempPosition(world::WorldState& world, const ServerEntity& creaking) {
     const std::int32_t blockY = floorOf(creaking.y);
     if (!ai::inWater(world, creaking)) {
@@ -75,7 +74,7 @@ constexpr std::int32_t kFallbackMinY = -64;
     return {creaking.x, static_cast<double>(surface), creaking.z};
 }
 
-/// parity: `Mob.getMaxFallDistance`: three, or what its health can spare while it has a target.
+/// parity: `Mob.getMaxFallDistance`.
 [[nodiscard]] std::int32_t maxFallDistance(const ServerEntity& creaking, std::int32_t difficulty) {
     float spare = 0.0F;
     if (creaking.targetId.has_value()) {
@@ -176,7 +175,7 @@ void trimPath(const world::WorldState& world, std::vector<Block>& nodes, std::ve
     return {vector[0] / length, vector[1] / length, vector[2] / length};
 }
 
-/// parity: `PathNavigation.shouldTargetNextNodeInDirection`, never with a direct line on the ground.
+/// parity: `PathNavigation.shouldTargetNextNodeInDirection`.
 [[nodiscard]] bool shouldTargetNextNode(const ServerEntity& creaking, const Vec& position) {
     const std::vector<Block>& path = *creaking.path;
     const auto next = static_cast<std::size_t>(creaking.pathIndex);
@@ -231,13 +230,12 @@ void followThePath(ServerEntity& creaking, const creakings::CreakingState& state
                            .maxUpStep = static_cast<float>(creaking.attributeWithModifiers(kStepHeight)),
                            .maxFallDistance = maxFallDistance(creaking, state.difficulty),
                            .maluses = maluses(state.home.has_value()),
-                           // parity: `setCanFloat(true)` in the constructor, `setCanPassDoors(true)` in
-                           // `createPathFinder`.
+                           // parity: `setCanFloat(true)`.
                            .canFloat = true,
                            .canPassDoors = true,
                            .minY = minY};
     mob.home = state.home;
-    // parity: `PowderSnowBlock.canEntityWalkOnPowderSnow`: leather boots let it stand on the snow.
+    // parity: `PowderSnowBlock.canEntityWalkOnPowderSnow`.
     const std::optional<server::world::loot::ItemStack> feet = mobEquipment::get(creaking, mobEquipment::Slot::Feet);
     mob.walksOnPowderSnow = feet.has_value() && feet->item == wire::common::Identifier::vanilla("leather_boots");
     mob.fallDistance = creaking.fallDistance;
@@ -245,8 +243,7 @@ void followThePath(ServerEntity& creaking, const creakings::CreakingState& state
     return mob;
 }
 
-/// parity: `PathNavigation.shouldRecomputePath`: a change nearer the middle of what is left of the
-/// path than the nodes left to walk.
+/// parity: `PathNavigation.shouldRecomputePath`.
 [[nodiscard]] bool shouldRecompute(const ServerEntity& creaking, const Block& changed) {
     if (!creaking.path.has_value() || ai::navigation::isDone(creaking) || creaking.path->empty()) {
         return false;
@@ -283,9 +280,7 @@ pathTypes::Maluses maluses(bool heartBound) {
 
 namespace {
 
-/// parity: `GroundPathNavigation.createPath` towards `target`, answering whether a path could be
-/// drawn at all. A `recompute` replaces the path it walks; a fresh ask keeps it when it still leads
-/// the same way, as `PathNavigation.createPath` and `moveTo(Path)` do.
+/// parity: `GroundPathNavigation.createPath`.
 bool drawPath(world::WorldState& world, ServerEntity& creaking, creakings::CreakingState& state, Block target,
               std::int32_t reachRange, bool recompute) {
     // parity: nothing towards a chunk that is not loaded.
@@ -323,7 +318,7 @@ bool drawPath(world::WorldState& world, ServerEntity& creaking, creakings::Creak
         nodes.push_back(node.at);
         types.push_back(static_cast<std::uint8_t>(node.type));
     }
-    // parity: `moveTo(Path)` keeps the path it has, and how far along it is, when the new one is the same.
+    // parity: `moveTo(Path)` keeps the path it has.
     if (recompute || !creaking.path.has_value() || *creaking.path != nodes ||
         state.pathNodeTypes.size() != creaking.path->size()) {
         creaking.path = std::move(nodes);
@@ -336,7 +331,7 @@ bool drawPath(world::WorldState& world, ServerEntity& creaking, creakings::Creak
     return true;
 }
 
-/// parity: `PathNavigation.recomputePath`: at most once a second, and only while it can update.
+/// parity: `PathNavigation.recomputePath`.
 void recomputePath(world::WorldState& world, ServerEntity& creaking, creakings::CreakingState& state) {
     if (state.gameTime - state.lastRecompute > 20 && canUpdatePath(world, creaking)) {
         if (state.pathTarget.has_value()) {
@@ -351,8 +346,7 @@ void recomputePath(world::WorldState& world, ServerEntity& creaking, creakings::
     }
 }
 
-/// parity: `ServerLevel.sendBlockUpdated` over the level's navigating mobs, for the squares whose
-/// collision changed since this creaking last looked.
+/// parity: `ServerLevel.sendBlockUpdated` over the level's navigating mobs.
 void noticeShapeChanges(world::WorldState& world, ServerEntity& creaking, creakings::CreakingState& state) {
     std::vector<Block> changed;
     bool overflowed = false;
@@ -395,7 +389,7 @@ bool moveTo(world::WorldState& world, ServerEntity& creaking, double x, double y
 
 void tick(world::WorldState& world, ServerEntity& creaking) {
     creakings::CreakingState& state = creakings::stateOf(creaking);
-    // parity: `CreakingPathNavigation.tick`, nothing at all while it is frozen, not even the count.
+    // parity: `CreakingPathNavigation.tick`.
     if (!state.canMove) {
         return;
     }

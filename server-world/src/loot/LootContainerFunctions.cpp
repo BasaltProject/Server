@@ -60,7 +60,6 @@ constexpr std::string_view kBundleContents = "minecraft:bundle_contents";
     return stack.count <= 0 || stack.item == Identifier::vanilla("air");
 }
 
-/// A `Fraction` in lowest terms, which is what bundle weights are counted in.
 struct Fraction {
     std::int64_t numerator = 0;
     std::int64_t denominator = 1;
@@ -126,7 +125,7 @@ constexpr Fraction kBundleInBundle{1, 16};
     return maxStackOf(stack) > 1 && !damaged;
 }
 
-/// parity: `BundleContents.Mutable.tryInsert`, each stack put in front and merged with its twin.
+/// parity: `BundleContents.Mutable.tryInsert`.
 void tryInsert(std::vector<ItemStack>& items, Fraction& weight, ItemStack stack) {
     // parity: `Item.canFitInsideContainerItems`, which only a shulker box answers no to.
     if (isEmpty(stack) || stack.item.path().ends_with("shulker_box")) {
@@ -159,7 +158,7 @@ void tryInsert(std::vector<ItemStack>& items, Fraction& weight, ItemStack stack)
 /// parity: `ContainerComponent.copyWithContents` for the three components.
 void setContents(ItemStack& holder, std::string_view component, const std::vector<ItemStack>& contents) {
     if (component == kContainer) {
-        // parity: `ItemContainerContents.fromItems`, each stack at its position up to the last one.
+        // parity: `ItemContainerContents.fromItems`.
         NbtList slots{NbtType::Compound};
         for (std::size_t index = 0; index < contents.size(); ++index) {
             if (isEmpty(contents[index])) {
@@ -244,8 +243,7 @@ ItemStack applyContainerEdit(const ComponentEdit& edit, ItemStack stack, random:
         setContents(stack, edit.component, contents);
         return stack;
     }
-    // parity: `ContainerComponentManipulator.modifyItems`: nothing without the component, and each
-    // stack run through the modifier and cut to its stack size.
+    // parity: `ContainerComponentManipulator.modifyItems`.
     if (stack.components.find(edit.component) == nullptr) {
         return stack;
     }

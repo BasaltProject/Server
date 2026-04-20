@@ -8,15 +8,11 @@
 namespace basalt::server::runtime::player {
 namespace {
 
-/// Both the player's window and the crafting table's are this long; only what the slots mean
-/// differs.
 constexpr std::int32_t kSlotCount = 46;
 
-/// The player's own storage and hotbar, tacked onto the bottom of every container window.
 constexpr std::int32_t kStorageSlots = 27;
 constexpr std::int32_t kPlayerSlotsInWindow = 36;
 
-/// Where a window's own slots end and the player's begin, for the windows shaped that way.
 [[nodiscard]] std::vector<std::optional<MenuSlot>> withPlayerSlots(std::vector<std::optional<MenuSlot>> slots) {
     for (std::int32_t slot = 0; slot < kPlayerSlotsInWindow; slot++) {
         slots.push_back(slot < kStorageSlots ? MenuSlot{menuSlot::Inventory{.index = slot}}
@@ -26,7 +22,6 @@ constexpr std::int32_t kPlayerSlotsInWindow = 36;
     return slots;
 }
 
-/// A window whose own slots are the block's, followed by the player's.
 [[nodiscard]] std::vector<std::optional<MenuSlot>> blockWindow(std::int32_t own) {
     std::vector<std::optional<MenuSlot>> slots;
     slots.reserve(static_cast<std::size_t>(own + kPlayerSlotsInWindow));

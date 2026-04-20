@@ -8,8 +8,6 @@
 
 namespace basalt::server::runtime::entity {
 
-/// The camel and the camel husk: sitting down, standing up, and the idle brain around it.
-///
 /// parity: `Camel`, `CamelHusk` and `CamelAi`.
 namespace camels {
 

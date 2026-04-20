@@ -12,8 +12,6 @@ namespace {
 
 using wire::common::Identifier;
 
-/// What the table is picking between: an enchantment, the level it would come at, and how often it
-/// is drawn against the others.
 struct Candidate {
     Identifier enchantment;
     std::int32_t level = 1;
@@ -36,8 +34,7 @@ struct Candidate {
     return from.back();
 }
 
-/// parity: `getAvailableEnchantmentResults`: the highest level of each whose band the cost falls
-/// in, and a plain book takes anything.
+/// parity: `getAvailableEnchantmentResults`.
 [[nodiscard]] std::vector<Candidate> available(const EnchantmentBooks& books, const storage::StoredItemStack& stack,
                                                const std::int32_t cost, const std::string_view tag) {
     const bool book = stack.id == "minecraft:book";

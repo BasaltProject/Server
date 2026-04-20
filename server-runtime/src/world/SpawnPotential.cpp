@@ -27,8 +27,6 @@ double SpawnPotential::energyChange(std::int32_t x, std::int32_t y, std::int32_t
         const double dy = static_cast<double>(point.y - y);
         const double dz = static_cast<double>(point.z - z);
         const double distanceSquared = dx * dx + dy * dy + dz * dz;
-        // Exactly on top of an existing charge: infinitely expensive, which is what refuses a
-        // second mob in the same block rather than dividing by zero.
         if (distanceSquared == 0.0) {
             return std::numeric_limits<double>::infinity();
         }

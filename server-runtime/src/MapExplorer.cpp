@@ -50,7 +50,7 @@ bool MapSystem::explore(world::LoadedWorld& world, wire::nbt::NbtCompound& compo
     std::optional<Found> nearest;
     double nearestDistance = std::numeric_limits<double>::max();
     const std::unique_lock<std::mutex> lock = storage_->lock();
-    // parity: `ExplorationMapFunction.claimStructureAt`: a structure the loot stands in is claimed
+    // parity: `ExplorationMapFunction.claimStructureAt`.
     // first, so a cartographer never sells the map to its own village.
     if (request.skipExistingChunks) {
         const server::world::structure::StructureQueries structures{
@@ -86,7 +86,7 @@ bool MapSystem::explore(world::LoadedWorld& world, wire::nbt::NbtCompound& compo
         if (!start.has_value()) {
             continue;
         }
-        // parity: `getLocatePos`, the start chunk's corner, measured from the loot with y at zero.
+        // parity: `getLocatePos`.
         const double dx = (start->first * 16.0) - originX;
         const double dy = -static_cast<double>(originY);
         const double dz = (start->second * 16.0) - originZ;

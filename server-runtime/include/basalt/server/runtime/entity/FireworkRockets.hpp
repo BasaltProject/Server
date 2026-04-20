@@ -11,8 +11,6 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// A firework rocket: how long it flies, who it is stuck to, and what it carries.
-///
 /// parity: `FireworkRocketEntity`'s fields and constructors.
 namespace fireworkRockets {
 
@@ -25,7 +23,6 @@ struct RocketState {
     bool shotAtAngle = false;
     /// parity: `Projectile.leftOwner`.
     bool leftOwner = false;
-    /// The rocket item as saved: `id`, `count` and `components`.
     wire::nbt::NbtCompound item;
 };
 
@@ -36,7 +33,7 @@ struct RocketState {
 /// parity: `new ItemStack(Items.FIREWORK_ROCKET)`, a rocket with nothing on it.
 [[nodiscard]] wire::nbt::NbtCompound plainRocket();
 
-/// parity: `CelebrateVillagersSurvivedRaid.getFirework`: one burst in the dye's firework colour.
+/// parity: `CelebrateVillagersSurvivedRaid.getFirework`.
 [[nodiscard]] wire::nbt::NbtCompound celebrationRocket(std::int32_t dye, std::int32_t flight);
 
 /// parity: `Fireworks.flightDuration`.
@@ -45,8 +42,6 @@ struct RocketState {
 /// parity: `getExplosions().size()`.
 [[nodiscard]] std::int32_t explosionCount(const wire::nbt::NbtCompound& item);
 
-/// parity: the position constructor: a tiny random drift, a climb of 0.05, and a lifetime of ten
-/// ticks a flight level plus up to eleven more.
 RocketState& start(ServerEntity& rocket, wire::nbt::NbtCompound item, random::RandomSource& random);
 
 /// parity: `addAdditionalSaveData`.

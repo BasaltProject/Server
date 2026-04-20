@@ -19,8 +19,7 @@ namespace {
     return *stateId;
 }
 
-/// parity: the configured feature's height provider, a weighted list rather than a uniform draw, so
-/// which branch runs decides how many further values are consumed.
+/// parity: the height provider is a weighted list, so the branch decides how many values are consumed.
 [[nodiscard]] std::int32_t sampleCaveHeight(random::RandomSource& random) {
     const std::int32_t choice = random.nextInt(15);
     if (choice <= 1) {

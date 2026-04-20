@@ -15,7 +15,6 @@ using wire::common::Identifier;
 using wire::text::Component;
 using wire::text::kGray;
 
-/// Two decimals, which is what vanilla's own report prints.
 [[nodiscard]] std::string formatted(double value) {
     const auto scaled = static_cast<std::int64_t>(std::llround(value * 100.0));
     const std::string fraction = std::to_string(scaled % 100);
@@ -68,8 +67,7 @@ void DebugCommand::build(const CommandNodeBuilder& root) const {
         });
     });
 
-    /// parity: `/debug function`, which runs a function and reports what it did. Vanilla writes a
-    /// trace file per command; this reports the count, which is the part a player sees.
+    /// parity: `/debug function`, which runs a function and reports what it did.
     root.literal("function", [this](const CommandNodeBuilder& form) {
         form.argument("name", functionArgument(), [this](const CommandNodeBuilder& name) {
             name.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {

@@ -12,12 +12,9 @@
 
 namespace basalt::server::runtime::world {
 
-/// The Overworld's biome lookup: the climate router through `OverworldBiomeSource`, zoomed with the
-/// world's own seed.
 class RealSurfaceEnvironment final : public server::world::terrain::surface::SurfaceRuleEnvironment {
 public:
-    /// The router is borrowed, not copied: it is shared by every generation worker, and it has to
-    /// outlive this.
+    /// Borrowed, not copied: shared by every generation worker and must outlive this.
     RealSurfaceEnvironment(const server::world::terrain::NoiseRouter& router, std::int64_t biomeZoomSeed);
 
     [[nodiscard]] std::optional<std::int64_t> biomeZoomSeed() const override { return biomeZoomSeed_; }
@@ -32,7 +29,6 @@ public:
                  server::world::densityfunction::SamplerContext* context = nullptr) const override;
 
 private:
-    /// The interface hands biome names out by reference, so each one is kept once and returned.
     [[nodiscard]] const std::string& nameOf(std::string_view biome) const;
 
     std::int64_t biomeZoomSeed_;

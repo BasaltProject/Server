@@ -23,8 +23,6 @@ constexpr float kMoonWeight = 0.25F;
     if (difficulty == "hard") {
         return 3;
     }
-    // Easy, and anything nobody recognizes: a word that is not a difficulty is not a reason to
-    // make the world harder than it was.
     return 1;
 }
 
@@ -33,8 +31,6 @@ constexpr float kMoonWeight = 0.25F;
 float effectiveDifficulty(std::string_view difficulty, std::int64_t gameTime, std::int64_t inhabitedTime,
                           float moonBrightness) {
     const std::int32_t id = difficultyId(difficulty);
-    // Multiplying by zero would answer the same; peaceful leaves before the arithmetic because
-    // that is what the rule says, not because the numbers happen to agree.
     if (id == 0) {
         return 0.0F;
     }
@@ -43,8 +39,7 @@ float effectiveDifficulty(std::string_view difficulty, std::int64_t gameTime, st
         std::clamp((static_cast<float>(gameTime) - kGlobalTimeOffset) / kMaxGlobalTime, 0.0F, 1.0F) * kGlobalTimeWeight;
     float localScale = std::clamp(static_cast<float>(inhabitedTime) / kMaxLocalTime, 0.0F, 1.0F) *
                        (difficulty == "hard" ? 1.0F : 0.75F);
-    // parity: the moon's share is capped by the global bonus, so a full moon on a young world is
-    // worth nothing at all.
+    // parity: the moon's share is capped by the global bonus, so a full moon on a young world is.
     localScale += std::clamp(moonBrightness * kMoonWeight, 0.0F, globalBonus);
     if (difficulty == "easy") {
         localScale *= 0.5F;

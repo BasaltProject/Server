@@ -13,8 +13,7 @@ namespace structure = server::world::structure;
 
 using wire::common::Identifier;
 
-/// parity: every name in these files may carry the `minecraft:` prefix or not, and both resolve to
-/// the same file.
+/// parity: every name in these files may carry the `minecraft:` prefix or not.
 [[nodiscard]] std::string_view stripNamespace(std::string_view id) {
     const std::size_t colon = id.find(':');
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
@@ -98,7 +97,6 @@ std::optional<std::set<std::int32_t>> VillageDataLoader::blockTag(std::string_vi
 
 std::optional<std::set<std::int32_t>> VillageDataLoader::expandBlockTag(std::string_view name,
                                                                         std::set<std::string>& seen) {
-    // A tag that refers to itself, however far around, resolves to nothing rather than looping.
     if (!seen.insert(std::string{name}).second) {
         return std::set<std::int32_t>{};
     }

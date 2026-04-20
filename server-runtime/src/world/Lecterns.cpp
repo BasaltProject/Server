@@ -13,10 +13,7 @@
 namespace basalt::server::runtime::world::lecterns {
 namespace {
 
-/// parity: `LecternBlock.updateBelow`. Every path that writes a lectern ends in it. The lectern's own
-/// `setBlock` has already told this square's neighbours; what this adds is the square below and its
-/// own, which is where a line of dust running under the stand reads from. A lectern written by
-/// command gets none of it, because a command never goes through these paths.
+/// parity: `LecternBlock.updateBelow`.
 void tellBelow(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
     redstoneComponents::scheduleAround(world, {}, x, y - 1, z, false, comparatorReading::of(world));
 }
@@ -24,9 +21,7 @@ void tellBelow(WorldState& world, const std::int32_t x, const std::int32_t y, co
 constexpr std::string_view kBookKey = "Book";
 constexpr std::string_view kPageKey = "Page";
 
-/// parity: `LecternBlockEntity.getPageCount`, which asks the book itself: a written one keeps its
-/// pages under `written_book_content` and a plain one under `writable_book_content`, and a book with
-/// neither has no pages at all.
+/// parity: `LecternBlockEntity.getPageCount`.
 constexpr std::string_view kWrittenContent = "minecraft:written_book_content";
 constexpr std::string_view kWritableContent = "minecraft:writable_book_content";
 constexpr std::string_view kPagesField = "pages";
@@ -35,7 +30,6 @@ constexpr std::string_view kResolvedField = "resolved";
 /// parity: `LecternBlockEntity.getRedstoneSignal`'s fourteen steps between the covers.
 constexpr float kSignalSteps = 14.0F;
 
-/// The book on the stand, or nothing when there is none.
 [[nodiscard]] std::optional<server::world::loot::ItemStack> bookIn(const wire::nbt::NbtCompound& data) {
     const wire::nbt::NbtCompound* stored = data.getCompound(std::string{kBookKey});
     return stored == nullptr ? std::nullopt : blockInventory::readStack(*stored);
@@ -62,7 +56,6 @@ constexpr float kSignalSteps = 14.0F;
     return found == properties.end() ? std::string{} : found->second;
 }
 
-/// The lectern at these coordinates, and the block entity it keeps its book in.
 [[nodiscard]] server::world::ChunkBlockEntity* entityAt(WorldState& world, std::int32_t x, std::int32_t y,
                                                         std::int32_t z, bool create) {
     server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
@@ -79,7 +72,6 @@ constexpr float kSignalSteps = 14.0F;
     return chunk->blockEntityAt(x & 15, y, z & 15);
 }
 
-/// Answers the lectern's own block, or nothing when this is not one or does not say what is wanted.
 [[nodiscard]] const wire::common::Identifier* lecternAt(WorldState& world, std::int32_t x, std::int32_t y,
                                                         std::int32_t z, std::int32_t& stateId,
                                                         const std::string& property, const std::string& wanted) {
@@ -123,8 +115,7 @@ std::optional<BlockChange> placeBook(WorldState& world, std::int32_t x, std::int
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    // parity: `saveAdditional` writes the book with `ItemStack.CODEC` and the page beside it, and
-    // writes neither while the stand is empty.
+    // parity: `saveAdditional` writes the book with `ItemStack.CODEC` and the page beside it.
     entity->data().set(std::string{kBookKey}, wire::nbt::NbtTag::ofCompound(blockInventory::writeStack(book)));
     entity->data().putInt(kPageKey, 0);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
@@ -146,8 +137,7 @@ bool resolveBook(WorldState& world, const std::int32_t x, const std::int32_t y, 
     };
     wire::nbt::NbtCompound* book = inside(&entity->data(), kBookKey);
     wire::nbt::NbtCompound* content = inside(inside(book, "components"), kWrittenContent);
-    // parity: `WrittenBookContent.resolve` answers nothing when it is already resolved, and the codec
-    // leaves the field out while it is false.
+    // parity: `WrittenBookContent.resolve` answers nothing when it is already resolved.
     if (content == nullptr || content->getBoolean(std::string{kResolvedField})) {
         return false;
     }

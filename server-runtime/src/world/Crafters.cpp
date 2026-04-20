@@ -71,8 +71,7 @@ constexpr std::string_view kTriggeredKey = "triggered";
     return step[2] < 0 ? registry::BlockFace::South : registry::BlockFace::North;
 }
 
-/// parity: `HopperBlockEntity.addItem` over `tryMoveInItem`: every slot open to that face in turn,
-/// an empty one taking the whole stack and a matching one topping up to the item's own limit.
+/// parity: `HopperBlockEntity.addItem` over `tryMoveInItem`.
 void addItem(std::string_view path, const wire::nbt::NbtCompound& data, blockInventory::Slots& slots,
              server::world::loot::ItemStack& stack, registry::BlockFace face) {
     const auto size = static_cast<std::int32_t>(slots.size());
@@ -101,7 +100,6 @@ void addItem(std::string_view path, const wire::nbt::NbtCompound& data, blockInv
     }
 }
 
-/// Puts the result into the container in front and answers what is left of it.
 [[nodiscard]] server::world::loot::ItemStack insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                     const std::array<std::int32_t, 3>& step,
                                                     const server::world::loot::ItemStack& stack) {
@@ -109,9 +107,6 @@ void addItem(std::string_view path, const wire::nbt::NbtCompound& data, blockInv
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     const wire::common::Identifier* block =
         stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
-    // How big the container in front is. This used to go through a callback that the one production
-    // caller never filled in, so `insert` always answered no and a crafter threw every result on the
-    // floor instead of putting it in the chest it was pointing at.
     const std::optional<std::int32_t> size = block == nullptr ? std::nullopt : containers::sizeOf(block->path());
     server::world::ChunkBlockEntity* entity = size.has_value() ? entityAt(world, x, y, z) : nullptr;
     if (entity == nullptr) {
@@ -121,7 +116,7 @@ void addItem(std::string_view path, const wire::nbt::NbtCompound& data, blockInv
     const registry::BlockFace face = oppositeOf(step);
     blockInventory::Slots slots = blockInventory::readFor(path, entity->data(), *size);
     const std::int32_t cap = std::min(containers::kSlotLimit, containers::maxStackFor(path, stack));
-    // parity: `CrafterBlock.dispenseItem`: into another crafter, or more than one slot takes, one at a time.
+    // parity: `CrafterBlock.dispenseItem`.
     if (path == "crafter" || stack.count > cap) {
         while (remaining.count > 0) {
             server::world::loot::ItemStack one = remaining;
@@ -149,7 +144,7 @@ void addItem(std::string_view path, const wire::nbt::NbtCompound& data, blockInv
     return remaining;
 }
 
-/// parity: `dispenseItem`, which prefers the container in front and throws it out when there is none.
+/// parity: `dispenseItem`.
 void deliver(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
              const server::world::loot::ItemStack& result, const Hooks& hooks) {
     const std::array<std::int32_t, 3> step = facingStep(stateId);
@@ -193,8 +188,7 @@ std::optional<BlockChange> onNeighbourChange(WorldState& world, std::string_view
     if (signal == triggered) {
         return std::nullopt;
     }
-    // parity: `CrafterBlockEntity` keeps its own `triggered` beside the state's, and the jar writes
-    // it down. Measured in the bench circuit `crafter`.
+    // parity: `CrafterBlockEntity` keeps its own `triggered` beside the state's.
     if (server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z); entity != nullptr) {
         entity->data().putInt(kTriggeredKey, signal ? 1 : 0);
     }
@@ -230,9 +224,7 @@ std::optional<BlockChange> craft(WorldState& world, std::int32_t x, std::int32_t
     const std::optional<server::world::loot::ItemStack> result =
         hooks.resultFor(server::world::crafting::CraftingInput::of(kGrid, kGrid, slots));
     if (!result.has_value() || result->count <= 0) {
-        // parity: `CrafterBlock.dispenseFrom` raises `levelEvent(1050, pos, 0)` when what is in it is
-        // not a recipe, which is the click a crafter makes at nothing. The block does not move, so the
-        // change carries the same state it already had and only the effect is new.
+        // parity: `CrafterBlock.dispenseFrom` raises `levelEvent(1050.
         return BlockChange{.x = x,
                            .y = y,
                            .z = z,
@@ -315,8 +307,7 @@ bool setSlotState(WorldState& world, const std::int32_t x, const std::int32_t y,
     if (entity == nullptr) {
         return false;
     }
-    // parity: `slotCanBeDisabled`, which is the slot being empty. A slot with something in it keeps
-    // its switch wherever it was.
+    // parity: `slotCanBeDisabled`.
     const blockInventory::Slots slots = blockInventory::read(entity->data(), kSize);
     if (slots[static_cast<std::size_t>(slot)].has_value()) {
         return false;
@@ -351,8 +342,7 @@ bool accepts(const wire::nbt::NbtCompound& data, const blockInventory::Slots& sl
     if (here->count >= maxStackOf(*here)) {
         return false;
     }
-    // parity: `smallerStackExist` only looks **forward**, so the grid fills left to right and then
-    // starts again rather than topping up the first slot it finds.
+    // parity: `smallerStackExist` only looks **forward**.
     for (std::int32_t later = slot + 1; later < kSize; ++later) {
         if (off.contains(later)) {
             continue;

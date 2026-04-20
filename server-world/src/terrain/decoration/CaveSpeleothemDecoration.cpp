@@ -59,7 +59,6 @@ struct ClusterConfig {
     float maxWetness;
 };
 
-/// What a scan up and down from one position found: the first non-empty block each way, if any.
 struct CaveColumn {
     std::optional<std::int32_t> floor;
     std::optional<std::int32_t> ceiling;
@@ -107,8 +106,6 @@ const PathSet& sulfurReplaceable() {
     return DecorationPos{.x = position.x, .y = y, .z = position.z};
 }
 
-/// The read and write view these features work through: a cluster reaches past its own chunk, and
-/// the part outside used to be collected and then dropped.
 class SpeleothemRegion {
 public:
     SpeleothemRegion(Chunk& chunk, ExternalStateReader externalBlockState)
@@ -129,8 +126,7 @@ public:
                 return stateId;
             }
         }
-        // parity: what this chunk already queued for the neighbour is in the neighbour's proto chunk
-        // as far as vanilla is concerned, so it beats whatever the neighbour view still reports.
+        // parity: writes already queued for the neighbour count as its proto chunk, beating the neighbour view.
         if (const std::optional<std::int32_t> queued =
                 chunk_->queuedDecorationStateId(position.x, position.y, position.z);
             queued.has_value()) {
@@ -209,9 +205,7 @@ private:
         std::clamp(value, static_cast<float>(minInclusive), static_cast<float>(maxInclusive)));
 }
 
-/// parity: a speleothem replaces `#dripstone_replaceable_blocks`, and vanilla decides that against
-/// whatever is really at the position. A write that crosses the chunk edge has to carry the same
-/// target predicate or it is refused as soon as the neighbour's own decoration touched the cell.
+/// parity: vanilla tests the dripstone-replaceable predicate against the real block, so crossing writes carry it.
 void setSpeleothemBlock(SpeleothemRegion& region, const DecorationPos& position, std::int32_t stateId,
                         const SpeleothemConfig& config) {
     const Chunk::WritePolicyScope scope{region.chunk(), oreBlockRules::policyFor(*config.replaceable)};
@@ -473,8 +467,7 @@ bool placeCluster(SpeleothemRegion& region, random::RandomSource& random, const 
                               ? config.wetnessMean
                               : clampedNormalFloat(random, config.wetnessMean, config.wetnessDeviation,
                                                    config.minWetness, config.maxWetness);
-    // parity: `Mth.randomBetween` is `nextFloat() * (max - min) + min`, and `0.7F - 0.3F` is not
-    // `0.4F`: written with the span precomputed, every density comes out one ulp high.
+    // parity: `Mth.randomBetween` is `nextFloat() * (max - min) + min`.
     const float density = random.nextFloat() * (0.7F - 0.3F) + 0.3F;
     const std::int32_t xRadius = 2 + random.nextInt(7);
     const std::int32_t zRadius = 2 + random.nextInt(7);
@@ -561,8 +554,7 @@ void placePointedFeature(SpeleothemRegion& region, random::RandomSource& random,
         const DecorationPos origin{.x = x, .y = bounds.minY() + random.nextInt(321), .z = z};
         const std::int32_t nestedCount = 1 + random.nextInt(5);
         for (std::int32_t nested = 0; nested < nestedCount; ++nested) {
-            // parity: `RandomOffsetPlacement` draws x, then y, then z from the same source. As
-            // arguments of one call the order is unspecified, so the sequence is pinned here.
+            // parity: `RandomOffsetPlacement` draws x.
             const std::int32_t offsetX = clampedNormal(random, 3.0F, -10, 10);
             const std::int32_t offsetY = clampedNormal(random, 0.6F, -2, 2);
             const std::int32_t offsetZ = clampedNormal(random, 3.0F, -10, 10);
@@ -603,9 +595,7 @@ const std::set<std::string, std::less<>>& caveSpeleothemDecoration::placedIds() 
     return ids;
 }
 
-/// parity: `ChunkGenerator.applyBiomeDecoration` gathers the biomes of the 3x3 of chunks and only
-/// runs the features some biome there lists. A feature nobody lists never draws, which matters for
-/// the gaussian: its spare outlives a `setFeatureSeed`.
+/// parity: `applyBiomeDecoration` only runs features some biome in the 3x3 lists.
 [[nodiscard]] bool biomeInRange(const surface::SurfaceRuleEnvironment& environment, const Chunk& chunk,
                                 std::string_view biome) {
     const ChunkHeight bounds = chunk.verticalBounds();

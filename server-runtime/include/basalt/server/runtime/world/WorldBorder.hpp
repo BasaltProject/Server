@@ -6,12 +6,9 @@
 
 namespace basalt::server::runtime::world {
 
-/// One world's border. parity: `WorldBorder`, minus the damage it deals outside itself, which needs
-/// the per-tick player damage pass; the numbers are kept so `/worldborder damage` still reports and
-/// persists what an operator set.
+/// parity: `WorldBorder`.
 class WorldBorder {
 public:
-    /// parity: `WorldBorder.DEFAULT_SIZE`.
     static constexpr double kDefaultSize = 5.9999968E7;
 
     /// parity: the caps `/worldborder set` refuses past.
@@ -27,7 +24,6 @@ public:
 
     [[nodiscard]] double centerZ() const noexcept { return centerZ_; }
 
-    /// Where the size is now, and where it is heading if a move is in progress.
     [[nodiscard]] double size() const noexcept { return size_; }
 
     [[nodiscard]] double targetSize() const noexcept { return targetSize_; }
@@ -38,32 +34,20 @@ public:
 
     void setSize(double newSize);
 
-    /// parity: `WorldBorder.lerpSizeBetween`, which reports the old size while it moves, and counts
-    /// in ticks. It used to be told milliseconds here, which made every moving border crawl at a
-    /// fiftieth of the speed the command asked for.
+    /// parity: `WorldBorder.lerpSizeBetween` reports the old size while it moves and counts in ticks.
     void moveSize(double newSize, std::int64_t overTicks);
 
     [[nodiscard]] wire::protocol::play::InitializeBorderPacket initializePacket() const;
 
-    /// How far outside the border a position is, in blocks, or 0 while it is inside.
-    ///
-    /// parity: `WorldBorder.getDistanceToBorder`, negated: vanilla measures towards the border and
-    /// damages on the distance past it plus the buffer.
+    /// parity: `getDistanceToBorder`.
     [[nodiscard]] double distanceOutside(double x, double z) const;
 
-    /// The damage one tick outside the border costs, or 0 inside it or inside the buffer.
-    ///
-    /// parity: `ServerPlayer.tick`'s border pass, which damages every ten ticks by
-    /// `damagePerBlock * (distance - buffer)`, with a floor of the per-block amount.
+    /// parity: `ServerPlayer.tick`.
     [[nodiscard]] float damageAt(double x, double z) const;
 
-    /// Whether a square is inside the border at all.
-    ///
-    /// parity: `WorldBorder.isWithinBounds(double, double)`, which is closed on the low side and
-    /// open on the high one.
+    /// parity: `WorldBorder.isWithinBounds(double, double)`.
     [[nodiscard]] bool contains(double x, double z) const;
 
-    /// Called when a move finishes, so the stored size stops being the one it started from.
     void settle();
 
 private:

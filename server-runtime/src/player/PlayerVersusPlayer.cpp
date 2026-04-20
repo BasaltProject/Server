@@ -123,7 +123,7 @@ void animate(const Context& context, std::string_view worldName, std::int32_t en
            victim.yaw;
 }
 
-/// parity: `LivingEntity.knockback` on a player, sent as their motion and forgotten by the server.
+/// parity: `LivingEntity.knockback` on a player.
 void pushPlayer(const Context& context, PlayerSession& attacker, PlayerSession& victim, double power) {
     const std::array<double, 2> towards = facing(attacker);
     const double resistance =
@@ -134,7 +134,6 @@ void pushPlayer(const Context& context, PlayerSession& attacker, PlayerSession& 
                angleFrom(attacker, victim));
 }
 
-/// The player's worn and held stacks, in `EquipmentSlot` order.
 [[nodiscard]] std::vector<world::postAttack::Equipped> equipmentOf(const PlayerSession& player) {
     static constexpr std::array<std::pair<std::int32_t, std::string_view>, 4> kWorn{
         {{PlayerInventory::kArmourStart + 3, "feet"},
@@ -155,7 +154,6 @@ void pushPlayer(const Context& context, PlayerSession& attacker, PlayerSession& 
     return equipped;
 }
 
-/// A player's stack worn by an enchantment, and their own client told.
 void wearSlot(const Context& context, PlayerSession& owner, std::int32_t slot, std::int32_t amount) {
     if (context.blocks == nullptr || amount <= 0) {
         return;
@@ -210,8 +208,7 @@ void wearWeapon(const Context& context, PlayerSession& attacker, const std::opti
 
 } // namespace
 
-/// parity: `EnchantmentHelper.doPostAttackEffectsWithItemSource` after a player's melee blow on
-/// `victim`, a player, or on `mob`.
+/// parity: `EnchantmentHelper.doPostAttackEffectsWithItemSource` after a melee blow on `victim` or `mob`.
 void postAttack(const Context& context, world::LoadedWorld& world, PlayerSession& attacker, PlayerSession* victim,
                 ServerEntity* mob, const std::optional<storage::StoredItemStack>& weapon, std::int32_t weaponSlot) {
     const world::weaponDamage::Victim facts = victimOf(context, victim != nullptr ? playerType() : mob->type());
@@ -424,8 +421,7 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
         soundAt(context, attacker, "entity.player.attack.nodamage");
         return false;
     }
-    // parity: `causeExtraKnockback`: the attribute and the knockback enchantment halved, the sprint
-    // on top; the victim's motion goes out and the server keeps the one from before the blow.
+    // parity: `causeExtraKnockback`.
     const float knockback =
         knockbackOf(context, attacker, swing.weapon) + (blow.knockbackAttack ? kSprintKnockback : 0.0F);
     if (knockback > 0.0F) {

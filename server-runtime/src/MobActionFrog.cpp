@@ -143,7 +143,7 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
             frog.targetId.reset();
         }
     }
-    // parity: `updateActivity`: tongue, lay spawn, long jump, swim, idle; none valid keeps the last.
+    // parity: `updateActivity`.
     if (frog.targetId.has_value()) {
         state.activity = Activity::Tongue;
     } else if (state.pregnant && !state.jump.midJump) {
@@ -162,7 +162,7 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
     const auto tempts = [this](const wire::common::Identifier& item) {
         return itemTagged("minecraft:frog_food", item);
     };
-    // parity: `StartAttacking` over `FrogAttackablesSensor`: the nearest thing it can eat within ten.
+    // parity: `StartAttacking` over `FrogAttackablesSensor`.
     const auto startAttacking = [&] {
         if (frog.targetId.has_value() || state.breedTarget.has_value()) {
             return;
@@ -197,7 +197,7 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
         }
         return true;
     };
-    // parity: the `RunOne` of a stroll, a walk to what it looks at, a croak and standing about.
+    // parity: the `RunOne` of a stroll.
     const auto runOne = [&](const std::vector<std::int32_t>& weights) {
         if (state.croaking) {
             return;
@@ -226,7 +226,7 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
             }
         }
     };
-    // parity: `TryFindLand(8, 1.5)`: a dry square off the water with something sturdy under it.
+    // parity: `TryFindLand(8, 1.5)`.
     const auto findLand = [&] {
         if (!waterAt(context.world, blockOf(frog)) || frog.targetId.has_value() || state.motion.walk.has_value()) {
             return;
@@ -295,7 +295,7 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
         break;
     }
     frogJumps(world, context, state);
-    // parity: `Croak.tick`, sixty turns counted from its start, the start's own turn included.
+    // parity: `Croak.tick`.
     if (state.croaking && ++state.croakCounter > frogs::kCroakTicks) {
         state.croaking = false;
         state.pose = frogs::Pose::Standing;
@@ -305,7 +305,7 @@ void MobActionSystem::tickFrog(world::LoadedWorld& world, entity::ai::MobContext
 }
 
 void MobActionSystem::frogJumps(world::LoadedWorld& world, entity::ai::MobContext& context, FrogState& state) {
-    // parity: `LongJumpToPreferredBlock(100..140, 2, 4)` in its activity, and `LongJumpMidJump`
+    // parity: `LongJumpToPreferredBlock(100..140, 2, 4)` in its activity.
     // running on until it lands whatever the activity.
     if (state.activity != Activity::LongJump && !state.jump.midJump) {
         return;
@@ -328,7 +328,7 @@ void MobActionSystem::frogJumps(world::LoadedWorld& world, entity::ai::MobContex
                                           .width = 4,
                                           .acceptable =
                                               [&](const kit::Block& target) {
-                                                  // parity: `FrogAi.isAcceptableLandingSpot`: dry all round, then a
+                                                  // parity: `FrogAi.isAcceptableLandingSpot`: dry all round, then a.
                                                   // preferred block, a trapdoor, or whatever the default takes.
                                                   const kit::Block below{target[0], target[1] - 1, target[2]};
                                                   if (fluidAt(context.world, target) != world::Submersion::None ||
@@ -375,7 +375,7 @@ void MobActionSystem::frogTongue(world::LoadedWorld& world, entity::ai::MobConte
         if (target == nullptr || state.motion.walk.has_value() || panicking) {
             return;
         }
-        // parity: `checkExtraStartConditions`: a path that ends in reach, or the target let go and
+        // parity: `checkExtraStartConditions`.
         // remembered as out of reach.
         if (!entity::ai::navigation::canReach(context.world, frog, target->x, target->y, target->z)) {
             frog.targetId.reset();
@@ -459,7 +459,7 @@ void MobActionSystem::frogLaysSpawn(world::LoadedWorld& world, entity::ai::MobCo
     ServerEntity& frog = context.mob;
     const std::int64_t now = context.gameTime;
     const kit::Block own = blockOf(frog);
-    // parity: `TryFindLandNearLiquid(8, 1.0)`: a dry square beside open water, every two seconds.
+    // parity: `TryFindLandNearLiquid(8, 1.0)`.
     if (!waterAt(context.world, own) && !frog.targetId.has_value() && !state.motion.walk.has_value()) {
         const bool due = now >= state.landNearLiquidSearch;
         state.landNearLiquidSearch = now + 40;
@@ -514,7 +514,7 @@ void MobActionSystem::tickTadpole(world::LoadedWorld& /*world*/, entity::ai::Mob
     frogs::TadpoleState& state = frogs::tadpoleOf(tadpole);
     const bool inWater = entity::ai::inWater(context.world, tadpole);
     tadpole.smoothSwimming = inWater;
-    // parity: `TadpoleAi`: panic, a look at players now and then, frog food followed, and the gate of a
+    // parity: `TadpoleAi`.
     // swim and a walk to what it looks at.
     if (!kit::panic(context, state.motion, state.panicTicks, 2.0F)) {
         kit::lookSometimes(context, state.look, state.lookTicker, 6.0, 30, 60, "player");

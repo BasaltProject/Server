@@ -16,12 +16,10 @@ namespace netherSurfaceStructuresDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const NetherBiomeLookup& biomeSource);
 
-/// One feature on its own, addressed by its global index in this step.
 void decorateFeature(Chunk& chunk, std::int64_t seed, const NetherBiomeLookup& biomeSource, std::int32_t globalIndex);
 
 [[nodiscard]] const std::set<std::string, std::less<>>& placedIds();
 
-/// One of them at one position, which is what `/place feature` runs.
 bool placeAt(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z,
              std::string_view placedFeature);
 

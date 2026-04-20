@@ -34,15 +34,12 @@ constexpr std::chrono::milliseconds kWaitPoll{1};
 struct ProtoChunks::Entry {
     std::unique_ptr<realTerrainGenerator::GeneratedTerrain> terrain;
     ChunkStage stage = ChunkStage::Terrain;
-    /// A neighbour decorated into it, so it no longer matches what its seed alone would make.
     bool touched = false;
     std::uint64_t used = 0;
 };
 
 struct ProtoChunks::Request {
     std::int32_t priority = 0;
-    /// Whether the region files were asked about it yet. Until then nothing near it may decorate:
-    /// the answer decides which neighbours it needs, and so what goes first.
     bool resolved = false;
     bool waited = false;
 };
@@ -143,10 +140,7 @@ void ProtoChunks::refreshWants() {
         return std::tuple{left.first, xOf(left.second), zOf(left.second)} <
                std::tuple{right.first, xOf(right.second), zOf(right.second)};
     });
-    // parity: `ChunkGenerationTask` takes the chunks it needs full one at a time and schedules each
-    // one's 3x3 to decorate, x outermost, so the turns come out in 3x3 blocks. Vanilla leaves the
-    // order between two tasks to its executor; this one fixes it (priority, then x, then z) so a seed
-    // makes one world.
+    // parity: `ChunkGenerationTask` order is executor-dependent in vanilla.
     decorationOrder_.clear();
     for (const auto& [priority, at] : resolved) {
         for (std::int32_t dx = -1; dx <= 1; ++dx) {
@@ -189,8 +183,6 @@ bool ProtoChunks::decorationMayRun(const std::int64_t chunk, const std::unordere
             if (adjacent && !entries_.contains(around) && !full_.contains(around)) {
                 return false;
             }
-            // Two whose 3x3 overlap write into the same chunks, so the earlier one goes first and
-            // neither runs beside the other.
             if ((dx != 0 || dz != 0) && (decorating_.contains(around) || earlier.contains(around))) {
                 return false;
             }
@@ -200,7 +192,6 @@ bool ProtoChunks::decorationMayRun(const std::int64_t chunk, const std::unordere
 }
 
 std::optional<ProtoChunks::Task> ProtoChunks::pick() {
-    // A chunk whose eight neighbours all decorated is done: nothing writes into it any more.
     for (auto& [at, request] : requests_) {
         if (!request.resolved || busy_.contains(at)) {
             continue;
@@ -410,8 +401,6 @@ std::vector<Chunk> ProtoChunks::evict() {
         return {};
     }
     refreshWants();
-    // What a request or a pending decoration still reads, a running one included: its region holds
-    // pointers into these.
     std::unordered_set<std::int64_t> needed;
     const auto around = [&needed](const std::int64_t at) {
         for (std::int32_t dx = -1; dx <= 1; ++dx) {
@@ -444,7 +433,6 @@ std::vector<Chunk> ProtoChunks::evict() {
             break;
         }
         const auto entry = entries_.find(at);
-        // Terrain nobody wrote into is the seed's own and is simply made again when needed.
         if (entry->second->stage == ChunkStage::Decorated || entry->second->touched) {
             Chunk chunk = std::move(entry->second->terrain->chunk());
             chunk.setStage(entry->second->stage);

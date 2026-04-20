@@ -59,18 +59,14 @@ namespace {
 /// parity: `TntBlock.explode`, which is where the fuse is heard being lit.
 constexpr std::string_view kTntPrimedSound = "entity.tnt.primed";
 
-/// The player type, whose box every mob measures a player by.
 [[nodiscard]] const wire::common::Identifier& playerType() {
     static const wire::common::Identifier player = wire::common::Identifier::vanilla("player");
     return player;
 }
 
-/// parity: `random.nextDouble() * (float)(Math.PI * 2)`, the whole turn a lit block of tnt picks its
-/// little sideways push from.
+/// parity: `random.nextDouble() * (float)(Math.PI * 2)`.
 constexpr double kFullTurn = 6.283185307179586;
 
-/// The seed of the tick's own random. Nothing here is checked bit for bit against vanilla: what a
-/// mob decides this turn is not part of a seed's world.
 [[nodiscard]] std::int64_t scratchSeed() {
     static thread_local std::mt19937_64 random{std::random_device{}()};
     return static_cast<std::int64_t>(random());
@@ -96,25 +92,21 @@ constexpr double kFullTurn = 6.283185307179586;
 } // namespace
 
 void BasaltServer::tickWorlds(const bool worldRuns) {
-    // Told once a tick, and only if somebody asked: with no listener this is a boolean.
     server::plugins::PluginEventBus* bus = plugins_ == nullptr ? nullptr : &plugins_->events();
     static_cast<void>(
         server::plugins::emit(bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::serverTick(),
                               [this](server::plugins::PluginEvent& event) { event.set(0, tickLoop_->ticksRun()); }));
 
     // Functions first, so one that changes the world does it before this tick's own work reads it.
-    // parity: `tickChildren` runs the function manager before the levels.
+    // parity: `tickChildren`.
     if (worldRuns) {
         tickFunctions();
     }
     flushAdvancements();
 
-    // What the world has loaded decides what its regions are, and it is worked out here, at the tick
-    // boundary, before any of them starts: a chunk changing hands mid-tick is the one thing this
-    // model cannot survive. With regions off it does nothing.
+    // Regions are worked out at the tick boundary: a chunk changing hands mid-tick is what this model cannot survive.
     for (const auto& [name, world] : worldRegistry_->worlds()) {
-        // Only when the world's chunks actually moved: the shape of a world is decided by them, and
-        // walking every loaded chunk on a tick where none arrived or left is pure cost.
+        // Only when the world's chunks moved: walking every loaded chunk on a quiet tick is pure cost.
         const std::int64_t version = world->state().chunkSetVersion();
         std::map<std::string, std::int64_t>& seen = worldRegistry_->lastChunkSetVersion();
         const auto last = seen.find(world->name());
@@ -131,14 +123,11 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             });
     }
 
-    // Between turns, where nothing this thread handed out is still being walked: what a player who
-    // left leaves behind is let go here and nowhere else.
+    // Between turns, so nothing this thread handed out is still being walked when a departed player is released.
     playerRegistry_.collect();
     tickScoreCriteria();
 
-    // Where each player's packets go is decided here, between turns: no region is running, so
-    // handing a session that walked across a border to its new owner cannot land two threads inside
-    // the same player.
+    // Decided between turns: with no region running, re-homing a session cannot put two threads in one player.
     const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
     for (player::PlayerSession* player : playerRegistry_.snapshot()) {
         const auto found = worlds.find(player->worldName);
@@ -153,9 +142,6 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
         }
     }
 
-    // Every turn goes through the scheduler, in both modes: the global owner first and then each
-    // region. With the world in one piece that is one region per world, ticked in the order the
-    // worlds were loaded, which is the order this loop walked them in before.
     worldRegistry_->scheduler().tick(
         [this](const std::exception& failure) {
             logger_.error([&failure] { return std::string{"A tick task failed: "} + failure.what(); });
@@ -170,38 +156,24 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 logger_.error(
                     [&world, &failure] { return "A task for world '" + world.name() + "' failed: " + failure.what(); });
             };
-            // A turn is: what came due, then what was waiting, then the world's own work, and last
-            // what asked to run at the end of it. Everything below this line is that third part.
-            // This region's own queue, not the world's: once a world is split there are several, and
-            // running the first region's queue from every region's thread was two threads in the
-            // same queue at once.
+            // This region's own queue, not the world's: another region's queue run from here put two threads in one.
             timings_.of("tick.tasks").time([&region, &onTaskFailure, worldRuns] {
-                // parity: a frozen turn does not move the clock, so nothing waiting on a delay comes
-                // due, but what is already queued still runs.
                 if (worldRuns) {
                     region.owner().advanceTick();
                 }
                 static_cast<void>(region.owner().runPending(onTaskFailure));
             });
-            // `/stop` and `/restart` run on this queue and wind the whole server down before they
-            // return: players gone, worlds written, scheduler closed. What follows would give a turn
-            // to a world that is already saved and shut, so the turn ends where the server did.
+            // `/stop` and `/restart` wind the server down before returning, so the turn ends where the server did.
             if (shuttingDown_.load()) {
                 return;
             }
-            // What the console typed runs at the turn's console point, not at its top: parity:
-            // `DedicatedServer.tickConnection`'s `handleConsoleInputs`, which the jar runs after
-            // the levels and before `playerList.tick` (see the drain before the player tick
-            // below).
             const auto drainConsole = [this, &region, &onTaskFailure] {
                 if (region.isPrimary() && region.worldName() == worldRegistry_->defaultWorld().name()) {
                     static_cast<void>(region.owner().runConsole(onTaskFailure));
                 }
             };
             if (!worldRuns) {
-                // parity: a frozen turn still takes console input, which is how `/tick unfreeze`
-                // reaches the world at all. It lands before the deaths and the tnt it may cause,
-                // as it did from the top of the turn.
+                // parity: `/tick unfreeze`.
                 drainConsole();
                 if (shuttingDown_.load()) {
                     return;
@@ -210,8 +182,6 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 tickPrimedTnt(world);
                 return;
             }
-            // Whatever those commands killed or lit goes off now: a running turn has already
-            // drained the console queue, and this pair only sees what it did.
             tickDeaths(world, region);
             tickPrimedTnt(world);
 
@@ -225,9 +195,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 }
             };
 
-            // What belongs to a piece of the map is done by whoever owns that piece; what belongs to
-            // the world as a whole (its clock, its weather, its players) runs once, in the world's
-            // first region. With one region the two are the same thing.
+            // Per-world state (clock, weather, players) runs once, in the world's first region.
             if (region.isPrimary()) {
                 step("Time tick", [this, &world] { environment_->tickTime(world); });
                 step("Border damage", [this, &world] { environment_->tickBorderDamage(world); });
@@ -240,46 +208,32 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Warden warning tick", [this, &world] { shriekers_->tickTrackers(world); });
             }
             step("Inhabited-time tick", [this, &world, &region] { redstone_->tickInhabitedTime(world, region); });
-            // parity: `ServerLevel.tick` runs booked block turns first, then fluids, then random ticks.
-            // The jar books an absolute `triggerTick`; the countdown equivalent is to count everything
-            // down once, here, before any turn runs, so a turn cannot shorten what it books itself.
+            // parity: `ServerLevel.tick`.
             step("Open turn", [this, &world, &region] { redstone_->openTurn(world, region); });
             step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
             step("Fluid tick", [this, &world, &region] { redstone_->tickFluids(world, region); });
             step("Random block tick", [this, &world, &region] { redstone_->tickRandomBlocks(world, region); });
-            // parity: `ServerLevel.tick` runs its block events after the block ticks and before the
-            // entities, and skips them altogether while the world is frozen.
+            // parity: `ServerLevel.tick`.
             step("Block event tick", [this, &world, &region] { redstone_->tickBlockEvents(world, region); });
             step("Falling block tick", [this, &world, &region] { redstone_->tickFallingBlocks(world, region); });
-            // parity: a dropped item is an entity like any other and moves in the entity pass, not
-            // before the world's own turn: what a block event pushes is where the item was, not
-            // where it is about to be.
             step("Item tick", [&world, &region] { static_cast<void>(world.state().tickItems(&region)); });
-            // parity: `TntBlock.prime` builds the entity where the signal reached it, inside the
-            // block's own turn, so it is already in the world for **this** tick's entity pass and
-            // moves with the hop its constructor gave it. Draining the queue only at the top of the
-            // turn left every lit block of tnt a tick behind the jar's. Measured in `hojagrande`.
+            // parity: `TntBlock.prime`.
             step("Primed tnt", [this, &world] { tickPrimedTnt(world); });
             step("Entity tick", [this, &world, &region] { tickEntities(world, region); });
             if (region.isPrimary()) {
                 step("Framed map tick", [this, &world] { maps_->tickFrames(world); });
             }
-            // parity: `entityInside` is part of the entity's own turn, so it reads where the entity
-            // has just moved to. Asking before that pass read the square of the turn before, which a
-            // dropped item hides (they move first of all) and an arrow does not: a tick late.
+            // parity: `entityInside`.
             step("Pressure plate tick", [this, &world, &region] { redstone_->tickPressurePlates(world, region); });
             step("Arrow button tick", [this, &world, &region] { redstone_->tickArrowButtons(world, region); });
             step("Tripwire tick", [this, &world, &region] { redstone_->tickTripwires(world, region); });
-            // parity: `ServerLevel.tick` leaves `tickBlockEntities` for the **end**, after the
-            // entities. A hopper minecart parked over a hopper is the visible half: the cart takes
-            // the item on its own turn and the hopper below it can already take it that same tick.
+            // parity: `ServerLevel.tick`.
             step("Block entity tick", [this, &world, &region] { redstone_->tickBlockEntities(world, region); });
             step("Mob spawning", [this, &world, &region] { spawning_->tickSpawning(world, region); });
             if (region.isPrimary()) {
                 step("Effect tick", [this, &world] { statusEffects_->tickEffects(world); });
                 step("Raid tick", [this, &world] { raids_->tickRaids(world); });
-                // parity: console input runs after the levels and before `playerList.tick`; the
-                // closest this turn has, the per-player tick below.
+                // parity: `playerList.tick`.
                 drainConsole();
                 if (shuttingDown_.load()) {
                     return;
@@ -288,7 +242,6 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Map tick", [this, &world] { maps_->tickPlayers(world); });
                 step("Sleep tick", [this, &world] { environment_->tickSleep(world); });
             }
-            // The end of the turn: what has to see everything it did, rather than a tick late.
             timings_.of("tick.tasks_end").time([&region, &onTaskFailure] {
                 static_cast<void>(region.owner().runEndOfTick(onTaskFailure));
             });
@@ -306,22 +259,16 @@ void BasaltServer::tickPrimedTnt(world::LoadedWorld& world) {
             watchers.push_back(player);
         }
     }
-    // parity: `TntBlock.prime` builds the entity **inside** the neighbour update that lit the block,
-    // so the fuse is heard on that very turn. The block half of it can run on a client's thread, so
-    // what it does is queue the square; this is where the queue becomes an entity, and it runs before
-    // the world's own turn so the two land together.
+    // parity: `TntBlock.prime`.
     const registry::EntityTypeEntry* tntType = registry::entityTypes::of(entity::primedTnt::type());
     if (tntType != nullptr) {
         random::RandomSource lighting = random::RandomSource::legacy(scratchSeed());
         for (const world::PrimedTntQueue::Primed& lit : world.state().takePrimedTnt()) {
             const std::array<std::int32_t, 3> position{lit.x, lit.y, lit.z};
-            // parity: the turn of that push comes off the level's random, which this build does not
-            // share with the jar: the hop is the same and the drift is noise.
             static_cast<void>(entity::primedTnt::prime(world.state(), position[0], position[1], position[2],
                                                        playerRegistry_.allocateEntityId(), tntType->protocolId,
                                                        lighting.nextDouble() * kFullTurn));
-            // parity: `TntBlock.prime` raises `PRIME_FUSE` from the block's own square, so a sculk
-            // sensor hears the tnt being lit at ten and not only the bang at fifteen.
+            // parity: `TntBlock.prime`.
             if (world.state().hasSculkSensorNear(position[0], position[1], position[2],
                                                  world::vibrations::kCalibratedRange)) {
                 world::vibrations::emit(world.state(), lit.event, position[0] + 0.5, position[1] + 0.5,
@@ -367,12 +314,12 @@ void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player:
             driver = player;
         }
     }
-    // parity: `AbstractBoat.tick` starts with `super.tick()`, whose `baseTick` lets the current in.
+    // parity: `AbstractBoat.tick` starts with `super.tick()`.
     pushes_->pushByFluid(world, boat);
     const entity::boats::TickResult result = entity::boats::tick(world.state(), boat, driver != nullptr);
-    // parity: `applyEffectsFromBlocks` and `tickBubbleColumn`, then the pushes at the end of the turn.
+    // parity: `applyEffectsFromBlocks` and `tickBubbleColumn`.
     vehicles_->tickBoatBubbles(world, boat, driver != nullptr);
-    // parity: `level.playSound(null, ...)` for each stroke, heard by everyone including the rower.
+    // parity: `level.playSound(null, ...)` for each stroke.
     for (const entity::boats::TickResult::Stroke& stroke : result.strokes) {
         random::RandomSource random = random::RandomSource::legacy(scratchSeed());
         const float pitch = 0.8F + (0.4F * random.nextFloat());
@@ -420,8 +367,7 @@ void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player:
 }
 
 bool BasaltServer::drinkBySculk(world::LoadedWorld& world, const entity::ServerEntity& dead) {
-    // parity: `ENTITY_DIE` reaches the nearest catalyst before the drops, and only the first one
-    // finds the experience still there; it drinks it whoever or whatever did the killing.
+    // parity: `ENTITY_DIE`.
     const std::optional<std::array<std::int32_t, 3>> catalyst =
         sculkCatalysts_ == nullptr ? std::nullopt : sculkCatalysts_->nearest(world, dead.x, dead.y, dead.z);
     if (!catalyst.has_value()) {
@@ -503,10 +449,7 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
             random::RandomSource random = random::RandomSource::legacy(scratchSeed());
             orbs_->award(world, dead->x, dead->y, dead->z, entity::deathDrops::experienceReward(*dead, random));
         }
-        // parity: `AbstractMinecartContainer.remove` calls `Containers.dropContents`, so what the
-        // cart was carrying falls where it was killed. Measured in `vagonetacomparador`: the jar
-        // leaves 192 stone and we left nothing. The drop is `dropItemStack`'s, which starts from the
-        // floor of the square (`Math.floor`) and not from the entity's exact point.
+        // parity: `AbstractMinecartContainer.remove`.
         if (const std::optional<std::int32_t> size = world::containers::sizeOf(dead->type().path());
             size.has_value() && dead->sourceNbt.has_value()) {
             random::RandomSource random = random::RandomSource::legacy(scratchSeed());
@@ -518,9 +461,7 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
                 }
             }
         }
-        // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears. Measured in
-        // `sensormuerte`: waiting for the next turn to raise it made the sensor wake a tick late,
-        // because a `/kill` runs while the world is frozen and the jar stamps it with that turn.
+        // parity: `GameEvent.ENTITY_DIE`.
         world::vibrations::emit(world.state(), "entity_die", dead->x, dead->y, dead->z, world.gameTime(),
                                 {.entity = dead->uuid()});
     }
@@ -533,7 +474,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             watchers.push_back(player);
         }
     }
-    // parity: `LivingEntity.pushEntities` on each player's own turn, which comes before the level's.
+    // parity: `LivingEntity.pushEntities` on each player's own turn.
     for (player::PlayerSession* player : watchers) {
         if (region.ownsPosition(player->x, player->z)) {
             // parity: `baseTick`'s currents come before `aiStep`'s pushes.
@@ -542,10 +483,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
-    // parity: `BlockEntity.preRemoveSideEffects` over `Containers.dropItemStack`: what a container
-    // held falls out where its block stood. The block write queues it because it holds the world's
-    // lock; this is where it becomes items, on the same thread that owns them.
-    // parity: `StructureBlock.trigger`, off the signal a redstone update queued.
+    // parity: `BlockEntity.preRemoveSideEffects`.
+    // parity: `StructureBlock.trigger`.
     for (const std::array<std::int32_t, 3>& at : world.state().takeStructureTriggers()) {
         if (structureBlocks_ != nullptr) {
             structureBlocks_->trigger(world, at);
@@ -589,11 +528,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         const registry::EntityTypeEntry* entry = registry::entityTypes::of(type);
         return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
     };
-    // The mobs a chunk brought back from disk: they wait for the tick loop because an entity id is
-    // the server's to hand out, and a chunk is loaded on a generation thread.
+    // Entity ids are handed out by the tick loop, while chunks load on a generation thread.
     for (const wire::nbt::NbtCompound& tag : world.state().takePendingEntities()) {
-        // An item on the floor is its own thing here, not a `ServerEntity`, so it comes back its
-        // own way. parity: to vanilla they are both just entities saved with the chunk.
+        // An item on the floor is its own thing here, not a `ServerEntity`, so it comes back its own way.
         if (const std::optional<world::DroppedItem> item = world::droppedItemNbt::decode(tag, allocateEntityId);
             item.has_value()) {
             static_cast<void>(world.state().spawnItem(*item));
@@ -604,9 +541,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             static_cast<void>(world.state().spawnEntity(std::move(restored)));
         }
     }
-    // Structure templates are generated off-thread and cannot allocate runtime ids there. A mob
-    // descriptor becomes the same live entity as a spawn egg here, so it receives AI, movement,
-    // persistence and ordinary client synchronization instead of remaining scenery.
+    // Structure mobs are generated off-thread and cannot allocate runtime ids, so they become live entities here.
     for (const server::world::ChunkGeneratedEntity& descriptor : world.state().takePendingGeneratedEntities()) {
         for (std::unique_ptr<entity::ServerEntity>& generated :
              entity::entityNbt::decodeGeneratedTree(descriptor, allocateEntityIdFor, protocolTypeOf)) {
@@ -614,16 +549,14 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
-    // parity: `LivingEntity.tickDeath`, which is the whole of what a dead mob does: count to twenty
-    // and then go. Until it goes it is still an entity, so a sculk sensor, a pressure plate and a
-    // comparator all keep feeling it, and `/kill` is no exception.
+    // parity: `LivingEntity.tickDeath`.
     for (entity::ServerEntity* dying : world.state().entities()) {
         // parity: `EnderDragon.tickDeath` is its own two hundred ticks, run from its own turn.
         if (dying->removed || !dying->dying || dying->dragon != nullptr) {
             continue;
         }
         ++dying->deathTime;
-        // parity: `Creaking.tickDeath`: a heart's creaking twitches for forty-five ticks and comes apart.
+        // parity: `Creaking.tickDeath`.
         if (dying->creaking != nullptr && dying->creaking->tearingDown && dying->creaking->home.has_value()) {
             if (dying->deathTime > entity::creakings::kTearDownTicks && mobActions_ != nullptr) {
                 mobActions_->tearDownCreaking(world, *dying);
@@ -633,8 +566,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (dying->deathTime < entity::kDeathTicks) {
             continue;
         }
-        // parity: `AbstractCubeMob.remove` splits inside the removal, so a slime killed any way at
-        // all leaves its halves behind: the death animation is not what makes them.
+        // parity: `AbstractCubeMob.remove`.
         random::RandomSource splitRandom = random::RandomSource::legacy(scratchSeed());
         for (const entity::cubeMobs::Split& split : entity::cubeMobs::splitsOf(*dying, splitRandom)) {
             if (spawning_ == nullptr) {
@@ -647,11 +579,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         dying->removed = true;
     }
 
-    // One snapshot for the whole tick: `entities()` takes the world's lock and copies the list, and
-    // asking for it per entity turned a pen of cows into a lock convoy.
-    //
-    // A dying mob stays on the list: it is still an entity with a box, so a detector rail under it
-    // still reads it. What it stops doing is its own turn, which is skipped below.
+    // One snapshot per tick: `entities()` copies under the world lock and per-entity calls made a lock convoy.
     std::vector<entity::ServerEntity*> living;
     for (entity::ServerEntity* candidate : world.state().entities()) {
         if (!candidate->removed) {
@@ -659,9 +587,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
-    // parity: `TargetingConditions.forCombat`, which skips anybody a mob cannot fight. Only the
-    // players in this region: anybody else is at least a section away, which is further than any
-    // mob's follow range, and building the list for every region was a hundred copies of it.
+    // parity: `TargetingConditions.forCombat`.
     const double playerWidth = registry::entityTypeShapes::widthOf(playerType());
     const double playerHeight = registry::entityTypeShapes::heightOf(playerType());
     std::vector<entity::ai::PlayerView> views;
@@ -729,8 +655,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     const world::cushions::Tagged attachedTags = [this](std::string_view tag, const wire::common::Identifier& block) {
         return world::realBlockTags::contains(vanillaData_.blockTags, tag, block);
     };
-    // Worked out on the first entity and not before, so a world with nothing alive never builds it.
-    // The plain radius here: entities stop one chunk sooner than blocks (`ChunkLevel.byStatus`).
+    // Built lazily; entities stop one chunk sooner than blocks (`ChunkLevel.byStatus`).
     std::optional<std::unordered_set<std::int64_t>> entityTicking;
     const auto ticking = [this, &entityTicking, &world, &region](double atX, double atZ) {
         if (!entityTicking.has_value()) {
@@ -748,8 +673,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (entity->removed || MobTickSystem::hasActiveVehicle(world, *entity)) {
             continue;
         }
-        // parity: `Mob.aiStep` stops the moment `isDeadOrDying`, so counting to twenty is the whole
-        // of a corpse's turn and that already happened above. A dragon dies on its own turn.
+        // parity: `Mob.aiStep`.
         if (entity->dying && !entity::enderDragon::isDragon(entity->type())) {
             // parity: a dying wither is still there, and so is its bar, until the body goes.
             if (WitherSystem::isWither(*entity)) {
@@ -757,16 +681,11 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             }
             continue;
         }
-        // An entity is ticked by whoever owns the ground it is standing on. It may walk out of this
-        // region during its own turn: that is fine, the next tick asks again, and the repartition
-        // that could change the answer only happens between ticks.
+        // An entity may walk out of this region mid-turn; repartitioning only happens between ticks, so that is fine.
         if (!region.ownsPosition(entity->x, entity->z)) {
             continue;
         }
-        // parity: `ServerLevel` ticks an entity only when it is a player or its chunk is
-        // `inEntityTickingRange`; everything else stays on the list, keeps its box and is still read
-        // by whatever stands under it, but takes no turn. Ours ticked every entity in the world, so
-        // a minecart three chunks from spawn kept rolling with nobody connected (`vagonetasinticket`).
+        // parity: `ServerLevel`.
         if (!ticking(entity->x, entity->z)) {
             continue;
         }
@@ -808,8 +727,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             fishing_->tick(world, watchers, living, *entity);
             continue;
         }
-        // parity: `EndCrystal.tick`, which does nothing but keep a fire under itself, and only where
-        // the level has a dragon fight.
+        // parity: `EndCrystal.tick`.
         if (world::endCrystals::isCrystal(entity->type())) {
             if (world.dragonFight() != nullptr) {
                 const std::int32_t delay = world::fires::kMinDelay + random.nextInt(world::fires::kDelaySpread);
@@ -871,20 +789,14 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                     break;
                 }
             }
-            // The rider's own copy of where they are comes from the cart: the client draws itself on
-            // the cart, and the server needs the same answer to load chunks around it.
+            // The rider's position comes from the cart, so chunks load around the same answer the client draws.
             if (rider != nullptr) {
                 rider->x = entity->x;
                 rider->y = entity->y;
                 rider->z = entity->z;
             }
-            // parity: `MinecartHopper.tick` sucks after the movement, and with no cooldown at all:
-            // a cart parked under a chest takes one item every tick it is enabled. It is no block
-            // entity, so nothing it takes tells a comparator; the container it took from does.
+            // parity: `MinecartHopper.tick`.
             static_cast<void>(world::hoppers::tickCart(world.state(), *entity, world.gameTime()));
-            // parity: a detector rail looks for carts whose box touches its own, so the cart has to
-            // ask every rail its box reaches and not only the one under its middle: it is on the
-            // next rail a quarter of a block before its centre gets there.
             const std::int32_t cartY = wire::common::mth::floor(entity->y);
             for (std::int32_t railX = wire::common::mth::floor(entity->x - world::detectorRails::kCartHalfWidth);
                  railX <= wire::common::mth::floor(entity->x + world::detectorRails::kCartHalfWidth); ++railX) {
@@ -907,7 +819,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             mobTicks_->tickPassengers(world, *entity, watchers, views, living, random, visited);
             continue;
         }
-        // parity: `BlockAttachedEntity.tick`, the hundred-tick check that something still holds it.
+        // parity: `BlockAttachedEntity.tick`.
         if (world::attachedEntities::isAttached(entity->type()) && world::attachedEntities::dueForCheck(*entity) &&
             !world::attachedEntities::survives(world.state(), *entity, attachedTags)) {
             // parity: `ItemFrame.dropItem(level, null, true)` drops the framed map's marker either way.
@@ -921,7 +833,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                              [this] { return playerRegistry_.allocateEntityId(); });
             continue;
         }
-        // parity: `AbstractBoat.tick`: floats and drifts with nobody at the oars, and scoops up mobs.
+        // parity: `AbstractBoat.tick`.
         if (entity::boats::isBoat(entity->type())) {
             tickBoat(world, watchers, living, *entity);
             if (mobActions_ != nullptr) {
@@ -936,8 +848,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             mobTicks_->tickPassengers(world, *entity, watchers, views, living, random, visited);
         }
     }
-    // What died while the entities were moving dies on this turn and not the next one: an arrow that
-    // lands in a pig kills it here, and vanilla's sensor hears that on the very tick.
+    // Deaths land this turn, not the next: an arrow killing a pig is heard by vanilla's sensor on the same tick.
     tickDeaths(world, region);
 }
 

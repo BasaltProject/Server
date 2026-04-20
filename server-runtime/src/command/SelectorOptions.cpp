@@ -17,7 +17,6 @@
 #include <utility>
 
 namespace basalt::server::runtime::command::selectorParser {
-/// One option's value, dispatched by the name that preceded the `=`.
 std::optional<CommandSyntaxError> SelectorParser::readOption(const std::string& key, std::int32_t start) {
     const auto readAnchor = [this, start, &key](std::optional<double>& into) -> std::optional<CommandSyntaxError> {
         if (into.has_value()) {

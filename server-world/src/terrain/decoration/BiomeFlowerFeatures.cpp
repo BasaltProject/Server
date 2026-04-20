@@ -42,8 +42,7 @@ namespace {
     return noise::NormalNoise::createParity(firstOctave, amplitudes).create(source);
 }
 
-/// parity: `NoiseProvider.getRandomState`, in float since 26.3. The list order decides which flower
-/// a position gets, so reordering it silently changes the world.
+/// parity: `NoiseProvider.getRandomState`.
 [[nodiscard]] std::int32_t stateFromNoise(const std::vector<std::int32_t>& states, float noiseValue) {
     const float placement = std::clamp((1.0F + noiseValue) / 2.0F, 0.0F, 0.9999F);
     return states[static_cast<std::size_t>(placement * static_cast<float>(states.size()))];
@@ -113,8 +112,7 @@ std::int32_t meadowDecoration::flowerStateAt(const DecorationPos& position) {
     std::vector<std::int32_t> possible;
     possible.reserve(static_cast<std::size_t>(localVariety));
     for (std::int32_t index = 0; index < localVariety; ++index) {
-        // parity: the slow noise is resampled at a large fixed stride per index, which is what gives
-        // one meadow a handful of species rather than all eight everywhere.
+        // parity: the slow noise is resampled at a large fixed stride per index.
         const float value = meadowSlowNoise().get(position.x + index * 54545, position.y, position.z + index * 34234);
         possible.push_back(stateFromNoise(meadowFlowerStates(), value));
     }

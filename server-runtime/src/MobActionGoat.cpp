@@ -44,7 +44,7 @@ using goats::Vec;
 
 [[nodiscard]] bool isBaby(const ServerEntity& mob) { return mob.age < 0; }
 
-/// parity: `GoatAi.RAM_TARGET_CONDITIONS`: anything but a goat, and an armour stand only with griefing.
+/// parity: `GoatAi.RAM_TARGET_CONDITIONS`.
 struct RamCandidate {
     std::int32_t id = 0;
     Vec at{};
@@ -240,7 +240,7 @@ void MobActionSystem::goatRam(world::LoadedWorld& world, entity::ai::MobContext&
                       1.0F);
             return;
         }
-        // parity: `hasRammedHornBreakingBlock`, a block of the `snaps_goat_horn` tag a step ahead.
+        // parity: `hasRammedHornBreakingBlock`.
         const double hx = goat.velocityX;
         const double hz = goat.velocityZ;
         const double hLength = std::sqrt((hx * hx) + (hz * hz));
@@ -275,7 +275,7 @@ void MobActionSystem::goatRam(world::LoadedWorld& world, entity::ai::MobContext&
         }
         return;
     }
-    // parity: `PrepareRamNearestTarget`: a start four to seven blocks out along a clear line, twenty
+    // parity: `PrepareRamNearestTarget`.
     // ticks of lowered head, then the charge.
     const auto chooseStart = [&](std::int32_t targetId, const Vec& at) {
         state.reachedRamStart.reset();
@@ -369,7 +369,7 @@ void MobActionSystem::goatRam(world::LoadedWorld& world, entity::ai::MobContext&
 
 void MobActionSystem::goatRams(world::LoadedWorld& world, ServerEntity& goat, std::int32_t targetId, bool player,
                                const std::array<double, 3>& direction) {
-    // parity: `RamTarget.tick`'s blow: the goat's attack, then a shove scaled by its speed and size,
+    // parity: `RamTarget.tick`'s blow.
     // halved through a shield.
     const float damage = static_cast<float>(goat.attributeWithModifiers("minecraft:attack_damage"));
     const double speedFactor =
@@ -405,7 +405,7 @@ void MobActionSystem::goatRams(world::LoadedWorld& world, ServerEntity& goat, st
 }
 
 bool MobActionSystem::goatDropsHorn(world::LoadedWorld& world, ServerEntity& goat, random::RandomSource& random) {
-    // parity: `Goat.dropHorn`: an adult with a horn left loses one, thrown up from where it stands.
+    // parity: `Goat.dropHorn`.
     if (isBaby(goat) || !goat.sourceNbt.has_value()) {
         return false;
     }
@@ -453,7 +453,7 @@ bool MobActionSystem::milkGoat(world::LoadedWorld& world, PlayerSession& player,
         return false;
     }
     playSound(world, goat, goats::isScreaming(goat) ? "entity.goat.screaming.milk" : "entity.goat.milk", 1.0F, 1.0F);
-    // parity: `ItemUtils.createFilledResult`: one bucket filled, the rest kept; creative keeps them all.
+    // parity: `ItemUtils.createFilledResult`.
     const storage::StoredItemStack milk{.id = "minecraft:milk_bucket", .count = 1};
     if (player.gamemode == Gamemode::Creative) {
         bool has = false;

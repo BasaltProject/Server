@@ -31,7 +31,6 @@ struct ConfiguredOre {
     std::int32_t size = 0;
     std::int32_t stateId = 0;
     Target target = Target::Netherrack;
-    /// A scattered ore walks outward from its origin; a vein sweeps overlapping spheres along a line.
     bool scattered = false;
 };
 
@@ -114,8 +113,7 @@ const PathSet& baseStoneNether() {
 
 [[nodiscard]] bool canPlace(const Chunk& chunk, std::int32_t worldX, std::int32_t y, std::int32_t worldZ, Target target,
                             bool discardOnAirExposure) {
-    // parity: `OreFeature` asks the level, which reaches into the neighbours. Guessing netherrack
-    // for everything outside approved veins over cells that hold air, lava or bedrock.
+    // parity: `OreFeature` asks the level, which reaches into neighbours.
     const std::int32_t stateId = chunk.decorationBlockStateId(worldX, y, worldZ);
     const std::string path = pathOf(stateId);
     if (path.empty()) {
@@ -174,8 +172,7 @@ bool placeVein(Chunk& chunk, random::RandomSource& random, std::int32_t originX,
     const std::int32_t sizeXZ = 2 * (spreadCeil + maxRadius);
     const std::int32_t sizeY = 2 * (2 + maxRadius);
 
-    // The Nether's protected solid roof makes OreFeature's ocean-floor precheck true for every valid
-    // configured height. It consumes no random, so it folds away here.
+    // The protected nether roof makes the ocean-floor precheck always true and it draws nothing.
     std::vector<double> spheres(static_cast<std::size_t>(config.size) * 4, 0.0);
     for (std::int32_t index = 0; index < config.size; ++index) {
         const float step = static_cast<float>(index) / static_cast<float>(config.size);

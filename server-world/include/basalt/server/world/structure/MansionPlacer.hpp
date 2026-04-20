@@ -4,9 +4,7 @@
 
 namespace basalt::server::world::structure {
 
-/// parity: `WoodlandMansionPieces.MansionPiecePlacer.createMansion`. Turns a floor plan into the
-/// list of templates that make the house: the outer walls of the three storeys, the roofs, then per
-/// floor the corridor tiles with their carpets and the walls and doors that close each room.
+/// parity: `WoodlandMansionPieces.MansionPiecePlacer.createMansion`.
 namespace mansionPlacer {
 
 void createMansion(std::vector<MansionPiece>& pieces, random::RandomSource& random, StructurePos origin,

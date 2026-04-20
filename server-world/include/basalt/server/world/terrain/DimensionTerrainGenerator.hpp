@@ -15,30 +15,25 @@
 
 namespace basalt::server::world::terrain::dimensionTerrainGenerator {
 
-/// parity: `noise_settings/nether.json` base shape, block and fluid defaults and cell sizes, with its
-/// structures: everything a chunk holds before it decorates.
+/// parity: `noise_settings/nether.json` base shape.
 [[nodiscard]] Chunk netherTerrain(const NoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
                                   std::int32_t chunkZ, std::int64_t seed = 0,
                                   NetherStructureGenerator* structureGenerator = nullptr);
 
-/// The Nether's decoration steps. `neighbours` answers past the chunk edge; without it the outside
-/// reads as nothing and what is written there is deferred.
 void decorateNether(Chunk& chunk, const NetherBiomeSource& biomeSource, std::int64_t seed,
                     const NeighbourTerrain* neighbours = nullptr);
 
-/// One Nether chunk decorated on its own.
 [[nodiscard]] Chunk nether(const NoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
                            std::int32_t chunkZ, std::int64_t seed = 0,
                            NetherStructureGenerator* structureGenerator = nullptr);
 
-/// parity: `noise_settings/end.json` base shape, block default and cell sizes, with the End cities.
+/// parity: `noise_settings/end.json` base shape.
 [[nodiscard]] Chunk endTerrain(const NoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int32_t chunkX,
                                std::int32_t chunkZ, std::int64_t seed = 0,
                                EndCityStructureGenerator* structureGenerator = nullptr);
 
 void decorateEnd(Chunk& chunk, const NoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int64_t seed);
 
-/// One End chunk decorated on its own.
 [[nodiscard]] Chunk end(const NoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int32_t chunkX,
                         std::int32_t chunkZ, std::int64_t seed = 0,
                         EndCityStructureGenerator* structureGenerator = nullptr);

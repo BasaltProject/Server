@@ -35,9 +35,6 @@ wire::protocol::play::InitializeBorderPacket WorldBorder::initializePacket() con
 }
 
 double WorldBorder::distanceOutside(double x, double z) const {
-    // Either clamp alone would do, since the larger of the two decides and one of them is never
-    // negative on its own. Both are here because vanilla measures each axis and this reads as what
-    // it is: how far outside, never how far inside.
     const double half = targetSize_ / 2.0;
     const double outsideX = std::max(std::abs(x - centerX_) - half, 0.0);
     const double outsideZ = std::max(std::abs(z - centerZ_) - half, 0.0);
@@ -45,8 +42,7 @@ double WorldBorder::distanceOutside(double x, double z) const {
 }
 
 bool WorldBorder::contains(double x, double z) const {
-    // parity: `isWithinBounds(x, z, 0)`, which is `>= min` and `< max` on both axes. The size that
-    // counts is the one the border has **now**, not the one it is moving towards.
+    // parity: `isWithinBounds(x, z, 0)`.
     const double half = size_ / 2.0;
     return x >= centerX_ - half && x < centerX_ + half && z >= centerZ_ - half && z < centerZ_ + half;
 }

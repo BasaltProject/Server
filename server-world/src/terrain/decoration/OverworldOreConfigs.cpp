@@ -67,7 +67,6 @@ const BlockSet& badlandsBiomes() {
     return blocks;
 }
 
-/// The single-biome and all-but-one lists the table needs, interned so a PlacedOre can point at one.
 const BlockSet& oneBiome(std::string_view name) {
     static std::map<std::string, BlockSet, std::less<>> interned;
     const auto found = interned.find(name);

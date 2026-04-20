@@ -4,14 +4,9 @@
 
 namespace basalt::server::world {
 
-/// Vertical section bounds carried by each chunk and its codecs.
-///
-/// parity: `NoiseSettings.OVERWORLD_NOISE_SETTINGS`, `create(-64, 384, 1, 2)`, read off the real
-/// 26.2 jar rather than assumed stable from older versions.
+/// parity: `NoiseSettings.OVERWORLD_NOISE_SETTINGS`.
 class ChunkHeight {
 public:
-    /// A height that is not section-aligned, or whose sections do not fit the byte chunk NBT keeps
-    /// them in, is refused: every caller here builds one from constants.
     constexpr ChunkHeight(std::int32_t minY, std::int32_t height) : minY_(minY), height_(height) {}
 
     [[nodiscard]] constexpr std::int32_t minY() const noexcept { return minY_; }
@@ -26,7 +21,6 @@ public:
 
     [[nodiscard]] constexpr std::int32_t maxSection() const noexcept { return minSection() + sectionCount() - 1; }
 
-    /// Whether these bounds are ones a chunk can actually be stored in.
     [[nodiscard]] constexpr bool isValid() const noexcept {
         return minY_ % 16 == 0 && height_ > 0 && height_ % 16 == 0 && minSection() >= -128 && minSection() <= 127 &&
                maxSection() >= -128 && maxSection() <= 127;

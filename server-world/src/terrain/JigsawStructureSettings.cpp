@@ -35,8 +35,6 @@ const JigsawStructureSettings& trailRuins() {
         .heightSource = JigsawHeightSource::Surface,
         // parity: `start_height: {absolute: -15}`, which draws nothing from the random.
         .startY = -15,
-        // `bury` fills ground back over the pieces instead of clearing a hollow under them, so only
-        // their top course shows.
         .adjustment = TerrainAdjustment::Bury,
         .startRecords = JigsawStartRecords::FromCandidate,
         .passWorldSeed = true,
@@ -66,16 +64,12 @@ const JigsawStructureSettings& ancientCity() {
 const JigsawStructureSettings& trialChamber() {
     static const JigsawStructureSettings built{
         .name = "trial_chambers",
-        // Last of the five in `underground_structures`, after the treasure, the two mineshafts and
-        // the trail ruins.
         .structureIndex = 4,
         .step = 3,
         .startPool = "minecraft:trial_chambers/chamber/end",
         .maxDepth = 20,
         .maxDistanceFromCenter = 116,
-        // parity: the chamber is the only jigsaw structure with `pool_aliases`. The group keeps the
-        // ranged and the slow ranged spawner on the same mob, which is why it is one binding and not
-        // two.
+        // parity: the chamber is the only jigsaw structure with `pool_aliases`.
         .poolAliases =
             {
                 {.kind = JigsawStructureSettings::PoolAlias::Kind::RandomGroup,

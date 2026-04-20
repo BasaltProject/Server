@@ -27,38 +27,27 @@ enum class StrongholdPieceKind : std::uint8_t {
     FillerCorridor,
 };
 
-/// One room of the maze. The per-kind fields are the draws its constructor made, kept here because
-/// the geometry needs them later and redrawing would move the shared random.
 struct StrongholdPiece {
     StrongholdPieceKind kind = StrongholdPieceKind::Start;
     StructureBoundingBox box;
     StructureDirection orientation = StructureDirection::North;
     std::int32_t depth = 0;
     StrongholdDoor entryDoor = StrongholdDoor::Opening;
-    /// FiveCrossing's four optional doorways.
     bool leftLow = false;
     bool leftHigh = false;
     bool rightLow = false;
     bool rightHigh = false;
-    /// Straight's two optional side doorways.
     bool leftChild = false;
     bool rightChild = false;
-    /// RoomCrossing's interior, one of five.
     std::int32_t roomType = 0;
-    /// Library is two storeys when it had room for eleven.
     bool tall = false;
-    /// Only the start piece, which is the one that forces a five-way next.
     bool isSource = false;
-    /// FillerCorridor's length along its own axis.
     std::int32_t steps = 0;
 };
 
-/// parity: `StrongholdStructure.generatePieces`. The maze is grown breadth-first but in random order:
-/// the pending list is drained by drawing an index, so the shape depends on the whole history. It is
-/// retried, seed bumped by one each time, until a portal room appears.
+/// parity: `StrongholdStructure.generatePieces`.
 namespace strongholdLayout {
 
-/// Reseeds `random` for attempt `n`, which is how vanilla retries a maze that grew no portal room.
 using Reseed = std::function<void(std::int32_t)>;
 
 [[nodiscard]] std::vector<StrongholdPiece> build(random::RandomSource& random, const Reseed& reseed,

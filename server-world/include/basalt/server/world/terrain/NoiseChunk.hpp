@@ -15,14 +15,12 @@ class Chunk;
 
 namespace basalt::server::world::terrain {
 
-/// parity: `Aquifer`, both the noise-based one and the disabled one a dimension without aquifer
-/// settings gets. One per `NoiseChunk`: its caches are keyed to that chunk's volume.
+/// parity: `Aquifer`.
 class Aquifer {
 public:
     Aquifer(const NoiseRouter& router, densityfunction::SamplerContext& samplers,
             const densityfunction::DensityVolume& volume);
 
-    /// Nothing for the default block, otherwise the air, water or lava state vanilla picks.
     [[nodiscard]] std::optional<std::int32_t> computeSubstance(std::int32_t x, std::int32_t y, std::int32_t z,
                                                                double density);
 
@@ -78,8 +76,7 @@ private:
     bool shouldScheduleFluidUpdate_ = false;
 };
 
-/// parity: `NoiseChunk`. The per-chunk sampler context, with the beardifier bound into it, and the
-/// aquifer built over the chunk's volume.
+/// parity: `NoiseChunk`.
 class NoiseChunk {
 public:
     NoiseChunk(const NoiseRouter& router, densityfunction::Sampler beardifier,
@@ -91,7 +88,6 @@ public:
 
     [[nodiscard]] const densityfunction::DensityVolume& volume() const noexcept { return volume_; }
 
-    /// The final density over the whole volume, y fastest.
     [[nodiscard]] std::vector<float> finalDensity();
 
 private:
@@ -101,8 +97,7 @@ private:
     Aquifer aquifer_;
 };
 
-/// parity: `NoiseBasedChunkGenerator.doFill`: the final density over the chunk's volume, each block
-/// through the aquifer, columns top down.
+/// parity: `NoiseBasedChunkGenerator.doFill`.
 void fillNoise(Chunk& chunk, NoiseChunk& noiseChunk, const NoiseRouter& router);
 
 } // namespace basalt::server::world::terrain

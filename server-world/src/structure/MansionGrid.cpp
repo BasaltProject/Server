@@ -128,8 +128,6 @@ void MansionGrid::recursiveCorridor(SimpleGrid& grid, std::int32_t x, std::int32
     grid.set(x, y, kCorridor);
     grid.setIf(x + dx(heading), y + dz(heading), kClear, kCorridor);
 
-    // Eight tries at a turn, and the draw happens on every one of them even when the branch is
-    // refused, so an early continue would move every roll after it.
     for (std::int32_t attempt = 0; attempt < 8; ++attempt) {
         const StructureDirection next = by2d()[static_cast<std::size_t>(random_->nextInt(4))];
         if (next != opposite(heading) && (next != StructureDirection::East || !random_->nextBoolean())) {
@@ -305,8 +303,7 @@ void MansionGrid::identifyRooms(const SimpleGrid& fromGrid, SimpleGrid& roomGrid
         std::int32_t doorX = random_->nextBoolean() ? x0 : x1;
         std::int32_t doorY = random_->nextBoolean() ? y0 : y1;
         std::int32_t doorFlag = kRoomDoorFlag;
-        // Four corners tried in a fixed dance, and the door is dropped only when none of them
-        // touches a corridor.
+        // Four corners tried in a fixed dance, and the door is dropped only when none of them touches a corridor.
         if (!fromGrid.edgesTo(doorX, doorY, kCorridor)) {
             doorX = doorX == x0 ? x1 : x0;
             doorY = doorY == y0 ? y1 : y0;

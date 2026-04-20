@@ -34,9 +34,7 @@ constexpr std::int32_t kMushroomIslandIndex = 82;
     return block.has_value() && paths.find(block->block.path()) != paths.end();
 }
 
-/// Whether the sky reaches this block at full strength. parity: `ChunkSkyLightSources`, whose column
-/// is lit to 15 from the first occluded edge upward, and an edge is occluded as soon as the block
-/// under it dampens light at all.
+/// Whether the sky reaches this block at full strength; parity: `ChunkSkyLightSources`.
 [[nodiscard]] bool skySource(const PatchRegion& region, const DecorationPos& at, ChunkHeight bounds) {
     for (std::int32_t y = at.y; y <= bounds.maxY(); ++y) {
         if (light::skyLight::opacity(region.get(DecorationPos{at.x, y, at.z})) > 0) {
@@ -58,11 +56,7 @@ constexpr std::array<DecorationPos, 6> kAround = {DecorationPos{1, 0, 0}, Decora
     return DecorationPos{at.x + by.x, at.y + by.y, at.z + by.z};
 }
 
-/// parity: `MushroomBlock.canSurvive` also asks for `getRawBrightness < 13`. Sky light loses at least
-/// one level per block (`LightEngine.getOpacity` is `max(1, dampening)`), so reaching 13 needs a
-/// source within two steps and nothing more distant can matter. The block itself is air here, which
-/// costs one, so the three ways to be too bright are: this column is open, a neighbour's column is,
-/// or a neighbour that dampens nothing has one of its own.
+/// parity: `MushroomBlock.canSurvive` asks `getRawBrightness < 13`.
 [[nodiscard]] bool tooBrightForMushroom(const PatchRegion& region, const DecorationPos& target, ChunkHeight bounds) {
     if (skySource(region, target, bounds)) {
         return true;

@@ -224,8 +224,7 @@ private:
     std::optional<std::int32_t> z_;
 };
 
-/// parity: `FindTopSurfaceFunction.Sampler`. The volume path reads the upper bound as a volume but
-/// probes the density point by point.
+/// parity: `FindTopSurfaceFunction.Sampler`.
 class FindTopSurfaceSampler final : public DensitySampler {
 public:
     FindTopSurfaceSampler(Sampler density, Sampler upperBound, std::int32_t lowerBound, std::int32_t cellHeight)
@@ -274,7 +273,6 @@ private:
     std::int32_t cellHeight_;
 };
 
-/// A spline compiled against its coordinate samplers, each coordinate function deduplicated.
 struct CompiledSpline {
     std::optional<float> constant;
     std::int32_t coordinate = 0;
@@ -289,7 +287,7 @@ struct CompiledSpline {
     return derivative == 0.0F ? value : value + derivative * (input - locations[index]);
 }
 
-/// parity: `SplineFunction`'s point and buffer inputs: each coordinate is sampled once, lazily.
+/// parity: `SplineFunction`'s point and buffer inputs.
 class SplineInput {
 public:
     virtual ~SplineInput() = default;
@@ -407,7 +405,7 @@ using CoordinateMap = std::vector<std::pair<Function, Sampler>>;
         compiled.constant = spline.constant;
         return compiled;
     }
-    // parity: the coordinate map is a `HashMap` keyed by function equality, indexed by first use.
+    // parity: the coordinate map is a `HashMap` keyed by function equality.
     std::int32_t index = -1;
     for (std::size_t i = 0; i < coordinates.size(); ++i) {
         if (equal(coordinates[i].first, spline.coordinate)) {

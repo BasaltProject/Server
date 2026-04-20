@@ -9,7 +9,6 @@
 
 namespace basalt::server::runtime::command::commands {
 
-/// One `/bossbar` bar: what it says, how full it is, and who can see it.
 struct CustomBossBar {
     wire::common::Identifier id;
     wire::text::Component name;
@@ -19,7 +18,6 @@ struct CustomBossBar {
     std::int32_t value = 0;
     std::int32_t max = 100;
     bool visible = true;
-    /// Player names rather than sessions: a bar outlives any one connection, as vanilla's does.
     std::set<std::string> players;
 
     [[nodiscard]] float progress() const;
@@ -27,11 +25,6 @@ struct CustomBossBar {
     [[nodiscard]] wire::protocol::play::BossEventPacket::Add addOperation() const;
 };
 
-/// Bars by id, and the packets that keep clients in step with them.
-///
-/// Held by the server rather than by the command, so a bar survives a `/reload` and so the join
-/// path can show a returning player the bars they belong to. They are not persisted across a
-/// restart yet, which vanilla does in `level.dat`; stated rather than silently lost.
 class BossBarRegistry {
 public:
     [[nodiscard]] std::vector<CustomBossBar*> all();
@@ -44,11 +37,9 @@ public:
 
     bool remove(const wire::common::Identifier& id);
 
-    /// Everything a player should see the moment they join, which is every visible bar naming them.
     [[nodiscard]] std::vector<const CustomBossBar*> barsFor(const player::PlayerSession& player) const;
 
 private:
-    /// In insertion order, which is what `/bossbar list` prints and vanilla's own map keeps.
     std::vector<wire::common::Identifier> order_;
     std::map<wire::common::Identifier, CustomBossBar> bars_;
 };

@@ -27,7 +27,7 @@ using brainKit::Vec;
     return {mth::floor(mob.x), mth::floor(mob.y), mth::floor(mob.z)};
 }
 
-/// parity: `WeightedRandom.getRandomItem` over the candidates, which it takes out of the list.
+/// parity: `WeightedRandom.getRandomItem` over the candidates.
 [[nodiscard]] std::optional<std::pair<Block, std::int32_t>>
 takeWeighted(random::RandomSource& random, std::vector<std::pair<Block, std::int32_t>>& candidates) {
     std::int64_t total = 0;
@@ -51,7 +51,7 @@ takeWeighted(random::RandomSource& random, std::vector<std::pair<Block, std::int
 
 std::optional<Vec> jumpVector(MobContext& context, const Spec& spec, const Vec& target) {
     ServerEntity& body = context.mob;
-    // parity: `calculateOptimalJumpVector`: the four angles in a shuffled order, the first that clears.
+    // parity: `calculateOptimalJumpVector`.
     std::array<std::int32_t, 4> angles{65, 70, 75, 80};
     random::RandomSource shuffle =
         random::RandomSource::legacy(static_cast<std::int64_t>(context.gameTime * 31 + body.entityId()));
@@ -239,7 +239,7 @@ Event tick(MobContext& mob, State& state, const Spec& spec, brainKit::Look& look
         return Event::None;
     }
     --state.tries;
-    // parity: `pickCandidate`, weighted by distance, skipping what a short walk reaches anyway.
+    // parity: `pickCandidate`.
     while (!state.candidates.empty() || !state.notPreferred.empty()) {
         std::optional<std::pair<Block, std::int32_t>> candidate;
         if (state.wantsPreferred) {

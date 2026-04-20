@@ -71,7 +71,7 @@ constexpr double kLookRange = 6.0;
     return block != nullptr && block->path() == path;
 }
 
-/// parity: `ShufflingList.shuffle`: each entry drawn `-nextFloat()^(1/weight)`, the smallest first.
+/// parity: `ShufflingList.shuffle`.
 [[nodiscard]] std::array<std::int32_t, 3> idleOrder(random::RandomSource& random) {
     constexpr std::array<std::int32_t, 3> kWeights{2, 2, 1};
     std::array<std::pair<double, std::int32_t>, 3> drawn{};
@@ -89,7 +89,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
     ServerEntity& allay = context.mob;
     allays::AllayState& state = allays::stateOf(allay);
     random::RandomSource& random = context.random;
-    // parity: `AllayAi.getLikedPlayer`: in survival or creative, and within sixty-four blocks.
+    // parity: `AllayAi.getLikedPlayer`.
     state.likedPlayerEntity.reset();
     PlayerSession* liked = nullptr;
     if (state.likedPlayer.has_value()) {
@@ -110,7 +110,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
         state.noteblockCooldown.reset();
     }
     state.pickupCooldown = std::max(state.pickupCooldown - 1, 0);
-    // parity: `getItemDepositPosition`: the liked note block while it is still one and remembered,
+    // parity: `getItemDepositPosition`.
     // else the liked player's eyes.
     std::optional<Vec> deposit;
     if (state.likedNoteblock.has_value()) {
@@ -131,7 +131,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
         deposit = Vec{liked->x, liked->y + static_cast<double>(1.62F), liked->z};
     }
     const std::optional<server::world::loot::ItemStack> hand = entity::copperGolems::mainHand(allay);
-    // parity: `NearestItemSensor`, every twenty ticks: the nearest item it wants within thirty-two
+    // parity: `NearestItemSensor`.
     // across and sixteen up or down that it can see.
     if (state.itemSensorTicks < 0) {
         state.itemSensorTicks = random.nextInt(20);
@@ -199,7 +199,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
             state.lookAt = Vec{wanted->x, wanted->y + 0.25, wanted->z};
             state.lookEntity.reset();
         }
-        // parity: `GoAndGiveItemsToTarget`, twenty ticks a run, one item a tick once within three.
+        // parity: `GoAndGiveItemsToTarget`.
         const bool canThrow = state.inventory.has_value() && deposit.has_value();
         if (state.giveTicks >= 0 && (!canThrow || state.giveTicks >= kGiveTimeout)) {
             state.giveTicks = -1;
@@ -234,7 +234,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
                 }
             }
         }
-        // parity: the idle `RunOne`: a flight, a walk to what it looks at, or thirty to sixty ticks
+        // parity: the idle `RunOne`.
         // of nothing.
         if (state.idleTicks > 0) {
             --state.idleTicks;
@@ -284,7 +284,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
             state.lookTicks = 0;
         }
     }
-    // parity: `MoveToTargetSink`: a path to the walk target, drawn again when it moves two blocks.
+    // parity: `MoveToTargetSink`.
     if (state.walk.has_value()) {
         const std::array<std::int32_t, 3> target = blockOf(state.walk->at);
         const std::array<std::int32_t, 3> own{mth::floor(allay.x), mth::floor(allay.y), mth::floor(allay.z)};
@@ -370,7 +370,7 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
             }
             continue;
         }
-        // parity: the vibration user: deaf while one travels, sixteen blocks from its eyes, past no
+        // parity: the vibration user: deaf while one travels, sixteen blocks from its eyes, past no.
         // wool, and only the liked note block once it has one.
         const double dy = record.y - eyeY;
         const bool liked = !state.likedNoteblock.has_value() ||
@@ -382,7 +382,7 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
             world::vibrations::occludedBetween(world.state(), record.x, record.y, record.z, allay.x, eyeY, allay.z)) {
             continue;
         }
-        // parity: `VibrationSelector`: the nearest of one tick's candidates, never a later tick's.
+        // parity: `VibrationSelector`.
         const auto distance = static_cast<float>(std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
         if (!state.vibrationCandidate.has_value() ||
             (state.vibrationCandidate->tick == record.gameTime && distance < state.vibrationCandidate->distance)) {
@@ -390,7 +390,7 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
                 allays::AllayState::Vibration{.pos = pos, .distance = distance, .tick = record.gameTime};
         }
     }
-    // parity: `VibrationSystem.Ticker.tick`: last tick's pick sets off and travels a block a tick.
+    // parity: `VibrationSystem.Ticker.tick`.
     if (!state.vibrationTravelling.has_value() && state.vibrationCandidate.has_value() &&
         state.vibrationCandidate->tick < now) {
         state.vibrationTravelling = std::exchange(state.vibrationCandidate, std::nullopt);
@@ -426,7 +426,7 @@ void MobActionSystem::allayThrows(world::LoadedWorld& world, ServerEntity& allay
     if (--state.inventory->count <= 0) {
         state.inventory.reset();
     }
-    // parity: `BehaviorUtils.throwItem` at the target a block up, at 0.2, 0.3, 0.2 from 0.2 under the eyes.
+    // parity: `BehaviorUtils.throwItem` at the target a block up.
     const double tx = target[0] - allay.x;
     const double ty = target[1] + 1.0 - allay.y;
     const double tz = target[2] - allay.z;
@@ -446,7 +446,7 @@ void MobActionSystem::allayThrows(world::LoadedWorld& world, ServerEntity& allay
     dropped.pickupDelay = world::kSpawnedPickupDelay;
     dropped.thrower = allay.uuid();
     world.state().spawnItem(std::move(dropped));
-    // parity: `AllayAi.throwItem` tells the liked player, under the square the item was aimed at.
+    // parity: `AllayAi.throwItem` tells the liked player.
     const player::PlayerSession* liked = state.likedPlayer.has_value() ? players_->get(*state.likedPlayer) : nullptr;
     if (liked != nullptr && options_.advancementTriggers != nullptr && lootTables_ != nullptr &&
         liked->worldName == world.name() &&

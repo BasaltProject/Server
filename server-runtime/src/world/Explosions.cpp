@@ -102,8 +102,7 @@ std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t m
                     if (stops && stops(world, blockX, blockY, blockZ, *stateId)) {
                         remaining -= (kImmuneResistance + kResistanceBias) * kStep;
                     }
-                    // parity: `shouldBlockExplode` is a plain true for this calculator, so every
-                    // square the ray still has power for is knocked on, air included.
+                    // parity: `shouldBlockExplode` is a plain true for this calculator, so every.
                     if (remaining > 0.0F) {
                         hit.insert(packed(blockX, blockY, blockZ));
                     }
@@ -132,8 +131,6 @@ std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t m
 std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,
                             float power, random::RandomSource& random, const Spares& spares,
                             const Resistance& resistance) {
-    // A set rather than a hash: the order the blocks come out in is the order they are broken, and a
-    // stable one keeps what the caller sends to clients stable too.
     std::set<std::int64_t> hit;
     for (std::int32_t rayX = 0; rayX < kRays; ++rayX) {
         for (std::int32_t rayY = 0; rayY < kRays; ++rayY) {
@@ -143,9 +140,7 @@ std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t m
                 if (!onShell) {
                     continue;
                 }
-                // parity: the three components are worked out in float and only then widened, which
-                // is what `xx / 15.0F * 2.0F - 1.0F` does. In double they come out a few ulps apart,
-                // and a ray that starts a few ulps off crosses a block boundary somewhere else.
+                // parity: the three components are worked out in float and only then widened, which.
                 double dx = static_cast<double>((static_cast<float>(rayX) / kLastRay * 2.0F) - 1.0F);
                 double dy = static_cast<double>((static_cast<float>(rayY) / kLastRay * 2.0F) - 1.0F);
                 double dz = static_cast<double>((static_cast<float>(rayZ) / kLastRay * 2.0F) - 1.0F);

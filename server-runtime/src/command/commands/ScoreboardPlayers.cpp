@@ -23,7 +23,7 @@ using scoreboardCommand::objectiveOf;
 using scoreboardCommand::sendScore;
 using wire::text::Component;
 
-/// parity: the one report `set`, `add` and `remove` share, which names the amount and the objective.
+/// parity: the one report `set`.
 void report(const CommandContext& context, const std::vector<std::string>& holders, const Objective& objective,
             const std::string& action, std::int32_t value) {
     context.success(holders.size() == 1
@@ -66,7 +66,7 @@ applyOperation(std::string_view operation, std::int32_t current, std::int32_t so
             // parity: vanilla floors, so -7 / 2 is -4, not -3.
             return static_cast<std::int32_t>(std::floor(static_cast<double>(current) / static_cast<double>(source)));
         }
-        // parity: `Math.floorMod`, whose answer takes the divisor's sign rather than the dividend's.
+        // parity: `Math.floorMod`.
         const std::int32_t remainder = current % source;
         return remainder != 0 && ((remainder < 0) != (source < 0)) ? remainder + source : remainder;
     }
@@ -132,7 +132,6 @@ void ScoreboardCommand::buildPlayers(const CommandNodeBuilder& root) const {
     });
 
     root.literal("display", [this](const CommandNodeBuilder& display) {
-        /// The per-holder overrides, which differ only in what they set and what they then say.
         const auto resendScore = [this](const CommandContext& context, const std::string& holder,
                                         const Objective& objective) {
             const std::optional<std::int32_t> value = scoreboard_->score(holder, objective.name);
@@ -240,7 +239,6 @@ void ScoreboardCommand::buildPlayers(const CommandNodeBuilder& root) const {
         });
     });
 
-    /// `add` and `remove` are the same walk with opposite signs.
     for (const bool adding : {true, false}) {
         root.literal(adding ? "add" : "remove", [this, adding](const CommandNodeBuilder& form) {
             form.argument("targets", scoreHolderArgument(), [this, adding](const CommandNodeBuilder& targets) {
@@ -369,8 +367,7 @@ void ScoreboardCommand::buildPlayers(const CommandNodeBuilder& root) const {
                                         scoreboard_->score(holder, (*target)->name).value_or(0);
                                     std::int32_t result = 0;
                                     if (*operation == "><") {
-                                        // The swap writes the source too, which no other operation
-                                        // does.
+                                        // The swap writes the source too, which no other operation does.
                                         scoreboard_->setScore(sourceHolder, (*sourceObjective)->name, current);
                                         sendScore(*scoreboard_, context, sourceHolder, (*sourceObjective)->name,
                                                   current);

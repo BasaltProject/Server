@@ -19,8 +19,7 @@ using colors::Brightness;
 
 constexpr std::int32_t kHalf = MapData::kSize / 2;
 
-/// parity: the `LinkedHashMultiset` the scan counts colours in: most frequent wins, and the first one
-/// counted wins a tie.
+/// parity: the `LinkedHashMultiset` the scan counts colours in.
 class ColorCount {
 public:
     void add(std::int32_t color, std::int32_t times = 1) {
@@ -48,7 +47,6 @@ public:
     }
 
 private:
-    /// At most 16 by 16 blocks are averaged, so at most 256 colours.
     std::array<std::pair<std::int32_t, std::int32_t>, 256> entries_{};
     std::size_t used_ = 0;
 };

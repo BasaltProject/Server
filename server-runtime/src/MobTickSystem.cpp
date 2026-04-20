@@ -142,7 +142,7 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     }
     entity::entityCombat::tick(entity);
     actions_->tickAmbientSound(world, entity, random);
-    // parity: `LivingEntity.tick`: one arrow or stinger falls out every twenty times thirty less the count.
+    // parity: `LivingEntity.tick`.
     if (entity.arrowCount > 0) {
         if (entity.removeArrowTime <= 0) {
             entity.removeArrowTime = 20 * (30 - entity.arrowCount);
@@ -186,7 +186,7 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (actions_->tickConversion(world, watchers, entity)) {
         return;
     }
-    // parity: `SnowGolem.aiStep` is the living entity's own turn, not the goals', so it lays its snow
+    // parity: `SnowGolem.aiStep` is the living entity's own turn.
     // even where nothing is driving it.
     if (entity.type().path() == "snow_golem") {
         actions_->trailSnow(world, entity);
@@ -256,7 +256,7 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity.type().path() == "parrot") {
         actions_->tickParrot(world, entity);
     }
-    // parity: `Pufferfish.tick` and `aiStep`: the puffing up, the sting and the deflating, after
+    // parity: `Pufferfish.tick` and `aiStep`.
     // the travel they belong to.
     if (entity.type().path() == "pufferfish") {
         actions_->tickPufferfish(world, watchers, entity, living);

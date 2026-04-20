@@ -35,8 +35,7 @@ std::int32_t airAfterTick(std::int32_t air, bool eyesInWater) {
 
 namespace {
 
-/// parity: `FlowingFluid.getOwnHeight` and `getHeight`: a full block when lava sits on it, else its
-/// amount in ninths.
+/// parity: `FlowingFluid.getOwnHeight` and `getHeight`.
 [[nodiscard]] double lavaHeight(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                 std::int32_t stateId) {
     const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);

@@ -10,8 +10,7 @@
 
 namespace basalt::server::world::structure {
 
-/// parity: `OceanMonumentPieces.RoomDefinition`. One cell of the monument's five by five by three
-/// lattice, with the six neighbours it touches and which of those doorways survived.
+/// parity: `OceanMonumentPieces.RoomDefinition`.
 class MonumentRoom {
 public:
     explicit MonumentRoom(std::int32_t index) : index_(index) {}
@@ -38,7 +37,6 @@ public:
 
     void updateOpenings();
 
-    /// Whether the entrance is still reachable from here through open doorways.
     [[nodiscard]] bool findSource(std::int32_t scan);
 
     [[nodiscard]] std::int32_t countOpenings() const;
@@ -52,8 +50,6 @@ private:
     std::int32_t scanIndex_ = 0;
 };
 
-/// The lattice plus the two cells the rest of the monument is measured from. The rooms are owned
-/// here: they point at each other, so they have to outlive any walk over them.
 struct MonumentRoomGraph {
     std::vector<std::unique_ptr<MonumentRoom>> owned;
     std::vector<MonumentRoom*> rooms;
@@ -61,9 +57,7 @@ struct MonumentRoomGraph {
     MonumentRoom* coreRoom = nullptr;
 };
 
-/// parity: `MonumentBuilding.generateRoomGraph`. Builds the lattice, hangs the roof and the two wings
-/// off it, claims the eight cells the core room occupies, and then walks every room shutting doorways
-/// at random as long as the entrance stays reachable from both sides of each one.
+/// parity: `MonumentBuilding.generateRoomGraph`.
 [[nodiscard]] MonumentRoomGraph generateMonumentRoomGraph(random::RandomSource& random);
 
 /// parity: `OceanMonumentPiece.getRoomIndex`.

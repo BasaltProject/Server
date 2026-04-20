@@ -44,8 +44,7 @@ const std::set<std::int32_t>& icePatchTargetStateIds() {
     return ids;
 }
 
-/// parity: La puia y el parche de hielo tienen radio, asi que cruzan el borde a menudo. Vanilla escribe ahi
-/// por el `WorldGenLevel`; recortar pierde el trozo que asoma. Coordenadas de mundo.
+/// parity: the spike and the ice patch cross chunk edges, written in world coordinates.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (y < bounds.minY() || y > bounds.maxY()) {
@@ -81,8 +80,7 @@ void placeSpike(Chunk& chunk, random::RandomSource& random, const DecorationPos&
     origin.y += random.nextInt(4);
     const std::int32_t height = random.nextInt(4) + 7;
     const std::int32_t width = height / 4 + random.nextInt(2);
-    // parity: the rare tall spike draws only when the base is already wide, so the draw order
-    // depends on the width above it.
+    // parity: the rare tall spike draws only when the base is already wide.
     if (width > 1 && random.nextInt(60) == 0) {
         origin.y += 10 + random.nextInt(30);
     }
@@ -113,8 +111,7 @@ void placeSpike(Chunk& chunk, random::RandomSource& random, const DecorationPos&
         for (std::int32_t zOffset = -pillarWidth; zOffset <= pillarWidth; ++zOffset) {
             std::int32_t cursorY = origin.y - 1;
             std::int32_t runLength = (std::abs(xOffset) == 1 && std::abs(zOffset) == 1) ? random.nextInt(5) : 50;
-            // parity: the floor is the literal 50, not the world minimum: a spike never roots
-            // deeper than that whatever the dimension's bounds are.
+            // parity: the floor is the literal 50, not the world minimum.
             while (cursorY > 50) {
                 const std::int32_t stateId = get(chunk, origin.x + xOffset, cursorY, origin.z + zOffset);
                 if (!registry::blocks::isAir(stateId) && !replaceableStateIds().contains(stateId) &&

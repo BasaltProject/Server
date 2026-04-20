@@ -9,16 +9,11 @@
 
 namespace basalt::server::registry::blockStateDefinitions {
 namespace {
-
 using wire::common::Identifier;
 
-/// The whole table, built once: the definitions by block, and their first state ids sorted so that a
-/// state id finds its owner by binary search.
 struct Table {
     std::unordered_map<Identifier, Definition> byBlock;
-    /// Every block's first state id, sorted.
     std::vector<std::int32_t> starts;
-    /// The definition that owns each start, or null for a block with a single state.
     std::vector<const Definition*> owners;
     std::vector<Identifier> ownerBlocks;
 };
@@ -58,7 +53,6 @@ struct Table {
         table.byBlock.emplace(block, Definition{block, firstStateId, std::move(names), std::move(values)});
     }
 
-    // A block with a single state is not in the table above, so its own id starts and ends it.
     std::vector<std::pair<std::int32_t, Identifier>> firsts;
     firsts.reserve(defaultBlockStatesTable().size());
     for (const auto& [stateId, path] : defaultBlockStatesTable()) {
@@ -84,7 +78,6 @@ struct Table {
     return built;
 }
 
-/// Where `stateId` sits in the sorted starts, or absent when it belongs to no block.
 [[nodiscard]] std::optional<std::size_t> indexOf(std::int32_t stateId) {
     const Table& built = table();
     const auto after = std::ranges::upper_bound(built.starts, stateId);
@@ -96,7 +89,6 @@ struct Table {
     const std::int32_t count = definition == nullptr ? 1 : definition->stateCount();
     return stateId < built.starts[index] + count ? std::optional{index} : std::nullopt;
 }
-
 } // namespace
 
 Definition::Definition(Identifier block, std::int32_t firstStateId, std::vector<std::string> names,
@@ -176,5 +168,4 @@ std::optional<std::int32_t> stateIdOf(const Identifier& block, const std::map<st
     }
     return stateId;
 }
-
 } // namespace basalt::server::registry::blockStateDefinitions

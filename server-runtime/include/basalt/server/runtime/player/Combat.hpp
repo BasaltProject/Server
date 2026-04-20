@@ -6,84 +6,44 @@
 
 namespace basalt::server::runtime::player::combat {
 
-/// How much of a hit actually lands: armour first, then resistance and protection.
-///
-/// parity: `CombatRules` plus `LivingEntity.getDamageAfterArmorAbsorb`/`getDamageAfterMagicAbsorb`,
-/// in that order, which is what makes armour worth less against a big hit than against a small one.
 inline constexpr float kMaxArmour = 20.0F;
 
-/// parity: `Attributes.SAFE_FALL_DISTANCE`.
 inline constexpr double kSafeFallDistance = 3.0;
 
-/// parity: `Player.attack`, where a critical hit is worth half again.
 inline constexpr float kCriticalMultiplier = 1.5F;
 
-/// parity: `CombatRules.getDamageAfterAbsorb`. `fractionAdd` is what the weapon's
-/// `armor_effectiveness` adds to the armour's share, which is how breach bites through it.
 [[nodiscard]] float afterArmour(float damage, float armour, float toughness, float fractionAdd = 0.0F);
 
-/// parity: `CombatRules.getDamageAfterMagicAbsorb`, the enchantment half of the same idea.
 [[nodiscard]] float afterProtection(float damage, float protection);
 
-/// What a fall of this many blocks costs.
-///
-/// parity: `LivingEntity.calculateFallDamage` over `calculateFallPower`: the distance minus the
-/// three blocks of `Attributes.SAFE_FALL_DISTANCE`, floored, with vanilla's own epsilon so a fall
-/// of exactly four blocks hurts.
 [[nodiscard]] std::int32_t fallDamage(double fallDistance, double safeFallDistance = kSafeFallDistance);
 
-/// How much of a swing has recharged, from zero to one.
-///
-/// parity: `Player.getAttackStrengthScale(0.5)`, whose delay is twenty ticks over the attack speed:
-/// a hand swings four times a second, an iron sword one and a half.
 [[nodiscard]] float attackStrengthScale(std::int32_t ticksSinceSwing, double attackSpeed);
 
-/// parity: `Player.baseDamageScaleFactor`: a swing that has not recharged still lands a fifth of
-/// the damage, and the rest comes back with the square of the charge.
+/// parity: `Player.baseDamageScaleFactor`.
 [[nodiscard]] float chargeScale(float strength);
 
-/// What the difficulty leaves of a hit dealt by something that is not a player.
-///
-/// parity: `Player.hurtServer`: peaceful takes nothing, easy halves it and adds one back (never
-/// more than the hit itself), normal is the hit, and hard is half again.
+/// parity: `Player.hurtServer`.
 [[nodiscard]] float afterDifficulty(float damage, std::string_view difficulty);
 
-/// parity: `LivingEntity.knockback`: the speed keeps half of what it had, the push is taken off it,
-/// and on the ground it also gets a lift capped at 0.4.
 [[nodiscard]] std::array<double, 3> knockback(double power, double towardsX, double towardsZ, double velocityX,
                                               double velocityY, double velocityZ, bool onGround,
                                               double knockbackResistance = 0.0);
 
-/// Whether a player standing here can reach that box. Vanilla measures from the eyes to the nearest
-/// corner of the target rather than centre to centre, so a tall mob is reachable from further up.
-///
-/// parity: `Player.canInteractWithEntity` over `AABB.distanceToSqr`.
 [[nodiscard]] bool withinAttackReach(double playerX, double playerY, double playerZ, double targetX, double targetY,
                                      double targetZ, double targetWidth, double targetHeight);
 
-/// What one swing is worth before the target does anything about it, and the three things the rest
-/// of the hit needs to know about it.
-///
-/// Pure on purpose: the two doors compute a swing from the same numbers, and a formula that lives
-/// in one of them is a formula the other one drifts away from.
 struct Swing {
     float damage = 0.0F;
-    /// Whether the swing had recharged. The sweep, the sprint push and the critical all need it.
     bool fullStrength = false;
     /// parity: `canCriticalAttack`, the falling half of a jump and nothing else.
     bool critical = false;
-    /// A sprinting hit at full strength, which pushes harder and sounds different.
     bool knockbackAttack = false;
 };
 
-/// parity: `Player.attack`'s own arithmetic: the charge scales the base, a critical takes half again
-/// of that, and what the enchantments add rides on the swing but never on the critical.
-/// `bonus` is the weapon's own `getAttackDamageBonus`, the mace's smash, which the critical scales too.
 [[nodiscard]] Swing swingOf(float strength, float base, float enchanted, bool falling, bool onGround, bool sprinting,
                             float bonus = 0.0F);
 
-/// parity: `LivingEntity.getDamageAfterMagicAbsorb`'s resistance case, which counts in fifths and
-/// floors at zero rather than going negative at level four and above.
 [[nodiscard]] float afterResistance(float damage, std::int32_t amplifier);
 
 } // namespace basalt::server::runtime::player::combat

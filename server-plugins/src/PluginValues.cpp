@@ -5,10 +5,8 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
 
-/// One string field of the table at `index`, or nothing when it is absent.
 [[nodiscard]] std::optional<std::string> stringField(LuaArgs& lua, std::int32_t index, std::string_view key) {
     lua.pushField(index, key);
     std::optional<std::string> value;
@@ -18,7 +16,6 @@ using lua::LuaArgs;
     lua.pop(1);
     return value;
 }
-
 } // namespace
 
 PluginCrossValue crossOut(LuaArgs& lua, std::int32_t index, std::int32_t depth) {
@@ -41,8 +38,6 @@ PluginCrossValue crossOut(LuaArgs& lua, std::int32_t index, std::int32_t depth) 
     if (!lua.isTable(index) || depth >= kMaxCrossDepth) {
         return {};
     }
-    // A player object is recognised by what it answers, not by its identity: it is a table with a
-    // uuid, and that uuid is all the other side needs.
     const std::optional<std::string> uuid = stringField(lua, index, "uuid");
     const std::optional<std::string> name = stringField(lua, index, "name");
     PluginCrossTable table;
@@ -67,5 +62,4 @@ std::vector<PluginCrossValue> crossArguments(LuaArgs& lua) {
     }
     return copied;
 }
-
 } // namespace basalt::server::plugins

@@ -67,7 +67,6 @@ const std::set<std::string, std::less<>>& supportOverrideSnowLayer() {
            registry::blockShapes::isCollisionFaceFull(belowStateId, registry::BlockFace::Up);
 }
 
-/// One column: ice on exposed water, snow on top of what can hold it.
 void freezeColumn(Chunk& chunk, const surface::SurfaceRuleEnvironment& environment, std::int32_t localX,
                   std::int32_t localZ) {
     const std::int32_t worldX = chunk.chunkX() * 16 + localX;

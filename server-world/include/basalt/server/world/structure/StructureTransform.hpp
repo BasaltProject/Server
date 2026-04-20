@@ -14,11 +14,10 @@ enum class StructureRotation : std::uint8_t { None, Clockwise90, Clockwise180, C
 /// parity: `net.minecraft.world.level.block.Mirror`.
 enum class StructureMirror : std::uint8_t { None, LeftRight, FrontBack };
 
-/// What `/place template` takes, which is each enum's `getSerializedName`.
 [[nodiscard]] std::string_view serializedName(StructureRotation rotation);
 [[nodiscard]] std::string_view serializedName(StructureMirror mirror);
 
-/// parity: `net.minecraft.core.Direction`, the six axis directions a jigsaw block can face.
+/// parity: `net.minecraft.core.Direction`.
 enum class StructureDirection : std::uint8_t { Down, Up, North, South, West, East };
 
 [[nodiscard]] std::int32_t dx(StructureDirection direction);
@@ -31,22 +30,17 @@ enum class StructureDirection : std::uint8_t { Down, Up, North, South, West, Eas
 
 [[nodiscard]] StructureDirection opposite(StructureDirection direction);
 
-/// parity: `Direction.mirror`. LeftRight swaps north and south (mirroring Z); FrontBack swaps east
-/// and west (mirroring X).
+/// parity: `Direction.mirror`.
 [[nodiscard]] StructureDirection mirrored(StructureDirection direction, StructureMirror mirror);
 
-/// parity: `Direction.getRotated`, how a rotation turns a horizontal direction around Y. Up and
-/// down are unaffected.
+/// parity: `Direction.getRotated`.
 [[nodiscard]] StructureDirection rotated(StructureDirection direction, StructureRotation rotation);
 
 [[nodiscard]] std::string_view serializedName(StructureDirection direction);
 
 [[nodiscard]] std::optional<StructureDirection> directionFromName(std::string_view name);
 
-/// parity: `StructureTemplate.transform(BlockPos, Mirror, Rotation, BlockPos)`. Which enum constant
-/// maps to which case was not obvious from the decompiled switch, so it was resolved against the
-/// disassembled switch map: mirror LeftRight and FrontBack negate Z and X respectively, and each
-/// rotation has its own pivot formula while None returns the possibly mirrored position unchanged.
+/// parity: `StructureTemplate.transform(BlockPos, Mirror, Rotation, BlockPos)`.
 [[nodiscard]] StructurePos transform(StructurePos pos, StructureMirror mirror, StructureRotation rotation,
                                      StructurePos pivot);
 
@@ -59,8 +53,7 @@ enum class StructureDirection : std::uint8_t { Down, Up, North, South, West, Eas
 /// parity: `BlockPos.rotate`, which turns a position about the origin.
 [[nodiscard]] StructurePos rotate(StructurePos pos, StructureRotation rotation);
 
-/// parity: `StructureTemplate.getZeroPositionWithTransform`, which is where a turned template's own
-/// zero lands.
+/// parity: `StructureTemplate.getZeroPositionWithTransform`.
 [[nodiscard]] StructurePos zeroPositionWithTransform(StructurePos zeroPos, StructureMirror mirror,
                                                      StructureRotation rotation, std::int32_t width,
                                                      std::int32_t depth);

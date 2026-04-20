@@ -60,7 +60,7 @@ constexpr std::int32_t kCreativeHivePickupDelay = 10;
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// parity: the two blocks `IceBlock` covers. Packed and blue ice are other blocks and do not melt.
+/// parity: the two blocks `IceBlock` covers.
 [[nodiscard]] bool isMeltingIce(const std::int32_t stateId) {
     const Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && (block->path() == "ice" || block->path() == "frosted_ice");
@@ -74,7 +74,6 @@ constexpr std::int32_t kCreativeHivePickupDelay = 10;
     return (doubleFrom(context) * 2 * kPopJitter) - kPopJitter;
 }
 
-/// What wears an item down, built from the two registries that decide it.
 [[nodiscard]] item::ItemDamageEffects effectsFrom(const BreakContext& context) {
     return item::ItemDamageEffects{
         [&context](const Identifier& id) {
@@ -170,9 +169,6 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
     if (context.registry == nullptr) {
         return;
     }
-    // Only put into the world here. Telling anyone about it belongs to each connection's own
-    // thread: broadcasting from here reaches whoever happens to be online at the instant of the
-    // drop and nobody who walks up afterwards.
     static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = context.registry->allocateEntityId(),
                                                                  .uuid = wire::common::Uuid::random(),
                                                                  .item = item,
@@ -191,8 +187,7 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
 void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const Identifier& block,
                  const std::int32_t stateId, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                  const wire::nbt::NbtCompound* carried, const storage::StoredItemStack* tool) {
-    // parity: `Block.popResource` reads the `block_drops` rule, so with it off a block broken by hand
-    // leaves nothing behind either.
+    // parity: `Block.popResource` reads the `block_drops` rule.
     if (!world.gameRules().get(world::gameRules::kBlockDrops)) {
         return;
     }
@@ -205,11 +200,10 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
     // parity: the stream the table names, so the same world drops the same sapling off the same leaf.
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
-    // parity: `LootContextParams.BLOCK_STATE`: the lower half of a door is what carries the drop,
-    // and `THIS_ENTITY`, which a block broken by hand always has.
+    // parity: `LootContextParams.BLOCK_STATE`.
     server::world::loot::LootContext lootContext{
         .blockState = reg::blockStateDefinitions::propertiesOf(stateId), .block = block, .hasEntity = true};
-    // parity: `LootContextParams.TOOL`, which is what silk touch, shears and fortune are read from.
+    // parity: `LootContextParams.TOOL`.
     if (tool != nullptr) {
         lootContext.tool = parsedOrNothing(tool->id);
         for (const auto& [enchantment, level] : enchantmentLevels(*tool)) {
@@ -232,8 +226,7 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
         if (carried != nullptr && stack.item == block) {
             components.set(world::shulkers::kContainer, wire::nbt::NbtTag::ofCompound(*carried));
         }
-        // parity: `Block.popResource`, which scatters the stack inside the block it came from and
-        // pops it up, rather than dropping every stack on the same point.
+        // parity: `Block.popResource` scatters the stack inside its block and pops it up.
         spawnDroppedItem(context, world, stack.item, stack.count, x + 0.5 + popJitter(context),
                          y + 0.5 + popJitter(context) - kItemHalfHeight, z + 0.5 + popJitter(context),
                          (doubleFrom(context) * kPopSpread) - (kPopSpread / 2.0), kBreakDropLift,
@@ -252,7 +245,7 @@ std::optional<std::int32_t> meltedIce(const BreakContext& context, world::Loaded
     if (config::dimensionFacts(world.declaration().dimension).hasCeiling) {
         return std::nullopt;
     }
-    // parity: 26.3 `IceBlock.playerDestroy`: `ice_melts_when_destroyed_above` or a liquid block below.
+    // parity: 26.3 `IceBlock.playerDestroy`.
     const std::optional<std::int32_t> below = world.state().blockState(x, y - 1, z);
     const Identifier* belowBlock = below.has_value() ? reg::blockStateDefinitions::blockOf(*below) : nullptr;
     if (belowBlock == nullptr) {
@@ -273,7 +266,7 @@ void wearHeldItemOnBreak(const BreakContext& context, PlayerSession& player, con
     if (session->gamemode == Gamemode::Creative) {
         return;
     }
-    // parity: `Item.mineBlock` answers true for anything with a `tool` component, which counts it.
+    // parity: `Item.mineBlock` answers true for anything with a `tool` component.
     if (const std::optional<storage::StoredItemStack>& tool = session->inventory.heldItem(); tool.has_value()) {
         if (const std::optional<Identifier> id = parsedOrNothing(tool->id);
             id.has_value() && !reg::itemTools::rulesFor(*id).empty()) {
@@ -335,8 +328,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     const Identifier* brokenBlock = broken.has_value() ? reg::blockStateDefinitions::blockOf(*broken) : nullptr;
     PlayerSession* session = &player;
     const BlockPos pos{x, y, z};
-    // Cancelling puts the block back on the digger's screen: the client broke it locally the moment
-    // it started, so saying nothing would leave a hole only they can see.
+    // Cancelling puts the block back on the digger's screen, since the client already broke it locally.
     if (context.breakAllowed && !context.breakAllowed(*session, x, y, z, broken.value_or(0))) {
         acknowledge(context);
         if (context.putBack) {
@@ -345,8 +337,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         stopDigging(context);
         return false;
     }
-    // parity: `ShulkerBoxBlock.getDrops`, read before the block goes: breaking it takes the block
-    // entity with it, and the contents have to travel in the item.
+    // parity: `ShulkerBoxBlock.getDrops`.
     std::optional<wire::nbt::NbtCompound> carried;
     if (brokenBlock != nullptr && world::shulkers::isShulkerBox(brokenBlock->path())) {
         server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
@@ -363,7 +354,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         if (context.creakingHeartBroken) {
             context.creakingHeartBroken(world, *session, x, y, z);
         }
-        // parity: `tryAwardExperience`: twenty to twenty-four for a natural heart, not in creative.
+        // parity: `tryAwardExperience`.
         const std::map<std::string, std::string> properties =
             reg::blockStateDefinitions::propertiesOf(broken.value_or(0));
         const auto natural = properties.find("natural");
@@ -383,9 +374,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             hive = entity->data();
         }
     }
-    // parity: `TripWireBlock.playerWillDestroy`, which writes `disarmed` before the string goes and
-    // raises `GameEvent.SHEAR`. It is what makes shears the way to cut a trap without setting it off:
-    // the line is handed a disarmed string, so it comes loose instead of firing.
+    // parity: `TripWireBlock.playerWillDestroy` writes `disarmed` before the string goes and raises `GameEvent.SHEAR`.
     std::optional<std::int32_t> removed = broken;
     if (broken.has_value() && world::tripwires::isWire(*broken)) {
         const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
@@ -400,19 +389,15 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             }
         }
     }
-    // parity: `TntBlock.playerWillDestroy`: an `unstable` block broken by a survival player lights
-    // instead of dropping. `unstable` is read nowhere else, and a signal lights a block whatever it
-    // says, so this is the only place it means anything.
+    // parity: `TntBlock.playerWillDestroy`.
     if (session->gamemode != Gamemode::Creative && broken.has_value() && brokenBlock != nullptr &&
         brokenBlock->path() == "tnt" && world.gameRules().get(world::gameRules::kTntExplodes) &&
         reg::blockStateDefinitions::propertiesOf(*broken).contains("unstable") &&
         reg::blockStateDefinitions::propertiesOf(*broken).at("unstable") == "true") {
-        // parity: `prime` only spawns the entity and raises the event; taking the block away and
-        // dropping whatever it drops is the ordinary break that follows, exactly as in the jar.
+        // parity: `prime` only spawns the entity and raises the event.
         world.state().primeTnt(x, y, z, "prime_fuse");
     }
-    // parity: `DoublePlantBlock.playerWillDestroy` drops the half before either goes, so its
-    // `location_check` still finds the other half; `playerDestroy` then drops nothing.
+    // parity: `DoublePlantBlock.playerWillDestroy` drops the half first.
     const bool dropsBeforeRemoval = session->gamemode == Gamemode::Survival && broken.has_value() &&
                                     brokenBlock != nullptr && reg::blockStateFamilies::isDoublePlantState(*broken);
     if (dropsBeforeRemoval) {
@@ -435,7 +420,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     for (const PlayerSession* watcher : watchers) {
         sendBlockChangeTo(*watcher, x, y, z, leaves);
     }
-    // parity: `JukeboxBlockEntity.preRemoveSideEffects` pops the disc, and `stop` tells everyone.
+    // parity: `JukeboxBlockEntity.preRemoveSideEffects` pops the disc.
     if (songPlaying) {
         for (const PlayerSession* watcher : watchers) {
             if (watcher->connection().sendLevelEvent) {
@@ -443,8 +428,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             }
         }
     }
-    // parity: `Level.levelEvent(player, 2001, pos, state)`: the breaker predicts its own puff of
-    // particles and its sound, everyone else needs telling.
+    // parity: `Level.levelEvent(player, 2001, pos, state)`.
     if (broken.has_value()) {
         const play::LevelEventPacket effect{
             .event = play::LevelEventPacket::kParticlesDestroyBlock, .pos = pos, .data = *broken};
@@ -467,14 +451,12 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     notifyAround(context, world, x, y, z, removed);
     // parity: `GameEvent.BLOCK_DESTROY`, which a sculk sensor hears as twelve.
     heardBySculk(context, world, "block_destroy", x, y, z, {.entity = player.uuid()});
-    // Breaking the frame puts the portal out, which is the other half of lighting one.
     for (const std::array<std::int32_t, 3>& block : world::netherPortals::extinguishAround(world, x, y, z)) {
         announceBlock(context, world.name(), block[0], block[1], block[2], reg::blocks::air().stateId);
     }
 
     if (session->gamemode == Gamemode::Survival && brokenBlock != nullptr && !dropsBeforeRemoval) {
-        // parity: `Player.hasCorrectToolForDrops`. A block marked as needing the right tool gives
-        // nothing to the wrong one, which is what makes punching stone a waste of time.
+        // parity: `Player.hasCorrectToolForDrops`.
         const std::optional<storage::StoredItemStack> held = session->inventory.heldItem();
         const std::optional<Identifier> heldItem = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
         const reg::BlockHardness* hardness = reg::blocks::hardnessOf(*brokenBlock);
@@ -488,8 +470,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         if (correctTool) {
             dropLootFor(context, world, *brokenBlock, broken.value_or(0), x, y, z,
                         carried.has_value() ? &*carried : nullptr, held.has_value() ? &*held : nullptr);
-            // parity: `spawnAfterBreak(..., true)` right after the drops, and `popExperience` reads
-            // `block_drops` like the items do.
+            // parity: `spawnAfterBreak(..., true)` after the drops.
             const bool silkTouch = held.has_value() && enchantmentLevel(*held, Identifier::vanilla("silk_touch")) > 0;
             random::RandomSource random = random::RandomSource::legacy(seedFrom(context));
             const std::int32_t points = world::blockExperience::onBreak(*brokenBlock, silkTouch, random);
@@ -501,8 +482,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             }
         }
     }
-    // parity: `BeehiveBlock.playerWillDestroy`: in creative, a hive with bees or honey drops itself
-    // with both, where drops are on.
+    // parity: `BeehiveBlock.playerWillDestroy`.
     if (session->gamemode == Gamemode::Creative && hive.has_value() && brokenBlock != nullptr &&
         world.gameRules().get(world::gameRules::kBlockDrops)) {
         const std::map<std::string, std::string> properties =

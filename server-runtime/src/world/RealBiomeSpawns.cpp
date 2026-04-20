@@ -47,7 +47,6 @@ using wire::common::JsonValue;
         std::optional<std::int64_t> minCount = integerOf(fields->find("minCount"));
         std::optional<std::int64_t> maxCount = integerOf(fields->find("maxCount"));
         bool constantCount = false;
-        // Since 26.3 the pack size is an int provider: a constant or a uniform range.
         if (const JsonValue* count = fields->find("count"); count != nullptr) {
             const JsonObject* provider = count->get<JsonObject>();
             const JsonValue* kind = provider == nullptr ? nullptr : provider->find("type");
@@ -99,7 +98,6 @@ RealBiomeSpawns::Settings RealBiomeSpawns::parse(std::string_view json) {
         return settings;
     }
 
-    // Since 26.3 the spawn settings are environment attributes of the biome.
     if (const JsonValue* attributesField = root->find("attributes"); attributesField != nullptr) {
         if (const JsonObject* attributes = attributesField->get<JsonObject>(); attributes != nullptr) {
             if (const JsonValue* spawns = attributes->find("minecraft:gameplay/natural_mob_spawns");

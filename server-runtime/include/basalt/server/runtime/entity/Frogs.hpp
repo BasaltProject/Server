@@ -12,10 +12,7 @@
 
 namespace basalt::server::runtime::entity {
 
-/// The frog and the tadpole: the tongue, the croak, the long jumps, and the spawn a frog lays.
-///
-/// parity: `Frog`, `FrogAi`, `ShootTongue`, `Croak`, `TryLaySpawnOnFluidNearLand`, `Tadpole` and
-/// `TadpoleAi`.
+/// parity: `Frog`.
 namespace frogs {
 
 /// parity: `Frog.DATA_TONGUE_TARGET_ID`, after the variant.
@@ -53,7 +50,7 @@ struct FrogState {
     std::int32_t eatTimer = 0;
     std::int32_t pathCounter = 0;
     std::optional<std::int32_t> tongueTarget;
-    /// parity: `UNREACHABLE_TONGUE_TARGETS`, five at most, forgotten a hundred ticks after the last.
+    /// parity: `UNREACHABLE_TONGUE_TARGETS`.
     std::vector<wire::common::Uuid> unreachable;
     std::int64_t unreachableUntil = 0;
     /// parity: the `nextOkStartTime` of `TryFindLand` and `TryFindLandNearLiquid`.

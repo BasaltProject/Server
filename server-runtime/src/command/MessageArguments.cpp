@@ -13,7 +13,6 @@ namespace {
 
 using wire::text::Component;
 
-/// One selector inside a message, by where it sits in the text.
 struct Part {
     std::int32_t start = 0;
     std::int32_t end = 0;
@@ -38,8 +37,7 @@ struct Part {
                                        translatable->key == "argument.entity.selector.unknown");
 }
 
-/// parity: `Message.parseText`'s loop: a malformed selector past its type is an error, a bad type
-/// only moves on one character.
+/// parity: `Message.parseText`'s loop: a malformed selector past its type is an error.
 [[nodiscard]] Parsed<std::vector<Part>> scan(StringReader& reader, const CommandSource& source,
                                              const CommandEnvironment& environment) {
     const std::int32_t offset = reader.cursor();

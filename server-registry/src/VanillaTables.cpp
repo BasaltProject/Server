@@ -1,5 +1,3 @@
-// Generated from the real 26.3 server jar. Regenerate rather than edit: every number here is a
-// fact about the game, not a decision.
 
 #include <basalt/server/registry/VanillaTables.hpp>
 
@@ -10,9 +8,6 @@
 
 namespace basalt::server::registry {
 namespace {
-
-/// Assembled at load rather than written as one literal: a compiler is only required to accept
-/// 64 KB of string, and one of these tables is longer than that.
 std::string join(std::initializer_list<std::string_view> parts) {
     std::size_t size = 0;
     for (const std::string_view part : parts) {
@@ -8488,7 +8483,6 @@ const std::string kBlockSupportIndexTable = join(
      "LBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBL"
      "BLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLBLB4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B"
      "4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B4B5B5ACACAAAAAC"});
-
 } // namespace
 
 std::span<const std::pair<std::int32_t, std::string_view>> itemIdsTable() { return kItemIdsTable; }
@@ -8558,5 +8552,4 @@ std::span<const std::pair<std::string_view, std::string_view>> itemBlocksTable()
 std::span<const std::pair<std::string_view, std::string_view>> trimMaterialsTable() { return kTrimMaterialsTable; }
 
 std::string_view blockSupportIndexTable() { return kBlockSupportIndexTable; }
-
 } // namespace basalt::server::registry

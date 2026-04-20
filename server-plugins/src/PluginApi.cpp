@@ -14,11 +14,9 @@
 
 namespace basalt::server::plugins::pluginApi {
 namespace {
-
 using lua::LuaArgs;
 using lua::LuaRef;
 
-/// The TOML tree as Lua tables. Numbers stay integers where they were written as integers.
 void pushToml(LuaArgs& lua, const wire::common::toml::TomlTable& table);
 
 void pushTomlValue(LuaArgs& lua, const wire::common::toml::TomlValue& value) {
@@ -53,8 +51,6 @@ void pushToml(LuaArgs& lua, const wire::common::toml::TomlTable& table) {
         }
         pushTomlValue(lua, *value);
         lua.setField(key);
-        // TOML is written kebab-case here and in the server's own files, and Lua cannot spell a dash
-        // in `config.starting-balance`, so the same key answers to an underscore too.
         if (key.find('-') != std::string::npos) {
             std::string underscored = key;
             std::ranges::replace(underscored, '-', '_');
@@ -64,7 +60,6 @@ void pushToml(LuaArgs& lua, const wire::common::toml::TomlTable& table) {
     }
 }
 
-/// One string field of the table at `index`, or nothing when it is absent.
 [[nodiscard]] std::optional<std::string> stringField(LuaArgs& lua, std::int32_t index, std::string_view key) {
     lua.pushField(index, key);
     std::optional<std::string> value;
@@ -75,7 +70,6 @@ void pushToml(LuaArgs& lua, const wire::common::toml::TomlTable& table) {
     return value;
 }
 
-/// What a registration hands back to Lua: a table with one `cancel`.
 void pushHandleTable(LuaArgs& lua, PluginHandle handle) {
     const auto held = std::make_shared<PluginHandle>(std::move(handle));
     lua.pushTable();
@@ -95,8 +89,6 @@ void installIdentity(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
     lua.setField("name");
     lua.pushString(plugin.manifest.version);
     lua.setField("version");
-    // A plugin that keeps state in a module-level variable has one of those per lane, so it is told
-    // which one it is rather than having to find out the hard way.
     lua.pushInteger(instance.lane);
     lua.setField("lane");
     lua.pushInteger(lanes);
@@ -126,11 +118,6 @@ void installIdentity(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
     lua.setGlobal("config");
 }
 
-/// `files.read`, `files.list`, `files.exists` and `files.write`, over the plugin's own folder.
-///
-/// Paths are relative to `plugins/<id>/`, which is where the package's resources were put, so what a
-/// plugin asks for is what the operator sees. Anything the package kept to itself is still readable:
-/// the folder is looked at first and the package after it.
 void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     LoadedPlugin* target = &plugin;
     lua.pushTable();
@@ -159,7 +146,6 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
         const std::string prefix = args.count() >= 1 ? args.checkString(1) : std::string{};
         args.pushTable();
         std::int64_t position = 1;
-        // The map is ordered by its key, so the list comes back the same way every run.
         for (const auto& [relative, path] : target->files) {
             if (relative.starts_with(prefix)) {
                 args.pushString(relative);
@@ -184,15 +170,12 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     lua.setGlobal("files");
 }
 
-/// `wait`, `later` and `every`: when a plugin's work runs.
 void installScheduling(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host) {
     LoadedPlugin* target = &plugin;
     PluginInstance* lane = &instance;
     PluginHost* server = &host;
 
-    // `wait(ticks)`: ends the turn here and picks it up again later.
     lua::installWaitingFunction(*instance.sandbox, "wait", [server, target, lane](lua::LuaCall::Resume resume) {
-        // A decider answers a question the server is holding open, so it cannot pause.
         if (lane->deciderDepth > 0) {
             return;
         }
@@ -218,8 +201,6 @@ void installScheduling(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plu
     lua.setGlobal("later");
 
     lua::pushHostFunction(lua, "every", [server, target, lane](LuaArgs& args) {
-        // `every(period, fn)` is the common shape; `every(delay, period, fn)` when the first one
-        // should not be immediate.
         const bool three = args.count() >= 3;
         const auto delay = static_cast<std::int32_t>(args.checkInteger(1));
         const auto period = static_cast<std::int32_t>(three ? args.checkInteger(2) : args.checkInteger(1));
@@ -237,7 +218,6 @@ void installScheduling(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plu
     lua.setGlobal("every");
 }
 
-/// `players`, `worlds`, `at` and `pos`: where a plugin reaches the world.
 void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host) {
     LoadedPlugin* target = &plugin;
     PluginInstance* lane = &instance;
@@ -290,7 +270,6 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
 
     lua.pushTable();
     lua::pushHostFunction(lua, "worlds.create", [server, hooks](LuaArgs& args) {
-        // `worlds.create{ name = "arena", dimension = "overworld", type = "flat", seed = 1 }`.
         if (!args.isTable(1)) {
             args.raise("worlds.create{ name = ..., dimension = ... } takes a table");
         }
@@ -344,8 +323,6 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
     lua.setField("default");
     lua.setGlobal("worlds");
 
-    // `at(world, x, z)`: from here on, this turn runs on the owner of that position. It is a pause,
-    // not a lock, which is why it can only be used where pausing is allowed.
     lua::installWaitingFunction(*instance.sandbox, "at", [server, target, lane](lua::LuaCall::Resume resume) {
         if (lane->deciderDepth > 0) {
             resume();
@@ -360,14 +337,11 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
             lane->sandbox->refill();
             server->resuming(*target, resume);
         });
-        // Nobody owns it (an unloaded world): carry on where we are rather than dropping the rest of
-        // the turn on the floor.
         if (!arranged) {
             resume();
         }
     });
 
-    // `pos(world, x, y, z)`: somewhere, written down once and passed around after that.
     lua::pushHostFunction(lua, "pos", [](LuaArgs& args) {
         pushPosition(args, args.checkString(1), args.checkNumber(2), args.checkNumber(3), args.checkNumber(4));
         return 1;
@@ -375,7 +349,6 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
     lua.setGlobal("pos");
 }
 
-/// `placeholder`, `fill`, `broadcast`, `t`, `service`, `store`, `data`, `emit` and `menu`.
 void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     LoadedPlugin* target = &plugin;
     PluginHost* server = &host;
@@ -413,7 +386,6 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     });
     lua.setGlobal("broadcast");
 
-    // `t("welcome", { name = ... })`: the translation on its own, for text that goes somewhere else.
     lua::pushHostFunction(lua, "t", [target](LuaArgs& args) {
         args.pushString(target->text.resolve("@" + args.checkString(1), &args, 2));
         return 1;
@@ -426,8 +398,6 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
             server->serviceRegistry().consume(args, *server, name);
             return 1;
         }
-        // Declared on both sides: what a plugin offers is in its manifest, so the tooling knows it
-        // and the operator can read it without running anything.
         if (std::ranges::find(target->manifest.exports.services, name) == target->manifest.exports.services.end()) {
             args.raise(name + " is not in [exports] services of " + target->manifest.id + "; add services = [\"" +
                        name + "\"] to plugin.toml");
@@ -444,7 +414,6 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     pushData(lua, plugin.folder);
     lua.setGlobal("data");
 
-    // `emit("arena:round_start", { ... })`: tell whoever is listening, and carry on either way.
     lua::pushHostFunction(lua, "emit", [server](LuaArgs& args) {
         const std::string name = args.checkString(1);
         if (name.find(':') == std::string::npos) {
@@ -458,7 +427,6 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     });
     lua.setGlobal("emit");
 
-    // `menu{ title = ..., rows = 3 }`: a window with buttons in it, and no slot arithmetic.
     lua::pushHostFunction(lua, "menu", [server, target](LuaArgs& args) {
         if (!args.isTable(1)) {
             args.raise("menu{ title = ..., rows = 3 } takes a table");
@@ -483,7 +451,6 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     lua.setGlobal("menu");
 }
 
-/// One filter or option value out of the table a listener was registered with.
 [[nodiscard]] PluginEventValue eventValueOf(LuaArgs& lua, std::int32_t index) {
     if (lua.isBoolean(index)) {
         return PluginEventValue{lua.toBoolean(index)};
@@ -494,7 +461,6 @@ void installMessaging(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     return PluginEventValue{lua.toText(index)};
 }
 
-/// `on(event, [opts], fn)` and `watch(event, [opts], fn)`.
 void installListener(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, bool observer) {
     LoadedPlugin* target = &plugin;
     PluginInstance* lane = &instance;
@@ -510,7 +476,6 @@ void installListener(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
         }
         LuaRef handler = LuaRef::of(args.state(), at);
 
-        // The two lifecycle names stay on `on`: they are about this plugin, not about the world.
         if (name == pluginEventTypes::kPluginEnable || name == pluginEventTypes::kPluginDisable) {
             if (observer) {
                 args.raise("'" + name + "' is about this plugin: listen to it with on(), not watch()");
@@ -522,7 +487,6 @@ void installListener(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
             }
             return 0;
         }
-        // A name with a colon in it is a plugin's own, not one of the server's.
         if (name.find(':') != std::string::npos) {
             if (observer) {
                 args.raise("'" + name + "' belongs to a plugin: listen to it with on()");
@@ -564,8 +528,6 @@ void installListener(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugi
                 wantsCancelled = args.toBoolean(-1);
             }
             args.pop(1);
-            // Anything else that names a field of the event filters on it, which is what saves every
-            // handler from opening with the same `if`.
             for (const std::string& field : type->fields()) {
                 args.pushField(options, field);
                 if (!args.isNil(-1)) {
@@ -585,7 +547,6 @@ void installListeners(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plug
     installListener(lua, instance, plugin, host, false);
     installListener(lua, instance, plugin, host, true);
 
-    // `cmd(spec, fn)`: one command, parsed from the shape a plugin wrote it in.
     LoadedPlugin* target = &plugin;
     PluginInstance* lane = &instance;
     PluginHost* server = &host;
@@ -608,7 +569,6 @@ void installListeners(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plug
     });
     lua.setGlobal("cmd");
 
-    // `sidebar{ priority = 50, when = ..., title = ..., lines = ... }`, and the same for the rest.
     for (const PluginSurface surface : allSurfaces()) {
         const std::string name{surfaceName(surface)};
         lua::pushHostFunction(lua, name, [server, target, surface, name](LuaArgs& args) {
@@ -662,8 +622,6 @@ void installListeners(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plug
                 drawn.title = title != nullptr ? server->answer(*target, *title, &player, name + " title")
                                                : target->text.resolve(writtenTitle, nullptr, 0);
                 if (lines != nullptr) {
-                    // A function that answers with one string is one line, which is what a plugin
-                    // drawing a name tag writes.
                     const std::string said = server->answer(*target, *lines, &player, name + " lines");
                     if (!said.empty()) {
                         drawn.lines.push_back(said);
@@ -687,10 +645,6 @@ void installListeners(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plug
     }
 }
 
-/// `packet`, `channel` and `run`: asked for in the manifest and granted by the operator.
-///
-/// Missing either way, the global is not there at all: a plugin cannot test for one and talk its way
-/// around it.
 void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     LoadedPlugin* target = &plugin;
     PluginHost* server = &host;
@@ -757,8 +711,6 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     }
 
     if (!plugin.manifest.capabilities.network.empty() && granted.contains(PluginPermission::Network)) {
-        // Only the channels the manifest listed: a plugin listening on `bungeecord:main` is talking
-        // to the proxy, and that is the operator's decision, not the plugin's.
         const std::set<std::string, std::less<>> allowed{plugin.manifest.capabilities.network.begin(),
                                                          plugin.manifest.capabilities.network.end()};
         const auto check = [target, allowed](LuaArgs& args, const std::string& name) {
@@ -812,8 +764,6 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     }
 
     if (plugin.manifest.capabilities.commands && granted.contains(PluginPermission::Commands)) {
-        // As the console and never as a player, so a plugin cannot borrow somebody's permissions by
-        // running something in their name.
         lua::pushHostFunction(lua, "run", [server, target](LuaArgs& args) {
             const std::string command = args.checkString(1);
             target->log.info([&command] { return "ran /" + command; });
@@ -823,7 +773,6 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
         lua.setGlobal("run");
     }
 }
-
 } // namespace
 
 void install(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, std::int32_t lanes) {
@@ -836,5 +785,4 @@ void install(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, s
     installListeners(lua, instance, plugin, host);
     installGranted(lua, plugin, host);
 }
-
 } // namespace basalt::server::plugins::pluginApi

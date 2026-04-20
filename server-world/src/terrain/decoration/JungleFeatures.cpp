@@ -65,7 +65,6 @@ struct VineDirection {
     std::int32_t dx;
     std::int32_t dy;
     std::int32_t dz;
-    /// The bit cleared from the default state to turn that face on: vine states count down.
     std::int32_t falseBit;
 };
 

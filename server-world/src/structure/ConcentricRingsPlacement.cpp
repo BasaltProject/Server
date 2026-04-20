@@ -20,9 +20,7 @@ ConcentricRingsPlacement::ringPositions(const std::int64_t seed) const {
     if (count_ == 0) {
         return {};
     }
-    /// parity: `BiomeSource.findBiomeHorizontal` with `findClosest` false, which is not a spiral out
-    /// from the centre: it sweeps the whole square at the outermost radius once and keeps a uniform
-    /// pick among every cell that matched, by reservoir sampling.
+    /// parity: `BiomeSource.findBiomeHorizontal` with `findClosest` false.
     const auto search = [this](std::int32_t chunkX, std::int32_t chunkZ,
                                random::RandomSource& random) -> std::optional<std::pair<std::int32_t, std::int32_t>> {
         const std::int32_t originX = (chunkX << 4) + 8;
@@ -64,12 +62,10 @@ ConcentricRingsPlacement::ringPositions(const std::int64_t seed) const {
     for (std::int32_t index = 0; index < count_; ++index) {
         const double ringDistance =
             4.0 * distance_ + distance_ * circle * 6.0 + (random.nextDouble() - 0.5) * (distance_ * 2.5);
-        // parity: `Math.round` is floor(v + 0.5), which for a negative half lands one higher than a
-        // round-half-away-from-zero would.
+        // parity: `Math.round` is floor(v + 0.5).
         const auto initialX = wire::common::toIntLikeJava(std::floor(std::cos(angle) * ringDistance + 0.5));
         const auto initialZ = wire::common::toIntLikeJava(std::floor(std::sin(angle) * ringDistance + 0.5));
-        // parity: the fork is drawn here, in the main loop, even though the search that uses it runs
-        // on another thread; that is what keeps the list reproducible.
+        // parity: the fork is drawn here, in the main loop, even though the search that uses it runs on another thread.
         random::RandomSource searchRandom = random.fork();
         positions.push_back(search(initialX, initialZ, searchRandom).value_or(std::pair{initialX, initialZ}));
         angle += std::numbers::pi * 2.0 / ringSpread;

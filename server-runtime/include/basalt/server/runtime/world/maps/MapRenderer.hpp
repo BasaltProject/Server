@@ -12,9 +12,7 @@ class Chunk;
 
 namespace basalt::server::runtime::world::maps {
 
-/// What the colour scan reads of the world a map is drawn in.
 struct ScanWorld {
-    /// The chunk, or null when it is not loaded.
     std::function<const server::world::Chunk*(std::int32_t chunkX, std::int32_t chunkZ)> chunkAt;
     std::function<std::optional<MapBanner>(const BlockPos&)> bannerAt;
     std::int32_t minY = 0;
@@ -23,12 +21,10 @@ struct ScanWorld {
 
 namespace mapRenderer {
 
-/// parity: `MapItem.update`, one step of the scan around a player holding the map. A chunk that is
-/// not loaded is skipped, where vanilla loads it.
+/// parity: `MapItem.update`.
 void update(MapData& data, MapData::Holder& holder, const ScanWorld& world, double playerX, double playerZ);
 
-/// parity: `MapItem.renderBiomePreviewMap`. `watery` answers whether the biome at a block position is
-/// in `water_on_map_outlines`.
+/// parity: `MapItem.renderBiomePreviewMap`.
 void renderBiomePreview(MapData& data, std::int32_t seaLevel,
                         const std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)>& watery);
 

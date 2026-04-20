@@ -52,7 +52,7 @@ constexpr std::array<std::string_view, 5> kComparisons{"<", "<=", "=", ">=", ">"
     return (!min.has_value() || value >= *min) && (!max.has_value() || value <= *max);
 }
 
-/// parity: `if blocks`, whose result is how many matched, and `masked` ignores air in the source.
+/// parity: `if blocks`.
 [[nodiscard]] std::optional<std::int32_t> compareRegions(const CommandContext& context, bool masked) {
     world::LoadedWorld* world = worldIn(context.source(), context.environment());
     if (world == nullptr) {
@@ -108,7 +108,6 @@ constexpr std::array<std::string_view, 5> kComparisons{"<", "<=", "=", ">=", ">"
     return name != nullptr && *name == *wanted ? std::optional{1} : std::nullopt;
 }
 
-/// The score an argument pair names, or nothing when either half is missing.
 [[nodiscard]] std::optional<std::int32_t> scoreOf(const scoreboard::Scoreboard& scoreboard,
                                                   const CommandContext& context, std::string_view holderName,
                                                   std::string_view objectiveName) {
@@ -253,8 +252,7 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
         });
     });
 
-    // parity: `ExecuteIfFunctionCustomModifier`: the first function to return decides, `if` passing
-    // on a value other than 0 and `unless` on 0; a source whose functions never return goes nowhere.
+    // parity: `ExecuteIfFunctionCustomModifier`: the first function to return decides.
     builder.literal("function", [this, &execute, positive](const CommandNodeBuilder& form) {
         form.argument("name", functionArgument(), [this, &execute, positive](const CommandNodeBuilder& named) {
             named.redirectTo(execute, true, [this, positive](const CommandContext& context) {
@@ -276,8 +274,7 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
                         .permission = std::max(context.source().permissionLevel(), permissionLevel::kGamemasters),
                         .silent = true}};
                 if (runner->insideFunction() && context.tailNode() != nullptr) {
-                    // parity: `scheduleFunctionConditionsAndTest`: the functions are queued in an
-                    // isolated call, and the rest of the line resumes for this source afterwards.
+                    // parity: `scheduleFunctionConditionsAndTest`.
                     const CommandDispatcher* dispatcher = &context.dispatcher();
                     const CommandNode* tail = context.tailNode();
                     const std::int32_t cursor = context.tailCursor();
@@ -368,7 +365,7 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
 
     // Declared so the tree matches vanilla's; each needs a system this build has not got.
     const auto never = [](const CommandContext&) { return std::optional<std::int32_t>{}; };
-    // parity: `ExecuteCommand.checkCustomPredicate`, this entity if the source has one, at its spot.
+    // parity: `ExecuteCommand.checkCustomPredicate`.
     builder.literal("predicate", [&execute, positive](const CommandNodeBuilder& form) {
         form.argument(
             "predicate", lootPredicateOrInlineArgument(), [&execute, positive](const CommandNodeBuilder& one) {
@@ -488,8 +485,6 @@ void ExecuteCommand::buildStores(const CommandNodeBuilder& builder, CommandNode&
     builder.literal("block", [this, &execute, fromSuccess](const CommandNodeBuilder& form) {
         form.argument("targetPos", blockPosArgument(), [this, &execute, fromSuccess](const CommandNodeBuilder& pos) {
             pos.argument("path", nbtPathArgument(), [this, &execute, fromSuccess](const CommandNodeBuilder& path) {
-                // The block store needs a context of its own to reach the world, so the position is
-                // captured and the write is done against the source that reported the result.
                 typedStore(path, execute, fromSuccess, [this](const CommandContext& context, std::string_view type) {
                     const auto* named = context.get<std::string>("path");
                     const std::string where = named == nullptr ? std::string{} : *named;

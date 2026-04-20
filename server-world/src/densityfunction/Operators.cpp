@@ -9,7 +9,6 @@ namespace {
 
 namespace jm = noise::javaMath;
 
-/// Applies `op` over the input, point by point and over a volume.
 template <typename Op>
 class MapSampler final : public DensitySampler {
 public:
@@ -44,8 +43,6 @@ template <typename Op>
 
 [[nodiscard]] float leaky(float factor, float input) noexcept { return input > 0.0F ? input : input * factor; }
 
-/// A two-input combination. The point path of `Mul`, `Div`, `Min` and `Max` may skip the right
-/// input, exactly as vanilla's own samplers do.
 class BinarySampler final : public DensitySampler {
 public:
     BinarySampler(BinaryType type, Sampler left, Sampler right, float rightBound)
@@ -205,8 +202,7 @@ private:
     float value_;
 };
 
-/// parity: `LerpFunction`'s samplers. Constant ends arrive as constant samplers, which is
-/// arithmetically the same as vanilla's specialised ones.
+/// parity: `LerpFunction`'s samplers.
 class LerpSampler final : public DensitySampler {
 public:
     LerpSampler(Sampler alpha, Sampler first, Sampler second)
@@ -284,7 +280,7 @@ private:
     Sampler outOfRange_;
 };
 
-/// parity: `RangeChoiceFunction.ConstSampler`, both branches constant: only the input is sampled.
+/// parity: `RangeChoiceFunction.ConstSampler`.
 class ConstRangeChoiceSampler final : public DensitySampler {
 public:
     ConstRangeChoiceSampler(Sampler input, float min, float max, float inRange, float outOfRange)

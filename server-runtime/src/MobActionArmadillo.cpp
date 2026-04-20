@@ -118,7 +118,7 @@ void MobActionSystem::tickArmadillo(world::LoadedWorld& world, entity::ai::MobCo
         makeSound(world, armadillo, "entity.armadillo.unroll_finish", 1.0F);
         switchTo(State::Idle);
     };
-    // parity: `actuallyHurt`: a blow from something living is danger, and a reason to curl up.
+    // parity: `actuallyHurt`.
     if (armadillo.hurtBy.has_value()) {
         armadillo.hurtBy.reset();
         if (armadillo.health > 0.0) {
@@ -128,7 +128,7 @@ void MobActionSystem::tickArmadillo(world::LoadedWorld& world, entity::ai::MobCo
             }
         }
     }
-    // parity: `ARMADILLO_SCARE_DETECTED`, every fifth turn: the undead, whoever hurt it last, and a
+    // parity: `ARMADILLO_SCARE_DETECTED`.
     // player running or riding, inside seven across and two up.
     if (armadillo.tickCount % 5 == 0) {
         if (!canStayRolledUp()) {
@@ -171,7 +171,7 @@ void MobActionSystem::tickArmadillo(world::LoadedWorld& world, entity::ai::MobCo
     if (!state.danger.has(now)) {
         state.danger.erase();
     }
-    // parity: the core: `Swim(0.8)`, `ArmadilloPanic(2.0)` which unrolls it, and the rolling out.
+    // parity: the core: `Swim(0.8)`.
     if (entity::ai::inWater(context.world, armadillo) && context.random.nextFloat() < 0.8F) {
         armadillo.velocityY += 0.04;
     }
@@ -186,7 +186,7 @@ void MobActionSystem::tickArmadillo(world::LoadedWorld& world, entity::ai::MobCo
     if (!state.danger.has(now) && state.state != State::Idle) {
         rollOut();
     }
-    // parity: `updateActivity`: the ball while danger is fresh and it is not running, else idle.
+    // parity: `updateActivity`.
     if (state.danger.has(now) && !panicking) {
         if (!state.ballUp && armadillo.onGround && !liquid) {
             state.ballUp = true;
@@ -276,7 +276,7 @@ void MobActionSystem::armadilloBallsUp(world::LoadedWorld& world, entity::ai::Mo
     }
     ServerEntity& armadillo = context.mob;
     const std::int64_t now = context.gameTime;
-    // parity: `ArmadilloBallUp.canStillUse` and `stop`: it ends once the armadillo is idle again.
+    // parity: `ArmadilloBallUp.canStillUse` and `stop`.
     if (now > state.ballUpEnd || state.state == State::Idle) {
         state.ballUp = false;
         const bool liquid = inLiquid(context.world, armadillo);
@@ -335,7 +335,7 @@ void MobActionSystem::armadilloBallsUp(world::LoadedWorld& world, entity::ai::Mo
 
 bool MobActionSystem::armadilloDrops(world::LoadedWorld& world, const ServerEntity& armadillo,
                                      std::string_view tableId) {
-    // parity: `dropFromGiftLootTable` and `dropFromEntityInteractLootTable`, spawned at its feet.
+    // parity: `dropFromGiftLootTable` and `dropFromEntityInteractLootTable`.
     const server::world::loot::LootTable* table =
         lootTables_->byId(wire::common::Identifier::vanilla(std::string{tableId}));
     if (table == nullptr) {
@@ -365,7 +365,7 @@ bool MobActionSystem::armadilloDrops(world::LoadedWorld& world, const ServerEnti
 }
 
 bool MobActionSystem::brushArmadillo(world::LoadedWorld& world, ServerEntity& armadillo) {
-    // parity: `Armadillo.brushOffScute`: never a baby; the brush table, its sound and the event.
+    // parity: `Armadillo.brushOffScute`.
     if (armadillo.age < 0) {
         return false;
     }

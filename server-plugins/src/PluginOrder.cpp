@@ -6,14 +6,9 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using Refusals = std::map<std::string, std::string, std::less<>>;
 
-/// Overwrites on purpose. A plugin already refused for its API is skipped before this is reached, so
-/// what this decides between is two broken dependencies of the same plugin, and there the last one
-/// wins: the same rule the frozen Kotlin's own map assignment has.
 void refuse(Refusals& refusals, const std::string& id, std::string reason) { refusals[id] = std::move(reason); }
-
 } // namespace
 
 std::vector<PluginOrdering> pluginOrder::resolve(const std::vector<PluginManifest>& candidates) {
@@ -46,7 +41,6 @@ std::vector<PluginOrdering> pluginOrder::resolve(const std::vector<PluginManifes
         }
     }
 
-    // A plugin whose dependency was refused cannot load either, however deep the chain goes.
     bool spread = true;
     while (spread) {
         spread = false;
@@ -54,8 +48,6 @@ std::vector<PluginOrdering> pluginOrder::resolve(const std::vector<PluginManifes
             if (refusals.contains(manifest.id)) {
                 continue;
             }
-            // The first broken one is the one named: any of them is enough to stop this plugin, and
-            // a list of them would not tell its author anything more.
             for (const PluginDependency& dependency : manifest.hardDependencies()) {
                 if (refusals.contains(dependency.id)) {
                     refuse(refusals, manifest.id, "'" + dependency.id + "' did not load");
@@ -88,8 +80,6 @@ std::vector<PluginOrdering> pluginOrder::resolve(const std::vector<PluginManifes
             if (placed.contains(manifest->id)) {
                 continue;
             }
-            // Soft dependencies count here and nowhere else: a plugin that can work without another
-            // still wants to come after it when both are installed.
             const bool waiting = std::any_of(
                 manifest->dependencies.begin(), manifest->dependencies.end(), [&](const PluginDependency& dependency) {
                     return readyIds.contains(dependency.id) && !placed.contains(dependency.id);
@@ -103,8 +93,6 @@ std::vector<PluginOrdering> pluginOrder::resolve(const std::vector<PluginManifes
         }
     }
 
-    // Whatever is left is in a cycle: it is refused as a group, and the group is named, because
-    // "one of these depends on itself" is not something an author can act on.
     std::vector<std::string> cycle;
     for (const PluginManifest* manifest : ready) {
         if (!placed.contains(manifest->id)) {
@@ -173,5 +161,4 @@ std::vector<std::string> pluginOrder::dependents(std::string_view id, const std:
     std::reverse(found.begin(), found.end());
     return found;
 }
-
 } // namespace basalt::server::plugins

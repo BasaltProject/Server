@@ -18,7 +18,7 @@ namespace {
 
 using registry::BlockFace;
 
-/// parity: `Direction.Plane.HORIZONTAL`'s order, which is the order the flow is summed in.
+/// parity: `Direction.Plane.HORIZONTAL`'s order.
 struct Step {
     std::int32_t dx;
     std::int32_t dz;
@@ -42,7 +42,7 @@ constexpr std::array<Step, 4> kHorizontal{
     return !neighbour.has_value() || *neighbour == kind;
 }
 
-/// parity: `FlowingFluid.isSolidFace`, whose sturdiness test looks at the face pointing onwards.
+/// parity: `FlowingFluid.isSolidFace`.
 [[nodiscard]] bool solidFace(const BlockAt& blockAt, std::int32_t x, std::int32_t y, std::int32_t z, BlockFace face,
                              FluidKind kind) {
     const std::int32_t state = blockAt(x, y, z).value_or(0);
@@ -57,7 +57,7 @@ constexpr std::array<Step, 4> kHorizontal{
     return registry::blockShapes::isFaceSturdy(state, face);
 }
 
-/// parity: `CurrentAccumulator.applyTo`'s floor, below which a still entity is still carried.
+/// parity: `CurrentAccumulator.applyTo`'s floor.
 constexpr double kStillSpeed = 0.003;
 constexpr double kMinimumPush = 0.0045000000000000005;
 /// parity: `EntityFluidInteraction.update` scales a flow down by a shallow fluid's height.
@@ -229,8 +229,7 @@ namespace {
     return world.declaration().dimension == config::WorldDimension::Nether;
 }
 
-/// parity: `getFluidInteractionBox` with `AbstractBoat.modifyPassengerFluidInteractionBox`: a rider
-/// only meets the fluid above the boat's rim, and none at all while the boat stands taller.
+/// parity: `getFluidInteractionBox` with `AbstractBoat.modifyPassengerFluidInteractionBox`.
 [[nodiscard]] std::optional<entity::Aabb> boxFor(LoadedWorld& world, entity::Aabb box,
                                                  const std::optional<std::int32_t>& vehicleId) {
     const entity::ServerEntity* vehicle = vehicleId.has_value() ? world.state().entity(*vehicleId) : nullptr;
@@ -259,7 +258,7 @@ bool pushedByFluid(const entity::ServerEntity& entity, const Contact& contact) {
     if (std::ranges::find(kStill, path) != kStill.end()) {
         return false;
     }
-    // parity: `Drowned.isPushedByFluid` is `!isSwimming()`, and it swims under water after a target.
+    // parity: `Drowned.isPushedByFluid` is `!isSwimming()`.
     if (path == "drowned") {
         return !(entity.targetId.has_value() && contact.waterHeight >= entity.height() * 0.85);
     }

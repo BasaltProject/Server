@@ -8,8 +8,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `Dolphin.MoveToItemGoal`: after the first item floating within eight blocks, and the
-/// held one thrown when it stops.
+/// parity: `Dolphin.MoveToItemGoal`.
 class DolphinMoveToItemGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -36,8 +35,7 @@ public:
     void tick(MobContext& mob) override;
 };
 
-/// parity: `Dolphin.DolphinSwimToTreasureGoal`: fed a fish, it leads the way to the nearest ocean
-/// ruin or shipwreck within fifty chunks.
+/// parity: `Dolphin.DolphinSwimToTreasureGoal`.
 class DolphinSwimToTreasureGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
@@ -61,7 +59,7 @@ private:
     bool stuck_ = false;
 };
 
-/// parity: `FollowPlayerRiddenEntityGoal`, behind and then ahead of a boat a player is rowing.
+/// parity: `FollowPlayerRiddenEntityGoal`.
 class FollowRiddenBoatGoal final : public Goal {
 public:
     [[nodiscard]] bool canUse(MobContext& mob) override;

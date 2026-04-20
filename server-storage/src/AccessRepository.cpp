@@ -2,7 +2,6 @@
 
 namespace basalt::server::storage {
 namespace {
-
 constexpr std::string_view kBanColumns = "subject, kind, name, reason, source, created_at, expires_at";
 constexpr std::string_view kWhitelistColumns = "uuid, name, added_at";
 
@@ -19,7 +18,6 @@ constexpr std::string_view kWhitelistColumns = "uuid, name, added_at";
 [[nodiscard]] WhitelistEntry readWhitelist(const sql::Statement& row) {
     return WhitelistEntry{.uuid = row.text(0), .name = row.text(1), .addedAtEpochSeconds = row.integer(2)};
 }
-
 } // namespace
 
 std::string_view storedNameOf(BanKind kind) { return kind == BanKind::Player ? "player" : "ip"; }
@@ -145,5 +143,4 @@ bool AccessRepository::removeFromWhitelist(std::string_view uuid) {
     statement.bind(1, uuid);
     return statement.execute();
 }
-
 } // namespace basalt::server::storage

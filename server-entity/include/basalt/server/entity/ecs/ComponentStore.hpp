@@ -6,13 +6,6 @@
 #include <vector>
 
 namespace basalt::server::entity::ecs {
-
-/// A sparse-set component store: dense, cache-friendly iteration over every entity that has this
-/// component, plus constant-time lookup, insert and remove by entity index. `sparse[entityIndex]` is
-/// either the position of that entity in the dense arrays or `kAbsent`; `dense` and `values` stay
-/// packed with no gaps, `remove` doing so by swapping the removed slot with the last one rather than
-/// shifting. Keyed by raw entity index, not the whole `EntityId`: the generation check happens once
-/// in `World`, not on every component access.
 template <typename T>
 class ComponentStore {
 public:
@@ -63,7 +56,6 @@ public:
         values_.pop_back();
     }
 
-    /// Dense iteration, in storage order rather than entity order: a swap-remove reorders it.
     template <typename Action>
     void forEach(Action&& action) {
         for (std::size_t slot = 0; slot < values_.size(); ++slot) {
@@ -85,5 +77,4 @@ private:
     std::vector<std::int32_t> dense_;
     std::vector<T> values_;
 };
-
 } // namespace basalt::server::entity::ecs

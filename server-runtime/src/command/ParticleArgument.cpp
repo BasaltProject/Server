@@ -27,7 +27,6 @@ using wire::text::Component;
         .cursor = reader.cursor()};
 }
 
-/// Any of the four numeric tags as a float, which is what every option field accepts.
 [[nodiscard]] std::optional<float> number(const NbtTag* tag) {
     if (tag == nullptr) {
         return std::nullopt;
@@ -60,7 +59,7 @@ using wire::text::Component;
     return (channel(alpha) << 24) | (channel(red) << 16) | (channel(green) << 8) | channel(blue);
 }
 
-/// parity: `ExtraCodecs.RGB_COLOR_CODEC`, an int or a `[r,g,b]` of floats between zero and one.
+/// parity: `ExtraCodecs.RGB_COLOR_CODEC`.
 [[nodiscard]] std::expected<std::int32_t, CommandSyntaxError> color(const NbtTag* tag, StringReader& reader) {
     if (const std::optional<std::int32_t> packed = integer(tag); packed.has_value()) {
         return *packed;
@@ -74,8 +73,6 @@ using wire::text::Component;
                      number(&(*list)[2]).value_or(0.0F));
 }
 
-/// `block_state`, either a plain id or an `{id:...}` compound. parity: `BlockState.CODEC`.
-/// Properties are dropped: every block resolves to its default state here.
 [[nodiscard]] std::expected<std::int32_t, CommandSyntaxError> blockState(const NbtTag* tag, StringReader& reader) {
     std::optional<std::string> name;
     if (tag != nullptr) {

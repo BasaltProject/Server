@@ -9,20 +9,18 @@
 
 namespace basalt::server::runtime::world {
 
-/// parity: `Panda.Gene`, whose two recessive genes are what makes a brown or weak panda rare.
+/// parity: `Panda.Gene`.
 enum class PandaGene : std::uint8_t { Normal, Lazy, Worried, Playful, Brown, Weak, Aggressive };
 
 [[nodiscard]] std::string_view pandaGeneName(PandaGene gene) noexcept;
 
 [[nodiscard]] std::int32_t pandaGeneId(PandaGene gene) noexcept;
 
-/// parity: only `brown` and `weak` are recessive, which is why a panda needs both parents to show
-/// one.
+/// parity: `brown`.
 [[nodiscard]] bool pandaGeneRecessive(PandaGene gene) noexcept;
 
 [[nodiscard]] std::optional<PandaGene> pandaGeneByName(std::string_view name);
 
-/// Immutable lookup tables used by natural mob spawn finalizers.
 namespace mobSpawnVariantData {
 
 [[nodiscard]] const std::vector<std::string>& chickenSoundVariants();
@@ -31,7 +29,7 @@ namespace mobSpawnVariantData {
 [[nodiscard]] const std::vector<std::string>& wolfVariants();
 [[nodiscard]] const std::vector<std::string>& wolfSoundVariants();
 
-/// parity: `TropicalFish.COMMON_VARIANTS`, packed the way the entity's own variant field is.
+/// parity: `TropicalFish.COMMON_VARIANTS`.
 [[nodiscard]] const std::vector<std::int32_t>& tropicalCommonVariants();
 
 [[nodiscard]] const std::set<std::string, std::less<>>& whiteRabbitBiomes();

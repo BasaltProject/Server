@@ -48,16 +48,14 @@ constexpr std::string_view kEnabledKey = "Enabled";
 /// parity: `MinecartHopper.getLevelY`, half a block over the cart's own middle.
 constexpr double kCartLevelRise = 0.5;
 
-/// parity: `MinecartHopper.suckInItems`, whose second box is its own widened a quarter sideways.
+/// parity: `MinecartHopper.suckInItems`.
 constexpr double kCartReach = 0.25;
 
-/// parity: `Container.getMaxStackSize(stack)`: how high this stack goes here, and in practice its own
-/// maximum. A bucket goes sixteen to a slot and a sword one, not sixty-four.
+/// parity: `Container.getMaxStackSize(stack)`.
 [[nodiscard]] std::int32_t capOf(const server::world::loot::ItemStack& stack) {
     return std::min(containers::kSlotLimit, registry::itemStacking::maxStackSize(stack.item, stack.components));
 }
 
-/// The same, for a container that stacks lower than the item does.
 [[nodiscard]] std::int32_t capIn(std::string_view path, const server::world::loot::ItemStack& stack) {
     return std::min(containers::kSlotLimit, containers::maxStackFor(path, stack));
 }
@@ -97,9 +95,6 @@ constexpr double kCartReach = 0.25;
     return chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
 }
 
-/// A container this build keeps contents for, with the tag that holds them. It is a block most of
-/// the time and a minecart the rest, and the two are the same thing from here: a name, a number of
-/// slots and somewhere to write.
 struct Container {
     std::string_view path;
     std::int32_t size = 0;
@@ -111,9 +106,7 @@ struct Container {
     bool isBlock = true;
 };
 
-/// parity: `HopperBlockEntity.getEntityContainer`, a cube of one block centred on the point the
-/// hopper asks about, against the cart's box. Only a block hopper's point is a square's own middle:
-/// a cart asks half a block over itself, which is why the point is what travels and not the square.
+/// parity: `HopperBlockEntity.getEntityContainer`.
 [[nodiscard]] std::optional<Container> cartAround(WorldState& world, double px, double py, double pz, std::int32_t x,
                                                   std::int32_t y, std::int32_t z) {
     for (entity::ServerEntity* cart : world.entities()) {
@@ -138,7 +131,7 @@ struct Container {
     return std::nullopt;
 }
 
-/// parity: `getContainerAt`: the block first, and only where there is none, whatever cart is there.
+/// parity: `getContainerAt`.
 [[nodiscard]] std::optional<Container> containerAtPoint(WorldState& world, double px, double py, double pz) {
     const std::int32_t x = wire::common::mth::floor(px);
     const std::int32_t y = wire::common::mth::floor(py);
@@ -169,8 +162,7 @@ struct Container {
                             static_cast<double>(z) + 0.5);
 }
 
-/// parity: `WorldlyContainer.getSlotsForFace`: a furnace takes fuel from the side, ingredients
-/// from above and gives its result downwards. Everything else opens every slot to every side.
+/// parity: `WorldlyContainer.getSlotsForFace`.
 [[nodiscard]] std::vector<std::int32_t> slotsFor(std::string_view path, std::int32_t size, registry::BlockFace from) {
     return containers::slotsForFace(path, size, from);
 }
@@ -182,7 +174,6 @@ struct Container {
 }
 
 /// One item out of the stack, with everything it carries. parity: `ItemStack.shrink`, which takes a
-/// number off and leaves the components where they are.
 [[nodiscard]] std::optional<ItemStack> minusOne(const ItemStack& stack) {
     if (stack.count <= 1) {
         return std::nullopt;
@@ -192,8 +183,7 @@ struct Container {
     return left;
 }
 
-/// parity: `ItemStack.isSameItemSameComponents`, which is what decides whether two stacks are the
-/// same thing. Two swords of the same name with different enchantments never share a slot.
+/// parity: `ItemStack.isSameItemSameComponents`.
 [[nodiscard]] bool same(const ItemStack& one, const ItemStack& other) {
     return one.item == other.item && one.components == other.components;
 }
@@ -218,7 +208,6 @@ void add(Slots& slots, const ItemStack& stack) {
     }
 }
 
-/// Puts one of `stack` into the container, answering whether it went in.
 [[nodiscard]] bool insert(WorldState& world, const Container& target, const ItemStack& stack, registry::BlockFace from,
                           const Around& around) {
     Slots slots = blockInventory::readFor(target.path, *target.data, target.size);
@@ -231,14 +220,11 @@ void add(Slots& slots, const ItemStack& stack) {
         if (there->has_value() && (!same(**there, stack) || (*there)->count >= capIn(target.path, stack))) {
             continue;
         }
-        // parity: `canPlaceItemThroughFace`. A furnace's result slot takes nothing, its fuel slot
-        // takes only fuel, a brewing stand's three slots each take their own thing, and a shulker
-        // box takes anything but another shulker box.
+        // parity: `canPlaceItemThroughFace`. A furnace's result slot takes nothing, its fuel slot.
         if (!containers::acceptsThroughFace(target.path, slot, stack.item, !there->has_value())) {
             continue;
         }
-        // parity: `CrafterBlockEntity.canPlaceItem` is more than a face rule: it refuses a slot that
-        // is switched off and spreads what it is fed across the grid rather than piling it up.
+        // parity: `CrafterBlockEntity.canPlaceItem` is more than a face rule.
         if (target.path == crafters::block().path() && !crafters::accepts(*target.data, slots, slot, stack)) {
             continue;
         }
@@ -249,9 +235,7 @@ void add(Slots& slots, const ItemStack& stack) {
             *there = ItemStack{.item = stack.item, .count = 1, .components = stack.components};
         }
         blockInventory::writeFor(target.path, *target.data, slots);
-        // parity: `tryMoveInItem` only calls `setItem` when the slot it lands in is empty; a merge
-        // goes through `grow` and leaves the counters alone. And `setItem` only cares about the
-        // slot a furnace cooks from.
+        // parity: `tryMoveInItem` only calls `setItem` when the slot it lands in is empty.
         if (wasEmpty && slot == furnaces::kInputSlot) {
             furnaces::inputChanged(target.path, *target.data, around.recipeFor);
         }
@@ -267,8 +251,7 @@ void add(Slots& slots, const ItemStack& stack) {
     return false;
 }
 
-/// parity: `Container.isEmpty` and `HopperBlockEntity.inventoryFull`, the two questions
-/// `tryMoveItems` asks before deciding whether to give and whether to take.
+/// parity: `Container.isEmpty` and `HopperBlockEntity.inventoryFull`, the two questions.
 [[nodiscard]] bool isEmpty(const Slots& slots) {
     return std::ranges::none_of(slots, [](const std::optional<ItemStack>& slot) { return slot.has_value(); });
 }
@@ -278,15 +261,10 @@ void add(Slots& slots, const ItemStack& stack) {
         slots, [](const std::optional<ItemStack>& slot) { return slot.has_value() && slot->count >= capOf(*slot); });
 }
 
-/// parity: `ejectItems`: the first slot with something in it gives one item to what it faces.
-/// parity: `ComposterBlock.InputContainer`, which is a container with one slot that only takes
-/// something compostable, only through the **top** face and only while there is room. Putting the
-/// item in composts it there and then: `setChanged` is what calls `addItem`.
+/// parity: `ejectItems`.
 [[nodiscard]] bool compost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace face,
                            Slots& slots, random::RandomSource& random, const std::int64_t gameTime) {
-    // parity: `ComposterBlock.getContainer` hands out an `InputContainer` **only** while the level is
-    // under seven: at seven it is an `EmptyContainer` and at eight an `OutputContainer`. A hopper on
-    // top of a composter that is full or ready puts nothing in, and this one was eating the item.
+    // parity: `ComposterBlock.getContainer` hands out an `InputContainer` **only** while the level is.
     const std::optional<std::int32_t> level = composters::levelAt(world, x, y, z);
     if (face != registry::BlockFace::Up || !level.has_value() || *level >= composters::kFull) {
         return false;
@@ -295,10 +273,7 @@ void add(Slots& slots, const ItemStack& stack) {
         if (!slot.has_value() || !composters::chanceOf(slot->item).has_value()) {
             continue;
         }
-        // The roll can fail and the item is eaten anyway: `InputContainer.setChanged` shrinks the
-        // stack whatever `addItem` answered.
-        // parity: `ComposterBlock.addItem` raises `BLOCK_CHANGE`, and only when the level really
-        // rose: a roll that fails is silent.
+        // parity: `ComposterBlock.addItem` raises `BLOCK_CHANGE`, and only when the level really.
         if (composters::addItem(world, x, y, z, slot->item, random).has_value() &&
             world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
             vibrations::emit(world, "block_change", static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
@@ -311,8 +286,7 @@ void add(Slots& slots, const ItemStack& stack) {
     return false;
 }
 
-/// parity: `ComposterBlock.OutputContainer`, the bone meal of a composter that is ready, given out
-/// through the **bottom** face only, and taking it empties the composter.
+/// parity: `ComposterBlock.OutputContainer`.
 [[nodiscard]] bool takeCompost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
                                const std::int64_t gameTime) {
     if (composters::levelAt(world, x, y, z) != composters::kReady) {
@@ -336,16 +310,13 @@ void add(Slots& slots, const ItemStack& stack) {
     return true;
 }
 
-/// Notes a block whose state a move changed, for whoever has to tell the clients.
 void noteChange(const Around& around, const BlockChange& change) {
     if (around.changes != nullptr) {
         around.changes->push_back(change);
     }
 }
 
-/// parity: `JukeboxBlockEntity` is a container of one, so a hopper loads a jukebox and another one
-/// under it takes the disc back out. What it holds lives under `RecordItem` rather than in an item
-/// list, so it goes through the jukebox's own door rather than through the generic one.
+/// parity: `JukeboxBlockEntity` is a container of one.
 [[nodiscard]] bool loadJukebox(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
                                const Around& around) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -369,7 +340,6 @@ void noteChange(const Around& around, const BlockChange& change) {
     return false;
 }
 
-/// The other half: the disc out of the jukebox above, which stops the song.
 [[nodiscard]] bool takeDisc(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
                             const Around& around) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -396,10 +366,7 @@ void noteChange(const Around& around, const BlockChange& change) {
     return true;
 }
 
-/// parity: `ChiseledBookShelfBlockEntity` is a container of six that holds one book each and whose
-/// `acceptsItemType` asks the `bookshelf_books` tag, so a hopper full of cobblestone gets nowhere.
-/// Putting one in goes through `setItem`, which is what lights the slot on the block and moves the
-/// number a comparator reads.
+/// parity: `ChiseledBookShelfBlockEntity` is a container of six that holds one book each and whose.
 [[nodiscard]] bool shelveBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
                               const Around& around) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -426,7 +393,6 @@ void noteChange(const Around& around, const BlockChange& change) {
     return false;
 }
 
-/// The other half: a hopper under a shelf takes the books back out, one a turn.
 [[nodiscard]] bool unshelveBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
                                 const Around& around) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -499,8 +465,7 @@ void noteChange(const Around& around, const BlockChange& change) {
         if (!accepts(slots, **stack)) {
             continue;
         }
-        // parity: `canTakeItemThroughFace`, which is what stops a hopper under a furnace draining
-        // its coal or one under a brewing stand stealing the ingredient.
+        // parity: `canTakeItemThroughFace`, which is what stops a hopper under a furnace draining.
         if (!containers::givesThroughFace(above.path, slot, (*stack)->item, registry::BlockFace::Down)) {
             continue;
         }
@@ -517,8 +482,7 @@ void noteChange(const Around& around, const BlockChange& change) {
     return false;
 }
 
-/// parity: `HopperBlockEntity.getItemsAtAndAbove` tests the item's box, not its middle, with the
-/// strict `AABB.intersects`: a stack just outside the column still goes in.
+/// parity: `HopperBlockEntity.getItemsAtAndAbove` tests the item's box.
 [[nodiscard]] bool itemCrosses(const DroppedItem& item, double minX, double minY, double minZ, double maxX, double maxY,
                                double maxZ) {
     static const double half = registry::entityTypeShapes::widthOf(wire::common::Identifier::vanilla("item")) / 2.0;
@@ -562,8 +526,7 @@ void noteChange(const Around& around, const BlockChange& change) {
     return took;
 }
 
-/// parity: `Hopper.SUCK_AABB` over a block hopper's own square, from 11/16 up to two blocks. A block
-/// hopper under a full block takes nothing, unless the block is in `does_not_block_hoppers`.
+/// parity: `Hopper.SUCK_AABB` over a block hopper's own square.
 [[nodiscard]] bool suckIn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
                           const Around& around) {
     if (const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
@@ -593,9 +556,7 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
     if (entity == nullptr) {
         return false;
     }
-    // parity: `pushItemsTick` counts down before checking, so a hopper waits eight ticks, not nine;
-    // only a move calls `setChanged`, so the countdown does not dirty the chunk. A missing
-    // cooldown is `getIntOr("TransferCooldown", -1)`: a hopper that never moved anything.
+    // parity: `pushItemsTick` counts down before checking.
     const std::int32_t was = entity->data().getInt(kCooldownKey, -1);
     if (was - 1 > 0) {
         entity->data().putInt(kCooldownKey, was - 1);
@@ -613,15 +574,13 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
         return false;
     }
     Slots slots = blockInventory::read(entity->data(), kSize);
-    // parity: `tryMoveItems` gives one away when it has something and takes one when it has room,
-    // and both happen on the same turn: the two are `moved |=`, not one or the other.
+    // parity: `tryMoveItems` gives one away when it has something and takes one when it has room.
     bool moved = false;
     if (!isEmpty(slots)) {
         moved = push(world, x, y, z, *out, slots, random, around);
     }
     if (!isFull(slots)) {
-        // parity: `suckInItems` looks at what is lying above only when there is no container there,
-        // and a composter that is ready **is** one: its bone meal comes out downwards.
+        // parity: `suckInItems` looks at what is lying above only when there is no container there.
         const std::optional<Container> above = containerAt(world, x, y + 1, z);
         const bool taken = takeCompost(world, x, y + 1, z, slots, around.gameTime) ||
                            takeDisc(world, x, y + 1, z, slots, around) ||
@@ -643,7 +602,7 @@ bool tickCart(WorldState& world, entity::ServerEntity& cart, const std::int64_t 
     if (cart.removed || !cart.sourceNbt.has_value() || cart.type().path() != "hopper_minecart") {
         return false;
     }
-    // parity: `MinecartHopper.isEnabled`, which an activator rail turns off. Missing means on.
+    // parity: `MinecartHopper.isEnabled`.
     if (cart.sourceNbt->getByte(kEnabledKey, 1) == 0) {
         return false;
     }
@@ -651,15 +610,15 @@ bool tickCart(WorldState& world, entity::ServerEntity& cart, const std::int64_t 
     if (isFull(slots)) {
         return false;
     }
-    // parity: `getLevelY` is half a block over the cart, and `suckInItems` asks one block over that.
+    // parity: `getLevelY` is half a block over the cart.
     const double levelY = cart.y + kCartLevelRise;
     const std::optional<Container> above = containerAtPoint(world, cart.x, levelY + 1.0, cart.z);
-    // parity: a cart's `isGridAligned` is false, so a full block over it never blocks the suck.
+    // parity: a cart's `isGridAligned` is false.
     bool took = above.has_value() ? pullFrom(world, *above, slots, gameTime)
                                   : suckInBox(world, cart.x - 0.5, levelY - 0.5 + kSuckBottom, cart.z - 0.5,
                                               cart.x + 0.5, levelY - 0.5 + kSuckTop, cart.z + 0.5, slots);
     if (!took) {
-        // parity: `MinecartHopper.suckInItems`' own half, which a block hopper has no equivalent of.
+        // parity: `MinecartHopper.suckInItems`' own half.
         constexpr double kSide = detectorRails::kCartHalfWidth + kCartReach;
         took = suckInBox(world, cart.x - kSide, cart.y, cart.z - kSide, cart.x + kSide,
                          cart.y + detectorRails::kCartHeight, cart.z + kSide, slots);

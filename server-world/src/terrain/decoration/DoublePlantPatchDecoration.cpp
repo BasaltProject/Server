@@ -72,8 +72,6 @@ void placeCandidate(PatchRegion& region, random::RandomSource& random, const Dec
     const DecorationPos target{origin.x + random.nextInt(8) - random.nextInt(8),
                                origin.y + random.nextInt(4) - random.nextInt(4),
                                origin.z + random.nextInt(8) - random.nextInt(8)};
-    // The upper half needs a block of its own, so the top of the world is excluded rather than
-    // clamped: a plant that cannot fit is not placed at all.
     if (target.y < bounds.minY() || target.y >= bounds.maxY() || !registry::blocks::isAir(region.get(target))) {
         return;
     }

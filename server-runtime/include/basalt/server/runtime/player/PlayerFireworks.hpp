@@ -17,12 +17,10 @@ namespace basalt::server::runtime::player {
 
 class PlayerSession;
 
-/// parity: `FireworkRocketItem.use`: a rocket stuck to whoever is gliding. Answers whether it was
-/// used.
 bool useRocketFor(const BreakContext& context, FireworkSystem& fireworks, PlayerSession& player,
                   world::LoadedWorld& world, std::int32_t slot);
 
-/// parity: `FireworkRocketItem.useOn`: a rocket a hair off the face clicked, unless gliding.
+/// parity: `FireworkRocketItem.useOn`.
 bool useRocketOnFor(const BreakContext& context, FireworkSystem& fireworks, PlayerSession& player,
                     world::LoadedWorld& world, std::int32_t slot, const BlockHit& hit);
 

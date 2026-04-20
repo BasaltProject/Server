@@ -18,8 +18,6 @@
 namespace basalt::server::runtime::bedrock {
 namespace {
 
-/// parity: Geyser's own eight, which it looks for rather than translating: that edition draws the
-/// layers of an ominous banner wrong and has a drawing of its own for the whole thing.
 [[nodiscard]] bool isOminous(const wire::nbt::NbtList& layers) {
     static constexpr std::array<std::pair<std::string_view, std::string_view>, 8> kOminous{{
         {"rhombus", "cyan"},
@@ -51,8 +49,6 @@ namespace {
     return true;
 }
 
-/// What one banner is over there: its own colour and its layers, both counted from the other end of
-/// the sixteen dyes.
 void writeBanner(wire::io::ByteBuffer& extras, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                  const std::uint8_t colour, const wire::nbt::NbtCompound& data) {
     constexpr std::int32_t kLastDye = 15;
@@ -74,7 +70,6 @@ void writeBanner(wire::io::ByteBuffer& extras, const std::int32_t x, const std::
                                   data.getString("CustomName"));
 }
 
-/// The Bedrock id for a Java biome id, or the fallback for one that edition lacks.
 [[nodiscard]] std::int32_t bedrockBiomeOf(const std::int32_t javaId) {
     static const std::vector<std::int32_t> kByJavaId = [] {
         const auto& registry = server::registry::biomes::registry();
@@ -98,9 +93,7 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
     const auto sections = static_cast<std::int32_t>(chunk.sectionCount());
     const std::int32_t bottom = chunk.verticalBounds().minY();
 
-    // Only up to the highest section with anything in it. A subchunk of pure air still costs its
-    // five hundred bytes of indices, and a world that is empty above the treeline was paying for
-    // fourteen of them in every column: two thirds of a join was air.
+    // Only up to the highest section with content: all-air subchunks cost five hundred bytes each in every column.
     std::int32_t sent = 0;
     for (std::int32_t section = sections - 1; section >= 0; --section) {
         if (chunk.section(static_cast<std::size_t>(section)).nonAirBlockCount() > 0) {
@@ -109,8 +102,7 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
         }
     }
 
-    // Where the beds are, picked up while the blocks are being read: this edition keeps a bed's
-    // colour in a block entity, and scanning the column a second time for them would be daft.
+    // Collected while reading blocks: that edition keeps a bed's colour in a block entity, so no second scan.
     struct Bed {
         std::int32_t x = 0;
         std::int32_t y = 0;
@@ -135,14 +127,11 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
                 }
             }
         }
-        // Bedrock counts its subchunks from the bottom of the world, which for the overworld starts
-        // four below zero: the index is the section's own place, not its distance from y zero.
+        // Bedrock counts subchunks from the bottom of the world (four below zero for the overworld).
         wire::bedrock::writeSubChunk(packed, blocks,
                                      static_cast<std::int8_t>(chunk.verticalBounds().minSection() + section), protocol);
     }
 
-    // What the column holds that is more than a block: the signs this edition keeps text in, and
-    // the beds it keeps a colour in. The rest are drawn from the block itself over there.
     wire::io::ByteBuffer extras;
     for (const Bed& bed : beds) {
         wire::bedrock::writeBedTag(extras, (chunk.chunkX() * 16) + bed.x, bed.y, (chunk.chunkZ() * 16) + bed.z,
@@ -164,7 +153,7 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
             world::signs::isWaxed(entity.data()));
     }
 
-    // parity: Geyser's `BiomeTranslator`: every section's quarts, each Java biome as its Bedrock id.
+    // parity: Geyser's `BiomeTranslator`.
     wire::io::ByteBuffer biomes{static_cast<std::size_t>(sections) * 4};
     std::array<std::int32_t, server::world::ChunkSection::kBiomes> javaIds{};
     wire::bedrock::BiomeQuarts quarts{};
@@ -177,8 +166,7 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
     }
 
     wire::io::ByteBuffer body;
-    // The count of subchunks is what was written; the count of biome sections is the column's own
-    // height, which does not shrink with them.
+    // The subchunk count is what was written; the biome section count is the column's own height.
     wire::bedrock::writeLevelChunk(body, chunk.chunkX(), chunk.chunkZ(), static_cast<std::uint32_t>(sent),
                                    packed.readable(), static_cast<std::uint32_t>(sections), 0, protocol,
                                    extras.readable(), biomes.readable());

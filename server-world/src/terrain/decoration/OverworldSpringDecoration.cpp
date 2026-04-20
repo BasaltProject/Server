@@ -93,8 +93,6 @@ struct Spring {
 void placeSpring(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, const Spring& spring,
                  const ExternalStateReader& externalBlockState) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    // Outside the chunk with no reader this answers nothing rather than air: a spring cannot judge
-    // its own neighbourhood without the terrain, and guessing air would open holes at every border.
     const auto stateAt = [&](std::int32_t worldX, std::int32_t worldY,
                              std::int32_t worldZ) -> std::optional<std::int32_t> {
         if (worldY < bounds.minY() || worldY > bounds.maxY()) {
@@ -134,8 +132,7 @@ void placeSpring(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, c
             ++holeCount;
         }
     }
-    // parity: exactly four solid sides and exactly one hole, which is what makes a spring a spring
-    // rather than an open pool.
+    // parity: exactly four solid sides and one hole.
     if (rockCount != 4 || holeCount != 1) {
         return;
     }
@@ -155,7 +152,7 @@ void placeSpring(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, c
     return bounds.minY() + random.nextInt(192 - bounds.minY() + 1);
 }
 
-/// parity: `VeryBiasedToBottomInt`, three nested draws that pile the result near the floor.
+/// parity: `VeryBiasedToBottomInt`.
 [[nodiscard]] std::int32_t veryBiasedHeight(random::RandomSource& random, ChunkHeight bounds) {
     const std::int32_t upperInclusive = nextInt(random, bounds.minY() + kLavaHeightInner, bounds.maxY() - 8);
     const std::int32_t biasedUpperInclusive = nextInt(random, bounds.minY(), upperInclusive - 1);

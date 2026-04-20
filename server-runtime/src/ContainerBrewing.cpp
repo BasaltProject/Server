@@ -170,7 +170,7 @@ void ContainerMenuController::quickMoveIntoBrewingStand(PlayerSession& session, 
         return;
     }
     std::int32_t remaining = stack.count;
-    // parity: `moveItemStackTo`: stack onto matching items first, then the first empty slot only.
+    // parity: `moveItemStackTo`.
     const auto moveInto = [&](std::int32_t first, std::int32_t last) {
         const std::int32_t before = remaining;
         for (std::int32_t index = first; index < last && remaining > 0; index++) {

@@ -123,7 +123,7 @@ const std::map<std::string, Column, std::less<>>& columns() {
     static const PathSet sugarCaneSupport = {"grass_block", "dirt",     "coarse_dirt", "podzol",
                                              "sand",        "red_sand", "moss_block"};
     static const std::map<std::string, Column, std::less<>> built = [] {
-        // parity: `patch_sugar_cane`, two to four tall biased to the bottom, on sand, dirt or moss.
+        // parity: `patch_sugar_cane`.
         const Column sugarCane{
             .stateId = state("sugar_cane"), .minHeight = 2, .maxHeight = 4, .support = &sugarCaneSupport};
         std::map<std::string, Column, std::less<>> map;

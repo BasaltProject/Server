@@ -36,18 +36,16 @@ using wire::nbt::NbtTag;
 
 /// parity: `LevelEvent.PARTICLES_MOBBLOCK_SPAWN`, the smoke and flames round the cage.
 constexpr std::int32_t kSpawnParticlesEvent = 2004;
-/// parity: the entity event `Mob.spawnAnim` broadcasts, the puff a spawned mob appears in.
+/// parity: the entity event `Mob.spawnAnim` broadcasts.
 constexpr std::int8_t kSpawnAnimEvent = 20;
 /// parity: `ServerLevel.levelEvent`, heard by the players within sixty-four blocks.
 constexpr double kLevelEventRange = 64.0;
 constexpr float kFullTurn = 360.0F;
 constexpr std::size_t kPosComponents = 3;
 
-/// What a spawner loaded: every entity of the tree, root first, and the one it asked for.
 struct Loaded {
     std::vector<std::unique_ptr<ServerEntity>> entities;
     ServerEntity* main = nullptr;
-    /// Riders of an entity already in the world, mounted only once the add is sure to happen.
     std::vector<std::pair<ServerEntity*, std::int32_t>> externalMounts;
 };
 
@@ -82,8 +80,7 @@ struct Loaded {
     return position;
 }
 
-/// parity: `EntityTypeTest.forExactClass`: every type is its own class, but for the boats, which
-/// share one class per kind.
+/// parity: `EntityTypeTest.forExactClass`.
 [[nodiscard]] std::string classOf(const Identifier& type) {
     const std::string& path = type.path();
     if (type.namespaceName() == Identifier::kVanillaNamespace && path.ends_with("_chest_boat")) {
@@ -111,7 +108,7 @@ struct Loaded {
     return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
 }
 
-/// parity: `startRiding` onto a chicken marks it as a jockey's mount, as the natural spawner does.
+/// parity: `startRiding` onto a chicken marks it as a jockey's mount.
 void mount(ServerEntity& rider, ServerEntity& vehicle) {
     rider.vehicleId = vehicle.entityId();
     vehicle.passengerIds.push_back(rider.entityId());
@@ -123,7 +120,6 @@ void mount(ServerEntity& rider, ServerEntity& vehicle) {
     }
 }
 
-/// The finalized forest as live entities, riders already on their vehicles inside it.
 [[nodiscard]] Loaded decodeForest(const world::MobSpawnForest& forest,
                                   const entity::entityNbt::AllocateEntityIdFor& allocate) {
     Loaded loaded;
@@ -173,8 +169,7 @@ MobSpawnerSystem::Attempt MobSpawnerSystem::attempt(Turn& turn, const world::Spa
     if (!type.has_value()) {
         return Attempt::Abort;
     }
-    // parity: the saved `Pos` if there is one, or a spot within `spawnRange` of the cage, drawn
-    // x, then y, then z.
+    // parity: `Pos`.
     std::array<double, 3> at{};
     if (const std::optional<std::array<double, 3>> saved = savedPosition(tag); saved.has_value()) {
         at = *saved;
@@ -341,7 +336,7 @@ void MobSpawnerSystem::broadcastSpawned(world::LoadedWorld& world, const std::ar
             player->connection().sendLevelEvent(kSpawnParticlesEvent, pos[0], pos[1], pos[2], 0);
         }
     }
-    // parity: `level.gameEvent(entity, ENTITY_PLACE, spawnBlockPos)`, heard from the block's middle.
+    // parity: `level.gameEvent(entity, ENTITY_PLACE, spawnBlockPos)`.
     world::vibrations::emit(world.state(), "entity_place", blockX + 0.5, blockY + 0.5, blockZ + 0.5, world.gameTime(),
                             {.entity = source});
     if (!animatedMob.has_value()) {

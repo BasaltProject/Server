@@ -19,7 +19,7 @@ using wire::protocol::play::ContainerSetDataPacket;
 using wire::protocol::play::OpenScreenPacket;
 using wire::text::Component;
 
-/// parity: `BeaconMenu.encodeEffect`, which shifts everything up one so zero can mean "none".
+/// parity: `BeaconMenu.encodeEffect`.
 [[nodiscard]] std::int16_t encodeEffect(const std::string& effect) {
     if (effect.empty()) {
         return 0;

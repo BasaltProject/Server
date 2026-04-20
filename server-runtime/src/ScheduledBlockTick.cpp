@@ -61,7 +61,7 @@ using wire::protocol::play::ClientboundBlockUpdatePacket;
 using wire::protocol::play::SoundPacket;
 using wire::protocol::play::SoundSource;
 
-/// parity: `ServerLevel.canSpreadFireAround`: the rule off, or somebody not spectating near enough.
+/// parity: `ServerLevel.canSpreadFireAround`.
 [[nodiscard]] bool canSpreadFireAround(const world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                        std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::int32_t radius = world.gameRules().number(world::gameRules::kFireSpreadRadiusAroundPlayer);
@@ -85,8 +85,7 @@ using wire::protocol::play::SoundSource;
 void sendBlockUpdates(const std::vector<PlayerSession*>& watchers, const std::vector<world::BlockChange>& changes) {
     for (const world::BlockChange& change : changes) {
         for (PlayerSession* player : watchers) {
-            // Through the shared one: water finding its level, a crop growing or a fire spreading
-            // is a block change like any other, and only one of the two editions was being told.
+            // Goes through the shared sender: water or fire changes were reaching only one edition.
             player::sendBlockChangeTo(*player, change.x, change.y, change.z, change.stateId);
         }
     }
@@ -150,14 +149,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         const std::int32_t x = position[0];
         const std::int32_t y = position[1];
         const std::int32_t z = position[2];
-        // parity: `LevelTicks.runCollectedTicks` takes the turn out of the batch before running it,
-        // so what the turn sets off books for real while everything still waiting does not.
+        // parity: `LevelTicks.runCollectedTicks`.
         world.state().beginBlockTick(x, y, z);
         if (!region.owns(x >> 4, z >> 4)) {
             continue;
         }
         const std::int32_t here = world.state().blockState(x, y, z).value_or(0);
-        // Fire acts on its own clock, and keeps asking for the next turn as it goes.
         if (world::fires::isFire(here)) {
             if (hooks_.igniteAllowed && !hooks_.igniteAllowed(world, x, y, z, "spread")) {
                 continue;
@@ -173,7 +170,6 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                                           random, {}, hasSkylight, surroundings));
             continue;
         }
-        // A block that lost its footing turns into an entity; everything else here is a button.
         if (world::fallingBlocks::falls(here)) {
             const entity::ServerEntity* fell = world::fallingBlocks::beginFalling(
                 world.state(), x, y, z, [this] { return players_->allocateEntityId(); });
@@ -187,20 +183,17 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         std::vector<world::BlockChange> scheduled;
         std::vector<world::scheduledBlocks::Hatchling> hatched;
         random::RandomSource random = freshRandom();
-        // parity: `LeavesBlock.tick`, which is where the distance really moves: the shape update only
-        // books this turn.
+        // parity: `LeavesBlock.tick`.
         if (const std::optional<world::BlockChange> leaves = world::neighbourUpdates::leafTick(world.state(), x, y, z);
             leaves.has_value()) {
-            // parity: `LeavesBlock.tick` writes with `setBlock(..., 3)`, so what is standing on the
-            // leaves hears it and falls if it cannot hold on there.
+            // parity: `LeavesBlock.tick`.
             sendBlockUpdates(watchers, {*leaves});
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);
         world::scheduledBlocks::driedGhast(world.state(), x, y, z, world.gameTime(), scheduled, hatched);
         releaseHatchlings(world, hatched);
-        // parity: `EyeblossomBlock.tick`, the booked half of the same flip the random tick does. One
-        // flower that turns books the ones around it, so a field flips as a wave.
+        // parity: `EyeblossomBlock.tick`.
         if (world::miscGrowth::isEyeblossom(here)) {
             world::miscGrowth::eyeblossom(world.state(), world.clock(), x, y, z, here, random, scheduled);
         }
@@ -225,9 +218,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(here);
         if (block != nullptr && *block == world::tripwires::wireBlock()) {
             bool stillOn = false;
-            // parity: the recheck reads the same box the press did, `state.getShape(...).bounds()`,
-            // so the two have to ask the same question or a string lets go while somebody is still
-            // in it.
+            // parity: `state.getShape(...).bounds()`.
             const auto sizeOf = [](const wire::common::Identifier& type) {
                 return std::pair{server::registry::entityTypeShapes::widthOf(type) / 2.0,
                                  server::registry::entityTypeShapes::heightOf(type)};
@@ -249,8 +240,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     }
                 }
             }
-            // parity: `TripWireBlock.checkPressed` asks the level for **every** entity in the wire's
-            // own shape, so what keeps a string down is not only a player or an item.
+            // parity: `TripWireBlock.checkPressed`.
             if (!stillOn) {
                 for (const entity::ServerEntity* standing : world.state().entities()) {
                     if (standing->removed || entity::blockTriggers::ignored(standing->type())) {
@@ -263,18 +253,14 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     }
                 }
             }
-            // `checkPressed` ends in `setBlock(..., 3)` for the wire and for every hook `updateSource`
-            // reaches, so the line letting go has to settle the dust around it. Sending the squares
-            // as packets left a lamp lit for good once whoever stepped on the string walked away.
+            // `checkPressed` ends in `setBlock(..., 3)`, so releasing must settle the dust; packets left a lamp lit.
             std::vector<world::BlockChange> pressed;
             world::tripwires::press(world.state(), x, y, z, stillOn, world.gameTime(), pressed);
             for (const world::BlockChange& moved : pressed) {
                 broadcaster_->announceRedstone(world, watchers, moved);
             }
         }
-        // parity: `TripWireHookBlock.tick`, booked when a wire changed: ten ticks later the hook lets
-        // go. `calculateState` writes with flag 3 and both hooks `notifyNeighbors`, so the dust
-        // around them updates too.
+        // parity: `TripWireHookBlock.tick`.
         if (here != 0 && world::tripwires::isHook(here)) {
             std::vector<world::BlockChange> hook;
             world::tripwires::calculateHook(world.state(), x, y, z, world.gameTime(), hook);
@@ -282,16 +268,14 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 broadcaster_->announceRedstone(world, watchers, moved);
             }
         }
-        // parity: `ComposterBlock.tick`, the twenty ticks the seventh layer waits before it becomes
-        // the bone meal, with the sound that says it is ready.
+        // parity: `ComposterBlock.tick`.
         if (std::optional<world::BlockChange> ready = world::composters::settle(world.state(), x, y, z);
             ready.has_value()) {
             ready->effects.push_back(world::blockEffect::Sound{
                 .name = "block.composter.ready", .source = SoundSource::Blocks, .volume = 1.0F, .pitch = 1.0F});
             broadcaster_->announceBlock(watchers, *ready);
             broadcaster_->sendEffects(watchers, x, y, z, ready->stateId, ready->effects);
-            // parity: `setBlock(..., 3)` tells the neighbours, which is what a comparator reading the
-            // composter is waiting for.
+            // parity: `setBlock(..., 3)`.
             world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z, containerSignal);
         }
         // parity: `LecternBlock.tick`, the two ticks a page turn pulses for.
@@ -306,53 +290,41 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             if (rail.change.has_value()) {
                 scheduled.push_back(*rail.change);
             }
-            // parity: `checkPressed` ends in `updateNeighbourForOutputSignal` whatever it decided, so
-            // a comparator reading a container minecart parked here follows what is inside it.
+            // parity: `checkPressed`.
             world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z, containerSignal);
         }
-        // parity: `SculkShriekerBlock.tick`, the end of a shriek and the warden's answer to it.
-        // parity: `SculkCatalystBlock.tick`, the bloom let go of.
+        // parity: `SculkShriekerBlock.tick`.
+        // parity: `SculkCatalystBlock.tick`.
         if (here != 0 &&
             (world::sculkShriekers::isShrieker(here) || world::sculkSpreading::unbloomed(here).has_value()) &&
             options_.foreignTick) {
             options_.foreignTick(world, watchers, x, y, z);
         }
-        // parity: `SculkSensorBlock.tick`: thirty ticks awake, then ten of cooldown, plus the turn
-        // the vibration on its way spends. `activate` and `deactivate` both end in `updateNeighbours`,
-        // so this goes out with the redstone settled around it and not as a bare block update:
-        // measured in `sensormuerte`, where our sensor woke on the right tick and the comparator in
-        // front of it never noticed.
+        // parity: `SculkSensorBlock.tick`.
         if (const std::optional<world::BlockChange> sensor =
                 world::vibrations::tick(world.state(), x, y, z, world.gameTime());
             sensor.has_value()) {
-            // parity: `SculkSensorBlock.updateNeighbours` tells the square below as well, which is
-            // what `alsoTells` carries for every path that announces a sensor.
+            // parity: `SculkSensorBlock.updateNeighbours`.
             broadcaster_->announceRedstone(world, watchers, *sensor);
         }
-        // parity: `BigDripleafBlock.tick`, the stage it takes next: ten ticks each on the way down
-        // and a hundred lying flat before it comes back up.
+        // parity: `BigDripleafBlock.tick`.
         if (const std::optional<world::BlockChange> leaf =
                 world::dripleaves::tick(world.state(), world.name(), x, y, z, world.gameTime());
             leaf.has_value()) {
             scheduled.push_back(*leaf);
         }
-        // parity: `LightningRodBlock.tick` writes with `UPDATE_ALL` and then runs `updateNeighbours`,
-        // so letting go of the signal has to settle the dust around it and not only redraw the rod.
-        // Measured in `pararrayos`, where the rod went quiet on the right tick and the dust beside it
-        // stayed at fifteen for ever.
+        // parity: `LightningRodBlock.tick`.
         if (const std::optional<world::BlockChange> rod = world::lightning::releaseRod(world.state(), x, y, z);
             rod.has_value()) {
             broadcaster_->announceRedstone(world, watchers, *rod);
         }
-        // parity: `TargetBlock`'s own scheduled tick, which ends the same way: the signal going is a
-        // block change like any other.
+        // parity: `TargetBlock`.
         if (const std::optional<world::BlockChange> target =
                 world::projectileHits::releaseTarget(world.state(), x, y, z);
             target.has_value()) {
             broadcaster_->announceRedstone(world, watchers, *target);
         }
-        // parity: `CommandBlock.tick`, the booked turn that runs the command and walks the chain on.
-        // It ends in `updateNeighbourForOutputSignal`, which here is the comparators around it.
+        // parity: `CommandBlock.tick`.
         if (world::commandBlocks::tick(
                 world.state(), x, y, z, world.gameTime(), world.gameRules().get(world::gameRules::kCommandBlocksWork),
                 world.gameRules().number(world::gameRules::kMaxCommandSequenceLength), runCommand_)) {
@@ -417,9 +389,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           result.effects);
             }
-            // parity: every block a dispenser behaviour writes goes down with `Level.setBlock`'s
-            // flag three, so the square it lands on tells its neighbours: the grass under a bucket
-            // of powder snow is what wears the white top.
+            // parity: `Level.setBlock`.
             for (const world::BlockChange& change : result.changes) {
                 broadcaster_->announceRedstone(world, watchers, change);
                 broadcaster_->notifyAround(world, watchers, change.x, change.y, change.z, std::nullopt);
@@ -439,13 +409,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             crafted.has_value()) {
             scheduled.push_back(*crafted);
         }
-        // parity: `RedstoneTorchBlock.tick` and `DiodeBlock.tick`, which is where a component's delay
-        // is actually spent. What it changes then settles the dust around it.
+        // parity: `RedstoneTorchBlock.tick`.
         if (const std::optional<world::BlockChange> moved = world::redstoneComponents::tick(
                 world.state(), world.name(), x, y, z, world.gameTime(), containerSignal);
             moved.has_value()) {
-            // A comparator whose level moved without its state moving answers with the state it
-            // already had: there is nothing to send, only neighbours to tell.
             if (moved->stateId != here) {
                 scheduled.push_back(*moved);
             }
@@ -454,37 +421,25 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
             world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z, false,
                                                       containerSignal);
-            // parity: that write is a flag two, and the shape updates sit outside the
-            // `UPDATE_NEIGHBORS` gate, so the six squares around it are redrawn all the same. That is
-            // what books the turn of a block of sand beside an observer that just pulsed. Measured in
-            // `arenacae`.
+            // parity: `UPDATE_NEIGHBORS`.
             broadcaster_->reshapeAround(world, watchers, moved->x, moved->y, moved->z);
-            // parity: writing its own state still runs the shape update on the six squares around it,
-            // and that is what locks the repeater beside a repeater that just turned on.
             const std::vector<world::BlockChange> held =
                 world::redstoneComponents::relockAround(world.state(), moved->x, moved->y, moved->z);
             scheduled.insert(scheduled.end(), held.begin(), held.end());
-            // parity: every piece of dust that moved reaches two squares out, which is what tells the
-            // next repeater in a chain that the dust in between lit up.
             for (const world::BlockChange& change : settled) {
                 world::redstoneComponents::scheduleAroundWire(world.state(), world.name(), change.x, change.y, change.z,
                                                               containerSignal);
             }
-            // parity: a component writes its own state and the shapes around it are updated, which
-            // is what an observer watching a repeater or another observer is waiting for.
             world::redstoneComponents::watchFor(world.state(), moved->x, moved->y, moved->z);
             for (const world::BlockChange& change : settled) {
                 world::redstoneComponents::watchFor(world.state(), change.x, change.y, change.z);
             }
-            // parity: `Level.updateNeighborsAt` after the component wrote its new state, which is
-            // what lights the lamp on a repeater's output side.
+            // parity: `Level.updateNeighborsAt`.
             const std::vector<world::BlockChange> reacted = world::redstoneReactors::update(
                 world.state(), world.name(), moved->x, moved->y, moved->z, world.gameTime(), random,
                 world.gameRules().get(world::gameRules::kTntExplodes));
             scheduled.insert(scheduled.end(), reacted.begin(), reacted.end());
-            // parity: a component writes with `UPDATE_ALL`, so a piston beside it runs its own
-            // `neighborChanged`. Nothing else asks a piston, and without this a repeater feeding one
-            // never made it move.
+            // parity: `UPDATE_ALL`.
             const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
             const world::pistons::Context pistonContext{.world = world.state(),
                                                         .worldName = world.name(),
@@ -493,9 +448,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                                         .random = random,
                                                         .gameTime = world.gameTime()};
             world::pistons::trigger(pistonContext, moved->x, moved->y, moved->z);
-            // parity: `DispenserBlock.neighborChanged` is the other one nobody else asks: a dropper
-            // fed by a repeater or by a piece of dust that just moved has to remember it was
-            // triggered and book its four ticks.
+            // parity: `DispenserBlock.neighborChanged`.
             if (const std::optional<world::BlockChange> armed =
                     world::dispensers::onNeighbourChange(world.state(), world.name(), moved->x, moved->y, moved->z);
                 armed.has_value()) {
@@ -515,9 +468,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     scheduled.push_back(*armed);
                 }
             }
-            // parity: a torch flicking on its own turn writes with `UPDATE_ALL` and stops at its six
-            // squares; only a diode and an observer reach past the block they feed, and only as far
-            // as that block's own neighbours.
+            // parity: `UPDATE_ALL`.
             for (const world::redstoneComponents::Reach& at :
                  world::redstoneComponents::outputReach(moved->stateId, moved->x, moved->y, moved->z)) {
                 if (!at.skip.has_value()) {
@@ -529,10 +480,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     world.state(), world.name(), at.x, at.y, at.z, *at.skip, world.gameTime(), random,
                     world.gameRules().get(world::gameRules::kTntExplodes));
                 scheduled.insert(scheduled.end(), ahead.begin(), ahead.end());
-                // parity: `updateNeighborsInFront` is two calls, `neighborChanged(front)` and
-                // `updateNeighborsAtExceptFromFacing(front)`, so the square itself hears it as well
-                // as its neighbours. Measured in `railpordiodo`, where the junction **is** that
-                // square.
+                // parity: `updateNeighborsInFront`.
                 {
                     const std::int32_t fx = at.x;
                     const std::int32_t fy = at.y;
@@ -554,9 +502,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                         scheduled.push_back(world::BlockChange{.x = fx, .y = fy, .z = fz, .stateId = *bent});
                     }
                 }
-                // parity: that reach is an `updateNeighborsAtExceptFromFacing`, so the two nobody
-                // else asks hear it as well. Measured in `pistonpordiodo`: a piston stuck under the
-                // block a repeater feeds never extended, because only the dust reached this far.
+                // parity: `updateNeighborsAtExceptFromFacing`.
                 for (const server::registry::BlockFace face :
                      {server::registry::BlockFace::West, server::registry::BlockFace::East,
                       server::registry::BlockFace::Down, server::registry::BlockFace::Up,
@@ -573,15 +519,13 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                         armed.has_value()) {
                         scheduled.push_back(*armed);
                     }
-                    // parity: `CrafterBlock.neighborChanged`, the third one nobody else asks.
-                    // Measured in `crafterpordiodo`.
+                    // parity: `CrafterBlock.neighborChanged`.
                     if (const std::optional<world::BlockChange> armed =
                             world::crafters::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
                         armed.has_value()) {
                         scheduled.push_back(*armed);
                     }
-                    // parity: `RailBlock.updateState`, which re-bends a three-way junction when the
-                    // block that told it is a signal source. Measured in `railpordiodo`.
+                    // parity: `RailBlock.updateState`.
                     if (const std::optional<std::int32_t> bent =
                             world::rails::onNeighbourChange(world.state(), world.name(), nx, ny, nz, moved->stateId);
                         bent.has_value()) {
@@ -594,9 +538,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     world.state(), world.name(), change.x, change.y, change.z, world.gameTime(), random,
                     world.gameRules().get(world::gameRules::kTntExplodes));
                 scheduled.insert(scheduled.end(), around.begin(), around.end());
-                // parity: the dust reaches its own square and its six, and each of those runs an
-                // `updateNeighborsAt` of its own, so what hears the news is **their** neighbours: a
-                // piston stuck to the block the dust is standing on is two steps away and moves.
+                // parity: `updateNeighborsAt`.
                 for (const std::array<std::int32_t, 3>& at :
                      world::redstoneComponents::wireReach(change.x, change.y, change.z)) {
                     for (const server::registry::BlockFace face :
@@ -629,9 +571,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         }
         world::scheduledBlocks::frogspawn(world.state(), x, y, z, random, scheduled, hatched);
         releaseHatchlings(world, hatched);
-        // parity: `SugarCaneBlock.tick` and `CactusBlock.tick` both end in
-        // `level.destroyBlock(pos, true)`, and the `true` is the drop. What was standing there is
-        // read before, because after it is air.
+        // parity: `SugarCaneBlock.tick`.
         const std::int32_t standing = world.state().blockState(x, y, z).value_or(0);
         const std::size_t before = scheduled.size();
         world::scheduledBlocks::breakIfStillLoose(
@@ -645,13 +585,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled);
         if (scheduled.size() != before) {
             broadcaster_->dropBrokenBlock(world, x, y, z, standing);
-            // parity: `destroyBlock` writes air with `Level.setBlock`'s flag three, so the square
-            // over it hears it go and books its own turn. Without this only the bottom of a tower
-            // came down. Measured in `cactuscana`.
+            // parity: `destroyBlock`.
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
-        // parity: `FarmlandBlock.turnToDirt`, which writes with `setBlockAndUpdate` and raises a
-        // `BLOCK_CHANGE`, so a sculk sensor beside a field hears it give way.
+        // parity: `FarmlandBlock.turnToDirt`.
         if (const std::optional<std::int32_t> soil = world::scheduledBlocks::coveredSoil(world.state(), x, y, z);
             soil.has_value()) {
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *soil});
@@ -661,23 +598,19 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                         static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, world.gameTime());
             }
         }
-        // parity: `LiquidBlock.tick` and `BubbleColumnBlock.tick` end in `updateColumn`, whose
-        // flag two writes still run the shape walk square by square; that walk books the column.
+        // parity: `LiquidBlock.tick`.
         world::scheduledBlocks::bubbleColumn(
             world.state(), x, y, z, scheduled,
             [this, &world, &watchers](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
                 broadcaster_->reshapeAround(world, watchers, cx, cy, cz);
             });
-        // parity: `CoralBlock.tick` is one line, `level.setBlock(pos, deadBlock, 2)`: it goes white
-        // without telling a single neighbour. But flag two still redraws the six squares around it,
-        // which is where a coral fan stuck to it books the turn of the water it is holding.
+        // parity: `CoralBlock.tick`.
         if (const std::optional<std::int32_t> dead = world::scheduledBlocks::coral(world.state(), x, y, z);
             dead.has_value()) {
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *dead});
             broadcaster_->reshapeAround(world, watchers, x, y, z);
         }
-        // parity: `AbstractCauldronBlock.tick`, the turn a stalactite's drip booked, written with
-        // `setBlockAndUpdate`.
+        // parity: `AbstractCauldronBlock.tick`.
         if (const std::optional<world::stalactiteDrips::Fill> fill =
                 world::stalactiteDrips::fillCauldron(world.state(), x, y, z, !hasSkylight);
             fill.has_value()) {
@@ -687,9 +620,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                       {world::blockEffect::Effect{.type = fill->levelEvent}});
             broadcaster_->notifyAround(world, watchers, x, y, z, here);
         }
-        // parity: `CreakingHeartBlock.tick` over `updateState`, written with `setBlock(..., 3)`. The
-        // jar asks `EnvironmentAttributes.CREAKING_ACTIVE`, whose track runs 12600 to 23401: a
-        // narrower window than a bed's, and reading the bed's was wrong on 116 ticks a day.
+        // parity: `CreakingHeartBlock.tick`.
         if (const std::optional<std::int32_t> heart = world::scheduledBlocks::creakingHeartTick(
                 world.state(), x, y, z,
                 [this](std::int32_t stateId) {
@@ -703,9 +634,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *heart});
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
-        // parity: `SpeleothemBlock.tick`: a stalagmite that lost its footing breaks where it stands,
-        // and a stalactite that lost its anchor comes down whole, every piece of the column an
-        // entity of its own, down to the tip. Measured in `estalactita`.
+        // parity: `SpeleothemBlock.tick`.
         const bool speleothemSupported = world::blockSurvival::isSupported(
             world.state(), x, y, z, std::nullopt,
             [&world](const world::WorldState&, std::int32_t sx, std::int32_t sy, std::int32_t sz) {
@@ -729,19 +658,14 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                                                  [this] { return players_->allocateEntityId(); }));
                 scheduled.push_back(
                     world::BlockChange{.x = x, .y = at, .z = z, .stateId = server::registry::blocks::air().stateId});
-                // parity: `FallingBlockEntity.fall` writes with flag three, so **each** piece leaving
-                // redraws the shapes under it, and that is what books the turn of the piece below.
-                // Measured in `estalactita`, where the jar held two turns nobody here had booked.
+                // parity: `FallingBlockEntity.fall`.
                 broadcaster_->notifyAround(world, watchers, x, at, z, was);
                 if (tip) {
                     break;
                 }
             }
         }
-        // parity: `ScaffoldingBlock.tick`, the turn the shape update booked: it counts the distance
-        // out again and only then decides whether the piece stays, breaks or falls. Both endings
-        // write with `Level.setBlock`'s flag three, so the piece beside it books its own turn and
-        // the count walks out one square per tick. Measured in `andamio`.
+        // parity: `ScaffoldingBlock.tick`.
         const world::scheduledBlocks::ScaffoldingTurn scaffold =
             world::scheduledBlocks::scaffoldingTick(world.state(), x, y, z);
         if (scaffold.reshaped.has_value()) {
@@ -766,8 +690,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             sendBlockUpdates(watchers, scheduled);
             continue;
         }
-        // parity: `ButtonBlock.checkPressed` looks again on its own turn, and an arrow still stuck in
-        // the button keeps it down and books another turn instead of letting it up.
+        // parity: `ButtonBlock.checkPressed`.
         if (world::arrowButtons::heldByArrow(world.state(), x, y, z, here)) {
             if (const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(here);
                 pressed.has_value()) {
@@ -783,16 +706,14 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (!released.has_value()) {
             continue;
         }
-        // parity: the `BLOCK_DEACTIVATE` of `checkPressed`, which is the arrow's button letting go.
+        // parity: the `BLOCK_DEACTIVATE` of `checkPressed`.
         if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
             world::vibrations::emit(world.state(), "block_deactivate", x + 0.5, y + 0.5, z + 0.5, world.gameTime());
         }
-        // parity: `ButtonBlock.tick` into `updateNeighbours`: a button coming back up has to take
-        // the signal with it, or whatever it powered stays on for good.
+        // parity: `ButtonBlock.tick`.
         broadcaster_->announceRedstone(world, watchers,
                                        world::BlockChange{.x = x, .y = y, .z = z, .stateId = released->stateId});
-        // parity: the same `updateNeighbours` the press did, so the wall the button is on hears it
-        // come back up too.
+        // parity: `updateNeighbours`.
         if (const std::optional<std::array<std::int32_t, 3>> wall =
                 world::blockInteractions::attachmentOf(released->stateId, x, y, z);
             wall.has_value()) {
@@ -826,8 +747,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             });
         }
     }
-    // parity: `LevelTicks.cleanupAfterTick`. Nothing waits in the batch once the pass is over, so a
-    // world that stops between ticks books like any other.
+    // parity: `LevelTicks.cleanupAfterTick`.
     world.state().endBlockTicks();
 }
 

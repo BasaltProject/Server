@@ -19,8 +19,6 @@ using entity::ServerEntity;
 using wire::common::Identifier;
 using wire::text::Component;
 
-/// The entity an `attribute` form acts on. A player's attributes are not modelled yet, so the
-/// command says so rather than answering with a number nothing reads.
 [[nodiscard]] std::expected<ServerEntity*, CommandSyntaxError> entityOf(const CommandContext& context) {
     const auto* matched = context.get<std::vector<CommandTarget>>("target");
     ServerEntity* what = matched == nullptr || matched->size() != 1 ? nullptr : matched->front().entity();
@@ -152,8 +150,6 @@ void AttributeCommand::build(const CommandNodeBuilder& root) const {
                 });
 
                 attribute.literal("modifier", [](const CommandNodeBuilder& modifier) {
-                    /// The modifiers the named entity already carries for the named
-                    /// attribute, and nothing else.
                     const auto carried = [](const SuggestionContext& context) {
                         std::vector<std::string> named;
                         const auto* matched = context.argument<std::vector<CommandTarget>>("target");

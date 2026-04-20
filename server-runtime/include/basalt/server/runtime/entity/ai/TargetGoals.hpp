@@ -8,13 +8,11 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `NearestAttackableTargetGoal`: one roll in ten before it even looks, the nearest thing
-/// inside the mob's own follow range, and it keeps it until it dies or gets away.
+/// parity: `NearestAttackableTargetGoal`.
 class NearestAttackablePlayerGoal final : public Goal {
 public:
     static constexpr std::int32_t kDefaultInterval = 10;
 
-    /// `needsDarkness` is `Spider.SpiderTargetGoal`, which only notices anybody in the dark.
     explicit NearestAttackablePlayerGoal(std::int32_t randomInterval = kDefaultInterval, bool needsDarkness = false);
 
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
@@ -32,8 +30,7 @@ private:
     bool needsDarkness_;
 };
 
-/// parity: `NearestAttackableTargetGoal` again, for the kinds of mob that go after other mobs: a
-/// zombie after a villager, an iron golem after whatever is hostile.
+/// parity: `NearestAttackableTargetGoal`.
 class NearestAttackableEntityGoal final : public Goal {
 public:
     static constexpr std::int32_t kDefaultInterval = 10;
@@ -56,8 +53,7 @@ private:
     std::int32_t randomInterval_;
 };
 
-/// parity: `HurtByTargetGoal`: whoever hit it becomes what it is after, and it stays after them for
-/// as long as they are in range.
+/// parity: `HurtByTargetGoal`.
 class HurtByTargetGoal final : public Goal {
 public:
     using Types = std::set<std::string, std::less<>>;
@@ -65,8 +61,7 @@ public:
     /// parity: the types whose hits it ignores, and `setAlertOthers` with the types it leaves out.
     explicit HurtByTargetGoal(Types ignoreDamageFrom = {}, bool alertOthers = false, Types ignoreAlert = {});
 
-    /// parity: `BeeHurtByOtherGoal.alertOther`, which only calls the others while it sees the
-    /// attacker.
+    /// parity: `BeeHurtByOtherGoal.alertOther`.
     void alertOnlyInSight() { alertInSight_ = true; }
 
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
@@ -86,8 +81,7 @@ private:
     bool alertInSight_ = false;
 };
 
-/// parity: `MeleeAttackGoal`: walk the target down, repath every four to ten ticks, and swing once a
-/// second when both boxes touch.
+/// parity: `MeleeAttackGoal`.
 class MeleeAttackGoal final : public Goal {
 public:
     explicit MeleeAttackGoal(double speedModifier);
@@ -113,11 +107,7 @@ private:
     std::int32_t repathCooldown_ = 0;
 };
 
-/// What a warden goes after: whoever it is angriest at, and nobody else.
-///
-/// parity: `WardenAi`'s anger, not a target goal at all in vanilla. The point is the same either
-/// way: a warden that has not heard you does not know you are there, however close you stand.
-/// parity: the warden's emerge, dig, roar and sonic boom, which hold its other behaviours still.
+/// parity: `WardenAi`'s anger, not a target goal at all in vanilla.
 class WardenBusyGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look, GoalFlag::Jump}; }
@@ -141,7 +131,6 @@ public:
 
     void stop(MobContext& mob) override;
 
-    /// Whoever it is angriest at can change while it is already after somebody.
     void tick(MobContext& mob) override;
 };
 

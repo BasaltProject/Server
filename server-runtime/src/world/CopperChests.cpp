@@ -58,7 +58,7 @@ using registry::BlockFace;
     return world.blockState(x, y, z).value_or(registry::blocks::air().stateId);
 }
 
-/// parity: `ChestBlock.candidatePartnerFacing`, which only looks at a half that is still on its own.
+/// parity: `ChestBlock.candidatePartnerFacing`.
 [[nodiscard]] std::string partnerFacing(const WorldState& world, const std::int32_t x, const std::int32_t y,
                                         const std::int32_t z, const std::string& side) {
     const std::optional<BlockFace> face = faceNamed(side);
@@ -72,7 +72,7 @@ using registry::BlockFace;
     return propertyOf(neighbour, "facing");
 }
 
-/// parity: `ChestBlock.getConnectedDirection`, the side the other half of a double chest is on.
+/// parity: `ChestBlock.getConnectedDirection`.
 [[nodiscard]] std::string connectedSide(const std::string& facing, const std::string& type) {
     return type == "left" ? clockwise(facing) : counterClockwise(facing);
 }
@@ -92,8 +92,7 @@ std::int32_t oxidationOf(const std::string_view path) {
 }
 
 std::string chestForBlock(const std::string_view copperBlockPath) {
-    // parity: `BlockItemIds.COPPER_BLOCK_SPECIAL_NAMES`: only the unaffected one is called
-    // `copper_block`, the other three are `<state>_copper`, and the waxed four carry the prefix.
+    // parity: `BlockItemIds.COPPER_BLOCK_SPECIAL_NAMES`: only the unaffected one is called.
     static constexpr std::array<std::string_view, 8> kBodies{
         "copper_block",       "exposed_copper",       "weathered_copper",       "oxidized_copper",
         "waxed_copper_block", "waxed_exposed_copper", "waxed_weathered_copper", "waxed_oxidized_copper"};
@@ -110,16 +109,14 @@ std::string chestForBlock(const std::string_view copperBlockPath) {
             return std::string{kChests[index]};
         }
     }
-    // parity: `getOrDefault(copperBlock, Blocks.COPPER_CHEST.weathering().unaffected())`: anything
-    // else in `#minecraft:copper`, a grate or a bulb, leaves a plain copper chest.
+    // parity: `getOrDefault(copperBlock, Blocks.COPPER_CHEST.weathering().unaffected())`.
     return "copper_chest";
 }
 
 std::optional<std::int32_t> placedState(const WorldState& world, const std::int32_t x, const std::int32_t y,
                                         const std::int32_t z, const std::string_view chestPath,
                                         const std::string& facing) {
-    // parity: `getChestType`, which takes the left side first, so a chest between two lone chests
-    // joins the one on its left.
+    // parity: `getChestType`.
     std::string type = "single";
     if (facing == partnerFacing(world, x, y, z, clockwise(facing))) {
         type = "left";
@@ -128,9 +125,7 @@ std::optional<std::int32_t> placedState(const WorldState& world, const std::int3
     }
     std::string chest{chestPath};
     if (type != "single") {
-        // parity: `getLeastOxidizedChestOfConnectedBlocks`. The waxing half of it never runs, since
-        // `CopperChestBlock.isWaxed` answers true for every one of them, so all that is left is that
-        // the less oxidized of the two decides the block, ties going to the one being placed.
+        // parity: `getLeastOxidizedChestOfConnectedBlocks`.
         const std::optional<BlockFace> face = faceNamed(connectedSide(facing, type));
         if (face.has_value()) {
             const std::int32_t joined = stateAt(world, x + registry::stepX(*face), y, z + registry::stepZ(*face));

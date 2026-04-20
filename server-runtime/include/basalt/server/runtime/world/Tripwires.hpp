@@ -10,17 +10,11 @@
 
 namespace basalt::server::runtime::world {
 
-/// The string on the floor and the hooks it runs between.
-///
-/// parity: `TripWireBlock.checkPressed` for the string, `TripWireHookBlock.calculateState` for the
-/// pair of hooks. The hook is the part that gives off redstone, and it only does so when the line
-/// between the two is unbroken: a string with nothing at both ends powers nothing.
+/// parity: `TripWireBlock.checkPressed`.
 namespace tripwires {
 
-/// parity: `TripWireBlock.RECHECK_PERIOD`, how long a pressed wire waits before looking again.
 inline constexpr std::int32_t kRecheckTicks = 10;
 
-/// parity: `calculateState`'s own 42, the longest a line of string can be.
 inline constexpr std::int32_t kMaxLength = 42;
 
 [[nodiscard]] const wire::common::Identifier& wireBlock();
@@ -30,64 +24,38 @@ inline constexpr std::int32_t kMaxLength = 42;
 
 [[nodiscard]] bool isHook(std::int32_t stateId);
 
-/// Whether a string here would join what is on that side: another string, or a hook facing this way.
-/// parity: `TripWireBlock.shouldConnectTo`. Reads only the neighbour, so placement can ask it before
-/// the string is written.
+/// parity: `TripWireBlock.shouldConnectTo`.
 [[nodiscard]] bool connectsTo(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                               server::registry::BlockFace towards);
 
-/// parity: `TripWireBlock.updateShape`, which draws a line of string as a line: each horizontal side
-/// is set from `shouldConnectTo`. Answers the new state, or nothing when this is not a string or
-/// nothing moved.
+/// parity: `TripWireBlock.updateShape`.
 [[nodiscard]] std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId, std::optional<registry::BlockFace> towards);
 
-/// parity: `TripWireHookBlock.updateShape`: a hook only falls when the news arrives **from the side
-/// it hangs on**, and `canSurvive` wants a sturdy face there. From any other side it is left alone,
-/// which is why one placed in mid air by command stays until something touches its wall.
+/// parity: `TripWireHookBlock.updateShape`.
 [[nodiscard]] bool hookFalls(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                              std::int32_t stateId, registry::BlockFace towards);
 
-/// Whether an entity of this size crosses the wire whose state this is.
-///
-/// parity: `TripWireBlock.checkPressed` uses the wire's own shape, which is taller while
-/// `attached` is false, crossed with the strict `AABB.intersects`.
+/// parity: `checkPressed`.
 [[nodiscard]] bool crosses(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, double entityX,
                            double entityY, double entityZ, double halfWidth, double height);
 
-/// What is standing on a wire, as its own box: the whole block, since a wire is walked into.
 [[nodiscard]] bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
                                 double entityZ);
 
-/// parity: `checkPressed`: the wire follows whether anything is on it, books its own recheck, and
-/// tells the hooks at both ends.
+/// parity: `checkPressed`.
 void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool occupied, std::int64_t gameTime,
            std::vector<BlockChange>& changes);
 
-/// parity: `TripWireHookBlock.calculateState`: it looks along the way it faces for the hook pointing
-/// back at it. Attached means it found one with unbroken string in between; powered means one of
-/// those strings has something on it.
-/// parity: `TripWireHookBlock`'s own ten ticks: a hook told by a wire that changed looks again that
-/// much later, which is what keeps it attached for a moment after the string is cut.
+/// parity: `TripWireHookBlock`'s own ten ticks.
 inline constexpr std::int32_t kHookRecheckTicks = 10;
 
-/// `gameTime` is the world's clock, which a hook's game events and vibrations are stamped with.
-/// `wireSource` is the square whose state to read from `wireSourceState` instead of the world, `-1`
-/// for none: that is how vanilla tells a hook about a wire that has already gone, handing the
-/// removed string over as still there and powered so the line fires.
-///
-/// `destroyedState` is the state of the hook that has just gone: with it set, its own square is
-/// neither read from the world nor rewritten, and the line is taken as loose. parity:
-/// `TripWireHookBlock.onRemoved` calls with `isBeingDestroyed`, and without it the hook at the other
-/// end stays stuck for good.
 void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
                    std::vector<BlockChange>& changes, std::int32_t wireSource = -1,
                    std::optional<std::int32_t> wireSourceState = std::nullopt,
                    std::optional<std::int32_t> destroyedState = std::nullopt);
 
-/// parity: `TripWireBlock.updateSource`, which a wire runs when it is placed, when it goes and when
-/// it is stepped on. It walks **south and west only**, because `calculateHook` writes both ends of
-/// the line, so the hook at the lower end is the only one that has to be found.
+/// parity: `TripWireBlock.updateSource`.
 void updateSource(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t wireStateId,
                   std::int64_t gameTime, std::vector<BlockChange>& changes);
 

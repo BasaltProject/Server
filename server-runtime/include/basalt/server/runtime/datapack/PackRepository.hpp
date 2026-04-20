@@ -17,13 +17,13 @@
 
 namespace basalt::server::runtime::datapack {
 
-/// parity: `PackSource`. Only built-in and world packs are picked up on their own.
+/// parity: `PackSource`.
 enum class PackSource : std::uint8_t { BuiltIn, Feature, World };
 
 /// parity: `Pack.Position`.
 enum class PackPosition : std::uint8_t { Top, Bottom };
 
-/// One pack the repository found. parity: `Pack` with its `PackLocationInfo`.
+/// parity: `Pack` with its `PackLocationInfo`.
 struct Pack {
     std::string id;
     wire::text::Component title = wire::text::Component::empty();
@@ -35,12 +35,10 @@ struct Pack {
     PackPosition defaultPosition = PackPosition::Top;
     bool required = false;
     bool fixedPosition = false;
-    /// The `KnownPack` id a client can hold a copy of, empty for a pack only this server has.
     std::string knownPackId;
     PackFiles files;
 
-    /// parity: `Pack.getChatLink`: the id in brackets, green or red, with title and description
-    /// on hover.
+    /// parity: `Pack.getChatLink`.
     [[nodiscard]] wire::text::Component chatLink(bool enabled) const;
 
     /// parity: `PackRepository.displayPackList`'s " (incompatible)".
@@ -48,21 +46,16 @@ struct Pack {
 };
 
 /// parity: `PackRepository` fed by `ServerPacksSource` and a `FolderRepositorySource`.
-///
-/// The vanilla pack and the feature packs come out of the jar, the rest out of the world's own
-/// `datapacks/` folder. Nothing here reads a data file: opening the selection is `openSelected`.
 class PackRepository {
 public:
     struct Sources {
-        /// The whole unpacked jar, `data/...` names included. Empty in a test with no jar.
         PackFiles jar;
-        /// The world's `datapacks/` folder, created on the first scan as vanilla does.
         std::string worldPacks;
     };
 
     explicit PackRepository(Sources sources, wire::common::Logger logger = wire::common::Logger{"Datapacks"});
 
-    /// Scans every source again, keeping the selection by id. parity: `reload`.
+    /// parity: `reload`.
     void reload();
 
     /// parity: `setSelected`: what is present, in the order given, plus whatever is required.
@@ -72,22 +65,19 @@ public:
 
     [[nodiscard]] bool isAvailable(std::string_view id) const { return pack(id) != nullptr; }
 
-    /// Every pack found, by id.
     [[nodiscard]] std::vector<const Pack*> availablePacks() const;
 
     [[nodiscard]] std::vector<std::string> availableIds() const;
 
-    /// The selection, bottom pack first.
     [[nodiscard]] std::vector<const Pack*> selectedPacks() const;
 
     [[nodiscard]] std::vector<std::string> selectedIds() const { return selected_; }
 
     [[nodiscard]] bool isSelected(std::string_view id) const;
 
-    /// Every feature the selection asks for. parity: `getRequestedFeatureFlags`.
+    /// parity: `getRequestedFeatureFlags`.
     [[nodiscard]] std::vector<wire::common::Identifier> requestedFeatures() const;
 
-    /// Opens the given packs, in that order, as one tree. Ids no longer available are skipped.
     [[nodiscard]] std::shared_ptr<const ResourceStack> open(const std::vector<std::string>& ids) const;
 
     [[nodiscard]] std::shared_ptr<const ResourceStack> openSelected() const { return open(selected_); }
@@ -105,7 +95,6 @@ private:
     std::vector<std::string> selected_;
 };
 
-/// Reads a `pack.mcmeta` into a pack, or nothing (logged) when it cannot be listed.
 /// parity: `Pack.readMetaAndCreate`.
 [[nodiscard]] std::optional<Pack> readPack(std::string id, wire::text::Component title, PackSource source,
                                            PackFiles files, const wire::common::Logger& logger);

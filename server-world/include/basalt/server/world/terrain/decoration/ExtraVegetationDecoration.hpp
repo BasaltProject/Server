@@ -4,10 +4,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// The shared pumpkin, sugar cane, cactus and firefly bush placed features.
-///
-/// Several biomes appear twice here: once whole, and once as the tail that is left after a feature
-/// moved to its own independent seed in the global step. Both shapes are real placements.
 namespace extraVegetationDecoration {
 
 [[nodiscard]] const BiomeVegetalDecoration& pumpkinOnly();
@@ -15,7 +11,6 @@ namespace extraVegetationDecoration {
 [[nodiscard]] const BiomeVegetalDecoration& standard();
 [[nodiscard]] const BiomeVegetalDecoration& standardWithoutPumpkin();
 
-/// The near-water firefly tail, once pumpkin and sugar cane have their own seeds.
 [[nodiscard]] const BiomeVegetalDecoration& fireflyNearWater();
 
 [[nodiscard]] const BiomeVegetalDecoration& nearWater();

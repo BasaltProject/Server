@@ -15,7 +15,6 @@ namespace {
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
-/// A string member, or nothing: an entry missing either of the two that matter is skipped whole.
 [[nodiscard]] const std::string* stringAt(const JsonObject& entry, std::string_view key) {
     const JsonValue* value = entry.find(key);
     return value == nullptr ? nullptr : value->get<std::string>();
@@ -53,8 +52,6 @@ std::expected<ImportReport, std::string> importVanillaSave(const std::string& sa
         const std::optional<std::vector<std::uint8_t>> bytes =
             wire::io::fileIO::readBytes(savePath + "/playerdata/" + *uuid + ".dat");
         if (!bytes.has_value()) {
-            // Perfectly normal: the cache remembers everyone who ever resolved a name, including
-            // players who never actually joined and so have no data file.
             report.skipped++;
             continue;
         }
@@ -68,8 +65,6 @@ std::expected<ImportReport, std::string> importVanillaSave(const std::string& sa
                 },
                 nowEpochSeconds, worldName);
         if (!player.has_value()) {
-            // One unreadable file must not abort the other thousand: a save old enough to need
-            // importing is exactly the kind that has a corrupt `.dat` in it.
             logger.warn([&] { return "Skipping " + *name + " (" + *uuid + "): its player data could not be read."; });
             report.failed++;
             continue;

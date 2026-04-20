@@ -5,7 +5,6 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 [[nodiscard]] std::string_view trimmed(std::string_view text) {
     while (!text.empty() && text.front() == ' ') {
         text.remove_prefix(1);
@@ -25,7 +24,6 @@ namespace {
     return value;
 }
 
-/// Splits on spaces, except inside an argument: `<name: word>` is one token, spaces and all.
 [[nodiscard]] std::vector<std::string> tokenize(std::string_view spec) {
     std::vector<std::string> tokens;
     std::string current;
@@ -77,7 +75,6 @@ namespace {
     if (name.empty()) {
         return std::unexpected(ManifestError{"'" + std::string{spec} + "' has an argument with no name"});
     }
-    // No colon at all means the type was left out, and a word is what an unqualified argument is.
     const std::string_view rest =
         trimmed(colon == std::string_view::npos ? std::string_view{"word"} : body.substr(colon + 1));
     std::vector<std::string_view> parts;
@@ -107,7 +104,6 @@ namespace {
     }
     return argument;
 }
-
 } // namespace
 
 std::string_view spellingOf(PluginArgumentType type) {
@@ -157,8 +153,6 @@ std::string PluginCommandSpec::usage() const {
         if (!text.empty()) {
             text += ' ';
         }
-        // A range with only one end is still written with both, `null` standing in for the one that
-        // was left out: what the plugin wrote is what comes back.
         std::string range;
         if (argument.min.has_value() || argument.max.has_value()) {
             range = " " + (argument.min.has_value() ? std::to_string(*argument.min) : "null") + ".." +
@@ -206,5 +200,4 @@ std::expected<PluginCommandSpec, ManifestError> PluginCommandSpec::parse(std::st
     }
     return built;
 }
-
 } // namespace basalt::server::plugins

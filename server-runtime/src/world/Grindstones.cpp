@@ -18,7 +18,7 @@ using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtTag;
 
-/// parity: `EnchantmentHelper.getComponentType`: a book keeps what it carries somewhere else.
+/// parity: `EnchantmentHelper.getComponentType`.
 [[nodiscard]] std::string_view componentFor(const storage::StoredItemStack& stack) {
     return stack.id == "minecraft:enchanted_book" ? item::itemComponents::kStoredEnchantments
                                                   : item::itemComponents::kEnchantments;
@@ -53,8 +53,7 @@ void write(storage::StoredItemStack& stack, const std::map<Identifier, std::int3
     stack.components.set(componentFor(stack), NbtTag::ofCompound(std::move(written)));
 }
 
-/// parity: `removeNonCursesFrom`: everything but the curses comes off, an enchanted book with
-/// nothing left on it goes back to being a book, and the prior work is rebuilt from what is left.
+/// parity: `removeNonCursesFrom`.
 [[nodiscard]] storage::StoredItemStack stripped(storage::StoredItemStack stack, const IsCurse& isCurse) {
     std::map<Identifier, std::int32_t> kept;
     for (const auto& [id, level] : writtenOn(stack)) {
@@ -88,15 +87,13 @@ merged(const storage::StoredItemStack& input, const storage::StoredItemStack& ad
             (max - item::itemWear::damage(input)) + (max - item::itemWear::damage(addition)) + (max * 5 / 100);
         out.components.putInt(item::itemComponents::kDamage, std::max(max - left, 0));
     } else {
-        // parity: two of something that does not wear only merge when they are the same stack to
-        // the last component, and then they come out as two.
+        // parity: two of something that does not wear only merge when they are the same stack to.
         if (input.components != addition.components) {
             return std::nullopt;
         }
         out.count = 2;
     }
-    // parity: `mergeEnchantsFrom`, which takes the higher of the two of everything but a curse the
-    // target already carries.
+    // parity: `mergeEnchantsFrom`.
     std::map<Identifier, std::int32_t> levels = writtenOn(out);
     for (const auto& [id, level] : writtenOn(addition)) {
         const auto held = levels.find(id);
@@ -111,7 +108,7 @@ merged(const storage::StoredItemStack& input, const storage::StoredItemStack& ad
     return stripped(std::move(out), isCurse);
 }
 
-/// parity: `getExperienceFromItem`: what everything but the curses on it costs at a table.
+/// parity: `getExperienceFromItem`.
 [[nodiscard]] std::int32_t worthOf(const storage::StoredItemStack& stack, const IsCurse& isCurse,
                                    const MinCost& minCost) {
     if (!minCost) {

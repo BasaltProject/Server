@@ -13,10 +13,7 @@ namespace {
 using wire::common::DurationSummary;
 using wire::common::TickDurations;
 
-/// Three decimals, and `null` for what the platform could not answer rather than a made-up zero.
-///
-/// Three because most of what is measured here takes well under a millisecond, and two rendered
-/// every one of them as `0.00`.
+// Three decimals (most sections take well under a millisecond) and `null` for what the platform could not answer.
 [[nodiscard]] std::string number(std::optional<double> value) {
     if (!value.has_value()) {
         return "null";
@@ -65,9 +62,7 @@ using wire::common::TickDurations;
 } // namespace
 
 std::string TimingsReport::stamp() {
-    // Local time, because it is what an operator reads off their own clock when they say which run
-    // they mean. Through `localtime_r` rather than `std::chrono::zoned_time`, which this platform's
-    // standard library does not carry: the time zone half of C++20 chrono is still missing here.
+    // Local time, via `localtime_r` since this platform's standard library lacks C++20 `zoned_time`.
     const std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm local{};
     localtime_r(&now, &local);
@@ -135,8 +130,7 @@ std::string TimingsReport::json(std::int64_t nowNanos) const {
     out += "    }\n";
     out += "  },\n";
 
-    // A section nobody called is not a zero row, it is absent: a report is read to find what cost
-    // something.
+    // A section nobody called is absent, not a zero row: a report is read to find what cost something.
     std::vector<wire::common::TimingSnapshot> sections;
     for (const wire::common::TimingSnapshot& section : timings_->snapshot()) {
         if (section.calls > 0) {

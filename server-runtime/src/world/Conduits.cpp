@@ -23,7 +23,6 @@ std::vector<Position> frame(const std::function<bool(std::int32_t, std::int32_t,
                 const std::int32_t ax = std::abs(ox);
                 const std::int32_t ay = std::abs(oy);
                 const std::int32_t az = std::abs(oz);
-                // The three rings of the frame: the outer square in each plane through the middle.
                 const bool outside = ax > 1 || ay > 1 || az > 1;
                 const bool ring = (ox == 0 && (ay == 2 || az == 2)) || (oy == 0 && (ax == 2 || az == 2)) ||
                                   (oz == 0 && (ax == 2 || ay == 2));

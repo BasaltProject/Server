@@ -18,7 +18,6 @@ constexpr std::string_view kStripped = "stripped_";
 }
 
 /// The named block wearing this state's properties. parity: `Block.withPropertiesOf`, which carries
-/// what the two blocks share; the pairs here have the same shape, so that is all of them.
 [[nodiscard]] std::optional<std::int32_t> sameShape(std::int32_t stateId, const std::string& path) {
     const registry::BlockState* plain = registry::blocks::named(path);
     if (plain == nullptr) {
@@ -55,8 +54,7 @@ std::optional<Scrape> scraped(const std::int32_t stateId) {
             return stripped;
         }
     }
-    // parity: `WeatheringCopper.getPrevious`, which only knows the unwaxed chain: a waxed block
-    // never scrapes back a step, it loses its wax instead.
+    // parity: `WeatheringCopper.getPrevious`.
     const std::optional<std::string_view> fresher = registry::weathering::previous(path);
     if (fresher.has_value()) {
         return asScrape(sameShape(stateId, std::string{*fresher}), Cut::Scraped);

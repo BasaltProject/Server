@@ -26,33 +26,27 @@ namespace basalt::server::runtime {
 
 class CombatSystem;
 
-/// What a lingering cloud does to whoever stands in it, and where a dragon's fireball leaves one.
-///
 /// parity: `AreaEffectCloud.serverTick` and `DragonFireball.onHit`.
 class AreaEffectCloudSystem {
 public:
     struct Options {
-        /// `undead`, which an instant damage heals.
         const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
     };
 
     AreaEffectCloudSystem(player::PlayerRegistry& players, CombatSystem& combat, Options options);
 
-    /// Puts a cloud in the world and answers its id. `owner` is who its kills are blamed on.
     std::optional<std::int32_t> spawn(world::LoadedWorld& world, const entity::areaEffectClouds::Cloud& settings,
                                       double x, double y, double z, std::optional<std::int32_t> owner = std::nullopt);
 
     void tick(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& cloud);
 
-    /// parity: `DragonFireball.onHit`: a growing cloud where it burst, moved onto the first living
-    /// thing within four blocks.
+    /// parity: `DragonFireball.onHit`.
     void fireballLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball);
 
 private:
-    /// parity: `HealOrHarmMobEffect.applyInstantenousEffect` at the cloud's half strength, or any
-    /// other effect handed on.
+    /// parity: `HealOrHarmMobEffect.applyInstantenousEffect`.
     void affect(world::LoadedWorld& world, const entity::ServerEntity& cloud,
                 const entity::areaEffectClouds::Cloud& settings, player::PlayerSession* player,
                 entity::ServerEntity* mob, const std::vector<player::PlayerSession*>& watchers,
@@ -62,7 +56,6 @@ private:
     CombatSystem* combat_;
     Options options_;
     std::mutex lock_;
-    /// Per cloud, who it touched and the tick it may touch them again.
     std::unordered_map<std::int32_t, std::unordered_map<std::int32_t, std::int32_t>> victims_;
 };
 

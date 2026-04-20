@@ -7,12 +7,10 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using wire::common::toml::TomlTable;
 
 constexpr std::string_view kDefaultMain = "src/main.lua";
 
-/// Lowercase letters, digits and underscores, starting with a letter.
 [[nodiscard]] bool isUsableId(std::string_view id) {
     if (id.empty() || id.front() < 'a' || id.front() > 'z') {
         return false;
@@ -87,7 +85,6 @@ constexpr std::string_view kDefaultMain = "src/main.lua";
     }
     return found;
 }
-
 } // namespace
 
 std::string_view permissionName(PluginPermission permission) {
@@ -215,5 +212,4 @@ std::expected<PluginManifest, ManifestError> PluginManifest::parse(std::string_v
         .privateResources = resources == nullptr ? std::vector<std::string>{} : resources->stringList("private"),
     };
 }
-
 } // namespace basalt::server::plugins

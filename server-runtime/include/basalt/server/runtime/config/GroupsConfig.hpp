@@ -12,16 +12,10 @@
 
 namespace basalt::server::runtime::config {
 
-/// One permission rule: a dotted name, possibly ending in `*`, granting or denying.
-///
-/// Specificity is the number of segments before any wildcard, so `basalt.command.stop` (3) beats
-/// `basalt.command.*` (2) beats `basalt.*` (1). That ordering is what lets a group be written as
-/// "everything except this one thing" without depending on the order of the list.
 class PermissionRule {
 public:
     PermissionRule(std::string pattern, bool granted);
 
-    /// A leading `-` denies; everything else grants.
     [[nodiscard]] static PermissionRule parse(std::string_view raw);
 
     [[nodiscard]] const std::string& pattern() const noexcept { return pattern_; }
@@ -42,7 +36,6 @@ private:
     std::int32_t specificity_ = 0;
 };
 
-/// A named set of permissions.
 struct PermissionGroup {
     std::string name;
     std::vector<PermissionRule> rules;
@@ -51,12 +44,6 @@ struct PermissionGroup {
     bool isOperator = false;
 };
 
-/// `config/groups.toml`, resolved: every group with its inheritance already flattened.
-///
-/// Membership is deliberately not here. A group definition is something the operator writes; which
-/// group a player is in is something the server writes, so it belongs in `players.db`. Keeping the
-/// two apart is what removed the old `[server] operators` list, which the server had to rewrite by
-/// hand every time somebody ran `op`.
 class GroupsConfig {
 public:
     static constexpr std::string_view kFileName = "groups.toml";
@@ -68,26 +55,14 @@ public:
     load(const ConfigDirectory& directory = ConfigDirectory{},
          const wire::common::Logger& logger = wire::common::Logger{"Config"});
 
-    /// The names, in the order the file declares them.
     [[nodiscard]] std::vector<std::string> names() const;
 
-    /// The default and operator groups, or a group that grants nothing when there are none at all.
-    ///
-    /// A configuration with no groups is what a test fixture and a server with no `groups.toml`
-    /// both hand over, and indexing an empty list for them is how this crashed in release.
     [[nodiscard]] const PermissionGroup& defaultGroup() const noexcept { return at(defaultIndex_); }
 
     [[nodiscard]] const PermissionGroup& operatorGroup() const noexcept { return at(operatorIndex_); }
 
-    /// The named group, or the default one when there is no such group and when there is no name.
     [[nodiscard]] const PermissionGroup& get(std::optional<std::string_view> name) const;
 
-    /// Whether `groupName` grants `node`.
-    ///
-    /// Rules from the group itself win over inherited ones at equal specificity, so a group can
-    /// override what it inherits without having to be more specific than its parent. Nothing
-    /// matching at all is a denial: what a group can do is exactly what its file says, and a
-    /// permission nobody granted has not been granted.
     [[nodiscard]] bool resolve(std::optional<std::string_view> groupName, std::string_view node) const;
 
 private:

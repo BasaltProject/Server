@@ -29,8 +29,6 @@ using wire::nbt::NbtType;
     return block == nullptr ? std::string{} : block->path();
 }
 
-/// Everything a template's block entity NBT can be attached to, and the subset that carries a loot
-/// seed. Both are exactly the jar's lists for the templates 26.2 ships.
 const std::set<std::string, std::less<>>& dyeColors() {
     static const std::set<std::string, std::less<>> colors = {
         "white",      "orange", "magenta", "light_blue", "yellow", "lime",  "pink", "gray",
@@ -59,12 +57,17 @@ const std::set<std::string, std::less<>>& randomizableContainerBlocks() {
 const std::set<std::string, std::less<>>& blockEntityBlocks() {
     static const std::set<std::string, std::less<>> blocks = [] {
         std::set<std::string, std::less<>> built = randomizableContainerBlocks();
-        built.insert({"spawner", "furnace", "blast_furnace", "smoker", "brewing_stand", "beacon", "lectern", "jukebox",
-                      "campfire", "soul_campfire", "beehive", "bee_nest", "decorated_pot", "chiseled_bookshelf",
-                      "trial_spawner", "vault", "bell",
-                      // The four the 26.2 templates carry that this list used to miss: the ancient
-                      // city's comparators and sculk sensors, and the End city's ender chest.
-                      "comparator", "sculk_sensor", "calibrated_sculk_sensor", "ender_chest"});
+        built.insert({"spawner",       "furnace",
+                      "blast_furnace", "smoker",
+                      "brewing_stand", "beacon",
+                      "lectern",       "jukebox",
+                      "campfire",      "soul_campfire",
+                      "beehive",       "bee_nest",
+                      "decorated_pot", "chiseled_bookshelf",
+                      "trial_spawner", "vault",
+                      "bell",          "comparator",
+                      "sculk_sensor",  "calibrated_sculk_sensor",
+                      "ender_chest"});
         for (const std::string& color : dyeColors()) {
             built.insert(color + "_banner");
             built.insert(color + "_wall_banner");
@@ -109,7 +112,6 @@ const std::set<std::string, std::less<>>& blockEntityBlocks() {
     return value == nullptr ? 0.0F : *value;
 }
 
-/// The state a `name[key=value,...]` string resolves to, falling back to the block's default.
 [[nodiscard]] std::int32_t parsedStateId(std::string_view stateName, std::map<std::string, std::string>& properties) {
     const std::size_t open = stateName.find('[');
     const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsedName =
@@ -162,7 +164,6 @@ const std::vector<StructureBlockInfo>& StructureTemplate::paletteBlocks(const st
 
 namespace {
 
-/// One palette's states, resolved once and shared by every block that points at it.
 struct Palette {
     std::vector<std::map<std::string, std::string>> properties;
     std::vector<std::int32_t> stateIds;
@@ -177,8 +178,7 @@ struct Palette {
     palette.frontFacing.reserve(paletteList.size());
     palette.topFacing.reserve(paletteList.size());
     for (std::size_t index = 0; index < paletteList.size(); ++index) {
-        // parity: `BlockState.CODEC` since 26.3: `{id, properties}`, a bare id (wrapped as `{"": id}`
-        // in a mixed list), or 26.2's `{Name, Properties}`.
+        // parity: `BlockState.CODEC` since 26.3.
         const NbtCompound* entry = paletteList[index].get<NbtCompound>();
         const std::string* bare = paletteList[index].get<std::string>();
         if (entry != nullptr && entry->size() == 1 && entry->names()[0].empty()) {
@@ -212,8 +212,7 @@ struct Palette {
                 stateId = block->stateId;
             }
         }
-        // parity: the jigsaw block's `orientation` property (`front_top`, front first) is the one
-        // block property this project reads, since jigsaw assembly cannot work without it.
+        // parity: the jigsaw block's `orientation` property (`front_top`.
         std::optional<StructureDirection> front;
         std::optional<StructureDirection> top;
         if (name == "minecraft:jigsaw") {
@@ -234,7 +233,6 @@ struct Palette {
     return palette;
 }
 
-/// Resolves one palette's states against the shared block positions.
 [[nodiscard]] std::vector<StructureBlockInfo> readPalette(const NbtList& paletteList, const NbtList& blockList) {
     const Palette palette = readPaletteEntries(paletteList);
     std::vector<StructureBlockInfo> target;
@@ -309,7 +307,7 @@ struct Palette {
     return sourceYaw + rotationOffset + mirrorOffset;
 }
 
-/// parity: the jigsaw replacement's `final_state`, parsed and then transformed like any state.
+/// parity: the jigsaw replacement's `final_state`.
 [[nodiscard]] std::int32_t parsedAndTransformedStateId(std::string_view stateName, StructureMirror mirror,
                                                        StructureRotation rotation) {
     std::map<std::string, std::string> properties;
@@ -317,16 +315,13 @@ struct Palette {
     return StructureTemplate::transformedStateId(stateId, properties, mirror, rotation);
 }
 
-/// One block that survived the pre-write pass: where the processors read, and where it lands.
 struct ProcessedBlock {
     const StructureBlockInfo* block;
     StructurePos processorPos;
     StructurePos placedPos;
 };
 
-/// parity: `AppendLoot`, the block entity modifier a processor rule carries. It builds the tag even
-/// when the template block had none, and takes the seed from the same positional random the rule was
-/// tested with.
+/// parity: `AppendLoot`, the block entity modifier a processor rule carries.
 void placeAppendedLoot(Chunk& chunk, std::int32_t stateId, StructurePos worldPos, const std::string& table,
                        const std::optional<NbtCompound>& existing = std::nullopt) {
     static const std::map<std::string, std::string, std::less<>> types{{"suspicious_sand", "brushable_block"},
@@ -391,9 +386,7 @@ void StructureTemplate::load(const NbtCompound& nbt) {
         size_ = StructurePos{};
     }
 
-    // parity: a template carries either one `palette` or several `palettes`; the shipwreck and the
-    // ocean ruins carry eight. The positions in `blocks` are shared and only the state index
-    // resolves differently, which is why the palette is drawn at placement time.
+    // parity: a template carries either one `palette` or several `palettes`.
     const NbtList* blockList = nbt.getList("blocks");
     if (blockList == nullptr) {
         return;
@@ -551,8 +544,7 @@ void StructureTemplate::placeEntities(Chunk& chunk, const StructurePos position,
 void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placement) const {
     static const StructureProcessorList kNoProcessors;
     const StructureProcessorList& processors = placement.processors == nullptr ? kNoProcessors : *placement.processors;
-    // parity: `getRandomPalette` draws whether there is one palette or eight, and the draw comes out
-    // of the placement's own stream when it has one.
+    // parity: `getRandomPalette` draws whether there is one palette or eight.
     std::size_t paletteIndex = 0;
     if (paletteCount() <= 1) {
         if (placement.settingsRandom != nullptr) {
@@ -581,9 +573,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         }
         const StructurePos originalWorldPos =
             plus(transform(blockInfo.pos, placement.mirror, placement.rotation, placement.pivot), placement.position);
-        // parity: `processBlockInfos` rejects blocks outside the chunk box before any processor,
-        // *unless* one of them evaluates the entire piece state. Only a capped one does, and it
-        // needs the whole piece to choose from; the write below still clips.
+        // parity: `processBlockInfos` rejects blocks outside the chunk box before any processor.
         if (!wholePiece && !placement.clipTo.isInside(originalWorldPos)) {
             continue;
         }
@@ -591,11 +581,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         const std::int32_t localZ = originalWorldPos.z & 15;
         StructurePos worldPos = originalWorldPos;
         if (placement.gravityOffset.has_value()) {
-            // parity: terrain matching appends a gravity processor over `WORLD_SURFACE_WG`. It uses
-            // the unrotated template Y, not the piece origin or the transformed Y, and it reads the
-            // **frozen** map: during generation the level is not a server level, so the processor
-            // never swaps in the live heightmap. Reading the live one let an earlier piece of the
-            // same village raise the ground the next one lands on.
+            // parity: terrain matching appends a gravity processor over `WORLD_SURFACE_WG`.
             worldPos.y = chunk.worldgenHeightAt(localX, localZ, HeightmapType::WorldSurface) +
                          *placement.gravityOffset + blockInfo.pos.y;
         }
@@ -610,9 +596,6 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
             ProcessedBlock{.block = &blockInfo, .processorPos = originalWorldPos, .placedPos = worldPos});
     }
 
-    // `processBlockInfos` completes the whole list before the first block is written, so one
-    // projected block cannot raise the height sampled by another block of the same template. The
-    // capped pass also has to see every final state before it picks.
     struct Resolved {
         const StructureBlockInfo* block;
         StructurePos worldPos;
@@ -677,14 +660,11 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         resolved.push_back(Resolved{.block = &blockInfo, .worldPos = entry.placedPos, .stateId = stateId});
     }
 
-    // Each capped pass sees what the previous one left, which is why the states are carried forward
-    // rather than every pass reading the same original list.
     std::vector<std::int32_t> cappedStates;
     cappedStates.reserve(resolved.size());
     for (const Resolved& entry : resolved) {
         cappedStates.push_back(entry.stateId);
     }
-    // The loot a capped rule hands its output, kept by index so the entity goes down with the block.
     std::map<std::size_t, std::string> cappedLoot = std::move(ruleLoot);
     if (placement.worldSeed.has_value()) {
         for (const CappedRules& capped : processors.capped()) {
@@ -708,17 +688,12 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         }
         if ((entry.worldPos.x >> 4) == chunk.chunkX() && (entry.worldPos.z >> 4) == chunk.chunkZ()) {
             chunk.setBlockStateId(entry.worldPos.x & 15, entry.worldPos.y, entry.worldPos.z & 15, finalStateId);
-            // parity: `placeInWorld` ends by running `updateFromNeighbourShapes` over every block it
-            // put down. The templates store a stair's `shape` as the modeller left it, so without
-            // this a hull's whole flight keeps `outer_right` where the jar reads `straight`.
+            // parity: `placeInWorld` ends by running `updateFromNeighbourShapes` over every block it put down.
             if (registry::blockConnections::connects(finalStateId) ||
                 registry::blockConnections::isStairs(finalStateId)) {
                 chunk.markShapeUpdate(entry.worldPos.x, entry.worldPos.y, entry.worldPos.z);
             }
         } else {
-            // A clip wider than the chunk is deliberate for the features that have one, so what
-            // falls outside belongs to a neighbour and has to be deferred. Masking it back in
-            // wrapped the far end of a fossil onto its own chunk's west edge.
             chunk.setDecorationBlockStateId(entry.worldPos.x, entry.worldPos.y, entry.worldPos.z, finalStateId,
                                             std::nullopt, true);
         }

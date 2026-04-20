@@ -61,7 +61,7 @@ void ContainerMenuController::recomputeGrindstoneResult() {
 }
 
 void ContainerMenuController::takeGrindstoneResult(PlayerSession& session) {
-    // parity: `GrindstoneMenu.ResultSlot.onTake`: both inputs go, the experience comes out of the
+    // parity: `GrindstoneMenu.ResultSlot.onTake`.
     // block as orbs and the stone grinds. Whoever took it gets nothing directly.
     static_cast<void>(session);
     const std::int32_t half = (grindstoneWorth_ + 1) / 2;

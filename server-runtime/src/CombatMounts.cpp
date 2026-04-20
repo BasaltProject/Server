@@ -173,7 +173,7 @@ void CombatHandler::rideMount(PlayerSession& session, ServerEntity& horse) {
 }
 
 bool CombatHandler::openMountInventory(PlayerSession& session, ServerEntity& horse) {
-    // parity: `openCustomInventoryScreen`: a camel's always, the others tame and with nobody else on.
+    // parity: `openCustomInventoryScreen`.
     const bool riding = std::ranges::find(horse.passengerIds, session.entityId()) != horse.passengerIds.end();
     if (!horses::isCamel(horse.type()) && ((!horse.passengerIds.empty() && !riding) || !horses::tamed(horse))) {
         return false;
@@ -211,7 +211,7 @@ bool CombatHandler::interactMount(PlayerSession& session, ServerEntity& horse, b
         }
         return true;
     };
-    // parity: `Equippable.equipOnTarget` for a saddle, which takes the item even from a creative hand.
+    // parity: `Equippable.equipOnTarget` for a saddle.
     const auto equipSaddle = [&] {
         if (!item.has_value() || horses::wearableFor(horse, *item) != horses::Wearable::Saddle ||
             horses::saddled(horse) || horse.health <= 0.0) {
@@ -248,7 +248,7 @@ bool CombatHandler::interactMount(PlayerSession& session, ServerEntity& horse, b
     if (path == "skeleton_horse" && !horses::tamed(horse)) {
         return true;
     }
-    // parity: `Horse`, `ZombieHorse` and `AbstractChestedHorse.mobInteract`, ahead of the shared one.
+    // parity: `Horse`.
     const bool shouldOpen = !baby && horses::tamed(horse) && session.sneaking;
     const bool dandelion = item.has_value() && item->path() == "golden_dandelion";
     if (path != "skeleton_horse" && !vehicle && !shouldOpen && (!baby || !dandelion) && item.has_value()) {
@@ -314,7 +314,7 @@ void CombatHandler::handleRidingCommand(wire::protocol::play::PlayerCommandPacke
         return;
     }
     if (horses::isCamel(vehicle->type())) {
-        // parity: `Camel.canJump` and `handleStartJump`: the dash sound, `ENTITY_ACTION` and `DASH`.
+        // parity: `Camel.canJump` and `handleStartJump`.
         if (entity::camels::refusesToMove(entity::camels::stateOf(*vehicle), world->gameTime())) {
             return;
         }

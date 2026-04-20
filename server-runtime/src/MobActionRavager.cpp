@@ -44,7 +44,6 @@ void sendEvent(const std::vector<PlayerSession*>& watchers, const ServerEntity& 
     }
 }
 
-/// Whether a box at those feet reaches into the ravager's box grown by the roar's reach.
 [[nodiscard]] bool inRoar(const ServerEntity& ravager, double x, double y, double z, double width, double height) {
     const double half = (ravager.width() / 2.0) + kRoarReach + (width / 2.0);
     return std::abs(x - ravager.x) < half && std::abs(z - ravager.z) < half && y + height > ravager.y - kRoarReach &&
@@ -73,8 +72,7 @@ void MobActionSystem::tickRavager(world::LoadedWorld& world, const std::vector<P
     if (turn != entity::shieldBlows::RavagerTurn::Roars) {
         return;
     }
-    // parity: `Ravager.roar`: hurts all but illagers, shoves all but players, and whether armour
-    // stands count hangs on `mobGriefing`.
+    // parity: `Ravager.roar`.
     const bool griefing = world.gameRules().get(world::gameRules::kMobGriefing);
     for (ServerEntity* other : world.state().entities()) {
         if (other == &ravager || other->removed || other->dying || other->type().path() == "ravager" ||

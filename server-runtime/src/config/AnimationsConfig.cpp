@@ -12,12 +12,10 @@ using wire::common::placeholder::lowercaseAscii;
 using wire::common::toml::TomlTable;
 
 const std::string& Animation::frameAt(std::int64_t epochMillis) const {
-    // A still picture, which the arithmetic below would also answer: this only says so plainly.
     if (frames.size() == 1) {
         return frames.front();
     }
-    // The clock decides, not a counter: everyone looking at it sees the same frame, and a player
-    // who reconnects does not restart it.
+    // The clock decides, not a counter: everyone sees the same frame and a reconnect does not restart it.
     const std::int64_t step = (epochMillis / changeIntervalMillis) % static_cast<std::int64_t>(frames.size());
     return frames[static_cast<std::size_t>(step)];
 }

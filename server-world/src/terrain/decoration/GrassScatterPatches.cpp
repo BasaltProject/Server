@@ -29,7 +29,6 @@ constexpr std::int32_t kPumpkinIndex = 85;
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
-/// The shape both patches share: a scatter of candidates that only take on a grass block.
 void scatterOnGrass(PatchRegion& region, random::RandomSource& random, const DecorationPos& origin,
                     std::int32_t attempts, std::int32_t stateId, ChunkHeight bounds) {
     for (std::int32_t attempt = 0; attempt < attempts; ++attempt) {

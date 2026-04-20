@@ -9,7 +9,7 @@
 
 namespace basalt::server::runtime::entity::enderDragon {
 
-/// parity: `Mth.atan2`, which is not libm's and turns a dragon by slightly different amounts.
+/// parity: `Mth.atan2`.
 [[nodiscard]] double vanillaAtan2(double y, double x);
 
 /// parity: `Mth.wrapDegrees`, with Java's remainder.
@@ -17,14 +17,12 @@ namespace basalt::server::runtime::entity::enderDragon {
 
 [[nodiscard]] double wrapDegrees(double degrees) noexcept;
 
-/// Lays out the 24 nodes the first time a dragon asks. `heightNoLeaves` is the column's
-/// `MOTION_BLOCKING_NO_LEAVES` height.
 void buildNodes(DragonState& state, const std::function<std::int32_t(std::int32_t x, std::int32_t z)>& heightNoLeaves);
 
 /// parity: `EnderDragon.findClosestNode(x, y, z)`.
 [[nodiscard]] std::int32_t closestNode(const DragonState& state, double x, double y, double z, bool crystalsLeft);
 
-/// parity: `EnderDragon.findPath`, an A* over the node graph that may end on one extra node.
+/// parity: `EnderDragon.findPath`.
 [[nodiscard]] std::optional<Path> findPath(DragonState& state, std::int32_t startIndex, std::int32_t endIndex,
                                            std::optional<std::array<std::int32_t, 3>> finalNode, bool crystalsLeft);
 

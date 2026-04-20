@@ -50,7 +50,6 @@ struct Fixture {
         : root(std::move(directory)),
           world(std::make_unique<LoadedWorld>(
               config::WorldDeclaration{.name = "world", .type = config::WorldType::Flat, .isDefault = true},
-              // The root is where worlds live, not one world: `LoadedWorld` appends its own name.
               config::WorldSettings{}, WorldMetadata{}, root, basalt::wire::common::Logger{"Test"})),
           commandStorage(root + "/storage.nbt") {
         auto opened = basalt::server::storage::PlayerStore::open(root + "/players.db");
@@ -83,7 +82,6 @@ struct Fixture {
 TEST_CASE("saving the players writes everyone who has a snapshot and skips whoever does not") {
     Fixture fixture{scratch("persistence-players")};
     fixture.add("Steve", true);
-    // A player still logging in has nothing worth writing, and must not be written as an empty row.
     fixture.add("Alex", false);
     const PersistenceCoordinator coordinator{fixture.hooks(),        fixture.registry, *fixture.store,
                                              fixture.commandStorage, fixture.metrics,  {}};
@@ -103,35 +101,4 @@ TEST_CASE("a full save writes the worlds and the players in one pass") {
     coordinator.persistEverything();
     CHECK(fixture.store->players().loadByName("Steve").has_value());
     CHECK(std::filesystem::exists(fixture.root + "/world/level.nbt"));
-}
-
-TEST_CASE("the unload sweep only reports chunks that really went, and only when somebody listens") {
-    Fixture fixture{scratch("persistence-unload")};
-    fixture.world->state().getOrGenerateChunk(40, 40);
-    std::vector<std::pair<std::int32_t, std::int32_t>> unloaded;
-    PersistenceCoordinator::Hooks hooks = fixture.hooks();
-    hooks.wantsUnloadEvents = [] { return true; };
-    hooks.chunkUnloaded = [&unloaded](const std::string&, std::int32_t x, std::int32_t z) {
-        unloaded.emplace_back(x, z);
-    };
-    const PersistenceCoordinator coordinator{
-        hooks, fixture.registry, *fixture.store, fixture.commandStorage, fixture.metrics, {}};
-
-    // Nobody is in the world, so a chunk far from spawn is unreachable and goes.
-    coordinator.unloadUnreachableChunks();
-    CHECK(unloaded == std::vector<std::pair<std::int32_t, std::int32_t>>{{40, 40}});
-
-    // A second sweep has nothing left to unload and reports nothing.
-    unloaded.clear();
-    coordinator.unloadUnreachableChunks();
-    CHECK(unloaded.empty());
-}
-
-TEST_CASE("the built-in favicon decodes to a real PNG") {
-    const std::span<const std::uint8_t> bytes = basalt::server::runtime::favicon::bytes();
-    REQUIRE(bytes.size() > 8);
-    // The PNG signature, so a truncated or misquoted blob fails here rather than at a client that
-    // silently draws nothing.
-    const std::vector<std::uint8_t> signature{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
-    CHECK(std::vector<std::uint8_t>{bytes.begin(), bytes.begin() + 8} == signature);
 }

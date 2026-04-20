@@ -74,34 +74,21 @@
 
 namespace basalt::server::runtime {
 
-/// A thread-per-connection server covering handshake, status, login, configuration and play.
-///
-/// The generator, the router and the surface environment stay optional so a protocol test needs no
-/// `server.jar`.
 class BasaltServer {
 public:
-    /// parity: the jar decorates the spawn 3x3 first and everything after it in plain raster,
-    /// measured on seed 11. Preparing more than that square puts chunks in front of the ones that
-    /// asked for them, and their neighbours then read a world the jar had not built yet.
     static constexpr std::int32_t kSpawnRadiusChunks = 1;
 
     struct Options {
-        /// The operator's own jar. Null in a test that never breaks a block in survival.
+        /// Null in a test that never breaks a block in survival.
         assets::ServerJarAssets* serverJar = nullptr;
-        /// The data packs everything reads through. Null in a test, which reads the jar alone.
         datapack::DataPacks* datapacks = nullptr;
         world::VanillaWorldGeneratorFactory* generators = nullptr;
-        /// Online mode's own key pair and session service, or null for offline mode.
         const wire::auth::SessionKeyPair* keyPair = nullptr;
         wire::auth::SessionService* sessionService = nullptr;
-        /// Mojang's public keys, which a chat session is checked against. Online mode only.
         const wire::auth::ServicesKeySet* servicesKeys = nullptr;
-        /// Which client versions may in. Read once: it decides what a connection is before there
-        /// is a player, so it is not one of the files a reload swaps.
         config::CompatibilityConfig compatibility{config::BackwardsSelection{},
                                                   wire::multiversion::UnknownProtocolPolicy::Refuse,
                                                   wire::multiversion::UnknownProtocolPolicy::Refuse};
-        /// Where `plugins/` is: the working directory on a real server, under `build/` in a test.
         std::string pluginsRoot = ".";
         std::string playersDatabasePath = "players.db";
         std::string worldsRoot = "worlds";
@@ -117,60 +104,40 @@ public:
     BasaltServer& operator=(BasaltServer&&) = delete;
     ~BasaltServer();
 
-    /// Whether this instance stopped in order to be replaced by a fresh one in the same process.
     [[nodiscard]] bool shouldRestart() const noexcept { return restarting_.load(); }
 
     [[nodiscard]] server::plugins::PluginHost& plugins() noexcept { return *plugins_; }
 
     [[nodiscard]] command::CommandDispatcher* commands() const noexcept { return wired_.dispatcher.get(); }
 
-    /// Binds the port, brings the plugins up, starts the tick loop and accepts until it is stopped.
     void start(std::chrono::steady_clock::time_point startedAt = std::chrono::steady_clock::now());
 
-    /// Disconnects everyone, stops the tick loop, drains the queues, then saves once: saving while
-    /// still live may never finish, since connected players keep generating more to save.
     void shutdown();
 
-    /// Stops this instance so a fresh one can take its place **in the same process**.
-    ///
-    /// Nothing is re-executed and no new process is spawned: everything this instance owns is wound
-    /// down exactly as a stop winds it down, and the caller then builds another one.
     void requestRestart();
 
 private:
-    /// Everything the world itself owes per tick, plus the termination check.
-    /// `worldRuns` is false on a turn `/tick freeze` is holding. Then only the queued tasks run, so
-    /// the console keeps working, and nothing that belongs to the world's clock moves.
     void tickWorlds(bool worldRuns);
 
-    /// Opens the Bedrock door, if the operator left it open. Never fatal: a taken port costs that
-    /// door and nothing else.
     void startBedrockListener();
 
-    /// Ticks the entities that are not players, items or falling blocks.
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
 
-    /// parity: the sculk catalyst's `CatalystListener` on a death. Answers whether it took the
-    /// experience, so none drops.
+    /// parity: the sculk catalyst's `CatalystListener` on a death.
     bool drinkBySculk(world::LoadedWorld& world, const entity::ServerEntity& dead);
-    /// parity: `WorldDataConfiguration.enabledFeatures`, `minecraft:vanilla` without data packs.
+    /// parity: `WorldDataConfiguration.enabledFeatures`.
     [[nodiscard]] std::vector<std::string> enabledFeatures() const;
     /// parity: `AbstractMinecart.useExperimentalMovement`.
     [[nodiscard]] bool minecartImprovements() const;
-    /// parity: `LivingEntity.die` runs on the tick of the damage; here a kill leaves a flag, so this runs
-    /// after the queued commands (vanilla's command phase, all `/tick freeze` lets run) and again after
-    /// entities move, where a mob killed by another dies.
+    /// parity: `LivingEntity.die`.
     void tickDeaths(world::LoadedWorld& world, const sched::Region& region);
 
-    /// The objectives the server keeps itself: deaths, kills, health, food, air, armour and
-    /// experience. parity: `ServerPlayer.doTick`, `die` and `awardKillScore`.
+    /// parity: `ServerPlayer.doTick`, `die` and `awardKillScore`.
     void tickScoreCriteria();
 
-    /// Applies `update` to every objective of `criterion` for `holder`, telling whoever shows it.
     void updateCriterion(std::string_view criterion, std::string_view holder,
                          const std::function<std::int32_t(std::int32_t)>& update);
 
-    /// One turn of a boat and whoever it takes aboard or throws off.
     void tickBoat(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& boat);
 
@@ -180,42 +147,29 @@ private:
     /// parity: `ServerPlayer.awardKillScore`.
     void awardKillScore(player::PlayerSession& killer, const std::string& victim, bool victimIsPlayer);
 
-    /// A mob a player killed, waiting for the scoring pass: killer uuid and the mob's holder name.
     struct PendingKill {
         wire::common::Uuid killer;
         std::string victim;
         wire::common::Identifier victimType;
-        /// What `player_killed_entity` reads: the victim and the blow that killed it.
         server::world::loot::EntityFacts victimFacts;
         world::TriggerDamage killingBlow;
     };
 
-    /// parity: `TntBlock.prime` makes the entity inside the neighbour update that lit the block, so
-    /// the fuse and its `PRIME_FUSE` land on that turn. Queued because the block half can run on a
-    /// client's thread; drained here, before the world's own turn.
+    /// parity: `TntBlock.prime`.
     void tickPrimedTnt(world::LoadedWorld& world);
 
-    /// The bridge between a signal and an orderly stop: the handler only sets a flag, and this is
-    /// what notices, once per tick.
     void shutdownIfSignalled();
 
-    /// Watches for a plugin that went into the server and did not come back.
     void startPluginWatchdog();
 
-    /// Names the plugins that left data behind, once, at startup. Nothing is deleted.
     void reportOrphanedPluginData();
 
-    /// Keeps the caller alive while the shutdown finishes on another thread.
     void awaitShutdown();
 
-    /// One session, on its own thread, with everything this server hands a connection.
     void serveConnection(wire::io::TcpConnection connection);
 
-    /// Everything a connection shows a plugin, built once per connection. Unset hooks mean nobody
-    /// objects, which is what a server with the plugins switched off hands every session.
     [[nodiscard]] ClientSession::PluginHooks pluginHooks();
 
-    /// The loaded worlds in the shape commands look them up in.
     [[nodiscard]] std::map<std::string, world::LoadedWorld*, std::less<>> namedWorlds() const;
 
     const config::BasaltConfig* config_;
@@ -225,79 +179,62 @@ private:
     wire::common::Logger logger_{"Server"};
 
     player::PlayerRegistry playerRegistry_;
-    /// Built once from the configuration and what this build can translate.
     wire::multiversion::ProtocolGate protocolGate_;
-    /// Null when the operator turned the naming off, which the rewriter reads as "leave it".
     std::unique_ptr<SubstituteLabels> substitutionLabels_;
-    /// Player-shaped entities a plugin made, drawn by every connection that may see them.
     plugins::NpcRegistry npcs_;
     ServerMetrics metrics_;
     CpuMeter cpuMeter_;
-    /// What hurting or healing a player needs, whichever door they came in by.
     [[nodiscard]] player::DamageContext damageContext();
 
-    /// What breaking a block needs, whichever door the breaker came in by.
     [[nodiscard]] player::BreakContext breakContext();
 
-    /// What a melee blow needs, over `blocks` for the wear it causes, whichever door it came by.
     [[nodiscard]] player::pvp::Context meleeContext(const player::BreakContext& blocks);
 
-    /// A Bedrock player's blow on another player. parity: `Player.attack` on a `ServerPlayer`.
+    /// parity: `Player.attack` on a `ServerPlayer`.
     void bedrockAttackPlayer(player::PlayerSession& session, player::PlayerSession& victim, world::LoadedWorld& world,
                              bool falling);
 
-    /// The recipe book as the other door reads it, built the first time it is asked for: the list
-    /// is the same for everyone and costs a walk of every recipe to build.
     [[nodiscard]] const bedrock::BedrockRecipeList& bedrockRecipeBook();
 
-    /// What the recipe with that number makes, which is the only thing a craft asks for.
     [[nodiscard]] std::optional<storage::StoredItemStack> bedrockRecipeResult(std::int32_t netId);
 
-    /// Tells a world that one more, or one fewer, is looking into the block that window belongs to.
     void openersChanged(world::LoadedWorld& world, const bedrock::OpenWindow& window, bool opened);
 
-    /// Rolls what the open enchanting table offers this player and leaves it in their window, for
-    /// the door whose screen reads the rows out of a packet rather than out of the window.
     void rollBedrockEnchantment(player::PlayerSession& session, world::LoadedWorld& world,
                                 bedrock::BedrockWindows& windows);
 
-    /// What the data is read through: the selected packs, or the jar alone without them.
     [[nodiscard]] VanillaGameData::Jar dataJar() const;
 
     [[nodiscard]] std::unique_ptr<command::commands::FunctionRunner> makeFunctionRunner(std::int32_t permissionLevel);
 
-    /// parity: the `scheduled_events` saved data, kept beside the default world's `level.nbt`.
+    /// parity: the `scheduled_events` saved data.
     [[nodiscard]] std::string schedulePath() const;
     void saveSchedule() const;
 
-    /// Compiles every function against the command tree, which is why it waits for the tree.
     void loadFunctions();
 
-    /// parity: `MinecraftServer.reloadResources`. Answers whether the selection loaded.
+    /// parity: `MinecraftServer.reloadResources`.
     bool reloadData(const std::vector<std::string>& selected);
 
     /// parity: `ServerFunctionManager.tick` and the scheduled functions of `TimerQueue`.
     void tickFunctions();
 
-    /// Tells every player what a reload changed. parity: `PlayerList.reloadResources`.
+    /// parity: `PlayerList.reloadResources`.
     void resyncAfterReload();
 
-    /// Builds the advancement sync and wires rewards, loot and functions into the trigger hooks.
     void addAdvancementHooks(world::AdvancementTriggers::Hooks& hooks);
 
-    /// parity: `AdvancementRewards.grant`'s loot: into the inventory, the rest at the player's feet.
+    /// parity: `AdvancementRewards.grant`'s loot.
     void awardAdvancementLoot(std::string_view uuid, const std::vector<wire::common::Identifier>& tables);
 
     /// parity: `ServerPlayer.tick`'s `flushDirty`, for every player.
     void flushAdvancements();
 
-    /// The advancement packets reach native clients only: an older one reads another layout.
     void sendAdvancementPacket(const player::PlayerSession& player, std::int32_t id,
                                const std::function<void(wire::io::ByteBuffer&)>& write) const;
 
     VanillaGameData vanillaData_;
     ChunkSimulationView chunkSimulation_;
-    /// What a mob spawns holding, out of the operator's own jar.
     std::unique_ptr<world::SpawnEquipmentFinalizer> spawnEquipment_;
     wire::common::Timings timings_;
     std::chrono::steady_clock::time_point serverClock_ = std::chrono::steady_clock::now();
@@ -325,9 +262,7 @@ private:
     std::unique_ptr<PersistenceCoordinator> persistence_;
     std::unique_ptr<command::commands::SaveControl> saveControl_;
 
-    /// What `/setidletimeout` last set. Recorded and reported; nothing disconnects on it yet.
     std::int32_t idleTimeoutMinutes_ = 0;
-    /// `server.toml` decides what the whitelist starts as, so a restart follows the file again.
     bool whitelistEnforced_ = false;
 
     WiredCommands wired_;
@@ -344,10 +279,8 @@ private:
 
     std::unique_ptr<BlockChangeBroadcaster> broadcaster_;
     std::unique_ptr<ExplosionSystem> explosions_;
-    /// Built the first time a Bedrock client asks for it, and the same for every one after.
     std::optional<bedrock::BedrockRecipeList> bedrockRecipes_;
     std::unique_ptr<NaturalSpawningSystem> spawning_;
-    /// The monster spawner, for the block and the minecart alike.
     std::unique_ptr<MobSpawnerSystem> mobSpawners_;
     std::unique_ptr<ExperienceOrbSystem> orbs_;
     std::unique_ptr<FishingSystem> fishing_;
@@ -377,12 +310,9 @@ private:
     std::string difficulty_ = "easy";
 
     std::optional<wire::io::TcpListener> listener_;
-    /// The Bedrock door, when the operator left it open. Its own socket and its own thread.
     std::unique_ptr<bedrock::BedrockListener> bedrockListener_;
     std::atomic<bool> accepting_{true};
-    /// Guards against running the shutdown twice: a stop command and a signal can arrive together.
     std::atomic<bool> shuttingDown_{false};
-    /// Set once the shutdown has finished its last write, so the caller knows it is safe to proceed.
     std::atomic<bool> shutdownComplete_{false};
     std::atomic<bool> restarting_{false};
     std::vector<std::jthread> connections_;

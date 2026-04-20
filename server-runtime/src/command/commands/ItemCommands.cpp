@@ -28,8 +28,7 @@ using wire::text::Component;
 
 constexpr auto kRadians = static_cast<float>(std::numbers::pi / 180.0);
 
-/// parity: `Player.drop(stack, false)`, a toss straight ahead from under the eyes, which `/give`
-/// then lets anybody pick up at once.
+/// parity: `Player.drop(stack, false)`, a toss straight ahead from under the eyes.
 void dropAtFeet(const CommandContext& context, const player::PlayerSession& target,
                 const storage::StoredItemStack& stack) {
     const auto& worlds = context.environment().options().worlds;
@@ -96,7 +95,7 @@ void GiveCommand::build(const CommandNodeBuilder& root) const {
                 ", which no client can draw yet: it is stored and saved, but the tooltip will not show it."));
         }
 
-        // parity: `GiveCommand.giveItem`: a hundred stacks at most, handed over one stack at a time.
+        // parity: `GiveCommand.giveItem`.
         const std::int32_t maxStack = reg::itemStacking::maxStackSize(item->id, parsed->components);
         if (count > maxStack * 100) {
             return std::unexpected{CommandSyntaxError{
@@ -173,8 +172,6 @@ namespace {
                 continue;
             }
             if (remaining == 0) {
-                // maxCount 0 is vanilla's "count only" form: nothing is taken, but everything that
-                // would have been is still counted.
                 cleared += stack->count;
                 continue;
             }

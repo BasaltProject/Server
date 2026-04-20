@@ -132,7 +132,7 @@ void MobActionSystem::tickCamel(world::LoadedWorld& world, entity::ai::MobContex
         --state.temptation.cooldown;
     }
     kit::lookAround(context, state.look, state.gazeCooldown, 150, 250, 30.0F);
-    // parity: the idle `RunOne` of a stroll, a walk to its look target, sitting and doing nothing.
+    // parity: the idle `RunOne` of a stroll.
     if (state.idleTicks > 0) {
         --state.idleTicks;
     } else if (!state.motion.walk.has_value()) {

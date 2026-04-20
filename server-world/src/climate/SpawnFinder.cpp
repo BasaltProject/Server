@@ -19,9 +19,7 @@ struct Candidate {
     std::int64_t fitness = 0;
 };
 
-/// parity: `getSpawnPositionAndFitness`. The sample is taken at y 0 and its depth is then
-/// **overwritten with zero**, so the target's own depth span is what decides, not the terrain's. The
-/// distance to the origin is added afterwards, scaled so that climate always outranks it.
+/// parity: `getSpawnPositionAndFitness`.
 [[nodiscard]] Candidate fitnessAt(const Sampler& sampler, const std::vector<ParameterPoint>& targets,
                                   std::int32_t blockX, std::int32_t blockZ) {
     const TargetPoint sampled = sampler.sample(blockX >> 2, 0, blockZ >> 2);
@@ -45,8 +43,7 @@ struct Candidate {
     Candidate best = from;
     float angle = 0.0F;
     float radius = increment;
-    // parity: the spiral is anchored where this search *started*, not where it is winning, so
-    // improving mid-spiral does not drag the remaining samples along with it.
+    // parity: the spiral is anchored where this search *started*, not where it is winning, so improving mid-spiral.
     const std::int32_t originX = from.x;
     const std::int32_t originZ = from.z;
     while (radius <= maxRadius) {

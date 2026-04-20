@@ -8,15 +8,11 @@
 
 namespace basalt::server::world::terrain {
 
-/// A chunk column's final density, sampled once as vanilla's `NoiseChunk` samples it: the whole
-/// volume through the volume path, with its own cached sampler context and no beardifier unless one
-/// is given.
 class DensityChunkSampler {
 public:
     DensityChunkSampler(const NoiseRouter& router, std::int32_t chunkX, std::int32_t chunkZ,
                         densityfunction::Sampler beardifier = nullptr);
 
-    /// `localX` and `localZ` are chunk-local; `y` is a world y within the router's noise height.
     [[nodiscard]] double sample(std::int32_t localX, std::int32_t y, std::int32_t localZ) const;
 
     [[nodiscard]] std::int32_t minY() const noexcept { return minY_; }

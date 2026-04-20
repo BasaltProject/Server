@@ -7,9 +7,7 @@
 
 namespace basalt::server::assets::langAssets {
 namespace {
-
 constexpr std::string_view kLangPrefix = "assets/minecraft/lang/";
-
 } // namespace
 
 std::expected<wire::text::LangTable, AssetError> load(const std::string& jarPath, std::string_view locale) {
@@ -44,5 +42,4 @@ wire::text::LangTable loadCachedOrEmpty(const std::string& versionDir, std::stri
     const std::expected<wire::text::LangTable, wire::common::JsonError> table = wire::text::parseLangTable(*content);
     return table.has_value() ? *table : wire::text::LangTable{};
 }
-
 } // namespace basalt::server::assets::langAssets

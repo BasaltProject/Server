@@ -36,7 +36,6 @@ using wire::nbt::NbtTag;
     return values;
 }
 
-/// Everything a feature pack could turn on, which is what a new world may ask for.
 [[nodiscard]] const std::vector<Identifier>& allFeatures() { return knownFeatures(); }
 
 } // namespace
@@ -121,8 +120,7 @@ DataPackConfig selectedPacks(const PackRepository& repository, bool disableInact
 
 namespace {
 
-/// parity: `enableForcedFeaturePacks`: a feature the world has that no selected pack provides pulls
-/// in the feature pack that does.
+/// parity: `enableForcedFeaturePacks`.
 void enableForcedFeaturePacks(PackRepository& repository, const std::vector<Identifier>& forced,
                               const wire::common::Logger& logger) {
     std::vector<Identifier> missing;

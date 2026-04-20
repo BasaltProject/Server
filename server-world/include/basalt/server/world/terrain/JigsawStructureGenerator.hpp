@@ -22,34 +22,24 @@
 namespace basalt::server::world::terrain {
 
 /// Where a start sits and what the assembly calls its heightmap. parity: the `start_height` of a
-/// `JigsawStructure`, plus whether the whole thing is projected onto the surface afterwards.
 enum class JigsawHeightSource : std::uint8_t {
-    /// The real terrain, walked down from the top of the world.
     Surface,
-    /// One y for the start and for every child that asks, drawing nothing.
     Fixed,
-    /// A uniform y in a range, which costs one draw before the assembly's own.
     Drawn,
 };
 
-/// Which chunk a recorded start belongs to, or that this structure records none.
 enum class JigsawStartRecords : std::uint8_t { None, FromCandidate, FromFirstPiece };
 
-/// Everything one jigsaw structure differs from another by.
 struct JigsawStructureSettings {
     std::string name;
-    /// Its index within its generation step, and which step that is.
     std::int32_t structureIndex = 0;
     std::int32_t step = 0;
     std::string startPool;
-    /// The jigsaw block the start piece is anchored by, such as the ancient city's `city_anchor`.
     std::string startJigsawName;
     std::int32_t maxDepth = 0;
     std::int32_t maxDistanceFromCenter = 0;
 
-    /// parity: one `pool_aliases` binding. `Random` picks one target for its alias; `RandomGroup`
-    /// picks one group and takes every direct binding in it, which is how the trial chamber keeps
-    /// `ranged` and `slow_ranged` on the same mob.
+    /// parity: one `pool_aliases` binding.
     struct PoolAlias {
         enum class Kind : std::uint8_t { Random, RandomGroup };
         Kind kind = Kind::Random;
@@ -58,14 +48,12 @@ struct JigsawStructureSettings {
         std::vector<std::vector<std::pair<std::string, std::string>>> groups;
     };
 
-    /// Resolved once per start, in this order: the draws they make are part of the world's sequence.
     std::vector<PoolAlias> poolAliases;
     /// parity: `JigsawStructure`'s `dimension_padding`, non-zero only for the trial chamber.
     std::int32_t dimensionPadding = 0;
     bool useExpansionHack = false;
     bool projectStartToHeightmap = false;
     JigsawHeightSource heightSource = JigsawHeightSource::Surface;
-    /// The start's own y. For `Drawn` it is the low end of the range.
     std::int32_t startY = 0;
     std::int32_t startYMax = 0;
     TerrainAdjustment adjustment = TerrainAdjustment::BeardThin;
@@ -75,9 +63,7 @@ struct JigsawStructureSettings {
     std::size_t cacheCapacity = 32;
 };
 
-/// The four jigsaw structures of the Overworld, which are one generator with different settings:
-/// the pillager outpost, the trail ruins, the ancient city and the trial chamber. parity:
-/// `JigsawStructure`, whose own differences are exactly the datapack fields above.
+/// the pillager outpost, the trail ruins, the ancient city and the trial chamber.
 class JigsawStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;
@@ -90,38 +76,26 @@ public:
                              std::set<std::string, std::less<>> biomes, PoolLookup poolLookup,
                              structure::PoolTemplateLoader templateLoader);
 
-    /// The structure this generator makes, without its namespace.
     [[nodiscard]] const std::string& name() const noexcept { return settings_.name; }
 
-    /// Cached candidate count and their total placed pieces, for the timings memory breakdown.
     [[nodiscard]] std::pair<std::size_t, std::int64_t> assemblyStats() const;
 
     void generateInto(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
-    /// Adds this chunk's pieces and junctions to the chunk's one beardifier.
     void addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
-    /// The nearest chunk holding a start, searched outward over the grid's own cells. `skip` passes
-    /// over a start somebody already claimed.
     [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>>
     locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ,
            std::int32_t maxCells = kDefaultSearchCells,
            const std::function<bool(std::int32_t, std::int32_t)>& skip = {});
 
-    /// parity: `PlaceCommand.placeStructure`: assembles the start at a chunk the grid did not pick,
-    /// skipping the grid check and the biome acceptance, as vanilla's `Structure.generate` with an
-    /// always-true biome predicate does. Not cached: the answer differs from worldgen's at a chunk
-    /// the biome would refuse.
+    /// parity: `PlaceCommand.placeStructure`.
     [[nodiscard]] std::optional<std::vector<structure::PlacedStructurePiece>>
     assembleAt(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
-    /// The union of what `assembleAt` at this chunk would place, which is what a placed start's
-    /// bounding box covers.
     [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
                                                                                std::int32_t chunkZ);
 
-    /// Writes the part of the start assembled at (chunkX, chunkZ) that lands in `chunk`, reusing
-    /// `assembleAt` so a placed structure is the assembled one.
     void placeAt(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
 private:
@@ -134,7 +108,6 @@ private:
     };
 
     using Start = std::pair<CandidateKey, const std::vector<structure::PlacedStructurePiece>*>;
-    /// One sampler per chunk column, kept for the length of a single candidate's assembly.
     using Samplers = std::map<std::int64_t, DensityChunkSampler>;
 
     [[nodiscard]] structure::StructureBoundingBox chunkClip(std::int32_t chunkX, std::int32_t chunkZ,
@@ -143,13 +116,9 @@ private:
     [[nodiscard]] std::vector<Start> nearbyStarts(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
                                                   const structure::StructureBoundingBox& clip);
 
-    /// Shared rather than borrowed: the cache is cleared when it fills, and a reference into it
-    /// would dangle as soon as another worker triggered that mid-read.
     [[nodiscard]] std::shared_ptr<const std::vector<structure::PlacedStructurePiece>>
     assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ, std::int64_t seed);
 
-    /// The assembly itself, shared by the cached worldgen path and the uncached `/place` path.
-    /// `forPlacement` skips the grid check and accepts any biome.
     [[nodiscard]] std::vector<structure::PlacedStructurePiece>
     buildStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ, std::int64_t seed, bool forPlacement);
 
@@ -169,9 +138,6 @@ private:
     std::map<CandidateKey, std::shared_ptr<const std::vector<structure::PlacedStructurePiece>>> cache_;
 };
 
-/// The four settings the Overworld's jigsaw structures use, and the fixed grids three of them have.
-/// The pillager outpost's grid is built by the caller: it carries an exclusion zone naming the
-/// village grid, which cannot be stated without it.
 namespace jigsawStructures {
 
 [[nodiscard]] const JigsawStructureSettings& pillagerOutpost();

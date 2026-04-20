@@ -1,5 +1,3 @@
-// Generated from the real 26.3 server jar. Regenerate rather than edit: every number here is a
-// fact about the game, not a decision.
 
 #include <basalt/server/registry/VanillaEntries.hpp>
 
@@ -7,7 +5,6 @@
 
 namespace basalt::server::registry {
 namespace {
-
 constexpr std::array<BlockMovementEntry, 24> kBlockMovementTable = {{
     {"black_bed", 0.6F, 1.0F, 1.0F, 0.75F},      {"blue_bed", 0.6F, 1.0F, 1.0F, 0.75F},
     {"blue_ice", 0.989F, 1.0F, 1.0F, 0.0F},      {"brown_bed", 0.6F, 1.0F, 1.0F, 0.75F},
@@ -4147,7 +4144,6 @@ constexpr std::array<ToolRule, 73> kItemToolsTable = {{
     {"wooden_sword", "minecraft:sword_instantly_mines", false, 3.4028235E38F},
     {"wooden_sword", "minecraft:sword_efficient", false, 1.5F},
 }};
-
 } // namespace
 
 std::span<const BlockMovementEntry> blockMovementTable() { return kBlockMovementTable; }
@@ -4163,5 +4159,4 @@ std::span<const ItemDurabilityEntry> itemDurabilityTable() { return kItemDurabil
 std::span<const EntityTypeShape> entityTypeShapesTable() { return kEntityTypeShapesTable; }
 
 std::span<const ToolRule> itemToolsTable() { return kItemToolsTable; }
-
 } // namespace basalt::server::registry

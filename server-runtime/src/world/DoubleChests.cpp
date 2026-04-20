@@ -61,8 +61,7 @@ std::optional<std::pair<Half, Half>> halves(WorldState& world, std::int32_t x, s
     if (type.empty() || type == "single" || facing.empty()) {
         return std::nullopt;
     }
-    // parity: `getConnectedDirection`: a left half looks clockwise for its partner, a right one
-    // counter-clockwise.
+    // parity: `getConnectedDirection`.
     const std::string towards = type == "left" ? clockwise(facing) : counterClockwise(facing);
     const Half partner{x + stepX(towards), y, z + stepZ(towards)};
     const std::optional<std::int32_t> partnerState = world.blockState(partner[0], partner[1], partner[2]);

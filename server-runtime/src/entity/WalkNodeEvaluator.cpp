@@ -28,7 +28,7 @@ constexpr double kJumpHeight = static_cast<double>(1.125F);
 /// parity: `Creaking.HomeNodeEvaluator.MAX_DISTANCE_TO_HOME_SQ`.
 constexpr double kHomeDistanceSquared = 1024.0;
 
-/// parity: `Direction.Plane.HORIZONTAL`: north, east, south, west, each the next one's anticlockwise.
+/// parity: `Direction.Plane.HORIZONTAL`.
 constexpr std::array<std::array<std::int32_t, 2>, 4> kHorizontal{{{0, -1}, {1, 0}, {0, 1}, {-1, 0}}};
 
 /// parity: `Node`, with the search's bookkeeping.
@@ -168,7 +168,6 @@ private:
     std::vector<SearchNode*> heap_;
 };
 
-/// One search: `WalkNodeEvaluator` between `prepare` and `done`, with the finder around it.
 class Search {
 public:
     Search(world::WorldState& world, const WalkMob& mob)
@@ -375,8 +374,7 @@ double Search::floorLevel(std::int32_t x, std::int32_t y, std::int32_t z) const 
 }
 
 bool Search::hasCollisions(const Aabb& box) {
-    // parity: `Level.noCollision(mob, box)`, inverted and remembered per box. `PathNavigationRegion`
-    // answers no entity collisions at all, so only the blocks and the border count.
+    // parity: `Level.noCollision(mob, box)`.
     const std::array<double, 6> key{box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ};
     if (const auto found = collisionCache_.find(key); found != collisionCache_.end()) {
         return found->second;
@@ -391,7 +389,7 @@ bool Search::borderStops(const Aabb& box) const {
         return false;
     }
     const auto [minX, minZ, maxX, maxZ] = *mob_->border;
-    // parity: `WorldBorder.isInsideCloseToBorder`: only a mob inside and near it meets it at all.
+    // parity: `WorldBorder.isInsideCloseToBorder`.
     const double xSize = box.maxX - box.minX;
     const double zSize = box.maxZ - box.minZ;
     const double margin = std::max(std::abs(xSize) > std::abs(zSize) ? xSize : zSize, 1.0);
@@ -402,8 +400,7 @@ bool Search::borderStops(const Aabb& box) const {
 }
 
 bool Search::blocksStop(const Aabb& box) const {
-    // parity: `BlockCollisions` walks a square further out, where only a large shape such as a
-    // sliding block can still reach in.
+    // parity: `BlockCollisions` walks a square further out.
     const auto low = [](double value) { return static_cast<std::int32_t>(std::floor(value - 1.0E-7)) - 1; };
     const auto high = [](double value) { return static_cast<std::int32_t>(std::floor(value + 1.0E-7)) + 1; };
     const std::int32_t x0 = low(box.minX);

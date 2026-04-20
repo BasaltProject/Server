@@ -12,19 +12,18 @@ class PlayerRegistry;
 
 namespace basalt::server::runtime {
 
-/// One boss bar and who is being shown it. parity: `ServerBossEvent`.
+/// parity: `ServerBossEvent`.
 class BossBarView {
 public:
     explicit BossBarView(wire::protocol::play::BossEventPacket::Add style);
 
     [[nodiscard]] float progress() const noexcept { return style_.progress; }
 
-    /// Shows the bar to whoever joined `players` and takes it from whoever left.
     void track(player::PlayerRegistry& registry, const std::set<std::int32_t>& players);
 
     void setProgress(player::PlayerRegistry& registry, float progress);
 
-    /// Takes the bar from everybody. parity: `ServerBossEvent.removeAllPlayers`.
+    /// parity: `ServerBossEvent.removeAllPlayers`.
     void clear(player::PlayerRegistry& registry);
 
 private:

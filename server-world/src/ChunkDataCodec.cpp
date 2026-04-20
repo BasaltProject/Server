@@ -18,7 +18,6 @@ namespace play = wire::protocol::play;
 
 constexpr std::size_t kBlocksPerSection = 16 * 16 * 16;
 constexpr std::size_t kBiomesPerSection = 4 * 4 * 4;
-/// One nibble per block: half a byte each, 4096 to a section.
 constexpr std::size_t kPackedSectionBytes = kBlocksPerSection / 2;
 
 [[nodiscard]] int ceilLog2(std::int32_t value) {
@@ -30,9 +29,6 @@ constexpr std::size_t kPackedSectionBytes = kBlocksPerSection / 2;
 }
 
 /// parity: `Strategy.globalPaletteBitsInMemory`, `ceillog2` of the registry size.
-///
-/// A flat 8 and 4 here truncated the ids of any section past an indirect palette, and the client
-/// reads eight bits as a palette, so it lost the rest of the chunk with them.
 [[nodiscard]] int blockDirectBits() {
     static const int bits = ceilLog2(registry::blocks::stateCount());
     return bits;
@@ -49,7 +45,6 @@ void writeBiomes(wire::io::ByteBuffer& buffer, const ChunkSection& section, std:
                                    play::palettedContainer::kBiomeMaxIndirectBits, biomeDirectBits());
 }
 
-/// Splits packed sections into the two masks and the arrays the packet carries.
 [[nodiscard]] std::tuple<std::vector<std::int64_t>, std::vector<std::int64_t>, std::vector<std::vector<std::uint8_t>>>
 masked(const Chunk::PackedLight* sections) {
     if (sections == nullptr || sections->empty()) {
@@ -85,16 +80,12 @@ masked(const Chunk::PackedLight* sections) {
 
 std::vector<std::uint8_t> encodeSections(const Chunk& chunk) {
     wire::io::ByteBuffer buffer;
-    // One scratch per expansion, shared across all sections: expanding each section into its own
-    // fresh array put roughly 400 KB of garbage behind every chunk sent.
     std::vector<std::int32_t> blockScratch(kBlocksPerSection);
     std::vector<std::int32_t> biomeScratch(kBiomesPerSection);
     for (std::size_t i = 0; i < chunk.sectionCount(); ++i) {
         const ChunkSection& section = chunk.section(i);
         buffer.writeShort(static_cast<std::int16_t>(section.nonAirBlockCount()));
-        // parity: LevelChunkSection.write always writes two shorts, the non-empty block count and
-        // then the fluid count, never just one: a real client overran the buffer reading the next
-        // section's data when this field was missing.
+        // parity: LevelChunkSection.write always writes two shorts, the non-empty block count and then the fluid.
         buffer.writeShort(static_cast<std::int16_t>(section.nonEmptyFluidCount()));
         section.copyBlockStateIdsInto(blockScratch);
         play::palettedContainer::write(buffer, blockScratch, play::palettedContainer::kBlockMinIndirectBits,
@@ -129,8 +120,6 @@ std::vector<std::int64_t> encodeHeightmap(const Chunk& chunk) {
 }
 
 LightData encodeLight(Chunk& chunk, bool hasSkylight, const light::LightWindow& window) {
-    // Held by value: what the chunk keeps is thrown away the moment a block moves, on another
-    // thread, and this one is about to spend a while turning it into a packet.
     std::optional<Chunk::PackedLight> sky;
     if (hasSkylight) {
         sky = chunk.skyLight([&window] { return packAll(light::skyLight::compute(window)); });

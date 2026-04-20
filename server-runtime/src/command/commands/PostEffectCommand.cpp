@@ -20,7 +20,7 @@ using wire::text::Component;
     return found == nullptr ? none : *found;
 }
 
-/// parity: `ServerPlayer.sendPostEffects`, the whole list, an empty one clearing the screen.
+/// parity: `ServerPlayer.sendPostEffects`.
 void send(const player::PlayerSession& player) {
     if (!player.connection().sendPlayPacket) {
         return;
@@ -30,7 +30,7 @@ void send(const player::PlayerSession& player) {
                                        [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
 }
 
-/// parity: `CommandResponseTracker`: fail when nobody changed, name the one, count the many.
+/// parity: `CommandResponseTracker`.
 [[nodiscard]] Parsed<std::int32_t> respond(const CommandContext& context, std::string_view verb,
                                            const std::vector<player::PlayerSession*>& changed,
                                            const std::optional<std::string>& effect) {
@@ -49,7 +49,6 @@ void send(const player::PlayerSession& player) {
     return static_cast<std::int32_t>(changed.size());
 }
 
-/// One change to every target that is a player, and the new list sent to each one it changed.
 template <typename Change>
 [[nodiscard]] Parsed<std::int32_t> change(const CommandContext& context, std::string_view verb,
                                           const std::optional<std::string>& effect, Change&& apply) {

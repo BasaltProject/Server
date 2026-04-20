@@ -16,7 +16,6 @@
 namespace basalt::server::runtime::entity::blockRay {
 namespace {
 
-/// A box inside its block, as min x, y, z then max x, y, z in blocks.
 using Box = std::array<double, 6>;
 
 constexpr double kUnits = registry::blockShapes::kUnits;
@@ -28,7 +27,7 @@ constexpr double kEdge = 1.0E-7;
 constexpr double kAboveSlack = static_cast<double>(1.0E-5F);
 
 constexpr Box kFullBlock{0.0, 0.0, 0.0, 1.0, 1.0, 1.0};
-/// parity: `ScaffoldingBlock.SHAPE_STABLE`: the top two sixteenths and the four corner legs.
+/// parity: `ScaffoldingBlock.SHAPE_STABLE`.
 constexpr std::array<Box, 5> kScaffoldStable{{{0.0, 14.0 / 16.0, 0.0, 1.0, 1.0, 1.0},
                                               {0.0, 0.0, 0.0, 2.0 / 16.0, 1.0, 2.0 / 16.0},
                                               {14.0 / 16.0, 0.0, 0.0, 1.0, 1.0, 2.0 / 16.0},
@@ -39,7 +38,6 @@ constexpr Box kScaffoldBottom{0.0, 0.0, 0.0, 1.0, 2.0 / 16.0, 1.0};
 /// parity: `PowderSnowBlock.FALLING_COLLISION_SHAPE`, nine tenths as a float.
 constexpr Box kPowderSnowFalling{0.0, 0.0, 0.0, 1.0, static_cast<double>(0.9F), 1.0};
 
-/// The blocks whose shape is not simply their collision table entry for this clip.
 enum class Special : std::uint8_t { None, Empty, Full, Fence, SnowLayers, Scaffolding, PowderSnow };
 
 [[nodiscard]] Special specialOf(std::int32_t stateId, ClipShape kind) {
@@ -49,8 +47,6 @@ enum class Special : std::uint8_t { None, Empty, Full, Fence, SnowLayers, Scaffo
     }
     const std::string_view path = block->path();
     if (kind == ClipShape::Visual) {
-        // parity: `TransparentBlock`, `IronBarsBlock` and `PowderSnowBlock` see through; `SoulSandBlock`
-        // and `MudBlock` a whole block; `FenceBlock` its outline; `SnowLayerBlock` all its layers.
         if (path == "glass" || path == "tinted_glass" || path.ends_with("_stained_glass") ||
             path.ends_with("copper_grate") || path == "iron_bars" || path.ends_with("copper_bars") ||
             path == "glass_pane" || path.ends_with("_stained_glass_pane") || path == "powder_snow") {
@@ -86,7 +82,6 @@ enum class Special : std::uint8_t { None, Empty, Full, Fence, SnowLayers, Scaffo
     return viewer.feetY > static_cast<double>(blockY) + shapeTop - kAboveSlack;
 }
 
-/// Hands `visit` every box of the block's shape for this clip, and answers whether any box answered true.
 template <typename Visit>
 bool anyBox(std::int32_t stateId, std::int32_t blockY, ClipShape kind, const ClipViewer& viewer, Visit&& visit) {
     switch (specialOf(stateId, kind)) {
@@ -135,7 +130,7 @@ bool anyBox(std::int32_t stateId, std::int32_t blockY, ClipShape kind, const Cli
     return false;
 }
 
-/// parity: `AABB.clipPoint`, one face against the line, with the scale that has to be beaten.
+/// parity: `AABB.clipPoint`.
 [[nodiscard]] bool clipPoint(double& scale, double da, double db, double dc, double point, double minB, double maxB,
                              double minC, double maxC, double fromA, double fromB, double fromC) {
     const double s = (point - fromA) / da;
@@ -148,7 +143,7 @@ bool anyBox(std::int32_t stateId, std::int32_t blockY, ClipShape kind, const Cli
     return false;
 }
 
-/// parity: `AABB.getDirection`: the faces of the box facing the line, each against the scale so far.
+/// parity: `AABB.getDirection`.
 [[nodiscard]] bool clipBox(const Box& box, const std::array<double, 3>& from, const std::array<double, 3>& delta,
                            double& scale) {
     const auto [minX, minY, minZ, maxX, maxY, maxZ] = box;
@@ -172,8 +167,7 @@ bool anyBox(std::int32_t stateId, std::int32_t blockY, ClipShape kind, const Cli
     return hit;
 }
 
-/// parity: `VoxelShape.clip`: a line starting inside the shape hits it where it starts, else
-/// `AABB.clip` over its boxes.
+/// parity: `VoxelShape.clip`.
 [[nodiscard]] bool shapeClips(std::int32_t stateId, std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
                               const std::array<double, 3>& from, const std::array<double, 3>& to, ClipShape kind,
                               const ClipViewer& viewer) {
@@ -181,7 +175,7 @@ bool anyBox(std::int32_t stateId, std::int32_t blockY, ClipShape kind, const Cli
     if ((delta[0] * delta[0]) + (delta[1] * delta[1]) + (delta[2] * delta[2]) < 1.0E-7) {
         return false;
     }
-    // parity: `isFullWide` at the point a thousandth of the way along, which a box holds half-open.
+    // parity: `isFullWide` at the point a thousandth of the way along.
     const double testX = from[0] + (delta[0] * 0.001) - blockX;
     const double testY = from[1] + (delta[1] * 0.001) - blockY;
     const double testZ = from[2] + (delta[2] * 0.001) - blockZ;

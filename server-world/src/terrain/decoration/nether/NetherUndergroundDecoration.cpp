@@ -20,8 +20,7 @@ constexpr std::int32_t kPatchAttempts = 96;
 
 using PathSet = std::set<std::string, std::less<>>;
 
-/// parity: the three spring configurations, which differ in what counts as rock and how many holes
-/// they demand.
+/// parity: the three spring configurations differ in rock set and hole count.
 struct Spring {
     const PathSet* validBlocks;
     bool requiresBlockBelow;
@@ -148,9 +147,7 @@ const Spring& closedSpring() {
     if (y < bounds.minY() || y > bounds.maxY()) {
         return std::nullopt;
     }
-    // parity: `SpringFeature` counts the rocks and the holes around itself through the level, so a
-    // spring on a chunk border sees the next chunk. Refusing the outside made five rocks impossible
-    // there, and `spring_closed` never placed a source in an edge column.
+    // parity: `SpringFeature` counts rocks and holes through the level.
     return chunk.decorationBlockStateId(x, y, z);
 }
 
@@ -286,8 +283,7 @@ void placeSpring(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, c
     }
     if (rockCount == spring.rockCount && holeCount == spring.holeCount) {
         setBlock(chunk, x, y, z, stateIdOf("lava"));
-        // parity: `SpringFeature` schedules the fluid where it puts it, which is what starts it
-        // running. Without it the spring is a single block of lava that never goes anywhere.
+        // parity: `SpringFeature` schedules the fluid where it places it.
         chunk.scheduleFluidTick(ChunkScheduledTick{.type = wire::common::Identifier::vanilla("lava"),
                                                    .localX = x & 15,
                                                    .y = y,
@@ -309,7 +305,7 @@ void placeGlowstoneBlob(Chunk& chunk, random::RandomSource& random, std::int32_t
     setBlock(chunk, originX, originY, originZ, glowstone);
     for (std::int32_t attempt = 0; attempt < 1500; ++attempt) {
         const std::int32_t x = originX + random.nextInt(8) - random.nextInt(8);
-        // parity: the 26.3 `random_neighbor_spread` draws x, y and z in order, its y a uniform -11..0.
+        // parity: the 26.3 `random_neighbor_spread` draws x.
         const std::int32_t y = originY + random.nextInt(12) - 11;
         const std::int32_t z = originZ + random.nextInt(8) - random.nextInt(8);
         if (!isAir(chunk, x, y, z)) {

@@ -160,8 +160,6 @@ void ScoreboardCommand::buildObjectives(const CommandNodeBuilder& root) const {
                     scoreboard_->display(*where, (*objective)->name);
                     broadcast(context,
                               play::SetDisplayObjectivePacket{.slot = *where, .objectiveName = (*objective)->name});
-                    // Whatever was already scored has to be sent again: the client only keeps lines
-                    // for an objective it is currently showing.
                     for (const std::string& holder : scoreboard_->holdersIn((*objective)->name)) {
                         const std::optional<std::int32_t> score = scoreboard_->score(holder, (*objective)->name);
                         if (score.has_value()) {

@@ -24,7 +24,7 @@ struct StructureBlockInfo {
     std::map<std::string, std::string> properties;
 };
 
-/// parity: `StructureTemplate.StructureEntityInfo`, before piece transform and chunk clipping.
+/// parity: `StructureTemplate.StructureEntityInfo`.
 struct StructureEntityInfo {
     double x = 0.0;
     double y = 0.0;
@@ -33,8 +33,7 @@ struct StructureEntityInfo {
     wire::nbt::NbtCompound data;
 };
 
-/// parity: `StructureTemplate.JigsawBlockInfo`, in world space. `finalStateName` is what vanilla's
-/// `JigsawReplacementProcessor` swaps the jigsaw block itself for once placement is done.
+/// parity: `StructureTemplate.JigsawBlockInfo`.
 struct PlacedJigsaw {
     StructurePos pos;
     StructureDirection front = StructureDirection::North;
@@ -48,17 +47,14 @@ struct PlacedJigsaw {
     std::int32_t selectionPriority = 0;
 };
 
-/// A transformed structure-block DATA marker consumed by a template structure piece callback.
 struct StructureDataMarker {
     StructurePos pos;
     std::string metadata;
 };
 
-/// Runs after the processor list and may drop a block outright, which a rule list cannot do.
 /// parity: the processors added after `RuleProcessor`, such as `BlockAgeProcessor`.
 using TemplateBlockProcessor = std::function<std::optional<std::int32_t>(std::int32_t, std::int32_t, StructurePos)>;
 
-/// Everything a placement can vary, so the call site does not carry ten positional arguments.
 struct TemplatePlacement {
     StructurePos position;
     StructureRotation rotation = StructureRotation::None;
@@ -68,26 +64,19 @@ struct TemplatePlacement {
     const StructureProcessorList* processors = nullptr;
     TemplateBlockProcessor blockProcessor;
     random::RandomSource* random = nullptr;
-    /// parity: `StructurePlaceSettings.setRandom`, used only by the template and fossil features:
-    /// the palette pick and every processor draw then come in template order.
+    /// parity: `StructurePlaceSettings.setRandom`.
     random::RandomSource* settingsRandom = nullptr;
-    /// The world's seed, which a capped processor forks positionally to pick its blocks.
     std::optional<std::int64_t> worldSeed;
     bool ignoreStructureBlocks = false;
     bool ignoreAir = false;
-    /// parity: `StructurePlaceSettings.setIgnoreEntities`, which a structure block sets by default.
+    /// parity: `StructurePlaceSettings.setIgnoreEntities`.
     bool ignoreEntities = false;
-    /// Runs the processors over every block and clips only the write, so a pass per chunk draws
     /// the same stream. parity: `processBlockInfos` with no bounding box.
     bool wholePiece = false;
     std::optional<std::int32_t> gravityOffset;
 };
 
-/// parity: `StructureTemplate`, scoped to what this project can represent. The NBT `Properties`
-/// compound is retained and resolved through the block registry; facing, axis, cardinal
-/// connections, numeric rotations and rail shapes are mirrored and rotated at placement. Block
-/// entity NBT is preserved for the blocks the chunk can store, loot seeds included, and template
-/// entities are emitted as persistent generated descriptors.
+/// parity: `StructureTemplate`.
 class StructureTemplate {
 public:
     [[nodiscard]] StructurePos size() const noexcept { return size_; }
@@ -96,7 +85,6 @@ public:
 
     [[nodiscard]] const std::vector<StructureEntityInfo>& entities() const noexcept { return entities_; }
 
-    /// How many palettes this template offers, which is what the placement draw picks between.
     [[nodiscard]] std::size_t paletteCount() const noexcept { return palettes_.size(); }
 
     void load(const wire::nbt::NbtCompound& nbt);
@@ -112,14 +100,9 @@ public:
     [[nodiscard]] StructureBoundingBox getBoundingBox(StructurePos position, StructureRotation rotation,
                                                       StructurePos pivot, StructureMirror mirror) const;
 
-    /// parity: `StructureTemplate.placeInWorld`, narrowed only by the missing fluid spread. The clip
-    /// mirrors vanilla's per-chunk clipping: a piece spanning several chunks is placed once per
-    /// intersecting chunk, each time keeping only the blocks that land inside that one.
+    /// parity: `StructureTemplate.placeInWorld`.
     void placeInto(Chunk& chunk, const TemplatePlacement& placement) const;
 
-    /// Places a configured-feature template from one owning chunk without wrapping the part that
-    /// crosses its border. Unlike a structure piece, a configured feature runs once, so its
-    /// out-of-chunk blocks travel as deferred decoration writes.
     bool placeDecorationInto(Chunk& chunk, StructurePos position, StructureRotation rotation,
                              random::RandomSource& random) const;
 
@@ -136,12 +119,10 @@ private:
 
     StructurePos size_;
     std::vector<StructureBlockInfo> blocks_;
-    /// Every palette's blocks. One entry for a plain `palette`, several for `palettes`.
     std::vector<std::vector<StructureBlockInfo>> palettes_;
     std::vector<StructureEntityInfo> entities_;
 };
 
-/// Loads a real NBT structure piece by its `minecraft:...` location, or null when unavailable.
 using TemplateLoader = std::function<const StructureTemplate*(const wire::common::Identifier&)>;
 
 } // namespace basalt::server::world::structure

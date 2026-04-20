@@ -144,8 +144,7 @@ std::optional<StructurePos> ShipwreckStructureGenerator::settle(const structure:
     std::int32_t lowest = kOverworldHeight.maxY() + 1;
     for (std::int32_t dx = 0; dx < size.x; ++dx) {
         for (std::int32_t dz = 0; dz < size.z; ++dz) {
-            // parity: `ShipwreckPiece.postProcess` averages `level.getHeight` over the footprint,
-            // not the density estimate the placement used to pick the spot.
+            // parity: `ShipwreckPiece.postProcess` averages `level.getHeight` over the footprint.
             const std::int32_t height = worldHeightAt_(
                 origin.x + dx, origin.z + dz, beached ? HeightmapType::WorldSurface : HeightmapType::OceanFloor);
             total += height;
@@ -186,8 +185,7 @@ std::optional<ShipwreckStructureGenerator::HullStart> ShipwreckStructureGenerato
                                                                                              std::int32_t chunkX,
                                                                                              std::int32_t chunkZ,
                                                                                              bool beached) const {
-    // parity: `context.random()`, a separate stream with the same seeding, so the rotation is its
-    // first draw whichever variant was asked for.
+    // parity: `context.random()` is a separate stream, so rotation is its first draw.
     random::RandomSource pick = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(pick, seed, chunkX, chunkZ);
     const StructureRotation rotation =
@@ -248,17 +246,13 @@ void ShipwreckStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std
         return;
     }
 
-    // parity: a set with more than one structure *draws* which one, with its own
-    // `setLargeFeatureSeed` random, and only then tests that one's biomes; a rejected option is
-    // removed and the draw repeats. Deciding by biome instead looks equivalent and is not: the two
-    // variants read different hull lists, so the draw that follows lands on another ship.
+    // parity: a multi-structure set draws which one first, then tests biomes; a rejected option is removed and redrawn.
     const std::optional<bool> beached = chooseVariant(seed, chunkX, chunkZ);
     if (!beached.has_value()) {
         return;
     }
 
-    // parity: `context.random()`, a separate stream with the same seeding, so the rotation is its
-    // first draw whichever variant won.
+    // parity: `context.random()` is a separate stream, so rotation is its first draw.
     random::RandomSource pick = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(pick, seed, chunkX, chunkZ);
     const StructureRotation rotation =

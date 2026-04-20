@@ -22,8 +22,7 @@ constexpr std::string_view kDeathProtection = "minecraft:death_protection";
 /// parity: `EntityEvent.PROTECTED_FROM_DEATH`, which the client plays as the totem.
 constexpr std::int8_t kProtectedFromDeath = 35;
 
-/// parity: `DeathProtection.TOTEM_OF_UNDYING`: everything cleared, then regeneration II for 45
-/// seconds, absorption II for 5 and fire resistance for 40.
+/// parity: `DeathProtection.TOTEM_OF_UNDYING`.
 [[nodiscard]] std::vector<reg::ConsumeEffect> totemEffects() {
     return {reg::ConsumeEffect{reg::ConsumeEffect::ClearAll{}},
             reg::ConsumeEffect{reg::ConsumeEffect::Apply{Identifier::vanilla("regeneration"), 900, 1, 1.0F}},
@@ -36,7 +35,7 @@ constexpr std::int8_t kProtectedFromDeath = 35;
     return id.has_value() ? std::optional{*id} : std::nullopt;
 }
 
-/// parity: `ConsumeEffect.CODEC` over the kinds a death can carry. An unknown kind is skipped.
+/// parity: `ConsumeEffect.CODEC` over the kinds a death can carry.
 [[nodiscard]] std::vector<reg::ConsumeEffect> effectsOf(const NbtCompound& protection) {
     std::vector<reg::ConsumeEffect> effects;
     const wire::nbt::NbtList* list = protection.getList("death_effects");

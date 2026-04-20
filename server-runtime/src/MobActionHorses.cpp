@@ -104,7 +104,7 @@ void MobActionSystem::horseRears(ServerEntity& horse) {
         return;
     }
     horses::standIfPossible(horse);
-    // parity: `RandomStandGoal.playStandSound`, the ambient sound at the mob's own volume and pitch.
+    // parity: `RandomStandGoal.playStandSound`.
     if (const std::string_view sound = horses::ambientSound(horse); !sound.empty() && !horses::silent(horse)) {
         random::RandomSource random = freshRandom();
         const float roll = random.nextFloat() - random.nextFloat();
@@ -157,7 +157,7 @@ void MobActionSystem::tickHorse(world::LoadedWorld& world, ServerEntity& horse, 
     if (!horses::isCamel(horse.type())) {
         return;
     }
-    // parity: `Camel.tick`: the dash ends on landing, and the cooldown ends with its ready sound.
+    // parity: `Camel.tick`.
     constexpr std::int32_t kDashLands = 50;
     if (state.dashing && state.dashCooldown < kDashLands && (horse.onGround || horse.vehicleId.has_value())) {
         state.dashing = false;

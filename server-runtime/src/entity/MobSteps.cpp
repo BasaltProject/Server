@@ -65,7 +65,7 @@ constexpr std::array kSilentSteps{
 
 [[nodiscard]] Sound quiet(std::string name) { return Sound{.name = std::move(name), .volume = 0.15F}; }
 
-/// parity: `AbstractHorse.isWoodSoundType`: wood, nether wood, stems, cherry and bamboo wood.
+/// parity: `AbstractHorse.isWoodSoundType`.
 [[nodiscard]] bool woodSounding(const registry::BlockSoundTypeEntry& sound) {
     return sound.stepSound == "block.wood.step" || sound.stepSound == "block.nether_wood.step" ||
            sound.stepSound == "block.stem.step" || sound.stepSound == "block.cherry_wood.step" ||
@@ -73,7 +73,7 @@ constexpr std::array kSilentSteps{
 }
 
 [[nodiscard]] std::optional<Sound> horseStep(const ServerEntity& mob, std::int32_t stateId, std::int32_t above) {
-    // parity: `AbstractHorse.playStepSound`: nothing on a liquid, the snow on top heard instead.
+    // parity: `AbstractHorse.playStepSound`.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block != nullptr && (block->path() == "water" || block->path() == "lava")) {
         return Sound{};

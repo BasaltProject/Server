@@ -25,8 +25,7 @@ const PathSet& vegetationSupport() {
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
-/// parity: the 26.3 placement's `count` 64 and trapezoid `offset`, then an air filter before the
-/// `simple_block` draws its weighted state and checks that it survives.
+/// parity: 26.3 placement, `count` 64 and trapezoid `offset`.
 void scatterVegetation(Chunk& chunk, random::RandomSource& random, const Pos& origin, ForestVegetation config) {
     for (std::int32_t attempt = 0; attempt < 64; ++attempt) {
         const std::int32_t x = origin.x + random.nextInt(8) - random.nextInt(8);

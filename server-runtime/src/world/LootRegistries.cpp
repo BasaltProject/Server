@@ -113,14 +113,14 @@ LootRegistries::LootRegistries(const Jar& jar, const RealEnchantments& enchantme
                 const Definition* found = definitionOf(enchantment);
                 return found != nullptr && matches(found->supported, "item", item);
             },
-        // parity: `isPrimaryItem`, which falls back to the supported set when there is no primary one.
+        // parity: `isPrimaryItem`.
         .primary =
             [this](const Identifier& enchantment, const Identifier& item) {
                 const Definition* found = definitionOf(enchantment);
                 return found != nullptr &&
                        matches(found->primary.present ? found->primary : found->supported, "item", item);
             },
-        // parity: `Enchantment.areCompatible`: different, and neither in the other's exclusive set.
+        // parity: `Enchantment.areCompatible`.
         .compatible =
             [this](const Identifier& first, const Identifier& second) {
                 const Definition* one = definitionOf(first);

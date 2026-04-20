@@ -40,7 +40,7 @@ constexpr std::int32_t kSpawnRangeY = 6;
     return all;
 }
 
-/// parity: `SpawnUtil.Strategy.LEGACY_IRON_GOLEM`, which is fussier than an ordinary spawn check.
+/// parity: `SpawnUtil.Strategy.LEGACY_IRON_GOLEM`.
 [[nodiscard]] bool legacySupport(std::int32_t supportState, std::int32_t aboveState) {
     const Identifier* block = reg::blockStateDefinitions::blockOf(supportState);
     if (block == nullptr) {

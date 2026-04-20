@@ -13,15 +13,13 @@ namespace {
 /// parity: `Player`'s reach for what is on the floor, the same one an item is taken from.
 constexpr double kPickupRadius = 1.5;
 
-/// What an arrow gives back when it is picked up. parity: `AbstractArrow.getPickupItem`, the stack
-/// it was fired from, potion and all.
+/// parity: `AbstractArrow.getPickupItem`: the stack it was fired from, potion and all.
 [[nodiscard]] storage::StoredItemStack itemOf(const entity::ServerEntity& arrow) {
     const std::string fallback{arrow.type().path() == "arrow" ? "arrow" : std::string{arrow.type().path()}};
     return storage::StoredItemStack{
         .id = "minecraft:" + arrow.heldItem.value_or(fallback), .count = 1, .components = arrow.heldItemComponents};
 }
 
-/// An arrow that is not moving at all, which is what being stuck looks like from outside.
 [[nodiscard]] bool isResting(const entity::ServerEntity& arrow) {
     return arrow.velocityX == 0.0 && arrow.velocityY == 0.0 && arrow.velocityZ == 0.0;
 }
@@ -36,8 +34,7 @@ constexpr double kPickupRadius = 1.5;
 std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::WorldState& world) {
     std::vector<PickedArrow> taken;
     for (entity::ServerEntity* candidate : world.entities()) {
-        // parity: `playerTouch` only takes a stuck arrow. Stillness says stuck, not `onGround`, which
-        // reads false for an arrow held by a wall.
+        // parity: `playerTouch`.
         if (candidate == nullptr || candidate->removed || !isArrow(*candidate) ||
             (!isResting(*candidate) && !candidate->noPhysics)) {
             continue;
@@ -54,12 +51,11 @@ std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::World
         if ((dx * dx) + (dy * dy) + (dz * dz) > kPickupRadius * kPickupRadius) {
             continue;
         }
-        // parity: `tryPickup`: a mob's arrow stays, one shot in creative only goes to a creative
-        // player and gives nothing, and the rest goes into the bag or stays.
+        // parity: `tryPickup`.
         const bool creative = session.gamemode == wire::protocol::play::Gamemode::Creative;
         switch (candidate->arrowPickup) {
         case entity::ServerEntity::ArrowPickup::Disallowed:
-            // parity: `ThrownTrident.tryPickup`, a loyal trident home with its thrower comes back anyway.
+            // parity: `ThrownTrident.tryPickup`.
             if (!(trident && candidate->noPhysics && owned && session.inventory.add(itemOf(*candidate)) == 0)) {
                 continue;
             }

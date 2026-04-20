@@ -57,8 +57,6 @@ std::vector<SectionLight> LightSpread::run() {
         }
         const std::size_t x = at % width;
         const std::size_t z = (at / width) % width;
-        // Straight index arithmetic rather than a table of offsets: this is the innermost loop of
-        // the whole engine and it runs a few hundred thousand times per chunk.
         if (x > 0) {
             spreadTo(at - 1, level);
         }

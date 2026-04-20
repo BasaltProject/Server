@@ -13,13 +13,11 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// One source for the numbers nobody checks bit for bit: a sound's seed, a scatter.
 [[nodiscard]] std::mt19937_64& scratchRandom() {
     static thread_local std::mt19937_64 random{std::random_device{}()};
     return random;
 }
 
-/// The three fields every player event starts with, filled once here rather than at each call site.
 void fillPlayer(server::plugins::PluginEvent& event, const player::PlayerSession& player) {
     event.set(0, player.name());
     event.set(1, player.uuid().toString());
@@ -31,7 +29,6 @@ void fillPlayer(server::plugins::PluginEvent& event, const player::PlayerSession
     return edited == nullptr ? fallback : *edited;
 }
 
-/// What a plugin drawing a surface put there for this player, or nothing when nobody claims it.
 [[nodiscard]] std::optional<ui::SurfaceContent> surfaceContent(server::plugins::PluginHost& plugins,
                                                                server::plugins::PluginPlayers& players,
                                                                const server::plugins::PluginSurface surface,
@@ -59,7 +56,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.onlineMode = options_.sessionService;
     options.keyPair = options_.keyPair;
     options.servicesKeys = options_.servicesKeys;
-    // parity: `DedicatedServer.enforceSecureProfile`, the setting only with online mode and keys.
+    // parity: `DedicatedServer.enforceSecureProfile`.
     options.enforceSecureProfile = config_->enforceSecureProfile && options_.sessionService != nullptr &&
                                    options_.servicesKeys != nullptr && options_.servicesKeys->canValidateProfileKeys();
     options.forwarding = config_->forwarding;
@@ -120,9 +117,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     };
     options.plugins = pluginHooks();
 
-    // On the heap and handed to the registry afterwards: a session that has left is kept for a
-    // window because the tick loop may still hold a pointer to it, and its callbacks reach back
-    // into this connection, so the connection has to outlive it by the same window.
+    // On the heap: the tick loop may hold a departed session, and its callbacks reach back into this connection.
     const std::shared_ptr<ClientSession> session =
         std::make_shared<ClientSession>(std::move(connection), std::move(options));
     session->run();
@@ -151,8 +146,7 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         return login->cancelMessage().value_or("");
     };
 
-    // Nothing is copied and nothing is decoded while nobody is watching that packet's own name: the
-    // first line of each of these is a map lookup on the path every packet takes.
+    // Nothing is copied or decoded while nobody watches that packet's name: this is on the path every packet takes.
     server::plugins::PluginPacketBus* packets = &host->packets();
     const auto intercept = [packets](wire::protocol::ProtocolState state, bool serverbound, std::int32_t id,
                                      std::span<const std::uint8_t> bytes,

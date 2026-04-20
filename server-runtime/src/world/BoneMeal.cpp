@@ -11,13 +11,11 @@
 namespace basalt::server::runtime::world::boneMeal {
 namespace {
 
-/// parity: `CropBlock.getBonemealAgeIncrease`, `Mth.nextInt(random, 2, 5)`, both ends included. The
-/// stems use the same two numbers written out by hand.
+/// parity: `CropBlock.getBonemealAgeIncrease`.
 constexpr std::int32_t kLeastAges = 2;
 constexpr std::int32_t kMostAges = 5;
 
-/// The blocks this grows: the crop family and the two stems. parity: they share `performBonemeal`,
-/// which is "add two to five ages and stop at the last one".
+/// The blocks this grows: the crop family and the two stems. parity: they share `performBonemeal`.
 constexpr std::array<std::string_view, 7> kByAge{
     "wheat", "carrots", "potatoes", "beetroots", "torchflower_crop", "melon_stem", "pumpkin_stem"};
 
@@ -41,7 +39,6 @@ constexpr std::string_view kShelfMushroom = "shelf_mushroom";
     return result.ec == std::errc{} && result.ptr == last ? std::optional{value} : std::nullopt;
 }
 
-/// The last age this block has, read off its own definition rather than written down per block.
 [[nodiscard]] std::int32_t maxAgeOf(const wire::common::Identifier& block) {
     const registry::blockStateDefinitions::Definition* definition = registry::blockStateDefinitions::of(block);
     return definition == nullptr ? 0 : static_cast<std::int32_t>(definition->valuesOf("age").size()) - 1;
@@ -60,8 +57,7 @@ bool grows(const std::int32_t stateId) {
     }
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     const std::optional<std::int32_t> age = ageOf(stateId);
-    // parity: `isValidBonemealTarget` for a crop is `!isMaxAge`, so bone meal on a grown one is not
-    // spent at all.
+    // parity: `isValidBonemealTarget` for a crop is `!isMaxAge`.
     return block != nullptr && age.has_value() && *age < maxAgeOf(*block);
 }
 
@@ -76,15 +72,14 @@ std::optional<BlockChange> apply(WorldState& world, const std::int32_t x, const 
     if (block == nullptr || !age.has_value()) {
         return std::nullopt;
     }
-    // parity: `ShelfMushroomBlock.performBonemeal` always succeeds and grows one age, rolling nothing.
+    // parity: `ShelfMushroomBlock.performBonemeal` always succeeds and grows one age.
     const std::int32_t grown =
         block->path() == kShelfMushroom
             ? *age + 1
             : std::min(maxAgeOf(*block), *age + random.nextIntBetweenInclusive(kLeastAges, kMostAges));
     const std::optional<std::int32_t> turned =
         registry::blockStateDefinitions::stateIdOf(*block, {{"age", std::to_string(grown)}}, *stateId);
-    // parity: `setBlock(pos, state, 2)`, which tells the clients and not the neighbours: growing a
-    // crop is not a block update anybody is waiting for.
+    // parity: `setBlock(pos, state, 2)`.
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned, WorldState::SideEffects::kSkip)) {
         return std::nullopt;
     }

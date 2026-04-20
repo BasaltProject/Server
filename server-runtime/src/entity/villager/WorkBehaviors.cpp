@@ -82,8 +82,6 @@ void setMainHand(Ctx& ctx, std::optional<ItemStack> stack) {
     ctx.world.mainHandChanged(ctx.self);
 }
 
-// --- WorkAtPoi and WorkAtComposter ----------------------------------------------------------------
-
 bool workCheck(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     if (!ctx.mem.jobSite.present()) {
         return false;
@@ -117,7 +115,7 @@ void makeBread(Ctx& ctx) {
     }
 }
 
-/// parity: `WorkAtComposter.compostItems`: twenty seeds at most, keeping ten of each kind.
+/// parity: `WorkAtComposter.compostItems`.
 void compostItems(Ctx& ctx, const BlockPos& pos, std::int32_t level) {
     if (level == 8) {
         ctx.world.composterExtract(ctx.self, pos);
@@ -188,8 +186,6 @@ void workStart(Ctx& ctx, const Node& node, NodeState& /*state*/) {
         trading::restock(ctx);
     }
 }
-
-// --- HarvestFarmland --------------------------------------------------------------------------------
 
 [[nodiscard]] bool harvestable(Ctx& ctx, const BlockPos& pos) {
     const std::optional<std::int32_t> state = stateAt(ctx, pos);
@@ -299,8 +295,6 @@ void harvestTick(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     ++state.i0;
 }
 
-// --- UseBonemeal ------------------------------------------------------------------------------------
-
 [[nodiscard]] std::optional<BlockPos> nextCrop(Ctx& ctx) {
     const BlockPos center = look::blockPosition(ctx.self);
     std::optional<BlockPos> result;
@@ -379,8 +373,6 @@ void bonemealTick(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     ++state.i0;
 }
 
-// --- ShowTradesToPlayer -------------------------------------------------------------------------------
-
 bool showCheck(Ctx& ctx, const Node& /*node*/, NodeState& /*state*/) {
     if (!ctx.mem.interactionTarget.present()) {
         return false;
@@ -453,8 +445,6 @@ void showStop(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     extraOf(state).shownFor.reset();
 }
 
-// --- SetLookAndInteract ---------------------------------------------------------------------------
-
 bool setLookAndInteract(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     if (ctx.mem.interactionTarget.present() || !ctx.mem.visibleLivingEntities.present()) {
         return false;
@@ -468,8 +458,6 @@ bool setLookAndInteract(Ctx& ctx, const Node& node, NodeState& /*state*/) {
     ctx.mem.lookTarget.set(Tracker::ofEntity(*closest, true));
     return true;
 }
-
-// --- GiveGiftToHero -----------------------------------------------------------------------------------
 
 [[nodiscard]] std::optional<std::int32_t> hero(Ctx& ctx) {
     if (!ctx.mem.nearestVisiblePlayer.present()) {
@@ -541,8 +529,6 @@ void giftStop(Ctx& ctx, const Node& /*node*/, NodeState& state) {
     ctx.mem.walkTarget.erase();
     ctx.mem.lookTarget.erase();
 }
-
-// --- TradeWithVillager --------------------------------------------------------------------------------
 
 [[nodiscard]] ServerEntity* partner(Ctx& ctx) {
     if (!ctx.mem.interactionTarget.present()) {

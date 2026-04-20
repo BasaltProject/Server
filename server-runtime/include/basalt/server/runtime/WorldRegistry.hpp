@@ -28,34 +28,25 @@ class RealLootTables;
 
 namespace basalt::server::runtime {
 
-/// Every world this server knows about: what builds one, what makes a new one at runtime, the
-/// scheduler they all share, and what `/reload` has to redo once the configuration underneath them
-/// changes. Split out of `BasaltServer` so the shape of "a world" has one owner.
+/// Split out of `BasaltServer` so a world has one owner.
 class WorldRegistry {
 public:
-    /// What has to be told that something changed, read late: the registry is built before the
-    /// command dispatcher and the plugin host exist, and by the time these run, they do.
+    /// Read late: the registry is built before the command dispatcher and plugin host exist.
     struct Hooks {
-        /// A world was made at runtime, one turn after the fact so a plugin handler is not re-entered.
+        /// One turn after the fact so a plugin handler is not re-entered.
         std::function<void(const std::string& name)> worldLoaded;
-        /// Builds the command tree again and pushes it to everyone: a command's permission and
-        /// aliases are baked in when it is registered, and the client holds its own copy.
+        /// A command's permission and aliases are baked in at registration and the client holds its own copy.
         std::function<void()> rebuildCommands;
     };
 
     struct Options {
         std::string worldsRoot = "worlds";
         wire::common::Timings* timings = nullptr;
-        /// One worker while measuring: the generation metrics count without atomics on purpose, so
-        /// their numbers are only exact when a single thread is generating.
         bool generationMetrics = false;
-        /// The jar's song table, which every world hands to its own state so a comparator can read a
-        /// jukebox. Null in a test, and then every jukebox reads zero.
+        /// Null in a test, and then every jukebox reads zero.
         world::jukeboxes::SongOutputs* jukeboxes = nullptr;
-        /// What a structure chest rolls the first time it is read. Null in a test, and then such a
-        /// chest stays empty.
+        /// Null in a test, and then such a chest stays empty.
         world::RealLootTables* lootTables = nullptr;
-        /// What a chest a player opened grants. Null in a test, and then nothing is granted.
         world::AdvancementTriggers* triggers = nullptr;
     };
 
@@ -67,12 +58,6 @@ public:
     WorldRegistry& operator=(const WorldRegistry&) = delete;
     ~WorldRegistry();
 
-    /// Every world, by the name a player's stored row refers to.
-    ///
-    /// Answered by value on purpose, and replaced rather than added to: the tick loop walks these
-    /// while a plugin can be making one, and inserting into a map somebody is iterating is a crash
-    /// on the tick thread. Swapping the map leaves whoever is mid-walk on the old one, which is
-    /// exactly right: a world made this turn starts ticking the next.
     [[nodiscard]] std::map<std::string, world::LoadedWorld*> worlds() const;
 
     [[nodiscard]] world::LoadedWorld& defaultWorld() const;
@@ -81,23 +66,13 @@ public:
 
     [[nodiscard]] sched::RegionScheduler& scheduler() noexcept { return scheduler_; }
 
-    /// Makes a world that was not in `worlds.toml`, the way a plugin asks for one.
-    ///
-    /// A world like any other: its own folder, `settings.toml` and seed. Null if the name is taken
-    /// or unusable, because a world that half exists is worse than none.
-    ///
-    /// Its spawn is not generated up front, unlike the declared ones: this runs inside a tick, and
-    /// forty-nine chunks there is a freeze every player would feel.
+    /// Null if the name is taken or unusable.
     world::LoadedWorld* createWorld(const std::string& name, config::WorldDimension dimension, config::WorldType type,
                                     std::optional<std::int64_t> seed);
 
-    /// The chunk-set version each world was last split on, so an unchanged world is not walked.
     [[nodiscard]] std::map<std::string, std::int64_t>& lastChunkSetVersion() noexcept { return lastChunkSetVersion_; }
 
-    /// What has to be told that the configuration changed.
-    ///
-    /// The tab list, scoreboard, boss bar and server list all read their file on every use, so they
-    /// need nothing. The command tree does not.
+    /// The tab list, scoreboard, boss bar and server list read their file on every use; the command tree does not.
     void onConfigsReloaded();
 
 private:
@@ -111,11 +86,8 @@ private:
     Options options_;
     wire::common::Logger logger_;
 
-    /// Every world's `level.nbt`, read before any world is built.
     std::map<std::string, world::WorldMetadata> metadata_;
-    /// The worlds themselves, each owned here for the life of the server.
     std::vector<std::unique_ptr<world::LoadedWorld>> owned_;
-    /// The generators of each world, kept because a world borrows them for its whole life.
     std::map<std::string, world::VanillaWorldGeneratorFactory::Generators> built_;
     std::map<std::string, std::int64_t> lastChunkSetVersion_;
     std::string defaultName_;

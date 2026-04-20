@@ -66,8 +66,6 @@ struct Fixture {
             write(buffer);
             packets.push_back(id);
         };
-        // The two a block's own effects take, bound the way the Java door binds them: the
-        // broadcaster asks the connection now rather than writing that edition's packet itself.
         connection.sendBlockEvent = [this](std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t,
                                            std::int32_t) { packets.push_back(play::BlockEventPacket::kId); };
         connection.sendLevelEvent = [this](std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t) {
@@ -103,7 +101,6 @@ TEST_CASE("a block change goes out as an update, and its effects as their own pa
     CHECK(fixture.sent(play::ClientboundBlockUpdatePacket::kId));
     CHECK(fixture.packets.size() == 1);
 
-    // One block update plus one packet per effect, whatever kind each one is.
     fixture.packets.clear();
     broadcaster.announceBlock(
         fixture.watchers(),
@@ -136,7 +133,6 @@ TEST_CASE("water washing a block away drops what breaking it would, and lava dro
     broadcaster.dropWashedAwayBlock(*fixture.world, 2, 64, 2, stateOf("torch"));
     CHECK(fixture.world->state().items().size() == 1);
 
-    // A fluid is not washed away by another fluid, so nothing rolls for one.
     broadcaster.dropWashedAwayBlock(*fixture.world, 1, 64, 1, stateOf("water"));
     CHECK(fixture.world->state().items().size() == 1);
 }

@@ -29,7 +29,7 @@ using wire::common::Identifier;
 using wire::protocol::play::SoundSource;
 namespace mth = wire::common::mth;
 
-/// parity: `ThrownTrident.onHitEntity`'s base damage and `deflect(REVERSE, (0.02, 0.2, 0.02))`.
+/// parity: `ThrownTrident.onHitEntity`'s base damage and `deflect(REVERSE.
 constexpr float kTridentDamage = 8.0F;
 constexpr double kBounceSideways = 0.02;
 constexpr double kBounceUp = 0.2;
@@ -168,7 +168,7 @@ CombatSystem::ArrowHit CombatSystem::tridentHitEntity(world::LoadedWorld& world,
                                                   std::ranges::any_of(living, [&trident](const ServerEntity* one) {
                                                       return one->entityId() == *trident.ownerId;
                                                   }));
-    // parity: channeling's `post_attack`: a bolt on whoever it hurt, under an open sky in a storm.
+    // parity: channeling's `post_attack`.
     const auto channel = [&](double x, double y, double z, SoundSource source) {
         if (!ownerLiving || !channels(trident) || !world.weather().isThundering() ||
             !world::naturalSpawner::canSeeSky(world, mth::floor(x), mth::floor(y), mth::floor(z))) {
@@ -239,7 +239,7 @@ CombatSystem::ArrowHit CombatSystem::tridentHitEntity(world::LoadedWorld& world,
         }
     }
     tridentSound(watchers, trident, "item.trident.hit", 1.0F);
-    // parity: `ProjectileDeflection.REVERSE` at (0.02, 0.2, 0.02): nearly straight down, turned round.
+    // parity: `ProjectileDeflection.REVERSE` at (0.02.
     trident.velocityX *= -kBounceSideways * 0.5;
     trident.velocityY *= -kBounceUp * 0.5;
     trident.velocityZ *= -kBounceSideways * 0.5;

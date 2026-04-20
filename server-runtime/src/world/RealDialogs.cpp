@@ -13,7 +13,6 @@ namespace {
 using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 
-/// One entry as the registry packet wants it, or why it cannot travel as NBT.
 [[nodiscard]] std::expected<NbtCompound, std::string> convert(const std::optional<std::string>& text) {
     if (!text.has_value()) {
         return std::unexpected(std::string{"no such entry"});

@@ -25,7 +25,6 @@ namespace {
 
 namespace crafting = server::world::crafting;
 
-/// What a cooker is called in an event, which is the lower-case form of its own name.
 [[nodiscard]] std::string_view nameOf(crafting::Cooker cooker) {
     switch (cooker) {
     case crafting::Cooker::Smelting:
@@ -63,8 +62,7 @@ namespace crafting = server::world::crafting;
     return *turned;
 }
 
-/// parity: the `state.setValue(LIT, isLit)` at the end of `serverTick`: the block itself carries
-/// whether the fire is burning, which is what the client draws and what light comes off it.
+/// parity: the `state.setValue(LIT, isLit)` at the end of `serverTick`.
 [[nodiscard]] std::optional<std::int32_t> litChange(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                     bool lit) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -89,7 +87,6 @@ namespace crafting = server::world::crafting;
     return *turned;
 }
 
-/// The slot's item, or nothing, for the event that reports what a furnace is working on.
 [[nodiscard]] const server::world::loot::ItemStack* slotOf(const furnaces::State& state, std::size_t slot) {
     return slot < state.items.size() && state.items[slot].has_value() ? &*state.items[slot] : nullptr;
 }
@@ -102,10 +99,6 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                               const Hooks& hooks, bool hasSkylight, bool sunMoves, std::int64_t worldSeed) {
     std::vector<BlockChange> changes;
     // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
-    // parity: `DaylightDetectorBlock.tickEntity` is `level.getGameTime() % 20L == 0L`, the world's
-    // **age**, not its time of day. The two are different counters in the jar and only the second is
-    // what `/time set` moves, so reading the clock here put the detector's twenty ticks on the wrong
-    // beat after any time change, and froze it altogether wherever the day is not advancing.
     if (gameTime % daylightDetectors::kIntervalTicks == 0) {
         for (const std::array<std::int32_t, 2>& position : chunks) {
             const server::world::Chunk* chunk = world.chunkIfLoaded(position[0], position[1]);
@@ -138,8 +131,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             const std::int32_t y = stored.y();
             const std::int32_t z = (position[1] << 4) + stored.localZ();
             const std::string path{stored.type().path()};
-            // parity: `SculkSensorBlockEntity`'s ticker, which is `VibrationSystem.Ticker.tick`: a
-            // noise on its way moves a block closer every turn of the world and books nothing.
+            // parity: `SculkSensorBlockEntity`'s ticker, which is `VibrationSystem.Ticker.tick`: a.
             if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
                 if (const std::optional<BlockChange> heard = vibrations::travelTick(world, x, y, z, gameTime);
                     heard.has_value()) {
@@ -147,9 +139,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            // parity: `SculkShriekerBlockEntity`'s ticker, the same countdown. The shriek itself
-            // answers on this very turn, inside the walk, where the jar's `onReceiveVibration`
-            // applies it.
+            // parity: `SculkShriekerBlockEntity`'s ticker, the same countdown. The shriek itself.
             if (path == "sculk_shrieker") {
                 if (std::optional<vibrations::ShriekerArrival> arrival =
                         vibrations::shriekerTravelTick(world, x, y, z, gameTime, hooks.ticking);
@@ -158,8 +148,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            // parity: `SERVER_WAITING_COUNTDOWN_TICKER`, the wait a periodic geyser keeps between
-            // going off and lying dormant: counted in the block entity, twenty ticks at a time.
+            // parity: `SERVER_WAITING_COUNTDOWN_TICKER`, the wait a periodic geyser keeps between.
             if (path == "potent_sulfur") {
                 if (const std::optional<BlockChange> flipped =
                         geysers::countdownTick(world, worldSeed, gameTime, x, y, z);
@@ -176,8 +165,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 if (jukeboxes::tick(world, x, y, z, hooks.songLength ? hooks.songLength(*song) : 0, gameTime)) {
                     chunk->markDirty();
-                    // parity: `JukeboxBlockEntity.onSongChanged` ends in `updateNeighborsAt`, which
-                    // is what takes the signal off whatever the jukebox was feeding.
+                    // parity: `JukeboxBlockEntity.onSongChanged` ends in `updateNeighborsAt`, which.
                     if (hooks.songStopped) {
                         hooks.songStopped(x, y, z);
                     }
@@ -221,9 +209,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             if (entity == nullptr) {
                 continue;
             }
-            // parity: `TheEndGatewayBlockEntity.portalTick`, one year older every turn, and the beam
-            // event every attention interval; only while its own block is still the gateway, which is
-            // `BoundTickingBlockEntity`'s check that the block still matches the type.
+            // parity: `TheEndGatewayBlockEntity.portalTick`, one year older every turn, and the beam.
             if (path == "end_gateway") {
                 const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
                 if (!stateId.has_value() || !endGateways::isGateway(*stateId)) {
@@ -247,8 +233,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            // parity: `SpawnerBlock.getTicker`, and `BoundTickingBlockEntity`, which only ticks a block
-            // entity whose block is still the one it belongs to.
+            // parity: `SpawnerBlock.getTicker`.
             if (path == "mob_spawner") {
                 const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
                 const wire::common::Identifier* block =
@@ -259,16 +244,14 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            // parity: `CampfireBlockEntity.cookTick` while it burns and `cooldownTick` when it does
-            // not: what is on a fire that went out loses its progress two at a time.
+            // parity: `CampfireBlockEntity.cookTick` while it burns and `cooldownTick` when it does.
             if (campfires::isCampfire(path)) {
                 const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
                 if (!stateId.has_value()) {
                     continue;
                 }
                 campfires::State fire = campfires::read(entity->data());
-                // parity: `changed` in both halves of the campfire's tick, which is a slot with
-                // something in it while it burns and a slot with progress left while it does not.
+                // parity: `changed` in both halves of the campfire's tick, which is a slot with.
                 const bool lit = campfires::isLitCampfire(*stateId);
                 bool moved = false;
                 for (std::size_t slot = 0; slot < fire.items.size(); ++slot) {
@@ -279,12 +262,10 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                         return hooks.recipeFor ? hooks.recipeFor(crafting::Cooker::Campfire, stack) : nullptr;
                     });
                 campfires::write(fire, entity->data());
-                // parity: `cookTick` and `cooldownTick` both only call `setChanged` when a slot
-                // actually moved, so an empty campfire does not rewrite its region file every turn.
+                // parity: `cookTick` and `cooldownTick` both only call `setChanged` when a slot.
                 if (moved) {
                     chunk->markDirty();
-                    // parity: `setChanged` is also what tells a comparator, and nothing reads a
-                    // campfire, but the square beside it may hold one over something else.
+                    // parity: `setChanged` is also what tells a comparator, and nothing reads a.
                     redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z,
                                                                   comparatorReading::of(world));
                 }
@@ -295,15 +276,13 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            // parity: `BeaconBlockEntity.tick`, which counts its pyramid and hands out its effects
-            // once every eighty turns and does nothing at all in between.
+            // parity: `BeaconBlockEntity.tick`, which counts its pyramid and hands out its effects.
             if (path == "beacon") {
                 if (gameTime % beacons::kApplyInterval != 0) {
                     continue;
                 }
                 beacons::Stored beacon = beacons::read(entity->data());
-                // parity: `BeaconBlockEntity.tick` walks the column above for blocks light goes
-                // through, and gives nothing out if anything else is in the way.
+                // parity: `BeaconBlockEntity.tick` walks the column above for blocks light goes.
                 const auto passes = [&world](const std::int32_t bx, const std::int32_t by, const std::int32_t bz) {
                     const std::optional<std::int32_t> state = world.blockState(bx, by, bz);
                     if (!state.has_value()) {
@@ -326,8 +305,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     },
                     x, y, z, server::world::worldHeight::kMinY);
                 const bool moved = levels != beacon.levels;
-                // parity: the criterion is raised on the dark-to-lit edge only, before the new count
-                // is written down.
+                // parity: the criterion is raised on the dark-to-lit edge only, before the new count.
                 if (beacon.levels <= 0 && levels > 0 && hooks.beaconLit) {
                     hooks.beaconLit(x, y, z, levels);
                 }
@@ -350,8 +328,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
-            // parity: `BrewingStandBlockEntity.serverTick`, which also shows what it holds on the
-            // block itself.
+            // parity: `BrewingStandBlockEntity.serverTick`, which also shows what it holds on the.
             if (path == "brewing_stand") {
                 brewingStands::State stand = brewingStands::read(entity->data());
                 if (brewingStands::tick(stand, [&hooks, x, y, z](const server::world::loot::ItemStack& remainder) {
@@ -364,8 +341,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z,
                                                                   comparatorReading::of(world));
                 }
-                // parity: the bottle bits are compared **every** turn, outside everything the brew
-                // does, so a bottle put into a stand with no fuel in it still shows on the block.
+                // parity: the bottle bits are compared **every** turn, outside everything the brew.
                 const std::optional<std::int32_t> turned =
                     bottleChange(world, x, y, z, brewingStands::bottleBits(stand));
                 if (turned.has_value()) {
@@ -397,8 +373,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 continue;
             }
             furnaces::write(state, entity->data());
-            // parity: `serverTick` only calls `setChanged` on its own `changed`, so a furnace merely
-            // counting down neither dirties its chunk nor tells the comparator anything.
+            // parity: `serverTick` only calls `setChanged` on its own `changed`, so a furnace merely.
             if (turn.changed) {
                 chunk->markDirty();
                 redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z, comparatorReading::of(world));

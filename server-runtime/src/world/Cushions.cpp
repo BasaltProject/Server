@@ -62,7 +62,6 @@ bool forBlocksIn(const Box& box, Visit&& visit) {
     return false;
 }
 
-/// The bounding box of a block's shape, or nothing for an empty one.
 [[nodiscard]] std::optional<Box> boundsOf(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::span<const std::int32_t> shape = registry::blockShapes::collisionBoxes(stateId);
     if (shape.size() < 6) {
@@ -95,8 +94,7 @@ bool forBlocksIn(const Box& box, Visit&& visit) {
     });
 }
 
-/// parity: `Cushion.isAnchorBuried`, the bottom sixty-fourth wholly under collision. Checked box by
-/// box, which is every case a single block can make.
+/// parity: `Cushion.isAnchorBuried`.
 [[nodiscard]] bool isAnchorBuried(const WorldState& world, const Box& box) {
     const Box slice{up(box.minX),  up(box.minY), up(box.minZ), down(box.maxX), down(box.minY + kAnchorDepth),
                     down(box.maxZ)};
@@ -193,7 +191,7 @@ bool occupied(const WorldState& world, double x, double y, double z) {
 }
 
 float snappedYaw(float yaw) {
-    // parity: `Direction.fromYRot`, `floor(yRot / 90 + 0.5) & 3` into south, west, north, east.
+    // parity: `Direction.fromYRot`.
     const auto quarter = static_cast<std::int32_t>(std::floor((static_cast<double>(yaw) / 90.0) + 0.5)) & 3;
     return static_cast<float>(quarter) * 90.0F;
 }
@@ -225,7 +223,7 @@ std::optional<Clip> clipCollision(std::int32_t stateId, std::int32_t blockX, std
             return Clip{.up = vertical && ray[1] < 0.0, .y = probe[1]};
         }
     }
-    // parity: `AABB.clip` over every box: the nearest entry wins, and only the Y face matters here.
+    // parity: `AABB.clip` over every box.
     std::optional<Clip> best;
     double bestScale = 1.0;
     for (std::size_t at = 0; at + 5 < shape.size(); at += 6) {

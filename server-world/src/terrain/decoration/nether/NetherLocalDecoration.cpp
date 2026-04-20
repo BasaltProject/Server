@@ -16,7 +16,7 @@ namespace {
 constexpr std::int32_t kLocalModificationsStep = 2;
 constexpr std::int32_t kBasaltPillarIndex = 0;
 
-/// parity: the order the 26.3 `basalt_pillar` lists its sides in: east, west, south, north.
+/// parity: the order the 26.3 `basalt_pillar` lists its sides in.
 constexpr std::array<std::pair<std::int32_t, std::int32_t>, 4> kSides{{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}};
 
 [[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
@@ -47,8 +47,7 @@ void setBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std:
     }
 }
 
-/// parity: `SingleBlockPillarFeature` over air: each step rolls its chance even when it is certain,
-/// and the pillar stops at the first block that is not air. Returns the last block it placed.
+/// parity: `SingleBlockPillarFeature` rolls each step's chance even when certain and stops at the first non-air.
 std::int32_t placeColumnDown(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z,
                              float chance, std::int32_t basalt) {
     const ChunkHeight bounds = chunk.verticalBounds();
@@ -61,8 +60,7 @@ std::int32_t placeColumnDown(Chunk& chunk, random::RandomSource& random, std::in
     return y + 1;
 }
 
-/// parity: `ProjectedRandomPatchySquare` of size 3, each kept cell dropped through up to three air
-/// blocks and turned to basalt only where something solid is below.
+/// parity: `ProjectedRandomPatchySquare` of size 3.
 void placeBase(Chunk& chunk, random::RandomSource& random, std::int32_t originX, std::int32_t originY,
                std::int32_t originZ, std::int32_t basalt) {
     for (std::int32_t offsetX = -3; offsetX <= 3; ++offsetX) {
@@ -88,8 +86,7 @@ void placeBase(Chunk& chunk, random::RandomSource& random, std::int32_t originX,
     }
 }
 
-/// parity: the 26.3 `basalt_pillar`, an `overlay` of a capped pillar and four side pillars. The cap
-/// is the patchy base under the pillar's foot and four `rarity_filter` basalt blocks beside it.
+/// parity: 26.3 `basalt_pillar`, an `overlay` of a capped pillar and four side pillars.
 void placePillar(Chunk& chunk, random::RandomSource& random, std::int32_t originX, std::int32_t originY,
                  std::int32_t originZ) {
     if (!isAir(chunk, originX, originY, originZ) || isAir(chunk, originX, originY + 1, originZ)) {

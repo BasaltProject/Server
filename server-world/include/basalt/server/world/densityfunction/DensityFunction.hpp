@@ -40,12 +40,11 @@ enum class Axis : std::uint8_t { X, Y, Z };
     return axis == Axis::X ? kAxisX : (axis == Axis::Y ? kAxisY : kAxisZ);
 }
 
-/// parity: `DensityFunction.CompileContext`, what a function needs from the world to sample.
+/// parity: `DensityFunction.CompileContext`.
 class CompileContext {
 public:
     virtual ~CompileContext() = default;
 
-    /// The sampler for a named noise, or the legacy-seeded one the Nether's climate asks for.
     [[nodiscard]] virtual std::shared_ptr<const noise::Noise> createNoise(const std::string& noiseId) = 0;
 
     [[nodiscard]] virtual random::RandomSource createRandom(std::string_view seedName) = 0;
@@ -60,8 +59,7 @@ public:
     [[nodiscard]] virtual Function rewrite(const Function& function) const = 0;
 };
 
-/// parity: `DensitySampler`, a compiled function. The point path and the volume path are both
-/// part of the contract: vanilla uses each where it does, and they do not always round alike.
+/// parity: `DensitySampler`.
 class DensitySampler {
 public:
     virtual ~DensitySampler() = default;
@@ -79,7 +77,6 @@ protected:
     DensitySampler() = default;
 };
 
-/// The node kinds, which rewrite rules and constant folding switch on.
 enum class Kind : std::uint8_t {
     Constant,
     Reference,
@@ -105,8 +102,7 @@ enum class Kind : std::uint8_t {
     BlendedNoise,
 };
 
-/// parity: `DensityFunction`, an immutable expression node. Structural equality matters: vanilla
-/// shares one cache between every `cache` node whose input compares equal.
+/// parity: `DensityFunction`.
 class DensityFunction {
 public:
     virtual ~DensityFunction() = default;
@@ -120,13 +116,11 @@ public:
     [[nodiscard]] virtual std::int32_t domainAxes() const = 0;
     [[nodiscard]] virtual Sampler compile(CompileContext& context) const = 0;
 
-    /// `self` is this node's own handle, returned when no child changed.
     [[nodiscard]] virtual Function rewriteChildren(const Function& self, const RewriteRule& rule) const = 0;
 
     [[nodiscard]] virtual bool equals(const DensityFunction& other) const = 0;
     [[nodiscard]] virtual std::size_t hash() const = 0;
 
-    /// The value of a `constant` node, and nothing for any other.
     [[nodiscard]] virtual std::optional<float> constantValue() const { return std::nullopt; }
 
 protected:
@@ -173,7 +167,6 @@ struct Spline {
         float derivative;
     };
 
-    /// A constant spline has no coordinate and no points.
     std::optional<float> constant;
     Function coordinate;
     std::vector<Point> points;
@@ -228,7 +221,6 @@ namespace functions {
 
 } // namespace functions
 
-/// The target of a reference node, or the node itself for any other.
 [[nodiscard]] const Function& inlineReference(const Function& function);
 
 } // namespace basalt::server::world::densityfunction

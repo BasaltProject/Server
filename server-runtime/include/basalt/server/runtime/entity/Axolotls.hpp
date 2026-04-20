@@ -7,8 +7,6 @@
 
 namespace basalt::server::runtime::entity {
 
-/// The axolotl: hunting what swims, playing dead when hurt, and the player it helps.
-///
 /// parity: `Axolotl`, `AxolotlAi`, `PlayDead` and `ValidatePlayDead`.
 namespace axolotls {
 

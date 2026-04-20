@@ -31,13 +31,11 @@ struct Hit {
     }
 };
 
-/// parity: `BlockState.canBeReplaced(Fluid)`: whatever gives way to a placed block, plus anything
-/// that is not solid, which is what lets a bucket be emptied into water or lava.
+/// parity: `BlockState.canBeReplaced(Fluid)`.
 [[nodiscard]] bool replaceable(std::int32_t stateId) {
     return registry::blockShapes::isReplaceable(stateId) || !registry::blockShapes::isSolidState(stateId);
 }
 
-/// Steps along the look vector until it meets something; no shapes here to clip against.
 [[nodiscard]] std::optional<Hit> trace(WorldState& world, double eyeX, double eyeY, double eyeZ, float yaw, float pitch,
                                        double reach, bool stopAtFluid) {
     const double yawRadians = static_cast<double>(yaw) * kPiOver180;
@@ -76,12 +74,10 @@ struct Hit {
 }
 
 /// Whether this block is one that takes water inside itself. parity: `SimpleWaterloggedBlock`, whose
-/// whole contract is the `waterlogged` property.
 [[nodiscard]] bool holdsWaterInside(std::int32_t stateId) {
     return registry::blockStateDefinitions::propertiesOf(stateId).contains("waterlogged");
 }
 
-/// The same state with `waterlogged` the other way round, or nothing when this block cannot hold
 /// water at all. parity: `SimpleWaterloggedBlock`, whose whole contract is that one property.
 [[nodiscard]] std::optional<std::int32_t> waterloggedTo(std::int32_t stateId, bool holdsWater) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -97,18 +93,14 @@ struct Hit {
                                                       stateId);
 }
 
-/// parity: `BucketItem.emptyContents`: onto the face it hit, or into the block itself if that can
-/// hold it.
+/// parity: `BucketItem.emptyContents`.
 [[nodiscard]] std::optional<Result> pour(const fluidFlow::Context& context, const Hit& hit, FluidKind content,
                                          bool creative) {
     const std::optional<std::int32_t> clicked = context.world.blockState(hit.x, hit.y, hit.z);
     if (!clicked.has_value()) {
         return std::nullopt;
     }
-    // parity: the `WATER_EVAPORATES` branch of `BucketItem.emptyContents`, which goes **before** the
-    // one that soaks a block and before the one that writes water: in the Nether a bucket of water
-    // hisses, leaves nothing at all, and is spent all the same. Putting it after would waterlog a
-    // Nether stair, which vanilla never does.
+    // parity: the `WATER_EVAPORATES` branch of `BucketItem.emptyContents`.
     if (content == FluidKind::Water && context.ultrawarm) {
         Result hissed;
         if (!creative) {
@@ -116,24 +108,17 @@ struct Hit {
         }
         return hissed;
     }
-    // parity: `BucketItem.emptyContents`' `LiquidBlockContainer` branch, which comes **before** the
-    // one that writes a block of water: a stair, a slab or a fence takes the water inside itself and
-    // stays where it is. `canPlaceLiquid` is `type == WATER`, so lava never goes in and falls through
-    // to the face instead, which is what the offset below already does.
+    // parity: `BucketItem.emptyContents`' `LiquidBlockContainer` branch.
     if (content == FluidKind::Water && holdsWaterInside(*clicked)) {
         Result soakedResult;
-        // parity: `canPlaceLiquid` only asks whether the fluid is water, not whether the block is
-        // already full, so emptying a bucket onto a stair that is **already** waterlogged changes
-        // nothing and still takes the bucket. `placeLiquid` answers false and `emptyContents` returns
-        // true regardless.
+        // parity: `canPlaceLiquid` only asks whether the fluid is water, not whether the block is.
         if (const std::optional<std::int32_t> soaked = waterloggedTo(*clicked, true); soaked.has_value()) {
             if (!context.world.setBlockState(hit.x, hit.y, hit.z, *soaked)) {
                 return std::nullopt;
             }
             soakedResult.changes.push_back(
                 FluidChange{.x = hit.x, .y = hit.y, .z = hit.z, .stateId = *soaked, .washedAway = *clicked});
-            // parity: `SimpleWaterloggedBlock.placeLiquid` books water's own turn right after the
-            // write, and the write is a flag three, so the neighbours hear it as well.
+            // parity: `SimpleWaterloggedBlock.placeLiquid` books water's own turn right after the.
             context.world.scheduleFluidTick(hit.x, hit.y, hit.z, fluidId(FluidKind::Water, true),
                                             fluidFlow::kWaterTickDelay);
             for (const FluidChange& change : fluidFlow::onBlockChanged(context, hit.x, hit.y, hit.z)) {
@@ -167,14 +152,13 @@ struct Hit {
     return result;
 }
 
-/// parity: `BucketPickup.pickupBlock` on `LiquidBlock`: only a source goes into the bucket.
+/// parity: `BucketPickup.pickupBlock` on `LiquidBlock`.
 [[nodiscard]] std::optional<Result> fill(const fluidFlow::Context& context, const Hit& hit) {
     const std::optional<std::int32_t> state = context.world.blockState(hit.x, hit.y, hit.z);
     if (!state.has_value()) {
         return std::nullopt;
     }
-    // parity: `SimpleWaterloggedBlock.pickupBlock`, which takes the water back out of a block that
-    // was holding it and leaves the block itself standing.
+    // parity: `SimpleWaterloggedBlock.pickupBlock`.
     if (const std::optional<std::int32_t> dried = waterloggedTo(*state, false); dried.has_value()) {
         if (!context.world.setBlockState(hit.x, hit.y, hit.z, *dried)) {
             return std::nullopt;

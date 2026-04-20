@@ -34,11 +34,6 @@ namespace timings {
 class TimingsReport;
 }
 
-/// Everything the command tree is built out of that only a running server owns.
-///
-/// A struct rather than forty parameters: almost all of it is a pointer the server already holds,
-/// and a caller that has none of it (a test) leaves them null and gets the commands that need
-/// nothing.
 struct CommandWiring {
     player::PlayerRegistry* players = nullptr;
     config::LiveConfigs* live = nullptr;
@@ -51,7 +46,6 @@ struct CommandWiring {
     function::FunctionLibrary* functions = nullptr;
     command::commands::FunctionRunner* functionRunner = nullptr;
     command::commands::FunctionSchedule* functionSchedule = nullptr;
-    /// The packs `/reload` and `/datapack` work on, and how a selection is loaded.
     command::commands::DataPackControl datapacks;
     command::commands::BossBarRegistry* bossBars = nullptr;
     command::CommandStorage* commandStorage = nullptr;
@@ -73,15 +67,12 @@ struct CommandWiring {
 
     std::function<server::plugins::PluginEventBus*()> pluginEvents;
     std::function<void()> stopServer;
-    /// parity: a block a command knocks down drops its own items. Handed over rather than reached
-    /// for: the command tree has no business knowing what a loot table is.
+    /// parity: a block a command knocks down drops its own items.
     std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                        std::int32_t destroyedState)>
         dropBrokenBlock;
-    /// parity: `CarvedPumpkinBlock.trySpawnGolem`. Handed over for the same reason: the command tree
-    /// has no business knowing how a mob is made.
+    /// parity: `CarvedPumpkinBlock.trySpawnGolem`.
     std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
-    /// What `/kill` hands the one entity whose death is not played out. See `CommandEnvironment`.
     std::function<bool(world::LoadedWorld& world, entity::ServerEntity& entity)> killOutright;
     std::function<void()> requestRestart;
     std::function<void()> onConfigsReloaded;
@@ -96,21 +87,12 @@ struct CommandWiring {
     std::function<void(std::int32_t minutes)> setIdleTimeout;
 };
 
-/// The tree and the two things it borrows for as long as it lives.
-///
-/// The dispatcher holds a reference to its environment and the commands hold one to the data access,
-/// so all three travel together: a caller that kept only the dispatcher would be holding a dangling
-/// reference the moment this went out of scope.
 struct WiredCommands {
     std::unique_ptr<command::CommandEnvironment> environment;
     std::unique_ptr<command::DataAccess> data;
     std::unique_ptr<command::CommandDispatcher> dispatcher;
 };
 
-/// Builds and registers every vanilla command, plus the ones tied to server-wide state.
-///
-/// Pure construction-time wiring: nothing here runs per tick. Kept out of the server's own
-/// constructor so that class stays about what a server *is*, not about assembling a command tree.
 [[nodiscard]] WiredCommands buildCommands(const CommandWiring& wiring);
 
 } // namespace basalt::server::runtime

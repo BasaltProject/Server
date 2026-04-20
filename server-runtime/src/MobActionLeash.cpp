@@ -192,7 +192,7 @@ ServerEntity* MobActionSystem::knotAt(world::LoadedWorld& world, const std::arra
 }
 
 void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed) {
-    // parity: `restoreLeashFromSave`: the saved holder found again, or the knot tied again, or the
+    // parity: `restoreLeashFromSave`.
     // lead dropped once it has waited long enough.
     if (!leashed.leashHolderId.has_value() &&
         (leashed.leashHolderUuid.has_value() || leashed.leashKnotAt.has_value())) {
@@ -238,7 +238,7 @@ void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed
     }
     const leashes::Body holderBody = player != nullptr ? bodyOf(*player) : bodyOf(*holder);
     const double distance = leashes::distance(bodyOf(leashed), holderBody);
-    // parity: `PathfinderMob.whenLeashedTo`: home is where the holder stands, five blocks across.
+    // parity: `PathfinderMob.whenLeashedTo`.
     if (!entity::boats::isBoat(leashed.type())) {
         leashed.homePosition = std::array{mth::floor(holderBody.x), mth::floor(holderBody.y), mth::floor(holderBody.z)};
         leashed.homeRadius = static_cast<std::int32_t>(leashes::elasticDistance(leashed)) - 1;
@@ -259,7 +259,7 @@ void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed
         leashed.velocityZ += pull->push[2];
     } else if (!entity::boats::isBoat(leashed.type()) && leashed.type().path() != "allay" &&
                leashed.type().path() != "happy_ghast" && leashed.panicTicks <= 0 && !leashed.noAi) {
-        // parity: `PathfinderMob.closeRangeLeashBehaviour`: walk to two blocks short of the holder.
+        // parity: `PathfinderMob.closeRangeLeashBehaviour`.
         const double dx = holderBody.x - leashed.x;
         const double dy = holderBody.y - leashed.y;
         const double dz = holderBody.z - leashed.z;
@@ -287,7 +287,7 @@ MobActionSystem::LeashUse MobActionSystem::useOnLeashable(world::LoadedWorld& wo
         return LeashUse::Pass;
     }
     const leashes::Body here = bodyOf(entity);
-    // parity: `Entity.interact`: a crouching player ties the mobs they hold to this one instead.
+    // parity: `Entity.interact`.
     if (player.sneaking && canBeLeashed(entity) && entity.age >= 0) {
         bool tied = false;
         for (ServerEntity* mob :
@@ -392,7 +392,7 @@ MobActionSystem::LeashUse MobActionSystem::useOnKnot(world::LoadedWorld& world, 
 
 bool MobActionSystem::bindPlayerMobs(world::LoadedWorld& world, PlayerSession& player,
                                      const std::array<std::int32_t, 3>& fence) {
-    // parity: `LeadItem.bindPlayerMobs`: every mob the player holds within reach, onto one knot.
+    // parity: `LeadItem.bindPlayerMobs`.
     const std::vector<ServerEntity*> held =
         leashedToId(world, player.entityId(), fence[0] + 0.5, fence[1] + 0.5, fence[2] + 0.5);
     if (held.empty()) {

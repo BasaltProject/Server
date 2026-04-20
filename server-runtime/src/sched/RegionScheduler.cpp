@@ -11,11 +11,7 @@ namespace basalt::server::runtime::sched {
 namespace {
 
 /// The chunk a world coordinate is in.
-///
-/// parity: `SectionPos.blockToSectionCoord(Mth.floor(x))`, which is a floor and then a shift. The
-/// frozen Kotlin subtracted almost sixteen from a negative coordinate instead, and that answers one
-/// chunk too far west at exact negative multiples of sixteen: x of -16.0 is the first block of
-/// chunk -1, not the last of chunk -2.
+/// parity: `SectionPos.blockToSectionCoord(Mth.floor(x))`.
 [[nodiscard]] std::int32_t floorToChunk(double value) { return wire::common::mth::floor(value) >> 4; }
 
 static_assert(regionMap::sectionOf(-1) == -1, "a shift, not a division: chunk -1 is in section -1");
@@ -132,12 +128,9 @@ void RegionScheduler::repartition(std::string_view worldName, std::span<const st
         }
         Region* survivor = nullptr;
         if (!owners.empty()) {
-            // Whoever already owns most of this group keeps it, so the fewest tasks move.
             survivor = *std::ranges::max_element(
                 owners, [&overlap](const Region* left, const Region* right) { return overlap(left) < overlap(right); });
         } else {
-            // A group nobody owned yet: the world's first free region takes it if there is one, and
-            // otherwise it is a new one.
             const auto free =
                 std::ranges::find_if(spare, [](const Region* region) { return region->sections().empty(); });
             if (free != spare.end()) {
@@ -151,10 +144,8 @@ void RegionScheduler::repartition(std::string_view worldName, std::span<const st
             if (other == survivor) {
                 continue;
             }
-            // Everything it had queued belongs to the survivor now, not to nobody.
             other->owner().drainInto(survivor->owner());
-            // Closed although it is about to be dropped: nothing can be handed to it between here
-            // and the end of this repartition, and a caller that kept a pointer is told why.
+            // Closed although about to be dropped: a caller that kept a pointer is told why instead of queueing.
             other->owner().close();
             std::erase(spare, other);
             ++merged;
@@ -164,8 +155,7 @@ void RegionScheduler::repartition(std::string_view worldName, std::span<const st
         kept.push_back(survivor);
     }
 
-    // What is left owned sections nobody has loaded any more: its work goes to the first region of
-    // the world rather than being dropped on the floor.
+    // What is left owned sections nobody has loaded: its work goes to the world's first region, not the floor.
     for (Region* gone : spare) {
         gone->owner().drainInto(kept.front()->owner());
         gone->owner().close();

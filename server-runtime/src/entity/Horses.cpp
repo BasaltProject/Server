@@ -146,7 +146,7 @@ bool saddleSlotActive(const ServerEntity& horse) {
     if (!takesSaddle(path)) {
         return false;
     }
-    // parity: `Horse`, `SkeletonHorse` and `ZombieHorse` can use every slot; the rest only grown and tame.
+    // parity: `Horse`.
     if (oneOf(path, {"horse", "skeleton_horse", "zombie_horse"})) {
         return true;
     }

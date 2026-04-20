@@ -11,20 +11,14 @@
 
 namespace basalt::server::runtime::world::growthSupport {
 
-/// Primitives shared by more than one block-family growth object.
-///
-/// Kept apart from any single family so none of them has to depend on another for a horizontal
-/// offset or a light threshold.
+/// Kept apart from any one family so none depends on another for a horizontal offset or light threshold.
 inline constexpr std::int32_t kGrowthLight = 9;
 
-/// parity: `Direction.Plane.HORIZONTAL`'s own array, which is **not** the order the `Direction` enum
-/// declares them in. Anything that picks one at random reads it by index, so the difference is a
-/// different branch for the same seed.
+/// parity: `Direction.Plane.HORIZONTAL`.
 inline constexpr std::array<std::string_view, 4> kHorizontalNames{"north", "east", "south", "west"};
 
 inline constexpr std::array<std::string_view, 6> kFaceNames{"down", "up", "north", "south", "west", "east"};
 
-/// Writes the block and records the change, or does neither when the position is not loaded.
 void set(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
          std::vector<BlockChange>& changes);
 
@@ -34,11 +28,9 @@ void set(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
 
 [[nodiscard]] std::int32_t offsetZ(std::string_view facing);
 
-/// Advances an age property by one, shared by every simple age-based crop.
 void grow(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, std::int32_t maxAge,
           std::vector<BlockChange>& changes);
 
-/// The `age` of a block state, or nothing when it has none or it is not a number.
 [[nodiscard]] std::optional<std::int32_t> ageOf(std::int32_t stateId);
 
 } // namespace basalt::server::runtime::world::growthSupport

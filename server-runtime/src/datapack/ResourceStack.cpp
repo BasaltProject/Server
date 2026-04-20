@@ -16,7 +16,6 @@ constexpr std::string_view kDataRoot = "data/";
 constexpr std::string_view kTagsDirectory = "tags/";
 constexpr std::string_view kJsonSuffix = ".json";
 
-/// `data/<namespace>/<path>` split into its two halves, or nothing for a name outside `data/`.
 [[nodiscard]] std::optional<std::pair<std::string_view, std::string_view>> split(std::string_view name) {
     if (!name.starts_with(kDataRoot)) {
         return std::nullopt;
@@ -34,11 +33,9 @@ constexpr std::string_view kJsonSuffix = ".json";
     return parts.has_value() && parts->second.starts_with(kTagsDirectory) && name.ends_with(kJsonSuffix);
 }
 
-/// The tag's own id: `data/ns/tags/<registry>/<path>.json` is `ns:<path>`.
 [[nodiscard]] std::string tagIdOf(std::string_view name) {
     const auto parts = split(name);
     std::string_view path = parts->second.substr(kTagsDirectory.size());
-    // The registry itself may have a slash in it (`worldgen/biome`), but the log only needs a name.
     path.remove_suffix(kJsonSuffix.size());
     return std::string{parts->first} + ":" + std::string{path};
 }
@@ -62,7 +59,6 @@ ResourceStack::ResourceStack(std::vector<Layer> layers, wire::common::Logger log
         std::vector<CompiledPattern> compiled;
         for (const IdentifierPattern& pattern : layer.filter) {
             CompiledPattern one;
-            // Checked when the metadata was read, so neither can throw here.
             if (pattern.namespacePattern.has_value()) {
                 one.nameSpace.emplace(*pattern.namespacePattern);
             }

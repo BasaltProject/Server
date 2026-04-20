@@ -112,7 +112,7 @@ void MapData::setColor(std::int32_t x, std::int32_t y, std::uint8_t color) {
 
 std::int8_t MapData::rotationOf(std::optional<std::int64_t> gameTime, double yRot) const {
     if (dimension_ == kNether && gameTime.has_value()) {
-        // parity: `calculateRotation` spins a Nether marker off the clock, in Java's wrapping ints.
+        // parity: `calculateRotation` spins a Nether marker off the clock.
         const auto s = static_cast<std::uint32_t>(static_cast<std::int32_t>(*gameTime / 10));
         const auto mixed = static_cast<std::int32_t>((s * s * 34187121U) + (s * 121U));
         return static_cast<std::int8_t>((mixed >> 15) & 15);

@@ -11,9 +11,7 @@
 namespace basalt::server::runtime::world::lightning {
 namespace {
 
-/// parity: the tag `lightning_rods`, which is **eight** blocks and not one: the rod oxidises like
-/// any other copper, and each stage is its own block. Every one of the eight ends in `lightning_rod`,
-/// and nothing else does, so the name is the whole test.
+/// parity: the tag `lightning_rods`.
 [[nodiscard]] bool isRod(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && block->path().ends_with("lightning_rod");
@@ -24,8 +22,6 @@ void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
     if (!stateId.has_value() || !isRod(*stateId)) {
         return;
     }
-    // The rod's **own** block, not the plain one: writing the plain one here would turn a weathered
-    // rod into a fresh one every time it was struck.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     if (block == nullptr) {
         return;
@@ -36,8 +32,7 @@ void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
         return;
     }
     if (world.setBlockState(x, y, z, *turned)) {
-        // parity: `LightningRodBlock.onLightningStrike` ends in `levelEvent(3002, pos, axis)`, the
-        // sparks running along the rod, and the axis is the ordinal of its facing's own axis.
+        // parity: `LightningRodBlock.onLightningStrike` ends in `levelEvent(3002.
         const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*turned);
         const auto facing = properties.find("facing");
         const std::int32_t axis = facing == properties.end()                                 ? 1
@@ -54,10 +49,7 @@ void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
     world.scheduleBlockTick(x, y, z, *block, kRodTicks);
 }
 
-/// parity: `findLightningRod`, which takes the closest rod whose tip is the top of its own column.
-///
-/// Vanilla searches its point-of-interest index; here the loaded chunks around the target are walked
-/// instead, which reaches the same rods without an index to keep.
+/// parity: `findLightningRod`.
 [[nodiscard]] std::optional<std::array<std::int32_t, 3>> rodNear(WorldState& world, std::int32_t x, std::int32_t y,
                                                                  std::int32_t z) {
     std::optional<std::array<std::int32_t, 3>> best;

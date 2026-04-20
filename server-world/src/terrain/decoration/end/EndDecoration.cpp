@@ -78,8 +78,6 @@ const std::set<std::string, std::less<>>& chorusDownConnections() {
     return paths;
 }
 
-/// The read and write view a chorus plant grows through: it reaches across the chunk edge, and what
-/// is out there has to be sampled from the router rather than read.
 class ChorusWorld {
 public:
     ChorusWorld(Chunk& chunk, const NoiseRouter& router) : chunk_(&chunk), router_(&router) {}

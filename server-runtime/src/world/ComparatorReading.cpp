@@ -14,7 +14,7 @@
 namespace basalt::server::runtime::world::comparatorReading {
 namespace {
 
-/// parity: `ShelfBlock.getAnalogOutputSignal`, which needs the shelf's own facing and its slots.
+/// parity: `ShelfBlock.getAnalogOutputSignal`.
 [[nodiscard]] std::optional<std::int32_t> shelfSignal(WorldState& world, const std::int32_t x, const std::int32_t y,
                                                       const std::int32_t z, const std::int32_t stateId,
                                                       const std::string_view from) {
@@ -51,8 +51,7 @@ bool exists(WorldState& world, const std::int32_t x, const std::int32_t y, const
     if (!stateId.has_value()) {
         return false;
     }
-    // parity: `ShelfBlock.hasAnalogOutputSignal` is true whichever side the comparator is on, even
-    // though `getAnalogOutputSignal` only answers from behind.
+    // parity: `ShelfBlock.hasAnalogOutputSignal` is true whichever side the comparator is on.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     if (block != nullptr && shelves::isShelf(block->path())) {
         return true;

@@ -30,21 +30,17 @@ namespace basalt::server::runtime {
 
 class ClientSession;
 
-/// Everything that hurts, heals or kills the player on this connection, plus what they hit.
 class CombatHandler {
 public:
-    /// What a plugin gets a say in. Answering nothing to `damaged` stops the hit entirely.
     struct Hooks {
         std::function<std::optional<float>(const player::PlayerSession& player, float amount, std::string_view cause,
                                            const std::optional<std::int32_t>& sourceEntityId)>
             damaged;
         std::function<std::optional<float>(const player::PlayerSession& player, float amount)> healed;
         std::function<void(const player::PlayerSession& player, const std::string& deathMessage)> died;
-        /// Whether this player may hit that entity, for a plugin that runs a protected area.
         std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> attackAllowed;
     };
 
-    /// The rolls a hit makes: the critical roll and the sound seeds.
     struct Options {
         std::function<double()> nextDouble;
         std::function<std::int64_t()> nextSeed;
@@ -52,13 +48,12 @@ public:
 
     explicit CombatHandler(ClientSession& owner, Hooks hooks = {}, Options options = {});
 
-    /// How far this player has fallen so far, which is what a landing is charged for.
     double fallDistance = 0.0;
 
     /// parity: `ServerPlayer.startingToFallPosition`, where the fall now being counted began.
     std::optional<std::array<double, 3>> fallStart;
 
-    /// parity: `ServerPlayer.resetFallDistance`, which grants `fall_from_height` to a fall survived.
+    /// parity: `ServerPlayer.resetFallDistance`.
     void resetFall(const player::PlayerSession& session);
 
     void dismount(player::PlayerSession& session);
@@ -68,14 +63,13 @@ public:
 
     void handleInteract(const wire::protocol::play::InteractPacket& interact);
 
-    /// parity: `checkAutoSpinAttack` for a riptide, on the move the client reports: the first living
-    /// thing in the way takes the spin's blow and ends it.
+    /// parity: `checkAutoSpinAttack`.
     void spinAttack(player::PlayerSession& session, double toX, double toY, double toZ);
 
     /// parity: the `STAB` of `handlePlayerAction`: a spear's jab along the look.
     void jab();
 
-    /// parity: `Item.use` for a `kinetic_weapon`: the spear held up in that hand slot to charge.
+    /// parity: `Item.use` for a `kinetic_weapon`.
     bool startCharge(player::PlayerSession& session, std::int32_t slot);
 
     /// parity: `KineticWeapon.damageEntities`, one tick of the charge.
@@ -84,8 +78,7 @@ public:
     /// parity: `stopUsingItem`, which forgets whoever the charge struck.
     void stopCharge();
 
-    /// parity: `ServerGamePacketListenerImpl.handleMoveVehicle`: the driver's client moves the vehicle
-    /// and the server takes it, unless it went too far at once.
+    /// parity: `ServerGamePacketListenerImpl.handleMoveVehicle`.
     void handleMoveVehicle(const wire::protocol::play::ServerboundMoveVehiclePacket& packet);
 
     /// parity: `handlePaddleBoat`, the oars everyone else sees.
@@ -94,19 +87,15 @@ public:
     /// parity: the riding jump and `OPEN_INVENTORY` of `handlePlayerCommand`.
     void handleRidingCommand(wire::protocol::play::PlayerCommandPacket::Action action, std::int32_t data);
 
-    /// A mount's saddle or body armour, as a click or its window sets it: seen by everyone, with the
-    /// equip sound and game event.
     void equipMount(entity::ServerEntity& mount, entity::mobEquipment::Slot slot,
                     const std::optional<server::world::loot::ItemStack>& stack);
 
     /// parity: `Entity.getControllingPassenger` as it answers this player.
     [[nodiscard]] bool controls(const player::PlayerSession& session, const entity::ServerEntity& vehicle) const;
 
-    /// What is left of a hit after armour, resistance, protection and the tags that bypass them.
     [[nodiscard]] float reduced(const player::PlayerSession& session, float amount,
                                 const std::optional<wire::common::Identifier>& damageType) const;
 
-    /// Counts the fall, and charges for it on landing.
     void trackFall(player::PlayerSession& session, double y, bool onGround,
                    const std::optional<std::int32_t>& feetState);
 
@@ -119,7 +108,6 @@ public:
     void killPlayer(std::string_view deathMessageId);
 
 private:
-    /// What the edition-agnostic damage needs, built from what this connection knows.
     [[nodiscard]] player::DamageContext damageContext() const;
 
     void die(std::string_view deathMessageId, const std::optional<wire::text::Component>& killer);
@@ -129,15 +117,13 @@ private:
 
     void applyFallDamage(player::PlayerSession& session, double landingY);
 
-    /// Whoever a spear may reach from here, mobs and, with pvp on, players.
     [[nodiscard]] std::vector<player::spear::Candidate> spearTargets(const player::PlayerSession& session,
                                                                      world::LoadedWorld& world);
 
-    /// parity: `Player.stabAttack`; `strength` is the swing's charge for a jab and nothing for a charge.
+    /// parity: `Player.stabAttack`.
     bool stab(player::PlayerSession& session, world::LoadedWorld& world, std::int32_t targetId, std::int32_t slot,
               float base, bool dealsDamage, bool dealsKnockback, bool dismounts, std::optional<float> strength);
 
-    /// What a stab carries once the weapon has been read.
     struct StabBlow {
         float total = 0.0F;
         float magic = 0.0F;
@@ -147,7 +133,6 @@ private:
         bool dismounts = false;
     };
 
-    /// `stab` landing on another player, whose motion is theirs to apply.
     bool stabPlayer(player::PlayerSession& session, player::PlayerSession& victim, std::int32_t slot,
                     const StabBlow& blow);
 
@@ -156,48 +141,42 @@ private:
 
     void soundAroundExceptSelf(const player::PlayerSession& session, std::string_view sound);
 
-    /// parity: `Mob.attemptToShearEquipment` with the shears in that hand slot. Answers whether a
-    /// piece came off.
+    /// parity: `Mob.attemptToShearEquipment` with the shears in that hand slot.
     bool shearEquipment(player::PlayerSession& session, entity::ServerEntity& mob, std::int32_t handSlot);
 
     /// parity: `Player.attack`'s sweep, which hits what is standing beside what was hit.
     void sweepAround(player::PlayerSession& session, const entity::ServerEntity& target, world::LoadedWorld& world,
                      float strength, float baseDamage, const std::optional<storage::StoredItemStack>& weapon);
 
-    /// What a melee blow needs, over `blocks` for the wear it causes.
     [[nodiscard]] player::pvp::Context meleeContext(const player::BreakContext& blocks);
 
     /// parity: `Player.attack` on another player, who is no entity of the world's.
     void attackPlayer(player::PlayerSession& session, player::PlayerSession& victim, world::LoadedWorld& world);
 
-    /// parity: `TamableAnimal.mobInteract`: a pet sits or stands, and a wild one may be tamed.
+    /// parity: `TamableAnimal.mobInteract`.
     bool tameOrSit(const world::LoadedWorld& world, player::PlayerSession& session, entity::ServerEntity& entity);
 
-    /// parity: `ItemFrame.interact`, which takes what is in the hand and turns what is already
-    /// behind the glass. Answers whether the click was a frame's.
+    /// parity: `ItemFrame.interact`.
     bool useItemFrame(player::PlayerSession& session, entity::ServerEntity& frame);
 
-    /// parity: `ItemFrame.hurtServer`: a frame with something behind the glass drops what it holds
-    /// and stays on the wall, and an empty one comes off.
+    /// parity: `ItemFrame.hurtServer`.
     void breakFrame(player::PlayerSession& session, entity::ServerEntity& frame);
 
-    /// parity: `Cushion.hurtServer`: any hit takes it off, and a survival player gets it back.
+    /// parity: `Cushion.hurtServer`.
     void breakCushion(player::PlayerSession& session, entity::ServerEntity& cushion);
 
-    /// The item and the turn a frame is showing, sent to everyone who can see it.
     void broadcastFrame(const entity::ServerEntity& frame);
 
     void mount(player::PlayerSession& session, entity::ServerEntity& vehicle);
 
-    /// parity: `getDismountLocationForPassenger`, where a vehicle sets its rider down, or nothing for
-    /// the vehicles that keep the old lift.
+    /// parity: `getDismountLocationForPassenger`.
     [[nodiscard]] std::optional<std::array<double, 3>> dismountSpot(const player::PlayerSession& session,
                                                                     const entity::ServerEntity& vehicle) const;
 
-    /// parity: each horse kind's `mobInteract`. Answers whether the click was the mount's.
+    /// parity: each horse kind's `mobInteract`.
     bool interactMount(player::PlayerSession& session, entity::ServerEntity& horse, bool mainHand);
 
-    /// parity: `fedFood` over `handleEating`. Answers whether it ate.
+    /// parity: `fedFood` over `handleEating`.
     bool feedMount(player::PlayerSession& session, entity::ServerEntity& horse, const wire::common::Identifier& item);
 
     void rideMount(player::PlayerSession& session, entity::ServerEntity& horse);
@@ -206,10 +185,9 @@ private:
 
     void mountSound(const entity::ServerEntity& mount, std::string_view sound, float volume, float pitch);
 
-    /// `nextFloat() - nextFloat()`, what vanilla spreads a pitch with.
     [[nodiscard]] float soundRoll() const;
 
-    /// parity: `AbstractBoat.interact`. Answers whether the player got in.
+    /// parity: `AbstractBoat.interact`.
     bool boardBoat(player::PlayerSession& session, entity::ServerEntity& boat);
 
     /// parity: `VehicleEntity.hurtServer`, which is damage points rather than health.
@@ -235,11 +213,9 @@ private:
     ClientSession* owner_;
     Hooks hooks_;
     Options options_;
-    /// parity: `vehiclePositionLastResetAt`, the turn a vehicle this player does not drive was last put back.
+    /// parity: `vehiclePositionLastResetAt`.
     std::int64_t vehicleResetAt_ = 0;
-    /// Whether the attack under way is a riptide's, which reaches anywhere and hits for the spin.
     bool spinning_ = false;
-    /// The hand slot a spear is being charged from, the ticks of it so far, and who it struck when.
     /// parity: `useItemRemaining` and `recentKineticEnemies`.
     std::optional<std::int32_t> chargeSlot_;
     std::int32_t chargeTicks_ = 0;

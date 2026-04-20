@@ -24,7 +24,7 @@ constexpr std::int32_t kOverworldSearchRadius = 128;
 constexpr std::int32_t kCreateSearchRadius = 16;
 constexpr std::int32_t kSectionHeight = 16;
 
-/// parity: `PortalForcer`'s own floor for a forced portal, which is why one appears in the air.
+/// parity: `PortalForcer`'s own floor for a forced portal.
 constexpr std::int32_t kForcedMinY = 70;
 
 constexpr std::array<std::array<std::int32_t, 3>, 6> kNeighbours{
@@ -40,7 +40,6 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kNeighbours{
     return state;
 }
 
-/// Tells the world's index about every chunk these blocks are in, once each.
 void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>& blocks) {
     if (blocks.empty()) {
         return;
@@ -59,7 +58,6 @@ void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>&
     }
 }
 
-/// Every portal block reachable from this one, turned back into air.
 [[nodiscard]] std::vector<std::array<std::int32_t, 3>> clearConnected(LoadedWorld& world, std::int32_t x,
                                                                       std::int32_t y, std::int32_t z) {
     std::vector<std::array<std::int32_t, 3>> cleared;
@@ -80,10 +78,9 @@ void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>&
     return cleared;
 }
 
-/// The right-hand step of the frame, which is the axis it stands on.
 [[nodiscard]] std::array<std::int32_t, 2> step(PortalAxis axis) { return {portal::rightX(axis), portal::rightZ(axis)}; }
 
-/// parity: `PortalForcer.canHostFrame`: solid under the frame, replaceable everywhere in it.
+/// parity: `PortalForcer.canHostFrame`.
 [[nodiscard]] bool canHostFrame(LoadedWorld& world, const std::array<std::int32_t, 3>& spot, PortalAxis axis) {
     const auto [stepX, stepZ] = step(axis);
     for (std::int32_t column = -1; column < 3; column++) {
@@ -109,7 +106,6 @@ void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>&
     return true;
 }
 
-/// Walks out from the origin looking for a column with a floor and four blocks of room.
 [[nodiscard]] std::optional<std::array<std::int32_t, 3>> findFrameSpot(LoadedWorld& world, std::int32_t x,
                                                                        std::int32_t y, std::int32_t z, PortalAxis axis,
                                                                        std::int32_t ceiling) {
@@ -159,7 +155,6 @@ void reindex(LoadedWorld& world, const std::vector<std::array<std::int32_t, 3>>&
     return spot;
 }
 
-/// The obsidian ring and the portal blocks inside it.
 void buildFrame(LoadedWorld& world, const std::array<std::int32_t, 3>& spot, PortalAxis axis) {
     const auto [stepX, stepZ] = step(axis);
     for (std::int32_t column = -1; column < 3; column++) {

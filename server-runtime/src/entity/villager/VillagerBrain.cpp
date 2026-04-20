@@ -30,7 +30,6 @@ namespace {
     return static_cast<std::uint16_t>(1U << static_cast<unsigned>(activity));
 }
 
-// The engine proper: `Behavior`, `OneShot`, `DoNothing`, `GateBehavior` and the trigger gate.
 bool tryStart(Ctx& ctx, std::size_t index);
 void tickOrStop(Ctx& ctx, std::size_t index);
 void doStop(Ctx& ctx, std::size_t index);
@@ -45,7 +44,7 @@ bool trigger(Ctx& ctx, std::size_t index);
            ops::of(kind).trigger != nullptr;
 }
 
-/// parity: `ShufflingList.shuffle`: each entry gets `-random^(1/weight)` and the list is sorted by it.
+/// parity: `ShufflingList.shuffle`.
 void shuffle(Ctx& ctx, const Node& node, NodeState& state) {
     std::array<std::pair<double, std::uint8_t>, 12> keyed{};
     for (std::uint8_t child = 0; child < node.childCount; ++child) {
@@ -204,7 +203,6 @@ void tickOrStop(Ctx& ctx, std::size_t index) {
 
 } // namespace
 
-/// Rebuilds the brain from the table this villager needs now, keeping what a save would keep.
 void rebuild(Ctx& ctx) {
     VillagerState& state = ctx.state;
     if (state.table != nullptr) {

@@ -27,7 +27,6 @@ Chunk voidWorldGenerator::generate(std::int32_t chunkX, std::int32_t chunkZ, std
     if (platformRadius <= 0) {
         return chunk;
     }
-    // Only the chunks the platform actually reaches do any work; everything else stays air.
     const std::int32_t stone = registry::blocks::named("stone")->stateId;
     for (std::int32_t x = 0; x < 16; ++x) {
         for (std::int32_t z = 0; z < 16; ++z) {

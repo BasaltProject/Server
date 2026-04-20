@@ -47,8 +47,6 @@ std::optional<std::int32_t> WorldClock::markerTicks(std::string_view name) {
 }
 
 std::int64_t WorldClock::timeOfNextMarker(std::int64_t from, std::int32_t markerTicks) {
-    // The floored remainder, not the truncated one: a clock set back before the epoch still asks
-    // for the next morning, not the previous one.
     const std::int64_t within = ((from % kDayLength) + kDayLength) % kDayLength;
     const std::int64_t delta = markerTicks - within;
     return from + (delta > 0 ? delta : kDayLength + delta);
@@ -58,8 +56,7 @@ void WorldWeather::tick(random::RandomSource& random, const bool advanceCycle) {
     if (advanceCycle) {
         if (clearWeatherTime > 0) {
             --clearWeatherTime;
-            // parity: the counters are left at a flip that is one tick away, so the cycle resumes
-            // the moment the clear spell ends rather than drawing a fresh delay.
+            // parity: the counters are left at a flip that is one tick away, so the cycle resumes.
             thunderTime = thundering ? 0 : 1;
             rainTime = raining ? 0 : 1;
             thundering = false;
@@ -86,8 +83,7 @@ void WorldWeather::tick(random::RandomSource& random, const bool advanceCycle) {
             }
         }
     }
-    // parity: a hundredth per tick towards the flag, thunder first, both clamped to [0,1]. This is
-    // outside the game rule on purpose: the jar ramps even with the cycle frozen.
+    // parity: a hundredth per tick towards the flag, thunder first, both clamped to [0,1]. This is.
     thunderLevel_ = std::clamp(thunderLevel_ + (thundering ? kLevelStep : -kLevelStep), 0.0F, 1.0F);
     rainLevel_ = std::clamp(rainLevel_ + (raining ? kLevelStep : -kLevelStep), 0.0F, 1.0F);
 }

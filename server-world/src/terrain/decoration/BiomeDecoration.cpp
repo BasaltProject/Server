@@ -7,9 +7,6 @@
 namespace basalt::server::world::terrain::decoration {
 namespace {
 
-/// All 55 Overworld biomes are listed. Their vegetal bodies are empty because each implemented
-/// feature is seeded by its own dispatcher; the table survives so an unknown biome is still
-/// distinguishable from one with nothing to place.
 const std::set<std::string, std::less<>>& knownBiomes() {
     static const std::set<std::string, std::less<>> paths = {"plains",
                                                              "sunflower_plains",

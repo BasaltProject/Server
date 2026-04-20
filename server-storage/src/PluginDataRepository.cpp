@@ -3,7 +3,6 @@
 #include <cstdint>
 
 namespace basalt::server::storage {
-
 std::optional<std::string> PluginDataRepository::get(std::string_view plugin, std::string_view uuid,
                                                      std::string_view key) {
     sql::Statement statement =
@@ -77,5 +76,4 @@ void PluginDataRepository::purge(std::string_view plugin) {
     statement.bind(1, plugin);
     statement.execute();
 }
-
 } // namespace basalt::server::storage

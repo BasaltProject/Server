@@ -26,7 +26,7 @@ constexpr std::string_view kFireworkTwinkle = "minecraft:firework_explosion_twin
 constexpr std::string_view kFireworkColours = "minecraft:firework_explosion_colors";
 constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duration";
 
-/// parity: `FireworkExplosion.Shape`, the four a recipe can ask for on top of the small ball.
+/// parity: `FireworkExplosion.Shape`.
 [[nodiscard]] const std::set<std::string, std::less<>>& shapes() {
     static const std::set<std::string, std::less<>> built{"burst", "creeper", "large_ball", "star"};
     return built;
@@ -69,8 +69,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
     return specialRecipes::repair(stacks[0], stacks[1]);
 }
 
-/// parity: `ImbueRecipe` and `MapExtendingRecipe`: the thing in the middle, the eight around it the
-/// same. They differ only in what comes out, which is why they share this.
+/// parity: `ImbueRecipe` and `MapExtendingRecipe`.
 [[nodiscard]] std::optional<loot::ItemStack> centredInNine(const Recipe& recipe, const CraftingInput& input,
                                                            bool keepResultCount) {
     if (input.width() != 3 || input.height() != 3 || input.ingredientCount() != 9) {
@@ -100,7 +99,6 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
     if (input.width() != 3 || input.height() != 3 || input.ingredientCount() != 4) {
         return std::nullopt;
     }
-    // Back, left, right and front, each tested against its own side's ingredient.
     const std::array<const loot::ItemStack*, 4> sides{input.item(1, 0), input.item(0, 1), input.item(2, 1),
                                                       input.item(1, 2)};
     static constexpr std::array<std::string_view, 4> kSideNames{"back", "left", "right", "front"};
@@ -124,7 +122,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
         decorations.set(kSideNames[index], NbtTag::ofCompound(std::move(entry)));
     }
     loot::ItemStack result = recipe.result;
-    // parity: `Items.DECORATED_POT` defaults to four bricks, and a patch equal to the default is dropped.
+    // parity: `Items.DECORATED_POT` defaults to four bricks.
     if (allBrick && result.item.toString() == "minecraft:decorated_pot") {
         return result;
     }
@@ -132,8 +130,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
     return result;
 }
 
-/// parity: `DyeRecipe` and `FireworkStarFadeRecipe`: exactly one thing being coloured and at least
-/// one dye, and the colours are averaged onto whatever it already had.
+/// parity: `DyeRecipe` and `FireworkStarFadeRecipe`.
 [[nodiscard]] std::optional<loot::ItemStack> dye(const Recipe& recipe, const CraftingInput& input) {
     if (input.ingredientCount() < 2) {
         return std::nullopt;
@@ -194,7 +191,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
     return specialRecipes::withComponentsOf(recipe.result.item, copies, *source);
 }
 
-/// parity: `BannerDuplicateRecipe`: one patterned banner and one blank of the same colour.
+/// parity: `BannerDuplicateRecipe`.
 [[nodiscard]] std::optional<loot::ItemStack> bannerDuplicate(const Recipe& recipe, const CraftingInput& input) {
     if (input.ingredientCount() != 2) {
         return std::nullopt;
@@ -221,7 +218,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
     return specialRecipes::withComponentsOf(recipe.result.item, 1, *patterned);
 }
 
-/// parity: `ShieldDecorationRecipe`: a plain shield and a banner, and the shield takes it on.
+/// parity: `ShieldDecorationRecipe`.
 [[nodiscard]] std::optional<loot::ItemStack> shieldDecoration(const Recipe& recipe, const CraftingInput& input) {
     if (input.ingredientCount() != 2) {
         return std::nullopt;
@@ -255,8 +252,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
     return decorated;
 }
 
-/// parity: `FireworkStarRecipe`: one gunpowder, at least one dye, and any of the shape and effect
-/// modifiers, each at most once.
+/// parity: `FireworkStarRecipe`.
 [[nodiscard]] std::optional<loot::ItemStack> fireworkStar(const Recipe& recipe, const CraftingInput& input) {
     if (input.ingredientCount() < 2) {
         return std::nullopt;
@@ -281,8 +277,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
             }
             dyes.push_back(*colour);
         } else if (modifier != nullptr) {
-            // parity: one shape, one trail and one twinkle at most, and a second of any of them
-            // makes the whole thing not a recipe.
+            // parity: one shape, one trail and one twinkle at most, and a second of any of them makes the whole.
             if (!extras.insert(modifier->first).second) {
                 return std::nullopt;
             }
@@ -320,8 +315,7 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
         .item = recipe.result.item, .count = recipe.result.count, .components = std::move(components)};
 }
 
-/// parity: `FireworkRocketRecipe`: one paper, one to three gunpowder, and any number of stars. The
-/// flight time is the gunpowder count, and the stars ride along in the rocket.
+/// parity: `FireworkRocketRecipe`.
 [[nodiscard]] std::optional<loot::ItemStack> fireworkRocket(const Recipe& recipe, const CraftingInput& input) {
     if (input.ingredientCount() < 2) {
         return std::nullopt;
@@ -362,8 +356,7 @@ std::optional<loot::ItemStack> specialCrafting::assemble(const Recipe& recipe, c
     case SpecialKind::DecoratedPot:
         return decoratedPot(recipe, input);
     case SpecialKind::MapExtending: {
-        // parity: `MapExtendingRecipe`, which only takes a map that has an id and leaves the zoom
-        // for when it is taken. That the map is not already at the widest is asked by the caller.
+        // parity: `MapExtendingRecipe`.
         const loot::ItemStack* centre = input.width() == 3 && input.height() == 3 ? input.item(1, 1) : nullptr;
         if (centre == nullptr || centre->components.find("minecraft:map_id") == nullptr) {
             return std::nullopt;

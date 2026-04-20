@@ -8,9 +8,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
-
 } // namespace
 
 std::set<std::string> PluginServiceRegistry::names() const {
@@ -96,8 +94,6 @@ void pushCrossed(LuaArgs& lua, const PluginCrossValue& value, PluginHost& host, 
         lua.pushNil();
         return;
     }
-    // A player crossed as their uuid: it is looked up here, so what this side holds is its own
-    // handle rather than one made in somebody else's state.
     const auto marked = table->find(kPlayerMark);
     if (marked != table->end() && table->size() == 1) {
         const auto* uuid = std::get_if<std::string>(&marked->second->value);
@@ -122,7 +118,6 @@ bool callService(PluginHost& host, LoadedPlugin& provider, const lua::LuaRef& fu
     if (provider.disabled) {
         caller.raise("the plugin behind this service is off");
     }
-    // What the provider answered, copied out of its state before this one is touched.
     PluginCrossValue answered;
     const bool ran = host.ask(
         provider, function, "service",
@@ -139,5 +134,4 @@ bool callService(PluginHost& host, LoadedPlugin& provider, const lua::LuaRef& fu
     pushCrossed(caller, answered, host, provider);
     return true;
 }
-
 } // namespace basalt::server::plugins

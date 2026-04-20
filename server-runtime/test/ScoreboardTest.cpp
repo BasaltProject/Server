@@ -36,8 +36,7 @@ TEST_CASE("the criteria a `/scoreboard objectives add` accepts, and what they me
     CHECK(criteria[27] == "killedByTeam.black");
     CHECK(criteria.back() == "killedByTeam.white");
 
-    // The six the server writes itself, which a command may not set. `trigger` is not one of them:
-    // it is writable, and gated by the score's lock instead.
+    // `trigger` is writable and gated by the score's lock, so it is not one of the six the server writes.
     for (const std::string& criterion : {"health", "food", "air", "armor", "xp", "level"}) {
         CAPTURE(criterion);
         CHECK(Objective::isReadOnly(criterion));
@@ -47,7 +46,6 @@ TEST_CASE("the criteria a `/scoreboard objectives add` accepts, and what they me
         CHECK_FALSE(Objective::isReadOnly(criterion));
     }
 
-    // Only `health` draws as hearts.
     CHECK(Objective::defaultRenderType("health") == play::ObjectiveRenderType::Hearts);
     for (const std::string& criterion : Objective::criteria()) {
         CAPTURE(criterion);
@@ -56,8 +54,6 @@ TEST_CASE("the criteria a `/scoreboard objectives add` accepts, and what they me
         }
     }
 
-    // A fresh objective draws as a number and keeps its display name up to date, which is what
-    // `/scoreboard objectives add` leaves behind before `displayautoupdate` is touched.
     const Objective fresh = dummy("x");
     CHECK(fresh.renderType == play::ObjectiveRenderType::Integer);
     CHECK(fresh.displayAutoUpdate);
@@ -96,7 +92,6 @@ TEST_CASE("removing an objective takes its scores and its slot with it") {
     CHECK(scoreboard.get("kills") == nullptr);
     CHECK_FALSE(scoreboard.score("Steve", "kills").has_value());
     CHECK(scoreboard.score("Steve", "deaths") == 1);
-    // The slot showing it is cleared; the one showing something else is left alone.
     CHECK(scoreboard.displayed(play::DisplaySlot::Sidebar) == nullptr);
     REQUIRE(scoreboard.displayed(play::DisplaySlot::List) != nullptr);
     CHECK(*scoreboard.displayed(play::DisplaySlot::List) == "deaths");
@@ -117,7 +112,6 @@ TEST_CASE("a slot holds one objective at a time and is cleared by name-less disp
     CHECK(*scoreboard.displayed(play::DisplaySlot::Sidebar) == "deaths");
     scoreboard.display(play::DisplaySlot::Sidebar, std::nullopt);
     CHECK(scoreboard.displayed(play::DisplaySlot::Sidebar) == nullptr);
-    // Clearing an empty slot is not an error, and does not disturb the others.
     scoreboard.display(play::DisplaySlot::BelowName, std::nullopt);
     CHECK(scoreboard.displayed(play::DisplaySlot::BelowName) == nullptr);
 }
@@ -132,7 +126,6 @@ TEST_CASE("scores are per holder and per objective, and adding saturates at the 
     CHECK(scoreboard.score("Alex", "kills") == 7);
     CHECK_FALSE(scoreboard.score("Alex", "deaths").has_value());
 
-    // A missing score counts as zero, which is what `/scoreboard players add` does.
     CHECK(scoreboard.addScore("Herobrine", "kills", 4) == 4);
     CHECK(scoreboard.addScore("Steve", "kills", -2) == 3);
     CHECK(scoreboard.score("Steve", "kills") == 3);
@@ -165,17 +158,13 @@ TEST_CASE("a reset drops the holder once nothing is left, along with what hung o
 
     scoreboard.resetScore("Steve", "kills");
     CHECK_FALSE(scoreboard.score("Steve", "kills").has_value());
-    // parity: the override lives on the score object, so it goes when the score does rather than
-    // coming back attached to the next score of the same name.
     CHECK(scoreboard.displayNameOf("Steve", "kills") == nullptr);
     CHECK(scoreboard.numberFormatOf("Steve", "kills") == nullptr);
-    // Still tracked, because a score is left.
     CHECK(scoreboard.holders() == std::vector<std::string>{"Steve"});
 
     scoreboard.resetScore("Steve", "deaths");
     CHECK(scoreboard.holders().empty());
 
-    // Resetting everything, and resetting what was never there.
     scoreboard.setScore("Alex", "kills", 1);
     scoreboard.setScore("Alex", "deaths", 1);
     scoreboard.resetScore("Alex", std::nullopt);
@@ -189,7 +178,6 @@ TEST_CASE("per-holder overrides are set and cleared without disturbing the numbe
     Scoreboard scoreboard;
     CHECK(scoreboard.displayNameOf("Steve", "kills") == nullptr);
     scoreboard.setDisplayName("Steve", "kills", Component::text("The Steve"));
-    // Setting an override creates the score at zero, as `getOrCreatePlayerScore` does.
     CHECK(scoreboard.score("Steve", "kills") == 0);
     REQUIRE(scoreboard.displayNameOf("Steve", "kills") != nullptr);
     CHECK(*scoreboard.displayNameOf("Steve", "kills") == Component::text("The Steve"));
@@ -221,10 +209,8 @@ TEST_CASE("a trigger is locked until enabled, and one enable buys one use") {
 
     scoreboard.disableTrigger("Steve", "menu");
     CHECK_FALSE(scoreboard.isTriggerEnabled("Steve", "menu"));
-    // Locking again keeps the number, which is what the client is still being shown.
     CHECK(scoreboard.score("Steve", "menu") == 0);
 
-    // Enabling a holder nobody has scored creates the score at zero, as vanilla's own enable does.
     scoreboard.enableTrigger("Alex", "menu");
     CHECK(scoreboard.score("Alex", "menu") == 0);
     CHECK(scoreboard.isTriggerEnabled("Alex", "menu"));
@@ -233,7 +219,6 @@ TEST_CASE("a trigger is locked until enabled, and one enable buys one use") {
     scoreboard.resetScore("Alex", "menu");
     CHECK_FALSE(scoreboard.isTriggerEnabled("Alex", "menu"));
 
-    // Locking something that was never scored is not an error and creates nothing.
     scoreboard.disableTrigger("Nobody", "menu");
     CHECK(scoreboard.holders() == std::vector<std::string>{"Steve"});
 }
@@ -263,9 +248,7 @@ TEST_CASE("a team starts with vanilla's own defaults and answers them as packet 
     red->seeFriendlyInvisibles = false;
     CHECK(red->parameters().options() == 0);
 
-    // Each field is carried by the one the client reads it from: the prefix and the suffix are not
-    // interchangeable, and the visibility on the wire is the name tag's, not the death message's,
-    // which is the team's own business and never leaves the server.
+    // The visibility on the wire is the name tag's, not the death message's, which never leaves the server.
     red->prefix = Component::text("[");
     red->suffix = Component::text("]");
     red->nameTagVisibility = play::NameTagVisibility::HideForOtherTeams;
@@ -298,8 +281,7 @@ TEST_CASE("a member belongs to one team, and joining another takes them out of t
     CHECK(blue->members == std::vector<std::string>{"Steve"});
     CHECK(teams.teamOf("Steve") == blue);
 
-    // Joining the team they are already on is not a duplicate, and neither is adding them twice
-    // directly: vanilla's members are a set.
+    // Joining the team already on, or adding twice, is not a duplicate: vanilla's members are a set.
     CHECK(teams.join(*blue, "Steve") == blue);
     CHECK(blue->members == std::vector<std::string>{"Steve"});
     CHECK_FALSE(blue->addMember("Steve"));
@@ -355,7 +337,6 @@ TEST_CASE("a statistic criterion is resolved the way the jar reads it") {
           std::optional<std::string>{"minecraft.mined:minecraft.stone"});
     CHECK_FALSE(Objective::canonical("nonsense").has_value());
     CHECK_FALSE(Objective::canonical("minecraft.nothing:minecraft.stone").has_value());
-    // The value has to be in the statistic type's own registry.
     CHECK_FALSE(Objective::canonical("minecraft.mined:minecraft.diamond").has_value());
     CHECK_FALSE(Objective::canonical("custom:nonsense").has_value());
     CHECK(Objective::canonical("killed:zombie") == std::optional<std::string>{"minecraft.killed:minecraft.zombie"});

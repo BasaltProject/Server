@@ -13,7 +13,7 @@ namespace mth = wire::common::mth;
 
 constexpr double kEpsilon = 1.0E-7;
 
-/// parity: `Item.Properties.spear`, the seconds turned into ticks the way it truncates them.
+/// parity: `Item.Properties.spear`.
 constexpr Spear make(std::string_view item, bool wood, float damageMultiplier, float delay, float dismountTime,
                      float dismountThreshold, float knockbackTime, float knockbackThreshold, float damageTime,
                      float damageThreshold) {
@@ -144,7 +144,7 @@ std::vector<std::int32_t> hitsAlong(world::WorldState& world, const std::array<d
         }
     }
     const auto margin = static_cast<double>(kRange.hitboxMargin);
-    // parity: `AABB.ofSize(from, margin...)` stretched to the far end, then a block all round.
+    // parity: `AABB.ofSize(from, margin...)` stretched to the far end.
     Box area{from[0] - (margin / 2.0), from[1] - (margin / 2.0), from[2] - (margin / 2.0),
              from[0] + (margin / 2.0), from[1] + (margin / 2.0), from[2] + (margin / 2.0)};
     const Vec stretch{to[0] - from[0], to[1] - from[1], to[2] - from[2]};

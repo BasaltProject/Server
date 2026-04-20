@@ -43,8 +43,7 @@ constexpr float kPerSideChance = 0.25F;
     return block != nullptr && block->path() == "water";
 }
 
-/// parity: `ShelfMushroomDecorator.isBlockReplaceableWithShelfMushroom`: replaceable and dry, with no
-/// water block beside it either.
+/// parity: `ShelfMushroomDecorator.isBlockReplaceableWithShelfMushroom`.
 [[nodiscard]] bool canHold(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     return registry::blockShapes::isReplaceable(stateAt(chunk, x, y, z)) && !isWater(chunk, x, y, z) &&
            !isWater(chunk, x + 1, y, z) && !isWater(chunk, x - 1, y, z) && !isWater(chunk, x, y, z - 1) &&

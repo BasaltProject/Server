@@ -111,8 +111,6 @@ bool isFrozenWater(const std::int32_t stateId) {
 }
 
 std::int64_t ChunkFeatureRegion::keyOf(const DecorationPos& position) noexcept {
-    // Packed, not mixed: an overlay only ever holds positions a few dozen blocks apart, so twenty six
-    // bits of each horizontal coordinate tell them apart and the height goes in unsigned.
     constexpr std::int64_t kHorizontalMask = 0x3FFFFFF;
     constexpr std::int64_t kHeightBias = 2048;
     return ((static_cast<std::int64_t>(position.x) & kHorizontalMask) << 38) |
@@ -128,9 +126,7 @@ std::int32_t ChunkFeatureRegion::get(const DecorationPos& position) const {
     if (position.y < bounds.minY() || position.y > bounds.maxY()) {
         return registry::blocks::air().stateId;
     }
-    // parity: an iceberg is wider than a chunk, so it reads into its neighbours. Guessing water
-    // below sea level and air above got the open sea right and everything else wrong, and `smooth`
-    // counts the sides that are not iceberg, so a wrong guess carves away blocks vanilla keeps.
+    // parity: an iceberg reads into its neighbours and `smooth` counts non-iceberg sides.
     return chunk_->decorationBlockStateId(position.x, position.y, position.z);
 }
 
@@ -149,8 +145,6 @@ void ChunkFeatureRegion::set(const DecorationPos& position, const std::int32_t s
 
 void ChunkFeatureRegion::flush() {
     for (const auto& [position, stateId] : changes_) {
-        // Deferred rather than dropped: the part of an iceberg that falls in the next chunk is
-        // still part of the iceberg.
         chunk_->setDecorationBlockStateId(position.x, position.y, position.z, stateId);
     }
 }

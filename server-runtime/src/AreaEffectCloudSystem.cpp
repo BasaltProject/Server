@@ -30,7 +30,7 @@ constexpr float kFireballCloudRadius = 3.0F;
 constexpr float kFireballCloudMaxRadius = 7.0F;
 constexpr std::int32_t kFireballCloudDuration = 600;
 constexpr double kFireballReach = 16.0;
-/// parity: `LevelEvent.PARTICLES_DRAGON_BLOCK_BREAK`'s neighbour, the fireball's own burst.
+/// parity: `LevelEvent.PARTICLES_DRAGON_BLOCK_BREAK`'s neighbour.
 constexpr std::int32_t kFireballBurstEvent = 2006;
 constexpr double kLevelEventRange = 64.0;
 const Identifier kIndirectMagic = Identifier::vanilla("indirect_magic");
@@ -224,7 +224,7 @@ void AreaEffectCloudSystem::fireballLanded(world::LoadedWorld& world, const std:
     clouds::Cloud settings = clouds::dragonBreath(
         kFireballCloudRadius, kFireballCloudDuration,
         (kFireballCloudMaxRadius - kFireballCloudRadius) / static_cast<float>(kFireballCloudDuration), 1);
-    // parity: the living things in the fireball's box grown by four, two and four; the first within
+    // parity: the living things in the fireball's box grown by four, two and four; the first within.
     // four blocks carries the cloud.
     const Box reach{fireball.x - 4.5, fireball.y - 2.0, fireball.z - 4.5,
                     fireball.x + 4.5, fireball.y + 3.0, fireball.z + 4.5};

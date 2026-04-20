@@ -41,7 +41,7 @@ namespace play = wire::protocol::play;
 using entity::ServerEntity;
 using player::PlayerSession;
 
-/// parity: `LevelEvent.SOUND_WITHER_BLOCK_BREAK`, `SOUND_WITHER_BOSS_SPAWN` and `SOUND_WITHER_BOSS_SHOOT`.
+/// parity: `LevelEvent.SOUND_WITHER_BLOCK_BREAK`.
 constexpr std::int32_t kBlockBreakEvent = 1022;
 constexpr std::int32_t kSpawnEvent = 1023;
 constexpr std::int32_t kShootEvent = 1024;
@@ -139,7 +139,7 @@ void WitherSystem::placed(world::LoadedWorld& world, std::int32_t x, std::int32_
         return;
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
-    // parity: `CarvedPumpkinBlock.clearPatternBlocks`: air with flag 2 and the break particles.
+    // parity: `CarvedPumpkinBlock.clearPatternBlocks`.
     const std::int32_t air = server::registry::blocks::air().stateId;
     std::vector<std::int32_t> cleared;
     cleared.reserve(match->cells.size());
@@ -164,12 +164,12 @@ void WitherSystem::placed(world::LoadedWorld& world, std::int32_t x, std::int32_
     boss::WitherState& state = stateOf(*wither);
     state.random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     boss::makeInvulnerable(*wither, state);
-    // parity: `WitherSkullBlock.checkSpawn` awards it before the wither is in the world, to every
+    // parity: `WitherSkullBlock.checkSpawn` awards it before the wither is in the world.
     // player within fifty blocks of where it is about to stand.
     world::summonAwards::award(options_.advancementTriggers, watchers, world.name(), *wither,
                                world::summonAwards::kWitherRange);
     static_cast<void>(world.state().spawnEntity(std::move(wither)));
-    // parity: `CarvedPumpkinBlock.updatePatternBlocks`, the neighbours told once the wither is in.
+    // parity: `CarvedPumpkinBlock.updatePatternBlocks`.
     for (std::size_t index = 0; index < match->cells.size(); ++index) {
         const auto& cell = match->cells[index];
         broadcaster_->notifyAround(world, watchers, cell[0], cell[1], cell[2], cleared[index]);
@@ -551,7 +551,7 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
         }
     }
     const bool griefing = world.gameRules().get(world::gameRules::kMobGriefing);
-    // parity: `WitherSkull.getBlockExplosionResistance`, which holds anything the wither may break to
+    // parity: `WitherSkull.getBlockExplosionResistance`.
     // `0.8`: that is what lets a blue skull through obsidian.
     world::explosions::Resistance resistance;
     if (skull.dangerousSkull) {
@@ -566,7 +566,7 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
 
 void WitherSystem::dropStar(world::LoadedWorld& world, const ServerEntity& wither) {
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-    // parity: `Entity.spawnAtLocation` over `new ItemEntity`, which throws it up and a little aside.
+    // parity: `Entity.spawnAtLocation` over `new ItemEntity`.
     static_cast<void>(
         world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
                                                    .uuid = wire::common::Uuid::random(),

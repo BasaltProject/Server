@@ -70,7 +70,6 @@ void MobActionSystem::runWardenActions(world::LoadedWorld& world, const std::vec
             }
             break;
         case brain::Action::Kind::Pose:
-            // The pose travels with the entity's live metadata.
             break;
         case brain::Action::Kind::Discard:
             warden.removed = true;
@@ -165,7 +164,7 @@ bool MobActionSystem::wardenSwings(world::LoadedWorld& world, ServerEntity& mob)
 }
 
 void MobActionSystem::wardenStruck(ServerEntity& warden, std::int32_t attackerId, bool direct, double distanceSquared) {
-    // parity: `Warden.hurtServer`: a direct hit, or one from within five blocks, is fought at once.
+    // parity: `Warden.hurtServer`.
     if (warden.noAi || brain::isDiggingOrEmerging(warden) || warden.targetId.has_value() ||
         (!direct && distanceSquared >= 25.0)) {
         return;

@@ -133,7 +133,7 @@ void VehicleSystem::tickMinecart(world::LoadedWorld& world, ServerEntity& cart) 
             state.pushZ = 0.0;
         }
     }
-    // parity: `MinecartTNT.tick`: the fuse counts down after the move, and a hard knock sideways
+    // parity: `MinecartTNT.tick`.
     // sets it off.
     if (path == "tnt_minecart") {
         const double speedSqr = (cart.velocityX * cart.velocityX) + (cart.velocityZ * cart.velocityZ);
@@ -178,7 +178,7 @@ void VehicleSystem::activate(world::LoadedWorld& world, ServerEntity& cart, cons
         return;
     }
     if (path == "minecart") {
-        // parity: `Minecart.activateMinecart`: everybody off, and a shake unless it is shaking already.
+        // parity: `Minecart.activateMinecart`.
         if (powered) {
             if (!cart.passengerIds.empty()) {
                 ejectPassengers(world, cart);
@@ -300,7 +300,7 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
 }
 
 void VehicleSystem::insideBlocks(world::LoadedWorld& world, ServerEntity& cart) {
-    // parity: `Entity.applyEffectsFromBlocks` over the box shrunk by a hundred-thousandth: the
+    // parity: `Entity.applyEffectsFromBlocks` over the box shrunk by a hundred-thousandth.
     // blocks that do something to anything, not only to the living.
     const Aabb box = boxOf(cart).inflate(-static_cast<double>(1.0E-5F));
     bool fire = false;
@@ -336,7 +336,7 @@ void VehicleSystem::insideBlocks(world::LoadedWorld& world, ServerEntity& cart) 
             }
         }
     }
-    // parity: `BaseFireBlock.entityInside`'s `FIRE_IGNITE` then the burn, once however many fires.
+    // parity: `BaseFireBlock.entityInside`'s `FIRE_IGNITE` then the burn.
     if (fire) {
         cart.fireTicks = std::max(cart.fireTicks, 160);
         static_cast<void>(hurt(world, cart, Hit{.amount = *fireDamage, .type = Identifier::vanilla("in_fire")}));

@@ -38,40 +38,28 @@ class EntityPushSystem;
 class ExplosionSystem;
 class MobActionSystem;
 
-/// Minecarts and boats: a cart's turn, the damage both take and how they break, and a player's hand on a cart.
-/// parity: `VehicleEntity`, `AbstractMinecart` and its subclasses, `AbstractBoat`'s pushes and bubble columns.
 class VehicleSystem {
 public:
-    /// One hit on a vehicle, as `hurtServer` sees its `DamageSource`.
     struct Hit {
         float amount = 0.0F;
         wire::common::Identifier type = wire::common::Identifier::vanilla("generic");
-        /// parity: `getEntity` and `getDirectEntity`.
         std::optional<std::int32_t> causeId;
         std::optional<std::int32_t> directId;
-        /// A player in creative, which takes a vehicle away whole.
         bool creativePlayer = false;
-        /// An arrow on fire, and how fast it went, which sets a tnt cart off at once.
         bool burningArrow = false;
         double arrowSpeedSqr = 0.0;
-        /// A projectile on fire, which `damageSourceIgnitesTnt` counts as fire.
         bool burningProjectile = false;
     };
 
     struct Options {
         std::function<std::int64_t()> nextSeed;
-        /// parity: `AbstractMinecart.useExperimentalMovement`.
         std::function<bool()> minecartImprovements;
         const world::realItemTags::TagMembers* itemTags = nullptr;
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
-        /// parity: `BaseCommandBlock.performCommand` for a command block cart: the line run from the
-        /// cart, answering how many times it succeeded.
         std::function<std::int32_t(world::LoadedWorld& world, entity::ServerEntity& cart, const std::string& command)>
             runCommand;
-        /// parity: `BaseSpawner.serverTick` at the spawner cart's square, over the cart's saved data;
-        /// `broadcastEvent` is the entity event it raises. Unset means no spawner cart ever spawns.
         std::function<bool(world::LoadedWorld& world, wire::nbt::NbtCompound& data,
                            const std::array<std::int32_t, 3>& pos,
                            const std::function<void(std::int32_t eventId)>& broadcastEvent)>
@@ -84,26 +72,18 @@ public:
     /// parity: `AbstractMinecart.tick` and the subclass that owns the cart.
     void tickMinecart(world::LoadedWorld& world, entity::ServerEntity& cart);
 
-    /// parity: `VehicleEntity.hurtServer` with `MinecartTNT`'s override. Answers whether it counted.
     bool hurt(world::LoadedWorld& world, entity::ServerEntity& vehicle, const Hit& hit);
 
-    /// parity: `VehicleEntity.ignoreExplosion`, a mob's blast with griefing off.
     [[nodiscard]] static bool ignoresExplosion(world::LoadedWorld& world, bool sourceIsMob);
 
-    /// parity: `MinecartFurnace.interact`: the fuel, from where the player stands. Answers whether
-    /// one of the stack in that hand slot is spent.
     bool fuel(world::LoadedWorld& world, player::PlayerSession& player, entity::ServerEntity& cart, bool fuelItem);
 
-    /// parity: `ServerGamePacketListenerImpl.handleSetCommandMinecart` once allowed.
     void program(world::LoadedWorld& world, entity::ServerEntity& cart, const std::string& command, bool trackOutput);
 
-    /// parity: `AbstractBoat.onAboveBubbleColumn` and `tickBubbleColumn`, a turn of the boat over one.
     void tickBoatBubbles(world::LoadedWorld& world, entity::ServerEntity& boat, bool driverIsPlayer);
 
-    /// parity: `AbstractBoat.tick`'s last part: what it touches is taken aboard or pushed.
     void boatPushes(world::LoadedWorld& world, entity::ServerEntity& boat, bool driverIsPlayer);
 
-    /// parity: `Entity.isInWater`, as `updateFluidHeightAndDoFluidPushing` finds it for a box.
     [[nodiscard]] static bool touchesFluid(world::LoadedWorld& world, double x, double y, double z, double width,
                                            double height, bool lava);
 

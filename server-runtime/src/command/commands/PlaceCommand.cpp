@@ -40,7 +40,6 @@ constexpr std::int32_t kMaxJigsawDepth = 20;
     return CommandSyntaxError{.component = Component::translatable("argument.pos.unloaded")};
 }
 
-/// Where a `/place` acts: the position it was given, or the whole-block position of the runner.
 [[nodiscard]] std::array<std::int32_t, 3> resolveOrigin(const CommandContext& context, std::string_view name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
     const std::array<double, 3> from = context.source().position();
@@ -114,8 +113,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                                       : std::chrono::duration_cast<std::chrono::milliseconds>(
                                             std::chrono::steady_clock::now().time_since_epoch())
                                             .count();
-        // parity: `PlaceCommand.placeTemplate` adds a `BlockRotProcessor` over every block, drawing
-        // from one stream in template order after the palette pick.
+        // parity: `PlaceCommand.placeTemplate` adds a `BlockRotProcessor` over every block.
         const std::optional<structure::StructureProcessorList> rot =
             integrity < 1.0F ? std::optional{structure::StructureProcessorList{
                                    {}, structure::BlockRot{.integrity = integrity, .rottable = std::nullopt}}}
@@ -130,16 +128,12 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         const StructurePos pivot{0, 0, 0};
         const StructureBoundingBox box = found->getBoundingBox(origin, rotation, pivot, mirror);
         std::int32_t chunks = 0;
-        // One pass per intersecting chunk, which is what generation does: each pass keeps only the
-        // blocks that land inside that chunk.
         for (std::int32_t chunkX = box.minX >> 4; chunkX <= (box.maxX >> 4); chunkX++) {
             for (std::int32_t chunkZ = box.minZ >> 4; chunkZ <= (box.maxZ >> 4); chunkZ++) {
                 server::world::Chunk* chunk = (*world)->state().chunkIfLoaded(chunkX, chunkZ);
                 if (chunk == nullptr) {
                     return std::unexpected{unloaded()};
                 }
-                // Every pass replays the same stream over the whole template, so the chunks agree on
-                // which blocks rotted.
                 random::RandomSource stream = random::RandomSource::legacy(seed);
                 found->placeInto(*chunk,
                                  structure::TemplatePlacement{
@@ -164,7 +158,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         return chunks;
     };
 
-    /// parity: `PlaceCommand.placeFeature`, which runs the feature once from the world's own random.
+    /// parity: `PlaceCommand.placeFeature`.
     const auto placeFeature = [this](const CommandContext& context, bool positioned) -> Parsed<std::int32_t> {
         const auto* id = context.get<Identifier>("feature");
         const Parsed<world::LoadedWorld*> world = context.world();
@@ -191,8 +185,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
 
         random::RandomSource random =
             random::RandomSource::worldgen(random::RandomSource::xoroshiro(nextSeed_ ? nextSeed_() : 0));
-        // parity: the feature runs in the level itself, so what it reads and writes past the chunk is
-        // the loaded neighbour, through the same region the generation decorates with.
+        // parity: the feature runs in the level itself, so what it reads and writes past the chunk is the loaded.
         std::array<server::world::Chunk*, 9> around{};
         for (std::int32_t dx = -1; dx <= 1; ++dx) {
             for (std::int32_t dz = -1; dz <= 1; ++dz) {
@@ -205,8 +198,6 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         if (placement != nullptr) {
             (*placement)(*chunk, random, at[0], at[1], at[2]);
         } else {
-            // Features that need more than a chunk: the End's own, fossils, the freeze pass and
-            // template-backed sulfur roots. Refuse instead of half-placing one without its context.
             const features::FeatureContext built{
                 .seed = (*world)->metadata().seed,
                 .surface = (*world)->surfaceEnvironment(),
@@ -232,8 +223,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         return 1;
     };
 
-    /// parity: `PlaceCommand.placeStructure`, which generates the structure where it was told and
-    /// skips the placement grid and the biome check that decide where one appears on its own.
+    /// parity: `PlaceCommand.placeStructure`.
     const auto placeStructure = [](const CommandContext& context, bool positioned) -> Parsed<std::int32_t> {
         const auto* id = context.get<Identifier>("structure");
         const Parsed<world::LoadedWorld*> world = context.world();
@@ -244,8 +234,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         const std::int64_t seed = (*world)->metadata().seed;
         const std::int32_t startChunkX = at[0] >> 4;
         const std::int32_t startChunkZ = at[2] >> 4;
-        // parity: `start.getBoundingBox()` and `ChunkPos.rangeClosed` with `checkLoaded` first:
-        // every chunk the start covers has to be loaded before anything is written.
+        // parity: `start.getBoundingBox()` and `ChunkPos.rangeClosed` with `checkLoaded` first.
         const auto placeCovered = [&context, world, seed, startChunkX, startChunkZ,
                                    &at](const world::StructurePlacer& placer) -> Parsed<std::int32_t> {
             const std::optional<StructureBoundingBox> bounds = placer.boundsAt(seed, startChunkX, startChunkZ);
@@ -260,8 +249,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                     if (chunk == nullptr) {
                         return std::unexpected{unloaded()};
                     }
-                    // parity: the pieces read their neighbours through the level, so while one chunk
-                    // is written a cross-chunk read sees the loaded world, as `WorldGenRegion` does.
+                    // parity: the pieces read their neighbours through the level.
                     const server::world::Chunk::ExternalStateScope readsThroughLevel{
                         *chunk, [world](std::int32_t x, std::int32_t y, std::int32_t z) {
                             return (*world)->state().blockState(x, y, z);
@@ -313,8 +301,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                                          ". `/place template` places a structure file.")}};
     };
 
-    /// parity: `PlaceCommand.placeJigsaw`, which grows a template pool at a position with no
-    /// structure around it.
+    /// parity: `PlaceCommand.placeJigsaw`.
     const auto placeJigsaw = [](const CommandContext& context, bool positioned) -> Parsed<std::int32_t> {
         const auto* pool = context.get<Identifier>("pool");
         const Parsed<world::LoadedWorld*> world = context.world();

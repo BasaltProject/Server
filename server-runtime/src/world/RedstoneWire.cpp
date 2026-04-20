@@ -17,8 +17,7 @@ constexpr std::string_view kNone = "none";
 constexpr std::string_view kSide = "side";
 constexpr std::string_view kUp = "up";
 
-/// parity: `Direction.Plane.HORIZONTAL`, which is the order `updateIndirectNeighbourShapes` walks
-/// the four sides in, and that one reshapes as it goes.
+/// parity: `Direction.Plane.HORIZONTAL`.
 constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::East, BlockFace::South, BlockFace::West};
 
 [[nodiscard]] std::string_view nameOf(BlockFace face) {
@@ -45,8 +44,7 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::East, Blo
     return found == properties.end() ? std::string{} : found->second;
 }
 
-/// parity: `shouldConnectTo`: dust joins dust, a diode only end on, an observer only at its face,
-/// and anything else that gives off a signal from a side.
+/// parity: `shouldConnectTo`.
 [[nodiscard]] bool connectsTo(std::int32_t stateId, const BlockFace* from) {
     const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(stateId);
     if (id == nullptr) {
@@ -88,11 +86,7 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::East, Blo
         if (!above.has_value()) {
             return std::string{kNone};
         }
-        // parity: a trapdoor is the exception that a dust can always climb over, and the rest is
-        // `RedStoneWireBlock.canSurviveOn`, which is `isFaceSturdy(UP) || is(HOPPER)`. It is a question
-        // about the **state**, not about which block it is, so the generated table cannot answer it:
-        // the same reason `blockSurvival::isSupported` spells the dust out by hand. Asking the table
-        // here left a dust unable to climb over anything with a sturdy top the probe never listed.
+        // parity: a trapdoor is the exception that a dust can always climb over, and the rest is.
         const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(*neighbour);
         const std::string_view path = id == nullptr ? std::string_view{} : id->path();
         const bool climbable = path.ends_with("_trapdoor") || path == "hopper" ||
@@ -136,9 +130,7 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::East, Blo
     return true;
 }
 
-/// parity: `getConnectionState`, which always works the four sides out again from the world and
-/// only uses the state it came from to answer one question: was it a dot. A dot that finds nothing
-/// stays a dot; anything else straightens out.
+/// parity: `getConnectionState`.
 [[nodiscard]] std::map<std::string, std::string> drawnFrom(const WorldState& world, std::int32_t x, std::int32_t y,
                                                            std::int32_t z, bool wasDot) {
     // parity: `canConnectUp`, which is one question asked once: is the way up clear at all.
@@ -175,7 +167,6 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::East, Blo
     return sides;
 }
 
-/// Writes the shape if it moved, and answers what it became.
 [[nodiscard]] std::optional<std::int32_t> written(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId,
                                                   const std::map<std::string, std::string>& wanted) {
@@ -208,8 +199,7 @@ std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int3
     if (!isWire(stateId)) {
         return std::nullopt;
     }
-    // parity: from below `updateShape` only asks whether the dust still has something to sit on,
-    // which is the survival check and not a drawing, so the shape is left alone.
+    // parity: from below `updateShape` only asks whether the dust still has something to sit on.
     if (towards == BlockFace::Down) {
         return std::nullopt;
     }
@@ -219,8 +209,7 @@ std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int3
         const std::string side = connectingSide(world, x, y, z, *towards, !conducts(world, x, y + 1, z));
         const auto found = was.find(std::string{nameOf(*towards)});
         const bool wasConnected = found != was.end() && found->second != kNone;
-        // parity: a side whose connection did not move is written on its own, without the
-        // straightening rule, so a line stays a line. A cross always starts over.
+        // parity: a side whose connection did not move is written on its own, without the.
         if ((side != kNone) == wasConnected && !isCross(was)) {
             wanted = was;
             wanted[std::string{nameOf(*towards)}] = side;
@@ -244,8 +233,7 @@ std::optional<std::int32_t> toggleShape(WorldState& world, const std::int32_t x,
     if (!cross && !isDot(was)) {
         return std::nullopt;
     }
-    // parity: a cross goes to the default state, which is a dot, and a dot goes to the cross; then
-    // both are redrawn against the world, so the answer is often neither of the two.
+    // parity: a cross goes to the default state, which is a dot, and a dot goes to the cross; then.
     return written(world, x, y, z, stateId, drawnFrom(world, x, y, z, cross));
 }
 
@@ -276,8 +264,6 @@ std::vector<Step> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y,
         }
         const std::int32_t nx = x + registry::stepX(face);
         const std::int32_t nz = z + registry::stepZ(face);
-        // Only across something that is not dust itself: two dusts side by side already see each
-        // other through their own six sides.
         const std::optional<std::int32_t> beside = world.blockState(nx, y, nz);
         if (beside.has_value() && isWire(*beside)) {
             continue;

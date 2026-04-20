@@ -37,7 +37,7 @@ struct Vec3 {
     double z = 0.0;
 };
 
-/// parity: `DragonFlightHistory`, the last 64 heights and headings the tail and neck follow.
+/// parity: `DragonFlightHistory`.
 class FlightHistory {
 public:
     struct Sample {
@@ -56,8 +56,7 @@ private:
     std::int32_t head_ = -1;
 };
 
-/// One of the 24 points the dragon flies between. parity: `pathfinder.Node`, only the fields the
-/// dragon's own A* touches.
+/// parity: `pathfinder.Node`.
 struct Node {
     std::int32_t x = 0;
     std::int32_t y = 0;
@@ -66,7 +65,6 @@ struct Node {
     float f = 0.0F;
     float g = 0.0F;
     float h = 0.0F;
-    /// Index into the node pool the search ran over, or -1.
     std::int32_t cameFrom = -1;
     bool closed = false;
     std::int32_t heapIdx = -1;
@@ -84,49 +82,35 @@ struct Path {
     [[nodiscard]] const std::array<std::int32_t, 3>& nextNode() const { return nodes[next]; }
 };
 
-/// Everything the phases keep. parity: each `DragonPhaseInstance` is made once and kept, so what one
-/// phase remembers survives leaving it and coming back; that is why these live side by side.
 struct PhaseMemory {
-    // DragonHoldingPatternPhase
     std::optional<Path> holdingPath;
     std::optional<Vec3> holdingTarget;
     bool holdingClockwise = false;
-    // DragonStrafePlayerPhase
     std::int32_t fireballCharge = 0;
     std::optional<Path> strafePath;
     std::optional<Vec3> strafeTarget;
     std::optional<std::int32_t> strafeVictim;
     bool strafeClockwise = false;
-    // DragonLandingApproachPhase
     std::optional<Path> approachPath;
     std::optional<Vec3> approachTarget;
-    // DragonLandingPhase
     std::optional<Vec3> landingTarget;
-    // DragonTakeoffPhase
     bool takeoffFirstTick = false;
     std::optional<Path> takeoffPath;
     std::optional<Vec3> takeoffTarget;
-    // DragonSittingFlamingPhase
     std::int32_t flameTicks = 0;
     std::int32_t flameCount = 0;
     std::optional<std::int32_t> flameCloud;
-    // DragonSittingScanningPhase
     std::int32_t scanningTime = 0;
-    // DragonSittingAttackingPhase
     std::int32_t attackingTicks = 0;
-    // DragonChargePlayerPhase
     std::optional<Vec3> chargeTarget;
     std::int32_t timeSinceCharge = 0;
-    // DragonDeathPhase
     std::optional<Vec3> dyingTarget;
     std::int32_t dyingTime = 0;
-    // DragonHoverPhase
     std::optional<Vec3> hoverTarget;
 };
 
 inline constexpr std::size_t kNodeCount = 24;
 
-/// The eight parts, in `subEntities` order: head, neck, body, three of tail, two wings.
 enum class Part : std::uint8_t { Head, Neck, Body, Tail1, Tail2, Tail3, Wing1, Wing2 };
 
 inline constexpr std::size_t kParts = 8;
@@ -140,7 +124,6 @@ struct PartBox {
 inline constexpr std::array<PartBox, kParts> kPartBoxes{
     {{1.0F, 1.0F}, {3.0F, 3.0F}, {5.0F, 3.0F}, {2.0F, 2.0F}, {2.0F, 2.0F}, {2.0F, 2.0F}, {4.0F, 2.0F}, {4.0F, 2.0F}}};
 
-/// A dragon's own state beyond what every entity has.
 struct DragonState {
     /// parity: `Entity.random`, the dragon's own, seeded from nothing a player can know.
     random::RandomSource random = random::RandomSource::legacy(0);
@@ -157,9 +140,7 @@ struct DragonState {
     bool nodesReady = false;
     std::array<Node, kNodeCount> nodes{};
     std::array<std::int32_t, kNodeCount> adjacency{};
-    /// The part the hit being applied landed on; a hit with none named lands on the body.
     std::optional<Part> hitPart;
-    /// Breath clouds a phase change left behind while no world was at hand to remove them.
     std::vector<std::int32_t> staleClouds;
 };
 

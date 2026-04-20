@@ -33,7 +33,7 @@ bool CombatSystem::isRedirectable(const Identifier& type) {
 
 void CombatSystem::deflectByPunch(const std::vector<PlayerSession*>& watchers, ServerEntity& projectile,
                                   const PlayerSession& by) {
-    // parity: `ProjectileDeflection.AIM_DEFLECT` at power one, then `setOwner`: the puncher owns it.
+    // parity: `ProjectileDeflection.AIM_DEFLECT` at power one.
     const entity::enderDragon::Vec3 look = entity::enderDragon::viewVector(by.pitch, by.yaw);
     projectile.velocityX = look.x;
     projectile.velocityY = look.y;
@@ -57,7 +57,7 @@ void CombatSystem::deflectByPunch(const std::vector<PlayerSession*>& watchers, S
 void CombatSystem::hitByLargeFireball(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                       const std::vector<ServerEntity*>& living, ServerEntity& fireball,
                                       const Target& target, double fromX, double fromZ) {
-    // parity: `DamageSources.fireball`, attributed to the owner, or `unattributed_fireball` without one.
+    // parity: `DamageSources.fireball`.
     const bool attributed = fireball.ownerId.has_value();
     const Identifier type = Identifier::vanilla(attributed ? "fireball" : "unattributed_fireball");
     if (hitVehicle(world, target.mob, kLargeFireballDamage, type, fireball)) {

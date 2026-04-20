@@ -37,7 +37,7 @@ using piglins::PiglinState;
 
 [[nodiscard]] bool isBaby(const ServerEntity& mob) { return mob.age < 0; }
 
-/// parity: `Mob.getEquipmentSlotForItem`, read off the item's name as this build keeps no equippable
+/// parity: `Mob.getEquipmentSlotForItem`.
 /// components per item.
 [[nodiscard]] equipment::Slot slotFor(const ItemStack& stack) {
     const std::string_view path = stack.item.path();
@@ -152,7 +152,7 @@ bool MobActionSystem::piglinWantsToPickUp(const ServerEntity& piglin, const Pigl
         return !state.ateRecently.has(now) && space;
     }
     if (!itemTagged("minecraft:piglin_loved", stack.item)) {
-        // parity: `canReplaceCurrentItem`, a wanted weapon over one it does not want, else an empty slot.
+        // parity: `canReplaceCurrentItem`.
         const equipment::Slot slot = slotFor(stack);
         const std::optional<ItemStack> current = equipment::get(piglin, slot);
         const bool newWanted = !isBaby(piglin) && itemTagged("minecraft:piglin_preferred_weapons", stack.item);
@@ -208,7 +208,7 @@ void MobActionSystem::piglinPicksUp(world::LoadedWorld& world, ServerEntity& pig
         // parity: `Piglin.pickUpItem` tells the thrower before `PiglinAi.pickUpItem` takes any of it.
         world::thrownItems::pickedUpByMob(options_.advancementTriggers, world, watchersOf(world), item, item.count,
                                           piglin);
-        // parity: `PiglinAi.pickUpItem`: the walk stops, and a nugget stack goes whole, anything else one.
+        // parity: `PiglinAi.pickUpItem`.
         state.motion.walk.reset();
         entity::ai::navigation::stop(piglin);
         ItemStack taken = whole;

@@ -31,7 +31,6 @@ namespace mth = wire::common::mth;
 using piglins::Activity;
 using piglins::PiglinState;
 
-/// What the piglin sensor saw on its last look.
 struct Sense {
     std::optional<std::int32_t> nemesis;
     std::optional<std::int32_t> huntableHoglin;
@@ -45,7 +44,6 @@ struct Sense {
     std::optional<std::int32_t> wantedItem;
 };
 
-/// Per piglin, what its sensors keep between looks. Filled every tick; see `piglinSense`.
 thread_local Sense tSense;
 
 [[nodiscard]] std::int32_t sample(random::RandomSource& random, const std::array<std::int32_t, 2>& range) {
@@ -89,7 +87,7 @@ void MobActionSystem::tickPiglin(world::LoadedWorld& world, entity::ai::MobConte
         piglinWasHurtBy(world, context, state, attacker);
     }
     piglinCore(world, context, state);
-    // parity: `updateActivity`, the first of admire, fight, avoid, celebrate and idle that applies.
+    // parity: `updateActivity`.
     const Activity before = state.activity;
     if (!state.brute && state.admiring.has(now)) {
         state.activity = Activity::AdmireItem;
@@ -271,7 +269,7 @@ void MobActionSystem::piglinCore(world::LoadedWorld& world, entity::ai::MobConte
                                           });
     }
     if (!state.brute) {
-        // parity: `babyAvoidNemesis` and `avoidZombified`, which only copy into an empty avoid target.
+        // parity: `babyAvoidNemesis` and `avoidZombified`.
         if (isBaby(piglin) && sense.nemesis.has_value() && !state.avoidTarget.has(now)) {
             state.avoidTarget.setFor(*sense.nemesis, now, sample(context.random, piglins::kAvoidZombified));
         }
@@ -300,8 +298,7 @@ void MobActionSystem::piglinCore(world::LoadedWorld& world, entity::ai::MobConte
                 }
             }
         }
-        // parity: `StartCelebratingIfTargetDead(300, wantsToDance)`, which holds on to a dead player
-        // unless `forgive_dead_players`.
+        // parity: `StartCelebratingIfTargetDead(300, wantsToDance)`.
         if (piglin.targetId.has_value() && !state.celebrateLocation.has(now)) {
             const ServerEntity* target = context.entityById(*piglin.targetId);
             const PlayerSession* deadPlayer = nullptr;
@@ -355,8 +352,7 @@ void MobActionSystem::piglinRetaliate(world::LoadedWorld& world, ServerEntity& p
         piglinBroadcastAnger(world, piglin, state, attackerId);
         return;
     }
-    // parity: `setAngerTargetToNearestTargetablePlayerIfFound` and `broadcastUniversalAnger`, each
-    // adult it sees turning on the nearest player it can see itself.
+    // parity: `setAngerTargetToNearestTargetablePlayerIfFound`.
     piglinSetAngerTarget(world, piglin, state, tSense.attackablePlayer.value_or(attackerId));
     for (ServerEntity* adult : tSense.adultPiglins) {
         if (const std::optional<std::int32_t> player = piglinNearestPlayer(world, *adult); player.has_value()) {
@@ -556,8 +552,6 @@ void MobActionSystem::piglinActivity(world::LoadedWorld& world, entity::ai::MobC
     }
     case Activity::Ride:
     case Activity::Idle:
-        // parity: the idle activity's look at a player holding gold, the attack, the hunt, the
-        // repellent, and the look and move shuffles.
         if (!state.brute && sense.playerHoldingLoved.has_value() && !state.look.entity.has_value()) {
             state.look = kit::Look{.entity = sense.playerHoldingLoved};
         }
@@ -609,8 +603,7 @@ void MobActionSystem::piglinIdle(world::LoadedWorld& world, entity::ai::MobConte
     static_cast<void>(world);
     ServerEntity& piglin = context.mob;
     const Sense& sense = tSense;
-    // parity: `createIdleLookBehaviors`: a player, a piglin or anybody within eight, or thirty to
-    // sixty ticks of nothing.
+    // parity: `createIdleLookBehaviors`.
     if (state.idleLookTicks > 0) {
         --state.idleLookTicks;
     } else if (!state.look.entity.has_value() && !state.look.at.has_value()) {
@@ -638,8 +631,7 @@ void MobActionSystem::piglinIdle(world::LoadedWorld& world, entity::ai::MobConte
     if (!moving) {
         return;
     }
-    // parity: `createIdleMovementBehaviors`: a stroll, a walk to a piglin, a walk to what it looks
-    // at, or nothing, and for a brute the strolls round its home.
+    // parity: `createIdleMovementBehaviors`.
     if (state.idleMoveTicks > 0) {
         --state.idleMoveTicks;
         return;
@@ -705,8 +697,7 @@ void MobActionSystem::piglinFight(world::LoadedWorld& world, entity::ai::MobCont
     ServerEntity& piglin = context.mob;
     const std::int64_t now = context.gameTime;
     const std::optional<entity::ai::TargetView> target = entity::ai::targetOf(context);
-    // parity: `StopAttackingIfTargetInvalid`: gone, unfightable, no longer the nearest valid one, or
-    // two hundred ticks out of reach.
+    // parity: `StopAttackingIfTargetInvalid`.
     const std::optional<std::int32_t> nearest = piglinAttackTarget(world, context, state);
     if (!target.has_value() || nearest != piglin.targetId ||
         (state.motion.cantReachSince.has_value() && now - *state.motion.cantReachSince > 200)) {
@@ -736,7 +727,7 @@ void MobActionSystem::piglinFight(world::LoadedWorld& world, entity::ai::MobCont
         }
         return;
     }
-    // parity: `CrossbowAttack`: charge for the crossbow's own time, wait twenty to forty ticks, shoot.
+    // parity: `CrossbowAttack`.
     if (!inRange) {
         state.crossbow = piglins::Crossbow::Uncharged;
         state.chargingCrossbow = false;

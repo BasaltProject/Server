@@ -18,7 +18,6 @@ using wire::common::placeholder::PlaceholderValue;
 constexpr std::int64_t kMillisPerSecond = 1000;
 constexpr std::int64_t kBytesPerMegabyte = 1048576;
 
-/// The placeholders that are real, spelled right, and cannot be answered by this build yet.
 const std::map<std::string, std::string, std::less<>>& notImplementedReasons() {
     static const std::map<std::string, std::string, std::less<>> kReasons{
         {"ram_free", "the native runtime has no fixed heap: only what is live after a collection is known"},
@@ -54,10 +53,7 @@ PlaceholderValue tps(const ServerFacts& facts, std::size_t window) {
     return PlaceholderValue::of(serverPlaceholderFormat::twoDecimals((*rates)[std::min(window, std::size_t{2})]));
 }
 
-/// The same number wrapped in a colour, as MiniMessage.
-///
-/// It is markup rather than a component because placeholders are substituted *before* the text is
-/// parsed, which is what lets a colour from here blend into whatever the operator wrote around it.
+// It is markup, not a component: placeholders are substituted before parsing, so the colour blends into the text.
 PlaceholderValue coloured(PlaceholderValue value) {
     const std::string* text = value.textOrNull();
     if (text == nullptr) {
@@ -105,8 +101,7 @@ std::string uptime(std::int64_t elapsedMillis) {
 }
 
 std::string localTime(std::string_view pattern, std::int64_t epochMillis) {
-    // Through `localtime_r` rather than `std::chrono::zoned_time`, which this platform's standard
-    // library does not carry.
+    // Through `localtime_r`, since this platform's standard library lacks `zoned_time`.
     const auto now = static_cast<std::time_t>(epochMillis / kMillisPerSecond);
     std::tm local{};
     localtime_r(&now, &local);
@@ -170,7 +165,6 @@ wire::common::placeholder::PlaceholderProvider serverPlaceholders(ServerFacts fa
             return PlaceholderValue::of((facts.nowMillis() - facts.startedAtMillis) / kMillisPerSecond);
         }
         if (params == "ram_used") {
-            // The one memory figure a native runtime with no fixed heap can honestly report.
             const std::optional<std::int64_t> live = facts.liveHeapBytes();
             return live.has_value() ? PlaceholderValue::of(*live / kBytesPerMegabyte) : PlaceholderValue::unavailable();
         }

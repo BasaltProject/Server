@@ -50,7 +50,7 @@ constexpr std::size_t kMaxLineLength = 2000000;
     });
 }
 
-/// parity: `StringTemplate.fromString`, with the variable names left for the caller to index.
+/// parity: `StringTemplate.fromString`.
 [[nodiscard]] std::expected<std::pair<std::vector<std::string>, std::vector<std::string>>, std::string>
 templateOf(std::string_view input) {
     std::vector<std::string> segments;
@@ -84,7 +84,6 @@ templateOf(std::string_view input) {
     return std::pair{std::move(segments), std::move(variables)};
 }
 
-/// The first unquoted word, for the "did you mean" of a line that starts with a slash.
 [[nodiscard]] std::string_view unquotedWord(std::string_view text) {
     std::size_t end = 0;
     while (end < text.size()) {
@@ -99,7 +98,7 @@ templateOf(std::string_view input) {
     return text.substr(0, end);
 }
 
-/// parity: `new DecimalFormat("#")` with fifteen fraction digits: no exponent, no trailing zeros.
+/// parity: `new DecimalFormat("#")` with fifteen fraction digits.
 [[nodiscard]] std::string decimal(double value) {
     if (std::isnan(value)) {
         return "NaN";

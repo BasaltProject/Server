@@ -22,7 +22,7 @@ using ::basalt::server::world::loot::EntityFacts;
 using entity::ServerEntity;
 using player::PlayerSession;
 
-/// parity: `ResolvableProfile.createResolved(gameProfile)`, as `STORED_GAME_PROFILE` writes it.
+/// parity: `ResolvableProfile.createResolved(gameProfile)`.
 [[nodiscard]] wire::nbt::NbtCompound profileOf(const PlayerSession& player) {
     wire::nbt::NbtCompound profile;
     const wire::common::Uuid& uuid = player.uuid();
@@ -85,7 +85,7 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     }
     world::RealLootTables* tables = lootTables_;
     tables->prepareAt(context, world, dead.x, dead.y, dead.z);
-    // parity: `damage_source_properties` reads the source of the killing blow, by its damage type.
+    // parity: `damage_source_properties` reads the source of the killing blow.
     if (!dead.lastDamageCause.empty() && options_.damageTypeTags != nullptr) {
         const Identifier type = world::triggerFacts::damageTypeOf(dead.lastDamageCause);
         context.damageType = type;
@@ -125,7 +125,7 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
         }
     }
     context.killedByPlayer = context.attackingPlayer.has_value();
-    // parity: `ATTACKING_ENTITY` and `DIRECT_ATTACKING_ENTITY` come off the killing blow's source:
+    // parity: `ATTACKING_ENTITY` and `DIRECT_ATTACKING_ENTITY` come off the killing blow's source.
     // who is behind it, and what landed it, the arrow or the fireball rather than its shooter.
     const ServerEntity::Blame& blame = dead.lastBlame;
     const auto factsById = [&](std::int32_t entityId) -> std::optional<EntityFacts> {

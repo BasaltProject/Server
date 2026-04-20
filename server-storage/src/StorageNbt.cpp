@@ -6,7 +6,6 @@
 
 namespace basalt::server::storage {
 namespace {
-
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
@@ -21,8 +20,6 @@ constexpr std::string_view kCountKey = "count";
 constexpr std::string_view kComponentsKey = "components";
 constexpr std::string_view kCountersKey = "Counters";
 
-/// Every blob read here starts the same way: it must be NBT, it must be a compound, and it must be
-/// the version this build writes.
 [[nodiscard]] std::expected<NbtCompound, StorageFormatError> rootOf(std::span<const std::uint8_t> bytes,
                                                                     std::string_view what, std::int32_t formatVersion) {
     const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::read(bytes);
@@ -41,15 +38,12 @@ constexpr std::string_view kCountersKey = "Counters";
     }
     return *root;
 }
-
 } // namespace
 
 std::vector<std::uint8_t> inventoryNbt::encode(const StoredInventory& inventory) {
     NbtCompound root;
     root.putInt(kVersionKey, kFormatVersion);
     root.putInt(kSizeKey, static_cast<std::int32_t>(inventory.slots.size()));
-    // Only occupied slots are written, each carrying its own index: an inventory is mostly empty
-    // most of the time, and a list of 41 empty compounds is all overhead.
     NbtList occupied{NbtType::Compound};
     for (std::size_t index = 0; index < inventory.slots.size(); ++index) {
         const std::optional<StoredItemStack>& stack = inventory.slots[index];
@@ -115,8 +109,6 @@ std::vector<std::uint8_t> statsNbt::encode(const StoredStats& stats) {
     NbtCompound root;
     root.putInt(kVersionKey, kFormatVersion);
     NbtCompound counters;
-    // A counter back at zero is dropped rather than written: it says the same thing as its absence,
-    // and every stat a player has never touched would otherwise be in every blob.
     for (const auto& [key, value] : stats.counters) {
         if (value != 0) {
             counters.putLong(key, value);
@@ -145,5 +137,4 @@ std::expected<StoredStats, StorageFormatError> statsNbt::decode(std::span<const 
     }
     return stats;
 }
-
 } // namespace basalt::server::storage

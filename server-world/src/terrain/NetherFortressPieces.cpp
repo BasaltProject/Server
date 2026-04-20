@@ -129,8 +129,6 @@ struct PieceWeight {
     return StructureBoundingBox{x, y, z, x + depth - 1, y + height - 1, z + width - 1};
 }
 
-/// The assembly's whole working state: the pieces so far, which still owe children, and the two
-/// weight tables, each of which counts down as pieces of a kind are used up.
 struct AssemblyState {
     std::vector<Piece> pieces;
     /// Indices into `pieces`, since the vector grows while the queue is walked.
@@ -195,8 +193,7 @@ void addChildren(AssemblyState& state, std::size_t index, random::RandomSource& 
                 break;
             }
             const std::optional<Piece> piece = createPiece(weight.type, state, random, x, y, z, direction, depth);
-            // parity: a refused kind does not end the walk. The running selection is already
-            // negative, so every weight after it is tried in turn.
+            // parity: a refused kind does not end the walk, every later weight is tried.
             if (piece.has_value()) {
                 ++weight.count;
                 state.previous = weight.type;
@@ -213,8 +210,7 @@ void addChildren(AssemblyState& state, std::size_t index, random::RandomSource& 
 void addPiece(AssemblyState& state, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z,
               StructureDirection direction, bool castle, std::int32_t parentDepth) {
     if (std::abs(x - state.startBox.minX) > 112 || std::abs(z - state.startBox.minZ) > 112) {
-        // parity: the jar builds the filler and throws it away. Only its draw survives, and the
-        // fortress simply stops growing in that direction.
+        // parity: the jar builds the filler and discards it, only its draw survives.
         static_cast<void>(createPiece(PieceType::BridgeEndFiller, state, random, x, y, z, direction, parentDepth));
         return;
     }

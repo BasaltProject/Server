@@ -30,57 +30,42 @@ namespace basalt::server::runtime {
 class BlockChangeBroadcaster;
 class ExplosionSystem;
 
-/// Everything a projectile does in flight and on landing: what it hits, what that hurts, and the
-/// flash and sound an entity being hit owes whoever is watching.
 class CombatSystem {
 public:
-    /// What a plugin gets a say in. Passed straight to `entityCombat::hurt`, which is the only place
-    /// a projectile hurts anything that is not a player.
     using Hooks = entity::entityCombat::Hooks;
 
-    /// The rolls a hit needs: a critical arrow's extra damage, and the seed a sound travels with.
     struct Options {
         std::function<std::int32_t(std::int32_t bound)> nextInt;
         std::function<std::int64_t()> nextSeed;
-        /// A hit on a minecart or a boat. parity: `VehicleEntity.hurtServer`; answers whether it counted.
+        /// parity: `VehicleEntity.hurtServer`; answers whether it counted.
         std::function<bool(world::LoadedWorld& world, entity::ServerEntity& vehicle, const VehicleSystem::Hit& hit)>
             hurtVehicle;
-        /// What the `blocks_wind_charge_explosions` tag holds, the only thing that shortens a gust.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
-        /// What `deflects_projectiles` holds: the breeze.
         const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
-        /// Where a dragon fireball burst, for the cloud it leaves.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball)>
             dragonFireballLanded;
-        /// A status effect given to a mob, instant ones included. `sourceId` is what threw it.
         std::function<bool(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId)>
             mobEffect;
-        /// Where a wither skull struck, and who if anyone.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            entity::ServerEntity& skull, entity::ServerEntity* mob, player::PlayerSession* player)>
             witherSkullLanded;
-        /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;
-        /// A target block struck by a player's projectile, where, and the signal it now gives.
         /// parity: `TargetBlock.onProjectileHit`'s statistic and trigger.
         std::function<void(world::LoadedWorld& world, player::PlayerSession& shooter,
                            const entity::ServerEntity& projectile, std::int32_t signal)>
             targetHit;
-        /// Where a player's arrow's `player_hurt_entity` and `killed_by_arrow` go.
         world::AdvancementTriggers* advancementTriggers = nullptr;
-        /// A crystal went, by that player if one was behind it.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>
             crystalDestroyed;
-        /// An enchantment's definition, which a trident's loyalty, impaling and channeling read.
         std::function<const wire::nbt::NbtCompound*(const wire::common::Identifier& id)> enchantmentDefinition;
-        /// A lightning bolt at a point, answering to that player if any. parity: `summon_entity`.
+        /// parity: `summon_entity`.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::optional<std::int32_t> cause)>
             summonLightning;
-        /// A stack dropped where something stood. parity: `Entity.spawnAtLocation`.
+        /// parity: `Entity.spawnAtLocation`.
         std::function<void(world::LoadedWorld& world, double x, double y, double z,
                            const server::world::loot::ItemStack& stack)>
             dropItem;
@@ -88,20 +73,16 @@ public:
 
     CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions, Hooks hooks, Options options);
 
-    /// One tick of something in flight, and whatever it hits on the way.
-    ///
-    /// One game event, sent from a place rather than from a block. parity: `Level.gameEvent`.
+    /// parity: `Level.gameEvent`.
     void emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z,
                        const wire::common::Uuid& source);
 
-    /// parity: `Projectile.hitTargetOrDeflectSelf`: what sticks stays where it landed, what does not
-    /// is gone the moment it lands. What the block itself does about it is `onProjectileHit`.
+    /// parity: `Projectile.hitTargetOrDeflectSelf`.
     void tickProjectile(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& entity,
                         const entity::projectiles::Kind& kind);
 
-    /// A blast that only pushes: a wind charge's, or wind burst's. parity: `ServerExplosion` with a
-    /// calculator that hurts nobody.
+    /// parity: `ServerExplosion`.
     struct Gust {
         double x = 0.0;
         double y = 0.0;
@@ -109,9 +90,8 @@ public:
         float radius = 0.0F;
         /// parity: `getKnockbackMultiplier`, the same for everything the blast reaches.
         float knockbackMultiplier = 1.0F;
-        /// The entity the blast comes from, which it leaves out. Nothing for wind burst.
         std::optional<std::int32_t> sourceId;
-        /// parity: `ServerPlayer.onExplosionHit`: a player's own wind charge spares the fall after.
+        /// parity: `ServerPlayer.onExplosionHit`.
         bool windCharge = false;
         /// parity: `block_interaction: trigger`; `immuneTag` is what it leaves alone.
         bool triggersBlocks = true;
@@ -124,42 +104,31 @@ public:
     void gust(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, const Gust& blast);
 
-    /// A post-attack `ExplodeEffect` as a gust at that point. parity: `ServerLevel.explode`, whose
-    /// particle is the large one for a blast of two or more that touches blocks.
+    /// parity: `ServerLevel.explode`.
     [[nodiscard]] static Gust gustOf(const world::postAttack::Explosion& blast, double x, double y, double z);
 
-    /// A hit on an end crystal, which destroys it whatever the damage. `byExplosion` leaves it
-    /// gone without a blast of its own. parity: `EndCrystal.hurtServer`.
+    /// parity: `EndCrystal.hurtServer`.
     void hitCrystal(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                     entity::ServerEntity& crystal, bool byExplosion, bool byDragon = false,
                     std::optional<std::int32_t> byPlayer = std::nullopt, bool byCreative = false);
 
-    /// What a blast does to the entities around it that are not players or items.
-    ///
-    /// parity: `ServerExplosion.hurtEntities`, which reaches twice the power and skips the entity
-    /// that went off.
+    /// parity: `ServerExplosion.hurtEntities`.
     void hurtByExplosion(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
                          double y, double z, float power, std::int32_t sourceEntityId);
 
-    /// The flash, the push and the sound of an entity being hit by something that is not a player.
     void announceEntityHit(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& entity,
                            const wire::common::Identifier& damageType, std::int32_t causeEntityId, bool died);
 
-    /// Gives a mob an effect through the server's own rules. Answers whether it took.
     bool giveMobEffect(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId = -1) const;
 
-    /// Tells a wither the hit about to land comes from an undead, through its projectile or blast.
-    /// A projectile's blow on a minecart or a boat, handed to `VehicleEntity.hurtServer`. Answers
-    /// whether `target` was one.
     bool hitVehicle(world::LoadedWorld& world, entity::ServerEntity* target, float amount,
                     const wire::common::Identifier& type, const entity::ServerEntity& projectile);
 
     static void markWitherFriend(world::LoadedWorld& world, entity::ServerEntity& target,
                                  std::optional<std::int32_t> sourceId);
 
-    /// parity: `Projectile.getOwner`, since an arrow kills for whoever shot it. The arrow itself is
-    /// the answer once its owner is gone.
+    /// parity: `Projectile.getOwner`, since an arrow kills for whoever shot it.
     [[nodiscard]] static wire::text::Component shooterName(const std::vector<player::PlayerSession*>& watchers,
                                                            const std::vector<entity::ServerEntity*>& living,
                                                            const entity::ServerEntity& projectile);
@@ -172,22 +141,20 @@ public:
                                const player::PlayerSession& by);
 
 private:
-    /// The nearest thing a projectile passed through this tick, as a mob or as a player.
     struct Target {
         entity::ServerEntity* mob = nullptr;
         player::PlayerSession* player = nullptr;
-        /// Which of a dragon's parts it went through; a dragon itself is never hit.
         std::optional<entity::enderDragon::Part> dragonPart;
     };
 
-    /// `margin` grows every box it is tested against. parity: `ProjectileUtil.computeMargin`.
+    /// parity: `ProjectileUtil.computeMargin`.
     [[nodiscard]] static std::optional<Target> targetAlong(const std::vector<player::PlayerSession*>& watchers,
                                                            const std::vector<entity::ServerEntity*>& living,
                                                            const entity::ServerEntity& projectile, double fromX,
                                                            double fromY, double fromZ, double margin = 0.0,
                                                            const std::vector<std::int32_t>* spared = nullptr);
 
-    /// parity: `LlamaSpit.tick`: it moves on the movement it started the tick with, whatever it hit.
+    /// parity: `LlamaSpit.tick`.
     void tickLlamaSpit(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& spit,
                        const entity::projectiles::Kind& kind);
@@ -197,20 +164,17 @@ private:
                   const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& spit,
                   const Target& target, double fromX, double fromZ);
 
-    /// parity: `Projectile.onHitBlock` and the `PROJECTILE_LAND` of `onHit`: what the block does
-    /// about being hit.
+    /// parity: `Projectile.onHitBlock`.
     void hitBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   const entity::ServerEntity& projectile, const entity::BlockHit& hit, bool byArrow);
 
-    /// Whether whoever fired it is a player, which is what an ender dragon asks of a hit.
     [[nodiscard]] static bool firedByPlayer(const std::vector<player::PlayerSession*>& watchers,
                                             const entity::ServerEntity& projectile);
 
-    /// Marks the target as hurt by the player who fired, when a player did.
     static void rememberShooter(const std::vector<player::PlayerSession*>& watchers,
                                 const entity::ServerEntity& projectile, entity::ServerEntity& target);
 
-    /// parity: `AbstractArrow.doPostHurtEffects`, what an arrow that landed leaves on whoever it hit.
+    /// parity: `AbstractArrow.doPostHurtEffects`.
     void arrowEffects(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                       const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& arrow,
                       entity::ServerEntity* mob, player::PlayerSession* player);
@@ -223,7 +187,6 @@ private:
     /// parity: `AbstractArrow.onHitEntity`'s failed hit, the arrow turned back.
     void deflectArrow(entity::ServerEntity& arrow);
 
-    /// What an arrow did with the next thing along its flight.
     enum class ArrowHit : std::uint8_t { Missed, Stopped, Pierced };
 
     ArrowHit hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
@@ -231,14 +194,11 @@ private:
                             double fromY, double fromZ);
 
     /// parity: what `AbstractArrow.onHitEntity` tells its shooting player's advancements.
-    /// parity: `AbstractArrow`'s hit sound, on a hit and on landing.
     void arrowHitSound(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& arrow);
 
     void arrowTriggers(const world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        entity::ServerEntity& arrow, const entity::ServerEntity& mob, float damage, bool died);
 
-    /// The gust a wind charge leaves where it landed: the blocks it triggers, the push it gives
-    /// everything around, and the burst the clients see and hear.
     void gustWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& charge,
                            double x, double y, double z);
@@ -247,16 +207,13 @@ private:
     [[nodiscard]] static bool breezeProof(const std::vector<entity::ServerEntity*>& living,
                                           const entity::ServerEntity& charge, const entity::ServerEntity& target);
 
-    /// The fire a small fireball leaves where it landed.
     void lightWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                             const entity::BlockHit& hit);
 
-    /// What a bottle leaves where it broke.
     void splashPotion(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                       const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& bottle);
 
-    /// parity: `ThrownTrident.tick`'s loyalty: home to its owner once it has hit, dropped where it is
-    /// when the owner is gone. Answers whether it is gone.
+    /// parity: `ThrownTrident.tick`.
     bool tridentReturns(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& trident);
 
@@ -265,19 +222,17 @@ private:
                               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& trident,
                               double fromX, double fromY, double fromZ);
 
-    /// parity: channeling's `hit_block` effect, a bolt on a lightning rod the trident struck in a storm.
+    /// parity: channeling's `hit_block` effect.
     void channelOnBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const entity::ServerEntity& trident, const entity::BlockHit& hit);
 
-    /// A trident's loyalty, read from its stack the first time it is asked.
     std::int32_t tridentLoyalty(entity::ServerEntity& trident);
 
     void tridentSound(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& trident,
                       std::string_view sound, float volume);
 
-    /// Where a thrown pearl puts whoever threw it.
     void landEnderPearl(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& pearl);
-    /// parity: `Projectile.hitTargetOrDeflectSelf` against a breeze. Answers whether it was turned.
+    /// parity: `Projectile.hitTargetOrDeflectSelf` against a breeze.
     bool deflected(const std::vector<player::PlayerSession*>& watchers,
                    const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& projectile, double fromX,
                    double fromY, double fromZ);

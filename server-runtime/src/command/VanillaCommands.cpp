@@ -35,10 +35,6 @@
 namespace basalt::server::runtime::command {
 namespace {
 
-/// The two of these that outlive one registration and belong to nobody else.
-///
-/// `/stopwatch` and `/bossbar` both keep state a command owns rather than the server: vanilla keeps
-/// them in `level.dat`, and until that is written they live here, for the life of the process.
 struct OwnedState {
     commands::Stopwatches stopwatches;
     commands::BossBarRegistry bossBars;

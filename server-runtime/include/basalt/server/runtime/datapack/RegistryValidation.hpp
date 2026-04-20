@@ -8,22 +8,16 @@
 
 namespace basalt::server::runtime::datapack {
 
-/// One registry element a pack wrote that cannot be read.
 struct ElementError {
     std::string registry;
     std::string element;
     std::string message;
 };
 
-/// The elements of the reloadable registries (and the world ones read at startup) that the packs
-/// outside `builtInPacks` got wrong: not JSON, not an object, or missing what its codec requires
-/// (`schemaError`). parity: `RegistryDataLoader.load`, where one such element fails the whole load.
-/// A type this build cannot model yet is this build's gap and not the pack's error, so it passes.
-/// `worldRegistries` adds the registries only a start reads, which `/reload` leaves alone.
+/// parity: `RegistryDataLoader.load`, where one such element fails the whole load.
 [[nodiscard]] std::vector<ElementError>
 invalidElements(const ResourceStack& resources, const std::vector<std::string>& builtInPacks, bool worldRegistries);
 
-/// The packs a client can hold a copy of: every one but the world's own.
 [[nodiscard]] std::vector<std::string> builtInPackIds(const class PackRepository& repository);
 
 /// parity: `RegistryDataLoader.printFullDetailsToLog`, grouped by registry then element.

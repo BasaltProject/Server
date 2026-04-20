@@ -15,33 +15,24 @@
 
 namespace basalt::server::runtime::command {
 
-/// A command source with pieces swapped out, which is all `/execute` does.
-/// parity: `CommandSourceStack.withEntity`/`withPosition`/`withLevel`. The rest is delegated to whoever
-/// started the chain, so `execute as <player>` keeps the original feedback target and permissions.
+/// parity: `CommandSourceStack.withEntity`/`withPosition`/`withLevel`.
 class ExecutionSource final : public CommandSource {
 public:
-    /// What `/execute store` hangs here: called with the result of whatever the chain ends up
-    /// running.
     using OnResult = std::function<void(bool success, std::int32_t result)>;
 
-    /// What this link changes about the source it wraps. Everything left unset is inherited.
     struct Changes {
         std::optional<player::PlayerSession*> player;
         std::optional<std::array<double, 3>> position;
-        /// The world this link acts in, or unset to use whatever the base source would.
         std::optional<world::LoadedWorld*> world;
         std::optional<std::pair<float, float>> rotation;
         /// parity: `anchored`, which decides whether a position means the feet or the eyes.
         std::optional<bool> anchorEyes;
-        /// Who `@s` is, which `/execute as` sets and which can be something other than a player.
         std::optional<CommandTarget> entity;
         OnResult onResult;
         /// parity: `withPermission`, what a function runs its lines with.
         std::optional<std::int32_t> permission;
         /// parity: `withSuppressedOutput`.
         bool silent;
-        /// Allowed every command node: a function's lines were compiled against its own permission
-        /// level already, which is what vanilla checks and all it checks.
         bool trusted;
     };
 
@@ -76,17 +67,12 @@ public:
 
     [[nodiscard]] const std::optional<CommandTarget>& entity() const noexcept { return entity_; }
 
-    /// The source that started the chain, which is who feedback belongs to.
     [[nodiscard]] const CommandSource& root() const;
 
-    /// Reports a result to every `store` in the chain, innermost first.
     void report(std::int32_t result) const;
 
-    /// Whether anything in the chain waits for the result, a `store` or a `return run`.
     [[nodiscard]] bool observesResult() const;
 
-    /// Everything in the chain that waits for the result, innermost first, copied so it can be
-    /// told after the chain itself is gone.
     [[nodiscard]] std::vector<OnResult> resultCallbacks() const;
 
 private:
@@ -103,7 +89,6 @@ private:
     bool trusted_ = false;
 };
 
-/// The world a source acts in: what `/execute in` chose, else the runner's own.
 [[nodiscard]] world::LoadedWorld* worldIn(const CommandSource& source, const CommandEnvironment& environment);
 
 } // namespace basalt::server::runtime::command

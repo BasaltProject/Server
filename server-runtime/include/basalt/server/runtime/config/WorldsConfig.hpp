@@ -13,39 +13,28 @@
 
 namespace basalt::server::runtime::config {
 
-/// The settings that apply to one world, after inheritance has been resolved.
 struct WorldSettings {
     std::string difficulty = "easy";
     std::int32_t viewDistance = 10;
     std::int32_t saveIntervalSeconds = 300;
 
-    /// Whether the End's exit portal is open from the start.
-    ///
-    /// A divergence, and off by default: vanilla only opens it when the dragon dies, and there is
-    /// no dragon in this build yet, so an End nobody can leave is what parity actually means today.
     bool openEndExitPortal = false;
 
-    /// The vanilla defaults, which is what a world with no settings of its own gets.
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 
-    /// Reads whichever of the keys `table` declares, leaving the rest at `inherited`.
     [[nodiscard]] static WorldSettings from(const wire::common::toml::TomlTable* table, const WorldSettings& inherited);
 
     friend bool operator==(const WorldSettings&, const WorldSettings&) = default;
 };
 
-/// How a world's terrain is made. parity: the `world_preset` registry, save `single_biome_surface`,
-/// plus `Void`, which is ours.
 enum class WorldType : std::uint8_t { Normal, Flat, Void, Amplified, LargeBiomes, Debug };
 
 [[nodiscard]] std::string_view worldTypeName(WorldType type) noexcept;
 
 [[nodiscard]] std::optional<WorldType> worldTypeByName(std::string_view name);
 
-/// The vanilla dimension whose rules and generator a declared world uses.
 enum class WorldDimension : std::uint8_t { Overworld, Nether, End };
 
-/// What a dimension is, as the registry and the generator need it.
 struct DimensionFacts {
     std::string_view configName;
     std::string_view registryPath;
@@ -54,48 +43,31 @@ struct DimensionFacts {
     server::world::ChunkHeight chunkHeight = server::world::kOverworldHeight;
     bool hasSkylight = false;
     bool hasCeiling = false;
-    /// parity: `DimensionType.coordinateScale`, the 1:8 that makes a Nether portal land where it
-    /// does.
+    /// parity: `DimensionType.coordinateScale`.
     double coordinateScale = 1.0;
-    /// parity: `gameplay/nether_portal_spawns_piglin`, which the overworld's own dimension type
-    /// turns on and every other one leaves off.
+    /// parity: `gameplay/nether_portal_spawns_piglin`.
     bool spawnsPortalPiglins = false;
-    /// parity: `EnvironmentAttributes.SKY_LIGHT_LEVEL`, whose default is fifteen and which only the
-    /// Nether sets, to four. It is what `Level.updateSkyBrightness` subtracts from fifteen.
+    /// parity: `EnvironmentAttributes.SKY_LIGHT_LEVEL`.
     float skyLightLevel = 15.0F;
-    /// parity: the `minecraft:day` timeline, which only `#minecraft:in_overworld` carries: the
-    /// Nether and the End tag nothing but `#minecraft:universal`, so neither the sky light nor the
-    /// angle of the sun moves there. Without this the End went dark at night and a detector in it
-    /// followed the overworld's clock.
     bool hasDayTimeline = false;
-    /// parity: `DimensionType.ambientLight`, what `getLightLevelDependentMagicValue` lifts darkness by.
+    /// parity: `DimensionType.ambientLight`.
     float ambientLight = 0.0F;
 };
 
 [[nodiscard]] const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept;
 
-/// The name a config file uses, which is the short one.
 [[nodiscard]] std::string_view dimensionName(WorldDimension dimension) noexcept;
 
-/// `minecraft:the_nether` and friends.
 [[nodiscard]] std::string dimensionRegistryKey(WorldDimension dimension);
 
-/// Accepts the config name, the registry path and the full registry key, in any case.
 [[nodiscard]] std::optional<WorldDimension> dimensionByName(std::string_view name);
 
 /// parity: `Level.canHaveWeather`, which is why it never rains in the Nether or the End.
 [[nodiscard]] bool canHaveWeather(WorldDimension dimension) noexcept;
 
-/// Whether time runs there at all.
-///
-/// parity: `dimension_type.default_clock`. The Overworld and the End name a world clock in 26.2 and
-/// the Nether names none, which is why its sky never moves however long anyone stays in it.
+/// parity: `dimension_type.default_clock`.
 [[nodiscard]] constexpr bool hasClock(WorldDimension dimension) noexcept { return dimension != WorldDimension::Nether; }
 
-/// One world as `worlds.toml` declares it. The seed is absent when the operator left it to chance.
-/// `linkedTo` names the Overworld a Nether or End belongs to (`skyblock_nether` to `skyblock`), which
-/// allows several sets of dimensions. Absent on an Overworld; a secondary dimension without it
-/// belongs to the default world.
 struct WorldDeclaration {
     std::string name;
     WorldDimension dimension = WorldDimension::Overworld;
@@ -107,10 +79,6 @@ struct WorldDeclaration {
     friend bool operator==(const WorldDeclaration&, const WorldDeclaration&) = default;
 };
 
-/// `config/worlds.toml`: which worlds to load, plus the settings they inherit.
-///
-/// Resolution order for a setting, strongest first: `worlds/<name>/settings.toml`, then
-/// `[defaults]` here, then the vanilla values.
 class WorldsConfig {
 public:
     static constexpr std::string_view kFileName = "worlds.toml";
@@ -128,19 +96,10 @@ public:
 
     [[nodiscard]] const WorldDeclaration& defaultWorld() const;
 
-    /// The overworld a world belongs to: itself, what it names, or the default world.
     [[nodiscard]] const WorldDeclaration& overworldOf(const WorldDeclaration& world) const;
 
-    /// The world a portal out of `world` leads to, or nothing when none is declared for it.
-    ///
-    /// Travel is always between an overworld and one of its own secondary dimensions, which is why
-    /// a portal in a Nether comes back to the overworld that Nether belongs to rather than to
-    /// whichever one is the default.
     [[nodiscard]] const WorldDeclaration* portalTarget(const WorldDeclaration& world, WorldDimension dimension) const;
 
-    /// The settings for `world`, generating its `settings.toml` if the world directory already
-    /// exists and lacks one. Never for a world not yet created: writing the file would create the
-    /// directory, and an existing directory is what marks a world as already created.
     [[nodiscard]] WorldSettings settingsFor(const WorldDeclaration& world) const;
 
 private:

@@ -24,7 +24,6 @@ namespace {
     return block == nullptr ? std::string{} : block->path();
 }
 
-/// What the below-trunk provider leaves alone: soil a tree may already be standing on.
 const std::set<std::string, std::less<>>& cannotReplaceBelowTrunkPaths() {
     static const std::set<std::string, std::less<>> paths = {
         "dirt", "coarse_dirt", "rooted_dirt", "mud", "muddy_mangrove_roots", "moss_block", "pale_moss_block", "podzol"};

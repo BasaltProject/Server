@@ -69,8 +69,7 @@ const std::set<std::string, std::less<>>& mossReplaceablePaths() {
     return y >= bounds.minY() && y <= bounds.maxY() && registry::blocks::isAir(chunk.decorationBlockStateId(x, y, z));
 }
 
-/// parity: `VegetationPatchFeature.getSurfacePos`, which walks up out of the air and then back down
-/// onto the first sturdy face.
+/// parity: `VegetationPatchFeature.getSurfacePos` walks up out of the air then down onto the first sturdy face.
 [[nodiscard]] std::optional<DecorationPos> findGround(const Chunk& chunk, std::int32_t x, std::int32_t startY,
                                                       std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
@@ -113,7 +112,7 @@ void placeVegetation(Chunk& chunk, random::RandomSource& random, random::RandomS
     feature.place(chunk, random, DecorationPos{.x = ground.x, .y = ground.y + 1, .z = ground.z}, mossyCarpetRandom);
 }
 
-/// parity: `WorldGenRegion.random`, positioned at the centre chunk's minimum block corner.
+/// parity: `WorldGenRegion.random`.
 [[nodiscard]] random::RandomSource worldgenRegionRandom(std::int64_t seed, const Chunk& chunk) {
     random::RandomSource source = random::RandomSource::xoroshiro(seed);
     random::RandomSource named = source.forkPositional().fromHashOf("minecraft:worldgen_region_random");

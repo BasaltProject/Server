@@ -37,20 +37,15 @@ namespace {
 
 using wire::text::Component;
 
-/// How often the rest of the server is looked at, in the listener's own loop. The world moves once
-/// every fifty milliseconds and the loop turns faster than that, so this is what a tick is worth.
+// The world moves once per 50 ms and the listener loop turns faster, so this is what a tick is worth.
 constexpr std::chrono::milliseconds kSyncPeriod{50};
 
-/// How far around a player the world is sent when they arrive. The same distance the door already
-/// told the client to draw.
 constexpr std::int32_t kChunkRadius = 4;
 
-/// A position this client has already been told is the same position: a double that came off the
-/// wire as a float never lands exactly where it started.
+// A double that came off the wire as a float never lands exactly where it started.
 constexpr double kMoveEpsilon = 0.01;
 constexpr float kTurnEpsilon = 1.0F;
 
-/// The objective a server-drawn board lives under. One per client, so the name never collides.
 constexpr std::string_view kSidebarObjective = "basalt";
 
 } // namespace
@@ -71,8 +66,6 @@ wire::bedrock::BedrockItemStack itemStackFor(const std::optional<storage::Stored
     if (named == nullptr) {
         return {};
     }
-    // An item that places a block carries which one: the client draws the block from that and not
-    // from the item's own name.
     std::int32_t block = 0;
     if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
             wire::common::Identifier::parse(stack->id);
@@ -104,8 +97,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
             player::playerPersistence::restore(*session_, *stored);
             firstSeenEpochSeconds_ = stored->firstSeenEpochSeconds;
             playTimeTicks_ = stored->playTimeTicks;
-            // Only the *position* is meaningless when the stored world is gone. Health, hunger,
-            // experience and game mode are the player's, not the world's.
+            // Only the position is meaningless when the stored world is gone; the rest is the player's.
             if (stored->world != context_.worldName) {
                 session_->x = context_.spawnX;
                 session_->y = context_.spawnY;
@@ -120,39 +112,27 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     if (context_.registry != nullptr) {
         context_.registry->add(session_.get());
     }
-    // What the HUD draws, before anything can change it: a client that is told nothing draws a
-    // player with no hearts at all.
+    // A client told nothing draws a player with no hearts at all.
     session_->connection().syncHealth();
     session_->connection().syncExperience();
-    // The body itself, which nothing else says: gravity, collision and how much air it holds. Until
-    // this arrives the client has zero for all three, which is a player who floats, cannot jump and
-    // drowns standing on grass. Everywhere else it only goes out when the air or the fire changes.
+    // Until this arrives the client has zero gravity, collision and air: a player who floats and drowns on grass.
     session_->connection().syncSubmersion();
     session_->connection().sendInventoryAll();
-    // What its hands may do. Nothing else says this, and a client that is told nothing cannot mine,
-    // build, open a door or hit anything whatever its gamemode is.
+    // A client told nothing cannot mine, build or hit anything whatever its gamemode is.
     sendAbilities();
 
-    // Where they actually are. `start_game` went out before this player was loaded, so the client
-    // was told the only place a start can name without knowing anybody: the origin. Left at that, a
-    // client stands at zero sixty-four zero in a world where that is rock or water, and cannot jump
-    // out of it because as far as it knows it is not standing anywhere.
+    // `start_game` went out before this player was loaded and names the origin, so the client must be teleported.
     if (session_->connection().teleportTo) {
         session_->connection().teleportTo(session_->x, session_->y, session_->z, session_->yaw, session_->pitch);
     }
 
-    // The world itself, once the player exists. The columns are built where the world runs and
-    // arrive here already written, so the door's thread never reads a chunk.
-    //
-    // And the client is only told it has spawned once they are all on their way: telling it first
-    // drops somebody into a world that is not there yet, which is what the bots caught.
+    // Spawned is sent only once all columns are on their way: earlier drops a player into a world not there yet.
     const auto spawned = [mailbox = mailbox_] {
         wire::io::ByteBuffer status;
         wire::bedrock::writePlayStatus(status, wire::bedrock::PlayStatus::PlayerSpawn);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayStatus), status.toVector());
     };
     if (!sendColumnsAround(spawned)) {
-        // No world to send means no reason to wait for it.
         spawned();
     }
 
@@ -163,13 +143,9 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTime), time.toVector());
     announceAndSay(Component::translatable("multiplayer.player.joined", {Component::text(session_->name())})
                        .color(wire::text::kYellow));
-    // The sidebar and the boss bar, off the same files and the same renderer the other door uses.
     if (context_.uiConfigs && context_.placeholders != nullptr) {
         ui_ = std::make_unique<ui::PlayerUi>(context_.uiConfigs, *context_.placeholders,
-                                             [](std::int32_t, const std::function<void(wire::io::ByteBuffer&)>&) {
-                                                 // Nothing speaks Java here: everything this player
-                                                 // is shown goes out through the surfaces below.
-                                             });
+                                             [](std::int32_t, const std::function<void(wire::io::ByteBuffer&)>&) {});
         ui::PlayerUi::Surfaces surfaces;
         surfaces.scoreboard = [this](const std::string& title, const std::vector<std::string>& lines) {
             drawSidebar(title, lines);
@@ -184,8 +160,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
                                           protocol_);
             mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), body.toVector());
             if (bossBarShown_) {
-                // The percentage and the name are two separate nudges over there, and re-adding the
-                // bar restarts its fade.
+                // Percentage and name are separate nudges there, and re-adding the bar restarts its fade.
                 wire::io::ByteBuffer named;
                 wire::bedrock::writeBossEvent(
                     named, static_cast<std::int64_t>(kRuntimeEntityId), wire::bedrock::BedrockBossAction::UpdateName,
@@ -207,8 +182,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         ui_->drawInto(std::move(surfaces));
     }
 
-    // Last, once the player exists everywhere: a plugin that opens a menu on the join event has to
-    // find a player who is already in the registry and can already be sent something.
+    // Last, so a plugin opening a menu on the join event finds a registered player.
     if (context_.joined) {
         context_.joined(*session_);
     }
@@ -218,22 +192,19 @@ BedrockPlayer::~BedrockPlayer() {
     if (session_ == nullptr) {
         return;
     }
-    // Whatever they were dragging goes back in the bag rather than leaving with the window. What
-    // does not fit is lost, which can only happen if the slot it came from was filled again.
     if (windows_->cursor.has_value()) {
         static_cast<void>(session_->inventory.add(*windows_->cursor));
         windows_->cursor.reset();
     }
     // parity: `PlayerList.remove` awards it before the player is saved.
     player::statAwards::award(*session_, "leave_game");
-    // Written before they leave the registry, so what is saved is a player who still exists.
+    // Written before leaving the registry, so what is saved is a player who still exists.
     if (context_.save && session_->connection().storedSnapshot) {
         if (const std::optional<storage::StoredPlayer> row = session_->connection().storedSnapshot(); row.has_value()) {
             context_.save(*row);
         }
     }
-    // parity: `ServerPlayer.disconnect` stops the sleeping, which is what puts the bed back down.
-    // The world is not this thread's to touch, so the square goes over rather than the state.
+    // parity: `ServerPlayer.disconnect`.
     if (session_->sleepingBed.has_value() && context_.freeBed) {
         const std::array<std::int32_t, 3> bed = *session_->sleepingBed;
         session_->sleepingBed.reset();
@@ -246,8 +217,7 @@ BedrockPlayer::~BedrockPlayer() {
                        .color(wire::text::kYellow));
     if (context_.registry != nullptr) {
         context_.registry->remove(session_->uuid());
-        // Handed over rather than deleted here: this runs on the listener's thread, and the tick
-        // loop may be halfway through a list of players that still has this one in it.
+        // Retired rather than deleted: this runs on the listener thread and the tick loop may still hold this player.
         context_.registry->retire(std::move(session_));
     }
 }
@@ -260,8 +230,7 @@ void BedrockPlayer::chat(const std::string_view message) {
         say(std::string{message});
         return;
     }
-    // A plugin may rewrite the line or stop it, and it only gets to do that where plugins run, so
-    // the line is handed over and comes back with the answer.
+    // A plugin may rewrite or stop the line, but only where plugins run, so it is handed over and comes back.
     context_.chatFilter(*session_, std::string{message}, [this](const bool allowed, std::string spoken) {
         if (allowed) {
             say(std::move(spoken));
@@ -277,8 +246,6 @@ wire::bedrock::BedrockItemStack BedrockPlayer::stackFor(const std::optional<stor
     if (named == nullptr) {
         return {};
     }
-    // An item that places a block carries which one: the client draws the block from that and not
-    // from the item's own name.
     std::int32_t block = 0;
     if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
             wire::common::Identifier::parse(stack->id);
@@ -314,8 +281,6 @@ void BedrockPlayer::sendEffect(const wire::common::Identifier& effect, const wir
         return;
     }
     wire::io::ByteBuffer body;
-    // parity: Java counts an infinite effect as -1 and Bedrock has no such thing, so it is sent as
-    // the longest one that edition can hold instead of as a negative that reads as already over.
     const std::int32_t ticks = durationTicks < 0 ? std::numeric_limits<std::int32_t>::max() : durationTicks;
     wire::bedrock::writeMobEffect(body, kRuntimeEntityId, event, id, amplifier, particles, ticks, ambient);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MobEffect), body.toVector());
@@ -328,8 +293,6 @@ void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x,
     }
     const auto kind = static_cast<wire::bedrock::BedrockBlockActionType>(action);
 
-    // A dig that is starting or carrying on: the client is told how fast it goes, which is both the
-    // cracks and the pace. The world answers on its own thread, so the reply carries the mailbox.
     if (kind == wire::bedrock::BedrockBlockActionType::StartBreak ||
         kind == wire::bedrock::BedrockBlockActionType::ContinueBreak ||
         kind == wire::bedrock::BedrockBlockActionType::ContinueDestroy) {
@@ -337,8 +300,7 @@ void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x,
             return;
         }
         const bool starting = kind == wire::bedrock::BedrockBlockActionType::StartBreak;
-        // The client says nothing about how far along it is, so the turns are counted here: it is
-        // what everybody else's cracks are drawn from.
+        // The client reports no progress, so turns are counted here; everybody else's cracks are drawn from it.
         if (starting || diggingAt_ != std::array<std::int32_t, 3>{x, y, z}) {
             diggingAt_ = {x, y, z};
             diggingTicks_ = 0;
@@ -346,12 +308,10 @@ void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x,
         ++diggingTicks_;
         context_.digSpeed(
             *session_, x, y, z, diggingTicks_, [mailbox = mailbox_, x, y, z, starting](const float perTick) {
-                // Nothing to draw on a block that comes apart in one tick or not at all.
                 if (perTick <= 0.0F || perTick >= 1.0F) {
                     return;
                 }
-                // How many whole ticks it takes, and the range shared out over them: the client counts in
-                // ticks, so a block that needs three and a half of them needs four.
+                // The client counts in ticks, so a block needing three and a half needs four.
                 const auto ticks = static_cast<std::int32_t>(std::ceil(1.0F / perTick));
                 wire::io::ByteBuffer body;
                 wire::bedrock::writeLevelEvent(body,
@@ -364,7 +324,6 @@ void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x,
         return;
     }
 
-    // Given up on: the cracks come off again.
     if (kind == wire::bedrock::BedrockBlockActionType::AbortBreak) {
         if (diggingAt_.has_value() && context_.digStopped) {
             context_.digStopped(*session_, (*diggingAt_)[0], (*diggingAt_)[1], (*diggingAt_)[2]);
@@ -378,10 +337,7 @@ void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x,
         return;
     }
 
-    // A client that predicts the break has already taken the block away on its own screen, which is
-    // the one that counts here: everything else is told by the world. Only this one action carries
-    // where it happened; `stop_break` arrives at the origin, and breaking what is there instead is
-    // how this server spent a while quarrying the middle of the world.
+    // `stop_break` arrives at the origin; breaking what is there instead once quarried the middle of the world.
     if (!context_.breakBlock || kind != wire::bedrock::BedrockBlockActionType::PredictDestroy) {
         return;
     }
@@ -394,8 +350,6 @@ void BedrockPlayer::useItemOn(const std::int32_t x, const std::int32_t y, const 
     if (session_ == nullptr || !context_.useOn || face < 0 || face > 5) {
         return;
     }
-    // The two editions number the six faces the same way, down first and east last, so the number
-    // travels as it arrives.
     const player::BlockHit hit{.x = x,
                                .y = y,
                                .z = z,
@@ -403,8 +357,7 @@ void BedrockPlayer::useItemOn(const std::int32_t x, const std::int32_t y, const 
                                .clickX = clickX,
                                .clickY = clickY,
                                .clickZ = clickZ};
-    // The answer comes back on the world's thread, where this player may already be gone: it
-    // carries the mailbox rather than the player, which is what the goodbye leaves behind.
+    // The answer lands on the world's thread where the player may be gone, so it carries the mailbox.
     context_.useOn(*session_, hit, hotbarSlot, windows_,
                    [mailbox = mailbox_, protocol = protocol_](
                        const OpenWindow& window, const std::vector<std::optional<storage::StoredItemStack>>& slots) {
@@ -468,8 +421,7 @@ void BedrockPlayer::useOnEntity(const std::uint64_t runtimeEntityId) {
     }
     // The client counts entities from one where this server counts from zero.
     const auto entityId = static_cast<std::int32_t>(runtimeEntityId - 1);
-    // parity: `Villager.mobInteract` opens its trades whatever is in the hand, so the book is asked
-    // for first and the rest of the click only happens when there is none.
+    // parity: `Villager.mobInteract`.
     if (context_.trades) {
         std::optional<OpenTrades> offers = context_.trades(*session_, entityId);
         if (offers.has_value() && !offers->offers.empty()) {
@@ -484,8 +436,7 @@ void BedrockPlayer::useOnEntity(const std::uint64_t runtimeEntityId) {
 
 void BedrockPlayer::openTrades(const std::uint64_t runtimeEntityId, OpenTrades offers) {
     windows_->nextContainerId = windows_->nextContainerId >= kMaxContainerId ? 1 : windows_->nextContainerId + 1;
-    // A merchant's window is not a block's: it carries no slots of this server's own, so nothing is
-    // left open behind it and closing it has nothing to put back.
+    // A merchant's window carries no slots of this server's own, so closing it has nothing to put back.
     windows_->open.reset();
     windows_->saidSlots.clear();
     windows_->saidNumbers.reset();
@@ -526,8 +477,6 @@ void BedrockPlayer::sendTrades() {
 }
 
 void BedrockPlayer::sendEnchantOptions() {
-    /// What the client draws in its own made-up alphabet. The words mean nothing: vanilla picks
-    /// them at random out of a list nobody reads.
     constexpr std::string_view kRowName = "enchant";
 
     std::vector<wire::bedrock::BedrockEnchantOption> options;
@@ -585,11 +534,9 @@ void BedrockPlayer::requestMap(const std::int64_t mapId) {
 
 void BedrockPlayer::showBorderColliders(const double minX, const double maxX, const double minZ, const double maxZ,
                                         const std::int32_t warningBlocks) {
-    /// The ids the two stand under. Negative on purpose: no entity of the world ever takes one.
+    // Negative on purpose: no entity of the world ever takes one.
     constexpr std::int64_t kColliderX = -3001;
     constexpr std::int64_t kColliderZ = -3002;
-    /// How close to a face it is worth standing at, and how far below the player's feet it stands
-    /// so that falling does not drop them through it.
     constexpr double kNearFace = 8.0;
     constexpr double kHalfWidth = 5.0;
     constexpr double kBelowFeet = 10.0;
@@ -622,13 +569,11 @@ void BedrockPlayer::showBorderColliders(const double minX, const double maxX, co
                                        false);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MoveEntityAbsolute), body.toVector());
     };
-    // Nothing to walk into once they are already past it, which is where the damage takes over.
     const bool inside = session_->x > minX && session_->x < maxX && session_->z > minZ && session_->z < maxZ;
     const double standY = session_->y - kBelowFeet;
     std::optional<std::array<double, 3>> alongX;
     std::optional<std::array<double, 3>> alongZ;
     if (inside) {
-        // Half its own width past the face, because the box is drawn around where it stands.
         if (session_->x > maxX - warning) {
             alongX = std::array{maxX + kHalfWidth, standY, session_->z};
         } else if (session_->x < minX + warning) {
@@ -721,7 +666,6 @@ void BedrockPlayer::useItemInAir(const std::int32_t hotbarSlot) {
     if (session_ == nullptr || hotbarSlot < 0 || hotbarSlot >= player::PlayerInventory::kHotbarSize) {
         return;
     }
-    // Whatever it is, it is now being held down: a bow bending, a spyglass raised, a bottle tipped.
     drawingSince_ = std::chrono::steady_clock::now();
     session_->usingItem = true;
     if (context_.useInAir) {
@@ -733,7 +677,6 @@ void BedrockPlayer::releaseItem(const std::int32_t hotbarSlot) {
     if (session_ == nullptr || hotbarSlot < 0 || hotbarSlot >= player::PlayerInventory::kHotbarSize) {
         return;
     }
-    /// How long a tick is, which is what turns a client's own draw into the number a bow wants.
     constexpr std::int64_t kTickMillis = 50;
 
     const std::chrono::steady_clock::time_point started = drawingSince_.value_or(std::chrono::steady_clock::now());
@@ -751,14 +694,12 @@ void BedrockPlayer::openOwnInventory() {
     if (session_ == nullptr) {
         return;
     }
-    // The bag itself is container zero, and it carries no block behind it: the position is the
-    // player's own, which is what that client draws the screen over.
+    // The bag is container zero with no block behind it; the position is the player's own.
     wire::io::ByteBuffer body;
     wire::bedrock::writeContainerOpen(
         body, 0, wire::bedrock::BedrockContainerType::Inventory, static_cast<std::int32_t>(std::floor(session_->x)),
         static_cast<std::int32_t>(std::floor(session_->y)), static_cast<std::int32_t>(std::floor(session_->z)));
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ContainerOpen), body.toVector());
-    // What is in it, so the screen it opens is not an empty one.
     if (session_->connection().sendInventoryAll) {
         session_->connection().sendInventoryAll();
     }
@@ -771,8 +712,7 @@ void BedrockPlayer::closeWindow(const std::int32_t containerId) {
     if (context_.closeWindow) {
         context_.closeWindow(*session_, windows_);
     }
-    // The client already took the screen down; this is the answer it waits for before it will open
-    // another one.
+    // The client already took the screen down; this is the answer it waits for before opening another.
     wire::io::ByteBuffer body;
     wire::bedrock::writeContainerClose(body, containerId, wire::bedrock::BedrockContainerType::Container, false);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ContainerClose), body.toVector());
@@ -818,8 +758,7 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
     if (session_ == nullptr) {
         return;
     }
-    // A client sends this every tick, so only the first one is worth a line: it says the movement
-    // arrived and was read as a position, which is the part that can be wrong.
+    // Sent every tick, so only the first is logged: it says movement was read as a position.
     if (!moved_) {
         moved_ = true;
         context_.logger.debug([this, x, y, z] {
@@ -827,9 +766,8 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
                    std::to_string(z);
         });
     }
-    // How far they have dropped without landing. parity: `Entity.fallDistance`, which is what
-    // decides whether a swing counts as a critical: only a hit on the way down does.
-    // parity: `resetFallDistance` from elsewhere, a mace's smash among them, lands here too.
+    // How far they have dropped without landing.
+    // parity: `resetFallDistance`.
     fallDistance_ = std::min(fallDistance_, session_->fallDistance);
     if (session_->onGround) {
         fallDistance_ = 0.0;
@@ -837,8 +775,7 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
         fallDistance_ += session_->y - y;
     }
     session_->fallDistance = fallDistance_;
-    // Written from the listener's thread, read by the tick, which is exactly what a Java connection
-    // does with the same fields from its own thread.
+    // Written from the listener thread and read by the tick, as a Java connection does from its own thread.
     session_->x = x;
     session_->y = y;
     session_->z = z;
@@ -853,7 +790,6 @@ void BedrockPlayer::showMenu(const std::string& title, const std::map<std::int32
     buttons.reserve(items.size());
     slots.reserve(items.size());
     for (const auto& [slot, item] : items) {
-        // What the plugin named it, flattened: a Bedrock button is a line of text and nothing else.
         const std::string label =
             item.name.has_value() ? wire::text::toLegacyText(wire::text::miniMessage::parse(*item.name)) : item.id;
         buttons.push_back(label.empty() ? item.id : label);
@@ -878,7 +814,6 @@ void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
     const auto flatten = [this](const wire::text::Component& text) {
         return wire::text::toLegacyText(wire::text::resolveComponent(text, context_.lang));
     };
-    // The body is the whole of what a dialog says; a screen of buttons has one place to put it.
     std::string content;
     for (const wire::text::Component& line : dialog.body) {
         content += content.empty() ? flatten(line) : "\n\n" + flatten(line);
@@ -888,8 +823,7 @@ void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
         content += "This dialog asks for something this edition cannot type here.";
     }
 
-    // Held rather than referenced: the click comes back long after whoever asked for the dialog
-    // has gone, and a button may lead to another dialog inside this one.
+    // Held rather than referenced: the click comes back long after whoever asked is gone.
     const auto held = std::make_shared<const world::dialogs::Dialog>(dialog);
     std::vector<std::string> buttons;
     std::vector<std::int32_t> which;
@@ -945,8 +879,7 @@ void BedrockPlayer::formAnswer(const std::uint32_t formId, const std::optional<s
             return;
         }
         if (!data.has_value()) {
-            // Dismissed. The plugin hears nothing, which is what closing a window without clicking
-            // is on the other edition too.
+            // Dismissed: the plugin hears nothing, as closing a window without clicking does on the other edition.
             form_.reset();
             return;
         }
@@ -997,14 +930,12 @@ void BedrockPlayer::settled(const bool afterDeath) {
                                         protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::EntityEvent), event.toVector());
     } else {
-        // Told again that it is in the world: a client that changed dimension sometimes never
-        // decides so on its own and keeps the loading screen up.
+        // A client that changed dimension sometimes never decides it is in the world and keeps the loading screen.
         wire::io::ByteBuffer status;
         wire::bedrock::writePlayStatus(status, wire::bedrock::PlayStatus::PlayerSpawn);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayStatus), status.toVector());
     }
-    // Either way the attributes go again, because the client believes its own copy of them and a
-    // screen it just took down is where that copy goes stale.
+    // The client believes its own copy of the attributes, and a closed screen is where it goes stale.
     if (session_->connection().syncHealth) {
         session_->connection().syncHealth();
     }
@@ -1032,8 +963,7 @@ void BedrockPlayer::tick() {
     syncSurroundings();
     tickCamera();
     if (session_ != nullptr && context_.lookAround) {
-        // The answer lands on the world's thread, where this player may already be gone: it carries
-        // the shared slot and nothing else.
+        // Lands on the world's thread where the player may be gone, so it carries the shared slot only.
         context_.lookAround(*session_, [into = surroundings_](std::vector<Seen> seen) {
             const std::lock_guard<std::mutex> guard{into->lock};
             into->latest = std::move(seen);
@@ -1041,8 +971,6 @@ void BedrockPlayer::tick() {
         });
     }
 
-    // The world follows: crossing into another column is what asks for the ring that just came into
-    // range, and nothing happens while somebody stands still.
     if (session_ != nullptr) {
         const std::pair here{static_cast<std::int32_t>(std::floor(session_->x)) >> 4,
                              static_cast<std::int32_t>(std::floor(session_->z)) >> 4};
@@ -1083,12 +1011,10 @@ void BedrockPlayer::tickCamera() {
         return;
     }
 
-    /// How far behind the watched entity the camera sits, and how much of their height the eyes
-    /// are at. parity: Geyser's own two numbers.
+    /// How far behind the watched entity the camera sits, and how much of their height the eyes are at.
     constexpr double kBehind = 4.0;
     constexpr double kEyeRatio = 0.85;
     constexpr double kDegrees = 0.017453292;
-    /// Long enough to look smooth and short enough not to lag behind somebody running.
     constexpr float kEase = 0.15F;
 
     double x = 0.0;
@@ -1112,7 +1038,6 @@ void BedrockPlayer::tickCamera() {
     if (!found) {
         const auto seen = shown_.find(spectating_);
         if (seen == shown_.end()) {
-            // Out of range, or gone. The camera stays where it was rather than snapping home.
             return;
         }
         x = seen->second.x;
@@ -1124,8 +1049,7 @@ void BedrockPlayer::tickCamera() {
         found = true;
     }
 
-    // parity: `Mth`'s own view vector, which is what puts the camera on the line the eyes look
-    // along rather than on the one the body faces.
+    // parity: `Mth`.
     const double alongYaw = -static_cast<double>(yaw) * kDegrees;
     const double alongPitch = static_cast<double>(pitch) * kDegrees;
     const double flat = std::cos(alongPitch);
@@ -1156,8 +1080,6 @@ void BedrockPlayer::syncSurroundings() {
         now = std::move(surroundings_->latest);
     }
 
-    /// How it is drawn, which this edition keeps in a handful of fields shared by every mob, and
-    /// for the newest looks in a property of its own.
     const auto drawLook = [this](const std::int32_t id, const Seen& seen) {
         if (wire::bedrock::hasAnything(seen.look)) {
             wire::io::ByteBuffer body;
@@ -1172,7 +1094,6 @@ void BedrockPlayer::syncSurroundings() {
         }
     };
 
-    /// An item frame, which is a block over here: the block itself and then what is in it.
     const auto drawFrame = [this](const Seen::Frame& frame) {
         wire::io::ByteBuffer block;
         wire::bedrock::writeItemFrameBlock(block, frame.x, frame.y, frame.z, frame.glowing, frame.face, protocol_);
@@ -1183,7 +1104,6 @@ void BedrockPlayer::syncSurroundings() {
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BlockEntityData), inside.toVector());
     };
 
-    /// The line over an entity, which is its own packet here rather than a field of the spawn.
     const auto drawName = [this](const std::int32_t id, const Seen& seen) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeNameTag(body, runtimeIdFor(id), seen.name, seen.alwaysShowName, protocol_);
@@ -1261,8 +1181,6 @@ void BedrockPlayer::syncSurroundings() {
             continue;
         }
         if (gone.frame.has_value()) {
-            // The frame was a block, so taking it away is putting back what was really there,
-            // which for anything a frame can hang in is air.
             wire::io::ByteBuffer empty;
             wire::bedrock::writeUpdateBlock(empty, gone.frame->x, gone.frame->y, gone.frame->z, 0, protocol_);
             mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateBlock), empty.toVector());
@@ -1280,8 +1198,7 @@ void BedrockPlayer::sendAbilities() {
         return;
     }
     const wire::protocol::play::Gamemode mode = session_->gamemode;
-    // A mode that only looks cannot change the world, and over here that is not an ability: it is
-    // a packet of its own, and the client believes it over anything the layer says.
+    // A look-only mode is a packet of its own here, and the client believes it over the ability layer.
     wire::io::ByteBuffer settings;
     wire::bedrock::writeUpdateAdventureSettings(settings, mode == wire::protocol::play::Gamemode::Adventure ||
                                                               mode == wire::protocol::play::Gamemode::Spectator);
@@ -1289,9 +1206,7 @@ void BedrockPlayer::sendAbilities() {
                    settings.toVector());
 
     wire::io::ByteBuffer abilities;
-    // Not an operator as far as this packet goes: what an operator may do with a command is decided
-    // by the command tree and the groups, not here, and claiming it would hand a client the
-    // operator's own buttons.
+    // Not an operator for this packet: claiming it would hand the client the operator's own buttons.
     wire::bedrock::writeUpdateAbilities(abilities, static_cast<std::int64_t>(kRuntimeEntityId), false,
                                         mode == wire::protocol::play::Gamemode::Creative);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateAbilities), abilities.toVector());
@@ -1306,21 +1221,19 @@ void BedrockPlayer::drawSidebar(const std::string& title, const std::vector<std:
         sidebarTitle_ = drawn;
     }
 
-    // Only what changed, the way the other door does it: these boards carry coordinates and a
-    // spinner, so every single tick has a different line in it somewhere.
+    // Only what changed: these boards carry coordinates and a spinner, so some line differs every tick.
     std::vector<wire::bedrock::BedrockScoreLine> changed;
     for (std::size_t at = 0; at < lines.size(); ++at) {
         std::string text = wire::text::toLegacyText(wire::text::miniMessage::parse(lines[at]));
         if (at < sidebarShown_.size() && sidebarShown_[at] == text) {
             continue;
         }
-        // Highest at the top, which is how a sidebar is read on both editions.
         changed.push_back(wire::bedrock::BedrockScoreLine{.lineId = static_cast<std::int64_t>(at) + 1,
                                                           .name = std::move(text),
                                                           .score = static_cast<std::int32_t>(lines.size() - at)});
     }
 
-    // A board that got shorter leaves its tail behind unless it is taken away by name.
+    // A shorter board leaves its tail behind unless it is taken away by name.
     std::vector<std::int64_t> gone;
     for (std::size_t at = lines.size(); at < sidebarShown_.size(); ++at) {
         gone.push_back(static_cast<std::int64_t>(at) + 1);
@@ -1363,8 +1276,7 @@ void BedrockPlayer::clearSidebar() {
 }
 
 void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chunkZ) {
-    // Only a column this client already has: one it has never been sent arrives whole when they
-    // walk into range, and sending it early would leave the client holding two of the same.
+    // Only a column the client already has: an unsent one arrives whole later, and early sending would duplicate it.
     if (!context_.sendChunks || !columns_.contains({chunkX, chunkZ})) {
         return;
     }
@@ -1374,8 +1286,7 @@ void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chu
                                           std::move(column));
                         },
                         {});
-    // An item frame is a block this client was told about and the world knows nothing of, so a
-    // column sent again writes air over it: the ones in this column are put back.
+    // Item frames are blocks the world knows nothing of, so a resent column writes air over them: put them back.
     for (const auto& [id, seen] : shown_) {
         if (!seen.frame.has_value() || (seen.frame->x >> 4) != chunkX || (seen.frame->z >> 4) != chunkZ) {
             continue;
@@ -1406,8 +1317,6 @@ bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
     const std::int32_t centreZ = static_cast<std::int32_t>(std::floor(session_->z)) >> 4;
     lastColumn_ = std::pair{centreX, centreZ};
 
-    // What is in range now, minus what this client already has, and the far ones forgotten so that
-    // walking back sends them again.
     std::set<std::pair<std::int32_t, std::int32_t>> inRange;
     std::vector<std::pair<std::int32_t, std::int32_t>> wanted;
     for (std::int32_t x = centreX - kChunkRadius; x <= centreX + kChunkRadius; ++x) {
@@ -1420,8 +1329,6 @@ bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
     }
     columns_ = std::move(inRange);
 
-    // Where the client should expect the world to be, which is what stops it waiting for columns
-    // that are not coming.
     wire::io::ByteBuffer centre;
     wire::bedrock::writeNetworkChunkPublisherUpdate(centre, centreX * 16, static_cast<std::int32_t>(session_->y),
                                                     centreZ * 16, kChunkRadius * 16);
@@ -1465,8 +1372,7 @@ void BedrockPlayer::syncOthers() {
                                                                            : std::string{};
             wornKey += '|';
         }
-        // parity: what the other door carries in `SharedFlags` and the living flags, as this edition
-        // draws them. Sleeping is a flag of the second word and has its own packet here.
+        // parity: `SharedFlags`.
         const player::PlayerEntityData data = player::PlayerEntityData::of(*other);
         const auto shared = [&data](const std::uint8_t bit) { return (data.sharedFlags & bit) != 0; };
         std::uint64_t flags = 0;
@@ -1502,16 +1408,14 @@ void BedrockPlayer::syncOthers() {
                         flags};
         present.emplace(other->uuid(), now);
 
-        // What is in their hand, whenever it is not what it was. Sent after the spawn below on the
-        // first turn, because the client has nobody to put it in the hand of before that.
+        // Sent after the spawn on the first turn, because the client has nobody to put it in the hand of before.
         const auto drawHand = [this, &post, &now, &holding] {
             wire::io::ByteBuffer body;
             wire::bedrock::writeMobEquipment(body, runtimeIdFor(now.entityId), itemStackFor(holding, protocol_), 0,
                                              protocol_);
             post(wire::bedrock::BedrockPacket::MobEquipment, body);
         };
-        // Head, chest, legs and feet, in the order this edition reads them. The fifth is a mob's
-        // own body plate, which a player never wears.
+        // The fifth is a mob's own body plate, which a player never wears.
         const auto drawArmour = [this, &post, &now, &wearing] {
             wire::io::ByteBuffer body;
             wire::bedrock::writeMobArmorEquipment(
@@ -1521,7 +1425,6 @@ void BedrockPlayer::syncOthers() {
             post(wire::bedrock::BedrockPacket::MobArmorEquipment, body);
         };
 
-        /// How they are drawn, whenever that changed.
         const auto drawFlags = [this, &post, &now] {
             wire::io::ByteBuffer body;
             wire::bedrock::writeEntityFlags(body, runtimeIdFor(now.entityId), now.flags, protocol_);
@@ -1535,8 +1438,6 @@ void BedrockPlayer::syncOthers() {
             entry.uuidLow = other->uuid().low();
             entry.entityId = static_cast<std::int64_t>(runtimeIdFor(now.entityId));
             entry.name = other->name();
-            // What that player's own client said it looks like, and a plain colour for anybody who
-            // arrived through the other door and has no Bedrock skin to send.
             const std::optional<wire::bedrock::SkinInfo> theirs =
                 skins_ == nullptr ? std::nullopt : skins_->of(other->uuid());
             entry.skin = theirs.has_value() ? *theirs : wire::bedrock::flatSkin(other->name());
@@ -1608,9 +1509,7 @@ void BedrockPlayer::syncOthers() {
 }
 
 void BedrockPlayer::announceAndSay(const Component& message) const {
-    // On the console too, exactly as the Java side says it: joining and leaving are what an operator
-    // watches the console for, and an edition is not a reason to stay quiet. Chat says itself where
-    // it is read, so it does not come through here.
+    // Logged like the Java side: operators watch the console for joins and leaves; chat says itself where read.
     wire::common::Logger{"Server"}.info(
         [this, &message] { return wire::text::resolvePlainText(message, context_.lang); });
     announce(message);

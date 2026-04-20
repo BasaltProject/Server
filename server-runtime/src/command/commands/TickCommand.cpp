@@ -13,10 +13,8 @@ namespace play = wire::protocol::play;
 
 using wire::text::Component;
 
-/// How far back `/tick query` averages, matching what `/timings` calls "recent".
 constexpr int kQueryWindowSeconds = 60;
 
-/// One decimal place, which is how vanilla prints every number `/tick` reports.
 [[nodiscard]] std::string format(float value) {
     const auto scaled = static_cast<std::int64_t>(std::llround(value * 10.0F));
     return std::to_string(scaled / 10) + "." + std::to_string(std::abs(scaled) % 10);

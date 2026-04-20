@@ -9,14 +9,11 @@
 
 namespace basalt::server::storage {
 namespace {
-
-/// The column order the whole-row queries select in, shared so the reader below can be one function.
 constexpr std::string_view kColumns =
     "uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch, health, food, "
     "saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode, group_name, last_ip, "
     "inventory, ender_chest, stats, tags, post_effects, warden_spawn_tracker, entity_data";
 
-/// A tag cannot contain a comma: vanilla's own tag argument is a single word.
 [[nodiscard]] std::set<std::string, std::less<>> splitTags(const std::optional<std::string>& stored) {
     std::set<std::string, std::less<>> tags;
     if (!stored.has_value()) {
@@ -53,7 +50,6 @@ constexpr std::string_view kColumns =
     return joined;
 }
 
-/// An identifier cannot contain a comma either.
 [[nodiscard]] std::vector<std::string> splitList(const std::optional<std::string>& stored) {
     std::vector<std::string> items;
     if (!stored.has_value()) {
@@ -151,7 +147,6 @@ constexpr std::string_view kColumns =
     }
     return found;
 }
-
 } // namespace
 
 std::optional<StoredPlayer> PlayerRepository::loadOne(std::string_view sql, std::string_view key) {
@@ -168,10 +163,6 @@ std::optional<StoredPlayer> PlayerRepository::load(std::string_view uuid) {
 }
 
 std::optional<StoredPlayer> PlayerRepository::loadByName(std::string_view name) {
-    // A name is not unique and never was: the same person has one row per UUID they have joined
-    // with, and a server that has run in both online and offline mode has two for everybody. Most
-    // recently seen wins, so `op <name>` acts on whoever that name last belonged to instead of
-    // failing outright.
     return loadOne("SELECT " + std::string{kColumns} +
                        " FROM player WHERE name = ? COLLATE NOCASE ORDER BY last_seen DESC LIMIT 1",
                    name);
@@ -282,8 +273,6 @@ void PlayerRepository::setLastIp(std::string_view uuid, const std::optional<std:
 }
 
 std::optional<std::string> PlayerRepository::findNameByAddress(std::string_view address) {
-    // Most recently seen wins: a household shares one address, and the last person to play on it is
-    // the best guess available. A guess is all this is ever used for.
     sql::Statement statement =
         database_->prepare("SELECT name FROM player WHERE last_ip = ? ORDER BY last_seen DESC LIMIT 1");
     statement.bind(1, address);
@@ -339,5 +328,4 @@ std::vector<PlayerSummary> PlayerRepository::findWithPlayTimeAtLeast(std::int64_
     statement.bind(1, ticks);
     return summaries(statement);
 }
-
 } // namespace basalt::server::storage

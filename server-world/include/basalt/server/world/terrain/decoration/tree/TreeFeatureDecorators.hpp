@@ -9,15 +9,13 @@
 
 namespace basalt::server::world::terrain::decoration::tree {
 
-/// parity: the `net.minecraft.world.level.levelgen.feature.treedecorators` shapes, each driven from
-/// what the tree recorded rather than from the level.
+/// parity: the `net.minecraft.world.level.levelgen.feature.treedecorators` shapes.
 namespace treeDecorators {
 
-/// Runs one decorator. `mossyCarpetRandom` is the region random the pale moss carpet draws from.
 void decorate(Chunk& chunk, random::RandomSource& random, random::RandomSource& mossyCarpetRandom,
               const TreeDecoratorContext& context, const TreeDecoratorConfiguration& decorator);
 
-/// parity: `ShelfMushroomDecorator`. A fallen log is told apart by its first and last log sharing a y.
+/// parity: `ShelfMushroomDecorator`.
 void decorateShelfMushroom(Chunk& chunk, random::RandomSource& random, const std::vector<BlockPos>& logs,
                            float probability);
 

@@ -16,7 +16,6 @@ namespace parserId = wire::protocol::play::argumentType;
 
 using wire::protocol::play::ArgumentParser;
 
-/// One of a fixed set of words, kept as written. Four of the ten arguments here are exactly this.
 class WordFromSetArgument final : public ArgumentType {
 public:
     WordFromSetArgument(std::int32_t parser, std::vector<std::string> names, std::string message)
@@ -41,8 +40,6 @@ private:
     std::string message_;
 };
 
-/// An id read exactly as a resource location, declared as its own parser so the client knows what
-/// it is completing.
 class IdArgument final : public ArgumentType {
 public:
     explicit IdArgument(std::int32_t parser) : parser_(parser) {}
@@ -101,7 +98,6 @@ public:
     [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kSwizzle}; }
 };
 
-/// A whole word, which is what `item_slots` and the two ranges keep.
 class RawWordArgument final : public ArgumentType {
 public:
     RawWordArgument(std::int32_t parser, bool quotable) : parser_(parser), quotable_(quotable) {}

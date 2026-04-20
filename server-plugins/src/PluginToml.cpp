@@ -5,7 +5,6 @@
 #include <vector>
 
 namespace basalt::server::plugins::pluginToml {
-
 using wire::common::toml::TomlTable;
 using wire::common::toml::TomlValue;
 
@@ -18,8 +17,6 @@ void push(lua::LuaArgs& lua, const TomlTable& table) {
         }
         pushValue(lua, *value);
         lua.setField(key);
-        // TOML is written kebab-case here and in the server's own files, and Lua cannot spell a dash
-        // in `config.starting-balance`, so the same key answers to an underscore too.
         if (key.find('-') != std::string::npos) {
             std::string underscored = key;
             for (char& character : underscored) {
@@ -64,5 +61,4 @@ void pushValue(lua::LuaArgs& lua, const TomlValue& value) {
     }
     lua.pushNil();
 }
-
 } // namespace basalt::server::plugins::pluginToml

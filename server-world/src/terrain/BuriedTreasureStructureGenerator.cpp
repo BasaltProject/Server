@@ -76,9 +76,7 @@ const std::set<std::string, std::less<>>& floors() {
     return paths;
 }
 
-/// parity: `StructurePiece.reorient`. One solid horizontal neighbour turns the chest away from it;
-/// two or more and it falls through to walking the default facing around until it finds a side that
-/// is not solid.
+/// parity: `StructurePiece.reorient`.
 [[nodiscard]] std::string reorient(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     std::string solid;
     bool ambiguous = false;

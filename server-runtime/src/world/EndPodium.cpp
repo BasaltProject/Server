@@ -54,8 +54,7 @@ constexpr std::array<Torch, 4> kTorches{{
     return stateId.value_or(registry::blocks::air().stateId);
 }
 
-/// parity: `EnderDragonFight.spawnExitPortal`: the surface at the origin, one block down, then down
-/// again through any bedrock, and never below the bottom of the world.
+/// parity: `EnderDragonFight.spawnExitPortal`.
 [[nodiscard]] std::int32_t originY(WorldState& world, server::world::ChunkHeight bounds) {
     const server::world::Chunk& chunk = world.getOrGenerateChunk(0, 0);
     std::int32_t y = chunk.heightAt(0, 0, server::world::HeightmapType::MotionBlockingNoLeaves) - 1;
@@ -99,7 +98,6 @@ constexpr std::array<Torch, 4> kTorches{{
 } // namespace
 
 std::optional<std::array<std::int32_t, 3>> locate(const WorldState& world, server::world::ChunkHeight bounds) {
-    // The pillar's top, then down its height: the pillar starts on the layer the portal fills.
     for (std::int32_t y = bounds.maxY(); y >= bounds.minY(); --y) {
         if (world.blockState(0, y, 0) == registry::blocks::bedrock().stateId) {
             return std::array<std::int32_t, 3>{0, y - (kPillarHeight - 1), 0};

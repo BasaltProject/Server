@@ -21,7 +21,6 @@ const PathSet& supportPaths() {
     return paths;
 }
 
-/// The plants a feature places straight onto the ground, single or the lower half of a double one.
 const PathSet& groundPlantPaths() {
     static const PathSet paths = {"short_grass",
                                   "fern",

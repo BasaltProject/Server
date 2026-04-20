@@ -36,8 +36,6 @@ template <typename Predicate>
     return !anyBlock(box, [&box, &blockAt](std::int32_t x, std::int32_t y, std::int32_t z) {
         const std::optional<std::int32_t> state = blockAt(x, y, z);
         if (!state.has_value()) {
-            // An unloaded block is not in the way: the spawner is asked about places the world has
-            // not caught up with, and refusing there would be refusing at random.
             return false;
         }
         const std::span<const std::int32_t> shapes = registry::blockShapes::collisionBoxes(*state);

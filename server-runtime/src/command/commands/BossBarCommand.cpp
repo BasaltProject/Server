@@ -352,7 +352,6 @@ void BossBarCommand::build(const CommandNodeBuilder& root) const {
                             });
                     }
                 });
-                /// `value` and `max` differ only in which number they move and its floor.
                 for (const bool isValue : {true, false}) {
                     const std::string what = isValue ? "value" : "max";
                     id.literal(what, [isValue, what, barOf, broadcast](const CommandNodeBuilder& form) {
@@ -442,8 +441,7 @@ void BossBarCommand::build(const CommandNodeBuilder& root) const {
                         if (bar.players == names) {
                             return std::unexpected{unchanged("players")};
                         }
-                        // Whoever is dropping off the bar loses it now, before the set
-                        // changes underneath them.
+                        // Whoever is dropping off the bar loses it now, before the set changes underneath them.
                         const play::BossEventPacket removal{.id = bar.uuid,
                                                             .operation = play::BossEventPacket::Remove{}};
                         for (const player::PlayerSession* player : context.environment().players().snapshot()) {

@@ -154,7 +154,6 @@ struct FortressReference {
     const std::vector<netherFortressPieces::Piece>* pieces = nullptr;
 };
 
-/// A biome name that outlives the lookup that produced it, as the carvers keep references.
 [[nodiscard]] const std::string& internedBiome(std::string_view name) {
     static std::mutex mutex;
     static std::set<std::string, std::less<>> names;
@@ -211,8 +210,7 @@ std::vector<PlacedStructurePiece> NetherStructureGenerator::bastionStart(std::in
     const structure::JigsawWorld world{.poolLookup = poolLookup_,
                                        .templateLoader = [this](std::string_view name) { return templateOf(name); },
                                        .heightAt = [](std::int32_t, std::int32_t) { return 0; }};
-    // parity: `PlaceCommand.placeStructure` skips the biome test `assembledBastion` applies after
-    // the assembly, and the fresh assembly is not cached: it can differ from worldgen's answer.
+    // parity: `PlaceCommand.placeStructure` skips the post-assembly biome test and the cache.
     return structure::assembleJigsaw(
         world,
         structure::JigsawRequest{.startPool = "minecraft:bastion/starts",
@@ -243,8 +241,7 @@ NetherStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, 
         // parity: `JigsawStructure.findGenerationPoint` never refuses.
         return boundsOf(bastionStart(seed, chunkX, chunkZ));
     case NetherPlacedStructure::Fossil: {
-        // parity: `NetherFossilStructure.findGenerationPoint` keeps the ground walk and drops the
-        // biome test, so a position with no solid ground above the lava sea is still refused.
+        // parity: `NetherFossilStructure.findGenerationPoint` keeps the ground walk and drops the biome test.
         const std::optional<FossilStart> start = netherFossilStart(chunkX, chunkZ, seed, /*forPlacement=*/true);
         if (!start.has_value()) {
             return std::nullopt;
@@ -330,9 +327,7 @@ DensityChunkSampler& NetherStructureGenerator::samplerAt(std::int32_t x, std::in
         return *found->second;
     }
     auto created = std::make_unique<DensityChunkSampler>(router_, key.first, key.second);
-    // One sampler per chunk with no ceiling is a leak in a server that keeps exploring: each holds its
-    // chunk's whole density volume. Clearing is safe here, and only here, because the only caller
-    // reads the sampler with `mutex_` still held, so no reference outlives this map.
+    // Clearing is safe only because the single caller reads the sampler with `mutex_` held.
     if (samplers_.size() >= kSamplerCacheCapacity) {
         samplers_.clear();
     }
@@ -340,8 +335,6 @@ DensityChunkSampler& NetherStructureGenerator::samplerAt(std::int32_t x, std::in
 }
 
 std::int32_t NetherStructureGenerator::baseStateAt(std::int32_t x, std::int32_t y, std::int32_t z) {
-    // Every chunk generation worker shares this generator, so the sampler map needs the lock, and a
-    // sampler must not be cleared out from under a reader.
     double density = 0.0;
     {
         const std::scoped_lock lock{mutex_};
@@ -507,9 +500,7 @@ void NetherStructureGenerator::placeFortresses(Chunk& chunk, std::int64_t seed) 
             references.push_back(FortressReference{candidateX, candidateZ, &pieces});
         }
     }
-    // Records the slice of a fortress that reaches this chunk. The monster override tests piece
-    // bounds, so only the pieces this chunk holds are kept; the full bounds serve the separate
-    // nether-brick gate, which tests the fortress as a whole.
+    // Only pieces this chunk holds are kept; the full bounds serve the nether-brick gate.
     for (const FortressReference& reference : references) {
         std::vector<StructureBoundingBox> here;
         for (const netherFortressPieces::Piece& piece : *reference.pieces) {

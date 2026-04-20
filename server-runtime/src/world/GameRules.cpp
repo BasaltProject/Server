@@ -9,11 +9,6 @@
 namespace basalt::server::runtime::world {
 namespace {
 
-/// Every rule, by id.
-///
-/// Vanilla declares them by field name instead, which puts `command_blocks_work` before
-/// `command_block_output` and `spawner_blocks_work` before `spawn_mobs`. Nothing observes that
-/// order: brigadier sorts the suggestions it offers, so the client sees this one either way.
 constexpr std::array kAll = {
     gameRules::kAdvanceTime,
     gameRules::kAdvanceWeather,
@@ -96,8 +91,7 @@ bool GameRuleValues::get(const GameRule& rule) const {
     if (found == values_.end()) {
         return rule.defaultFlag;
     }
-    // parity: `toBooleanStrictOrNull`, so anything that is not one of the two words falls back to
-    // the default rather than reading as false.
+    // parity: `toBooleanStrictOrNull`.
     if (found->second == "true") {
         return true;
     }
@@ -153,8 +147,6 @@ GameRuleValues GameRuleValues::readFrom(const wire::nbt::NbtCompound& root) {
         return values;
     }
     for (const std::string& id : rules->names()) {
-        // A rule this build does not know is dropped rather than kept: it would be written back out
-        // as a rule nothing can set, and vanilla drops it too.
         if (const GameRule* rule = gameRules::byId(id); rule != nullptr) {
             values.values_[std::string{rule->id}] = std::string{rules->getString(id)};
         }

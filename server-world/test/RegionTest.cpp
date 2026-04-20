@@ -19,7 +19,6 @@ TEST_CASE("a chunk survives a round trip through its own NBT") {
     Chunk chunk{3, -5};
     chunk.setBlockStateId(1, 64, 2, registry::blocks::stone().stateId);
     chunk.setBlockStateId(1, 65, 2, registry::blocks::water().stateId);
-    // A state nobody named: a chunk holds whatever the world put in it.
     const std::optional<std::int32_t> slab =
         registry::blocks::stateIdOf(Identifier::vanilla("stone_slab"), {{"type", "top"}, {"waterlogged", "true"}});
     REQUIRE(slab.has_value());
@@ -42,9 +41,7 @@ TEST_CASE("a chunk survives a round trip through its own NBT") {
     CHECK(back->blockStateId(3, 70, 4) == *slab);
     CHECK(back->blockStateId(0, 0, 0) == registry::blocks::air().stateId);
     CHECK(back->biomeId(1, 5, 2) == 7);
-    // Straight off disk, so nothing in it is newer than the file it came from.
     CHECK_FALSE(back->isDirty());
-    // The heightmaps were filled behind the chunk's back and must be rebuilt, not trusted.
     CHECK(back->heightAt(1, 2) == 66);
 }
 
@@ -62,7 +59,6 @@ TEST_CASE("block entities and ticks keep their places") {
     REQUIRE(entity != nullptr);
     CHECK(entity->type() == Identifier::vanilla("chest"));
     CHECK(entity->data().getString("CustomName") == "a chest");
-    // What the chunk already knows about the position is not kept twice.
     CHECK_FALSE(entity->data().contains("x"));
     CHECK_FALSE(entity->data().contains("id"));
 
@@ -114,11 +110,7 @@ TEST_CASE("entities and structures ride with the chunk") {
 }
 
 TEST_CASE("a chunk imported from vanilla keeps its structures") {
-    // parity: vanilla keys `starts` by structure id instead of listing them, and each start repeats
-    // its own id inside. Reading only the list shape dropped every structure an imported world had,
-    // and said nothing about it.
-    // The shape is the jar's, and that means no `BB` on the start: it never writes one, and works
-    // its box out from the pieces every time it is asked.
+    // parity: vanilla keys `starts` by structure id and writes no `BB` on the start.
     NbtCompound start;
     start.putString("id", "minecraft:mineshaft");
     start.putInt("ChunkX", 0);
@@ -144,7 +136,6 @@ TEST_CASE("a chunk imported from vanilla keeps its structures") {
     CHECK(back->structures().has("mineshaft"));
     REQUIRE(back->structures().starts().size() == 1);
     CHECK(back->structures().starts().front().pieces.size() == 2);
-    // Worked out from the two pieces, because the start carried no box of its own.
     const structure::StructureBoundingBox& bounds = back->structures().starts().front().fullBounds;
     CHECK(bounds.minX == 0);
     CHECK(bounds.minY == 20);
@@ -159,8 +150,6 @@ TEST_CASE("nonsense is refused with a reason rather than half-read") {
     REQUIRE_FALSE(missing.has_value());
     CHECK(missing.error().message == "missing sections list");
 
-    // A block this build has never heard of cannot be resolved to a state, and guessing one would
-    // put the wrong block in the world.
     Chunk chunk{0, 0};
     NbtCompound tag = chunkNbt::write(chunk);
     const auto* sections = tag.getList("sections");
@@ -183,8 +172,7 @@ TEST_CASE("nonsense is refused with a reason rather than half-read") {
 }
 
 TEST_CASE("a palette entry reads in every spelling vanilla has written it") {
-    // parity: `BlockState.CODEC` writes a default state as its bare id and anything else as
-    // `{id, properties}`; a mixed list wraps the bare ones as `{"": id}`; 26.2 wrote `Name`/`Properties`.
+    // parity: BlockState.CODEC bare id, {id, properties}, {"": id} in mixed lists; 26.2 Name/Properties.
     const auto sectionWith = [](NbtList palette) {
         Chunk chunk{0, 0};
         NbtCompound tag = chunkNbt::write(chunk);

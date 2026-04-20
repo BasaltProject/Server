@@ -33,8 +33,7 @@ std::optional<bool> test(RealLootTables& tables, const wire::common::JsonValue& 
     }
     context.hasEntity = self.has_value();
     context.thisEntity = std::move(self);
-    // parity: `LootContext.Builder.create(Optional.empty())` draws on the level's own random, one
-    // stream per level seeded when the level was made.
+    // parity: `LootContext.Builder.create(Optional.empty())` draws on the level's own random.
     static std::mutex mutex;
     static std::map<const LoadedWorld*, random::RandomSource> levels;
     const std::scoped_lock lock{mutex};

@@ -33,8 +33,6 @@ namespace {
 
 namespace cmd = command::commands;
 
-/// One tag table as the environment wants it: the members of a tag, or nothing for one nobody
-/// declared, so a command fails on the tag by name rather than on a missing service.
 template <typename Members>
 [[nodiscard]] command::CommandEnvironment::TagMembers
 tagLookup(const Members* tags,
@@ -127,7 +125,6 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     wired.dispatcher = std::make_unique<command::CommandDispatcher>(*wired.environment);
     command::CommandDispatcher* dispatcher = wired.dispatcher.get();
 
-    // Everything that needs nothing but what the server already handed over.
     command::VanillaCommandHooks hooks;
     hooks.players = wiring.players;
     hooks.scoreboard = wiring.scoreboard;
@@ -155,8 +152,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     hooks.setWhitelistState = wiring.setWhitelistEnforced;
     registerVanillaCommands(*dispatcher, hooks);
 
-    // The rest, each needing something only a running server owns. A dependency that is absent
-    // means the command is simply not registered, which is how a fixture gets the ones it can run.
+    // A missing dependency means the command is simply not registered, which is how a fixture gets the ones it can run.
     const auto add = [&dispatcher](std::shared_ptr<const command::Command> command) {
         static_cast<void>(dispatcher->registerCommand(std::move(command)));
     };

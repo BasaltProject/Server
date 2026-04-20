@@ -46,7 +46,7 @@ constexpr std::string_view kZipSuffix = ".zip";
         .color(wire::text::kGray);
 }
 
-/// parity: `ServerPacksSource`'s built-in metadata, since the jar has no `pack.mcmeta` of its own.
+/// parity: `ServerPacksSource`'s built-in metadata.
 [[nodiscard]] Pack vanillaPack(const PackFiles& jar) {
     Pack pack;
     pack.id = std::string{kVanillaId};

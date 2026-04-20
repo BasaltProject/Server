@@ -20,7 +20,7 @@ using wire::protocol::play::SoundSource;
 
 namespace mth = wire::common::mth;
 
-/// parity: `Llama.spit`: a fifth of the distance as lift, shot at 1.5 with the llama's ten of
+/// parity: `Llama.spit`.
 /// `rangedAttackUncertainty`, from a tenth of a block under its eyes.
 constexpr double kSpitLift = static_cast<double>(0.2F);
 constexpr float kSpitPower = 1.5F;
@@ -40,7 +40,7 @@ void MobActionSystem::llamaSpit(ServerEntity& llama, double targetX, double targ
     if (world == nullptr || entry == nullptr) {
         return;
     }
-    // parity: `new LlamaSpit(level, llama)`, half its width plus half a block out to the side of its
+    // parity: `new LlamaSpit(level, llama)`.
     // body's facing.
     const float reach = static_cast<float>(llama.width()) + 1.0F;
     const float body = llama.yaw * (static_cast<float>(std::numbers::pi) / 180.0F);
@@ -57,7 +57,7 @@ void MobActionSystem::llamaSpit(ServerEntity& llama, double targetX, double targ
                                    dy + lift, dz, kSpitPower, kSpitUncertainty, random);
     spit.ownerId = llama.entityId();
     spit.ownerUuid = llama.uuid();
-    // parity: `Projectile.getAddEntityPacket`, which names the owner in the spawn packet's data.
+    // parity: `Projectile.getAddEntityPacket`.
     spit.objectData = llama.entityId();
     if (!entity::horses::silent(llama)) {
         const float pitch = 1.0F + ((random.nextFloat() - random.nextFloat()) * 0.2F);

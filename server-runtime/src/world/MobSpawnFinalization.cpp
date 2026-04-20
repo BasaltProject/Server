@@ -57,7 +57,6 @@ void writeTypeState(NbtCompound& data, const CommonSpawnState& state) {
     }
 }
 
-/// Writes the vanilla fields that let generated mobs survive materialization and chunk saves.
 void writeMobState(NbtCompound& data, const Identifier& type, const CommonSpawnState& state) {
     if (!state.ranMobFinalizer) {
         return;
@@ -101,8 +100,6 @@ void writeMobState(NbtCompound& data, const Identifier& type, const CommonSpawnS
 } // namespace
 
 std::optional<float> babySpawnChance(std::string_view type) {
-    // These concrete classes construct `AgeableMobGroupData(false)`, and axolotls and foxes replace
-    // the roll with "member three onward", so neither has a chance of its own.
     static constexpr std::array<std::string_view, 9> kNoRoll{
         "magma_cube", "parrot", "slime", "strider", "villager", "wandering_trader", "wolf", "axolotl", "fox"};
     if (std::ranges::find(kNoRoll, type) != kNoRoll.end()) {
@@ -126,8 +123,7 @@ CommonSpawnState stateFor(const Identifier& type, std::int32_t groupIndex, const
     random::RandomSource& random = *context.random;
     CommonSpawnState state;
     if (type.path() == "cave_spider") {
-        // parity: `CaveSpider.finalizeSpawn` deliberately answers group data without calling `Mob`
-        // at all, so nothing below it runs and nothing below it is written.
+        // parity: `CaveSpider.finalizeSpawn` deliberately answers group data without calling `Mob`.
         state.cubeSize = entity::cubeMobs::kDefaultSize;
         return state;
     }
@@ -147,8 +143,7 @@ CommonSpawnState stateFor(const Identifier& type, std::int32_t groupIndex, const
     }
     state.age =
         (concreteBaby || inheritedBaby) && type.path() != "zombie_nautilus" ? entity::ageableMobs::kBabyStartAge : 0;
-    // parity: `Mob.finalizeSpawn`. `RandomSource.triangle` consumes two doubles before the
-    // left-handed float, even though neither result usually changes what the client draws.
+    // parity: `Mob.finalizeSpawn`. `RandomSource.triangle` consumes two doubles before the.
     state.followRangeBonus = random.triangle(0.0, kFollowRangeBonusSpread);
     state.leftHanded = random.nextFloat() < kLeftHandedChance;
     state.ranMobFinalizer = true;
@@ -184,7 +179,7 @@ void writeGeneratedNode(MobSpawnForestBuilder& builder, MobSpawnNode& node, std:
     context.equipmentOrFallback().finalizeAfterCommon(data, type.path(), *context.random, context.specialMultiplier,
                                                       context.difficulty);
     zombieSpawnFinalizer::afterCommon(builder, node, group, context, entityRandom);
-    // parity: `AbstractCubeMob` saves one less than its live size, so absent or zero means size one.
+    // parity: `AbstractCubeMob` saves one less than its live size.
     if (entity::cubeMobs::isCube(type)) {
         data.putInt("Size", state.cubeSize - 1);
     }

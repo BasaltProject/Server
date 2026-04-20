@@ -9,8 +9,7 @@
 
 namespace basalt::server::world::structure {
 
-/// parity: the `spawn_overrides` field of the six vanilla structures that carry one. An empty spawn
-/// list is meaningful: it silences a whole category inside the structure.
+/// parity: the `spawn_overrides` field of the six vanilla structures that carry one.
 namespace structureSpawnOverrides {
 
 /// Which box a category's override is tested against. parity: `BoundingBoxType`.
@@ -34,7 +33,6 @@ struct Override {
     friend bool operator==(const Override&, const Override&) = default;
 };
 
-/// The structures that override anything, so a caller can skip the rest of the index.
 [[nodiscard]] const std::set<std::string, std::less<>>& structures();
 
 [[nodiscard]] const Override* of(std::string_view structure, std::string_view category);

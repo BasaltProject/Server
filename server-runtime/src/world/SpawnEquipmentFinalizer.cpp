@@ -50,7 +50,6 @@ constexpr std::array<std::array<std::string_view, 4>, 6> kArmorTiers{
      {"iron_helmet", "iron_chestplate", "iron_leggings", "iron_boots"},
      {"diamond_helmet", "diamond_chestplate", "diamond_leggings", "diamond_boots"}}};
 
-/// A nested compound, empty when it is absent: every slot read here treats the two the same.
 [[nodiscard]] NbtCompound compoundAt(const NbtCompound& root, std::string_view key) {
     const NbtTag* found = root.find(key);
     const auto* compound = found == nullptr ? nullptr : found->get<NbtCompound>();

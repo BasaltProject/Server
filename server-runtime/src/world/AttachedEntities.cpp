@@ -15,8 +15,7 @@ namespace {
 
 [[nodiscard]] bool isPainting(const wire::common::Identifier& type) { return type.path() == "painting"; }
 
-/// parity: `Cushion.destroyIfInFire` over the box less an ulp, and lava's `entityInside`, which
-/// sets it alight and hurts it off its block.
+/// parity: `Cushion.destroyIfInFire` over the box less an ulp.
 [[nodiscard]] bool burning(const WorldState& world, const entity::ServerEntity& cushion,
                            const cushions::Tagged& tagged) {
     const double half = cushions::kWidth / 2.0;
@@ -104,8 +103,7 @@ std::vector<server::world::loot::ItemStack> drops(const entity::ServerEntity& at
     } else if (isPainting(attached.type())) {
         out.push_back(withName(attached, wire::common::Identifier::vanilla("painting")));
     } else if (itemFrames::isFrame(attached.type())) {
-        // parity: `ItemFrame.dropItem(level, null, true)`: nothing at all from a fixed frame, else
-        // the frame and then what it held, against its drop chance.
+        // parity: `ItemFrame.dropItem(level, null, true)`.
         if (attached.sourceNbt.has_value() && attached.sourceNbt->getBoolean("Fixed")) {
             return out;
         }
@@ -141,7 +139,7 @@ void comeOff(LoadedWorld& world, entity::ServerEntity& attached, const std::vect
              random::RandomSource& random, const std::function<std::int32_t()>& allocateEntityId) {
     attached.removed = true;
     const bool dropping = world.gameRules().get(gameRules::kEntityDrops);
-    // parity: a painting's `dropItem` is silent with drops off; a frame's and a cushion's are not.
+    // parity: a painting's `dropItem` is silent with drops off.
     if (dropping || attached.type().path() != "painting") {
         for (const player::PlayerSession* listener : watchers) {
             player::playSoundFor(*listener, breakSound(attached.type()), wire::protocol::play::SoundSource::Neutral,

@@ -23,7 +23,7 @@ constexpr std::string_view kBambooVegetation = "bamboo_vegetation";
     return countExtraPlacement(count, chance, extra);
 }
 
-/// parity: `WorldGenRegion.random`, positioned at the centre chunk's minimum block corner.
+/// parity: `WorldGenRegion.random`.
 [[nodiscard]] random::RandomSource worldgenRegionRandom(std::int64_t seed, const Chunk& chunk) {
     random::RandomSource source = random::RandomSource::xoroshiro(seed);
     random::RandomSource named = source.forkPositional().fromHashOf("minecraft:worldgen_region_random");
@@ -33,9 +33,7 @@ constexpr std::string_view kBambooVegetation = "bamboo_vegetation";
 void decorateSpecs(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
                    const std::vector<const treePatchDecoration::FeatureSpec*>& specs,
                    const treePatchDecoration::PlacementObserver& observer) {
-    // The reader the caller installed for the whole phase stays in force: a tree leaning over the
-    // chunk edge has to see the neighbour's real blocks, which is what vanilla's WorldGenRegion
-    // gives it.
+    // The phase-wide reader stays in force so a leaning tree sees the neighbour's real blocks.
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     random::RandomSource regionRandom = worldgenRegionRandom(seed, chunk);
     const std::int64_t decorationSeed =

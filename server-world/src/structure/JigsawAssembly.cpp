@@ -9,7 +9,6 @@
 namespace basalt::server::world::structure {
 namespace {
 
-/// The box a piece may still occupy: its bounds, minus everything already standing in it.
 class CollisionSpace {
 public:
     CollisionSpace(StructureBoundingBox bounds, std::vector<StructureBoundingBox> occupied)
@@ -40,8 +39,7 @@ struct QueuedPiece {
     std::int32_t order = 0;
 };
 
-/// parity: `JigsawBlock.canAttach`. 26.3 lets a jigsaw without a name, a feature element's, take
-/// any target.
+/// parity: `JigsawBlock.canAttach`.
 [[nodiscard]] bool canAttach(const PlacedJigsaw& source, const PlacedJigsaw& target) {
     return source.front == opposite(target.front) && (source.rollable || source.top == target.top) &&
            (target.name.empty() || source.target == target.name);
@@ -55,7 +53,6 @@ struct QueuedPiece {
     return StructurePos{first.x - second.x, first.y - second.y, first.z - second.z};
 }
 
-/// The height the expansion hack grows a village piece to, so its children still fit above it.
 [[nodiscard]] std::int32_t expansionHeight(const JigsawWorld& world, const StructureBoundingBox& unexpandedBox,
                                            const std::vector<PlacedJigsaw>& targetJigsaws) {
     std::int32_t tallest = 0;
@@ -104,9 +101,7 @@ std::vector<PlacedStructurePiece> Assembler::run() {
         return {};
     }
 
-    // parity: a structure that names a starting jigsaw (the ancient city's `city_anchor`) is shifted
-    // so that block lands on the chosen position instead of the template's own origin. The lookup
-    // shuffles, so naming one costs a draw that a structure without a name never makes.
+    // parity: a structure that names a starting jigsaw (the ancient city's `city_anchor`) is shifted.
     StructurePos anchoredPosition = request_->startPosition;
     if (!request_->startJigsawName.empty()) {
         const std::vector<PlacedJigsaw> jigsaws = centerElement.getShuffledJigsawBlocks(
@@ -126,9 +121,7 @@ std::vector<PlacedStructurePiece> Assembler::run() {
         centerElement.getBoundingBox(world_->templateLoader, adjustedPosition, centerRotation);
     const std::int32_t centerX = (rawBox.maxX + rawBox.minX) / 2;
     const std::int32_t centerZ = (rawBox.maxZ + rawBox.minZ) / 2;
-    // parity: the projected floor is `position.getY() + getFirstFreeHeight(...)`, not the heightmap
-    // alone. Every caller until the trail ruins started at y 0, where the two agree; the ruins start
-    // at -15 and are meant to end up that far under the surface.
+    // parity: the projected floor is `position.getY() + getFirstFreeHeight(...)`.
     const std::int32_t bottomY = request_->projectStartToHeightmap
                                      ? request_->startPosition.y + world_->heightAt(centerX, centerZ)
                                      : adjustedPosition.y;
@@ -149,10 +142,7 @@ std::vector<PlacedStructurePiece> Assembler::run() {
         return std::move(pieces_);
     }
 
-    // parity: `JigsawPlacement`'s allowed region is the reach box intersected with the world height
-    // shrunk by the dimension padding, so the floor and the ceiling bound the assembly even when the
-    // vertical reach alone would not. Leaving the vertical side open lets pieces land where vanilla
-    // refuses them, and every later collision test then sees a different set of neighbours.
+    // parity: `JigsawPlacement`'s allowed region is the reach box intersected with the world height shrunk by the.
     const bool unbounded = request_->maxVerticalDistanceFromCenter == std::numeric_limits<std::int32_t>::max();
     const std::int32_t reachMinY =
         unbounded ? std::numeric_limits<std::int32_t>::min() : centerY - request_->maxVerticalDistanceFromCenter;
@@ -212,7 +202,7 @@ void Assembler::tryPlacingChildren(std::size_t sourceIndex, std::int32_t depth, 
             childrenFree = insideSourceFree;
         }
 
-        // parity: `poolAliasLookup.lookup(sourceJigsaw.pool())`, applied before the pool is resolved.
+        // parity: `poolAliasLookup.lookup(sourceJigsaw.pool())`.
         const auto aliased = request_->poolAliases.find(sourceJigsaw.pool);
         const std::string_view poolName =
             aliased == request_->poolAliases.end() ? std::string_view{sourceJigsaw.pool} : aliased->second;

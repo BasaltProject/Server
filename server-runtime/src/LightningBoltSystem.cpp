@@ -39,7 +39,7 @@ constexpr double kAnnounceDistance = 256.0;
 /// parity: `GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER`.
 constexpr world::GameRule kFireSpreadRadius = world::GameRule::integer("fire_spread_radius_around_player", 128, -1);
 
-/// parity: `ServerLevel.canSpreadFireAround`: the rule off, or somebody not spectating near enough.
+/// parity: `ServerLevel.canSpreadFireAround`.
 [[nodiscard]] bool canSpreadFireAround(const world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                        std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::int32_t radius = world.gameRules().number(kFireSpreadRadius);
@@ -75,10 +75,10 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
     }
     const bool fierce = world.difficulty() == "normal" || world.difficulty() == "hard";
     std::vector<world::BlockChange> changes;
-    // parity: `life == 2` does everything to the blocks: the rod it hit answers, the ground catches
+    // parity: `life == 2` does everything to the blocks.
     // on normal and hard, and it is heard as fourteen.
     if (bolt.boltLife == 2) {
-        // parity: `getStrikePosition`, which nudges down by a millionth so a bolt standing on a
+        // parity: `getStrikePosition`, which nudges down by a millionth so a bolt standing on a.
         // whole number hits the block under its feet and not the air it is in.
         world::lightning::strike(world.state(), mth::floor(bolt.x), mth::floor(bolt.y - 1.0e-6), mth::floor(bolt.z),
                                  false, random, changes);
@@ -123,7 +123,7 @@ void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector
         return x + halfWidth > bolt.x - kReach && x - halfWidth < bolt.x + kReach && y + height > bolt.y - kReach &&
                y < bolt.y + kHeight + kReach && z + halfWidth > bolt.z - kReach && z - halfWidth < bolt.z + kReach;
     };
-    // parity: `CHANNELED_LIGHTNING` for the bolt's cause, every turn, with whatever this turn touched.
+    // parity: `CHANNELED_LIGHTNING` for the bolt's cause.
     world::TriggerEvent channeled;
     for (ServerEntity* entity : living) {
         if (entity == &bolt || entity->removed || entity->dying || entity->health <= 0.0 ||
@@ -212,7 +212,7 @@ void LightningBoltSystem::announceStrike(const world::LoadedWorld& world, const 
         if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) >= kAnnounceDistance) {
             continue;
         }
-        // parity: `LightningStrikeTrigger` wants any one viewer to match, so each is offered in turn.
+        // parity: `LightningStrikeTrigger` wants any one viewer to match.
         if (viewers.empty()) {
             triggers_->fire("lightning_strike", player->name(), player->uuid().toString(),
                             world::TriggerEvent{.entities = {{"lightning", facts}}});

@@ -60,13 +60,11 @@ using wire::common::JsonValue;
     return std::nullopt;
 }
 
-/// A block's own default state, which is what a name with no properties means.
 [[nodiscard]] std::int32_t defaultStateId(const wire::common::Identifier& block) {
     const registry::BlockState* found = registry::blocks::named(block.path());
     return found == nullptr ? registry::blocks::air().stateId : found->stateId;
 }
 
-/// A block state written as a bare id, `{id, properties}` or `{Name, Properties}`; air when absent.
 [[nodiscard]] std::int32_t stateIdOf(const JsonValue* json) {
     const std::optional<std::int32_t> state = json == nullptr ? std::nullopt : blockStateJson::parse(*json);
     return state.value_or(registry::blocks::air().stateId);
@@ -211,8 +209,6 @@ using wire::common::JsonValue;
                 protectedBlocks = resolveTag(name);
             }
         }
-        // Everything else is either a no-op here or belongs to a structure that does not read this
-        // yet; a processor list is data, so an unknown one is skipped, not fatal.
     }
     return StructureProcessorList{std::move(rules), std::move(rot), std::move(protectedBlocks), std::move(capped)};
 }

@@ -5,7 +5,6 @@
 namespace basalt::server::world::terrain::netherFortressPieces {
 
 /// Writes whatever of `piece` lands inside `clip`. parity: `NetherFortressPieces`' per-kind
-/// `postProcess` bodies, which are split here only so neither file grows past reading.
 void place(const Piece& piece, Chunk& chunk, const structure::StructureBoundingBox& clip,
            random::RandomSource& placementRandom);
 

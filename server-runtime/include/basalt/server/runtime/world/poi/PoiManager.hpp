@@ -30,7 +30,7 @@ struct BlockPos {
     friend bool operator==(const BlockPos&, const BlockPos&) = default;
 };
 
-/// parity: `PoiRecord`, a workstation, bed or bell and how many of its tickets are still free.
+/// parity: `PoiRecord`.
 struct PoiRecord {
     BlockPos pos;
     PoiType type = PoiType::kNone;
@@ -44,26 +44,19 @@ struct PoiRecord {
 /// parity: `PoiManager.Occupancy`.
 enum class Occupancy : std::uint8_t { kHasSpace, kIsOccupied, kAny };
 
-/// Every point of interest in one world, and how far each section is from a village.
-/// parity: `PoiManager` over `PoiSection`, vanilla's NBT in `poi/` Linear regions (an `.mca` is read too).
-/// Records keep the order of vanilla's per-type `HashSet`, bucket by bucket: the first free bed or
-/// bell in range is whichever that order finds first.
+/// parity: `PoiManager`.
 class PoiManager {
 public:
-    /// parity: `MAX_VILLAGE_DISTANCE`, the furthest the section tracker counts.
     static constexpr std::int32_t kMaxVillageDistance = 6;
 
     explicit PoiManager(server::world::ChunkHeight bounds = server::world::kOverworldHeight);
 
-    /// Where the region files live and how tall the world is. An empty directory keeps everything
-    /// in memory, which is what a test wants.
+    /// An empty directory keeps everything in memory, as tests want.
     void configure(std::string directory, server::world::ChunkHeight bounds);
 
     /// parity: `ServerLevel.updatePOIOnBlockStateChange`.
     void noteBlockChange(const BlockPos& pos, std::int32_t oldStateId, std::int32_t newStateId);
 
-    /// The same, for a write that reached the chunk without going through the world, where only
-    /// the state it ended with is known.
     void noteBlockState(const BlockPos& pos, std::int32_t stateId);
 
     /// parity: `PoiManager.checkConsistencyWithBlocks` for every section of a chunk that arrived.
@@ -75,8 +68,7 @@ public:
 
     [[nodiscard]] std::optional<PoiRecord> record(const BlockPos& pos);
 
-    /// parity: `getInRange`, in the order vanilla walks it: chunks by row, sections upwards, then
-    /// each type's set in its hash order. The result is written into `out`, which is cleared first.
+    /// parity: `getInRange`.
     void inRange(PoiMask mask, const BlockPos& center, std::int32_t radius, Occupancy occupancy,
                  std::vector<PoiRecord>& out);
 
@@ -84,7 +76,6 @@ public:
     void inSquare(PoiMask mask, const BlockPos& center, std::int32_t radius, Occupancy occupancy,
                   std::vector<PoiRecord>& out);
 
-    /// parity: `getCountInRange`.
     [[nodiscard]] std::int64_t countInRange(PoiMask mask, const BlockPos& center, std::int32_t radius,
                                             Occupancy occupancy);
 
@@ -92,23 +83,19 @@ public:
     [[nodiscard]] std::optional<BlockPos> findClosest(PoiMask mask, const BlockPos& center, std::int32_t radius,
                                                       Occupancy occupancy);
 
-    /// parity: `PoiRecord.acquireTicket` at a position, as `take` ends. Answers whether one was free.
+    /// parity: `PoiRecord.acquireTicket` at a position.
     bool acquire(const BlockPos& pos);
 
-    /// parity: `release`. Answers false where there is nothing registered, which vanilla throws on.
+    /// parity: `release`.
     bool release(const BlockPos& pos);
 
-    /// parity: `sectionsToVillage`, the Chebyshev distance in sections to one holding an occupied
-    /// village point, up to seven.
+    /// parity: `sectionsToVillage`.
     [[nodiscard]] std::int32_t sectionsToVillage(std::int32_t sectionX, std::int32_t sectionY, std::int32_t sectionZ);
 
-    /// parity: `ServerLevel.isCloseToVillage`.
     [[nodiscard]] bool isCloseToVillage(const BlockPos& pos, std::int32_t sectionDistance);
 
-    /// parity: `ServerLevel.isVillage`.
     [[nodiscard]] bool isVillage(const BlockPos& pos) { return isCloseToVillage(pos, 1); }
 
-    /// Writes every region with a changed chunk.
     void save();
 
     /// parity: `PoiSection.Packed.CODEC` over a whole chunk, `Sections` keyed by section y.

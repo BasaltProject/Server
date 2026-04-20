@@ -39,7 +39,7 @@ constexpr float kArrowPower = 3.15F;
 constexpr float kRocketPower = 1.6F;
 constexpr float kStartSound = 0.2F;
 constexpr float kMidSound = 0.5F;
-/// parity: `CrossbowItem.createProjectile`'s rocket and `AbstractArrow`'s arrow, below the eyes.
+/// parity: `CrossbowItem.createProjectile`'s rocket and `AbstractArrow`'s arrow.
 constexpr double kEyeHeight = 1.62;
 constexpr double kRocketDrop = 0.15;
 constexpr double kArrowDrop = 0.1;
@@ -48,7 +48,6 @@ constexpr double kArrowDrop = 0.1;
     return id == "minecraft:arrow" || id == "minecraft:spectral_arrow" || id == "minecraft:tipped_arrow";
 }
 
-/// A numeric enchantment value: a constant, or a linear one scaled by the level.
 [[nodiscard]] float levelValue(const NbtTag* value, std::int32_t level) {
     if (value == nullptr) {
         return 0.0F;
@@ -72,8 +71,7 @@ constexpr double kArrowDrop = 0.1;
     return spec->getFloat("value");
 }
 
-/// parity: `EnchantmentHelper`'s value effects over each enchantment on the weapon, for the
-/// `add` kind every crossbow effect uses.
+/// parity: `EnchantmentHelper`'s value effects over each enchantment for the `add` kind.
 [[nodiscard]] float enchantedValue(const BreakContext& context, const StoredItemStack& weapon, std::string_view key,
                                    float base) {
     float value = base;
@@ -111,7 +109,7 @@ constexpr double kArrowDrop = 0.1;
         static_cast<double>(enchantedValue(context, weapon, "minecraft:crossbow_charge_time", kChargeSeconds) * 20.0F));
 }
 
-/// parity: `CrossbowItem.getChargingSounds`, the highest level's entry of the enchantment's list.
+/// parity: `CrossbowItem.getChargingSounds`.
 [[nodiscard]] std::optional<std::string> chargingSound(const BreakContext& context, const StoredItemStack& weapon,
                                                        std::string_view which) {
     for (const auto& [id, level] : enchantmentLevels(weapon)) {
@@ -152,8 +150,7 @@ void changed(const BreakContext& context, PlayerSession& player, std::int32_t sl
     }
 }
 
-/// parity: `ProjectileWeaponItem.draw`: the first from the ammo, the rest of a multishot as
-/// intangible copies, and nothing spent for infinite materials.
+/// parity: `ProjectileWeaponItem.draw`.
 [[nodiscard]] std::vector<StoredItemStack> draw(const BreakContext& context, PlayerSession& player,
                                                 const StoredItemStack& weapon) {
     const std::optional<std::int32_t> slot = ammoSlot(player);
@@ -220,8 +217,7 @@ void changed(const BreakContext& context, PlayerSession& player, std::int32_t sl
     return (1.0F / ((random.nextFloat() * 0.5F) + 1.8F)) + decider;
 }
 
-/// parity: `ItemStack.hurtAndBreak` on the crossbow: unbreaking may spare it, and the last point
-/// breaks it.
+/// parity: `ItemStack.hurtAndBreak`: unbreaking may spare it, the last point breaks it.
 [[nodiscard]] bool wear(const BreakContext& context, PlayerSession& player, std::int32_t slot, std::int32_t amount,
                         random::RandomSource& random) {
     if (player.gamemode == wire::protocol::play::Gamemode::Creative) {

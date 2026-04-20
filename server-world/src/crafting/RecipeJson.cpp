@@ -50,8 +50,6 @@ using Parsed = std::expected<Value, RecipeParseError>;
     return std::nullopt;
 }
 
-/// A token is an item name or, with a leading `#`, a tag. Either way it is a resource ID, so it is
-/// normalised before it is compared against a stack's own.
 [[nodiscard]] Parsed<Ingredient> ingredientOfToken(std::string_view raw, const TagResolver& resolveTag) {
     const bool tag = !raw.empty() && raw.front() == '#';
     const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
@@ -111,8 +109,7 @@ using Parsed = std::expected<Value, RecipeParseError>;
     return std::optional<Ingredient>{std::move(*parsed)};
 }
 
-/// parity: `ShapedRecipePattern.shrink`: trims blank leading and trailing rows and columns from the
-/// authored pattern before it is turned into a fixed grid.
+/// parity: `ShapedRecipePattern.shrink`.
 [[nodiscard]] std::vector<std::string> shrinkPattern(const std::vector<std::string>& pattern) {
     std::int32_t left = std::numeric_limits<std::int32_t>::max();
     std::int32_t right = 0;
@@ -225,7 +222,7 @@ using Parsed = std::expected<Value, RecipeParseError>;
     return built;
 }
 
-/// parity: 26.3 `BrewingRecipe`: a `PotionIngredient` bottle and reagent, and an `output` stack.
+/// parity: 26.3 `BrewingRecipe`.
 [[nodiscard]] Parsed<Recipe> parseBrewing(const JsonObject& root, Recipe built, const TagResolver& resolveTag) {
     const JsonValue* inputValue = root.find("input");
     const JsonValue* reagentValue = root.find("reagent");
@@ -244,8 +241,6 @@ using Parsed = std::expected<Value, RecipeParseError>;
     if (!made.has_value()) {
         return std::unexpected(made.error());
     }
-    // A reagent may carry potions too in the codec; none in the jar does, and matching them would
-    // need its contents, so such a recipe is refused rather than matched loosely.
     if (reagent->find("potion_contents") != nullptr) {
         return std::unexpected(RecipeParseError{"Unsupported brewing reagent potion_contents"});
     }
@@ -288,7 +283,6 @@ using Parsed = std::expected<Value, RecipeParseError>;
     return built;
 }
 
-/// One special recipe, with whichever of its two ingredient fields the file carries.
 [[nodiscard]] Parsed<Recipe> parseSpecial(const JsonObject& root, Recipe built, SpecialKind specialKind,
                                           std::string_view targetKey, std::string_view materialKey,
                                           const TagResolver& resolveTag) {
@@ -354,15 +348,14 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
         return std::unexpected(missing("recipe type"));
     }
 
-    // parity: two recipe types carry no result at all, because theirs comes out of the grid: a trim
-    // is the armour that went in, and a repair is the tool that went in.
+    // parity: two recipe types carry no result at all, because theirs comes out of the grid: a trim is the armour.
     Recipe built{.result = loot::ItemStack{.item = wire::common::Identifier::vanilla("air"), .count = 1}};
     built.group = asString(root->find("group")).value_or("");
     if (const JsonValue* resultValue = root->find("result"); resultValue != nullptr) {
         if (const JsonObject* result = resultValue->get<JsonObject>(); result != nullptr) {
             const std::optional<std::string> id = asString(result->find("id"));
             const auto count = static_cast<std::int32_t>(asNumber(result->find("count")).value_or(1.0));
-            // parity: `TransmuteResult`, whose item defaults to the input's own; air stands for it here.
+            // parity: `TransmuteResult`.
             const bool keepsInput =
                 *type == "minecraft:crafting_transmute" || *type == "minecraft:crafting_special_mapextending";
             if (!id.has_value()) {
@@ -415,9 +408,7 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
     if (*type == "minecraft:campfire_cooking") {
         return parseCooking(*root, std::move(built), Cooker::Campfire, resolveTag);
     }
-    // parity: `TransmuteRecipe`: two ingredients in any arrangement, one of which decides what comes
-    // out. The result keeps the input's components in vanilla; nothing here carries components
-    // through a craft yet, so it comes out plain.
+    // parity: `TransmuteRecipe`.
     if (*type == "minecraft:crafting_transmute") {
         Parsed<Ingredient> input = requiredIngredient(*root, "input", resolveTag);
         if (!input.has_value()) {
@@ -485,8 +476,7 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
         }
         return built;
     }
-    // parity: the specials, which name their own ingredients in 26.2: what is code is the rule, not
-    // the list of items.
+    // parity: the specials, which name their own ingredients in 26.2: what is code is the rule, not the list of items.
     if (*type == "minecraft:crafting_dye") {
         return parseSpecial(*root, std::move(built), SpecialKind::Dye, "target", "dye", resolveTag);
     }
@@ -547,8 +537,7 @@ std::expected<Recipe, RecipeParseError> parse(std::string_view json, const TagRe
     if (*type == "minecraft:crafting_special_firework_star_fade") {
         return parseSpecial(*root, std::move(built), SpecialKind::FireworkStarFade, "target", "dye", resolveTag);
     }
-    // parity: `RepairItemRecipe`, the one that names nothing because both its inputs are whatever
-    // damaged item you put in.
+    // parity: `RepairItemRecipe`.
     if (*type == "minecraft:crafting_special_repairitem") {
         built.kind = RecipeKind::Special;
         built.specialKind = SpecialKind::RepairItem;

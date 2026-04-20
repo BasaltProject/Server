@@ -114,8 +114,7 @@ constexpr std::array<float, 14> kNetherrackByDistance{1.0F, 1.0F, 1.0F, 1.0F, 1.
     return built.contains(colon == std::string_view::npos ? biome : biome.substr(colon + 1));
 }
 
-/// parity: the position of each variant among the 44 structures of `surface_structures`, in registry
-/// order. They share a structure set but not an index, so they do not share a stream.
+/// parity: each variant has its own index among the 44 `surface_structures`.
 [[nodiscard]] std::int32_t structureIndexOf(std::string_view name) {
     static const std::map<std::string, std::int32_t, std::less<>> built{
         {"ruined_portal", 28},          {"ruined_portal_desert", 29}, {"ruined_portal_jungle", 30},
@@ -357,8 +356,7 @@ RuinedPortalStructureGenerator::placementStart(std::int64_t seed, std::int32_t c
                                                std::string_view variant) const {
     for (const RuinedPortalVariant& candidate : variants_) {
         if (candidate.name == variant) {
-            // parity: `RuinedPortalStructure.findGenerationPoint` for one structure, which is what
-            // `/place structure` runs: no variant draw and no biome test.
+            // parity: `RuinedPortalStructure.findGenerationPoint` for `/place structure`.
             return generationPoint(chunkX, chunkZ, candidate, seed);
         }
     }
@@ -393,8 +391,6 @@ void RuinedPortalStructureGenerator::generateInto(Chunk& chunk, std::int64_t see
             if (portal == nullptr || !portal->box.intersects(clip)) {
                 continue;
             }
-            // Without the start the chunk cannot say what it holds, and a ruined portal is one of
-            // the seven separate structures of the registry, so it goes in under its own name.
             chunk.structures().add(structure::StructureStartRecord{.structure = portal->variantName,
                                                                    .chunkX = portal->chunkX,
                                                                    .chunkZ = portal->chunkZ,
@@ -409,9 +405,7 @@ void RuinedPortalStructureGenerator::place(const Portal& portal, Chunk& chunk, c
                                            std::int64_t seed) const {
     const RuinedPortalSetup& setup = portal.setup;
     std::vector<structure::TemplateBlockProcessor> processors;
-    // parity: the block ignore processor comes first, and which one depends on the air pocket.
-    // Without it the template's structure void is written as air, which buries the water a cave
-    // portal is meant to sit in.
+    // parity: the block ignore processor comes first, chosen by the air pocket.
     processors.push_back(portal.airPocket ? structure::templateBlockProcessors::ignoreStructureBlock()
                                           : structure::templateBlockProcessors::ignoreStructureAndAir());
     processors.push_back(structure::templateBlockProcessors::age(setup.mossiness));
@@ -420,10 +414,7 @@ void RuinedPortalStructureGenerator::place(const Portal& portal, Chunk& chunk, c
     if (setup.replaceWithBlackstone) {
         processors.push_back(structure::templateBlockProcessors::blackstoneReplace());
     }
-    // parity: `RuinedPortalPiece.postProcess` takes the decoration random it is handed, not one of
-    // its own, and passes it to `placeInWorld`, the netherrack, the drip columns and the vines. Each
-    // of the seven variants owns its index within `surface_structures`, so the stream depends on
-    // which was drawn.
+    // parity: `RuinedPortalPiece.postProcess` uses the handed decoration random, per variant.
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed =
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
@@ -439,8 +430,7 @@ void RuinedPortalStructureGenerator::place(const Portal& portal, Chunk& chunk, c
     spreadNetherrack(portal, chunk, clip, random);
     dripColumnsBelowPortal(portal, chunk, clip, random);
     if (setup.vines || setup.overgrown) {
-        // parity: `BlockPos.betweenClosedStream` walks x fastest, then y, then z, and every non-air
-        // block draws a direction whether or not a vine ends up on it.
+        // parity: `BlockPos.betweenClosedStream` walks x.
         for (std::int32_t z = portal.box.minZ; z <= portal.box.maxZ; ++z) {
             for (std::int32_t y = portal.box.minY; y <= portal.box.maxY; ++y) {
                 for (std::int32_t x = portal.box.minX; x <= portal.box.maxX; ++x) {

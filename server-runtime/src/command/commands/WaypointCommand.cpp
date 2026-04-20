@@ -39,7 +39,6 @@ constexpr std::array<std::string_view, 16> kColorNames{
 WaypointCommand::WaypointCommand() : Command("waypoint", permissionLevel::kGamemasters) {}
 
 void WaypointCommand::build(const CommandNodeBuilder& root) const {
-    /// Sends the target's waypoint to everyone, which is what draws the bar entry.
     const auto broadcast = [this](const CommandContext& context) {
         const CommandTarget* target = only(context);
         if (target == nullptr) {

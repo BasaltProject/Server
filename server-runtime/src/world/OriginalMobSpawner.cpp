@@ -149,8 +149,6 @@ std::int32_t spawnInto(Chunk& chunk, const std::vector<SpawnerEntry>& entries, f
                                biome.has_value() ? std::string_view{biome->path()} : std::string_view{}) &&
                     naturalSpawnObstruction::blocksAllow(
                         entry->type, entityX, static_cast<double>(y), entityZ,
-                        // Only this chunk answers: a neighbour is not generated yet, and asking one
-                        // during generation is how two chunks end up waiting on each other.
                         [&chunk](std::int32_t wx, std::int32_t wy, std::int32_t wz) -> std::optional<std::int32_t> {
                             if ((wx >> 4) != chunk.chunkX() || (wz >> 4) != chunk.chunkZ() ||
                                 wy < chunk.verticalBounds().minY() || wy > chunk.verticalBounds().maxY()) {

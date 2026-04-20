@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-/// The node classes behind the factories. Internal to the density function implementation.
 namespace basalt::server::world::densityfunction::nodes {
 
 using noise::Interval;
@@ -25,7 +24,6 @@ using noise::Interval;
 [[nodiscard]] bool sameFloat(float a, float b) noexcept;
 [[nodiscard]] bool sameDouble(double a, double b) noexcept;
 
-/// Rewrites a child and reports whether it changed, the shape every `rewriteChildren` shares.
 [[nodiscard]] inline Function rewriteChild(const Function& child, const RewriteRule& rule, bool& changed) {
     Function rewritten = rule.rewrite(child);
     changed = changed || rewritten.get() != child.get();
@@ -556,7 +554,6 @@ private:
     std::int32_t cellHeight_;
 };
 
-/// Sampler factories other nodes compose, as vanilla's samplers reuse each other.
 [[nodiscard]] Sampler constantSampler(float value);
 [[nodiscard]] Sampler noiseSampler(std::shared_ptr<const noise::Noise> noise, double xzScale, double yScale);
 [[nodiscard]] Sampler constAddSampler(Sampler input, float value);

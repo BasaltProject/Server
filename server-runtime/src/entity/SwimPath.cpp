@@ -16,7 +16,7 @@ namespace {
 using Position = std::array<std::int32_t, 3>;
 
 constexpr double kHeuristicWeight = 1.5;
-/// parity: `PathType.BREACH`'s malus, and the eight `findAcceptedNode` adds for a dry node.
+/// parity: `PathType.BREACH`'s malus.
 constexpr double kBreachMalus = 4.0 + 8.0;
 
 [[nodiscard]] double distance(const Position& from, const Position& to) {
@@ -30,7 +30,6 @@ constexpr double kBreachMalus = 4.0 + 8.0;
     return std::abs(to[0] - from[0]) + std::abs(to[1] - from[1]) + std::abs(to[2] - from[2]);
 }
 
-/// The malus of a node, or nothing when it cannot be entered.
 [[nodiscard]] std::optional<double> accepted(world::WorldState& world, const Position& at, bool breaching) {
     if (isSwimmable(world, at[0], at[1], at[2])) {
         return 0.0;
@@ -97,8 +96,7 @@ std::optional<std::vector<Position>> find(world::WorldState& world, const Positi
             reached = true;
             break;
         }
-        // parity: `getNeighbors`, the faces in `Direction.values()` order and then the flat corners
-        // whose two sides are both open.
+        // parity: `getNeighbors`.
         std::vector<Position> next;
         const std::array<Position, 6> faces{Position{0, -1, 0}, Position{0, 1, 0},  Position{0, 0, -1},
                                             Position{0, 0, 1},  Position{-1, 0, 0}, Position{1, 0, 0}};

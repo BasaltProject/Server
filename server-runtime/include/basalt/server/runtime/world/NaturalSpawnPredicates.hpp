@@ -6,10 +6,7 @@
 
 namespace basalt::server::runtime::world {
 
-/// The placement tables of Minecraft 26.2, shared by the runtime and by chunk-generation spawning.
-///
-/// parity: the `SpawnPlacements` registrations and the predicates they name. Nothing here reads the
-/// world: every fact it needs arrives as an argument, which is what lets both spawners use it.
+/// parity: `SpawnPlacements`.
 namespace naturalSpawnPredicates {
 
 /// parity: the `NO_RESTRICTIONS` registrations that appear in a natural CREATURE biome list.
@@ -22,15 +19,14 @@ namespace naturalSpawnPredicates {
 /// parity: the `Monster.checkSurfaceMonstersSpawnRules` registrations that appear in a biome list.
 [[nodiscard]] bool isSurfaceMonster(std::string_view type);
 
-/// parity: `SpawnPlacementTypes.IN_WATER`: water here, and nothing conducting redstone right above.
+/// parity: `SpawnPlacementTypes.IN_WATER`.
 [[nodiscard]] bool waterPlacementAllows(bool atHasWater, bool aboveConductsRedstone);
 
 /// parity: a glow squid also wants the block itself to be water, not merely to hold some.
 [[nodiscard]] bool glowSquidAllows(std::int32_t y, std::int32_t seaLevel, std::int32_t rawBrightness,
                                    bool atIsWaterBlock);
 
-/// parity: `Guardian.checkGuardianSpawnRules`, in its own short-circuiting order: the sky is only
-/// looked at when the roll misses.
+/// parity: `Guardian.checkGuardianSpawnRules`.
 [[nodiscard]] bool guardianAllows(std::int32_t oneInTwentyRoll, std::string_view difficulty, bool atHasWater,
                                   bool belowHasWater, const std::function<bool()>& canSeeSkyFromBelowWater);
 

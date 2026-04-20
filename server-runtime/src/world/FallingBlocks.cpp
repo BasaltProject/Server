@@ -23,7 +23,7 @@ namespace {
 constexpr double kGravity = 0.04;
 constexpr double kAirDrag = 0.98;
 
-/// parity: `FluidTags.WATER` at a square, which is the water itself and anything waterlogged.
+/// parity: `FluidTags.WATER` at a square.
 [[nodiscard]] bool waterAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> at = world.blockState(x, y, z);
     if (!at.has_value()) {
@@ -43,10 +43,7 @@ constexpr double kAirDrag = 0.98;
     return block != nullptr && block->path().ends_with("_concrete_powder");
 }
 
-/// parity: the `clip` of `FallingBlockEntity.tick`, which only runs for concrete powder moving faster
-/// than one block a tick: it looks back along the way it came for the water it went through, so a
-/// long fall into a pool sets at the surface instead of under it. The fall is straight down here, so
-/// walking the column is that ray exactly.
+/// parity: the `clip` of `FallingBlockEntity.tick`.
 [[nodiscard]] bool waterSource(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> at = world.blockState(x, y, z);
     if (!at.has_value()) {
@@ -64,8 +61,6 @@ constexpr double kAirDrag = 0.98;
 [[nodiscard]] std::optional<std::int32_t> waterCrossed(WorldState& world, std::int32_t x, std::int32_t z,
                                                        std::int32_t fromY, std::int32_t toY) {
     for (std::int32_t y = fromY; y >= toY; --y) {
-        // `ClipContext.Fluid.SOURCE_ONLY` stops the ray at a **source**, so water that is only
-        // flowing is passed straight through; `Block.COLLIDER` stops it at anything in the way.
         const std::optional<std::int32_t> at = world.blockState(x, y, z);
         const bool stops = waterSource(world, x, y, z) || (at.has_value() && !isFree(*at));
         if (!stops) {
@@ -85,10 +80,7 @@ const wire::common::Identifier& entityType() {
 }
 
 bool falls(std::int32_t stateId) {
-    // parity: `SpeleothemBlock implements Fallable` so that a stalactite the block itself drops can
-    // land, but it is **not** a `FallingBlock`: it books no fall check of its own and a dripstone
-    // with air under it stays where it is. The table cannot tell the two apart, so it is named here.
-    // Measured in `estalactita`, where ours fell like sand and the jar's hung there.
+    // parity: `SpeleothemBlock implements Fallable`.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block != nullptr && (block->path() == "pointed_dripstone" || block->path() == "sulfur_spike")) {
         return false;
@@ -96,9 +88,7 @@ bool falls(std::int32_t stateId) {
     return registry::blockConnections::isFalling(stateId);
 }
 
-/// parity: `BrushableBlock.tick` makes its falling entity and then calls `disableDrop()`, which sets
-/// `cancelDrop`, and `cancelDrop` skips the whole place-or-drop branch of `FallingBlockEntity.tick`:
-/// a suspicious sand that falls is simply gone, it neither lands nor leaves an item.
+/// parity: `BrushableBlock.tick` makes its falling entity and then calls `disableDrop()`.
 [[nodiscard]] bool cancelsDrop(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
@@ -112,8 +102,6 @@ bool isFree(std::int32_t stateId) {
     if (stateId == registry::blocks::air().stateId || registry::blockShapes::isReplaceable(stateId)) {
         return true;
     }
-    // Fire is replaceable too, so the check above already covers it; vanilla names it separately
-    // and so does this.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && block->path() == "fire";
 }
@@ -123,15 +111,12 @@ void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::i
     if (!stateId.has_value() || !falls(*stateId)) {
         return;
     }
-    // parity: a scheduled tick is stored under the **block** that booked it, so a world of ours opens
-    // in vanilla with the sand still about to fall. `falling_block` is an entity type and no block at
-    // all, and vanilla drops a tick whose name it cannot find in the block registry.
+    // parity: a scheduled tick is stored under the **block** that booked it, so a world of ours opens.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     if (block == nullptr) {
         return;
     }
-    // parity: only `ConcretePowderBlock.updateShape` short-circuits, and it is super that books the
-    // fall. `onPlace` is `FallingBlock`'s own and books powder that water has already reached.
+    // parity: only `ConcretePowderBlock.updateShape` short-circuits.
     if (asked == Asked::updateShape && reshapes::concreteFor(*block).has_value() &&
         reshapes::touchesWater(world, x, y, z)) {
         return;
@@ -163,8 +148,6 @@ entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32
     if (!stateId.has_value() || !falls(*stateId)) {
         return nullptr;
     }
-    // On the floor of the world there is nothing below to read, so the check below would refuse it
-    // anyway; this says why rather than leaving it to a missing block.
     const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     if (chunk == nullptr || y <= chunk->verticalBounds().minY()) {
         return nullptr;
@@ -180,11 +163,7 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
              const OnArrival& onArrival) {
     entity.velocityY -= kGravity;
     entity.velocityY *= kAirDrag;
-    // parity: `Entity.move`, which is real collision and not a question about the block below. A
-    // falling block goes **straight through** anything with no collision box, a torch, a line of
-    // dust or a nest of frogspawn included, and stops on the first thing that is really in the way.
-    // Reading the square underneath instead landed the sand on top of the eggs. Measured in
-    // `huevarana`.
+    // parity: `Entity.move`.
     const entity::entityCollision::BlockAt blockAt = [&world](std::int32_t x, std::int32_t y, std::int32_t z) {
         return world.blockState(x, y, z);
     };
@@ -196,9 +175,7 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
     std::int32_t blockX = wire::common::mth::floor(entity.x);
     std::int32_t blockY = wire::common::mth::floor(entity.y);
     const std::int32_t blockZ = wire::common::mth::floor(entity.z);
-    // parity: `FallingBlockEntity.tick`. Concrete powder standing in water lands **there and then**,
-    // in mid air if need be: the landing branch is `if (!onGround && !isStuckInWater)` inverted, not
-    // `onGround` alone. Without it the powder sank to the floor of the pool and set seven ticks late.
+    // parity: `FallingBlockEntity.tick`.
     const bool concrete = isConcretePowder(entity.objectData);
     bool stuckInWater = concrete && waterAt(world, blockX, blockY, blockZ);
     if (concrete && (entity.velocityY * entity.velocityY) > 1.0 && !stuckInWater) {
@@ -220,13 +197,11 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
     if (cancelsDrop(entity.objectData)) {
         return Landing{};
     }
-    // parity: the three questions `FallingBlockEntity.tick` asks once it is on the ground, and the
-    // square it asks them about is `blockPosition()`, where its own feet are.
+    // parity: the three questions `FallingBlockEntity.tick` asks once it is on the ground.
     const std::optional<std::int32_t> at = world.blockState(blockX, blockY, blockZ);
     const std::optional<std::int32_t> below = world.blockState(blockX, blockY - 1, blockZ);
     const bool mayReplace = at.has_value() && registry::blockShapes::isReplaceable(*at);
-    // parity: `wouldContinueFalling`, which is `FallingBlock.isFree` on the square underneath: a
-    // block that came to rest on something it could still fall through drops as an item instead.
+    // parity: `wouldContinueFalling`.
     const bool wouldContinueFalling = below.has_value() && isFree(*below);
     const bool wouldSurvive =
         (!canSurvive || canSurvive(entity.objectData, blockX, blockY, blockZ)) && !wouldContinueFalling;
@@ -235,9 +210,7 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
         if (const std::optional<std::int32_t> set =
                 reshapes::landedConcrete(world, blockX, blockY, blockZ, entity.objectData, *at);
             set.has_value()) {
-            // parity: `onLand` runs **after** the entity's own `setBlock`, so the powder is really
-            // there for a moment and gets the neighbour update, and the `onPlace` of that update is
-            // what leaves the fall turn the jar keeps on the square.
+            // parity: `onLand` runs **after** the entity's own `setBlock`, so the powder is really.
             if (onArrival) {
                 onArrival(entity.objectData, blockX, blockY, blockZ);
             }

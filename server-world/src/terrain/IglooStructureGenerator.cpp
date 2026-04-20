@@ -174,8 +174,7 @@ void IglooStructureGenerator::placeIgloo(Chunk& chunk, std::int64_t seed, std::i
     const StructureRotation rotation =
         kRotations[static_cast<std::size_t>(pick.nextInt(static_cast<std::int32_t>(kRotations.size())))];
 
-    // parity: the basement is decided first and its pieces are added before the igloo itself, which
-    // is the order they are then written in.
+    // parity: the basement pieces are added before the igloo itself.
     std::vector<std::pair<std::string_view, std::int32_t>> pieces;
     if (pick.nextDouble() < kBasementChance) {
         const std::int32_t depth = pick.nextInt(8) + 4;

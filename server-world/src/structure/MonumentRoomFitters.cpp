@@ -30,7 +30,6 @@ using Fitter = std::function<std::optional<MonumentRoomPiece>(MonumentRoom&, ran
 /// parity: the seven fitters, in the order `MonumentBuilding` registers them.
 const std::vector<Fitter>& fitters() {
     static const std::vector<Fitter> built = {
-        // Double on X and Y: the cell, its east neighbour and both of their ceilings.
         [](MonumentRoom& room, random::RandomSource&) -> std::optional<MonumentRoomPiece> {
             MonumentRoom* east = neighbour(room, StructureDirection::East);
             if (!open(room, StructureDirection::East) || !open(room, StructureDirection::Up) || east == nullptr ||
@@ -43,7 +42,6 @@ const std::vector<Fitter>& fitters() {
             claimIfPresent(neighbour(*east, StructureDirection::Up));
             return MonumentRoomPiece{.kind = MonumentRoomKind::DoubleXY, .room = &room};
         },
-        // Double on Y and Z, the same shape turned onto the north face.
         [](MonumentRoom& room, random::RandomSource&) -> std::optional<MonumentRoomPiece> {
             MonumentRoom* north = neighbour(room, StructureDirection::North);
             if (!open(room, StructureDirection::North) || !open(room, StructureDirection::Up) || north == nullptr ||
@@ -56,9 +54,6 @@ const std::vector<Fitter>& fitters() {
             claimIfPresent(neighbour(*north, StructureDirection::Up));
             return MonumentRoomPiece{.kind = MonumentRoomKind::DoubleYZ, .room = &room};
         },
-        // Double on Z. The jar falls back to the south neighbour here, but its own `fits` already
-        // guarantees the north door is open and free, so that branch is unreachable; it is kept
-        // because reading the jar and finding it missing would look like an omission.
         [](MonumentRoom& room, random::RandomSource&) -> std::optional<MonumentRoomPiece> {
             if (!open(room, StructureDirection::North)) {
                 return std::nullopt;
@@ -91,7 +86,6 @@ const std::vector<Fitter>& fitters() {
             claimIfPresent(neighbour(room, StructureDirection::Up));
             return MonumentRoomPiece{.kind = MonumentRoomKind::DoubleY, .room = &room};
         },
-        // A cell with no doorway at all but the floor becomes the little top room.
         [](MonumentRoom& room, random::RandomSource&) -> std::optional<MonumentRoomPiece> {
             const bool sealed = !room.hasOpening(ordinal(StructureDirection::West)) &&
                                 !room.hasOpening(ordinal(StructureDirection::East)) &&
@@ -104,7 +98,6 @@ const std::vector<Fitter>& fitters() {
             room.claim();
             return MonumentRoomPiece{.kind = MonumentRoomKind::SimpleTop, .room = &room};
         },
-        // The catch-all, and the only fitter that draws: one of three interiors.
         [](MonumentRoom& room, random::RandomSource& random) -> std::optional<MonumentRoomPiece> {
             room.claim();
             return MonumentRoomPiece{.kind = MonumentRoomKind::Simple, .room = &room, .design = random.nextInt(3)};

@@ -7,8 +7,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `TransportItemsBetweenContainers` as `CopperGolemAi` configures it: from a copper chest
-/// to a plain one, sixteen at a time, a minute at each chest.
+/// parity: `TransportItemsBetweenContainers`.
 class CopperGolemTransportGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
@@ -22,8 +21,6 @@ public:
     void tick(MobContext& mob) override;
 };
 
-/// parity: the idle `RunOne` of `RandomStroll.stroll(1.0, 2, 2)` and `DoNothing(30, 60)`, which only
-/// runs while the transport is cooling down.
 class CopperGolemIdleGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
@@ -41,8 +38,7 @@ public:
     void stop(MobContext& mob) override;
 };
 
-/// parity: `SetEntityLookTargetSometimes(PLAYER, 6, 40..80)` with `LookAtTargetSink(45, 90)`: now
-/// and then a long look at the nearest player within six blocks.
+/// parity: `SetEntityLookTargetSometimes(PLAYER, 6, 40..80)`.
 class LookAtPlayerSometimesGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Look}; }

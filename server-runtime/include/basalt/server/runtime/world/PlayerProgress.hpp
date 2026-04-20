@@ -16,20 +16,13 @@
 
 namespace basalt::server::runtime::world {
 
-/// Every advancement the operator's own `server.jar` ships, by id.
-///
-/// Datapack content, so it is read from the download rather than committed, the same way loot
-/// tables and recipes are. What awards them is `AdvancementTriggers`; `/advancement grant` remains
-/// the only way to complete one whose trigger this build cannot observe yet.
 class RealAdvancements {
 public:
-    /// The jar's directory listing and its file reader, as callbacks rather than the jar itself.
     struct Jar {
         std::function<std::vector<std::string>(std::string_view prefix)> entriesUnder;
         std::function<std::optional<std::string>(std::string_view name)> readText;
     };
 
-    /// Definitions handed in directly, which is how a test builds one without a jar to read.
     explicit RealAdvancements(std::map<wire::common::Identifier, server::world::advancement::Advancement> definitions);
 
     explicit RealAdvancements(const Jar& jar, wire::common::Logger logger = wire::common::Logger{"Advancements"});
@@ -40,44 +33,35 @@ public:
 
     [[nodiscard]] const server::world::advancement::Advancement* find(const wire::common::Identifier& id) const;
 
-    /// This one and everything below it, which is what `/advancement grant ... from` acts on.
     [[nodiscard]] std::vector<wire::common::Identifier> descendantsOf(const wire::common::Identifier& id) const;
 
-    /// Everything from the root down to this one, which is `/advancement grant ... until`.
     [[nodiscard]] std::vector<wire::common::Identifier> ancestorsOf(const wire::common::Identifier& id) const;
 
 private:
     std::map<wire::common::Identifier, server::world::advancement::Advancement> advancements_;
 };
 
-/// What each player has been granted or taught, kept in memory and written through to `players.db`.
-/// Keyed by UUID, as vanilla keys `advancements/<uuid>.json`. `load` fills a player in at join and
-/// lookups answer from memory; with no repository (no database) nothing is persisted.
+/// Keyed by UUID as vanilla keys `advancements/<uuid>.json`; with no repository nothing is persisted.
 class PlayerProgress {
 public:
     PlayerProgress() = default;
 
     explicit PlayerProgress(storage::ProgressRepository* repository) : repository_(repository) {}
 
-    /// Reads one player's rows in. Called at join, before anything can ask about them.
     void load(std::string_view uuid);
 
-    /// Drops a player from memory at quit. Their rows stay in the database.
     void unload(std::string_view uuid);
 
-    /// Told of every change to a player's criteria, so the client can be told in turn.
     using Changed = std::function<void(std::string_view uuid, const wire::common::Identifier& advancement)>;
 
     void onChanged(Changed changed) { changed_ = std::move(changed); }
 
-    /// Marks one criterion as done, now. Answers false when it already was.
     bool grantCriterion(std::string_view uuid, const wire::common::Identifier& advancement, std::string_view criterion);
 
-    /// When each granted criterion of an advancement was obtained, in epoch milliseconds.
+    /// Epoch milliseconds.
     [[nodiscard]] std::map<std::string, std::int64_t, std::less<>>
     obtained(std::string_view uuid, const wire::common::Identifier& advancement) const;
 
-    /// Every advancement a player has any criterion of.
     [[nodiscard]] std::vector<wire::common::Identifier> started(std::string_view uuid) const;
 
     bool revokeCriterion(std::string_view uuid, const wire::common::Identifier& advancement,

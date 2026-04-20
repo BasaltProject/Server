@@ -25,7 +25,7 @@ constexpr float kRadians = std::numbers::pi_v<float> / 180.0F;
 /// parity: `MoveControl.MIN_SPEED_SQR`.
 constexpr double kArrived = static_cast<double>(2.5000003E-7F);
 constexpr double kGravity = 0.08;
-/// parity: `LivingEntity.aiStep`, which zeroes a mob's speed under three thousandths an axis.
+/// parity: `LivingEntity.aiStep`.
 constexpr double kStill = 0.003;
 
 /// parity: `Mth.wrapDegrees(float)`.
@@ -210,7 +210,7 @@ void phantomControl(world::WorldState& world, ServerEntity& mob) {
     livingMovement::travelFlying(world, mob, {}, 0.2F, submersionOf(world, mob));
 }
 
-/// parity: `Bat`'s travel with the half forward its AI step asks for, and `Bat.tick` after it.
+/// parity: `Bat`'s travel with the half forward its AI step asks for.
 void batControl(world::WorldState& world, ServerEntity& mob) {
     if (mob.flight.resting) {
         mob.velocityX = 0.0;
@@ -260,8 +260,7 @@ bool ghastCanReach(world::WorldState& world, const ServerEntity& mob, double dx,
     const double cx = (from.minX + from.maxX) * 0.5;
     const double cy = (from.minY + from.maxY) * 0.5;
     const double cz = (from.minZ + from.maxZ) * 0.5;
-    // parity: every block the box passes through, each against its own shape; the cells are walked
-    // here rather than gathered, since a ghast looks up to sixty blocks ahead.
+    // parity: every block the box passes through against its own shape, walked since a ghast looks 60 blocks ahead.
     for (std::int32_t y = mth::floor(swept.minY); y <= mth::floor(swept.maxY); ++y) {
         for (std::int32_t z = mth::floor(swept.minZ); z <= mth::floor(swept.maxZ); ++z) {
             for (std::int32_t x = mth::floor(swept.minX); x <= mth::floor(swept.maxX); ++x) {
@@ -276,8 +275,7 @@ bool ghastCanReach(world::WorldState& world, const ServerEntity& mob, double dx,
                     continue;
                 }
                 for (const Aabb& shape : entityCollision::collidingBoxes(blockAt, cell.inflate(-1.0E-7))) {
-                    // parity: `AABB.collidedAlongVector`, the centre's line through the shape grown
-                    // by half the box.
+                    // parity: `AABB.collidedAlongVector`.
                     const Aabb grown{shape.minX - halfX, shape.minY - halfY, shape.minZ - halfZ,
                                      shape.maxX + halfX, shape.maxY + halfY, shape.maxZ + halfZ};
                     if (grown.contains(cx + dx, cy + dy, cz + dz) || grown.contains(cx, cy, cz) ||

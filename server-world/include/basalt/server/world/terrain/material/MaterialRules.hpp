@@ -54,7 +54,6 @@ class MaterialSystem;
 class MaterialRuleContext;
 
 using ConditionEvaluator = std::function<bool()>;
-/// A block state id, or nothing when the rule does not apply.
 using RuleEvaluator = std::function<std::optional<std::int32_t>(std::int32_t x, std::int32_t y, std::int32_t z)>;
 
 /// parity: `MaterialCondition`.
@@ -71,7 +70,6 @@ public:
     [[nodiscard]] virtual RuleEvaluator compile(MaterialRuleContext& context) const = 0;
 };
 
-/// Looks a biome up at a block, through the biome manager's zoom.
 using BiomeGetter = std::function<const std::string&(std::int32_t x, std::int32_t y, std::int32_t z)>;
 
 /// parity: `MaterialRuleContext`, the per-chunk state the compiled rules read.
@@ -88,7 +86,6 @@ public:
     [[nodiscard]] const std::string& biome();
     [[nodiscard]] std::int32_t minSurfaceLevel();
 
-    /// A noise sampled once per column (2D) or once per block (3D).
     [[nodiscard]] std::function<double()> noiseSampler(const std::string& noiseId, bool is3d);
 
     /// parity: `getDensitiesInChunk`. Prefilled over the chunk's volume when asked to.
@@ -155,8 +152,7 @@ private:
     std::int32_t stoneDepthAbove_ = 0;
 };
 
-/// parity: `MaterialSystem`, a dimension's surface builder: the clay bands, the surface noises and
-/// the eroded badlands and frozen ocean extensions.
+/// parity: `MaterialSystem`.
 class MaterialSystem {
 public:
     MaterialSystem(densityfunction::RandomState& state, std::int32_t defaultBlock, std::int32_t seaLevel,
@@ -206,8 +202,6 @@ private:
     std::shared_ptr<const noise::Noise> icebergSurface_;
 };
 
-/// Parses material rules and conditions, following references into `worldgen/material_rule` and
-/// `worldgen/material_condition`.
 class MaterialRuleLoader {
 public:
     explicit MaterialRuleLoader(densityfunction::DensityFunctionLoader& functions);

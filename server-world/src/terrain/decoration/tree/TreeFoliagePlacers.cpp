@@ -11,8 +11,7 @@
 namespace basalt::server::world::terrain::decoration::tree {
 namespace {
 
-/// parity: real `Direction.Plane.HORIZONTAL` face order (NORTH, EAST, SOUTH, WEST) with each
-/// direction's own `getClockWise` as the edge normal, and EAST/SOUTH the positive axes.
+/// parity: `Direction.Plane.HORIZONTAL` order (NORTH.
 constexpr std::array<HorizontalDirection, 4> kAlongEdges{
     HorizontalDirection{.dx = 0, .dz = -1}, HorizontalDirection{.dx = 1, .dz = 0},
     HorizontalDirection{.dx = 0, .dz = 1}, HorizontalDirection{.dx = -1, .dz = 0}};

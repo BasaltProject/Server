@@ -14,31 +14,26 @@ namespace basalt::server::runtime::command {
 
 class CommandContext;
 
-/// The `minecraft:message` argument beyond its text: the selectors inside it and the chat message
-/// it becomes. parity: `MessageArgument`.
+/// parity: `MessageArgument`.
 namespace messageArguments {
 
-/// parity: `MessageArgument.Message.parseText`'s ceiling, in UTF-16 units as Java counts them.
+/// parity: `MessageArgument.Message.parseText`'s ceiling.
 inline constexpr std::int32_t kMaxLength = 256;
 
 /// parity: `EntitySelectorParser.allowSelectors`, the gamemaster level.
 [[nodiscard]] bool allowsSelectors(const CommandSource& source);
 
-/// Reads the rest of the line as a message, refusing one too long and one whose selectors do not
-/// parse. The reader ends at the end of the line.
 [[nodiscard]] Parsed<std::string> parse(StringReader& reader, const CommandSource& source,
                                         const CommandEnvironment& environment);
 
-/// parity: `Message.toComponent`: the text with every selector replaced by the names it matches.
+/// parity: `Message.toComponent`.
 [[nodiscard]] wire::text::Component resolveComponent(const std::string& text, const CommandSource& source,
                                                      const CommandEnvironment& environment);
 
-/// parity: `MessageArgument.resolveChatMessage`: the signed argument when the player signed one,
-/// otherwise a system message; either way with the resolved text as its unsigned content.
+/// parity: `MessageArgument.resolveChatMessage`.
 [[nodiscard]] chat::PlayerChatMessage resolveChatMessage(const CommandContext& context, std::string_view name);
 
-/// parity: `CommandSourceStack.sendChatMessage`: a player receives it as chat, anything else as the
-/// decorated line.
+/// parity: `CommandSourceStack.sendChatMessage`.
 void sendChatMessage(const CommandSource& source, const chat::PlayerChatMessage& message,
                      const chat::BoundChatType& chatType);
 

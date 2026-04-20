@@ -20,8 +20,7 @@ using wire::text::Component;
 constexpr std::int32_t kIconSize = 64;
 constexpr std::size_t kSampleLimit = 12;
 
-/// Custom hover lines are sent with a nil UUID because the field is not optional in the packet and a
-/// made-up one would be a real player's identifier somewhere.
+// Hover lines use a nil UUID: the field is not optional and a made-up one would be a real player's id.
 constexpr std::string_view kNilUuid = "00000000-0000-0000-0000-000000000000";
 
 [[nodiscard]] std::int32_t readInt(const std::vector<std::uint8_t>& bytes, std::size_t offset) {
@@ -30,7 +29,6 @@ constexpr std::string_view kNilUuid = "00000000-0000-0000-0000-000000000000";
         (static_cast<std::uint32_t>(bytes[offset + 2]) << 8) | static_cast<std::uint32_t>(bytes[offset + 3]));
 }
 
-/// The PNG signature plus the width and height out of the IHDR chunk, which is always first.
 [[nodiscard]] bool isPng64(const std::vector<std::uint8_t>& bytes) {
     static constexpr std::array<std::uint8_t, 8> kSignature{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
     if (bytes.size() < 24) {
@@ -75,8 +73,6 @@ ServerStatusPayload ServerListStatus::statusFor(std::int32_t protocolVersion, co
     std::int32_t max = profile.maxPlayers.value_or(options_.slots);
     Component motd = render(profile.motd.value_or(std::vector<std::string>{}), context);
 
-    // The last word on what a pinger sees, after the profile decided it: a plugin can change the
-    // line and the slots without the operator's file having to know about it.
     if (hooks_.ping) {
         const Hooks::Answer answer = hooks_.ping(address, wire::text::toPlainText(motd), online, max);
         if (answer.motd.has_value()) {
@@ -161,13 +157,7 @@ Component ServerListStatus::render(const std::vector<std::string>& lines, const 
 }
 
 std::string ServerListStatus::substitute(const std::string& text, const ph::PlaceholderContext& context) const {
-    // Placeholders are filled in before MiniMessage parses, so `%...%` and `<...>` never have to
-    // agree about anything.
-    //
-    // The two failures differ because the MOTD is a line strangers read. An unregistered name is the
-    // operator's typo: it stays visible and is warned about. A registered name this ping cannot
-    // answer, like a player's own name for someone who never connected, is ordinary: it resolves to
-    // nothing and only reaches the debug log.
+    // Filled in before MiniMessage parses; unknown names are warned about, unanswerable ones resolve to nothing.
     return ph::substitute(
         text, *placeholders_, context,
         [this](std::string_view name, const ph::PlaceholderValue& value) -> std::optional<std::string> {

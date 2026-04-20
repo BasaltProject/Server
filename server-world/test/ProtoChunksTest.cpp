@@ -21,7 +21,6 @@ namespace registry = basalt::server::registry;
 
 namespace {
 
-/// Every decoration writes stone into the column just east of its own chunk and remembers its turn.
 struct Recorder {
     std::mutex mutex;
     std::vector<std::pair<std::int32_t, std::int32_t>> decorated;
@@ -65,9 +64,8 @@ TEST_CASE("a chunk is full once its eight neighbours decorated, and theirs wrote
     REQUIRE(finished.size() == 1);
     CHECK(finished[0].stage() == ChunkStage::Full);
     CHECK(recorder.terrains == 25);
-    // The west neighbour decorated too, and its write landed in the proto chunk it was aimed at.
     CHECK(finished[0].blockStateId(0, 0, 0) == registry::blocks::stone().stateId);
-    // parity: the 3x3 is scheduled x outermost, which is the order a lone request decorates in.
+    // parity: the 3x3 is scheduled x outermost.
     const std::vector<std::pair<std::int32_t, std::int32_t>> expected{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0},
                                                                       {0, 1},   {1, -1}, {1, 0},  {1, 1}};
     CHECK(recorder.decorated == expected);
@@ -105,7 +103,6 @@ TEST_CASE("the same requests decorate in the same order however many threads ste
     }
     workers.clear();
     CHECK(chunks.takeFinished().size() == 16);
-    // Only chunks whose 3x3 overlap are ordered, and those are what decide the world.
     const auto turnOf = [](const auto& order, std::pair<std::int32_t, std::int32_t> chunk) {
         return std::ranges::find(order, chunk) - order.begin();
     };

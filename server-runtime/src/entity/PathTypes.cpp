@@ -138,7 +138,7 @@ using namespace std::string_view_literals;
     if (path == "lava") {
         return PathType::Lava;
     }
-    // parity: `NodeEvaluator.isBurningBlock`: fire, magma, a lit campfire and a lava cauldron.
+    // parity: `NodeEvaluator.isBurningBlock`.
     if (path == "fire" || path == "soul_fire" || path == "magma_block" || path == "lava_cauldron" ||
         ((path == "campfire" || path == "soul_campfire") && property(stateId, "lit") == "true")) {
         return PathType::Fire;

@@ -12,14 +12,12 @@
 namespace basalt::server::runtime::world::pressurePlates {
 namespace {
 
-/// parity: `TOUCH_AABB`, `Block.column(14, 0, 4)`: one sixteenth in on each side, a quarter tall.
+/// parity: `TOUCH_AABB`.
 constexpr double kEdge = 1.0 / 16.0;
 constexpr double kHeight = 4.0 / 16.0;
 constexpr std::int32_t kMaxSignal = 15;
 
 [[nodiscard]] const wire::common::Identifier* plateAt(std::int32_t stateId) {
-    // The underscore is what tells a plate from a block named after one; nothing in 26.2 is called
-    // just `pressure_plate`, so the two spellings pick the same blocks today.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr || !block->path().ends_with("_pressure_plate")) {
         return nullptr;
@@ -44,8 +42,7 @@ constexpr std::int32_t kMaxSignal = 15;
     return result.ec == std::errc{} && result.ptr == last ? value : fallback;
 }
 
-/// parity: `PressurePlateBlock.getSignalStrength` and `WeightedPressurePlateBlock`'s own, which
-/// scales what is on it against its limit and rounds up, so a single item already reads one.
+/// parity: `PressurePlateBlock.getSignalStrength` and `WeightedPressurePlateBlock`'s own.
 [[nodiscard]] std::int32_t signalFor(std::string_view path, std::int32_t standing) {
     if (standing <= 0) {
         return 0;
@@ -93,9 +90,7 @@ std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_
     const auto powered = properties.find("powered");
     const std::int32_t showing =
         number(properties, "power", powered != properties.end() && powered->second == "true" ? kMaxSignal : 0);
-    // parity: `entityInside` asks only while the plate reads zero and `tick` only while it reads
-    // more than zero. That is what leaves a weighted plate counting one when four items land on the
-    // same tick: the first one in presses it, and by the time the others move it has stopped asking.
+    // parity: `entityInside` asks only while the plate reads zero and `tick` only while it reads.
     if ((from == Trigger::Touched) != (showing == 0)) {
         return std::nullopt;
     }
@@ -111,8 +106,7 @@ std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    // parity: `checkPressed` raises the event only when the plate goes from off to on or back, not
-    // every time a weighted plate's count moves.
+    // parity: `checkPressed` raises the event only when the plate goes from off to on or back.
     if ((wanted > 0) != (showing > 0) && world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         vibrations::emit(world, wanted > 0 ? "block_activate" : "block_deactivate", static_cast<double>(x) + 0.5,
                          static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, gameTime);

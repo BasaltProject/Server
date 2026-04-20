@@ -40,7 +40,7 @@ using player::PlayerSession;
 using server::world::portal::PortalAxis;
 using wire::protocol::play::Gamemode;
 
-/// parity: `Entity.lavaHurt`, which hurts every ten ticks, and fire, which does every twenty.
+/// parity: `Entity.lavaHurt`.
 constexpr std::int64_t kLavaDamageIntervalTicks = 10;
 constexpr std::int32_t kFireDamageIntervalTicks = 20;
 
@@ -95,8 +95,7 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
             continue;
         }
         players.push_back(player);
-        // parity: `Player.tick`: the counter stops at a hundred in bed, and once up it runs on to
-        // a hundred and ten before it clears, which is the window a cat's gift is read in.
+        // parity: `Player.tick`.
         if (!player->sleepingBed.has_value() && player->sleepTicks > 0 && ++player->sleepTicks >= 110) {
             player->sleepTicks = 0;
         }
@@ -105,9 +104,7 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
         }
         awake.push_back(player);
         if (player->sleepingBed.has_value()) {
-            // parity: `ServerPlayer.tick` counts this while a player is in bed. Counted here rather
-            // than in the Java session's own turn because a Bedrock player has no such turn, and a
-            // sleeper nobody counts never sees morning.
+            // parity: `ServerPlayer.tick`.
             player->sleepTicks = std::min(player->sleepTicks + 1, 100);
             sleeping.push_back(player);
         }
@@ -161,8 +158,7 @@ void EnvironmentTickSystem::tickBorderDamage(world::LoadedWorld& world) {
 }
 
 void EnvironmentTickSystem::tickBorderWall(world::LoadedWorld& world) {
-    /// The wall is a puff of particles that does not move, so once a second is enough; what stands
-    /// in the way has to keep up with the player and goes every turn.
+    // The wall is a static puff, so once a second is enough; what stands in the way goes every turn.
     constexpr std::int64_t kWallIntervalTicks = 20;
 
     const world::WorldBorder& border = world.border();
@@ -189,9 +185,7 @@ void EnvironmentTickSystem::tickLocation(world::LoadedWorld& world) {
     }
 }
 
-// parity: the jar reaches `onInsideBlock` from `Entity.move`, so it asks on every movement packet
-// rather than on a clock. Asking once a tick instead grants the same criteria a moment earlier at
-// worst: what a criterion reads is the block, and a player who stands in one was moved into it.
+// parity: `onInsideBlock`.
 void EnvironmentTickSystem::tickInsideBlocks(world::LoadedWorld& world) {
     const bool entering =
         options_.advancementTriggers != nullptr && options_.advancementTriggers->listensTo("enter_block");
@@ -286,8 +280,7 @@ void EnvironmentTickSystem::tickPortals(world::LoadedWorld& world) {
             static_cast<std::int32_t>(std::floor(player->x)), static_cast<std::int32_t>(std::floor(player->y)),
             static_cast<std::int32_t>(std::floor(player->z)));
         if (state.has_value() && world::endPortals::isEndPortal(*state)) {
-            // parity: `Portal.getPortalTransitionTime` is zero for an end portal, so it takes
-            // whoever stepped in on the tick they stepped in.
+            // parity: `Portal.getPortalTransitionTime`.
             travelThroughEndPortal(world, *player);
             continue;
         }
@@ -344,8 +337,7 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
             }
         } else if (player->fireTicks > 0) {
             player->fireTicks--;
-            // parity: `Entity.baseTick` burns for one heart every second, and lava's own damage
-            // replaces it while standing in it.
+            // parity: `Entity.baseTick`.
             if (player->fireTicks % kFireDamageIntervalTicks == 0 && player->connection().hurt) {
                 player->connection().hurt(world::fluids::kFireDamage, "onFire", world::damageTypes::kOnFire,
                                           std::nullopt);
@@ -371,8 +363,7 @@ world::LoadedWorld* EnvironmentTickSystem::counterpart(const world::LoadedWorld&
             }
         }
     }
-    // A dimension nobody declared leaves the portal leading nowhere, and saying nothing about it is
-    // the one answer that leaves the operator guessing.
+    // A dimension nobody declared leaves the portal leading nowhere; saying nothing leaves the operator guessing.
     if (target == nullptr && warnedMissingDimensions_.emplace(world.name(), dimension).second) {
         logger_.warn([&] {
             const std::string overworld = worldsConfig_->overworldOf(world.declaration()).name;
@@ -402,7 +393,7 @@ void EnvironmentTickSystem::travelThroughPortal(world::LoadedWorld& world, Playe
     if (target == nullptr) {
         return;
     }
-    // parity: `Level.isAllowedToEnterPortal`, the game rule that keeps a server out of the Nether.
+    // parity: `Level.isAllowedToEnterPortal`.
     if (target->declaration().dimension == config::WorldDimension::Nether &&
         !world.gameRules().get(world::gameRules::kAllowEnteringNetherUsingPortals)) {
         return;
@@ -562,8 +553,7 @@ void EnvironmentTickSystem::strikeLightning(world::LoadedWorld& world) {
         if (isTrap) {
             static_cast<void>(spawning_->spawnSkeletonTrap(world, (*target)[0], (*target)[1], (*target)[2]));
         }
-        // parity: `ServerLevel.tickThunder` puts a bolt at the bottom centre of the square, a trap's
-        // only for show; the bolt's own turn does the rod, the fire and the game event.
+        // parity: `ServerLevel.tickThunder`.
         static_cast<void>(LightningBoltSystem::spawn(world, (*target)[0] + 0.5, (*target)[1], (*target)[2] + 0.5,
                                                      players_->allocateEntityId(), std::nullopt, isTrap));
     }

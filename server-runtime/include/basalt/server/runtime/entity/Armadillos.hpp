@@ -8,9 +8,6 @@
 
 namespace basalt::server::runtime::entity {
 
-/// The armadillo: rolling up at danger, peeking out, unrolling, and the scute it sheds or is
-/// brushed for.
-///
 /// parity: `Armadillo` and `ArmadilloAi`.
 namespace armadillos {
 

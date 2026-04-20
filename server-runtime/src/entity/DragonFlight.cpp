@@ -39,7 +39,7 @@ void place(const ServerEntity& dragon, DragonState& state, Part part, float x, d
     return static_cast<float>(state.history.get(5).y - state.history.get(0).y);
 }
 
-/// parity: `AbstractDragonSittingPhase`, which hover is not, although it counts as sitting.
+/// parity: `AbstractDragonSittingPhase`.
 [[nodiscard]] bool shrugsOffProjectiles(Phase phase) {
     return phase == Phase::SittingFlaming || phase == Phase::SittingScanning || phase == Phase::SittingAttacking;
 }

@@ -26,57 +26,45 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 class RealLootTables;
 
-/// What the advancement and loot predicates can see of the things in the world.
 namespace triggerFacts {
 
-/// parity: the parts of `Entity` an `EntityPredicate` reads, for a mob or any other entity.
+/// parity: the parts of `Entity` an `EntityPredicate` reads.
 [[nodiscard]] server::world::loot::EntityFacts ofEntity(const LoadedWorld& world, const entity::ServerEntity& entity);
 
-/// The same without the world around it, so without what it rides.
 [[nodiscard]] server::world::loot::EntityFacts ofEntity(const entity::ServerEntity& entity);
 
-/// The same for a player: what they wear and hold, their flags and effects.
 [[nodiscard]] server::world::loot::EntityFacts ofPlayer(const player::PlayerSession& player);
 
-/// The damage type behind the name `entityCombat::hurt` was given, where the two differ.
 [[nodiscard]] wire::common::Identifier damageTypeOf(std::string_view cause);
 
 [[nodiscard]] std::optional<TriggerItem> itemOf(const std::optional<storage::StoredItemStack>& stack);
 
-/// A player's predicates' context: their facts as `this`, prepared at where they stand.
 [[nodiscard]] server::world::loot::LootContext ofPlayerAt(RealLootTables& tables, LoadedWorld& world,
                                                           const player::PlayerSession& player,
                                                           const player::PlayerRegistry* players = nullptr);
 
-/// parity: `PlayerPredicate.looking_at`'s pick: the nearest entity the view meets within a hundred
-/// blocks, and only if nothing solid stands between the two pairs of eyes.
+/// parity: `PlayerPredicate.looking_at`.
 [[nodiscard]] std::shared_ptr<const server::world::loot::EntityFacts>
 lookingAtOf(LoadedWorld& world, const player::PlayerSession& player, const player::PlayerRegistry* players);
 
-/// parity: `ItemUsedOnLocationTrigger`'s context: the player, the block, the tool and the square's
-/// centre. `stateId` stands in for the block when it has changed since the use it answers.
+/// parity: `ItemUsedOnLocationTrigger`.
 [[nodiscard]] server::world::loot::LootContext atBlock(RealLootTables& tables, LoadedWorld& world,
                                                        const player::PlayerSession& player, std::int32_t x,
                                                        std::int32_t y, std::int32_t z,
                                                        const std::optional<storage::StoredItemStack>& tool,
                                                        std::optional<std::int32_t> stateId = std::nullopt);
 
-/// A noise a player makes: who, whether they crouch, and the `avoid_vibration` a sensor that let it
-/// pass fires for them.
 [[nodiscard]] vibrations::Source vibrationSourceOf(const player::PlayerSession& player, AdvancementTriggers* triggers);
 
-/// A player's facts, or an entity's, by entity id in `world`.
 [[nodiscard]] std::optional<server::world::loot::EntityFacts>
 ofId(const LoadedWorld& world, const std::vector<player::PlayerSession*>& players, std::int32_t id);
 
-/// parity: `PlayerHurtEntityTrigger`, fired for a player's hit on `victim`. `direct` is what landed
-/// it when that was not the player's own hand.
+/// parity: `PlayerHurtEntityTrigger`.
 void playerHurtEntity(AdvancementTriggers& triggers, const LoadedWorld& world, const player::PlayerSession& player,
                       const entity::ServerEntity& victim, float dealt, const wire::common::Identifier& damageType,
                       const std::optional<server::world::loot::EntityFacts>& direct = std::nullopt);
 
-/// parity: `ItemStack.applyDamage`'s `ITEM_DURABILITY_CHANGED`, read off the stack before the wear;
-/// `after` is nothing when the wear broke it.
+/// parity: `ItemStack.applyDamage`.
 void durabilityChanged(AdvancementTriggers* triggers, const player::PlayerSession& player,
                        const storage::StoredItemStack& before, const std::optional<storage::StoredItemStack>& after);
 

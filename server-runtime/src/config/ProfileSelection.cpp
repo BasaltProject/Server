@@ -35,7 +35,6 @@ void OnceReporter::report(const wire::common::Logger& logger, const std::string&
 bool profileApplies(const ProfileHeader& header, const wire::common::placeholder::PlaceholderRegistry& registry,
                     const wire::common::placeholder::PlaceholderContext& context, const wire::common::Logger& logger,
                     OnceReporter& reporter, std::string_view what) {
-    // A profile with no conditions is one that is only ever chosen by hand, or the default.
     if (header.conditions.empty()) {
         return false;
     }

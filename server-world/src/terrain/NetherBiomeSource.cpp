@@ -69,7 +69,6 @@ NetherBiomeLookup NetherBiomeSource::cached(densityfunction::SamplerContext& con
     if (!state_->zoomer.has_value()) {
         return lookup();
     }
-    // One worker's own quart cache: the zoom asks for the same quart from many block positions.
     auto noiseBiomes = std::make_shared<std::map<std::int64_t, BiomeName>>();
     return [self = *this, noiseBiomes, fallback = &context](std::int32_t x, std::int32_t y, std::int32_t z,
                                                             densityfunction::SamplerContext* cache) {

@@ -40,8 +40,7 @@ constexpr double kChickenSearchHorizontal = 5.0;
 constexpr double kChickenSearchVertical = 3.0;
 constexpr float kFullRotation = 360.0F;
 
-/// Every category a cap is kept for. parity: `MobCategory.values()` minus `MISC`, which is not
-/// capped at all.
+/// Every category a cap is kept for.
 constexpr std::array<MobCategory, 7> kCappedCategories{MobCategory::Monster,
                                                        MobCategory::Creature,
                                                        MobCategory::Ambient,
@@ -73,8 +72,7 @@ NaturalSpawningSystem::NaturalSpawningSystem(player::PlayerRegistry& players, wo
       hooks_(std::move(hooks)), options_(std::move(options)) {}
 
 NaturalSpawningSystem::WorldSpawners& NaturalSpawningSystem::spawnersFor(const world::LoadedWorld& world) {
-    // Each spawner carries its own countdown between ticks, so one set per world and never a fresh
-    // one: a new one every tick would never reach its next spawn.
+    // Each spawner carries its countdown between ticks, so one set per world: a fresh one each tick never spawns.
     const auto found = spawners_.find(world.name());
     if (found != spawners_.end()) {
         return *found->second;
@@ -151,8 +149,7 @@ bool NaturalSpawningSystem::summonVillageGolem(world::LoadedWorld& world, const 
 }
 
 void NaturalSpawningSystem::tickSpawning(world::LoadedWorld& world, const sched::Region& region) {
-    // Global and local caps are one world-wide snapshot. Running this independently in every region
-    // made the first distant player consume the cap of every other one.
+    // Global and local caps are one world-wide snapshot: per region, the first distant player consumed everyone's cap.
     if (!region.isPrimary() || !world.gameRules().get(world::gameRules::kSpawnMobs)) {
         return;
     }
@@ -223,8 +220,7 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
     }
     world::StructureSpawnLists structureSpawnLists{world};
 
-    // parity: `NaturalSpawner.createState` excludes both PersistenceRequired and each mob's
-    // requiresCustomPersistence override before global caps, local caps and spawn costs.
+    // parity: `NaturalSpawner.createState`.
     std::vector<ServerEntity*> alive;
     for (ServerEntity* entity : world.state().entities()) {
         if (!entity->removed && !entity::mobPersistence::keeps(*entity)) {
@@ -258,7 +254,7 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
         counts[*category]++;
         localCaps.add(*category, blockX >> 4, blockZ >> 4);
     }
-    // parity: `ServerChunkCache` shuffles once, then gives every spawning chunk every category.
+    // parity: `ServerChunkCache` shuffles once.
     for (std::size_t index = chunks.size(); index > 1; index--) {
         const auto swap = static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(index)));
         std::swap(chunks[index - 1], chunks[swap]);

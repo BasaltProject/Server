@@ -11,8 +11,7 @@
 namespace basalt::server::runtime::entity::breeding {
 namespace {
 
-/// parity: the `isFood` of each animal class. Only the ones this build can actually spawn are
-/// listed; anything else refuses the food rather than pretending.
+/// parity: the `isFood` of each animal class.
 [[nodiscard]] const std::map<std::string, std::set<std::string, std::less<>>, std::less<>>& foods() {
     static const std::map<std::string, std::set<std::string, std::less<>>, std::less<>> all{
         {"cow", {"wheat"}},
@@ -64,8 +63,7 @@ void feed(ServerEntity& animal, std::optional<std::string> cause) {
 bool canAgeUp(const ServerEntity& animal) { return animal.age < 0; }
 
 void feedBaby(ServerEntity& animal) {
-    // parity: the jar divides by twenty as whole ticks *before* taking the tenth, so the last few
-    // seconds of growing left give nothing at all.
+    // parity: the jar divides by twenty as whole ticks before taking the tenth, so the last seconds give nothing.
     const auto seconds = static_cast<std::int32_t>(static_cast<float>(-animal.age / 20) * 0.1F);
     animal.age = std::min(0, animal.age + (seconds * 20));
 }

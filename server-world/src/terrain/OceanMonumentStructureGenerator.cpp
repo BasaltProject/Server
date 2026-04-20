@@ -22,7 +22,7 @@ constexpr std::int32_t kSurfaceStructuresStep = 4;
 /// The monument is 58 blocks wide and starts 29 west of its chunk, so it reaches two chunks out.
 constexpr std::int32_t kReachChunks = 2;
 constexpr std::int32_t kRadius = 29;
-/// parity: `makeBoundingBox(west, 39, north, ...)`; the roof lands on y 61 whatever the sea bed does.
+/// parity: `makeBoundingBox(west, 39, north, ...)`.
 constexpr std::int32_t kBaseY = 39;
 
 constexpr std::array<StructureDirection, 4> kHorizontal{StructureDirection::North, StructureDirection::East,
@@ -34,7 +34,6 @@ struct RoomSize {
     std::int32_t depth = 1;
 };
 
-/// Each room kind's size in lattice cells, as its piece constructor names it.
 [[nodiscard]] std::optional<RoomSize> sizeOf(structure::MonumentRoomKind kind) {
     switch (kind) {
     case structure::MonumentRoomKind::Entry:
@@ -120,9 +119,7 @@ void draw(const structure::MonumentRoomPiece& piece, const structure::MonumentBr
     }
 }
 
-/// parity: `OceanMonumentPiece.makeBoundingBox`. A room's box is its lattice cell scaled by eight and
-/// four, laid out along the monument's facing and then moved by the building's own offset. The wings
-/// and the penthouse are not lattice cells: their corners are named outright.
+/// parity: `OceanMonumentPiece.makeBoundingBox`.
 [[nodiscard]] std::optional<structure::StructureBoundingBox> boxOf(const structure::MonumentRoomPiece& piece,
                                                                    StructureDirection orientation,
                                                                    const structure::StructurePieceFill& shell,
@@ -225,8 +222,7 @@ void OceanMonumentStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed,
         return;
     }
 
-    // parity: `onTopOfChunkCenter` over `OCEAN_FLOOR_WG`, which only decides where the biome is
-    // sampled: the monument itself never moves off y 39.
+    // parity: `onTopOfChunkCenter` over `OCEAN_FLOOR_WG` only decides the biome sample.
     const std::int32_t centreX = chunkX * 16 + 8;
     const std::int32_t centreZ = chunkZ * 16 + 8;
     const std::int32_t groundY = oceanFloorAt_(centreX, centreZ) - 1;
@@ -259,9 +255,7 @@ void OceanMonumentStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed,
     structure::monumentShell::place(structure::MonumentBrush{shellFill, seaLevel_, clip}, seaLevel_);
     here.push_back(shellBox);
 
-    // parity: the children are placed in the order `MonumentBuilding` built them, and a room only
-    // draws where its own box reaches this chunk, so a room's draws happen once per chunk it touches.
-    // The offset is the building's own (9, 0, 22) turned by the monument's facing.
+    // parity: children are placed in `MonumentBuilding` order and a room draws once per chunk it touches.
     const structure::StructurePos offset{shellFill.worldX(9, 22), shellFill.worldY(0), shellFill.worldZ(9, 22)};
     for (const structure::MonumentRoomPiece& piece : rooms) {
         const std::optional<structure::StructureBoundingBox> box = boxOf(piece, orientation, shellFill, offset);

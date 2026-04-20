@@ -24,7 +24,6 @@ namespace {
     return directory.string();
 }
 
-/// One overworld and its Nether, the way `worlds.toml` declares a pair.
 [[nodiscard]] config::WorldsConfig pairedWorlds() {
     return config::WorldsConfig{{config::WorldDeclaration{.name = "world",
                                                           .dimension = config::WorldDimension::Overworld,
@@ -49,8 +48,6 @@ TEST_CASE("a dimension with no seed of its own takes its overworld's") {
 
     const std::map<std::string, LoadedWorld*> all = registry.worlds();
     REQUIRE(all.size() == 2);
-    // parity: a vanilla save has one seed for its three dimensions, which is what makes them one
-    // world rather than three unrelated ones.
     CHECK(all.at("world")->metadata().seed == 4242);
     CHECK(all.at("world_nether")->metadata().seed == 4242);
     CHECK(registry.worldSeed() == 4242);
@@ -79,8 +76,7 @@ TEST_CASE("a world made at runtime is a world like any other, and its name has t
     CHECK(made->metadata().seed == 7);
     CHECK(registry.worlds().size() == 3);
 
-    // A name already taken, and a name that is not a folder name, are both refused outright: a
-    // world that half exists is worse than none.
+    // A taken name and a name that is not a folder name are refused: a half-existing world is worse than none.
     CHECK(registry.createWorld("arena", config::WorldDimension::Overworld, config::WorldType::Flat, 7) == nullptr);
     CHECK(registry.createWorld("../escape", config::WorldDimension::Overworld, config::WorldType::Flat, 7) == nullptr);
     CHECK(registry.createWorld("", config::WorldDimension::Overworld, config::WorldType::Flat, 7) == nullptr);

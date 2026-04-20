@@ -17,15 +17,13 @@ namespace {
 
 using wire::common::Identifier;
 
-/// The block at these coordinates, or nothing when the column is not loaded.
 [[nodiscard]] const Identifier* blockAt(world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
                                         const std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
     return stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
 }
 
-/// Which block entity a slot of the window belongs to, and its index inside it. A double chest is
-/// one window of 54 over two of 27.
+// A double chest is one window of 54 over two of 27.
 [[nodiscard]] std::optional<std::pair<std::array<std::int32_t, 3>, std::int32_t>> halfFor(const OpenWindow& window,
                                                                                           const std::int32_t slot) {
     if (slot < 0 || slot >= window.size) {
@@ -37,7 +35,6 @@ using wire::common::Identifier;
     return std::pair{std::array<std::int32_t, 3>{window.x, window.y, window.z}, slot};
 }
 
-/// How many slots each half holds, which is not the window's own size when there are two of them.
 [[nodiscard]] std::int32_t halfSize(const OpenWindow& window) {
     return window.second.has_value() ? world::containers::kChestSize : window.size;
 }
@@ -58,7 +55,7 @@ lootOf(const std::optional<storage::StoredItemStack>& stack) {
     return server::world::loot::ItemStack{.item = *id, .count = stack->count, .components = stack->components};
 }
 
-/// The block entity at a point, without making one: a window only ever reads a block that is there.
+// Without making one: a window only ever reads a block that is there.
 [[nodiscard]] server::world::ChunkBlockEntity* entityAt(world::LoadedWorld& world,
                                                         const std::array<std::int32_t, 3>& at) {
     server::world::Chunk* chunk = world.state().chunkIfLoaded(at[0] >> 4, at[2] >> 4);
@@ -74,8 +71,6 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return std::nullopt;
     }
     const std::string path{block->path()};
-    // A cooker is a window of its own kind, with its three slots and its two bars. Everything else
-    // this build opens is a box: rows of slots and nothing behind them.
     if (world::furnaces::cookerFor(path).has_value()) {
         return OpenWindow{.type = path == "blast_furnace" ? wire::bedrock::BedrockContainerType::BlastFurnace
                                   : path == "smoker"      ? wire::bedrock::BedrockContainerType::Smoker
@@ -86,10 +81,7 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
                           .size = world::furnaces::kSize,
                           .block = path};
     }
-    // A table's nine cells are not the block's: they belong to whoever is standing at it, so the
-    // window has none of the block's own slots.
-    // parity: `EnderChestBlock.useWithoutItem` refuses under a block that would trap the lid, and
-    // then shows the player's own slots rather than anything in the world.
+    // parity: `EnderChestBlock.useWithoutItem`.
     if (path == "ender_chest") {
         const std::optional<std::int32_t> above = world.state().blockState(x, y + 1, z);
         if (!above.has_value() || server::registry::blockSupport::conductsRedstone(*above)) {
@@ -103,14 +95,12 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
                           .block = path,
                           .playerOwned = true};
     }
-    // parity: `StonecutterBlock.useWithoutItem`. Its one slot belongs to the screen rather than to
-    // the block, the same as a table's grid does.
+    // parity: `StonecutterBlock.useWithoutItem`.
     if (path == "stonecutter") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Stonecutter, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
-    // parity: `EnchantingTableBlock.useWithoutItem`. Its two slots belong to the screen, and what
-    // it offers comes off the shelves around it.
+    // parity: `EnchantingTableBlock.useWithoutItem`.
     if (path == "enchanting_table") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Enchantment, .x = x, .y = y, .z = z, .size = 0, .block = path};
@@ -129,12 +119,12 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Loom, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
-    // parity: `CartographyTableBlock.useWithoutItem`. Its three slots belong to the screen too.
+    // parity: `CartographyTableBlock.useWithoutItem`.
     if (path == "cartography_table") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Cartography, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
-    // parity: `BeaconBlockEntity` is a `MenuProvider`: its one slot belongs to the screen too.
+    // parity: `BeaconBlockEntity` is a `MenuProvider`.
     if (path == "beacon") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Beacon, .x = x, .y = y, .z = z, .size = 0, .block = path};
@@ -144,8 +134,7 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Grindstone, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
-    // parity: `AnvilBlock.useWithoutItem`. Its three slots belong to the screen, and the block
-    // wears out under whoever uses it.
+    // parity: `AnvilBlock.useWithoutItem`.
     if (path == "anvil" || path == "chipped_anvil" || path == "damaged_anvil") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Anvil, .x = x, .y = y, .z = z, .size = 0, .block = path};
@@ -154,8 +143,7 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Workbench, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
-    // Three of the boxes below have a screen of their own over there, and a brewing stand and a
-    // crafter are not boxes at all: a client sent the wrong kind draws the wrong shape.
+    // A brewing stand and a crafter are not boxes at all: a client sent the wrong kind draws the wrong shape.
     if (path == "brewing_stand" || path == "crafter") {
         const std::optional<std::int32_t> size = world::containers::sizeOf(path);
         if (!size.has_value()) {
@@ -186,8 +174,7 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
     window.z = z;
     window.size = *size;
     window.block = path;
-    // Which half leads is not the one that was clicked: both chests of a pair show the same rows in
-    // the same order, whichever one was opened.
+    // Which half leads is not the one clicked: both chests of a pair show the same rows in the same order.
     if (const std::optional<std::pair<world::doubleChests::Half, world::doubleChests::Half>> halves =
             world::doubleChests::halves(world.state(), x, y, z);
         halves.has_value()) {
@@ -204,13 +191,12 @@ std::optional<std::int32_t> blockSlotOf(const OpenWindow& window, const std::int
                                         const std::int32_t slot) {
     const auto named = static_cast<wire::bedrock::BedrockContainerSlot>(container);
     if (window.size == 0) {
-        return std::nullopt; // Nothing in this window is the block's.
+        return std::nullopt;
     }
     if (window.type == wire::bedrock::BedrockContainerType::Container) {
         return named == wire::bedrock::BedrockContainerSlot::LevelEntity ? std::optional{slot} : std::nullopt;
     }
-    // A cooker gives each of its three slots a container of its own, so the slot number inside it
-    // says nothing: which container it is *is* the slot.
+    // A cooker gives each slot a container of its own, so which container it is is the slot.
     switch (named) {
     case wire::bedrock::BedrockContainerSlot::FurnaceIngredient:
         return world::furnaces::kInputSlot;
@@ -291,8 +277,7 @@ bool writeWindowSlot(world::LoadedWorld& world, const OpenWindow& window, const 
     if (entity == nullptr) {
         return false;
     }
-    // Every slot of the block goes back, not just the one that moved: writing fewer than it holds
-    // is what would empty a chest the moment somebody touched its first item.
+    // Every slot goes back, not just the one that moved: writing fewer would empty a chest on its first touch.
     world::blockInventory::Slots slots = world::blockInventory::readFor(window.block, entity->data(), halfSize(window));
     if (half->second < 0 || static_cast<std::size_t>(half->second) >= slots.size()) {
         return false;

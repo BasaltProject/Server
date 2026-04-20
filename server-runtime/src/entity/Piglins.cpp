@@ -54,7 +54,6 @@ constexpr std::string_view kHome = "minecraft:home";
     return a.item == b.item && a.components == b.components;
 }
 
-/// A memory's slot with its time left, which is how a brain saves one set with an expiry.
 void putTimed(NbtCompound& memories, std::string_view name, NbtTag value, std::int64_t until, std::int64_t now) {
     NbtCompound slot;
     slot.set("value", std::move(value));

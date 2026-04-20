@@ -36,15 +36,14 @@ TEST_CASE("the tag table goes out in a fixed order, each registry's names sorted
         CHECK(std::ranges::is_sorted(tags));
         CHECK(std::ranges::adjacent_find(tags) == tags.end());
     }
-    // The order is the order they go out on the wire, so it is pinned rather than sorted.
+    // Pinned, not sorted: the order is the order they go out on the wire.
     CHECK(order == "minecraft:banner_pattern,minecraft:block,minecraft:damage_type,minecraft:dialog,"
                    "minecraft:enchantment,minecraft:entity_type,minecraft:fluid,minecraft:game_event,"
                    "minecraft:instrument,minecraft:item,minecraft:painting_variant,"
                    "minecraft:point_of_interest_type,minecraft:potion,minecraft:timeline,"
                    "minecraft:worldgen/biome");
 
-    // A registry this build does not track answers with nothing rather than inventing one: sending
-    // tags for a registry the client has no `RegistryAccess` entry for crashed it outright.
+    // Sending tags for a registry the client has no `RegistryAccess` entry for crashed it outright.
     CHECK(vanillaTagData::tagsOf("minecraft:worldgen/world_preset").empty());
     CHECK(vanillaTagData::tagsOf("").empty());
 }
@@ -81,9 +80,7 @@ TEST_CASE("the variant registries are the lists the frozen kotlin source spells 
         CHECK(expected.values.back() == expected.last);
     }
 
-    // The order is the bootstrap order, because these indices go out as holder ids in entity
-    // metadata: a client whose registry holds fewer entries than the id being sent drops the
-    // connection failing to decode it.
+    // Bootstrap order matters: indices go out as holder ids, and a client with fewer entries drops the connection.
     CHECK(vanillaRegistryData::catVariants()[10] == "all_black");
     CHECK(vanillaRegistryData::bannerPatterns()[0] == "base");
 
@@ -101,8 +98,6 @@ TEST_CASE("the variant registries are the lists the frozen kotlin source spells 
     CHECK(vanillaRegistryData::instruments().front().first == "ponder_goat_horn");
     CHECK(vanillaRegistryData::instruments().back().first == "dream_goat_horn");
 
-    // Every name of every list in one number: the counts and the ends above say what a mismatch
-    // should have been, and this catches anything that moved in between them.
     std::string joined;
     const auto append = [&joined](std::string_view name, const std::vector<std::string>& values) {
         if (!joined.empty()) {
@@ -147,15 +142,13 @@ TEST_CASE("a variant's own entry is built the way the codec reads it") {
         return written == nullptr ? std::string{"-"} : *written;
     };
 
-    // The default wolf's files are just `wolf`, not `wolf_pale`: the one place the name is not the
-    // id with a prefix on it.
+    // The default wolf's files are `wolf`, not `wolf_pale`: the one name that is not the id with a prefix.
     const nbt::NbtCompound pale = vanillaRegistryData::wolfVariant("pale");
     CHECK(text(*pale.find("assets")->get<nbt::NbtCompound>(), "wild") == "minecraft:entity/wolf/wolf");
     CHECK(text(*pale.find("baby_assets")->get<nbt::NbtCompound>(), "angry") == "minecraft:entity/wolf/wolf_angry_baby");
     const nbt::NbtCompound ashen = vanillaRegistryData::wolfVariant("ashen");
     CHECK(text(*ashen.find("assets")->get<nbt::NbtCompound>(), "tame") == "minecraft:entity/wolf/wolf_ashen_tame");
 
-    // However a wolf sounds, it steps like a plain one, and its baby always sounds like a baby.
     const nbt::NbtCompound grumpy = vanillaRegistryData::wolfSoundVariant("grumpy");
     const nbt::NbtCompound& adult = *grumpy.find("adult_sounds")->get<nbt::NbtCompound>();
     CHECK(text(adult, "ambient_sound") == "minecraft:entity.wolf_grumpy.ambient");
@@ -163,15 +156,12 @@ TEST_CASE("a variant's own entry is built the way the codec reads it") {
     CHECK(text(*grumpy.find("baby_sounds")->get<nbt::NbtCompound>(), "whine_sound") ==
           "minecraft:entity.baby_wolf.whine");
 
-    // The model field appears only where the variant has one, which is not every variant.
-    // Every variant has a baby asset beside its own, named for it.
     CHECK(text(vanillaRegistryData::pigVariant("warm"), "asset_id") == "minecraft:entity/pig/pig_warm");
     CHECK(text(vanillaRegistryData::pigVariant("warm"), "baby_asset_id") == "minecraft:entity/pig/pig_warm_baby");
     CHECK(text(vanillaRegistryData::catVariant("jellie"), "baby_asset_id") == "minecraft:entity/cat/cat_jellie_baby");
     CHECK(text(vanillaRegistryData::cowVariant("cold"), "baby_asset_id") == "minecraft:entity/cow/cow_cold_baby");
     CHECK(text(vanillaRegistryData::chickenVariant("temperate"), "baby_asset_id") ==
           "minecraft:entity/chicken/chicken_temperate_baby");
-    // The frog is the one variant with no baby of its own.
     CHECK(text(vanillaRegistryData::frogVariant("warm"), "asset_id") == "minecraft:entity/frog/frog_warm");
     CHECK(vanillaRegistryData::frogVariant("warm").find("baby_asset_id") == nullptr);
 
@@ -184,7 +174,6 @@ TEST_CASE("a variant's own entry is built the way the codec reads it") {
     CHECK(text(vanillaRegistryData::zombieNautilusVariant("temperate"), "asset_id") ==
           "minecraft:entity/nautilus/zombie_nautilus");
 
-    // The cow is flat rather than split into adult and baby, unlike every other animal here.
     const nbt::NbtCompound moody = vanillaRegistryData::cowSoundVariant("moody");
     CHECK(moody.find("adult_sounds") == nullptr);
     CHECK(text(moody, "step_sound") == "minecraft:entity.cow_moody.step");
@@ -205,14 +194,12 @@ TEST_CASE("the dimension types carry what a client joins a world with") {
     CHECK(types[3].first == "overworld_caves");
 
     const nbt::NbtCompound& overworld = types[0].second;
-    // `has_fixed_time` is written only when true, the way the codec's default leaves it out.
     CHECK(overworld.find("has_fixed_time") == nullptr);
     CHECK(overworld.getBoolean("has_skylight"));
     CHECK_FALSE(overworld.getBoolean("has_ceiling"));
     CHECK(overworld.getInt("min_y") == -64);
     CHECK(overworld.getInt("height") == 384);
     CHECK(overworld.getDouble("coordinate_scale") == 1.0);
-    // The overworld's spawn light is a range rather than a number, unlike the other two.
     CHECK(overworld.find("monster_spawn_light_level")->get<nbt::NbtCompound>() != nullptr);
 
     const nbt::NbtCompound& nether = types[1].second;
@@ -226,11 +213,9 @@ TEST_CASE("the dimension types carry what a client joins a world with") {
     CHECK(end.getBoolean("has_ender_dragon_fight"));
     CHECK(end.getString("default_clock") == "minecraft:the_end");
 
-    // The caves entry is the overworld with a ceiling, and nothing else changed.
     CHECK(types[3].second.getBoolean("has_ceiling"));
     CHECK(types[3].second.getInt("min_y") == -64);
 
-    // Both clocks use the empty default clock codec.
     REQUIRE(vanillaDimensionTypes::worldClocks().size() == 2);
     CHECK(vanillaDimensionTypes::worldClocks()[0].first == "overworld");
     CHECK(vanillaDimensionTypes::worldClocks()[0].second.empty());

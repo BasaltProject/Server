@@ -83,7 +83,7 @@ constexpr float kFangDamage = 6.0F;
 constexpr std::int32_t kFangParticles = 4;
 constexpr double kFangParticleLift = 0.5;
 
-/// parity: `Ghast.DATA_IS_CHARGING`, `Blaze`'s own flags byte and `Guardian`'s beam target.
+/// parity: `Ghast.DATA_IS_CHARGING`.
 constexpr std::uint8_t kGhastChargingIndex = 16;
 constexpr std::uint8_t kBlazeChargedIndex = 16;
 constexpr std::int8_t kBlazeChargedFlag = 1;
@@ -234,7 +234,7 @@ void MobActionSystem::hurtPlayer(ServerEntity& mob, std::int32_t playerId, float
     }
     // parity: `Bee.doHurtTarget` stings, with the whole of its attack damage cut to an int.
     const bool bee = entity::bees::isBee(mob.type());
-    // parity: `HoglinBase.hurtAndThrowTarget`: half the attack and a random share of the rest.
+    // parity: `HoglinBase.hurtAndThrowTarget`.
     const bool tosses = (mob.type().path() == "hoglin" || mob.type().path() == "zoglin") && mob.age >= 0;
     random::RandomSource toss = freshRandom();
     if (tosses && static_cast<std::int32_t>(damage) > 0) {
@@ -520,8 +520,7 @@ void MobActionSystem::summonVexes(ServerEntity& mob, std::int32_t count) {
         ServerEntity* vex = spawning_->spawnMob(*world, kVexType, mob.x + offsetX, mob.y + 1.0, mob.z + offsetZ);
         if (vex != nullptr) {
             vex->targetId = mob.targetId;
-            // parity: `EvokerSummonSpellGoal`: bound where it rose, and twenty to a hundred and twenty
-            // seconds to live.
+            // parity: `EvokerSummonSpellGoal`.
             vex->ownerId = mob.entityId();
             vex->flight.boundOrigin = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(vex->x)),
                                                                   static_cast<std::int32_t>(std::floor(vex->y)),
@@ -556,7 +555,6 @@ void MobActionSystem::teleported(ServerEntity& mob) {
         return;
     }
     playSound(*world, mob, kSoundEndermanTeleport);
-    // The client has to be told where it went: it is a jump, not a walk.
     for (PlayerSession* player : watchersOf(*world)) {
         if (!player->connection().sendPlayPacket) {
             continue;
@@ -623,7 +621,7 @@ void MobActionSystem::shootArrow(ServerEntity& mob, double targetX, double targe
         entity::projectiles::spawn(world->state(), kind, players_->allocateEntityId(), entry->protocolId, mob.x, fromY,
                                    mob.z, dx, dy + (flat * kArrowArc), dz, kArrowPower, arrowSpread(*world), random);
     arrow.ownerId = mob.entityId();
-    // parity: `Stray.getArrow` and `Bogged.getArrow`, thirty seconds of slowness or five of poison.
+    // parity: `Stray.getArrow` and `Bogged.getArrow`.
     if (mob.type().path() == "stray" || mob.type().path() == "bogged") {
         const bool stray = mob.type().path() == "stray";
         wire::nbt::NbtCompound effect;

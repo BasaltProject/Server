@@ -7,9 +7,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
-
 } // namespace
 
 std::shared_ptr<LuaMenu> LuaMenu::create(PluginMenus& menus, PluginPlayers& players, std::string title,
@@ -38,7 +36,6 @@ void LuaMenu::closeAll() {
 }
 
 void LuaMenu::push(LuaArgs& lua) {
-    // Shared rather than raw: the object a plugin stashes has to keep the menu alive.
     const std::shared_ptr<LuaMenu> self = shared_from_this();
     PluginObject object{"menu"};
     object.reads("title", [self] { return PluginValue{self->title_}; })
@@ -109,5 +106,4 @@ void LuaMenu::push(LuaArgs& lua) {
         });
     std::move(object).push(lua);
 }
-
 } // namespace basalt::server::plugins

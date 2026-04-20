@@ -96,7 +96,7 @@ void TeleportAwayGoal::tick(MobContext& mob) {
         teleportRandomly(mob);
         return;
     }
-    // parity: `customServerAiStep`, the daylight teleport for an enderman with nothing to chase.
+    // parity: `customServerAiStep`.
     if (!mob.mob.targetId.has_value() && !mob.night && mob.light > kDaylight && mob.random.nextInt(kDayOdds) == 0) {
         teleportRandomly(mob);
     }
@@ -113,7 +113,7 @@ bool teleportEndermanRandomly(MobContext& mob) {
 }
 
 bool teleportEnderman(MobContext& mob, double x, double y, double z) {
-    // parity: 26.3 `Enderman.teleport` over `randomTeleport(..., ENDERMAN_DOES_NOT_TELEPORT_TO)`.
+    // parity: 26.3 `Enderman.teleport` over `randomTeleport(.
     if (mob.mob.vehicleId.has_value()) {
         return false;
     }
@@ -138,7 +138,6 @@ std::optional<double> landingFor(MobContext& mob, double x, double y, double z, 
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
         return block != nullptr && mob.actions.blockTagged(tag, *block).value_or(false);
     };
-    // Without the server's tags, the rule before them: down to anything with a shape.
     if (!mob.actions.blockTagged(avoided, wire::common::Identifier::vanilla("air")).has_value()) {
         return groundBelow(world, x, y, z);
     }
@@ -148,8 +147,7 @@ std::optional<double> landingFor(MobContext& mob, double x, double y, double z, 
 std::optional<double> randomTeleportLanding(const world::WorldState& world, const BlockTagged& tagged, double x,
                                             double y, double z, double width, double height, std::string_view avoided,
                                             bool waterBelowBlocks) {
-    // parity: `LivingEntity.randomTeleport`: down until `entities_can_teleport_to`, the height
-    // falling one with every block passed.
+    // parity: `LivingEntity.randomTeleport`.
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));
     auto blockY = static_cast<std::int32_t>(std::floor(y));
@@ -168,8 +166,7 @@ std::optional<double> randomTeleportLanding(const world::WorldState& world, cons
         }
         feet -= 1.0;
     }
-    // parity: `checkPositionAndTeleport`: room for the box, no liquid in it, nothing in it the mob
-    // avoids, and for an enderman no water right under its feet.
+    // parity: `checkPositionAndTeleport`.
     const Aabb box = Aabb::of(x, feet, z, width, height);
     const entityCollision::BlockAt blockAt = [&world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
         return world.blockState(bx, by, bz);

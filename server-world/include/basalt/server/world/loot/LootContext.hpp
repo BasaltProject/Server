@@ -15,10 +15,6 @@
 
 namespace basalt::server::world::loot {
 
-/// A stack of an item: what a loot table produces and what a crafting grid holds.
-///
-/// `components` is what the item carries beyond its own defaults, in the server's usual form;
-/// recipes that dye, repair, copy a book or decorate a shield work entirely on them.
 struct ItemStack {
     wire::common::Identifier item;
     std::int32_t count = 0;
@@ -44,14 +40,11 @@ struct EnchantmentEntry {
     EnchantmentCost maxCost;
 };
 
-/// The enchantment registry as the loot functions ask it. The data is the operator's jar, so the
-/// caller supplies it.
 struct Enchanting {
-    /// In registry order: all of them for no options, else what the ids or the one `#tag` name.
     std::function<std::vector<const EnchantmentEntry*>(const std::vector<std::string>& options)> candidates;
     /// parity: `Enchantment.canEnchant`, the `supported_items` set.
     std::function<bool(const wire::common::Identifier& enchantment, const wire::common::Identifier& item)> supports;
-    /// parity: `Enchantment.isPrimaryItem`, the `primary_items` set or else the supported one.
+    /// parity: `Enchantment.isPrimaryItem`.
     std::function<bool(const wire::common::Identifier& enchantment, const wire::common::Identifier& item)> primary;
     /// parity: `Enchantment.areCompatible`.
     std::function<bool(const wire::common::Identifier& first, const wire::common::Identifier& second)> compatible;
@@ -71,7 +64,6 @@ enum class EntityTarget : std::uint8_t {
 
 /// What an explorer map function asks the world for. parity: `ExplorationMapFunction`'s fields.
 struct ExplorationMapRequest {
-    /// Structure ids, or one `#tag`.
     std::vector<std::string> destination;
     std::string decoration = "minecraft:mansion";
     std::int8_t zoom = 2;
@@ -80,50 +72,38 @@ struct ExplorationMapRequest {
 };
 
 /// What a roll knows about where it came from. parity: `LootContextParams`, the parts this server
-/// can answer; anything a caller leaves empty is a parameter the roll does not have.
 struct LootContext {
     /// parity: `BLOCK_STATE`, the properties of the block behind the roll.
     std::map<std::string, std::string> blockState;
-    /// The block `blockState` belongs to. A caller that leaves it empty is trusted to roll a block's
-    /// own table, so `match_block` then checks the state alone.
     std::optional<wire::common::Identifier> block;
-    /// Whether somebody is behind the break: the player mining it or the projectile that hit it.
-    /// parity: `LootContextParams.THIS_ENTITY`, which a block broken by a neighbour or a blast has
-    /// none of. Snow and the chorus flower are the two tables that ask.
+    /// parity: `LootContextParams.THIS_ENTITY`.
     bool hasEntity = false;
-    /// parity: `LootParams.withDynamicDrop`, the drops a block hands the roll itself rather than
-    /// naming in its table. The only one in the game is a decorated pot's four sherds.
+    /// parity: `LootParams.withDynamicDrop`.
     std::map<std::string, std::vector<ItemStack>> dynamic;
     /// The tables a `loot_table` entry names. parity: `LootContext.getResolver`.
     std::function<const LootTable*(const wire::common::Identifier& id)> tables;
-    /// Whether the fishing hook behind the roll is in open water, or nothing without a hook.
     /// parity: `FishingHookPredicate.inOpenWater`.
     std::optional<bool> inOpenWater;
-    /// parity: `ADDITIONAL_COST_COMPONENT_ALLOWED`, set only when a villager works out its offers.
+    /// parity: `ADDITIONAL_COST_COMPONENT_ALLOWED`.
     bool additionalCostAllowed = false;
     /// parity: `LootContextParams.TOOL`, what broke the block, and its enchantments by id.
     std::optional<wire::common::Identifier> tool;
     std::map<std::string, std::int32_t, std::less<>> toolEnchantments;
-    /// The tool's whole component patch, when the caller has it: `match_tool` then reads every part
-    /// of its predicate rather than the item and enchantments alone.
     std::optional<wire::nbt::NbtCompound> toolComponents;
     /// parity: `LAST_DAMAGE_PLAYER`, whether a player's hit is behind the death.
     bool killedByPlayer = false;
-    /// parity: `THIS_ENTITY`, `ATTACKING_ENTITY` and `DIRECT_ATTACKING_ENTITY` as a predicate sees them.
+    /// parity: `THIS_ENTITY`.
     std::optional<EntityFacts> thisEntity;
     std::optional<EntityFacts> attacker;
     std::optional<EntityFacts> directAttacker;
-    /// parity: `LAST_DAMAGE_PLAYER`, the player behind the death whatever landed the last blow.
+    /// parity: `LAST_DAMAGE_PLAYER`.
     std::optional<EntityFacts> attackingPlayer;
-    /// The highest level of each enchantment across what the attacker wears and holds.
     /// parity: `EnchantmentHelper.getEnchantmentLevel(enchantment, attacker)`.
     std::map<std::string, std::int32_t, std::less<>> attackerEnchantments;
     TagLookup tags;
     /// parity: `RecipeType.SMELTING`, what a furnace makes of an item, for `furnace_smelt`.
     std::function<std::optional<ItemStack>(const ItemStack& input)> smelt;
-    /// The enchantment registry, for the enchanting functions; without it they leave the item alone.
     const Enchanting* enchanting = nullptr;
-    /// A tag's members in the order the tag lists them, for a `tag` entry and `set_instrument`.
     std::function<std::vector<wire::common::Identifier>(std::string_view registry, const wire::common::Identifier& tag)>
         tagMembers;
     /// parity: `LootParams.getLuck`, what `fill` rolls with: the opening player's luck.
@@ -136,10 +116,10 @@ struct LootContext {
     std::optional<wire::common::Identifier> damageType;
     /// parity: `EXPLOSION_RADIUS`, what `survives_explosion` and `explosion_decay` read.
     std::optional<float> explosionRadius;
-    /// parity: `ENCHANTMENT_LEVEL` and `ENCHANTMENT_ACTIVE`, set only by an enchantment effect.
+    /// parity: `ENCHANTMENT_LEVEL` and `ENCHANTMENT_ACTIVE`.
     std::optional<std::int32_t> enchantmentLevel;
     std::optional<bool> enchantmentActive;
-    /// parity: `Scoreboard.getPlayerScoreInfo`, the score of the named holder, or nothing without one.
+    /// parity: `Scoreboard.getPlayerScoreInfo`.
     std::function<std::optional<std::int32_t>(std::string_view holder, std::string_view objective)> score;
     /// The score holder name of one of the roll's entities. parity: `Entity.getScoreboardName`.
     std::function<std::optional<std::string>(EntityTarget target)> scoreHolder;
@@ -152,18 +132,13 @@ struct LootContext {
     /// parity: `WeatherCheck`, whether it rains and whether it thunders.
     std::optional<bool> raining;
     std::optional<bool> thundering;
-    /// parity: `ExplorationMapFunction.run`, which finds the structure and draws the map. Unset, the
-    /// stack is left as it is, which a `map_id` filter after it then throws away.
+    /// parity: `ExplorationMapFunction.run`.
     std::function<void(ItemStack& stack, const ExplorationMapRequest& request)> explorationMap;
-    /// parity: `SlotProvider.getSlotsFromRange`: the stacks in a slot range (`container.*`) of one of
-    /// the roll's entities, its block entity (`block_entity`) or its container (`container`). Unset,
-    /// or a source the roll lacks, is no slots, as vanilla answers a missing parameter.
+    /// parity: `SlotProvider.getSlotsFromRange`.
     std::function<std::vector<ItemStack>(std::string_view source, std::string_view slots)> slotsOf;
-    /// Every entry of a registry in id order, for `set_random_potion` with no options.
     std::function<std::vector<wire::common::Identifier>(std::string_view registry)> registryEntries;
 };
 
-/// The score holder behind one of the roll's entities: the context's own answer when it has one,
 /// else the name its facts carry. parity: `LootContext.getOptionalParameter(...).getScoreboardName`.
 [[nodiscard]] std::optional<std::string> scoreHolderOf(const LootContext& context, EntityTarget target);
 

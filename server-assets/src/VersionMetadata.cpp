@@ -8,16 +8,13 @@
 
 namespace basalt::server::assets {
 namespace {
-
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
 [[nodiscard]] std::string artifactJson(const DownloadArtifact& artifact) {
-    // The size goes back out quoted, exactly as the Kotlin wrote it: the reader takes either.
     return std::format(R"({{"url":"{}","sha1":"{}","size":"{}"}})", artifact.url, artifact.sha1, artifact.size);
 }
 
-/// piston-meta writes the size as a number; a cached copy of ours writes it as a string.
 [[nodiscard]] std::optional<std::int64_t> asLong(const JsonValue* value) {
     if (value == nullptr) {
         return std::nullopt;
@@ -51,7 +48,6 @@ using wire::common::JsonValue;
     }
     return DownloadArtifact{.url = *url->get<std::string>(), .sha1 = *sha1->get<std::string>(), .size = *size};
 }
-
 } // namespace
 
 std::string VersionMetadata::toJson() const {
@@ -138,5 +134,4 @@ std::expected<VersionMetadata, AssetError> versionManifest::resolveCached(std::s
     }
     return resolved;
 }
-
 } // namespace basalt::server::assets

@@ -26,8 +26,6 @@ constexpr std::int32_t kIdleSpinsBeforeBackoff = 20;
 constexpr std::chrono::milliseconds kIdleBackoff{20};
 constexpr std::chrono::milliseconds kBetweenChunks{1};
 
-// A forceload asks for every chunk with priority 0, so most picks are ties. Left to the map they
-// would go by hash iteration order, which depends on how the requests happened to interleave.
 [[nodiscard]] bool rasterBefore(const std::int64_t key, const std::int64_t other) {
     const std::int32_t x = ChunkGenerationQueue::unpackX(key);
     const std::int32_t otherX = ChunkGenerationQueue::unpackX(other);
@@ -73,8 +71,6 @@ ChunkGenerationQueue::~ChunkGenerationQueue() {
         live_->queue = nullptr;
     }
     stop();
-    // The Kotlin let its threads outlive the queue: nothing here can, because the world they write
-    // into is destroyed right after this.
     workers_.clear();
 }
 
@@ -89,26 +85,17 @@ void ChunkGenerationQueue::runWorker() {
             logger_.error([&failure] { return std::string{"A chunk failed to generate: "} + failure.what(); });
         }
         if (!generated) {
-            // Back off while there is nothing to do. Eight workers each grabbing the lock every
-            // millisecond is thousands of acquisitions a second spent discovering the queue is
-            // empty, and it is contention everything else then has to win against.
             ++idleSpins;
             wire::io::sleepFor(idleSpins > kIdleSpinsBeforeBackoff ? kIdleBackoff : kIdlePoll);
             continue;
         }
         idleSpins = 0;
-        // A deliberate breath between chunks. These eight threads otherwise hold the world's lock
-        // in a tight loop, and the single thread that saves, unloads and sends keep-alives never
-        // wins against them.
         wire::io::sleepFor(kBetweenChunks);
     }
 }
 
 void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t priority) {
     const std::int64_t key = pack(chunkX, chunkZ);
-    // A queue that has been stopped takes nothing, which the frozen Kotlin left to the workers
-    // noticing: one still between its own check and the queue would pick the request up and
-    // generate into a world that is being torn down.
     if (!running_.load() || world_->isLoaded(chunkX, chunkZ)) {
         return;
     }
@@ -130,11 +117,6 @@ void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std
         return;
     }
     if (queued_.size() >= kCapacity) {
-        // Requests arrive faster than chunks can be generated whenever a player moves at any speed,
-        // so without a ceiling this grows without bound, and every extra entry makes picking the
-        // next one slower, which makes it grow faster still. Past the ceiling the farthest pending
-        // request is the one worth losing.
-        // Ties as in takeNext: among equals the one that decorates last is the one dropped.
         const auto worst = std::ranges::max_element(queued_, [](const auto& left, const auto& right) {
             if (left.second != right.second) {
                 return left.second < right.second;
@@ -195,14 +177,8 @@ ChunkGenerationQueue::awaitAll(const std::vector<std::pair<std::int32_t, std::in
     for (const auto& [chunkX, chunkZ] : positions) {
         request(chunkX, chunkZ, 0);
     }
-    // One lock acquisition per poll, not one per position: asking about each position on its own
-    // was hundreds of thousands of acquisitions a second. Past the deadline the rest are generated
-    // on this thread.
     std::int64_t waited = 0;
     while (world_->countMissing(positions) > 0 && waited < awaitTimeoutMillis_) {
-        // Waiting on the owner's own thread would wait for ever: the workers hand their chunks to
-        // it, so it has to keep running what it is handed while it waits. That is the one reentrant
-        // point in the model, and it is here rather than anywhere a task can reach.
         if (sched::Owner* owner = world_->owner(); owner != nullptr && owner->isCurrent()) {
             static_cast<void>(owner->runPending());
         }
@@ -271,8 +247,6 @@ bool ChunkGenerationQueue::generatePiped() {
     const bool worked = pipeline_->step();
     std::vector<Chunk> finished;
     {
-        // Under the lock with the keys marked, so a request between the two cannot find the chunk
-        // neither in the pipeline nor on its way in, and ask for it all over again.
         const std::lock_guard<std::mutex> lock{mutex_};
         finished = pipeline_->takeFinished();
         for (const Chunk& chunk : finished) {
@@ -301,8 +275,6 @@ bool ChunkGenerationQueue::generateNext() {
     }
     const std::int64_t key = *next;
 
-    // A chunk stays in progress until it is really in the world, not until it is generated:
-    // installing is a task the world owner runs later, and a request in between would make it twice.
     struct Finally {
         ChunkGenerationQueue* queue;
         std::int64_t key;
@@ -317,10 +289,6 @@ bool ChunkGenerationQueue::generateNext() {
         }
     } finish{this, key};
 
-    // Generated here, installed by whoever owns the world: the set of chunks is that owner's state,
-    // and a worker that put its own chunk in it was the last thing keeping the world's lock in the
-    // hot path. A freshly generated chunk marks itself dirty as it is filled in, so persistence is
-    // still driven from the chunks themselves.
     std::optional<Chunk> chunk = world_->generateDetached(unpackX(key), unpackZ(key));
     if (!chunk.has_value()) {
         return true;

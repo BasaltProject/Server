@@ -19,9 +19,6 @@ namespace basalt::server::runtime::command {
 
 class ExecutionSource;
 
-/// Vanilla's permission ladder (`Commands.LEVEL_*`), recorded per command as a parity fact: what the
-/// real server demands and what a client is told about itself. It does **not** authorise anything
-/// here: authorisation is by named permission, which `commands.toml` and plugins can refer to.
 namespace permissionLevel {
 
 inline constexpr std::int32_t kAll = 0;
@@ -32,16 +29,8 @@ inline constexpr std::int32_t kOwners = 4;
 
 } // namespace permissionLevel
 
-/// Seeing other people's successful commands, vanilla's `chat.type.admin` broadcast.
-///
-/// A permission rather than "level 2 or above", so that who receives them is decided in the same
-/// file and the same way as everything else. `*` covers it, so an operator gets them by default.
 inline constexpr std::string_view kAdminPermission = "basalt.admin.broadcast";
 
-/// Whoever ran a command: a player, or the operator at the console. Commands reach the world through
-/// `CommandEnvironment`, not a global; the position lives here, as in vanilla's `CommandSourceStack`,
-/// so relative coordinates (`~ ~ ~`) resolve against the runner. Virtual because a source is asked
-/// about once per command, never on a hot path.
 class CommandSource {
 public:
     CommandSource() = default;
@@ -57,48 +46,31 @@ public:
 
     [[nodiscard]] virtual std::int32_t permissionLevel() const = 0;
 
-    /// Where `~` resolves from. The console stands at the world's shared spawn, as vanilla's does.
     [[nodiscard]] virtual std::array<double, 3> position() const = 0;
 
-    /// Yaw then pitch, which `^` turns with. parity: `CommandSourceStack.getRotation`, zero for the
-    /// console.
+    /// parity: `CommandSourceStack.getRotation`.
     [[nodiscard]] virtual std::pair<float, float> rotation() const { return {0.0F, 0.0F}; }
 
-    /// The player who ran this, or null for the console. Commands that need one say so themselves.
     [[nodiscard]] virtual player::PlayerSession* player() const = 0;
 
     virtual void sendSystemMessage(const wire::text::Component& message) const = 0;
 
-    /// Whether this source has been granted a node. A node nobody granted is denied.
     [[nodiscard]] virtual bool hasPermission(std::optional<std::string_view> node) const = 0;
 
-    /// This source as an `/execute` link, or null for one that is not.
-    ///
-    /// Asked rather than cast: there is no RTTI here, so a source that wants to be recognised says
-    /// so itself. `/execute` is the only thing that asks.
     [[nodiscard]] virtual const ExecutionSource* asExecution() const { return nullptr; }
 
-    /// Whether this source only stands in for the ones an `/execute` link will hand on, so a
-    /// selector that matches nobody here is no error yet. parity: brigadier resolves a selector
-    /// when the command runs, once per source, not when it parses.
     [[nodiscard]] virtual bool defersSelectors() const { return false; }
 
-    /// parity: `CommandSourceStack.isSilent`: a source whose command feedback nobody hears, which
-    /// is what a function runs as.
+    /// parity: `CommandSourceStack.isSilent`.
     [[nodiscard]] virtual bool silent() const { return false; }
 
-    /// parity: `CommandSourceStack.getSigningContext`: the message arguments a player signed for
-    /// this line, or null when nothing was signed.
+    /// parity: `CommandSourceStack.getSigningContext`.
     [[nodiscard]] virtual const chat::SignedArguments* signedArguments() const { return nullptr; }
 };
 
-/// The console. Permission `kOwners`, like vanilla's own `MinecraftServer` source: whoever can type
-/// here can already stop the process.
 class ConsoleCommandSource final : public CommandSource {
 public:
-    /// parity: `MinecraftServer.createCommandSourceStack` stands the console at the overworld's
-    /// shared spawn, not the origin, so `/locate` and relative coordinates answer from there. Asked
-    /// lazily: the world is not loaded when the server builds this.
+    /// parity: `MinecraftServer.createCommandSourceStack`.
     using SpawnAt = std::function<std::array<double, 3>()>;
 
     explicit ConsoleCommandSource(wire::common::Logger logger = wire::common::Logger{"Console"},
@@ -116,8 +88,6 @@ public:
 
     void sendSystemMessage(const wire::text::Component& message) const override;
 
-    /// Everything, unconditionally: whoever can type here can already stop the process, and making
-    /// the console depend on a group would let a typo in `groups.toml` lock the operator out.
     [[nodiscard]] bool hasPermission(std::optional<std::string_view> node) const override;
 
 private:
@@ -126,8 +96,6 @@ private:
     SpawnAt spawn_;
 };
 
-/// A player running a command in chat. Their feedback goes back to them as a system message, as
-/// vanilla's does.
 class PlayerCommandSource final : public CommandSource {
 public:
     PlayerCommandSource(player::PlayerSession& player, const config::GroupsConfig& groups,
@@ -137,7 +105,6 @@ public:
 
     [[nodiscard]] wire::text::Component displayName() const override;
 
-    /// Only meaningful for the vanilla-facing bridge; nothing here authorises on it.
     [[nodiscard]] std::int32_t permissionLevel() const override;
 
     [[nodiscard]] std::array<double, 3> position() const override;
@@ -158,9 +125,7 @@ private:
     const chat::SignedArguments* signedArguments_;
 };
 
-/// A command block running its own command. parity: `BaseCommandBlock.createCommandSourceStack`,
-/// permission two, named by `CustomName` or `@`. What it says reaches the operators only while
-/// `commandBlockOutput` is on, which is what `speaks` stands for.
+/// parity: `BaseCommandBlock.createCommandSourceStack`.
 class CommandBlockSource final : public CommandSource {
 public:
     CommandBlockSource(std::array<double, 3> at, std::string name, bool speaks, wire::common::Logger logger,
@@ -178,8 +143,6 @@ public:
 
     void sendSystemMessage(const wire::text::Component& message) const override;
 
-    /// parity: a command block is granted whatever level two is granted, and this build asks the same
-    /// question every other source does rather than inventing a second answer.
     [[nodiscard]] bool hasPermission(std::optional<std::string_view> node) const override;
 
 private:

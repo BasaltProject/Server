@@ -14,8 +14,7 @@ class RandomSource;
 
 namespace basalt::server::world::noise {
 
-/// parity: `NormalNoise`, which since 26.3 is a recipe rather than a sampler: the parameters of a
-/// `worldgen/noise` file, turned into a stack of Perlin octaves by `create`.
+/// parity: `NormalNoise`.
 class NormalNoise {
 public:
     /// parity: `NormalNoise.Normalization`.
@@ -58,7 +57,7 @@ private:
     Interval range_ = Interval::notAnInterval();
 };
 
-/// parity: `LegacyFbmInitializer.createForLegacyNetherBiome`, the old sequential octave seeding.
+/// parity: `LegacyFbmInitializer.createForLegacyNetherBiome`.
 [[nodiscard]] std::shared_ptr<const NoiseStack> createLegacyFbm(random::RandomSource& random, std::int32_t firstOctave,
                                                                 std::span<const double> amplitudes);
 

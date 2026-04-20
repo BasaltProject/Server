@@ -286,7 +286,7 @@ void removeItem(VillagerState& state, std::string_view item, std::int32_t count)
 std::int32_t addItem(VillagerState& state, const server::world::loot::ItemStack& stack) {
     std::int32_t left = stack.count;
     const std::int32_t max = maxStack(stack.item);
-    // parity: `SimpleContainer.addItem`: the stacks already there first, then the empty slots.
+    // parity: `SimpleContainer.addItem`.
     for (std::optional<server::world::loot::ItemStack>& slot : state.inventory) {
         if (left <= 0) {
             return 0;
@@ -314,7 +314,7 @@ std::int32_t addItem(VillagerState& state, const server::world::loot::ItemStack&
 bool wantsToPickUp(const ServerEntity& villager, const VillagerState& state,
                    const server::world::loot::ItemStack& stack) {
     const std::string& path = stack.item.path();
-    // parity: `ItemTags.VILLAGER_PICKS_UP`, the villager's own foods, and what its profession asks for.
+    // parity: `ItemTags.VILLAGER_PICKS_UP`.
     const bool picks = path == "bread" || path == "wheat" || path == "beetroot" || path == "wheat_seeds" ||
                        path == "potato" || path == "carrot" || path == "beetroot_seeds" ||
                        path == "torchflower_seeds" || path == "pitcher_pod" || nutritionOf(stack.item) > 0 ||

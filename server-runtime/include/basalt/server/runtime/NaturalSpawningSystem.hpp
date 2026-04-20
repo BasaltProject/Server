@@ -31,20 +31,14 @@ namespace basalt::server::runtime {
 
 class ChunkSimulationView;
 
-/// What fills the world around the players with the mobs their biomes offer, and how a plugin or
-/// another system asks for one mob in particular.
 class NaturalSpawningSystem {
 public:
-    /// What a plugin gets a say in. A callback rather than the plugin bus itself, and unset means
-    /// nobody objects.
     struct Hooks {
         std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                            double z, std::string_view reason)>
             spawnAllowed;
     };
 
-    /// The streams a spawn attempt draws from: the level's own, and the fresh one every constructed
-    /// mob gets.
     struct Options {
         std::function<std::int64_t()> nextSeed;
     };
@@ -53,43 +47,28 @@ public:
                           ChunkSimulationView& chunkSimulation, const world::SpawnEquipmentFinalizer& equipment,
                           Hooks hooks, Options options);
 
-    /// One mob of this type where it was asked for, or nothing when the type is not one this build
-    /// has.
-    ///
-    /// `reason` is why it is being made, which is the one thing a plugin always wants to filter on.
     entity::ServerEntity* spawnMob(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                                    double z, float yaw = 0.0F, std::string_view reason = "natural",
                                    const std::function<void(entity::ServerEntity&)>& initialize = {});
 
-    /// A mob a spawner placed and turned, finalized with SPAWNER but not yet in the world (the
-    /// spawner equips it first). parity: `Mob.finalizeSpawn(..., SPAWNER, null)` as
-    /// `BaseSpawner.serverTick` calls it, drawing from `random`, the level's own stream.
     [[nodiscard]] world::MobSpawnForest finalizeForSpawner(world::LoadedWorld& world,
                                                            const wire::common::Identifier& type, double x, double y,
                                                            double z, float yaw, random::RandomSource& random);
 
-    /// The EVENT horse made by `ServerLevel.tickThunder`; it deliberately skips `finalizeSpawn`.
     entity::ServerEntity* spawnSkeletonTrap(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
-    /// The TRIGGERED rider forest created when a living player comes within ten blocks.
     bool activateSkeletonTrap(world::LoadedWorld& world, entity::ServerEntity& horse, random::RandomSource& random);
 
-    /// parity: `EntityType.create` then `finalizeSpawn` with `EVENT` where it was put, as
-    /// `Raid.joinRaid` does. `initialize` runs before anybody can see it.
     entity::ServerEntity* spawnEventRaider(world::LoadedWorld& world, const wire::common::Identifier& type, double x,
                                            double y, double z, random::RandomSource& random,
                                            const std::function<void(entity::ServerEntity&)>& initialize);
 
-    /// parity: `SpawnUtil.trySpawnMob` with `LEGACY_IRON_GOLEM`, the golem villagers agreed on.
     bool summonVillageGolem(world::LoadedWorld& world, const entity::ServerEntity& villager,
                             random::RandomSource& random);
 
-    /// parity: `NaturalSpawner.spawnForChunk`, once per simulated chunk per tick, under a per-category
-    /// cap that scales with how much of the world is simulated. `doMobSpawning` turns it off.
     void tickSpawning(world::LoadedWorld& world, const sched::Region& region);
 
 private:
-    /// The five spawners vanilla keeps on a level, which have their own clocks between ticks.
     struct WorldSpawners {
         world::PhantomSpawner phantom;
         world::PatrolSpawner patrol;
@@ -123,8 +102,6 @@ private:
     entity::ServerEntity* materializeCat(world::LoadedWorld& world, const world::CatSpawnRequest& cat,
                                          random::RandomSource& random);
 
-    /// VillageSiege finalizes a zero-position zombie and only then moves that zombie, not its
-    /// vehicle.
     entity::ServerEntity* materializeVillageSiegeZombie(world::LoadedWorld& world,
                                                         const world::VillageSiegeSpawnRequest& siege,
                                                         random::RandomSource& random);
@@ -136,8 +113,6 @@ private:
     void materializeTraderLlama(world::LoadedWorld& world, const world::TraderLlamaSpawnRequest& request,
                                 std::int32_t traderId, random::RandomSource& random);
 
-    /// parity: `EntityType.spawn`: level yaw first, then EVENT finalization at the already-positioned
-    /// mob.
     entity::ServerEntity* materializeEventMob(world::LoadedWorld& world, const wire::common::Identifier& type, double x,
                                               double y, double z, random::RandomSource& random);
 

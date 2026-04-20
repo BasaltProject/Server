@@ -36,7 +36,7 @@ bool MobSpawnerSystem::tick(world::LoadedWorld& world, wire::nbt::NbtCompound& d
         !world.gameRules().get(world::gameRules::kSpawnerBlocksWork)) {
         return false;
     }
-    // parity: `BaseSpawner.serverTick` draws from `level.getRandom()`, the level's own stream.
+    // parity: `BaseSpawner.serverTick` draws from `level.getRandom()`.
     world::LoadedWorld::RandomLease lease = world.leaseRandom();
     Turn turn{.world = world,
               .state = state,
@@ -54,7 +54,7 @@ bool MobSpawnerSystem::tick(world::LoadedWorld& world, wire::nbt::NbtCompound& d
         bool spawned = false;
         for (std::int32_t count = 0; count < state.spawnCount; ++count) {
             const Attempt result = attempt(turn, next);
-            // parity: an unknown type, an entity that would not load, a full cage or a refused add
+            // parity: an unknown type, an entity that would not load, a full cage or a refused add.
             // all end the turn with a fresh delay, whatever the earlier attempts managed.
             if (result == Attempt::Abort) {
                 delay(turn);
@@ -67,7 +67,7 @@ bool MobSpawnerSystem::tick(world::LoadedWorld& world, wire::nbt::NbtCompound& d
             delay(turn);
         }
     }
-    // parity: `BaseSpawner.save`. A countdown alone only moves `Delay`, so only that is rewritten.
+    // parity: `BaseSpawner.save`.
     if (turn.dataChanged) {
         world::baseSpawnerData::save(state, data);
     } else {

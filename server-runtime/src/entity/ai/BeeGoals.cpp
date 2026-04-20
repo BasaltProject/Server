@@ -38,7 +38,7 @@ constexpr std::int32_t kMaxTravellingTicks = 2400;
     return !bees::closerThan(mob.mob, pos, bees::kTooFarDistance);
 }
 
-/// parity: `getBeehiveBlockEntity`: nothing when there is no hive, it is too far or it is gone.
+/// parity: `getBeehiveBlockEntity`.
 [[nodiscard]] std::optional<MobActions::HiveView> hiveOf(MobContext& mob) {
     const BeeState& bee = beeOf(mob);
     if (!bee.hive.has_value() || tooFar(mob, *bee.hive)) {
@@ -63,7 +63,7 @@ constexpr std::int32_t kMaxTravellingTicks = 2400;
     return !(hive.has_value() && hive->fireNearby);
 }
 
-/// parity: `Bee.attractsBees`: the tag, never waterlogged, and only a sunflower's top half.
+/// parity: `Bee.attractsBees`.
 [[nodiscard]] bool attractsBees(MobContext& mob, std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr || !mob.actions.blockTagged("minecraft:bee_attractive", *block).value_or(false)) {
@@ -311,7 +311,7 @@ private:
         moveControl::setWanted(mob.mob, (*hover_)[0], (*hover_)[1], (*hover_)[2], static_cast<double>(0.35F));
     }
 
-    /// parity: `findNearbyFlower`, which forgets every square it did not meet again this search.
+    /// parity: `findNearbyFlower`.
     [[nodiscard]] std::optional<Pos> nearbyFlower(MobContext& mob) {
         std::map<Pos, std::int64_t> kept;
         const std::optional<Pos> found = nav::firstByManhattan(blockOf(mob.mob), kSearchRadius, [&](const Pos& at) {
@@ -566,7 +566,7 @@ public:
 
     void start(MobContext& mob) override {
         const BeeState& bee = beeOf(mob);
-        // parity: `getWanderThreshold`, forty-eight less sixteen for a homeless bee, less twenty-four else.
+        // parity: `getWanderThreshold`.
         const std::int32_t threshold =
             bees::kTooFarDistance - (!bee.hive.has_value() && !bee.flower.has_value() ? 16 : 24);
         const std::optional<Pos> hive = hiveOf(mob).has_value() ? bee.hive : std::nullopt;
@@ -598,7 +598,7 @@ private:
     HurtByTargetGoal inner_{{}, true};
 };
 
-/// parity: `BeeBecomeAngryTargetGoal`: the nearest player it is angry at, while it still can sting.
+/// parity: `BeeBecomeAngryTargetGoal`.
 class BecomeAngryTargetGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
@@ -643,8 +643,7 @@ void add(GoalSelector& selector, std::int32_t priority, Args&&... args) {
 } // namespace
 
 void registerGoals(GoalSelector& selector) {
-    // parity: `ValidateHiveGoal` and `ValidateFlowerGoal` roll their cooldowns from the bee's random
-    // when it is built; there is no bee yet here, so a source of its own stands in.
+    // parity: `ValidateHiveGoal`.
     static std::atomic<std::int64_t> seeds{0};
     random::RandomSource random = random::RandomSource::legacy(++seeds);
     add<BeeAttackGoal>(selector, 0);

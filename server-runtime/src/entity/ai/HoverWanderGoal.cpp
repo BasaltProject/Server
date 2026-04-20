@@ -29,8 +29,7 @@ constexpr std::int32_t kAirLift = -2;
 constexpr std::int32_t kHoverMax = 3;
 constexpr std::int32_t kHoverMin = 1;
 
-/// parity: `BlockState.isSolid` as `GoalUtils.isSolid` asks it; a square past the world is treated
-/// as open, which only stops the climb.
+/// parity: `BlockState.isSolid` as `GoalUtils.isSolid` asks it.
 [[nodiscard]] bool solid(const world::WorldState& world, const Block& at) {
     const std::optional<std::int32_t> state = world.blockState(at[0], at[1], at[2]);
     return state.has_value() && !registry::blockShapes::isEmptyShape(*state);
@@ -73,7 +72,7 @@ constexpr std::int32_t kHoverMin = 1;
         return std::nullopt;
     }
     Block at = toward(mob.mob, *direction);
-    // parity: `FlyingPathNavigation.isStableDestination`, something to stand on in that very square.
+    // parity: `FlyingPathNavigation.isStableDestination`.
     if (!inWorld(mob.world, at) || !solid(mob.world, at)) {
         return std::nullopt;
     }
@@ -111,8 +110,7 @@ constexpr std::int32_t kHoverMin = 1;
     return at;
 }
 
-/// parity: `Monster.getWalkTargetValue`, less the brighter the square:
-/// `-(getLightLevelDependentMagicValue(pos) - 0.5)`.
+/// parity: `Monster.getWalkTargetValue`.
 [[nodiscard]] float walkTargetValue(MobContext& mob, const Block& at) {
     const auto v = static_cast<float>(world::worldLight::rawBrightness(mob.world, at[0], at[1], at[2], mob.hasSkylight,
                                                                        mob.skyDarken)) /
@@ -121,7 +119,7 @@ constexpr std::int32_t kHoverMin = 1;
     return -((mob.ambientLight + ((1.0F - mob.ambientLight) * curved)) - 0.5F);
 }
 
-/// parity: `RandomPos.generateRandomPos`: ten rolls, all of them made, the first of the best kept.
+/// parity: `RandomPos.generateRandomPos`.
 template <typename Supplier>
 [[nodiscard]] std::optional<Block> bestOf(MobContext& mob, Supplier supply) {
     std::optional<Block> best;
@@ -161,8 +159,7 @@ bool HoverWanderGoal::canUse(MobContext& mob) {
     if (!target.has_value()) {
         return false;
     }
-    // parity: `FlyingPathNavigation.createPath`, from the square half a block up its feet, as far as
-    // the follow range reaches and sixteen nodes a block of it.
+    // parity: `FlyingPathNavigation.createPath`.
     const double range = mob.mob.attributeWithModifiers("minecraft:follow_range");
     const flyingPathFinder::Footprint size{.width = static_cast<std::int32_t>(std::floor(mob.mob.width() + 1.0)),
                                            .height = static_cast<std::int32_t>(std::floor(mob.mob.height() + 1.0))};
@@ -175,7 +172,7 @@ bool HoverWanderGoal::canUse(MobContext& mob) {
     if (path.empty()) {
         return false;
     }
-    // parity: `PathNavigation.moveTo(path, 1.0)`; the flying control then follows it node by node.
+    // parity: `PathNavigation.moveTo(path, 1.0)`.
     mob.mob.path = std::move(path);
     mob.mob.pathIndex = 0;
     mob.mob.walkTarget =

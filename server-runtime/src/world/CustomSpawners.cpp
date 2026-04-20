@@ -49,7 +49,7 @@ using wire::common::Identifier;
     return difficulty == "hard" ? 3 : 1;
 }
 
-/// parity: the moon phase as `Level.getMoonBrightness` answers it, which is the slime curve doubled.
+/// parity: the moon phase as `Level.getMoonBrightness` answers it.
 [[nodiscard]] float moonBrightness(const LoadedWorld& world) {
     return naturalSpawner::surfaceSlimeChance(world.clock().totalTicks()) * 2.0F;
 }
@@ -183,7 +183,7 @@ void CatSpawner::tick(LoadedWorld& world, const std::vector<player::PlayerSessio
         }
     }
 
-    // parity: `SpawnPlacementTypes.ON_GROUND`; `CatSpawner` deliberately skips the animal predicate.
+    // parity: `SpawnPlacementTypes.ON_GROUND`.
     if (world.border().distanceOutside(x + 0.5, z + 0.5) > 0.0) {
         return;
     }
@@ -333,7 +333,6 @@ void PatrolSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vecto
 
 namespace {
 
-/// A block position, which the trader search passes around by value.
 struct BlockPosition {
     std::int32_t x = 0;
     std::int32_t y = 0;
@@ -345,8 +344,7 @@ struct BlockPosition {
     return type;
 }
 
-/// parity: `PoiManager.find(MEETING)`: the first bell in chunk and section traversal order, not the
-/// closest one. Which bell it is decides where the trader appears, so the order is observable.
+/// parity: `PoiManager.find(MEETING)`.
 [[nodiscard]] std::optional<BlockPosition> findMeetingBell(LoadedWorld& world, BlockPosition centre,
                                                            std::int32_t radius) {
     const std::int32_t radiusSquared = radius * radius;
@@ -488,8 +486,7 @@ bool WanderingTraderSpawner::spawn(LoadedWorld& world, const std::vector<player:
             alive.push_back(player);
         }
     }
-    // parity: nobody to arrive for counts as a success, which resets the chance rather than raising
-    // it on an empty server.
+    // parity: nobody to arrive for counts as a success, which resets the chance rather than raising.
     if (alive.empty()) {
         return true;
     }
@@ -552,8 +549,7 @@ constexpr std::int32_t kSiegeMonsterLightRange = 8;
 constexpr std::int32_t kSiegeThunderSkyDampen = 10;
 constexpr std::int32_t kSiegeMaxGroundEmission = 14;
 
-/// parity: `Mth.sin` reads a 65,536-entry table, and the siege's ring of positions depends on the
-/// exact values that table holds rather than on `std::sin` of the same angle.
+/// parity: `Mth.sin` reads a 65,536-entry table.
 constexpr double kSinIndexScale = 10430.378350470453;
 constexpr std::int32_t kSinIndexMask = 65535;
 constexpr std::int32_t kCosIndexOffset = 16384;

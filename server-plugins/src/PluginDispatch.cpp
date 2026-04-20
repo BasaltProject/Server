@@ -10,21 +10,13 @@
 
 namespace basalt::server::plugins {
 namespace {
-
 using lua::LuaArgs;
 
-/// One field of an event, when it is there and it is of the type asked for.
 template <typename T>
 [[nodiscard]] const T* fieldOf(const PluginEvent& event, std::string_view name) {
     return std::get_if<T>(&event.get(name));
 }
 
-/// `e.player`, `e.entity` and `e.pos`: the objects behind the plain fields an event carries, looked
-/// up when asked for and never before. That is why an event carries a uuid and three numbers rather
-/// than objects most handlers never read; the event object is reused between fires, so this reads
-/// the one the view was built around.
-///
-/// A lookup that finds nobody answers nil: a player who logged out is a question with an answer.
 [[nodiscard]] PluginEventView::Objects objectsOf(PluginHost& host, LoadedPlugin& plugin, PluginEvent& event) {
     PluginHost* server = &host;
     LoadedPlugin* target = &plugin;
@@ -35,7 +27,6 @@ template <typename T>
             const std::string* uuid = fieldOf<std::string>(*fired, "player_uuid");
             std::shared_ptr<PluginPlayerRef> player =
                 uuid == nullptr ? nullptr : server->services().players().byUuid(*uuid);
-            // By name second: an event may name somebody it has no uuid for.
             if (player == nullptr) {
                 const std::string* named = fieldOf<std::string>(*fired, "player_name");
                 player = named == nullptr ? nullptr : server->services().players().byName(*named);
@@ -79,7 +70,6 @@ template <typename T>
     };
 }
 
-/// Pushes what a command handed over as an argument, in the shapes a spec can produce.
 void pushArgument(LuaArgs& lua, const PluginCommandCall::Argument& argument) {
     if (std::holds_alternative<std::monostate>(argument)) {
         lua.pushNil();
@@ -93,7 +83,6 @@ void pushArgument(LuaArgs& lua, const PluginCommandCall::Argument& argument) {
         lua.pushString(*text);
     }
 }
-
 } // namespace
 
 void PluginCommandDispatch::registerCommand(LoadedPlugin& plugin, PluginInstance& instance,
@@ -127,9 +116,6 @@ void PluginCommandDispatch::registerCommand(LoadedPlugin& plugin, PluginInstance
 }
 
 PluginInstance* PluginCommandDispatch::laneFor(LoadedPlugin& plugin, CommandEntry& entry) {
-    // With one lane there is nothing to decide. With more, they take turns, which is on purpose: a
-    // plugin that assumed one state sees it here, in a test, rather than in production the first
-    // time an operator turns regions on.
     if (plugin.instances.empty()) {
         return nullptr;
     }
@@ -156,7 +142,6 @@ void PluginCommandDispatch::run(PluginHost& host, LoadedPlugin& plugin, CommandE
     PluginCommandCall* target = &call;
     const PluginText* text = &plugin.text;
     host.enter(plugin, *instance, handler->second, "/" + spec.name(), [target, text, &spec](LuaArgs& lua) {
-        // The source first, then the arguments the spec declared, in the order it declared them.
         PluginObject source{"source"};
         source.reads("name", [target] { return PluginValue{target->source()}; })
             .reads("is_console", [target] { return PluginValue{target->isConsole()}; })
@@ -177,8 +162,6 @@ void PluginEventDispatch::registerEventHandler(LoadedPlugin& plugin, PluginInsta
                                                bool wantsCancelled,
                                                std::map<std::string, PluginEventValue, std::less<>> filters,
                                                lua::LuaRef handler) {
-    // One view per handler, made on the first fire and reused: dispatching an event should not build
-    // a table.
     const auto view = std::make_shared<std::unique_ptr<PluginEventView>>();
     const auto held = std::make_shared<lua::LuaRef>(std::move(handler));
     PluginHost* host = host_;
@@ -212,8 +195,6 @@ void PluginEventDispatch::dispatch(PluginHost& host, LoadedPlugin& plugin, Plugi
                                    const std::string& typeName) {
     view.bind();
     if (observer) {
-        // An observer runs after the fact, so it may take as long as it likes: it is handed to the
-        // owner rather than run here, which is the whole point of it being one.
         PluginHost* target = &host;
         LoadedPlugin* owner = &plugin;
         PluginInstance* lane = &instance;
@@ -227,9 +208,6 @@ void PluginEventDispatch::dispatch(PluginHost& host, LoadedPlugin& plugin, Plugi
         }));
         return;
     }
-    // A decider runs here and now, because the server is waiting for the answer: if this is not the
-    // thread plugins run on, it does not run at all, and the reason is said once rather than every
-    // tick.
     if (!host.onPluginThread()) {
         if (!warnedAboutThread_) {
             warnedAboutThread_ = true;
@@ -249,5 +227,4 @@ void PluginEventDispatch::dispatch(PluginHost& host, LoadedPlugin& plugin, Plugi
     });
     instance.deciderDepth--;
 }
-
 } // namespace basalt::server::plugins

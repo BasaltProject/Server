@@ -52,8 +52,7 @@ void placeWaterlilyCandidate(PatchRegion& region, random::RandomSource& random, 
     region.set(target, stateIdOf("lily_pad"));
 }
 
-// parity: the weighted provider has twelve unit-weight entries, amounts 1 through 3, each in the
-// horizontal plane order north, east, south, west.
+// parity: twelve unit-weight entries, amounts 1 through 3, in plane order north, east, south, west.
 constexpr std::array<std::int32_t, 4> kHorizontalFacingStateOffsets = {0, 12, 4, 8};
 
 [[nodiscard]] std::int32_t leafLitterStateId(std::int32_t choice) {

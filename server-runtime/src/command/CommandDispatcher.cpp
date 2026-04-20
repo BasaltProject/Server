@@ -14,8 +14,6 @@
 namespace basalt::server::runtime::command {
 namespace {
 
-/// The source a line is parsed against past an `/execute` modifier. Everything is the typist's; it
-/// only lets a selector come up empty, since the sources that will really run are not known yet.
 class DeferredSource final : public CommandSource {
 public:
     explicit DeferredSource(const CommandSource& typist) : typist_(&typist) {}
@@ -63,7 +61,6 @@ using wire::text::Component;
     return result;
 }
 
-/// The first word of a line, which is what a timing is named after.
 [[nodiscard]] std::string firstWord(const std::string& input) {
     const std::size_t space = input.find(' ');
     return lowered(space == std::string::npos ? input : input.substr(0, space));
@@ -127,7 +124,7 @@ Parsed<player::PlayerSession*> CommandContext::requirePlayer() const {
 }
 
 Parsed<world::LoadedWorld*> CommandContext::world() const {
-    // parity: `CommandSourceStack.getLevel`, which is the world `/execute in` chose when it chose one.
+    // parity: `CommandSourceStack.getLevel`.
     world::LoadedWorld* found = worldIn(*source_, environment());
     if (found == nullptr) {
         return std::unexpected{CommandSyntaxError{.component = Component::text("No world is loaded.")}};
@@ -195,8 +192,7 @@ std::string smartUsage(const CommandNode& node, const CommandSource& source, boo
 }
 
 std::vector<std::string> smartUsages(const CommandNode& node, const CommandSource& source) {
-    // parity: `getSmartUsage` reads the node's own command for the children's optionality and
-    // skips a child the source may not use (it answers null in brigadier).
+    // parity: `getSmartUsage` reads the node's own command for the children's optionality and skips a child the.
     const bool optional = static_cast<bool>(node.executor);
     std::vector<std::string> usages;
     for (const CommandNode* child : node.sortedChildren()) {
@@ -218,21 +214,13 @@ CommandDispatcher::CommandDispatcher(const CommandEnvironment& environment)
     registerCustom();
 }
 
-void CommandDispatcher::registerCustom() {
-    // The operator's own commands are built by `ConfiguredCommand`, which arrives with the rest of
-    // the command bodies. Until then the file's custom section declares nothing that can be built.
-}
+void CommandDispatcher::registerCustom() {}
 
 CommandNode* CommandDispatcher::registerCommand(std::shared_ptr<const Command> command) {
-    // Remembered before the override is consulted, so a command switched off in the file can be
-    // switched back on by a later reload.
     const auto same = std::ranges::find_if(registered_, [&command](const std::shared_ptr<const Command>& held) {
         return held->name() == command->name();
     });
     const Command& definition = *command;
-    // The one that arrives last is the one the tree is built from, so it is the one that has to be
-    // held: the nodes keep references into the command object, and dropping it leaves the tree
-    // reading freed memory the next time somebody runs it.
     std::shared_ptr<const Command> replaced;
     if (same == registered_.end()) {
         registered_.push_back(std::move(command));
@@ -249,7 +237,6 @@ CommandNode* CommandDispatcher::registerBuilt(const Command& command) {
         return nullptr;
     }
     // A second registration replaces the first so clients do not see two roots with one name.
-    // `registerCommand` keeps the old one alive because the nodes still reference it.
     const CommandNode* replaced = nullptr;
     for (const std::unique_ptr<CommandNode>& child : root_.children()) {
         if (child->kind() == NodeKind::Literal && child->redirect == nullptr && child->name() == command.name()) {
@@ -262,8 +249,6 @@ CommandNode* CommandDispatcher::registerBuilt(const Command& command) {
     }
 
     auto node = std::make_unique<CommandNode>(NodeKind::Literal, command.name());
-    // Before build(), so children inherit them: a sub-command is never easier to reach than the
-    // command it belongs to.
     node->requiredLevel = command.permissionLevel();
     node->permission = override.permission.has_value() ? *override.permission : command.permission();
     CommandNode& added = root_.addChild(std::move(node));
@@ -325,9 +310,6 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
 std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::string& input,
                                         std::int32_t& successes) const {
     StringReader reader{input};
-    // Named after the command, so a report shows which one is slow rather than that "commands" are.
-    // The name comes from the input rather than the parse, since a command that fails to parse
-    // still cost whatever it cost.
     const auto started = std::chrono::steady_clock::now();
     const Parsed<std::vector<Link>> links = parse(reader, root_, source, {});
     std::int32_t result = 0;
@@ -403,8 +385,7 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
         resultDeferred = false;
         const Parsed<std::int32_t> result = link.executor(CommandContext{source, *this, input, link.arguments});
         const bool deferred = std::exchange(resultDeferred, false);
-        // parity: brigadier tells its consumer `true` for a leaf that ran at all, whatever it
-        // answered, and `false` only for one that threw. That is what a command block counts.
+        // parity: brigadier tells its consumer `true` for a leaf that ran at all.
         if (result.has_value()) {
             ++successes;
         }
@@ -487,7 +468,6 @@ Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringRead
     if (!reader.canRead()) {
         return std::vector<Link>{Link{.arguments = arguments, .executor = node.executor}};
     }
-    // Every node but the first is preceded by the separator that ended the previous one.
     if (node.kind() != NodeKind::Root) {
         const Parsed<void> separator = reader.expect(' ');
         if (!separator.has_value()) {
@@ -506,15 +486,12 @@ Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringRead
             continue;
         }
         reader.setCursor(start);
-        // What follows a redirect is its own command, so it starts with no arguments.
         Arguments branch = redirect == nullptr ? arguments : Arguments{};
         std::optional<CommandSyntaxError> failure;
         if (child->kind() == NodeKind::Root) {
             continue;
         }
         if (child->kind() == NodeKind::Literal) {
-            // Matched as text, not as a word: `/execute if score ... >= ...` names literals that
-            // are not words at all. parity: `LiteralCommandNode.parse`.
             if (!reader.readLiteral(child->name())) {
                 continue;
             }
@@ -567,8 +544,6 @@ SuggestionResult CommandDispatcher::suggest(const CommandSource& source, const s
     if (collected.empty()) {
         return SuggestionResult{};
     }
-    // The deepest token wins: a branch that got further is completing a more specific word than one
-    // that stopped earlier, and a single reply carries a single range.
     std::int32_t start = collected.front().first;
     for (const auto& [at, suggestion] : collected) {
         start = std::max(start, at);
@@ -600,8 +575,6 @@ void CommandDispatcher::collect(StringReader& reader, const CommandNode& node, c
     }
     const std::int32_t start = reader.cursor();
     const std::string rest = reader.string().substr(static_cast<std::size_t>(start));
-    // A word still being typed has nothing after it: anything with a space is already settled, and
-    // the cursor is further along the line.
     const bool typing = rest.find(' ') == std::string::npos;
 
     for (const CommandNode* child : target.sortedChildren()) {
@@ -660,8 +633,7 @@ void CommandDispatcher::reportSyntaxError(const CommandSource& source, const Com
         context.push_back(Component::text(rawInput.substr(cursor)).color(wire::text::kRed).underlined(true));
     }
     context.push_back(Component::translatable("command.context.here").color(wire::text::kRed).italic(true));
-    // parity: `Commands.finishParsing`, whose line suggests the whole command again when clicked
-    // and goes out through `sendFailure`, so inside a red parent.
+    // parity: `Commands.finishParsing`.
     const Component line = Component::text("")
                                .withChildren(std::move(context))
                                .color(wire::text::kGray)
@@ -743,8 +715,6 @@ std::vector<std::pair<std::string, std::string>> CommandDispatcher::unreachableS
         for (const std::unique_ptr<CommandNode>& child : node.children()) {
             const std::string name = path.empty() ? child->name() : path + " " + child->name();
             if (child->kind() == NodeKind::Argument && child->provider() && !child->answersOnItsOwn()) {
-                // The parser by its registry number, which is what a report has to name it by: the
-                // wire carries an id and nothing else.
                 found.emplace_back(name, std::to_string(child->type()->wire().registryId()));
             }
             walk(*child, name);
@@ -766,9 +736,6 @@ std::vector<CommandNode*> CommandDispatcher::usableCommands(const CommandSource&
 
 namespace {
 
-/// The deepest node a help line reaches below `node`, with the reader left where that parse ended.
-/// parity: `CommandDispatcher.parseNodes` as `ParseResults.getContext().getNodes()` keeps it: a
-/// match with trailing data still counts, and a branch that got further wins over one that did not.
 const CommandNode* deepestIn(StringReader& reader, const CommandNode& node, const CommandSource& source,
                              const CommandEnvironment& environment, std::int32_t& reached) {
     const CommandNode& target = node.redirect == nullptr ? node : *node.redirect;

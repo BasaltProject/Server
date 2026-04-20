@@ -22,10 +22,7 @@ std::vector<std::array<std::int32_t, 2>> ChunkSimulationView::simulatedChunks(co
         if (player->worldName != world.name()) {
             continue;
         }
-        // Only the players this region owns: the chunks around a player are always in the same
-        // region as the player (a region is made of the sections that are loaded and touching, and a
-        // player loads the ones around them), so walking every player's square in every region was
-        // the same answer worked out a hundred times.
+        // Only this region's players: the chunks around a player always sit in the player's own region.
         if (region != nullptr && !region->ownsPosition(player->x, player->z)) {
             continue;
         }
@@ -33,7 +30,6 @@ std::vector<std::array<std::int32_t, 2>> ChunkSimulationView::simulatedChunks(co
         const auto centreZ = static_cast<std::int32_t>(player->z) >> 4;
         for (std::int32_t x = centreX - radius; x <= centreX + radius; x++) {
             for (std::int32_t z = centreZ - radius; z <= centreZ + radius; z++) {
-                // A chunk is simulated by whoever owns it, so two regions never tick the same one.
                 if (region != nullptr && !region->owns(x, z)) {
                     continue;
                 }
@@ -44,9 +40,7 @@ std::vector<std::array<std::int32_t, 2>> ChunkSimulationView::simulatedChunks(co
             }
         }
     }
-    // parity: `/forceload` takes a `TicketType.FORCED` ticket, which holds the chunk at entity
-    // ticking with nobody anywhere near. Without this a forced chunk kept its blocks and did
-    // nothing with them: no hopper moved an item and no furnace smelted.
+    // parity: `/forceload`.
     for (const std::int64_t key : world.forcedChunks()) {
         const std::int32_t x = world::ChunkGenerationQueue::unpackX(key);
         const std::int32_t z = world::ChunkGenerationQueue::unpackZ(key);

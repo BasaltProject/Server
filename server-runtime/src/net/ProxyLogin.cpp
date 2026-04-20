@@ -11,8 +11,7 @@ namespace {
 using wire::auth::forwarding::ForwardedLogin;
 using wire::auth::forwarding::ForwardingResult;
 
-/// The transaction id only has to be unpredictable enough that a second query cannot be answered
-/// with the first one's reply, which is what the id check below is for.
+// The id only has to be unpredictable enough that a second query cannot be answered with the first's reply.
 [[nodiscard]] std::int32_t randomTransactionId() {
     static thread_local std::mt19937 generator{std::random_device{}()};
     return static_cast<std::int32_t>(generator());
@@ -25,9 +24,7 @@ ForwardingResult ProxyLogin::readHandshake(std::string_view host) const {
 }
 
 std::int32_t ProxyLogin::beginQuery() {
-    // Never the value that means "not waiting on one", so the guard in `readAnswer` cannot turn a
-    // real answer away once every four billion queries. Which value that is does not matter, only
-    // that no query can take it.
+    // Never the value meaning not waiting, so `readAnswer` cannot turn away a real answer once in four billion queries.
     std::int32_t id = randomTransactionId();
     while (id == kNoQuery) {
         id = randomTransactionId();
@@ -41,17 +38,14 @@ std::vector<std::uint8_t> ProxyLogin::query() const { return wire::auth::forward
 ForwardingResult ProxyLogin::readAnswer(std::int32_t answeredId,
                                         const std::optional<std::vector<std::uint8_t>>& payload) {
     if (transactionId_ == kNoQuery) {
-        // Nothing was asked, so nothing can be answered. Without this the id that means "not
-        // waiting" is an id like any other, and a connection that names it is answering a query
-        // that was already over, or one that never happened.
+        // Nothing was asked, so nothing can be answered: otherwise the not-waiting id answers a query never made.
         return ForwardingResult{std::string{"the connection answered a login query nobody asked"}};
     }
     if (answeredId != transactionId_) {
         return ForwardingResult{std::string{"the login query answer names another query"}};
     }
     transactionId_ = kNoQuery;
-    // A client that does not know the channel answers with nothing, which is every real one:
-    // somebody came to this port directly instead of through the proxy.
+    // A client that does not know the channel answers nothing: somebody came to this port directly, not via the proxy.
     if (!payload.has_value()) {
         return ForwardingResult{std::string{"the connection did not answer the forwarding query"}};
     }

@@ -74,14 +74,12 @@ using Registry = std::map<wire::common::Identifier, Placement>;
     };
 }
 
-/// Wraps a placement whose body takes the position as one value rather than three.
 template <typename Body>
 [[nodiscard]] Placement byPos(Body body) {
     return [body = std::move(body)](Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y,
                                     std::int32_t z) { body(chunk, random, DecorationPos{x, y, z}); };
 }
 
-/// Wraps a named placement, binding the name the registry was keyed under.
 template <typename Body>
 [[nodiscard]] Placement byName(Body body, std::string name) {
     return [body = std::move(body), name = std::move(name)](Chunk& chunk, random::RandomSource& random, std::int32_t x,
@@ -128,7 +126,6 @@ void putTrees(Registry& registry) {
         {"mangrove_checked", configs::mangrove()},
         {"tall_mangrove_checked", configs::tallMangrove()},
         {"cherry_checked", configs::cherry()},
-        // The bee variants are the same trees with a hive decorator, and vanilla names each.
         {"oak_bees_002", configs::oakBees002()},
         {"oak_bees_0002_leaf_litter", configs::oakBees0002LeafLitter()},
         {"birch_bees_002", configs::birchBees002()},
@@ -221,8 +218,7 @@ void putPatches(Registry& registry) {
     for (const std::string_view name : {"patch_dead_bush", "patch_dead_bush_2", "patch_dead_bush_badlands"}) {
         put(registry, name, byPos(desertDecoration::placeAt));
     }
-    // parity: the three `patch_cactus*` placed features are the same configured feature with
-    // different placement modifiers, and `/place feature` supplies the position.
+    // parity: the three `patch_cactus*` placed features share one configured feature.
     for (const std::string_view name : {"patch_cactus", "patch_cactus_desert", "patch_cactus_decorated"}) {
         put(registry, name, byPos([](Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
                 static_cast<void>(cactusFeature::place(chunk, random, origin));

@@ -100,8 +100,7 @@ const PathSet& treeReplaceable() {
     return paths;
 }
 
-/// parity: `#minecraft:azalea_grows_on`, which does **not** list stone. The root set below does, so
-/// it names it there instead of inheriting it from here.
+/// parity: `#minecraft:azalea_grows_on` does not list stone; the root set does.
 const PathSet& azaleaGrowsOn() {
     static const PathSet paths = {"dirt",
                                   "coarse_dirt",
@@ -235,8 +234,7 @@ bool rootedAzaleaFeature::place(Chunk& chunk, random::RandomSource& random, cons
             continue;
         }
         const std::int32_t below = blockAt(chunk, DecorationPos{.x = position.x, .y = position.y - 1, .z = position.z});
-        // parity: the test is `BlockState.isSolid`, not a sturdy top face. A fence passes the first
-        // and fails the second, so the two disagree on where an azalea may root.
+        // parity: the test is `BlockState.isSolid`, not a sturdy top face (fences differ).
         if (pathOf(below) == "lava" || !registry::blockShapes::isSolidState(below)) {
             return true;
         }

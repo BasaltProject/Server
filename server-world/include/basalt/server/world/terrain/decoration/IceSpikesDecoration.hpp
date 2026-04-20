@@ -17,7 +17,6 @@ void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnviron
 
 [[nodiscard]] const std::set<std::string, std::less<>>& placedIds();
 
-/// One of them at one position, which is what `/place feature` runs.
 bool placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin, std::string_view placedFeature);
 
 } // namespace iceSpikesDecoration

@@ -46,7 +46,6 @@ constexpr std::string_view kLastSlotKey = "last_interacted_slot";
     return turned;
 }
 
-/// The shelf at these coordinates, if the slot is one it has and it is in the state wanted.
 [[nodiscard]] bool shelfAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t slot,
                            bool occupied, std::int32_t& stateId) {
     const std::optional<std::int32_t> found = world.blockState(x, y, z);
@@ -101,8 +100,7 @@ std::optional<std::int32_t> slotsChanged(WorldState& world, const std::int32_t x
     if (!turned.has_value() || *turned == *found || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    // parity: `updateState` ends in `gameEvent(BLOCK_CHANGE)`, which is what a sculk sensor beside a
-    // shelf hears when a book goes in or comes out.
+    // parity: `updateState` ends in `gameEvent(BLOCK_CHANGE)`.
     vibrations::emit(world, "block_change", x + 0.5, y + 0.5, z + 0.5, gameTime);
     return turned;
 }

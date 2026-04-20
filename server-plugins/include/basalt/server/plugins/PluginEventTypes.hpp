@@ -5,18 +5,7 @@
 #include <vector>
 
 namespace basalt::server::plugins {
-
-/// The events this server fires, and what each one carries.
-///
-/// Names are dotted and read as `thing.happening`. There are far fewer of these than Bukkit has
-/// classes, and on purpose: what Bukkit splits into a dozen subclasses is one event with a field
-/// here (`entity.damage` with `cause`, not twelve `EntityDamageBy*Event`).
-///
-/// Two conventions worth knowing before reading the list. A player is carried as `player_name` and
-/// `player_uuid` rather than as an object, because the object model is the next stage and the name
-/// `player` is being kept free for it. And a position is `world`, `x`, `y`, `z`, in blocks.
 namespace pluginEventTypes {
-
 [[nodiscard]] const PluginEventType& playerJoin();
 [[nodiscard]] const PluginEventType& playerQuit();
 [[nodiscard]] const PluginEventType& playerChat();
@@ -88,14 +77,9 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& entityCombust();
 [[nodiscard]] const PluginEventType& blockFade();
 
-/// Every one of them, in the order they are declared above, which is the order `/plugins events`
-/// lists them and the order the bus is filled in.
 [[nodiscard]] const std::vector<const PluginEventType*>& all();
 
-/// The two names that are not broadcast: they are about one plugin's own life.
 inline constexpr std::string_view kPluginEnable = "plugin.enable";
 inline constexpr std::string_view kPluginDisable = "plugin.disable";
-
 } // namespace pluginEventTypes
-
 } // namespace basalt::server::plugins

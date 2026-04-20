@@ -9,7 +9,6 @@
 
 namespace basalt::server::world::terrain::surface {
 
-/// Caches raw quart biomes while exposing BiomeManager's zoomed block-position lookup.
 class ChunkBiomeEnvironment final : public SurfaceRuleEnvironment {
 public:
     ChunkBiomeEnvironment(const SurfaceRuleEnvironment& delegate, densityfunction::SamplerContext* context);

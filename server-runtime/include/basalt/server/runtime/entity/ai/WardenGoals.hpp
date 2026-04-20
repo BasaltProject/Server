@@ -7,8 +7,7 @@
 
 namespace basalt::server::runtime::entity::ai {
 
-/// parity: `WardenAi`'s investigate activity, `GoToTargetLocation(DISTURBANCE_LOCATION, 2, 0.7)`:
-/// to a block beside where the noise came from, until it is within two.
+/// parity: `WardenAi`.
 class WardenInvestigateGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }
@@ -18,8 +17,7 @@ public:
     void tick(MobContext& mob) override;
 };
 
-/// parity: `TryToSniff` then `Sniffing`: stopped still for eighty-four ticks, then angrier at the
-/// nearest thing it may fight when that is close, and off to see where it is.
+/// parity: `TryToSniff`.
 class WardenSniffGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look}; }

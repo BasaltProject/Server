@@ -110,10 +110,9 @@ std::optional<std::int32_t> idOf(const Ids& ids, std::string_view name) {
     return found == ids.end() ? std::nullopt : std::optional{found->second};
 }
 
-/// parity: `Entity`'s eight fields, then `HangingEntity.DATA_DIRECTION`, then the painting's own.
+/// parity: `Entity`'s eight fields.
 constexpr std::uint8_t kPaintingVariantIndex = 9;
 
-/// A synchronised registry's ids as the client was sent them, which is its installed order.
 Ids syncedIds(const std::vector<std::string>& paths) {
     Ids ids;
     std::int32_t index = 0;
@@ -123,7 +122,7 @@ Ids syncedIds(const std::vector<std::string>& paths) {
     return ids;
 }
 
-/// parity: `defineSynchedData` starts on `fallback`, so the first packet never carries it.
+/// parity: `defineSynchedData` starts on `fallback`.
 void addRegistryMetadata(Entries& into, const NbtCompound& data, std::string_view key, std::uint8_t index,
                          const std::vector<std::string>& registry, std::string_view fallback, RegistryHolder holder) {
     const std::string_view name = data.getString(key);
@@ -134,9 +133,7 @@ void addRegistryMetadata(Entries& into, const NbtCompound& data, std::string_vie
     }
 }
 
-/// parity: `ItemFrame`'s own two fields, the stack behind the glass and the eighth of a turn it is
-/// drawn at. Both are read off the entity's saved tag, so a frame from a structure and one somebody
-/// just put something in are drawn the same way.
+/// parity: `ItemFrame`'s item and rotation fields.
 void addItemFrameMetadata(Entries& into, const NbtCompound& data) {
     if (const NbtCompound* held = data.getCompound("Item"); held != nullptr) {
         const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
@@ -257,10 +254,8 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         entries.push_back(
             Entry{.index = kAirSupplyDataIndex, .value = SetEntityDataPacket::IntValue{.value = data.getShort("Air")}});
     }
-    // Read as a number rather than a float tag, so older saves and imported worlds still count. Zero
-    // makes the client play the death animation even for a walking mob.
-    // parity: index 9 is `LivingEntity.DATA_HEALTH_ID` (on an arrow, `AbstractArrow.PIERCE_LEVEL`, a
-    // byte). Every entity is saved with a Health tag, alive or not.
+    // Read as a number so older saves still count; zero makes the client play the death animation.
+    // parity: `LivingEntity.DATA_HEALTH_ID`.
     if (data.contains("Health") && server::registry::entityAttributes::isLiving(typeId)) {
         entries.push_back(Entry{.index = 9,
                                 .value = SetEntityDataPacket::FloatValue{
@@ -302,8 +297,7 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
                 .value = SetEntityDataPacket::RegistryIdValue{.value = *colour, .registry = RegistryHolder::DyeColor}});
         }
     }
-    // parity: `Painting.DATA_PAINTING_VARIANT_ID`, right after the direction a hanging entity
-    // carries. The id is the entry's place in the registry we sent at login.
+    // parity: `Painting.DATA_PAINTING_VARIANT_ID`.
     if (type == "painting") {
         const std::string variant{data.getString("variant")};
         const std::string_view wanted = variant.starts_with("minecraft:")
@@ -331,7 +325,7 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         entries.push_back(Entry{.index = 16, .value = SetEntityDataPacket::BoolValue{.value = true}});
     } else if ((type == "piglin" || type == "piglin_brute" || type == "hoglin") &&
                data.getBoolean("IsImmuneToZombification")) {
-        // parity: `AbstractPiglin`'s flag comes right after `Mob`'s, and the hoglin's after `AgeableMob`'s.
+        // parity: `AbstractPiglin`'s flag comes right after `Mob`'s.
         entries.push_back(Entry{.index = static_cast<std::uint8_t>(type == "hoglin" ? 18 : 16),
                                 .value = SetEntityDataPacket::BoolValue{.value = true}});
     } else if (type == "creeper" && data.getBoolean("powered")) {
@@ -391,9 +385,7 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
     } else if (type == "parrot") {
         addIntIfSet(entries, data, "Variant", 20);
     } else if (type == "panda") {
-        // parity: `Panda`'s own fields start at 18 (`UNHAPPY_COUNTER`, `SNEEZE_COUNTER`,
-        // `EAT_COUNTER`), so the genes are 21 and 22. At 19 and 20 the client reads a byte where it
-        // keeps an integer and drops the connection with a packet handling error.
+        // parity: `Panda` fields start at 18.
         const std::optional<std::int32_t> main = idOf(pandaGeneIds(), data.getString("MainGene"));
         if (main.has_value() && *main != 0) {
             entries.push_back(
@@ -635,7 +627,6 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
                      previous == nullptr ? std::nullopt : previous->creakingActive, true},
           std::tuple{creakings::kTearingDownDataIndex, creakingTearingDown,
                      previous == nullptr ? std::nullopt : previous->creakingTearingDown, true}}) {
-        // A new viewer is told only what differs from the default: moving, calm and whole.
         if (now.has_value() && (previous == nullptr ? *now == unusual : before != now)) {
             entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::BoolValue{.value = *now}});
         }

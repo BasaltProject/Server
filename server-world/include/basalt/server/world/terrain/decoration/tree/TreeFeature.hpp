@@ -14,7 +14,6 @@
 
 namespace basalt::server::world::terrain::decoration::tree {
 
-/// A world-coordinate position a tree wrote to, as the decorators see it.
 struct BlockPos {
     std::int32_t x = 0;
     std::int32_t y = 0;
@@ -24,7 +23,6 @@ struct BlockPos {
     friend auto operator<=>(const BlockPos&, const BlockPos&) = default;
 };
 
-/// What the trunk, the foliage and the roots left behind, which is all a decorator gets to see.
 struct TreeDecoratorContext {
     std::vector<BlockPos> logs;
     std::vector<BlockPos> leaves;
@@ -50,7 +48,6 @@ namespace treeFeature {
 bool place(Chunk& chunk, random::RandomSource& random, std::int32_t originX, std::int32_t originY, std::int32_t originZ,
            const TreeConfiguration& config);
 
-/// `mossyCarpetRandom` is the region random the pale moss carpet draws from, which is not the tree's.
 bool place(Chunk& chunk, random::RandomSource& random, std::int32_t originX, std::int32_t originY, std::int32_t originZ,
            const TreeConfiguration& config, random::RandomSource& mossyCarpetRandom);
 

@@ -70,7 +70,7 @@ constexpr std::array<std::int32_t, 10> kSizes{2477, 1237, 617, 307, 149, 73, 37,
            ExperienceOrbSystem::valueOf(orb) == value;
 }
 
-/// parity: `ExperienceOrb.repairPlayerItems`: a random damaged piece with mending, two points of
+/// parity: `ExperienceOrb.repairPlayerItems`.
 /// durability a point of experience, and whatever that leaves goes round again.
 std::int32_t repairWithXp(PlayerSession& player, std::int32_t amount, random::RandomSource& random, bool& repaired) {
     // parity: `EquipmentSlot.VALUES`: main hand, off hand, then feet up to the head.
@@ -212,7 +212,7 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
             }
         }
     }
-    // parity: `followNearbyPlayer`, the nearest living, non-spectating player within eight blocks.
+    // parity: `followNearbyPlayer`.
     PlayerSession* nearest = nullptr;
     double best = kFollowDistance * kFollowDistance;
     for (PlayerSession* player : watchers) {
@@ -258,7 +258,7 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
         orb.removed = true;
         return;
     }
-    // parity: `Player.touch` over the player's box grown by one, a half and one, and `playerTouch`.
+    // parity: `Player.touch` over the player's box grown by one.
     for (PlayerSession* player : watchers) {
         if (player->dead || player->gamemode == wire::protocol::play::Gamemode::Spectator) {
             continue;

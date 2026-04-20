@@ -16,15 +16,14 @@ namespace basalt::server::runtime::entity {
 
 class ServerEntity;
 
-/// Boats and rafts, with and without a chest. parity: `AbstractBoat` and its four kinds.
+/// parity: `AbstractBoat` and its four kinds.
 namespace boats {
 
-/// parity: `AbstractBoat.DATA_ID_PADDLE_LEFT`, `PADDLE_RIGHT` and `BUBBLE_TIME`, after
-/// `VehicleEntity`'s three.
+/// parity: `AbstractBoat.DATA_ID_PADDLE_LEFT`.
 inline constexpr std::uint8_t kPaddleLeftDataIndex = 11;
 inline constexpr std::uint8_t kPaddleRightDataIndex = 12;
 
-/// parity: the `outOfControlTicks` past which a sunk boat stops taking riders and throws them off.
+/// parity: the `outOfControlTicks` past.
 inline constexpr float kOutOfControlTicks = 60.0F;
 
 [[nodiscard]] bool isBoat(const wire::common::Identifier& type);
@@ -38,7 +37,7 @@ inline constexpr float kOutOfControlTicks = 60.0F;
 /// parity: `AbstractBoat.Status`, in its declared order.
 enum class Status : std::uint8_t { InWater, UnderWater, UnderFlowingWater, OnLand, InAir };
 
-/// What a boat keeps between turns. parity: `AbstractBoat`'s own fields.
+/// parity: `AbstractBoat`'s own fields.
 struct BoatState {
     Status status = Status::InAir;
     Status oldStatus = Status::InAir;
@@ -47,7 +46,7 @@ struct BoatState {
     double lastYd = 0.0;
     /// parity: `paddlePositions`, how far round each oar has turned.
     std::array<float, 2> paddlePositions{};
-    /// parity: `isAboveBubbleColumn`, `bubbleColumnDirectionIsDown` and `DATA_ID_BUBBLE_TIME`.
+    /// parity: `isAboveBubbleColumn`.
     bool aboveBubbleColumn = false;
     bool bubbleColumnDown = false;
     std::int32_t bubbleTime = 0;
@@ -56,7 +55,6 @@ struct BoatState {
 /// parity: `rideHeight`: a third of the boat, or eight ninths of a raft.
 [[nodiscard]] double rideHeight(const ServerEntity& boat);
 
-/// What one turn of a boat left for its caller to do.
 struct TickResult {
     /// parity: sunk for three seconds: everybody aboard goes.
     bool ejectAll = false;
@@ -72,8 +70,7 @@ struct TickResult {
     std::vector<Stroke> strokes;
 };
 
-/// parity: `AbstractBoat.tick` on the server: the status, the out-of-control clock, the float and the
-/// move when no player drives it. What it bumps into is `VehicleSystem::boatPushes`.
+/// parity: `AbstractBoat.tick`.
 [[nodiscard]] TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlayer);
 
 } // namespace boats

@@ -30,7 +30,6 @@ constexpr int kBiomeMaxIndirectBits = 3;
 constexpr std::size_t kSectionBlockCount = 16 * 16 * 16;
 constexpr std::size_t kSectionBiomeCount = 4 * 4 * 4;
 
-/// What a block entity carries about *where* it is, which the chunk knows already.
 constexpr std::array<std::string_view, 5> kBlockEntityMetadata = {"id", "x", "y", "z", "keepPacked"};
 
 [[nodiscard]] int bitsFor(std::size_t distinctCount) {
@@ -62,11 +61,8 @@ constexpr std::array<std::string_view, 5> kBlockEntityMetadata = {"id", "x", "y"
     return structure::StructureBoundingBox{values[0], values[1], values[2], values[3], values[4], values[5]};
 }
 
-/// Reused across a chunk's sections and owned by one write: saves run on their own thread while
-/// generation workers run on theirs.
+/// Reused across a chunk's sections and owned by one write.
 struct PaletteScratch {
-    /// Holds `slot + 1`, so a zeroed array means absent and only the entries actually used are
-    /// cleared afterwards, leaving it reusable without refilling it.
     std::vector<std::int32_t> blockSlots;
     std::vector<std::int32_t> biomeSlots;
     std::vector<std::int32_t> paletteValues;
@@ -79,8 +75,7 @@ struct PaletteScratch {
           blockValues(kSectionBlockCount, 0), biomeValues(kSectionBiomeCount, 0) {}
 };
 
-/// The palette is derived in first-appearance order through plain arrays: a set of boxed integers
-/// plus a boxed map cost 200,000 lookups a chunk and all but two milliseconds of a save.
+/// The palette is derived in first-appearance order through plain arrays.
 template <typename ToNbt>
 [[nodiscard]] NbtCompound encodePalette(std::span<const std::int32_t> values, int minIndirectBits, int maxIndirectBits,
                                         int directBits, NbtType elementType, std::span<std::int32_t> slotOfValue,
@@ -159,9 +154,7 @@ template <typename ToNbt>
     section.copyBlockStateIdsInto(scratch.blockValues);
     return encodePalette(scratch.blockValues, kBlockMinIndirectBits, kBlockMaxIndirectBits, blockDirectBits(),
                          NbtType::Compound, scratch.blockSlots, scratch.paletteValues, [](std::int32_t stateId) {
-                             // Every state, not only the ones some caller happened to register: a chunk holds
-                             // whatever the world put in it, and a crop that grew or a fence that connected is a
-                             // state nobody named. The state definitions know all of them.
+                             // Every state, not only the ones some caller happened to register.
                              NbtCompound entry;
                              const Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
                              entry.putString("id", block == nullptr ? "minecraft:air" : block->toString());
@@ -257,7 +250,7 @@ template <typename ToNbt>
 
 namespace {
 
-/// parity: the `ChunkStatus` names. Every status from `features` to `spawn` is a decorated proto chunk.
+/// parity: the `ChunkStatus` names.
 [[nodiscard]] std::string_view statusName(ChunkStage stage) {
     switch (stage) {
     case ChunkStage::Terrain:
@@ -270,8 +263,6 @@ namespace {
     }
 }
 
-/// Nothing for a chunk saved before its terrain, which is as good as never generated. A missing
-/// status is an older save of ours, where every chunk was full.
 [[nodiscard]] std::optional<ChunkStage> stageOf(std::string_view status) {
     if (status.empty() || status == "minecraft:full" || status == "full") {
         return ChunkStage::Full;
@@ -384,8 +375,7 @@ namespace {
     std::vector<std::int32_t> paletteIds;
     paletteIds.reserve(paletteList->size());
     for (const NbtTag& entry : *paletteList) {
-        // parity: `BlockState.CODEC`, a bare id for a default state and `{id, properties}` otherwise;
-        // a mixed list wraps the bare ones as `{"": id}`. `Name`/`Properties` is 26.2's spelling.
+        // parity: `BlockState.CODEC`.
         const NbtCompound* entryTag = entry.get<NbtCompound>();
         const std::string* bare = entry.get<std::string>();
         if (entryTag != nullptr && entryTag->size() == 1 && entryTag->names()[0].empty()) {
@@ -529,8 +519,7 @@ void decodeStructureStart(const NbtTag& entry, std::vector<structure::StructureS
     }
     std::optional<structure::StructureBoundingBox> bounds = arrayToBox(startTag->getIntArray("BB"));
     if (!bounds.has_value()) {
-        // parity: `StructureStart.createTag` never writes the start's own box, and
-        // `getBoundingBox()` works it out from the pieces. A world from vanilla has no `BB` at all.
+        // parity: `StructureStart.createTag` never writes the start's own box.
         for (const structure::StructureBoundingBox& piece : pieces) {
             bounds = bounds.has_value() ? bounds->encapsulating(piece) : piece;
         }
@@ -559,10 +548,6 @@ void decodeStructures(const NbtCompound* tag, structure::ChunkStructures& into) 
             decodeStructureStart(entry, records);
         }
     } else if (const NbtCompound* byName = tag->getCompound("starts"); byName != nullptr) {
-        // A world coming from vanilla keys its starts by structure id instead of listing them, and
-        // each one repeats its own id inside. Reading only the list shape lost every structure an
-        // imported world had, silently: no `/locate`, and nothing that asks whether a position is
-        // inside one.
         for (const NbtTag& entry : byName->values()) {
             decodeStructureStart(entry, records);
         }
@@ -711,7 +696,7 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     }
     chunk.setSavedEntities(std::move(entities));
     decodeStructures(tag.getCompound("structures"), chunk.structures());
-    // parity: `PostProcessing`, one list of packed offsets per section, kept by a proto chunk.
+    // parity: `PostProcessing`.
     if (const NbtList* post = tag.getList("PostProcessing"); post != nullptr) {
         for (std::size_t index = 0; index < post->size(); ++index) {
             const NbtList* offsets = (*post)[index].get<NbtList>();

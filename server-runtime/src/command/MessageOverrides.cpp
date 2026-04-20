@@ -43,9 +43,6 @@ Component MessageOverrides::transform(const Component& component, const player::
             }
             return rendered.withChildren(std::move(children));
         }
-        // Not overridden itself, but its arguments can be: `chat.type.admin` carries the whole
-        // command message as an argument, so a transform that only walked children would leave
-        // exactly the copy every other operator sees untouched.
         std::vector<Component> children;
         children.reserve(component.children().size());
         for (const Component& child : component.children()) {
@@ -68,11 +65,6 @@ Component MessageOverrides::transform(const Component& component, const player::
 
 Component MessageOverrides::render(const std::string& text, const std::vector<Component>& args,
                                    const player::PlayerSession* player) const {
-    // The operator's text: arguments first, then placeholders, then MiniMessage.
-    //
-    // Arguments come in as components and go in as plain text. Keeping their own colours would mean
-    // splicing components into a MiniMessage parse, and the result would fight whatever styling the
-    // operator wrote around them; a name is a name.
     std::string result = text;
     for (std::size_t index = 0; index < args.size(); index++) {
         const std::string token = "%" + std::to_string(index + 1) + "%";

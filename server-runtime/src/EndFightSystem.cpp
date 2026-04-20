@@ -41,7 +41,7 @@ constexpr double kPlayerEyeHeight = 1.62;
 constexpr double kPlayerHeight = 1.8;
 /// parity: `LivingEntity.hasLineOfSight`, which gives up past this.
 constexpr double kSightRange = 128.0;
-/// parity: `EnderDragon.checkCrystals`, how far a dragon looks for a crystal to heal from.
+/// parity: `EnderDragon.checkCrystals`.
 constexpr double kCrystalReach = 32.0;
 constexpr float kWingDamage = 5.0F;
 constexpr float kHeadDamage = 10.0F;
@@ -159,7 +159,7 @@ dragons::DragonWorld EndFightSystem::worldFor(world::LoadedWorld& world, const s
             }
             const dragons::Target target = targetOf(*player);
             if (query.range > 0.0) {
-                // parity: `TargetingConditions.test`, where a sneaking player is seen at 0.8 of the range.
+                // parity: `TargetingConditions.test`.
                 const double reach = std::max(query.range * (player->sneaking ? 0.8 : 1.0), 2.0);
                 const double apart = ((dragon.x - player->x) * (dragon.x - player->x)) +
                                      ((dragon.y - player->y) * (dragon.y - player->y)) +
@@ -192,7 +192,7 @@ dragons::DragonWorld EndFightSystem::worldFor(world::LoadedWorld& world, const s
         return std::nullopt;
     };
     view.breathe = [this, &world, id = dragon.entityId()](const dragons::Vec3& at) {
-        // parity: `DragonSittingFlamingPhase`, five blocks wide for ten seconds, owned by the dragon.
+        // parity: `DragonSittingFlamingPhase`.
         return clouds_->spawn(world, entity::areaEffectClouds::dragonBreath(kBreathRadius, kBreathDuration, 0.0F, 0),
                               at.x, at.y, at.z, id);
     };
@@ -221,7 +221,7 @@ dragons::DragonWorld EndFightSystem::worldFor(world::LoadedWorld& world, const s
             }
         }
         random::RandomSource spread = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-        // parity: `assignDirectionalMovement`, the direction at the tenth of a block a tick every
+        // parity: `assignDirectionalMovement`, the direction at the tenth of a block a tick every.
         // hurting projectile starts with.
         ServerEntity& ball =
             entity::projectiles::spawn(world.state(), *kind, players_->allocateEntityId(), entry->protocolId, from.x,
@@ -255,7 +255,7 @@ void EndFightSystem::tickDragon(world::LoadedWorld& world, const std::vector<Pla
     checkCrystals(living, dragon, state);
     dragons::steer(dragon, state, view);
     dragons::placeBodyAndWings(dragon, state);
-    // parity: `LivingEntity.hurtTime`, ten ticks from a hit, is half the invulnerability window.
+    // parity: `LivingEntity.hurtTime`.
     if (dragon.hurtCooldown <= entity::entityCombat::kHurtCooldownTicks / 2) {
         strike(world, watchers, living, dragon, state);
     }
@@ -462,7 +462,7 @@ void EndFightSystem::tickDeath(world::LoadedWorld& world, ServerEntity& dragon, 
             }
         }
     }
-    // parity: `tickDeath`'s experience, twelve thousand for the first dragon and five hundred after,
+    // parity: `tickDeath`'s experience.
     // eight percent every fifth tick from 150 and a fifth at the end.
     const world::DragonFight* fight = fightOf(world, dragon);
     const std::int32_t worth =

@@ -28,11 +28,11 @@ using entity::ServerEntity;
 using player::PlayerSession;
 using wire::protocol::play::Gamemode;
 
-/// parity: `PufferfishPuffGoal`'s box, the fish's own grown by two blocks, and the sting's, grown
+/// parity: `PufferfishPuffGoal`'s box.
 /// by the three tenths the aura reaches past the skin.
 constexpr double kScareInflate = 2.0;
 constexpr double kAuraInflate = 0.3;
-/// parity: `Pufferfish.tick`, full puff forty ticks into inflating and deflated a hundred ticks
+/// parity: `Pufferfish.tick`.
 /// after the last scare, halfway there after sixty.
 constexpr std::int32_t kFullPuffAt = 40;
 constexpr std::int32_t kHalfDeflatedAfter = 60;
@@ -41,7 +41,7 @@ constexpr std::int32_t kDeflatedAfter = 100;
 constexpr float kStingPerPuff = 1.0F;
 /// parity: `Pufferfish.touch`, a second of poison per puff level.
 constexpr std::int32_t kPoisonPerPuff = 60;
-/// parity: `ClientboundGameEventPacket.PUFFER_FISH_STING` (9), the screen flash the stung player
+/// parity: `ClientboundGameEventPacket.PUFFER_FISH_STING` (9).
 /// gets.
 constexpr std::uint8_t kStingGameEvent = 9;
 
@@ -57,7 +57,7 @@ constexpr std::uint8_t kStingGameEvent = 9;
         static_cast<double>(server::registry::entityTypeShapes::heightOf(wire::common::Identifier::vanilla("player"))));
 }
 
-/// parity: `Pufferfish.SCARY_MOB`, creative players apart: nothing in `not_scary_for_pufferfish`
+/// parity: `Pufferfish.SCARY_MOB`.
 /// is worth puffing up for.
 [[nodiscard]] bool scary(const ServerEntity& other, const world::realEntityTypeTags::TagMembers* tags) {
     return tags == nullptr ||
@@ -92,7 +92,7 @@ void MobActionSystem::tickPufferfish(world::LoadedWorld& world, const std::vecto
             ++fish.puffDeflateTimer;
         }
     }
-    // parity: the PufferfishPuffGoal's start and stop, which decide whether the tick above counts
+    // parity: the PufferfishPuffGoal's start and stop, which decide whether the tick above counts.
     // up or down. Invisible targets are not weighed, as `TargetingConditions` cannot see them.
     if (!fish.noAi) {
         const Aabb reach = boxOf(fish).inflate(kScareInflate);
@@ -138,7 +138,7 @@ void MobActionSystem::tickPufferfish(world::LoadedWorld& world, const std::vecto
         return own == nullptr || own != options_.teams->teamOf(member) || own->friendlyFire;
     };
     for (ServerEntity* other : living) {
-        // parity: `getEntitiesOfClass(Mob.class, ...)`: mobs the tag leaves scary and still alive.
+        // parity: `getEntitiesOfClass(Mob.class, ...)`.
         if (other == &fish || other->removed || other->health <= 0.0 || !entity::mobs::isMob(other->type()) ||
             !scary(*other, options_.entityTags) || !aura.intersects(boxOf(*other))) {
             continue;
@@ -163,7 +163,7 @@ void MobActionSystem::tickPufferfish(world::LoadedWorld& world, const std::vecto
         world::vibrations::emit(world.state(), "entity_damage", other->x, other->y, other->z, world.gameTime(),
                                 {.entity = other->uuid()});
     }
-    // parity: `Player.touch`, whose pickup area is the player's own box grown by a block sideways
+    // parity: `Player.touch`.
     // and half a one up.
     const Aabb grown = boxOf(fish);
     for (PlayerSession* player : watchers) {

@@ -98,7 +98,7 @@ void playBlockSound(const BreakContext& context, world::LoadedWorld& world, std:
     return true;
 }
 
-/// parity: `POTTED_BY_CONTENT`, which names each pot after its plant except the two azaleas.
+/// parity: `POTTED_BY_CONTENT`.
 [[nodiscard]] std::optional<Identifier> pottedFor(const Identifier& item) {
     if (item.namespaceName() != "minecraft") {
         return std::nullopt;
@@ -152,7 +152,7 @@ bool useCakeFor(const BreakContext& context, PlayerSession& player, world::Loade
     if (!block->path().ends_with("candle_cake")) {
         return false;
     }
-    // parity: `CandleCakeBlock.useItemOn`, which leaves a flint and steel or a fire charge alone.
+    // parity: `CandleCakeBlock.useItemOn`.
     if (item.has_value() && (item->path() == "flint_and_steel" || item->path() == "fire_charge")) {
         return false;
     }
@@ -165,7 +165,7 @@ bool useCakeFor(const BreakContext& context, PlayerSession& player, world::Loade
         }
         return true;
     }
-    // parity: `CandleCakeBlock.useWithoutItem` eats a plain cake, and only then drops the candle.
+    // parity: `CandleCakeBlock.useWithoutItem` eats a plain cake.
     if (!canEat(player)) {
         return false;
     }

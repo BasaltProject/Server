@@ -9,8 +9,6 @@
 
 namespace basalt::server::world::terrain::endCityPieces {
 
-/// One placed End City template: which one, where, how it is turned, and whether it overwrites the
-/// air it carries.
 struct Piece {
     std::string templateName;
     structure::StructurePos position;
@@ -18,7 +16,6 @@ struct Piece {
     bool overwrite = false;
     const structure::StructureTemplate* piece = nullptr;
     structure::StructureBoundingBox boundingBox;
-    /// The tag the collision test compares: a child that hits a piece of another branch is refused.
     std::int32_t generationDepth = 0;
 };
 

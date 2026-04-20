@@ -60,8 +60,6 @@ const std::vector<PlacementModifier>& denseModifiers() {
     return modifiers;
 }
 
-/// Reads and writes with the world surface kept up to date, because a clump raises the ground it
-/// then checks for podzol.
 class BambooRegion {
 public:
     BambooRegion(Chunk& chunk, ExternalStateReader externalBlockState)
@@ -76,9 +74,6 @@ public:
         if ((position.x >> 4) == chunk_->chunkX() && (position.z >> 4) == chunk_->chunkZ()) {
             return chunk_->blockStateId(position.x & 15, position.y, position.z & 15);
         }
-        // Outside the chunk this used to read as air, so anything needing a block beneath it was
-        // refused everywhere but its own chunk. Falling through to the chunk reaches the phase-wide
-        // neighbour reader, which is what vanilla's own level lookup sees.
         for (const auto& [written, stateId] : externalWrites_) {
             if (written == position) {
                 return stateId;

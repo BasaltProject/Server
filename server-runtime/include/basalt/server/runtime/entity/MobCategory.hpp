@@ -6,11 +6,6 @@
 
 namespace basalt::server::runtime::entity {
 
-/// The eight kinds a mob can be, and what each is worth to the world.
-///
-/// parity: `MobCategory`, whose numbers decide how many of that kind the world keeps per chunk, how
-/// far away one despawns, and whether it counts as friendly. They are declared in code rather than
-/// data, so they are declared here too, in the same order and with the same values.
 enum class MobCategory : std::uint8_t {
     Monster,
     Creature,
@@ -30,7 +25,6 @@ struct MobCategoryFacts {
     std::int32_t despawnDistance = 0;
 };
 
-/// parity: `MobCategory.noDespawnDistance`, the same 32 for every category.
 inline constexpr std::int32_t kNoDespawnDistance = 32;
 
 [[nodiscard]] const MobCategoryFacts& mobCategoryFacts(MobCategory category) noexcept;

@@ -8,8 +8,7 @@
 
 namespace basalt::server::registry::mapColors {
 namespace {
-
-/// parity: `MapColor.Brightness.modifier`, by brightness id.
+// parity: `MapColor.Brightness.modifier`, by brightness id.
 constexpr std::array<std::uint32_t, 4> kModifiers{180, 220, 255, 135};
 
 [[nodiscard]] const std::vector<std::uint8_t>& byState() {
@@ -27,7 +26,6 @@ constexpr std::array<std::uint32_t, 4> kModifiers{180, 220, 255, 135};
     }();
     return table;
 }
-
 } // namespace
 
 std::int32_t of(std::int32_t stateId) {
@@ -48,5 +46,4 @@ std::uint32_t argbOf(std::uint8_t packedColor) {
     const std::uint32_t blue = (rgb & 0xFFU) * modifier / 255U;
     return 0xFF000000U | (red << 16U) | (green << 8U) | blue;
 }
-
 } // namespace basalt::server::registry::mapColors

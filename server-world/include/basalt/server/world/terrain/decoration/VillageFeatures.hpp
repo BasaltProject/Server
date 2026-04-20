@@ -8,10 +8,6 @@
 
 namespace basalt::server::world::terrain::decoration {
 
-/// The placed features the desert, savanna, snowy and taiga village pools reference through their
-/// `feature_pool_element` entries. Each mirrors its own modifier list: count plus trapezoid offset
-/// and no in-square spread, because a village element scatters around its piece, not the chunk
-/// corner.
 namespace villageFeatures {
 
 void place(std::string_view feature, Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z,

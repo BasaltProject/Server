@@ -182,8 +182,6 @@ void ContainerMenuController::announceOpeners(const BlockPos& pos, const std::st
     if (world == nullptr) {
         return;
     }
-    // The lid, the barrel, the sound and the vibration are the same on both editions, so both
-    // doors say it the same way: see `player/PlayerContainers`.
     player::OpenersContext context;
     context.blocks = owner_->blockInteraction().breakContext();
     context.nextFloat = options_.nextFloat;
@@ -231,8 +229,7 @@ void ContainerMenuController::fillPluginMenu(const std::map<std::int32_t, Plugin
             continue;
         }
         wire::nbt::NbtCompound components;
-        // The name is MiniMessage on the plugin's side and a component on the wire, so it is parsed
-        // here rather than stored as the tags a client would show literally.
+        // The name is MiniMessage on the plugin's side and a component on the wire, so it is parsed here.
         if (item.name.has_value()) {
             components.set("minecraft:custom_name",
                            wire::text::componentNbt::serialize(wire::text::miniMessage::parse(*item.name)));
@@ -356,16 +353,14 @@ void ContainerMenuController::setSlotState(const std::int32_t slot, const bool e
     const std::optional<std::int32_t> stateId = world->state().blockState(openBlock->x, openBlock->y, openBlock->z);
     const Identifier* block =
         stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
-    // parity: the packet reaches `CrafterBlockEntity` and nothing else, so a window over anything
-    // else says nothing.
+    // parity: `CrafterBlockEntity`.
     if (block == nullptr || *block != world::crafters::block()) {
         return;
     }
     if (!world::crafters::setSlotState(world->state(), openBlock->x, openBlock->y, openBlock->z, slot, enabled)) {
         return;
     }
-    // parity: `setChanged` is what tells the comparator, and the window draws the cross from its own
-    // data slot.
+    // parity: `setChanged`.
     world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), openBlock->x, openBlock->y,
                                                          openBlock->z, world::comparatorReading::of(world->state()));
     const std::int32_t containerId = openMenu.containerId();
@@ -380,7 +375,6 @@ void ContainerMenuController::setSlotState(const std::int32_t slot, const bool e
 
 void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
     if (openMenu.containerId() == 0) {
-        // Their own inventory closing still has a grid to empty.
         returnCraftingGrid(session);
         sendInventory();
         return;
@@ -427,8 +421,7 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
         std::ranges::fill(smithingSlots_, std::nullopt);
         openSmithing_ = false;
     }
-    // parity: `BeaconMenu.removed`, which drops the payment on the floor rather than putting it
-    // back into the player.
+    // parity: `BeaconMenu.removed`.
     if (openBeacon_) {
         if (beaconPayment_.has_value()) {
             dropStack(session, *beaconPayment_);
@@ -560,8 +553,7 @@ void ContainerMenuController::clickContainerButton(std::int32_t button) {
     if (session == nullptr || world == nullptr) {
         return;
     }
-    // parity: `StonecutterMenu.clickMenuButton`, whose button is an index into the recipes that fit
-    // whatever is in the input slot, in the order the client was sent them.
+    // parity: `StonecutterMenu.clickMenuButton`.
     if (openStonecutter_) {
         selectStonecutterRecipe(button);
         return;
@@ -571,7 +563,7 @@ void ContainerMenuController::clickContainerButton(std::int32_t button) {
         selectLoomPattern(button);
         return;
     }
-    // parity: `EnchantmentMenu.clickMenuButton`, whose button is which of the three rows was pressed.
+    // parity: `EnchantmentMenu.clickMenuButton`.
     if (openEnchantment_) {
         takeEnchantmentOffer(*session, button);
         return;

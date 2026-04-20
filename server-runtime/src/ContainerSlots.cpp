@@ -42,7 +42,6 @@ std::optional<Identifier> parsedOrNothing(const std::string& id) {
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// A stored stack as the crafting and smithing tables want one.
 std::optional<server::world::loot::ItemStack> craftingStackOf(const std::optional<storage::StoredItemStack>& stack) {
     if (!stack.has_value()) {
         return std::nullopt;
@@ -183,7 +182,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             return;
         }
         loomSlots_[static_cast<std::size_t>(index)] = stack;
-        // parity: `slotsChanged`, which works the offer out again whenever any of the three moves.
+        // parity: `slotsChanged`.
         recomputeLoomResult();
         return;
     }
@@ -216,7 +215,6 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             return;
         }
         if (index == Menu::kAnvilResult) {
-            // Taking the result is the only way this slot is written, and it costs the levels.
             PlayerSession* session = owner_->playerSession();
             if (!stack.has_value() && session != nullptr) {
                 takeAnvilResult(*session);
@@ -232,7 +230,6 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             return;
         }
         if (index == Menu::kSmithingResult) {
-            // Taking the result is the only way this slot is written, and it costs the inputs.
             if (!stack.has_value()) {
                 // parity: `SmithingMenu.onTake` over `ItemStack.onCraftedBy`.
                 const std::optional<storage::StoredItemStack>& made =
@@ -290,9 +287,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
     server::world::ChunkBlockEntity* entity =
         chunk->blockEntityAt(half->first.x & 15, half->first.y, half->first.z & 15);
     if (entity == nullptr) {
-        // A block that never got its block entity (one from worldgen, or one written by a command)
-        // used to swallow whatever was put into it: the cursor was already empty and the write had
-        // nowhere to land. It gets one here instead.
+        // A block entity that never existed (worldgen, commands) used to swallow the stack; it gets one here.
         const std::optional<std::int32_t> stateId =
             world->state().blockState(half->first.x, half->first.y, half->first.z);
         const Identifier* block =
@@ -307,8 +302,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             return;
         }
     }
-    // Every slot of the block, not the three a cooker has: writing back fewer than it holds is what
-    // would empty a chest the moment somebody moved its first item.
+    // Every slot of the block, not the cooker's three: writing back fewer would empty a chest on its first move.
     world::blockInventory::Slots slots = world::blockInventory::read(entity->data(), halfSize());
     if (half->second < 0 || static_cast<std::size_t>(half->second) >= slots.size()) {
         owner_->logger().warn([&] {
@@ -325,8 +319,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
     const std::optional<server::world::loot::ItemStack> before = was;
     slots[static_cast<std::size_t>(half->second)] = put;
     world::blockInventory::write(entity->data(), slots);
-    // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the thing
-    // being cooked changes: a new item does not inherit the last one's progress.
+    // parity: `AbstractFurnaceBlockEntity.setItem`.
     const std::optional<std::int32_t> cookingState =
         world->state().blockState(half->first.x, half->first.y, half->first.z);
     const Identifier* cooking =
@@ -343,8 +336,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             });
         world::furnaces::write(state, entity->data());
     }
-    // parity: `FurnaceResultSlot.checkTakeAchievements`: taking from the result pays out everything
-    // cooked since the last taker, at the taker's feet.
+    // parity: `FurnaceResultSlot.checkTakeAchievements`.
     if (half->second == world::furnaces::kResultSlot && cooker.has_value() &&
         (put.has_value() ? put->count : 0) < hadCount) {
         // parity: `FurnaceResultSlot.checkTakeAchievements` over `ItemStack.onCraftedBy`.
@@ -353,7 +345,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         }
         payFurnace(*world, *entity);
     }
-    // parity: `BrewingStandMenu.PotionSlot.onTake`, `BREWED_POTION` for a bottle with a potion.
+    // parity: `BrewingStandMenu.PotionSlot.onTake`.
     if (cooking != nullptr && *cooking == world::brewingStands::block() &&
         half->second < world::brewingStands::kBottles && before.has_value() && !put.has_value()) {
         awardBrewed(*before);
@@ -407,7 +399,7 @@ void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::worl
                                               world::furnaces::experienceFor(count, recipe->experience, random));
         }
     }
-    // parity: `awardUsedRecipesAndPopExperience`: the experience, then the recipes, then each trigger.
+    // parity: `awardUsedRecipesAndPopExperience`.
     awardRecipes(*session, used);
     if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
         for (const Identifier& id : used) {
@@ -530,8 +522,7 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
     if (block == nullptr) {
         return true;
     }
-    // parity: `FurnaceResultSlot.mayPlace`, which is a *furnace's* third slot and nobody else's: a
-    // chest's third slot took nothing until this stopped being unconditional.
+    // parity: `FurnaceResultSlot.mayPlace`.
     if (openBlockSize == world::furnaces::kSize && block->index == world::furnaces::kResultSlot) {
         return false;
     }
@@ -539,7 +530,7 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
     if (openMerchant_ && block->index == VillagerTradeController::kResult) {
         return false;
     }
-    // parity: `StonecutterMenu.ResultSlot.mayPlace`, and the smithing table's, both always false.
+    // parity: `StonecutterMenu.ResultSlot.mayPlace`.
     if (openStonecutter_ && block->index == Menu::kStonecutterResult) {
         return false;
     }
@@ -578,7 +569,7 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
         return block->index == Menu::kBeaconPayment && payment.has_value() && owner_->options().itemTags != nullptr &&
                world::realItemTags::contains(*owner_->options().itemTags, "minecraft:beacon_payment_items", *payment);
     }
-    // parity: `CartographyTableMenu`'s two inputs: a map with an id, and paper, a map or a pane.
+    // parity: `CartographyTableMenu`'s two inputs.
     if (openCartography_) {
         if (block->index == Menu::kCartographyMap) {
             return stack.components.contains("minecraft:map_id");
@@ -586,7 +577,7 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
         return block->index == Menu::kCartographyAdditional &&
                (stack.id == "minecraft:paper" || stack.id == "minecraft:map" || stack.id == "minecraft:glass_pane");
     }
-    // parity: `LoomMenu`'s three inputs, each of which takes one kind of thing and nothing else.
+    // parity: `LoomMenu`'s three inputs.
     if (openLoom_) {
         if (block->index == Menu::kLoomBanner) {
             return world::looms::isBanner(stack.id);
@@ -600,16 +591,15 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
     if (openStonecutter_) {
         return block->index == Menu::kStonecutterInput;
     }
-    // parity: `SmithingMenu.quickMoveStack`, which tries the three inputs and never the result.
+    // parity: `SmithingMenu.quickMoveStack`.
     if (openSmithing_) {
         return block->index != Menu::kSmithingResult;
     }
-    // parity: `ItemCombinerMenu.quickMoveStack`, which tries the two inputs and never the result.
+    // parity: `ItemCombinerMenu.quickMoveStack`.
     if (openAnvil_) {
         return block->index != Menu::kAnvilResult;
     }
-    // parity: `EnchantmentMenu`'s second slot takes lapis and nothing else, and its first takes one
-    // of anything.
+    // parity: `EnchantmentMenu`.
     if (openEnchantment_) {
         return block->index != Menu::kEnchantmentLapis || stack.id == "minecraft:lapis_lazuli";
     }
@@ -636,7 +626,6 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
     if (block->index == world::furnaces::kInputSlot) {
         return true;
     }
-    // Nothing goes into the slot the cooked thing comes out of.
     return block->index == world::furnaces::kFuelSlot && server::registry::fuels::isFuel(*item);
 }
 
@@ -724,8 +713,7 @@ void ContainerMenuController::recomputeCraftingResult() {
     const std::int32_t height = openMenu.gridHeight();
     std::vector<std::optional<server::world::loot::ItemStack>> cells;
     for (std::int32_t index = 0; index < width * height; index++) {
-        // The components go into the grid too: a dye, a copy or a repair is defined by what it does
-        // to them, so a recipe that cannot see them cannot exist.
+        // Components go into the grid too: dye, copy and repair recipes are defined by what they do to them.
         cells.push_back(index < static_cast<std::int32_t>(craftingGrid_.size())
                             ? craftingStackOf(craftingGrid_[static_cast<std::size_t>(index)])
                             : std::nullopt);
@@ -733,8 +721,7 @@ void ContainerMenuController::recomputeCraftingResult() {
     const server::world::crafting::CraftingInput input =
         server::world::crafting::CraftingInput::of(width, height, cells);
     const std::optional<world::RealRecipes::Match> match = recipes->recipeMatching(input);
-    // parity: the `limited_crafting` game rule, which is what makes `/recipe give` and `/recipe
-    // take` mean something: with it on, a player crafts only what they have been taught.
+    // parity: `limited_crafting`.
     const bool limited = owner_->currentWorld() != nullptr &&
                          owner_->currentWorld()->gameRules().get(world::gameRules::kLimitedCrafting);
     bool known = !limited;
@@ -749,7 +736,7 @@ void ContainerMenuController::recomputeCraftingResult() {
     }
     const std::optional<server::world::loot::ItemStack> result = recipes->resultFor(input);
     craftingResult_ = result.has_value() ? std::optional{storedOf(*result)} : std::nullopt;
-    // parity: `MapExtendingRecipe.matches`, which also wants the map known and short of the widest.
+    // parity: `MapExtendingRecipe.matches`.
     if (craftingResult_.has_value() && craftingResult_->components.contains("minecraft:map_post_processing")) {
         const std::optional<std::int32_t> mapId = MapSystem::mapIdOf(craftingResult_->components);
         const std::optional<MapSystem::Summary> data = mapId.has_value() && owner_->options().maps != nullptr
@@ -781,8 +768,7 @@ std::vector<std::optional<storage::StoredItemStack>> ContainerMenuController::cr
     if (!match.has_value() || match->recipe == nullptr) {
         return {};
     }
-    // The grid is trimmed to its occupied box, so the recipe answers in that box's order: walk the
-    // same cells in the same order to line the two up.
+    // The grid is trimmed to its occupied box, so the recipe answers in that box's order.
     const std::vector<std::optional<server::world::loot::ItemStack>> answered = match->recipe->remainingItems(input);
     std::vector<std::optional<storage::StoredItemStack>> remainders;
     std::size_t next = 0;
@@ -818,7 +804,6 @@ void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
     }
     const storage::StoredItemStack result = *craftingResult_;
     if (carriedItem_.has_value()) {
-        // The cursor has to be empty or hold the same thing, and have room for a whole batch.
         if (carriedItem_->id != result.id || carriedItem_->components != result.components) {
             return;
         }
@@ -833,8 +818,7 @@ void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
     session.stats.increment(storage::stats::crafted(result.id), result.count);
     awardRecipeCrafted();
     settleCraftedMaps(session);
-    // parity: `Recipe.getRemainingItems`: a cell whose item leaves something behind (a bucket, a
-    // bottle) keeps it instead of emptying, and the book being copied stays where it was.
+    // parity: `Recipe.getRemainingItems`.
     const std::vector<std::optional<storage::StoredItemStack>> remaining = craftingRemainders();
     for (std::int32_t index = 0; index < openMenu.gridSize(); index++) {
         if (index >= static_cast<std::int32_t>(craftingGrid_.size())) {
@@ -871,7 +855,6 @@ void ContainerMenuController::returnCraftingGrid(PlayerSession& session) {
             dropStack(session, dropped);
         }
     }
-    // The cursor goes the same way: it is not part of the inventory either.
     if (carriedItem_.has_value()) {
         const storage::StoredItemStack held = *carriedItem_;
         carriedItem_.reset();

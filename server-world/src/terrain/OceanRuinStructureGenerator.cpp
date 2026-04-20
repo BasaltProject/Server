@@ -34,8 +34,7 @@ constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, S
                                                       StructureRotation::Clockwise180,
                                                       StructureRotation::Counterclockwise90};
 
-/// The eight small lists are numbered one to eight; the large ones are 1, 2, 3 and 8, because the
-/// jar skips 4 to 7 for the cold ruins, and 4 to 7 for the warm ones.
+/// The large lists are 1, 2, 3 and 8 because the jar skips 4 to 7.
 [[nodiscard]] std::string ruin(std::string_view prefix, std::int32_t index) {
     return "underwater_ruin/" + std::string{prefix} + "_" + std::to_string(index);
 }
@@ -163,9 +162,7 @@ StructurePos OceanRuinStructureGenerator::settle(const Chunk& chunk, const struc
     return StructurePos{position.x, settledY, position.z};
 }
 
-/// parity: `OceanRuinPieces.handleDataMarker`. The template carries a structure block tagged
-/// `chest`, and the piece turns it into a chest of its own, waterlogged where the sea already is,
-/// with the ruin's loot. The seed comes from the piece's stream, unlike the rot's.
+/// parity: `OceanRuinPieces.handleDataMarker`.
 void placeMarkerChests(Chunk& chunk, const structure::StructureTemplate& piece, StructurePos position,
                        StructureRotation rotation, const StructureBoundingBox& clip, bool large,
                        random::RandomSource& random) {
@@ -193,9 +190,7 @@ void placeMarkerChests(Chunk& chunk, const structure::StructureTemplate& piece, 
     }
 }
 
-/// parity: `OceanRuinPieces.archyRuleProcessor`, at most five blocks turned into their suspicious
-/// twin, each carrying the ruin's archaeology loot. Its own positional random, so it neither reads
-/// nor moves the stream anything else draws from.
+/// parity: `OceanRuinPieces.archyRuleProcessor`, its own positional random.
 [[nodiscard]] const std::vector<structure::CappedRules>& archaeologyRules(bool cold) {
     const auto build = [](const char* from, const char* to, const char* table) {
         std::vector<structure::CappedRules> built;
@@ -254,9 +249,7 @@ OceanRuinStructureGenerator::addPiece(Chunk& chunk, std::int64_t seed, const Str
                                     .processors = &processors,
                                     .blockProcessor = structure::templateBlockProcessors::ignoreStructureAndAir(),
                                     .random = &random,
-                                    // parity: `OceanRuinPieces.makeSettings` never sets a random on
-                                    // the settings, so the palette pick and the rot both take their
-                                    // own from the position, not from this piece's stream.
+                                    // parity: `OceanRuinPieces.makeSettings` sets no random.
                                     .settingsRandom = nullptr,
                                     .worldSeed = seed});
         placeMarkerChests(chunk, *piece, settled, rotation, clip, large, random);

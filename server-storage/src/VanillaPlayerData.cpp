@@ -7,7 +7,6 @@
 
 namespace basalt::server::storage::vanillaPlayerData {
 namespace {
-
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
@@ -35,11 +34,7 @@ constexpr std::int32_t kOffhand = -106;
     return found == nullptr ? nullptr : found->get<NbtList>();
 }
 
-/// Vanilla's inventory is a list of item compounds each carrying its own `Slot` byte, with armour at
-/// slots 100 to 103 and the offhand at -106. Those are folded into the flat layout used here,
-/// because a slot number that is negative or above the inventory size is vanilla's own encoding
-/// trick, not a real position.
-/// parity: `WardenSpawnTracker.CODEC`, three counts that default to zero.
+// parity: `WardenSpawnTracker.CODEC`, three counts that default to zero.
 [[nodiscard]] std::array<std::int32_t, 3> wardenTrackerOf(const NbtCompound* tracker) {
     if (tracker == nullptr) {
         return {};
@@ -48,7 +43,7 @@ constexpr std::int32_t kOffhand = -106;
             tracker->getInt("cooldown_ticks")};
 }
 
-/// parity: 26.3 `ServerPlayer.readAdditionalSaveData`'s `post_effects`, a list of identifiers.
+// parity: 26.3 `ServerPlayer.readAdditionalSaveData`'s `post_effects`.
 [[nodiscard]] std::vector<std::string> postEffectsOf(const NbtList* list) {
     std::vector<std::string> effects;
     if (list == nullptr) {
@@ -102,7 +97,7 @@ constexpr std::int32_t kOffhand = -106;
     return inventory;
 }
 
-/// parity: the `Score` and shoulder parrots a `.dat` keeps, which have no column of their own.
+// parity: the `Score` and shoulder parrots a `.dat` keeps.
 [[nodiscard]] wire::nbt::NbtCompound entityDataOf(const wire::nbt::NbtCompound& root) {
     wire::nbt::NbtCompound kept;
     for (const std::string_view key : {"Score", "ShoulderEntityLeft", "ShoulderEntityRight"}) {
@@ -112,7 +107,6 @@ constexpr std::int32_t kOffhand = -106;
     }
     return kept;
 }
-
 } // namespace
 
 std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std::string_view name,
@@ -136,8 +130,6 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
         .name = std::string{name},
         .lastSeenEpochSeconds = nowEpochSeconds,
         .firstSeenEpochSeconds = nowEpochSeconds,
-        // Vanilla keeps play time in the statistics file, not here, so an import starts the counter
-        // rather than inventing one.
         .playTimeTicks = 0,
         .world = std::string{worldName},
         .x = asDouble(position, 0),
@@ -163,5 +155,4 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
         .entityData = entityDataOf(*root),
     };
 }
-
 } // namespace basalt::server::storage::vanillaPlayerData

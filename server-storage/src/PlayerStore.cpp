@@ -7,12 +7,8 @@
 
 namespace basalt::server::storage {
 namespace {
-
-/// The tables and columns a freshly created database has, read back from a throwaway one rather than
-/// listed by hand: this cannot then fall behind the schema it checks.
 [[nodiscard]] std::map<std::string, std::vector<std::string>, std::less<>> referenceColumns() {
     std::map<std::string, std::vector<std::string>, std::less<>> expected;
-    // In memory, so there is nothing to clean up and nothing that can be left behind by a crash.
     std::optional<sql::Database> reference = sql::Database::open(":memory:");
     if (!reference.has_value()) {
         return expected;
@@ -24,8 +20,6 @@ namespace {
     return expected;
 }
 
-/// Refuses to run against a database this build cannot use. What must not happen is the mismatch
-/// staying invisible until a query touches a new column mid server-list ping.
 [[nodiscard]] std::optional<PlayerDatabaseSchemaError> verifySchema(sql::Database& database, const std::string& path) {
     for (const auto& [table, columns] : referenceColumns()) {
         const std::vector<std::string> actual = database.columns(table);
@@ -52,7 +46,6 @@ namespace {
     }
     return std::nullopt;
 }
-
 } // namespace
 
 PlayerStore::PlayerStore(std::unique_ptr<sql::Database> database)
@@ -62,8 +55,6 @@ PlayerStore::PlayerStore(std::unique_ptr<sql::Database> database)
 PlayerStore::~PlayerStore() { close(); }
 
 std::expected<std::unique_ptr<PlayerStore>, PlayerDatabaseSchemaError> PlayerStore::open(const std::string& path) {
-    // A configured path whose directory does not exist yet should work, not fail: SQLite opens the
-    // file but will not create the folder around it.
     const std::filesystem::path parent = std::filesystem::path{path}.parent_path();
     if (!parent.empty()) {
         std::error_code ignored;
@@ -75,9 +66,6 @@ std::expected<std::unique_ptr<PlayerStore>, PlayerDatabaseSchemaError> PlayerSto
         return std::unexpected(PlayerDatabaseSchemaError{path + " could not be opened"});
     }
     auto database = std::make_unique<sql::Database>(std::move(*opened));
-    // Only a file with nothing in it gets the schema. Running it over an existing one would fail on
-    // the first index naming a column that build did not have, and report that instead of the
-    // mismatch the operator needs to read.
     if (database->tables().empty() && !database->exec(schema::ddl())) {
         return std::unexpected(PlayerDatabaseSchemaError{path + " could not be created: " + database->error()});
     }
@@ -97,5 +85,4 @@ void PlayerStore::close() {
         database_->close();
     }
 }
-
 } // namespace basalt::server::storage

@@ -49,13 +49,12 @@ constexpr std::array<std::string_view, 6> kPersistentOnly{"minecraft:intangible_
                                                           "minecraft:lock",
                                                           "minecraft:container_loot"};
 
-/// A writer answers false when the value it was handed is not the shape the component takes.
 using Encoder = std::function<bool(ByteBuffer&, const NbtTag&)>;
 
 /// parity: `FireworkExplosion.Shape`, whose id is its place in this list.
 constexpr std::array<std::string_view, 5> kFireworkShapes{"small_ball", "large_ball", "star", "creeper", "burst"};
 
-/// parity: `FireworkExplosion.COLOR_LIST_STREAM_CODEC`, a count and then each colour as a plain int.
+/// parity: `FireworkExplosion.COLOR_LIST_STREAM_CODEC`.
 bool writeColours(ByteBuffer& buffer, const NbtCompound& explosion, std::string_view field) {
     const NbtTag* colours = explosion.find(field);
     std::vector<std::int32_t> values;
@@ -150,8 +149,7 @@ bool writeExplosion(ByteBuffer& buffer, const NbtTag& value) {
     return text == nullptr ? std::string_view{} : std::string_view{*text};
 }
 
-/// parity: `ByteBufCodecs.holderSet`: a zero and a tag name, or the count plus one followed by the
-/// plain registry ids.
+/// parity: `ByteBufCodecs.holderSet`.
 [[nodiscard]] bool writeHolderSet(ByteBuffer& buffer, const NbtTag& value,
                                   const std::function<std::optional<std::int32_t>(const Identifier&)>& idOf) {
     if (const std::string* text = value.get<std::string>(); text != nullptr) {
@@ -260,8 +258,7 @@ bool writeExplosion(ByteBuffer& buffer, const NbtTag& value) {
     return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
 }
 
-/// parity: `ItemStackTemplate.STREAM_CODEC`: the item, the count, then the component patch that
-/// follows it (the added components, then the removed ids).
+/// parity: `ItemStackTemplate.STREAM_CODEC`.
 void writeStackTemplate(ByteBuffer& buffer, std::int32_t item, std::int32_t count, const NbtCompound* components) {
     wire::protocol::varInt::write(buffer, item);
     wire::protocol::varInt::write(buffer, count);
@@ -291,7 +288,7 @@ void writeStackTemplate(ByteBuffer& buffer, std::int32_t item, std::int32_t coun
         table.emplace("minecraft:note_block_sound", identifierEncoder());
         table.emplace("minecraft:glider", [](ByteBuffer&, const NbtTag&) { return true; });
         table.emplace("minecraft:firework_explosion", writeExplosion);
-        // parity: `ChargedProjectiles.STREAM_CODEC`, each an `ItemStackTemplate`: item, count, patch.
+        // parity: `ChargedProjectiles.STREAM_CODEC`.
         table.emplace("minecraft:charged_projectiles", [](ByteBuffer& buffer, const NbtTag& value) {
             const NbtList* stacks = value.get<NbtList>();
             if (stacks == nullptr) {
@@ -332,8 +329,7 @@ void writeStackTemplate(ByteBuffer& buffer, std::int32_t item, std::int32_t coun
             return true;
         });
 
-        // parity: `BannerPatternLayers.STREAM_CODEC`. Reference holders use registry id + 1; zero is
-        // reserved for a direct, inline pattern.
+        // parity: `BannerPatternLayers.STREAM_CODEC`.
         table.emplace("minecraft:banner_patterns", [](ByteBuffer& buffer, const NbtTag& value) {
             const NbtList* layers = value.get<NbtList>();
             if (layers == nullptr) {
@@ -389,9 +385,7 @@ void writeStackTemplate(ByteBuffer& buffer, std::int32_t item, std::int32_t coun
         table.emplace("minecraft:base_color", enumEncoder(kDyeColours));
         table.emplace("minecraft:map_post_processing", enumEncoder(kMapPostProcessing));
 
-        // parity: a component vanilla never gave a network codec falls back to
-        // `ByteBufCodecs.fromCodecWithRegistries`, which puts its persistent value on the wire as
-        // NBT. These are exactly those, so they need no shape of their own.
+        // parity: `ByteBufCodecs.fromCodecWithRegistries`.
         for (const std::string_view name : kPersistentOnly) {
             table.emplace(std::string{name}, nbtEncoder());
         }
@@ -476,8 +470,7 @@ void writeStackTemplate(ByteBuffer& buffer, std::int32_t item, std::int32_t coun
         };
         table.emplace("minecraft:attack_animation", swing);
         table.emplace("minecraft:interact_animation", swing);
-        // parity: `PotDecorations.STREAM_CODEC`, four optional `ItemStackTemplate`s, a sherd's own
-        // components riding along in its patch.
+        // parity: `PotDecorations.STREAM_CODEC`.
         table.emplace("minecraft:pot_decorations", [](ByteBuffer& buffer, const NbtTag& value) {
             const NbtCompound* compound = value.get<NbtCompound>();
             if (compound == nullptr) {

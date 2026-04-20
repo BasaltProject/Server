@@ -52,7 +52,7 @@ struct BlockSource {
     PoiType type;
 };
 
-// parity: `PoiTypes.bootstrap`, every state of each block, and only the head half of a bed.
+// parity: `PoiTypes.bootstrap`.
 constexpr std::array<BlockSource, 46> kSources{{
     {"blast_furnace", PoiType::kArmorer},
     {"smoker", PoiType::kButcher},

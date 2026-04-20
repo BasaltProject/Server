@@ -153,7 +153,7 @@ void SculkCatalystSystem::drink(world::LoadedWorld& world, const std::array<std:
             chunk->markDirty();
         }
     }
-    // parity: `CatalystListener.bloom`, written with `setBlockAndUpdate` and let go of eight ticks on.
+    // parity: `CatalystListener.bloom`.
     const std::optional<std::int32_t> state = world.state().blockState(cx, cy, cz);
     const std::optional<std::int32_t> bloom = state.has_value() ? sculk::bloomed(*state) : std::nullopt;
     if (!bloom.has_value()) {

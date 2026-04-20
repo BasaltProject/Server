@@ -11,7 +11,6 @@ namespace {
 
 using wire::text::Component;
 
-/// A path as an operator typed it: trailing separators and stray spaces are theirs, not the save's.
 [[nodiscard]] std::string tidied(std::string path) {
     while (!path.empty() && (path.back() == ' ' || path.back() == '/')) {
         path.pop_back();

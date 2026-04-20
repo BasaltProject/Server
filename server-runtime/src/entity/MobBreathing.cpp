@@ -18,7 +18,7 @@ using namespace std::string_view_literals;
 constexpr std::int32_t kDrowningAir = -20;
 constexpr float kDrownDamage = 2.0F;
 constexpr std::int32_t kAxolotlMaxAir = 6000;
-/// parity: `EntityDimensions.scalable`, whose eye is 0.85 of the height unless the builder says.
+/// parity: `EntityDimensions.scalable`.
 constexpr float kEyeShare = 0.85F;
 /// parity: `LivingEntity.SLEEPING_DIMENSIONS`.
 constexpr float kSleepingEye = 0.2F;
@@ -183,7 +183,7 @@ double eyeHeightOf(const ServerEntity& mob) {
         const std::optional<float> own = eyeIn(kBabyEyes, path);
         eye = own.value_or(eye * babyScaleOf(path));
     }
-    // parity: `AbstractCubeMob.getDefaultDimensions` scales by the size, `Phantom` by 15 % a size.
+    // parity: `AbstractCubeMob.getDefaultDimensions` scales by the size.
     if (path == "slime" || path == "magma_cube" || path == "sulfur_cube") {
         eye *= static_cast<float>(mob.cubeSize);
     } else if (path == "phantom") {
@@ -226,7 +226,7 @@ std::vector<Hurt> tick(ServerEntity& mob, const Surroundings& at) {
     } else if (mob.airSupply < maxAir) {
         refill();
     }
-    // parity: the `handleAirSupply` overrides, which start again from the air before the tick.
+    // parity: the `handleAirSupply` overrides.
     const Gasp gasp = gaspOf(path);
     const bool alive = !mob.dying && mob.health > 0.0;
     if (gasp == Gasp::None || (gasp != Gasp::WaterAnimal && mob.noAi)) {

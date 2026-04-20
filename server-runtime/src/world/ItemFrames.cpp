@@ -12,8 +12,7 @@ namespace {
 /// parity: `ItemFrame.NUM_ROTATIONS`.
 constexpr std::int32_t kRotations = 8;
 
-/// parity: `createBoundingBox`'s own `0.46875`, which is what puts the frame against the wall rather
-/// than in the middle of its square.
+/// parity: `createBoundingBox`'s own `0.46875`.
 constexpr double kAgainstTheWall = 0.46875;
 
 } // namespace
@@ -24,8 +23,7 @@ bool isFrame(const wire::common::Identifier& type) {
 
 bool canHang(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
              const server::registry::BlockFace facing) {
-    // parity: `calculateSupportBox` is the frame's own box pushed half a block back, which lands in
-    // the square behind it, and every block in it has to be solid or a diode.
+    // parity: `calculateSupportBox` is the frame's own box pushed half a block back.
     const std::optional<std::int32_t> behind =
         world.blockState(x - registry::stepX(facing), y - registry::stepY(facing), z - registry::stepZ(facing));
     if (!behind.has_value()) {
@@ -37,13 +35,12 @@ bool canHang(const WorldState& world, const std::int32_t x, const std::int32_t y
     if (!holds) {
         return false;
     }
-    // parity: `hasLevelCollision(getPopBox())`, and the pop box lies inside the frame's own square.
+    // parity: `hasLevelCollision(getPopBox())`.
     const std::optional<std::int32_t> here = world.blockState(x, y, z);
     if (!here.has_value() || !registry::blockShapes::collisionBoxes(*here).empty()) {
         return false;
     }
-    // parity: `canCoexist(false)`, which refuses another hanging entity of the same kind and any
-    // hanging entity facing the same way.
+    // parity: `canCoexist(false)`.
     for (const entity::ServerEntity* other : world.entities()) {
         if (other == nullptr || !isFrame(other->type()) || other->removed) {
             continue;
@@ -80,7 +77,7 @@ bool survives(const WorldState& world, const entity::ServerEntity& frame) {
         !(horizontal && (path == "repeater" || path == "comparator"))) {
         return false;
     }
-    // parity: `canCoexist(true)`: only another hanging entity facing the same way is in the way.
+    // parity: `canCoexist(true)`.
     for (const entity::ServerEntity* other : world.entities()) {
         if (other == nullptr || other == &frame || other->removed || !isFrame(other->type()) ||
             squareOf(*other) != square) {
@@ -181,16 +178,14 @@ std::optional<std::int32_t> analogOutput(const WorldState& world, const std::int
         if (frame == nullptr || !isFrame(frame->type())) {
             continue;
         }
-        // parity: the box `getItemFrame` searches is the square itself, and a frame always hangs
-        // inside the square it occupies rather than on its edge.
+        // parity: the box `getItemFrame` searches is the square itself, and a frame always hangs.
         if (static_cast<std::int32_t>(std::floor(frame->x)) != x ||
             static_cast<std::int32_t>(std::floor(frame->y)) != y ||
             static_cast<std::int32_t>(std::floor(frame->z)) != z) {
             continue;
         }
         const wire::nbt::NbtCompound* data = frame->sourceNbt.has_value() ? &*frame->sourceNbt : nullptr;
-        // parity: `Facing` is `Direction.LEGACY_ID_CODEC`, the same order the block faces are in,
-        // and a frame that never said which way it hangs hangs downwards.
+        // parity: `Facing` is `Direction.LEGACY_ID_CODEC`, the same order the block faces are in.
         const std::int32_t hangs = data == nullptr ? 0 : data->getByte("Facing", 0);
         if (hangs != static_cast<std::int32_t>(facing)) {
             continue;

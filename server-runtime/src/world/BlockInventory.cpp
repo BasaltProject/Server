@@ -22,9 +22,7 @@ std::optional<server::world::loot::ItemStack> readStack(const wire::nbt::NbtComp
     if (!item.has_value()) {
         return std::nullopt;
     }
-    // parity: `ItemStack.CODEC` is `{id, count, components}`, and the components are where an
-    // enchantment, a custom name or a written book's pages live. Dropping them here emptied every
-    // enchanted book somebody left in a chest.
+    // parity: `ItemStack.CODEC` is `{id, count, components}`, and the components are where an.
     const wire::nbt::NbtCompound* components = stack.getCompound("components");
     return server::world::loot::ItemStack{.item = *item,
                                           .count = stack.getInt("count", 1),
@@ -77,8 +75,7 @@ void write(wire::nbt::NbtCompound& data, const Slots& slots) {
 
 namespace {
 
-/// parity: `DecoratedPotBlockEntity.TAG_ITEM`, the one stack a pot holds, written as an item and not
-/// as a list of one.
+/// parity: `DecoratedPotBlockEntity.TAG_ITEM`.
 constexpr std::string_view kSingleItemKey = "item";
 
 } // namespace

@@ -22,7 +22,6 @@ using hoglins::HoglinState;
 
 [[nodiscard]] bool isBaby(const ServerEntity& mob) { return mob.age < 0; }
 
-/// What the hoglin sensor saw.
 struct HoglinSense {
     std::optional<kit::Block> repellent;
     std::optional<std::int32_t> adultPiglin;

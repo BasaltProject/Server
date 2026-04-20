@@ -10,8 +10,7 @@
 namespace basalt::server::world::terrain::decoration {
 namespace {
 
-/// parity: `Biome.BIOME_INFO_NOISE`, a single-octave simplex off the fixed legacy seed 2345, not the
-/// world seed.
+/// parity: `Biome.BIOME_INFO_NOISE`.
 const noise::SimplexNoise& biomeInfoNoise() {
     static const noise::SimplexNoise built = [] {
         random::RandomSource source = random::RandomSource::legacy(2345LL);
@@ -122,8 +121,7 @@ PlacementModifier surfaceRelativeThresholdFilter(HeightmapType heightmap, std::i
                                                  std::int32_t maxInclusive) {
     return filter([heightmap, minInclusive, maxInclusive](const PlacementContext& context, random::RandomSource&,
                                                           const DecorationPos& origin) {
-        // parity: the three features that use this filter, glow_lichen, lake_lava_underground and
-        // underwater_magma, all name `OCEAN_FLOOR_WG`, which stops moving after the carvers.
+        // parity: glow_lichen, lake_lava_underground and underwater_magma use the frozen `OCEAN_FLOOR_WG`.
         const auto surfaceY =
             static_cast<std::int64_t>(context.worldgenHeight(origin.x & 15, origin.z & 15, heightmap));
         const auto y = static_cast<std::int64_t>(origin.y);

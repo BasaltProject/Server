@@ -103,8 +103,7 @@ const std::set<std::string, std::less<>>& blockingBiomes() {
            !sameBlock(stateId, blocks.fence()) && block->path() != "iron_chain";
 }
 
-/// parity: `MineShaftPiece.isInInvalidLocation`. A shaft refuses to open into liquid, checking the
-/// shell of its own box one block out, clipped to what this chunk can see.
+/// parity: `MineShaftPiece.isInInvalidLocation`.
 [[nodiscard]] bool isInInvalidLocation(const MineshaftPiece& piece, const Chunk& chunk,
                                        const StructureBoundingBox& clip, const mineshaftFill::BiomeAt& biomeAt) {
     const std::int32_t x0 = std::max(piece.box.minX - 1, clip.minX);
@@ -114,9 +113,7 @@ const std::set<std::string, std::less<>>& blockingBiomes() {
     const std::int32_t y1 = std::min(piece.box.maxY + 1, clip.maxY);
     const std::int32_t z1 = std::min(piece.box.maxZ + 1, clip.maxZ);
 
-    // parity: the biome at the centre of the clipped box is tested before any block, and a shaft
-    // simply refuses to exist in one that blocks it. Without this a mineshaft drives straight
-    // through a deep dark that vanilla leaves alone.
+    // parity: the biome at the centre of the clipped box is tested before any block, and a shaft simply refuses to.
     if (biomeAt && blockingBiomes().contains(biomeAt((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2))) {
         return true;
     }
@@ -166,7 +163,7 @@ const std::set<std::string, std::less<>>& blockingBiomes() {
     return false;
 }
 
-/// parity: `maybePlaceCobWeb`, whose roll only happens where the spot is already underground.
+/// parity: `maybePlaceCobWeb`.
 void maybeCobweb(const StructurePieceFill& fill, random::RandomSource& random, float probability, std::int32_t x,
                  std::int32_t y, std::int32_t z) {
     if (!fill.isInterior(x, y, z)) {
@@ -181,7 +178,7 @@ void maybeCobweb(const StructurePieceFill& fill, random::RandomSource& random, f
     fill.place(cobweb(), x, y, z);
 }
 
-/// parity: `setPlanksBlock`, which floors the corridor only where it has no footing already.
+/// parity: `setPlanksBlock`.
 void setPlanks(const StructurePieceFill& fill, const MineshaftBlocks& blocks, std::int32_t x, std::int32_t y,
                std::int32_t z) {
     if (!fill.isInterior(x, y, z)) {
@@ -193,8 +190,7 @@ void setPlanks(const StructurePieceFill& fill, const MineshaftBlocks& blocks, st
     fill.place(blocks.planks(), x, y, z);
 }
 
-/// parity: `StructurePiece.isReplaceableByStructures`. `liquid()` is a block property, not a fluid
-/// state, so a waterlogged block is not empty here and a bubble column is.
+/// parity: `StructurePiece.isReplaceableByStructures`.
 [[nodiscard]] bool isReplaceableByStructures(std::int32_t stateId) {
     if (registry::blocks::isAir(stateId)) {
         return true;
@@ -205,8 +201,7 @@ void setPlanks(const StructurePieceFill& fill, const MineshaftBlocks& blocks, st
     return block != nullptr && paths.find(block->path()) != paths.end();
 }
 
-/// parity: `Block.canSupportCenter(level, pos, Direction.DOWN)`, which is the centre of the face
-/// rather than the whole of it, minus the `#unstable_bottom_center` tag: only the fence gates.
+/// parity: `Block.canSupportCenter(level, pos, Direction.DOWN)`.
 [[nodiscard]] bool canSupportCentreBelow(std::int32_t stateId) {
     const wire::common::Identifier* block = blockOf(stateId);
     if (block != nullptr && block->path().ends_with("fence_gate")) {
@@ -215,7 +210,7 @@ void setPlanks(const StructurePieceFill& fill, const MineshaftBlocks& blocks, st
     return registry::blockShapes::supportsCentre(stateId, registry::BlockFace::Down);
 }
 
-/// parity: `!(state.getBlock() instanceof FallingBlock)`. A chain refuses to hang from what falls.
+/// parity: `!(state.getBlock() instanceof FallingBlock)`.
 [[nodiscard]] bool isFallingBlock(std::int32_t stateId) {
     static const std::set<std::string, std::less<>> paths = {"sand",  "red_sand",      "gravel",       "dragon_egg",
                                                              "anvil", "chipped_anvil", "damaged_anvil"};
@@ -226,10 +221,7 @@ void setPlanks(const StructurePieceFill& fill, const MineshaftBlocks& blocks, st
     return paths.find(block->path()) != paths.end() || block->path().ends_with("_concrete_powder");
 }
 
-/// parity: `fillPillarDownOrChainUp`. The support does not stand where the plank is: it looks down
-/// for footing and fills the gap under the plank with wood, or, failing that, up for a ceiling and
-/// hangs a fence and a chain from it. Both searches advance one step at a time, together, so the
-/// nearer of the two wins.
+/// parity: `fillPillarDownOrChainUp`.
 void fillPillarDownOrChainUp(const StructurePieceFill& fill, const MineshaftBlocks& blocks, std::int32_t x,
                              std::int32_t y, std::int32_t z) {
     const std::int32_t originY = fill.worldY(y);
@@ -272,7 +264,6 @@ void placeDoubleSupport(const StructurePieceFill& fill, const MineshaftBlocks& b
     }
 }
 
-/// Whether the ceiling above the support line is closed, so a beam has something to bridge.
 [[nodiscard]] bool isSupportingBox(const StructurePieceFill& fill, std::int32_t z) {
     for (std::int32_t x = 0; x <= 2; ++x) {
         if (registry::blocks::isAir(fill.blockAt(x, 3, z))) {
@@ -282,7 +273,7 @@ void placeDoubleSupport(const StructurePieceFill& fill, const MineshaftBlocks& b
     return true;
 }
 
-/// parity: `placeSupport`. Two fence posts and a beam, or two stubs, once every five blocks.
+/// parity: `placeSupport`.
 void placeSupport(const StructurePieceFill& fill, const MineshaftBlocks& blocks, random::RandomSource& random,
                   std::int32_t z) {
     if (!isSupportingBox(fill, z)) {
@@ -301,8 +292,7 @@ void placeSupport(const StructurePieceFill& fill, const MineshaftBlocks& blocks,
     fill.maybePlace(random, 0.05F, 1, 2, z + 1, wallTorchNorth());
 }
 
-/// parity: `MineShaftCorridor.createChest`: a rail with a random axis, and a chest minecart riding it
-/// with the shaft's loot table and its own seed.
+/// parity: `MineShaftCorridor.createChest`.
 void placeChestRail(const StructurePieceFill& fill, random::RandomSource& random, std::int32_t x, std::int32_t y,
                     std::int32_t z) {
     if (!registry::blocks::isAir(fill.blockAt(x, y, z))) {
@@ -319,9 +309,7 @@ void placeChestRail(const StructurePieceFill& fill, random::RandomSource& random
     fill.placeEntity(wire::common::Identifier::vanilla("chest_minecart"), x, y, z, std::move(data));
 }
 
-/// parity: the one cave spider spawner a spider corridor gets. The jar writes the block straight to
-/// the level, so it skips the orientation and the replacement rule the rest of the piece goes
-/// through, and `setEntityId` draws nothing: its spawn potentials are empty.
+/// parity: the one cave spider spawner a spider corridor gets.
 void placeCaveSpiderSpawner(Chunk& chunk, const StructurePieceFill& fill, std::int32_t z) {
     const std::int32_t worldX = fill.worldX(1, z);
     const std::int32_t worldY = fill.worldY(0);
@@ -407,7 +395,6 @@ void corridor(const MineshaftPiece& piece, const MineshaftBlocks& blocks, const 
     }
 }
 
-/// A corner post, but only where the crossing has a ceiling for it to hold up.
 void supportPillar(const StructurePieceFill& fill, const MineshaftBlocks& blocks, std::int32_t x, std::int32_t y0,
                    std::int32_t z, std::int32_t y1) {
     if (registry::blocks::isAir(fill.blockAt(x, y1 + 1, z))) {

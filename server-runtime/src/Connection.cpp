@@ -26,8 +26,7 @@ bool Connection::fill() {
 
     const std::span<std::uint8_t> arrived{chunk.data(), *received};
     if (inbound_) {
-        // Decrypted in place, before framing sees it: the cipher runs under the framing, not over
-        // it, so a partial frame decrypts correctly and waits for the rest.
+        // Decrypted in place before framing: the cipher runs under the framing, so a partial frame waits for the rest.
         inbound_->decrypt(arrived);
     }
     read_.writeBytes(arrived);
@@ -42,8 +41,7 @@ bool Connection::nextPacket(wire::io::ByteBuffer& into) {
         return false;
     }
     if (*got) {
-        // The frame is out of the way; slide the rest to the front so the buffer stays bounded by
-        // one packet rather than by the whole session.
+        // Slide the rest to the front so the buffer stays bounded by one packet, not the whole session.
         read_.discardReadBytes();
     }
     return *got;

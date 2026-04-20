@@ -35,10 +35,10 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// parity: `EntityTypes.ITEM.getHeight() / 2`, which `popResource` sits the stack down by.
+/// parity: `EntityTypes.ITEM.getHeight() / 2`.
 constexpr double kItemHalfHeight = 0.125;
 
-/// parity: the y of `ItemEntity`'s own `setDeltaMovement`, the little hop a dropped block makes.
+/// parity: the y of `ItemEntity`'s own `setDeltaMovement`.
 constexpr double kPoppedUpwards = 0.2;
 
 } // namespace
@@ -57,7 +57,6 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
     }
 }
 
-/// The world's own neighbour-update context, which is what the cascade reads off a world.
 [[nodiscard]] world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random,
                                                          world::neighbourUpdates::Context::SummonGolem summonGolem,
                                                          world::golemPatterns::IsCopper isCopper) {
@@ -68,8 +67,7 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
         .minY = facts.chunkHeight.minY(),
         .maxY = facts.chunkHeight.maxY(),
         .random = random,
-        // parity: the `water_evaporates` attribute, which `WetSpongeBlock.onPlace` reads. Only the
-        // Nether carries it: water stays put in the End, so `!hasSkylight` is the wrong test.
+        // parity: `water_evaporates`.
         .evaporates = world.declaration().dimension == config::WorldDimension::Nether,
         .hasSkylight = facts.hasSkylight,
         .ultrawarm = world.declaration().dimension == config::WorldDimension::Nether,
@@ -91,9 +89,7 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
                                                                   config::WorldDimension::Nether};
                 world::fluidFlow::onArrived(flow, x, y, z);
             },
-        // parity: `PotentSulfurBlock.updateShape` is
-        // `validBlockState`, which reads the water above and the
-        // block below to say what the geyser is doing now.
+        // parity: `PotentSulfurBlock.updateShape`.
         .geyser =
             [&world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
                 return world::geysers::validState(world.state(), world.gameTime(), x, y, z, stateId);
@@ -210,10 +206,7 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
                                               const world::BlockChange& change) const {
     announceBlock(watchers, change);
     settleFrom(world, watchers, change.x, change.y, change.z, true, world::redstone::Asked::WithSelf);
-    // parity: a rod and a hook reach one square further than their own write does, and what is on
-    // the far side of the wall they hang on only hears them through that second update. What
-    // answers is `updateNeighborsAt` on the square behind, which tells the six around it and never
-    // the square itself, so the dust there settles `NeighboursOnly`.
+    // parity: `updateNeighborsAt`.
     for (const registry::BlockFace behind : world::redstone::alsoTells(change.stateId)) {
         settleFrom(world, watchers, change.x + registry::stepX(behind), change.y + registry::stepY(behind),
                    change.z + registry::stepZ(behind), false, world::redstone::Asked::NeighboursOnly);
@@ -234,8 +227,6 @@ void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::ve
                                          world.gameRules().get(world::gameRules::kTntExplodes))) {
         announceBlock(watchers, reacted);
     }
-    // parity: every piece of dust that moved tells its own neighbours, so a lamp at the end of the
-    // line lights rather than waiting for something to touch it.
     for (const world::BlockChange& moved : settled) {
         for (const world::BlockChange& reacted : world::redstoneReactors::updateAroundWire(
                  world.state(), world.name(), moved.x, moved.y, moved.z, world.gameTime(), random,
@@ -249,9 +240,7 @@ void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::ve
     for (const world::BlockChange& moved : settled) {
         world::redstoneComponents::scheduleAroundWire(world.state(), world.name(), moved.x, moved.y, moved.z, reading);
     }
-    // parity: `PistonBaseBlock.checkIfExtend` and `DispenserBlock.neighborChanged` are the two that
-    // nobody else asks, and they hear the same `updateNeighborsAt` as the rest: the six squares
-    // around what changed, and the six around each square a dust that moved reaches.
+    // parity: `PistonBaseBlock.checkIfExtend`.
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     const world::pistons::Context piston{.world = world.state(),
                                          .worldName = world.name(),
@@ -279,8 +268,7 @@ void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::ve
                 armed.has_value()) {
                 announceBlock(watchers, *armed);
             }
-            // parity: `RailBlock.updateState`, the three-way junction that re-bends when a signal
-            // reaches it.
+            // parity: `RailBlock.updateState`.
             if (source.has_value()) {
                 if (const std::optional<std::int32_t> bent =
                         world::rails::onNeighbourChange(world.state(), world.name(), nx, ny, nz, *source);
@@ -381,8 +369,7 @@ void BlockChangeBroadcaster::dropFallenBlock(world::LoadedWorld& world, double x
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    // parity: `ItemEntity`'s own constructor, which throws whatever is spawned up at a fifth and
-    // sideways by a random tenth either way.
+    // parity: `ItemEntity`.
     static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
                                                                  .uuid = wire::common::Uuid::random(),
                                                                  .item = *block,
@@ -400,8 +387,7 @@ void BlockChangeBroadcaster::dropWashedAwayBlock(world::LoadedWorld& world, std:
     if (destroyedState <= 0 || world::fluidFlow::kindOf(destroyedState).has_value()) {
         return;
     }
-    // parity: `LavaFluid.beforeDestroyingBlock` only plays the fizz, so only water drops what it
-    // washed away.
+    // parity: `LavaFluid.beforeDestroyingBlock`.
     const std::optional<std::int32_t> now = world.state().blockState(x, y, z);
     if (!now.has_value() || world::fluidFlow::kindOf(*now) != world::FluidKind::Water) {
         return;
@@ -411,8 +397,7 @@ void BlockChangeBroadcaster::dropWashedAwayBlock(world::LoadedWorld& world, std:
 
 void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                              std::int32_t destroyedState, bool byEntity) {
-    // parity: `Block.popResource` puts nothing in the world with the `block_drops` rule off, so the
-    // block still goes and leaves nothing behind.
+    // parity: `Block.popResource`.
     if (destroyedState <= 0 || !world.gameRules().get(world::gameRules::kBlockDrops)) {
         return;
     }
@@ -424,13 +409,10 @@ void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int
     if (table == nullptr) {
         return;
     }
-    // parity: a table rolls on the stream it names, which is the world's own and carries on between
-    // rolls: the same seed drops the same thing. A table with no name of its own keeps the scratch.
     random::RandomSource scratch = random::RandomSource::legacy(nextSeed());
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
-    // parity: `LootContextParams.BLOCK_STATE`, which is what a door, a slab or a bed drops by, and
-    // `DecoratedPotBlock.getDrops`, which hands the roll the pot's own four sherds.
+    // parity: `LootContextParams.BLOCK_STATE`.
     server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(destroyedState),
                                              .block = state->block,
                                              .hasEntity = byEntity};
@@ -447,10 +429,7 @@ void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int
         if (reg::items::registry().byName(stack.item) == nullptr) {
             continue;
         }
-        // parity: `Block.popResource` scatters it a quarter of a block either way and sits it half
-        // its own height lower, and `ItemEntity`'s own constructor throws it up at 0.2. Dropping it
-        // dead still at the middle of the square left it a block lower than the jar's a few ticks
-        // later, which is what the bench sees.
+        // parity: `Block.popResource`.
         const auto scatter = [&random] { return (random.nextDouble() * 0.5) - 0.25; };
         static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
                                                                      .uuid = wire::common::Uuid::random(),

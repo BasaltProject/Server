@@ -8,10 +8,7 @@ namespace basalt::server::runtime::world {
 
 class BiomeTagLoader;
 
-/// The seven Overworld ruined portal structures.
-///
-/// parity: `worldgen/structure/ruined_portal*.json`, whose numbers are these and whose biome lists
-/// come out of the jar's own `has_structure/*` tags.
+/// parity: `worldgen/structure/ruined_portal*.json`.
 namespace ruinedPortalVariants {
 
 [[nodiscard]] std::vector<server::world::terrain::RuinedPortalVariant> overworld(BiomeTagLoader& tags);

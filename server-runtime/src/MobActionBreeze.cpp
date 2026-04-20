@@ -55,7 +55,7 @@ void MobActionSystem::tickBreeze(world::LoadedWorld& world, entity::ai::MobConte
     if (breeze.hurtBy.has_value()) {
         state.hurtBy.setFor(*std::exchange(breeze.hurtBy, std::nullopt), now, 40);
     }
-    // parity: `BreezeAttackEntitySensor` and `Breeze.canAttack`: a player or an iron golem in sight.
+    // parity: `BreezeAttackEntitySensor` and `Breeze.canAttack`.
     const auto attackable = [&](const kit::Seen& seen) {
         if (seen.player != nullptr) {
             return seen.player->targetable;
@@ -77,7 +77,7 @@ void MobActionSystem::tickBreeze(world::LoadedWorld& world, entity::ai::MobConte
             break;
         }
     }
-    // parity: `StopAttackingIfTargetInvalid`, with a target that has not been attackable for a
+    // parity: `StopAttackingIfTargetInvalid`.
     // hundred ticks let go.
     std::optional<kit::Vec> targetAt;
     if (breeze.targetId.has_value()) {
@@ -143,7 +143,7 @@ void MobActionSystem::tickBreeze(world::LoadedWorld& world, entity::ai::MobConte
         breezeJumps(world, context, state);
     }
     kit::moveToTarget(context, state.motion);
-    // parity: `SlideToTargetSink.stop`: standing again, with a shot owed if there is a target.
+    // parity: `SlideToTargetSink.stop`.
     if (state.sliding && (!state.motion.walk.has_value() || now > state.slideEnd)) {
         state.sliding = false;
         state.motion.walk.reset();
@@ -192,7 +192,7 @@ void MobActionSystem::breezeFights(world::LoadedWorld& world, entity::ai::MobCon
         (breeze.vehicleId.has_value() || inWater || levitating)) {
         state.shoot.setFor(true, now, 60);
     }
-    // parity: `Slide`: away inside the inner ring, else behind the target or into the middle ring.
+    // parity: `Slide`.
     if (!state.jumpCooldown.has(now) && walkFree && !state.shoot.has(now) && breeze.onGround && !inWater &&
         state.pose == Pose::Standing) {
         const kit::Vec centre{mth::floor(breeze.x) + 0.5, mth::floor(breeze.y) + 0.5, mth::floor(breeze.z) + 0.5};

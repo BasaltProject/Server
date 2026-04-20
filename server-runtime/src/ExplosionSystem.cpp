@@ -32,7 +32,7 @@ using wire::common::Identifier;
 /// parity: `Explosion.isSmall`, which is what picks the small flash over the big one.
 constexpr float kLargeExplosion = 2.0F;
 
-/// parity: `ItemEntity.merge(stack, input, 16)`, the cap on what one blast stacks together.
+/// parity: `ItemEntity.merge(stack, input, 16)`.
 constexpr std::int32_t kExplosionMergeLimit = 16;
 
 // parity: `Block.popResource` and `ItemEntity`'s own opening movement.
@@ -76,14 +76,10 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     const std::vector<world::explosions::Broken> broken = world::explosions::explode(
         world.state(), facts.chunkHeight.minY(), facts.chunkHeight.maxY(), x, y, z, power, random, spares, resistance);
 
-    // parity: `ServerExplosion.createDrops`, which gathers everything the blast broke and only then
-    // drops it: what an explosion leaves is a handful of merged stacks, not one item per block, and
-    // that is what a real client shows.
+    // parity: `ServerExplosion.createDrops`.
     std::vector<Drop> drops;
-    // parity: `ServerLevel.explode`'s own packet, which is the flash, the smoke thrown off the
-    // blocks and the bang. The blocks themselves go out as ordinary updates below, so without this
-    // an explosion was a wall of stone silently turning into air.
-    // parity: 26.3 `ServerLevel.explode`, whose bang is off only for a silent source.
+    // parity: `ServerLevel.explode`.
+    // parity: `ServerLevel.explode`.
     const entity::ServerEntity* source = sourceEntityId == 0 ? nullptr : world.state().entity(sourceEntityId);
     const bool silent = source != nullptr && source->sourceNbt.has_value() && source->sourceNbt->getBoolean("Silent");
     const play::ExplodePacket explode{
@@ -111,10 +107,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         }
     }
 
-    // parity: `ServerExplosion.explode` runs `hurtEntities()` before `interactWithBlocks`, so a blast
-    // never hurts the items it is about to drop itself. It hurts everything else in the box: a tnt
-    // blast is `DESTROY_WITH_DECAY`, and `ItemEntity.ignoreExplosion` only saves a stack when that is
-    // false, so five health against a charge beside it and the stack is gone.
+    // parity: `ServerExplosion.explode`.
     for (const world::DroppedItem& item : world.state().items()) {
         const double distance =
             std::sqrt((item.x - x) * (item.x - x) + (item.y - y) * (item.y - y) + (item.z - z) * (item.z - z));
@@ -122,8 +115,6 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         if (damage <= 0.0F) {
             continue;
         }
-        // A stack leaving the world is enough: whoever is watching it hears about it through the same
-        // pass that reports one which despawned on its own.
         static_cast<void>(world.state().hurtItem(item.entityId, static_cast<std::int32_t>(damage)));
     }
 
@@ -139,10 +130,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         if (block.hive.has_value() && hooks_.hiveBlown) {
             hooks_.hiveBlown(world, block.x, block.y, block.z, block.stateId, *block.hive, sourceEntityId);
         }
-        // parity: `JukeboxBlockEntity.setRemoved`, which a blast reaches without any player: the 1011
-        // that tells the clients the song is over and the `jukebox_stop_play` an allay dancing to it
-        // hears. Vanilla raises both for the disc-less box too; this server keeps no block entity for
-        // one of those, so only a song that was playing is reported.
+        // parity: `JukeboxBlockEntity.setRemoved`.
         if (block.songWasPlaying) {
             for (const player::PlayerSession* watcher : watchers) {
                 if (watcher->connection().sendLevelEvent) {
@@ -170,8 +158,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
             context, block.x, block.y, block.z, block.stateId, effects,
             [this, &world, &watchers, &drops](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
                 sendBlock(watchers, bx, by, bz, reg::blocks::air().stateId);
-                // What the blast knocked loose afterwards falls as an ordinary break, not as part of
-                // the explosion: parity with `dropResources`, which carries no radius.
+                // parity: `dropResources` has no radius.
                 if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(stateId); state.has_value()) {
                     collectExplodedBlock(world, state->block, stateId, bx, by, bz, 0.0F, drops);
                 }
@@ -206,9 +193,7 @@ void ExplosionSystem::collectExplodedBlock(world::LoadedWorld& world, const Iden
     if (table == nullptr) {
         return;
     }
-    // parity: `LootContextParams.EXPLOSION_RADIUS`, which `explosion_decay` turns into the one in
-    // `power` chance each item has of surviving the blast.
-    // parity: the blast rolls on the table's own stream like any other break.
+    // parity: `LootContextParams.EXPLOSION_RADIUS`.
     random::RandomSource scratch = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
@@ -220,8 +205,7 @@ void ExplosionSystem::collectExplodedBlock(world::LoadedWorld& world, const Iden
         if (reg::items::registry().byName(stack.item) == nullptr) {
             continue;
         }
-        // parity: `ServerExplosion.addOrAppendStack`, which merges into the first stack that will
-        // take it, up to sixteen, and only starts a new one when none will.
+        // parity: `ServerExplosion.addOrAppendStack`.
         std::int32_t remaining = stack.count;
         for (Drop& drop : drops) {
             if (drop.item != stack.item || drop.count >= kExplosionMergeLimit) {
@@ -241,8 +225,7 @@ void ExplosionSystem::collectExplodedBlock(world::LoadedWorld& world, const Iden
 }
 
 void ExplosionSystem::popResource(world::LoadedWorld& world, const Drop& drop) const {
-    // parity: `Block.popResource` reads the `block_drops` rule before it puts anything in the world,
-    // and what a blast knocked loose is dropped through that same call.
+    // parity: `Block.popResource`.
     if (!world.gameRules().get(world::gameRules::kBlockDrops)) {
         return;
     }

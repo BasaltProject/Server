@@ -29,8 +29,7 @@ constexpr float kTurtleHatchChance = 0.002F;
 /// parity: `DriedGhastBlock.randomTick`'s own delay.
 constexpr std::int32_t kDriedGhastDelay = 5000;
 
-/// parity: `tryChangingState`'s `offset(-3, -2, -3)` to `offset(3, 2, 3)` and its `distance * 5` to
-/// `distance * 10`.
+/// parity: `tryChangingState`'s `offset(-3.
 constexpr std::int32_t kEyeblossomReach = 3;
 constexpr std::int32_t kEyeblossomHeight = 2;
 constexpr double kEyeblossomNear = 5.0;
@@ -170,9 +169,7 @@ void buddingAmethyst(WorldState& world, std::int32_t x, std::int32_t y, std::int
 
 void turtleEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                random::RandomSource& random, std::vector<BlockChange>& changes) {
-    // parity: `TurtleEggBlock.shouldUpdateHatchLevel` over the `turtle_egg_hatch_chance` environment
-    // attribute, whose default is this. The attribute system itself is not modelled, so the default
-    // is what every position gets.
+    // parity: `TurtleEggBlock.shouldUpdateHatchLevel` over the `turtle_egg_hatch_chance` environment.
     if (random.nextFloat() >= kTurtleHatchChance) {
         return;
     }
@@ -205,8 +202,7 @@ void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     if (propertyOf(stateId, "waterlogged") != std::optional<std::string>{"true"} && hydration <= 0) {
         return;
     }
-    // parity: `DriedGhastBlock.randomTick` is gated on `!hasScheduledTick(pos, this)`: the long wait
-    // is armed once and the random ticks that land while it counts down do nothing.
+    // parity: `DriedGhastBlock.randomTick` is gated on `!hasScheduledTick(pos.
     if (world.hasScheduledBlockTick(x, y, z, scheduledBlocks::driedGhastTickType())) {
         return;
     }
@@ -256,10 +252,7 @@ void eyeblossom(WorldState& world, const WorldClock& clock, std::int32_t x, std:
     if (was == nullptr) {
         return;
     }
-    // parity: `tryChangingState` books every flower in the same state inside a box of three across
-    // and two up and down, further ones later, which is what makes a field flip as a wave instead of
-    // one at a time. `BlockPos.betweenClosed` runs x innermost, then y, then z, and the delays come
-    // off the level's random in that order.
+    // parity: `tryChangingState` books every flower in the same state inside a box of three across.
     for (std::int32_t dz = -kEyeblossomReach; dz <= kEyeblossomReach; ++dz) {
         for (std::int32_t dy = -kEyeblossomHeight; dy <= kEyeblossomHeight; ++dy) {
             for (std::int32_t dx = -kEyeblossomReach; dx <= kEyeblossomReach; ++dx) {

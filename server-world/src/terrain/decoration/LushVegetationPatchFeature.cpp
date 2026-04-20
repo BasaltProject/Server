@@ -386,8 +386,7 @@ bool placePatch(Chunk& chunk, random::RandomSource& random, const DecorationPos&
     const std::vector<DecorationPos> vegetationSurface =
         config.waterlogged ? waterlogEnclosedSurface(chunk, surface) : surface;
     for (const DecorationPos& ground : javaHashSetOrder(vegetationSurface)) {
-        // parity: vanilla short-circuits on a zero chance, so it makes no draw at all there. No patch
-        // in 26.2 uses zero, but matching the jar keeps that from mattering later.
+        // parity: vanilla short-circuits on a zero chance and makes no draw.
         if (config.vegetationChance <= 0.0F || random.nextFloat() >= config.vegetationChance) {
             continue;
         }

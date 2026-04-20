@@ -4,10 +4,7 @@
 
 namespace basalt::server::world {
 
-/// Overworld vertical-bound compatibility constants. New dimension-aware code uses `ChunkHeight`.
-///
-/// parity: `NoiseSettings.OVERWORLD_NOISE_SETTINGS` (`create(-64, 384, 1, 2)`), confirmed directly
-/// against the real 26.2 jar, not just assumed stable from older versions.
+/// parity: `NoiseSettings.OVERWORLD_NOISE_SETTINGS` (`create(-64.
 namespace worldHeight {
 
 inline constexpr std::int32_t kMinY = -64;

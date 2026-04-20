@@ -31,13 +31,10 @@ TEST_CASE("a missing file is written from its commented default and then read") 
     CHECK(directory.root() == root);
     CHECK(directory.pathOf("server.toml") == root + "/server.toml");
 
-    // The directory does not exist yet either: first run is one call, not a setup step.
     const std::expected<toml::TomlTable, std::string> loaded = directory.load("server.toml", kServerDefaultToml);
     REQUIRE(loaded.has_value());
     CHECK(fileIO::exists(root + "/server.toml"));
 
-    // What was written is the default itself, comments and all: the file an operator opens on
-    // first run explains itself.
     const std::optional<std::string> written = fileIO::readText(root + "/server.toml");
     REQUIRE(written.has_value());
     CHECK(*written == kServerDefaultToml);
@@ -72,16 +69,11 @@ TEST_CASE("a file that does not parse names itself rather than being replaced") 
     const ConfigDirectory directory{root};
     const std::expected<toml::TomlTable, std::string> loaded = directory.load("groups.toml", kGroupsDefaultToml);
     REQUIRE_FALSE(loaded.has_value());
-    // With several files, "the configuration is broken" is not a useful thing to tell someone.
     CHECK(loaded.error().starts_with(root + "/groups.toml is not valid TOML: "));
-    // And the broken file is left exactly as the operator wrote it: falling back to the default
-    // would be a typo in `groups.toml` quietly granting nobody any permissions.
     CHECK(*fileIO::readText(root + "/groups.toml") == "[unclosed\n");
 }
 
 TEST_CASE("every commented default is valid TOML") {
-    // The templates are edited by hand and compiled in, so a broken one would only show up on
-    // somebody's first run. Here instead.
     const std::vector<std::pair<std::string, std::string_view>> templates = {
         {"animations.toml", kAnimationsDefaultToml},
         {"boss_bar.toml", kBossBarDefaultToml},
@@ -97,7 +89,6 @@ TEST_CASE("every commented default is valid TOML") {
     for (const auto& [name, contents] : templates) {
         CAPTURE(name);
         CHECK_FALSE(contents.empty());
-        // Written for an operator to read, not an empty skeleton.
         CHECK(contents.find('#') != std::string_view::npos);
         CHECK(toml::parse(contents).has_value());
     }

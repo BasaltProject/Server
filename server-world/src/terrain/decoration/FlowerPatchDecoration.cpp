@@ -163,8 +163,7 @@ void decorateSpecs(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEn
     const DecorationPos chunkOrigin{chunk.chunkX() * 16, 0, chunk.chunkZ() * 16};
     for (const FeatureSpec* spec : chosen) {
         random::setFeatureSeed(random, decorationSeed, spec->index, kVegetalDecorationStep);
-        // The biome test sits between the modifiers and the body, so a position the modifiers
-        // produced still costs its draws even when the biome rejects it.
+        // parity: the biome test sits between the modifiers and the body, so rejected positions still cost draws.
         placeFrom(chunk, random, chunkOrigin, spec->beforeBiome, [&](const DecorationPos& position) {
             if (std::ranges::find(spec->biomes, biomePath(environment.biomeAt(position.x, position.y, position.z))) ==
                 spec->biomes.end()) {

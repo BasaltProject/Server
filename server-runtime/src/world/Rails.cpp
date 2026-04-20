@@ -12,7 +12,6 @@
 namespace basalt::server::runtime::world::rails {
 namespace {
 
-/// The three rails that carry a signal: they climb, but they never turn a corner.
 constexpr std::array<std::string_view, 3> kStraightOnly{"powered_rail", "detector_rail", "activator_rail"};
 
 constexpr std::string_view kNorthSouth = "north_south";
@@ -107,9 +106,7 @@ using Position = std::array<std::int32_t, 3>;
     return links.size() != 2;
 }
 
-/// parity: `removeSoftConnections`: a connection only counts when there is a rail there *and* it
-/// points back. A rail pointing at empty ground still says it does in its own state, and taking
-/// that at face value is what stops a corner ever forming.
+/// parity: `removeSoftConnections`.
 std::vector<Position> softConnections(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                       std::string_view shape) {
     std::vector<Position> links;
@@ -179,8 +176,6 @@ std::vector<Position> softConnections(const WorldState& world, std::int32_t x, s
     if (!turned.has_value()) {
         return std::nullopt;
     }
-    // Already in that shape: answered without writing it again, which is what keeps a track laid
-    // rail by rail from reporting every rail it looked at.
     if (*turned == stateId) {
         return stateId;
     }
@@ -190,7 +185,7 @@ std::vector<Position> softConnections(const WorldState& world, std::int32_t x, s
     return turned;
 }
 
-/// parity: `RailState.place`'s shape choice, neighbours first and the default only as a fallback.
+/// parity: `RailState.place`'s shape choice.
 [[nodiscard]] std::optional<std::string> shapeFor(const WorldState& world, std::string_view worldName, std::int32_t x,
                                                   std::int32_t y, std::int32_t z, std::int32_t stateId) {
     const std::string defaultShape = shapeOf(stateId);
@@ -205,8 +200,6 @@ std::vector<Position> softConnections(const WorldState& world, std::int32_t x, s
     const bool alongZ = north || south;
     const bool alongX = west || east;
 
-    // The four rules here are vanilla's own order, and every one of them is said again by the
-    // fallback below: they are a fast path, not a different answer.
     std::string shape;
     if (alongZ && !alongX) {
         shape = kNorthSouth;
@@ -236,8 +229,7 @@ std::vector<Position> softConnections(const WorldState& world, std::int32_t x, s
         } else if (alongX) {
             shape = kEastWest;
         }
-        // parity: `place(hasSignal, ...)`, whose two orders differ only in which corner wins when a
-        // rail could take either: powered, the last one tried is north-west.
+        // parity: `place(hasSignal, ...)`.
         if (!straight) {
             const bool hasSignal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
             if (hasSignal) {
@@ -272,7 +264,7 @@ std::vector<Position> softConnections(const WorldState& world, std::int32_t x, s
     return slope(world, x, y, z, shape.empty() ? defaultShape : shape);
 }
 
-/// parity: `RailState.connectTo`, which bends a neighbour towards a rail that just appeared.
+/// parity: `RailState.connectTo`.
 void connectTo(WorldState& world, const Position& at, std::int32_t stateId, std::int32_t towardsX,
                std::int32_t towardsZ, const Changed& changed) {
     const std::string shape = shapeOf(stateId);
@@ -323,7 +315,7 @@ void connectTo(WorldState& world, const Position& at, std::int32_t stateId, std:
     }
 }
 
-/// parity: `countPotentialConnections`, which counts rails beside it whatever they point at.
+/// parity: `countPotentialConnections`.
 [[nodiscard]] std::int32_t potentialConnections(const WorldState& world, std::int32_t x, std::int32_t y,
                                                 std::int32_t z) {
     std::int32_t count = 0;
@@ -383,7 +375,6 @@ std::optional<std::int32_t> onNeighbourChange(WorldState& world, std::string_vie
     if (!stateId.has_value()) {
         return std::nullopt;
     }
-    // Only the plain rail: the three that carry a signal never turn a corner at all.
     if (pathOf(*stateId) != "rail") {
         return std::nullopt;
     }

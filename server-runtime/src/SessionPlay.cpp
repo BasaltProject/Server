@@ -59,8 +59,7 @@ using player::PlayerInventory;
 using player::PlayerSession;
 using wire::common::Identifier;
 
-/// parity: `ServerboundMovePlayerPacket`'s three shapes beyond the full one, which carry a
-/// rotation, a status byte, or both.
+/// parity: `ServerboundMovePlayerPacket`.
 constexpr std::int32_t kMovePlayerRotId = 0x20;
 constexpr std::int32_t kMovePlayerStatusOnlyId = 0x21;
 constexpr std::int32_t kServerboundClientInformationId = 0x0e;
@@ -73,21 +72,16 @@ constexpr std::int32_t kLeftInputFlag = 0x04;
 constexpr std::int32_t kRightInputFlag = 0x08;
 constexpr std::int32_t kSneakInputFlag = 0x20;
 
-/// What the client's own answer to "how fast can you take chunks" is clamped to.
 constexpr float kMinChunksPerTick = 0.01F;
 constexpr float kMaxChunksPerTick = 64.0F;
 
-/// A coordinate as the log wants it: one decimal, which is as much as anybody reads off it.
 std::string oneDecimal(double value) {
-    // The sign is kept apart from the digits: dividing a negative tenth by ten is zero, so anything
-    // between -1 and 0 came out looking positive.
+    // The sign is kept apart: dividing a negative tenth by ten is zero, so values in (-1, 0) looked positive.
     const auto tenths = static_cast<std::int64_t>(std::llround(std::abs(value) * 10.0));
     const std::string sign = value < 0.0 && tenths != 0 ? "-" : "";
     return sign + std::to_string(tenths / 10) + "." + std::to_string(tenths % 10);
 }
 
-/// What a plugin drew, as what the window machinery draws: the same three fields, and the rest of a
-/// `PluginItem` (damage, enchantments) is not something a menu button has.
 [[nodiscard]] std::map<std::int32_t, PluginMenuItem>
 menuItemsOf(const std::map<std::int32_t, server::plugins::PluginItem>& items) {
     std::map<std::int32_t, PluginMenuItem> drawn;
@@ -106,7 +100,6 @@ play::PlayerInfoEntry entryFor(const PlayerSession& player) {
                                  .chatSession = player.chatSession()};
 }
 
-/// The protocol ids of every item the ingredients name, each once.
 [[nodiscard]] std::vector<std::int32_t> itemIdsOf(const std::vector<const server::world::crafting::Ingredient*>& from) {
     std::set<std::int32_t> ids;
     for (const server::world::crafting::Ingredient* ingredient : from) {
@@ -121,8 +114,7 @@ play::PlayerInfoEntry entryFor(const PlayerSession& player) {
     return {ids.begin(), ids.end()};
 }
 
-/// parity: `RecipeManager`'s nine `RecipePropertySet`s, which decide what a client lets into a
-/// furnace, smithing table or brewing stand slot.
+/// parity: `RecipeManager`.
 [[nodiscard]] std::vector<play::ItemPropertySet> propertySetsOf(const world::RealRecipes& recipes) {
     namespace crafting = server::world::crafting;
     using Pick = const crafting::Ingredient* (*)(const crafting::Recipe&);
@@ -195,9 +187,7 @@ void ClientSession::runCommand(const std::string& command, const chat::SignedArg
     if (options_.plugins.commandAllowed && !options_.plugins.commandAllowed(*session, line)) {
         return;
     }
-    // No vanilla counterpart: vanilla logs only the result of a command. It is logged anyway because
-    // an operator watching the console should see what players are running, and console output is
-    // not part of protocol parity.
+    // No vanilla counterpart: an operator should see what players run, and console output is not protocol parity.
     logger_.info([session, &line] { return session->name() + " issued server command: /" + line; });
     command::PlayerCommandSource source{*session, dispatcher->environment().groups(), signedArguments};
     dispatcher->execute(source, line);
@@ -219,7 +209,7 @@ void ClientSession::sendSuggestions(const play::CommandSuggestionRequestPacket& 
 }
 
 void ClientSession::seenAdvancements(wire::io::ByteBuffer& body) {
-    // parity: `handleSeenAdvancements`: only an opened tab of a known advancement selects anything.
+    // parity: `handleSeenAdvancements`.
     const std::optional<play::SeenAdvancementsPacket> seen = play::SeenAdvancementsPacket::read(body);
     PlayerSession* session = playerSession_.get();
     if (!seen.has_value() || session == nullptr || options_.advancements == nullptr ||
@@ -418,7 +408,7 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.sendActionBar = [this](const wire::text::Component& message) { sendPluginText(message, true); };
     connection.sendTitle = [this](const wire::text::Component& title, const wire::text::Component& subtitle,
                                   std::int32_t fadeIn, std::int32_t stay, std::int32_t fadeOut) {
-        // The timings first: sent after the text, the client applies them to the *next* title.
+        // Timings go first: sent after the text, the client applies them to the next title.
         const play::SetTitlesAnimationPacket timings{.fadeIn = fadeIn, .stay = stay, .fadeOut = fadeOut};
         sendCompressed(play::SetTitlesAnimationPacket::kId,
                        [&timings](wire::io::ByteBuffer& buffer) { timings.write(buffer); });
@@ -445,8 +435,6 @@ player::PlayerConnection ClientSession::playerConnection() {
         });
     };
     connection.storedSnapshot = [this] { return storedSnapshot(); };
-    // A window a plugin drew. The controller has had all three of these all along; without them
-    // `menu:open` found no way through and returned as if it had opened one.
     connection.openPluginMenu = [this](const std::string& title, std::int32_t rows,
                                        const std::map<std::int32_t, server::plugins::PluginItem>& items,
                                        std::function<void(std::int32_t)> onClick) {
@@ -468,9 +456,7 @@ void ClientSession::enterPlay() {
     }
     const std::int32_t entityId = registry->allocateEntityId();
 
-    // Which world this player belongs to is decided before anything is sent, because the login
-    // packet already carries a position. A stored world that is no longer declared is not an error:
-    // the player goes to the default world and the log says so.
+    // Decided before anything is sent (the login carries a position); an undeclared stored world falls back to default.
     const std::optional<storage::StoredPlayer> stored =
         options_.playerStore == nullptr || !options_.playerStore->isOpen()
             ? std::nullopt
@@ -497,8 +483,7 @@ void ClientSession::enterPlay() {
 
     const std::int32_t chunkRadius = world->settings().viewDistance;
     const std::array<double, 3>& spawn = world->spawn();
-    // Before the login packet rather than after it, because everything below this point describes
-    // this player and so needs them to exist.
+    // Before the login packet, because everything after it describes this player.
     auto session = std::make_unique<PlayerSession>(pendingProfile_->id, pendingProfile_->name, entityId,
                                                    playerConnection(), options_.defaultGamemode);
     session->x = spawn[0];
@@ -506,14 +491,12 @@ void ClientSession::enterPlay() {
     session->z = spawn[2];
     session->flying = options_.defaultGamemode == play::Gamemode::Spectator;
     session->worldName = world->name();
-    // Before a single packet goes out: the login packet carries the game mode and the position, so
-    // restoring afterwards would mean announcing one state and then correcting it.
+    // Restored before any packet: the login carries game mode and position, so later means announce then correct.
     if (stored.has_value()) {
         player::playerPersistence::restore(*session, *stored);
         firstSeenEpochSeconds = stored->firstSeenEpochSeconds;
         playTimeTicks = stored->playTimeTicks;
-        // Only the *position* is meaningless when the stored world is gone. Health, hunger,
-        // experience and game mode are the player's, not the world's.
+        // Only the position is meaningless when the stored world is gone; the rest is the player's.
         if (stored->world != world->name()) {
             session->x = spawn[0];
             session->y = spawn[1];
@@ -543,7 +526,6 @@ void ClientSession::enterPlay() {
     sendCompressed(play::LoginPlayPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         play::LoginPlayPacket{.entityId = entityId,
                               .isHardcore = false,
-                              // Every world, so the client accepts being moved into any of them.
                               .worldNames = worldNames,
                               .maxPlayers = 20,
                               .viewDistance = chunkRadius,
@@ -551,37 +533,27 @@ void ClientSession::enterPlay() {
                               .reducedDebugInfo = false,
                               .enableRespawnScreen = true,
                               .doLimitedCrafting = false,
-                              // The session's mode, not the configured default: a returning player
-                              // was restored above.
                               .spawnInfo = spawnInfo(player.gamemode),
                               .onlineMode = online,
                               .enforcesSecureChat = options_.enforceSecureProfile && !translatedClient()}
             .write(buffer);
     });
 
-    // Straight after the login packet, where vanilla's own join sequence puts them: abilities decide
-    // whether the client will even let itself fly, and without a command tree its own parser rejects
-    // every slash command before one reaches the server.
+    // Straight after login as in vanilla: abilities gate flying, and slash commands need the command tree.
     uiState_->sendAbilities();
-    // parity: the recipes go right here, between the abilities and the permission level. The
-    // stonecutter draws its own buttons from them.
     sendStonecutterRecipes();
     uiState_->sendCommandTree();
 
-    // Without these a real client's "loading terrain" screen never dismisses: it has no centre to
-    // count chunks around and no radius to know when it has enough.
+    // Without these the client's loading screen never dismisses: it has no centre or radius to count chunks against.
     chunkStreamer_->setRequestedViewDistance(pendingViewDistance_);
     const server::world::ChunkTracker::Delta initialChunks =
         chunkStreamer_->initialJoin(player.x, player.z, chunkRadius);
 
-    // parity: teleport and player info before level data, and the chunks last. Chunks first leaves a
-    // real client on "loading terrain" for ever.
     uiState_->sendTime(*world);
     if (world->weather().raining) {
         uiState_->sendWeather(world->weather());
     }
-    // parity: `CustomBossEvents.onPlayerConnect`, which shows a joining player every bar that names
-    // them. Without it a `/bossbar` set before they joined is invisible until it changes.
+    // parity: `CustomBossEvents.onPlayerConnect`.
     if (options_.bossBars != nullptr) {
         for (const command::commands::CustomBossBar* bar : options_.bossBars->barsFor(player)) {
             sendCompressed(play::BossEventPacket::kId, [bar](wire::io::ByteBuffer& buffer) {
@@ -603,8 +575,7 @@ void ClientSession::enterPlay() {
 
     const std::vector<PlayerSession*> others = registry->snapshot();
     registry->add(&player);
-    // Their advancements and recipe book, before anything can ask about them: `limited_crafting`
-    // consults the book on the first click.
+    // Advancements and recipe book go first: `limited_crafting` consults the book on the first click.
     if (options_.progress != nullptr) {
         options_.progress->load(player.uuid().toString());
     }
@@ -620,9 +591,7 @@ void ClientSession::enterPlay() {
     });
     logger_.info([&player] { return player.name() + " joined the game"; });
     if (options_.plugins.joined) {
-        // Handed to the owner rather than announced from here, which is this connection's own
-        // thread: a decider only runs on the thread plugins live on, and fired from here the host
-        // drops it and warns. Nothing waits for the answer, so a turn later is late enough.
+        // Handed to the owner: a decider only runs on the plugin thread, and from here the host drops it.
         onOwner([this] {
             const PlayerSession* joined = playerSession_.get();
             if (joined != nullptr) {
@@ -641,20 +610,15 @@ void ClientSession::enterPlay() {
         play::PlayerInfoUpdatePacket::initializing(entries).write(buffer);
     });
 
-    // The HUD draws no hearts and no experience bar until it has been told what to draw.
     uiState_->syncHealth();
     uiState_->syncExperience();
     // parity: `PlayerList.placeNewPlayer` sends the saved post effects after the mob effects.
     sendPostEffects();
-    // parity: the inventory goes here, after the level info and the player list, not among the
-    // chunk-radius packets above. Order matters on join.
     sendInventory();
 
-    // Awaits and sends the ground the player lands on, then queues the rest of the view distance.
     chunkStreamer_->sendInitialChunks(initialChunks);
 
-    // Only the players who cannot see this one as an entity: for the rest, the entity sync sends the
-    // entry itself, immediately before the spawn, so the two never arrive out of order.
+    // Only players who cannot see this one as an entity; the entity sync sends the entry before the spawn for the rest.
     const play::PlayerInfoUpdatePacket joining = play::PlayerInfoUpdatePacket::initializing({entryFor(player)});
     for (const PlayerSession* other : others) {
         if (other->worldName == player.worldName || !other->connection().sendPlayPacket) {
@@ -664,20 +628,14 @@ void ClientSession::enterPlay() {
                                            [&joining](wire::io::ByteBuffer& buffer) { joining.write(buffer); });
     }
 
-    // Drawn here rather than left to the outbound loop, which sends chunks before it redraws
-    // anything: on a fresh join the scoreboard, tab list and boss bar would wait behind the whole
-    // terrain stream.
+    // Drawn here: the outbound loop sends chunks first and would leave the scoreboard behind the terrain.
     uiState_->tickUi();
 
-    // parity: announced here, near the end and in yellow, not on the first packet of the join.
-    // Everyone means everyone on the server, not just this world.
     broadcastToEveryone(
         wire::text::Component::translatable("multiplayer.player.joined", {wire::text::Component::text(player.name())})
             .color(wire::text::kYellow));
 
-    // Last, once the whole join sequence is on the wire. Started any earlier and this thread
-    // interleaves chunk batches with the packets still finishing the join, which a client reads as a
-    // protocol desynchronisation.
+    // Last: started earlier, this thread interleaves chunk batches with join packets, which the client reads as desync.
     startOutboundLoop();
 }
 
@@ -702,7 +660,6 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
-    // The client no longer follows the confirmation with a move packet of its own.
     if (packetId == play::AcceptTeleportationPacket::kId) {
         const std::optional<play::AcceptTeleportationPacket> accept = play::AcceptTeleportationPacket::read(body);
         if (accept.has_value()) {
@@ -710,7 +667,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
-    // parity: `ServerboundMovePlayerPacket.Rot`, which a client sends when it turns on the spot.
+    // parity: `ServerboundMovePlayerPacket.Rot`.
     if (packetId == kMovePlayerRotId) {
         const float yaw = body.readFloat();
         const float pitch = body.readFloat();
@@ -723,7 +680,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
-    // parity: `ServerboundMovePlayerPacket.StatusOnly`: neither moved nor turned, only landed.
+    // parity: `ServerboundMovePlayerPacket.StatusOnly`.
     if (packetId == kMovePlayerStatusOnlyId) {
         const bool onGround = (body.readByte() & 1) != 0;
         if (session != nullptr && !body.failed() && !updateAwaitingTeleport()) {
@@ -759,8 +716,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         return;
     }
     if (packetId == play::ServerboundPlayerAbilitiesPacket::kId) {
-        // The client toggles its own flight and tells the server after the fact. Believed only when
-        // the game mode actually allows it.
+        // Believed only when the game mode actually allows flying.
         const std::optional<play::ServerboundPlayerAbilitiesPacket> abilities =
             play::ServerboundPlayerAbilitiesPacket::read(body);
         if (session != nullptr && abilities.has_value()) {
@@ -982,8 +938,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         return;
     }
     if (packetId == kServerboundClientInformationId) {
-        // parity: `ServerPlayer.updateOptions`, which re-reads this every time the player touches
-        // their video settings, not just once at login.
+        // parity: `ServerPlayer.updateOptions`.
         const std::optional<wire::protocol::configuration::ClientInformationPacket> information =
             wire::protocol::configuration::ClientInformationPacket::read(body);
         if (!information.has_value()) {
@@ -1009,8 +964,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         return;
     }
     if (packetId == play::ChunkBatchReceivedPacket::kId) {
-        // The client's own answer to "how fast can you take chunks". This is the protocol's flow
-        // control; it is not advice.
+        // This is the protocol's flow control, not advice.
         const std::optional<play::ChunkBatchReceivedPacket> packet = play::ChunkBatchReceivedPacket::read(body);
         if (packet.has_value()) {
             chunkStreamer_->desiredChunksPerTick =
@@ -1018,8 +972,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
-    // `player_input`: the movement keys currently held, sent on every change. Sneaking lives here
-    // now, and it decides whether right-clicking a crafting table opens it or places against it.
+    // Sneaking lives here now, and it decides whether right-clicking a crafting table opens it or places against it.
     if (packetId == kServerboundPlayerInputId) {
         const std::int32_t inputs = body.readByte();
         if (session == nullptr || body.failed()) {

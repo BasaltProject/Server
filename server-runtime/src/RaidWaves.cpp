@@ -29,12 +29,12 @@ namespace mth = wire::common::mth;
 constexpr std::array<RaiderType, 5> kRaiderTypes{RaiderType::Vindicator, RaiderType::Evoker, RaiderType::Pillager,
                                                  RaiderType::Witch, RaiderType::Ravager};
 
-/// parity: `getNumGroups(NORMAL)` and `getNumGroups(HARD)`, which the riders and buffs key on.
+/// parity: `getNumGroups(NORMAL)` and `getNumGroups(HARD)`.
 constexpr std::int32_t kNormalGroups = 5;
 constexpr std::int32_t kHardGroups = 7;
 constexpr std::int32_t kEasyGroups = 3;
 
-/// parity: `findRandomSpawnPos`: how far out the ring is, and when the village itself will do.
+/// parity: `findRandomSpawnPos`.
 constexpr float kRingPerSecond = 0.22F;
 constexpr float kRingOffset = 0.24F;
 constexpr float kRingRadius = 32.0F;
@@ -42,7 +42,7 @@ constexpr std::int32_t kMaxHeightDifference = 96;
 constexpr std::int32_t kInsideVillageSeconds = 7;
 constexpr std::int32_t kLoadedAround = 10;
 
-/// parity: `playSound`: thirteen blocks from the listener towards the raid, heard from sixty-four.
+/// parity: `playSound`.
 constexpr double kHornDistance = 13.0;
 constexpr double kHornRange = 64.0;
 constexpr float kHornVolume = 64.0F;
@@ -162,7 +162,7 @@ entity::ServerEntity* RaidSystem::spawnRaider(world::LoadedWorld& world, Raid& r
                                               std::int32_t wave, const RaidPos& pos) {
     const std::optional<std::int32_t> raidId = world.raids().idOf(&raid);
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-    // parity: `joinRaid` with a fresh raider: half a block in and one up, finalized as an event, then
+    // parity: `joinRaid` with a fresh raider.
     // the raid's own buffs, all before it is added to the world.
     entity::ServerEntity* raider =
         spawning_->spawnEventRaider(world, Identifier::vanilla(std::string{type}), pos[0] + 0.5, pos[1] + 1.0,
@@ -187,14 +187,14 @@ void RaidSystem::applyRaidBuffs(Raid& raid, entity::ServerEntity& raider, std::i
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     const std::string_view type = raider.type().path();
     if (type == "vindicator") {
-        // parity: `Vindicator.applyRaidBuffs`: an axe, sharpened past the fifth wave when enchanted.
+        // parity: `Vindicator.applyRaidBuffs`.
         if (random.nextFloat() <= raid.enchantOdds()) {
             entity::raiderEquipment::holdInMainHand(raider, "iron_axe", "sharpness", wave > kNormalGroups ? 2 : 1);
         } else {
             entity::raiderEquipment::holdInMainHand(raider, "iron_axe");
         }
     } else if (type == "pillager") {
-        // parity: `Pillager.applyRaidBuffs`: quick charge from the fourth wave on, only when enchanted.
+        // parity: `Pillager.applyRaidBuffs`.
         if (random.nextFloat() <= raid.enchantOdds() && wave > kEasyGroups) {
             entity::raiderEquipment::holdInMainHand(raider, "crossbow", "quick_charge", wave > kNormalGroups ? 2 : 1);
         }

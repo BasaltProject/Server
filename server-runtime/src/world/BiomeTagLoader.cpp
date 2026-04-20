@@ -22,7 +22,6 @@ const std::set<std::string>& BiomeTagLoader::biomesIn(const std::string& name) {
 }
 
 std::set<std::string> BiomeTagLoader::expand(const std::string& name, std::set<std::string>& seen) const {
-    // A tag that refers to itself, however far around, contributes nothing the second time.
     if (!seen.insert(name).second) {
         return {};
     }

@@ -4,9 +4,6 @@
 
 namespace basalt::server::world::terrain::decoration::tree {
 
-/// The real per-tree configurations, from the jar's own `TreeFeatures` bootstrap rather than from a
-/// datapack dump: the serialized form loses values the runtime object keeps (see the cherry's corner
-/// hole chance).
 namespace treeConfigs {
 
 [[nodiscard]] const TreeConfiguration& oak();

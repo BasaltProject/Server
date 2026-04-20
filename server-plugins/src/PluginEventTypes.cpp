@@ -1,7 +1,6 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 
 namespace basalt::server::plugins::pluginEventTypes {
-
 const PluginEventType& playerJoin() {
     static const PluginEventType type{"player.join", false, {"player_name", "player_uuid", "world"}};
     return type;
@@ -473,5 +472,4 @@ const std::vector<const PluginEventType*>& all() {
                                                            &blockFade()};
     return every;
 }
-
 } // namespace basalt::server::plugins::pluginEventTypes

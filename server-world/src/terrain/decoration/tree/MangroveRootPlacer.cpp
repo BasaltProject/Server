@@ -16,8 +16,7 @@
 namespace basalt::server::world::terrain::decoration::tree {
 namespace {
 
-// parity: MangroveRootPlacement(8, 15, 0.2) and AboveRootPlacement(moss_carpet, 0.5), the exact
-// values both mangrove tree configs use.
+// parity: `MangroveRootPlacement(8, 15, 0.2)` and `AboveRootPlacement(moss_carpet, 0.5)`.
 constexpr std::int32_t kMaxRootWidth = 8;
 constexpr std::size_t kMaxRootLength = 15;
 constexpr float kRandomSkewChance = 0.2F;
@@ -79,8 +78,7 @@ void placeRoot(Chunk& chunk, random::RandomSource& random, const std::int32_t x,
         return;
     }
     const std::int32_t current = chunk.decorationBlockStateId(x, y, z);
-    // parity: MangroveRootPlacer.placeRoot turns mud and muddy roots into muddy_mangrove_roots
-    // whatever canPlaceRoot says; everything else goes through the real RootPlacer.placeRoot.
+    // parity: `MangroveRootPlacer.placeRoot` turns mud into muddy_mangrove_roots regardless of `canPlaceRoot`.
     if (muddyRootsInPaths().contains(pathOf(current))) {
         chunk.setDecorationBlockStateId(x, y, z, potentiallyWaterlogged(stateIdOf("muddy_mangrove_roots"), current));
         return;
@@ -95,8 +93,7 @@ void placeRoot(Chunk& chunk, random::RandomSource& random, const std::int32_t x,
     }
 }
 
-/// parity: `MangroveRootPlacer.potentialRootPositions`. The draws differ per branch, so the width
-/// bands are not interchangeable.
+/// parity: `MangroveRootPlacer.potentialRootPositions`, draws differ per branch.
 [[nodiscard]] std::vector<std::tuple<std::int32_t, std::int32_t, std::int32_t>>
 potentialRootPositions(random::RandomSource& random, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                        const HorizontalDirection dir, const std::int32_t originX, const std::int32_t originY,

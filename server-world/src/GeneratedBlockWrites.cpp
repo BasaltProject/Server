@@ -28,11 +28,9 @@ bool apply(Chunk& chunk, const ChunkGeneratedBlockWrite& write, const bool sourc
     const std::int32_t localX = write.x & 15;
     const std::int32_t localZ = write.z & 15;
     const std::int32_t current = chunk.blockStateId(localX, write.y, localZ);
-    // Earlier writes of this same batch are not the receiver's decoration: among themselves they
-    // keep the order they were issued in, so a later one may still cover them.
+    // Earlier writes of this same batch are not the receiver's decoration.
     const bool untouched = current == write.expectedStateId || (queued != nullptr && queued->contains(cellKey(write)));
-    // A chunk that decorates later covers this write only with a feature that could have replaced
-    // it. Nothing after an ore targets a geode, a dirt vein or an ore, so those land regardless.
+    // A chunk that decorates later covers this write only with a feature that could have replaced it.
     const bool onTop = sourceGoesOnTop || untouched ||
                        terrain::decoration::oreBlockRules::survivesLaterDecoration(write.policy, write.stateId);
     const bool loosely =
@@ -48,8 +46,6 @@ bool apply(Chunk& chunk, const ChunkGeneratedBlockWrite& write, const bool sourc
         write.policy == GeneratedBlockWritePolicy::Tree
             ? terrain::decoration::tree::treeBlockRules::resolveDeferredState(current, write.stateId)
             : write.stateId;
-    // The ground this plant was validated against may have been refused, or replaced by whatever the
-    // receiving chunk generated. A plant with nothing under it breaks on the first block update.
     const std::int32_t below = write.y > chunk.verticalBounds().minY() ? chunk.blockStateId(localX, write.y - 1, localZ)
                                                                        : registry::blocks::air().stateId;
     if (!terrain::decoration::vegetationBlockRules::survivesDeferred(stateId, below)) {

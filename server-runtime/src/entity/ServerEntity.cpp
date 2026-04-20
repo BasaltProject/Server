@@ -145,8 +145,7 @@ double ServerEntity::attributeWithModifiers(std::string_view id) const {
             value += modifier.amount;
         }
     }
-    // Against what the additions left, not against the running total: that is what makes the order
-    // of the three operations matter.
+    // Against what the additions left, not the running total, which is what makes operation order matter.
     const double afterAdditions = value;
     for (const auto& [name, modifier] : found->second) {
         if (modifier.operation == AttributeOperation::AddMultipliedBase) {
@@ -163,7 +162,7 @@ double ServerEntity::attributeWithModifiers(std::string_view id) const {
 
 namespace {
 
-/// parity: `Camel`'s own baby boxes, `BABY_STANDING_DIMENSIONS` and `BABY_SITTING_DIMENSIONS`.
+/// parity: `Camel`'s own baby boxes.
 constexpr float kBabyCamelWidth = 0.95F;
 constexpr float kBabyCamelHeight = 1.4F;
 constexpr float kBabyCamelSittingHeight = 0.425F;
@@ -174,7 +173,6 @@ constexpr float kSnifferDiggingDrop = 0.4F;
 
 [[nodiscard]] bool babyCamel(const ServerEntity& entity) { return entity.camel != nullptr && entity.age < 0; }
 
-/// A baby's own box: `width` and `height` fixed, or the type's scaled when `scale` is set.
 struct BabyBox {
     std::string_view type;
     float width = 0.0F;
@@ -222,15 +220,14 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
     {"turtle", 0.0F, 0.0F, 0.3F},
 }};
 
-/// parity: `LivingEntity.getAgeScale` where no box of its own is given, and `HappyGhast`'s, and
-/// `Nautilus`'s `BABY_DIMENSIONS`, which is the same half.
+/// parity: `LivingEntity.getAgeScale`, `HappyGhast` and `Nautilus`'s `BABY_DIMENSIONS`.
 [[nodiscard]] float ageScaleOf(std::string_view type) { return type == "happy_ghast" ? 0.2375F : 0.5F; }
 
 [[nodiscard]] bool baby(const ServerEntity& entity) {
     return entity.age < 0 && ageableMobs::hasBabyMetadata(entity.type().path());
 }
 
-/// parity: `getDefaultDimensions` for a baby, or for a slime or magma cube scaled by its size.
+/// parity: `getDefaultDimensions` for a baby.
 [[nodiscard]] std::pair<float, float> defaultBox(const ServerEntity& entity, const wire::common::Identifier& type) {
     const auto width = static_cast<float>(registry::entityTypeShapes::widthOf(type));
     const auto height = static_cast<float>(registry::entityTypeShapes::heightOf(type));
@@ -245,7 +242,7 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
         const float scale = 1.0F + (0.15F * static_cast<float>(size));
         return {width * scale, height * scale};
     }
-    // parity: `Pufferfish.getScale`: half deflated, seven tenths half puffed, whole when puffed up.
+    // parity: `Pufferfish.getScale`.
     if (path == "pufferfish") {
         const float scale = entity.puffState == 0 ? 0.5F : (entity.puffState == 1 ? 0.7F : 1.0F);
         return {width * scale, height * scale};
@@ -266,8 +263,7 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
 } // namespace
 
 double ServerEntity::width() const {
-    // parity: `Camel.getDefaultDimensions` and `Sniffer.getDefaultDimensions`, the two whose box
-    // follows what they are doing.
+    // parity: `Camel.getDefaultDimensions` and `Sniffer.getDefaultDimensions`.
     if (babyCamel(*this)) {
         return static_cast<double>(kBabyCamelWidth);
     }

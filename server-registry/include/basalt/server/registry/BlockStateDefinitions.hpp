@@ -10,16 +10,8 @@
 #include <vector>
 
 namespace basalt::server::registry {
-
-/// Every block's properties and how its state ids run through them.
-///
-/// The ids are the nested loops of the properties, outermost first, so a state id and a set of
-/// values convert into each other with arithmetic instead of a table per family.
-///
-/// parity: `StateDefinition`, which builds the same product in the same order.
+// parity: `StateDefinition`, which builds the same product in the same order.
 namespace blockStateDefinitions {
-
-/// One block: where its states start, and each property with the values it cycles through.
 class Definition {
 public:
     Definition(wire::common::Identifier block, std::int32_t firstStateId, std::vector<std::string> names,
@@ -52,21 +44,12 @@ private:
 
 [[nodiscard]] const Definition* of(const wire::common::Identifier& block);
 
-/// Which block owns `stateId`, properties or not.
 [[nodiscard]] const wire::common::Identifier* blockOf(std::int32_t stateId);
 
-/// The property values of `stateId`, empty for a block that has none.
 [[nodiscard]] std::map<std::string, std::string> propertiesOf(std::int32_t stateId);
 
-/// The state id of `block` with `properties` applied, the rest kept from `fromStateId` when it
-/// belongs to the same block and from the block's first state otherwise.
-///
-/// An unknown property or value is refused rather than ignored: silently placing a block facing the
-/// wrong way is worse than not placing it.
 [[nodiscard]] std::optional<std::int32_t> stateIdOf(const wire::common::Identifier& block,
                                                     const std::map<std::string, std::string>& properties,
                                                     std::optional<std::int32_t> fromStateId = std::nullopt);
-
 } // namespace blockStateDefinitions
-
 } // namespace basalt::server::registry
