@@ -363,6 +363,7 @@ basalt_module(server-runtime-core
         src/sched/RegionScheduler.cpp
         src/sched/RegionWorkers.cpp
         src/scoreboard/Scoreboard.cpp
+        src/scoreboard/ScoreboardStorage.cpp
         src/scoreboard/TeamNameTags.cpp
         src/scoreboard/Teams.cpp
         src/ui/PlayerUi.cpp

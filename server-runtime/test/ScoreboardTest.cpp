@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
+#include <basalt/server/runtime/scoreboard/ScoreboardStorage.hpp>
 #include <basalt/server/runtime/scoreboard/Teams.hpp>
 
 #include <doctest.h>
@@ -343,4 +344,29 @@ TEST_CASE("a statistic criterion is resolved the way the jar reads it") {
     CHECK(Objective::canonical("crafted:minecraft.diamond") ==
           std::optional<std::string>{"minecraft.crafted:minecraft.diamond"});
     CHECK(Objective::criterionOfStat("minecraft:custom/minecraft:jump") == "minecraft.custom:minecraft.jump");
+}
+
+TEST_CASE("a saved scoreboard comes back with its scores, display slot and teams") {
+    Scoreboard scoreboard;
+    Teams teams;
+    scoreboard.add(dummy("kills"));
+    scoreboard.setScore("Alice", "kills", 7);
+    scoreboard.display(play::DisplaySlot::Sidebar, "kills");
+    Team* red = teams.add("red");
+    red->color = play::TeamColor::Red;
+    red->friendlyFire = false;
+    red->addMember("Alice");
+
+    Scoreboard loadedScoreboard;
+    Teams loadedTeams;
+    unpack(pack(scoreboard, teams), loadedScoreboard, loadedTeams);
+
+    CHECK(loadedScoreboard.score("Alice", "kills") == 7);
+    REQUIRE(loadedScoreboard.displayed(play::DisplaySlot::Sidebar) != nullptr);
+    CHECK(*loadedScoreboard.displayed(play::DisplaySlot::Sidebar) == "kills");
+    const Team* loaded = loadedTeams.get("red");
+    REQUIRE(loaded != nullptr);
+    CHECK(loaded->color == play::TeamColor::Red);
+    CHECK_FALSE(loaded->friendlyFire);
+    CHECK(loaded->hasMember("Alice"));
 }

@@ -55,6 +55,34 @@ float WorldBorder::damageAt(double x, double z) const {
     return static_cast<float>(std::max(1.0, outside * damagePerBlock));
 }
 
+wire::nbt::NbtCompound WorldBorder::encode() const {
+    constexpr double kTicksPerSecond = 20.0;
+    wire::nbt::NbtCompound out;
+    out.putDouble("center_x", centerX_);
+    out.putDouble("center_z", centerZ_);
+    out.putDouble("damage_per_block", damagePerBlock);
+    out.putDouble("safe_zone", damageBuffer);
+    out.putInt("warning_blocks", warningBlocks);
+    out.putInt("warning_time", static_cast<std::int32_t>(warningSeconds * kTicksPerSecond));
+    out.putDouble("size", size_);
+    out.putLong("lerp_time", lerpTimeTicks_);
+    out.putDouble("lerp_target", targetSize_);
+    return out;
+}
+
+void WorldBorder::restore(const wire::nbt::NbtCompound& settings) {
+    constexpr double kTicksPerSecond = 20.0;
+    center(settings.getDouble("center_x"), settings.getDouble("center_z"));
+    damagePerBlock = settings.getDouble("damage_per_block", 0.2);
+    damageBuffer = settings.getDouble("safe_zone", 5.0);
+    warningBlocks = settings.getInt("warning_blocks", 5);
+    warningSeconds = static_cast<std::int32_t>(settings.getInt("warning_time", 300) / kTicksPerSecond);
+    setSize(settings.getDouble("size", kDefaultSize));
+    if (const std::int64_t lerp = settings.getLong("lerp_time"); lerp > 0) {
+        moveSize(settings.getDouble("lerp_target", size_), lerp);
+    }
+}
+
 void WorldBorder::settle() {
     size_ = targetSize_;
     lerpTimeTicks_ = 0;

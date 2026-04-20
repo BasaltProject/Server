@@ -210,6 +210,10 @@ private:
     /// parity: the `scheduled_events` saved data.
     [[nodiscard]] std::string schedulePath() const;
     void saveSchedule() const;
+    void loadScoreboard();
+    void saveScoreboard() const;
+    void loadBossBars();
+    void saveBossBars() const;
 
     void loadFunctions();
 

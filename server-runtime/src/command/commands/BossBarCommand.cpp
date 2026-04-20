@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -48,6 +49,68 @@ using wire::text::Component;
 }
 
 } // namespace
+
+wire::nbt::NbtCompound BossBarRegistry::encode() const {
+    wire::nbt::NbtCompound out;
+    for (const wire::common::Identifier& id : order_) {
+        const CustomBossBar& bar = bars_.at(id);
+        wire::nbt::NbtCompound entry;
+        entry.set("Name", wire::text::componentNbt::serialize(bar.name));
+        entry.putBoolean("Visible", bar.visible);
+        entry.putInt("Value", bar.value);
+        entry.putInt("Max", bar.max);
+        entry.putString("Color", std::string{bossBarColorName(bar.color)});
+        entry.putString("Overlay", std::string{play::bossBarOverlayName(bar.overlay)});
+        std::vector<wire::nbt::NbtTag> names;
+        for (const std::string& name : bar.players) {
+            names.push_back(wire::nbt::NbtTag::ofString(name));
+        }
+        entry.set("PlayerNames",
+                  wire::nbt::NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::String, std::move(names)}));
+        out.set(id.toString(), wire::nbt::NbtTag::ofCompound(std::move(entry)));
+    }
+    return out;
+}
+
+void BossBarRegistry::restore(const wire::nbt::NbtCompound& packed) {
+    for (std::size_t i = 0; i < packed.size(); ++i) {
+        const wire::nbt::NbtCompound* entry = packed.values()[i].get<wire::nbt::NbtCompound>();
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(packed.names()[i]);
+        if (entry == nullptr || !id.has_value()) {
+            continue;
+        }
+        CustomBossBar bar{.id = *id};
+        if (const wire::nbt::NbtTag* name = entry->find("Name"); name != nullptr) {
+            bar.name = wire::text::componentNbt::deserialize(*name);
+        }
+        bar.visible = entry->getBoolean("Visible", false);
+        bar.value = entry->getInt("Value", 0);
+        bar.max = entry->getInt("Max", 100);
+        for (const play::BossBarColor color :
+             {play::BossBarColor::Pink, play::BossBarColor::Blue, play::BossBarColor::Red, play::BossBarColor::Green,
+              play::BossBarColor::Yellow, play::BossBarColor::Purple, play::BossBarColor::White}) {
+            if (bossBarColorName(color) == entry->getString("Color")) {
+                bar.color = color;
+            }
+        }
+        for (const play::BossBarOverlay overlay :
+             {play::BossBarOverlay::Progress, play::BossBarOverlay::Notched6, play::BossBarOverlay::Notched10,
+              play::BossBarOverlay::Notched12, play::BossBarOverlay::Notched20}) {
+            if (play::bossBarOverlayName(overlay) == entry->getString("Overlay")) {
+                bar.overlay = overlay;
+            }
+        }
+        if (const wire::nbt::NbtList* names = entry->getList("PlayerNames"); names != nullptr) {
+            for (const wire::nbt::NbtTag& name : *names) {
+                if (const std::string* text = name.get<std::string>(); text != nullptr) {
+                    bar.players.insert(*text);
+                }
+            }
+        }
+        add(std::move(bar));
+    }
+}
 
 float CustomBossBar::progress() const {
     return max == 0 ? 0.0F : std::clamp(static_cast<float>(value) / static_cast<float>(max), 0.0F, 1.0F);

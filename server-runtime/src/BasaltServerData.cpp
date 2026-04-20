@@ -1,12 +1,15 @@
+#include <basalt/server/datafix/DataFixer.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/datapack/RegistryValidation.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/PackRegistries.hpp>
 #include <basalt/server/runtime/registry/SyncedTags.hpp>
+#include <basalt/server/runtime/scoreboard/ScoreboardStorage.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
+#include <basalt/wire/io/Compression.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
@@ -50,6 +53,63 @@ void BasaltServer::saveSchedule() const {
     if (!wire::io::fileIO::writeBytes(
             schedulePath(), wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(functionSchedule_.toNbt())))) {
         logger_.warn([] { return std::string{"Could not save the scheduled functions."}; });
+    }
+}
+
+void BasaltServer::saveScoreboard() const {
+    wire::nbt::NbtCompound root;
+    root.set("data", wire::nbt::NbtTag::ofCompound(scoreboard::pack(scoreboard_, teams_)));
+    root.putInt("DataVersion", server::datafix::kCurrentVersion);
+    const std::string path = worldRegistry_->defaultWorld().worldRoot() + "/scoreboard.nbt";
+    if (!wire::io::fileIO::writeBytes(path, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(root))))) {
+        logger_.warn([] { return std::string{"Could not save the scoreboard."}; });
+    }
+}
+
+void BasaltServer::loadScoreboard() {
+    const std::string root = worldRegistry_->defaultWorld().worldRoot();
+    // A vanilla world copied in brings its own, gzipped, under data/minecraft.
+    std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(root + "/scoreboard.nbt");
+    if (!bytes.has_value()) {
+        bytes = wire::io::fileIO::readBytes(root + "/data/minecraft/scoreboard.dat");
+        if (bytes.has_value() && bytes->size() > 2 && (*bytes)[0] == 0x1F && (*bytes)[1] == 0x8B) {
+            auto plain = wire::io::gzip::decompress(*bytes);
+            bytes = plain.has_value() ? std::optional{std::move(*plain)} : std::nullopt;
+        }
+    }
+    if (!bytes.has_value()) {
+        return;
+    }
+    const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::read(*bytes);
+    const wire::nbt::NbtCompound* file = read.has_value() ? read->tag.get<wire::nbt::NbtCompound>() : nullptr;
+    const wire::nbt::NbtCompound* data = file == nullptr ? nullptr : file->getCompound("data");
+    if (data == nullptr) {
+        logger_.warn([] { return std::string{"The saved scoreboard could not be read and is ignored."}; });
+        return;
+    }
+    scoreboard::unpack(*data, scoreboard_, teams_);
+}
+
+void BasaltServer::saveBossBars() const {
+    wire::nbt::NbtCompound root;
+    root.set("data", wire::nbt::NbtTag::ofCompound(bossBars_.encode()));
+    root.putInt("DataVersion", server::datafix::kCurrentVersion);
+    const std::string path = worldRegistry_->defaultWorld().worldRoot() + "/custom_boss_events.nbt";
+    if (!wire::io::fileIO::writeBytes(path, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(root))))) {
+        logger_.warn([] { return std::string{"Could not save the custom boss bars."}; });
+    }
+}
+
+void BasaltServer::loadBossBars() {
+    const std::optional<std::vector<std::uint8_t>> bytes =
+        wire::io::fileIO::readBytes(worldRegistry_->defaultWorld().worldRoot() + "/custom_boss_events.nbt");
+    if (!bytes.has_value()) {
+        return;
+    }
+    const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::read(*bytes);
+    const wire::nbt::NbtCompound* file = read.has_value() ? read->tag.get<wire::nbt::NbtCompound>() : nullptr;
+    if (const wire::nbt::NbtCompound* data = file == nullptr ? nullptr : file->getCompound("data"); data != nullptr) {
+        bossBars_.restore(*data);
     }
 }
 

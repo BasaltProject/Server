@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
 #include <map>
@@ -38,6 +39,11 @@ public:
     bool remove(const wire::common::Identifier& id);
 
     [[nodiscard]] std::vector<const CustomBossBar*> barsFor(const player::PlayerSession& player) const;
+
+    /// parity: the `custom_boss_events` saved data, one `CustomBossEvent.Packed` per bar; players are kept by name.
+    [[nodiscard]] wire::nbt::NbtCompound encode() const;
+
+    void restore(const wire::nbt::NbtCompound& packed);
 
 private:
     std::vector<wire::common::Identifier> order_;
