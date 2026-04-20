@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/entity/CreakingNavigation.hpp>
 #include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 #include <basalt/server/runtime/entity/WalkNodeEvaluator.hpp>
@@ -408,6 +409,41 @@ TEST_CASE("a creaking's heart keeps its paths within thirty-two blocks of it") {
     CHECK_FALSE(bound.reached);
     REQUIRE_FALSE(bound.nodes.empty());
     CHECK(bound.nodes.back().at == Position{31, 64, 8});
+}
+
+TEST_CASE("a heart-bound creaking pays eight for what a loose one cannot cross at all") {
+    // parity: `Creaking.setTransient`'s five maluses; one no heart keeps pays the type's own cost.
+    const pathTypes::Maluses loose = creakingNavigation::maluses(false);
+    CHECK(loose == pathTypes::defaults());
+    const pathTypes::Maluses bound = creakingNavigation::maluses(true);
+    CHECK(bound[static_cast<std::size_t>(pathTypes::PathType::Damaging)] == 8.0F);
+    CHECK(bound[static_cast<std::size_t>(pathTypes::PathType::PowderSnow)] == 8.0F);
+    CHECK(bound[static_cast<std::size_t>(pathTypes::PathType::Lava)] == 8.0F);
+    CHECK(bound[static_cast<std::size_t>(pathTypes::PathType::Fire)] == 0.0F);
+    CHECK(bound[static_cast<std::size_t>(pathTypes::PathType::FireInNeighbor)] == 0.0F);
+
+    // parity: a wall of cactus or of powder snow two deep, with no way round it.
+    for (const char* wall : {"cactus", "powder_snow"}) {
+        Loaded loaded;
+        loaded.floor(0, 0, 8, 8);
+        for (std::int32_t z = 0; z <= 8; ++z) {
+            REQUIRE(loaded.state.setBlockState(4, 64, z, stateOf(wall)));
+            REQUIRE(loaded.state.setBlockState(4, 65, z, stateOf(wall)));
+        }
+        walkNodes::WalkMob mob{
+            .x = 0.5, .y = 64.0, .z = 4.5, .width = 0.9F, .height = 2.7F, .onGround = true, .maxUpStep = 1.0625F};
+        const Position target{8, 64, 4};
+        // parity: the defaults price both at negative one, which is not a way through at all.
+        mob.maluses = loose;
+        const walkNodes::Path stopped = walkNodes::findPath(loaded.state, mob, target, 64.0F, 0, 1024);
+        CHECK_FALSE(stopped.reached);
+        // parity: the heart's malus of eight is dear but passable.
+        mob.maluses = bound;
+        const walkNodes::Path through = walkNodes::findPath(loaded.state, mob, target, 64.0F, 0, 1024);
+        REQUIRE(through.reached);
+        REQUIRE_FALSE(through.nodes.empty());
+        CHECK(through.nodes.back().at == target);
+    }
 }
 
 TEST_CASE("the level remembers where a collision shape changed, and nothing else") {
