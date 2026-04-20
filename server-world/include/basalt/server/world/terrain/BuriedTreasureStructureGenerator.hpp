@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -28,12 +29,25 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: the piece never leaves its start chunk, so the bounds
+    /// are that whole chunk. The grid and biome checks are skipped, as the command skips them.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ) const;
+
+    /// Writes the treasure buried in (chunkX, chunkZ) into `chunk`, like the worldgen pass does, but
+    /// without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
     /// Whether a treasure is buried in this chunk, which is what `/locate` and an explorer map ask.
     [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
 private:
+    /// The walk down the column to the first floor block, the shell and the chest. `forPlacement`
+    /// skips the start record, which `PlaceCommand.placeStructure` does not register.
+    void bury(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool forPlacement = false);
+
     /// parity: the six-direction shell. A neighbour that is air or liquid gets the floor block when
     /// what is under it is also open (so the chest is not left over a hole), and the soft block
     /// otherwise. Up never gets the floor treatment, which is the jar's own exception.

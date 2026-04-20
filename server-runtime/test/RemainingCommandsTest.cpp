@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/server/runtime/command/commands/RemainingCommands.hpp>
@@ -7,6 +8,9 @@
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/server/world/terrain/DesertPyramidStructureGenerator.hpp>
+#include <basalt/server/world/terrain/OceanMonumentStructureGenerator.hpp>
+#include <basalt/server/world/terrain/SwampHutStructureGenerator.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/UiPackets.hpp>
@@ -38,6 +42,8 @@ using basalt::wire::text::Component;
 namespace commands = basalt::server::runtime::command::commands;
 namespace config = basalt::server::runtime::config;
 namespace play = basalt::wire::protocol::play;
+namespace terrain = basalt::server::world::terrain;
+namespace world = basalt::server::runtime::world;
 
 namespace {
 
@@ -131,10 +137,13 @@ struct Fixture {
     CommandDispatcher dispatcher;
     RecordingSource source;
 
-    explicit Fixture(const std::string& root)
+    explicit Fixture(const std::string& root) : Fixture{root, {}} {}
+
+    Fixture(const std::string& root, std::vector<world::StructurePlacer> placers)
         : world(std::make_unique<LoadedWorld>(
               config::WorldDeclaration{.name = "world", .type = config::WorldType::Flat, .isDefault = true},
-              config::WorldSettings{}, WorldMetadata{}, root, basalt::wire::common::Logger{"Test"})),
+              config::WorldSettings{}, WorldMetadata{}, root, basalt::wire::common::Logger{"Test"},
+              LoadedWorld::Options{.structurePlacers = std::move(placers)})),
           store(openStore(root)), environment(registry, options()), dispatcher(environment) {}
 
     [[nodiscard]] CommandEnvironment::Options options() {
@@ -219,11 +228,89 @@ TEST_CASE("place names what it cannot generate instead of failing silently") {
     fixture.dispatcher.registerCommand(std::make_shared<commands::PlaceCommand>(std::move(command)));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "place structure minecraft:village_plains 0 64 0") == 0);
-    CHECK(fixture.source.lastAsText().find("commands.place.structure.invalid") != std::string::npos);
+    CHECK(fixture.source.lastAsText().find("is not a structure this build generates") != std::string::npos);
 
     // An empty jar ships no structure files, so a template name resolves to nothing at all.
     CHECK(fixture.dispatcher.execute(fixture.source, "place template minecraft:igloo/top 0 64 0") == 0);
     CHECK(fixture.source.lastAsText().find("igloo/top") != std::string::npos);
+}
+
+TEST_CASE("place structure generates the placers' structures, and keeps vanilla's refusals") {
+    // A hut answers to nothing but its own draws: biome and height lookups stand in for the world.
+    auto hutBiome = [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:swamp"}; };
+    auto flatSurface = [](std::int32_t, std::int32_t) { return 66; };
+    terrain::SwampHutStructureGenerator huts{hutBiome, flatSurface};
+    // A monument whose surrounding sweep never finds an ocean biome refuses every position, which
+    // is `OceanMonumentStructure.findGenerationPoint`'s own condition.
+    terrain::OceanMonumentStructureGenerator monuments{
+        [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:plains"}; },
+        {"minecraft:ocean"},
+        {"minecraft:ocean"},
+        [](std::int32_t, std::int32_t) { return 40; },
+        63};
+    // A pyramid on high ground places a 21 by 21 piece, so its start covers four chunks.
+    terrain::DesertPyramidStructureGenerator pyramids{hutBiome, flatSurface};
+
+    std::vector<world::StructurePlacer> placers;
+    placers.push_back({.id = Identifier::vanilla("swamp_hut"),
+                       .boundsAt = [&huts](std::int64_t seed, std::int32_t x,
+                                           std::int32_t z) { return huts.placeBoundsAt(seed, x, z); },
+                       .place = [&huts](basalt::server::world::Chunk& chunk, std::int64_t seed, std::int32_t x,
+                                        std::int32_t z) { huts.placeAt(chunk, seed, x, z); }});
+    placers.push_back({.id = Identifier::vanilla("monument"),
+                       .boundsAt = [&monuments](std::int64_t seed, std::int32_t x,
+                                                std::int32_t z) { return monuments.placeBoundsAt(seed, x, z); },
+                       .place = [&monuments](basalt::server::world::Chunk& chunk, std::int64_t seed, std::int32_t x,
+                                             std::int32_t z) { monuments.placeAt(chunk, seed, x, z); }});
+    placers.push_back({.id = Identifier::vanilla("desert_pyramid"),
+                       .boundsAt = [&pyramids](std::int64_t seed, std::int32_t x,
+                                               std::int32_t z) { return pyramids.placeBoundsAt(seed, x, z); },
+                       .place = [&pyramids](basalt::server::world::Chunk& chunk, std::int64_t seed, std::int32_t x,
+                                            std::int32_t z) { pyramids.placeAt(chunk, seed, x, z); }});
+
+    Fixture fixture{scratch("place-structures"), std::move(placers)};
+    basalt::server::runtime::world::StructureTemplates templates{{}};
+    commands::PlaceCommand command{templates, [] { return std::int64_t{1}; }};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::PlaceCommand>(std::move(command)));
+    static_cast<void>(fixture.world->state().getOrGenerateChunk(0, 0));
+
+    // A single-chunk structure places into its chunk and reports success.
+    CHECK(fixture.dispatcher.execute(fixture.source, "place structure minecraft:swamp_hut 8 64 8") == 1);
+    CHECK(fixture.source.lastAsText().find("commands.place.structure.success") != std::string::npos);
+    // The fixture's flat world has no terrain beyond a floor at the bottom of the heightmap, so
+    // the hut settles there, exactly `updateAverageGroundHeight` over what the chunk holds.
+    const std::int32_t planks = basalt::server::registry::blocks::named("spruce_planks")->stateId;
+    bool hutWritten = false;
+    for (std::int32_t y = -64; y <= 100 && !hutWritten; ++y) {
+        for (std::int32_t z = 0; z < 16 && !hutWritten; ++z) {
+            for (std::int32_t x = 0; x < 16; ++x) {
+                if (fixture.world->state().blockState(x, y, z).value_or(0) == planks) {
+                    hutWritten = true;
+                    break;
+                }
+            }
+        }
+    }
+    CHECK(hutWritten);
+
+    // The monument's own condition refuses, which is `commands.place.structure.failed`.
+    CHECK(fixture.dispatcher.execute(fixture.source, "place structure minecraft:monument 8 40 8") == 0);
+    CHECK(fixture.source.lastAsText().find("commands.place.structure.failed") != std::string::npos);
+
+    // The pyramid covers chunks the world has not loaded, which is `argument.pos.unloaded` before
+    // anything is written.
+    CHECK(fixture.dispatcher.execute(fixture.source, "place structure minecraft:desert_pyramid 8 64 8") == 0);
+    CHECK(fixture.source.lastAsText().find("argument.pos.unloaded") != std::string::npos);
+
+    static_cast<void>(fixture.world->state().getOrGenerateChunk(1, 0));
+    static_cast<void>(fixture.world->state().getOrGenerateChunk(0, 1));
+    static_cast<void>(fixture.world->state().getOrGenerateChunk(1, 1));
+    CHECK(fixture.dispatcher.execute(fixture.source, "place structure minecraft:desert_pyramid 8 64 8") == 1);
+    CHECK(fixture.source.lastAsText().find("commands.place.structure.success") != std::string::npos);
+
+    // Nothing the placers hold answers for an id they do not know.
+    CHECK(fixture.dispatcher.execute(fixture.source, "place structure minecraft:stronghold 8 64 8") == 0);
+    CHECK(fixture.source.lastAsText().find("is not a structure this build generates") != std::string::npos);
 }
 
 TEST_CASE("enchant refuses a registry the client never got, and writes the component when it has one") {

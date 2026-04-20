@@ -60,6 +60,20 @@ public:
     /// Writes into `chunk` whatever of a nearby ruined portal lands there.
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// The names of the seven structures this generator makes, which is what `/place structure`
+    /// accepts for a ruined portal.
+    [[nodiscard]] std::vector<std::string> variantNames() const;
+
+    /// parity: `PlaceCommand.placeStructure`: the bounds of the named variant started at this chunk
+    /// with the grid and biome checks skipped, or nothing when its template draw found nothing.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox>
+    placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, std::string_view variant) const;
+
+    /// Writes the part of the named variant started at (chunkX, chunkZ) that lands in `chunk`, like
+    /// the worldgen pass does, but without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                 std::string_view variant) const;
+
 private:
     struct Portal {
         std::int32_t chunkX = 0;
@@ -128,6 +142,11 @@ private:
     /// parity: `RuinedPortalStructure.findGenerationPoint`, whose every draw is in this order.
     [[nodiscard]] std::optional<Portal> generationPoint(std::int32_t chunkX, std::int32_t chunkZ,
                                                         const RuinedPortalVariant& variant, std::int64_t seed) const;
+
+    /// The named variant's generation point at this chunk: what `/place structure` places, with no
+    /// variant draw and no biome test.
+    [[nodiscard]] std::optional<Portal> placementStart(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                                       std::string_view variant) const;
 
     [[nodiscard]] std::int32_t suitableY(random::RandomSource& random, RuinedPortalPlacement placement, bool airPocket,
                                          std::int32_t surfaceY, std::int32_t ySpan,

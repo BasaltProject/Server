@@ -193,7 +193,23 @@ void BuriedTreasureStructureGenerator::generateInto(Chunk& chunk, std::int64_t s
     if (!beachBiomes_.contains(biomeAt_(centreX, surfaceHeightAt_(centreX, centreZ) - 1, centreZ))) {
         return;
     }
+    bury(chunk, seed, chunkX, chunkZ);
+}
 
+std::optional<structure::StructureBoundingBox>
+BuriedTreasureStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    static_cast<void>(seed);
+    return structure::StructureBoundingBox{chunkX * 16,      kOverworldHeight.minY(), chunkZ * 16,
+                                           chunkX * 16 + 15, kOverworldHeight.maxY(), chunkZ * 16 + 15};
+}
+
+void BuriedTreasureStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                               std::int32_t chunkZ) {
+    bury(chunk, seed, chunkX, chunkZ, /*forPlacement=*/true);
+}
+
+void BuriedTreasureStructureGenerator::bury(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                            bool forPlacement) {
     const std::int32_t x = chunkX * 16 + kPieceOffset;
     const std::int32_t z = chunkZ * 16 + kPieceOffset;
     for (std::int32_t y = chunk.heightAt(x & 15, z & 15, HeightmapType::OceanFloor); y > kOverworldHeight.minY(); --y) {
@@ -205,6 +221,10 @@ void BuriedTreasureStructureGenerator::generateInto(Chunk& chunk, std::int64_t s
         const std::int32_t soft = !registry::blocks::isAir(current) && !isLiquid(current) ? current : sand();
         shellAround(chunk, x, y, z, below, soft);
         placeChest(chunk, seed, x, y, z);
+        if (forPlacement) {
+            // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+            return;
+        }
         const structure::StructureBoundingBox box{x, y, z, x, y, z};
         chunk.structures().add(structure::StructureStartRecord{
             .structure = std::string{kName}, .chunkX = chunkX, .chunkZ = chunkZ, .fullBounds = box, .pieces = {box}});

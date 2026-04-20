@@ -82,6 +82,7 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         options.villageGenerator = built.villages;
         options.campGenerator = built.camps;
         options.structureLocators = built.locators;
+        options.structurePlacers = built.placers;
         options.strongholdGenerator = built.strongholds;
         options.spawnChunkFinder = built.spawnChunk;
         options.pipeline = built.pipeline;

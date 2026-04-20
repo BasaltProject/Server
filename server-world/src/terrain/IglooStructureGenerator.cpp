@@ -149,7 +149,22 @@ void IglooStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
     if (!iglooBiomes_.contains(biomeAt_(centreX, surfaceHeightAt_(centreX, centreZ) - 1, centreZ))) {
         return;
     }
+    placeIgloo(chunk, seed, chunkX, chunkZ);
+}
 
+std::optional<structure::StructureBoundingBox>
+IglooStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    static_cast<void>(seed);
+    return structure::StructureBoundingBox{chunkX * 16,      kOverworldHeight.minY(), chunkZ * 16,
+                                           chunkX * 16 + 15, kOverworldHeight.maxY(), chunkZ * 16 + 15};
+}
+
+void IglooStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    placeIgloo(chunk, seed, chunkX, chunkZ, /*forPlacement=*/true);
+}
+
+void IglooStructureGenerator::placeIgloo(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                         bool forPlacement) {
     random::RandomSource pick = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(pick, seed, chunkX, chunkZ);
     const StructurePos start{chunkX * 16, kGenerationHeight, chunkZ * 16};
@@ -184,7 +199,8 @@ void IglooStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
             boxes.push_back(*box);
         }
     }
-    if (boxes.empty()) {
+    if (boxes.empty() || forPlacement) {
+        // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
         return;
     }
     const std::optional<structure::StructureStartRecord> whole =

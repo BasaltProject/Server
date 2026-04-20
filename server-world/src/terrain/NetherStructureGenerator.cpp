@@ -191,6 +191,138 @@ void NetherStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
     placeFortresses(chunk, seed);
 }
 
+const structure::StructureTemplate* NetherStructureGenerator::templateOf(std::string_view name) const {
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+        wire::common::Identifier::parse(name);
+    return parsed.has_value() ? templateLoader_(*parsed) : nullptr;
+}
+
+std::vector<netherFortressPieces::Piece> NetherStructureGenerator::fortressStart(std::int64_t seed, std::int32_t chunkX,
+                                                                                 std::int32_t chunkZ) const {
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
+    random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
+    return netherFortressPieces::assemble(random, chunkX, chunkZ);
+}
+
+std::vector<PlacedStructurePiece> NetherStructureGenerator::bastionStart(std::int64_t seed, std::int32_t chunkX,
+                                                                         std::int32_t chunkZ) const {
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
+    random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
+    const structure::JigsawWorld world{.poolLookup = poolLookup_,
+                                       .templateLoader = [this](std::string_view name) { return templateOf(name); },
+                                       .heightAt = [](std::int32_t, std::int32_t) { return 0; }};
+    // parity: `PlaceCommand.placeStructure` skips the biome test `assembledBastion` applies after
+    // the assembly, and the fresh assembly is not cached: it can differ from worldgen's answer.
+    return structure::assembleJigsaw(
+        world,
+        structure::JigsawRequest{.startPool = "minecraft:bastion/starts",
+                                 .startPosition = StructurePos{chunkX * 16, kBastionStartY, chunkZ * 16},
+                                 .maxDepth = 6,
+                                 .projectStartToHeightmap = false,
+                                 .maxDistanceFromCenter = 80,
+                                 .maxVerticalDistanceFromCenter = 80},
+        random);
+}
+
+template <typename Boxed>
+[[nodiscard]] std::optional<structure::StructureBoundingBox> boundsOf(const std::vector<Boxed>& pieces) {
+    if (pieces.empty()) {
+        return std::nullopt;
+    }
+    return unionOf(pieces);
+}
+
+std::optional<structure::StructureBoundingBox>
+NetherStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                        NetherPlacedStructure structure) {
+    switch (structure) {
+    case NetherPlacedStructure::Fortress:
+        // parity: `NetherFortressStructure.findGenerationPoint` never refuses.
+        return boundsOf(fortressStart(seed, chunkX, chunkZ));
+    case NetherPlacedStructure::Bastion:
+        // parity: `JigsawStructure.findGenerationPoint` never refuses.
+        return boundsOf(bastionStart(seed, chunkX, chunkZ));
+    case NetherPlacedStructure::Fossil: {
+        // parity: `NetherFossilStructure.findGenerationPoint` keeps the ground walk and drops the
+        // biome test, so a position with no solid ground above the lava sea is still refused.
+        const std::optional<FossilStart> start = netherFossilStart(chunkX, chunkZ, seed, /*forPlacement=*/true);
+        if (!start.has_value()) {
+            return std::nullopt;
+        }
+        const structure::StructureTemplate* piece = templateOf(start->templateName);
+        return piece == nullptr ? std::nullopt
+                                : std::optional{piece->getBoundingBox(start->position, start->rotation, kZeroPos,
+                                                                      StructureMirror::None)};
+    }
+    }
+    return std::nullopt;
+}
+
+void NetherStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                       NetherPlacedStructure structure) {
+    const StructureBoundingBox clip = chunkClip(chunk);
+    random::RandomSource placementRandom = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
+    switch (structure) {
+    case NetherPlacedStructure::Fortress: {
+        // parity: the same per-chunk stream worldgen gives a chunk that holds this start.
+        const std::int64_t decorationSeed =
+            random::setDecorationSeed(placementRandom, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+        random::setFeatureSeed(placementRandom, decorationSeed, kFortressStructureIndex, kUndergroundDecorationStep);
+        for (const netherFortressPieces::Piece& piece : fortressStart(seed, chunkX, chunkZ)) {
+            if (piece.boundingBox.intersects(clip)) {
+                netherFortressPieces::place(piece, chunk, clip, placementRandom);
+            }
+        }
+        return;
+    }
+    case NetherPlacedStructure::Bastion: {
+        const std::int64_t decorationSeed =
+            random::setDecorationSeed(placementRandom, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+        random::setFeatureSeed(placementRandom, decorationSeed, kBastionStructureIndex, kSurfaceStructuresStep);
+        for (const PlacedStructurePiece& piece : bastionStart(seed, chunkX, chunkZ)) {
+            if (piece.boundingBox.intersects(clip)) {
+                piece.element.place([this](std::string_view name) { return templateOf(name); }, chunk, piece.position,
+                                    piece.rotation, clip, placementRandom);
+            }
+        }
+        return;
+    }
+    case NetherPlacedStructure::Fossil: {
+        const std::optional<FossilStart> start = netherFossilStart(chunkX, chunkZ, seed, /*forPlacement=*/true);
+        if (!start.has_value()) {
+            return;
+        }
+        const structure::StructureTemplate* piece = templateOf(start->templateName);
+        if (piece == nullptr) {
+            return;
+        }
+        const StructureBoundingBox boundingBox =
+            piece->getBoundingBox(start->position, start->rotation, kZeroPos, StructureMirror::None);
+        piece->placeInto(chunk, structure::TemplatePlacement{.position = start->position,
+                                                             .rotation = start->rotation,
+                                                             .mirror = StructureMirror::None,
+                                                             .pivot = kZeroPos,
+                                                             .clipTo = clip,
+                                                             .ignoreStructureBlocks = true,
+                                                             .ignoreAir = true});
+        placeDriedGhast(chunk, seed, boundingBox, clip);
+        return;
+    }
+    }
+}
+
+std::optional<structure::StructureBoundingBox>
+NetherStructureGenerator::netherPortalBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::optional<NetherRuinedPortalStartSnapshot> snapshot =
+        ruinedPortals_->placementSnapshot(seed, chunkX, chunkZ);
+    return snapshot.has_value() ? std::optional{snapshot->boundingBox} : std::nullopt;
+}
+
+void NetherStructureGenerator::netherPortalPlaceAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                                   std::int32_t chunkZ) {
+    ruinedPortals_->placeAt(chunk, seed, chunkX, chunkZ);
+}
+
 DensityChunkSampler& NetherStructureGenerator::samplerAt(std::int32_t x, std::int32_t z) {
     const std::pair<std::int32_t, std::int32_t> key{x >> 4, z >> 4};
     const auto found = samplers_.find(key);
@@ -405,7 +537,7 @@ void NetherStructureGenerator::placeFortresses(Chunk& chunk, std::int64_t seed) 
 
 std::optional<NetherStructureGenerator::FossilStart>
 NetherStructureGenerator::netherFossilStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
-                                            std::int64_t seed) {
+                                            std::int64_t seed, bool forPlacement) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
     const std::int32_t x = candidateChunkX * 16 + random.nextInt(16);
@@ -422,7 +554,7 @@ NetherStructureGenerator::netherFossilStart(std::int32_t candidateChunkX, std::i
     if (y <= kNetherSeaLevel) {
         return std::nullopt;
     }
-    if (biomePath(biomeSource_->biomeAt(x, y, z)) != "soul_sand_valley") {
+    if (!forPlacement && biomePath(biomeSource_->biomeAt(x, y, z)) != "soul_sand_valley") {
         return std::nullopt;
     }
     const StructureRotation rotation =

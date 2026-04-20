@@ -37,12 +37,33 @@ public:
     /// clipping the write; here that means walking the nearby cells rather than only this chunk's.
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: the bounds of the wreck of this kind (`beached` picks
+    /// the template list) started at this chunk with the grid and biome checks skipped, or nothing
+    /// when its template or its settle is missing.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ, bool beached) const;
+
+    /// Writes the part of the wreck of this kind started at (chunkX, chunkZ) that lands in `chunk`,
+    /// like the worldgen pass does, but without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool beached) const;
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
     /// Whether a wreck of that kind starts in the chunk, which is what `/locate` and a dolphin ask.
     [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool beached) const;
 
 private:
+    /// A drawn and settled hull of the given kind, which both the bounds query and the writer derive
+    /// the same way so they agree on what a start at this chunk is.
+    struct HullStart {
+        const structure::StructureTemplate* piece = nullptr;
+        structure::StructureRotation rotation = structure::StructureRotation::None;
+        structure::StructurePos settled{};
+    };
+
+    [[nodiscard]] std::optional<HullStart> hullStart(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                                     bool beached) const;
+
     void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
     /// Which of the two the chunk gets, or nothing when neither fits its biome.

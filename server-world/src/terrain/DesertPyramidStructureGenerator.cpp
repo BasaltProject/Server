@@ -145,8 +145,9 @@ void DesertPyramidStructureGenerator::placeSuspiciousSand(Chunk& chunk, const St
 }
 
 std::optional<DesertPyramidPiece> DesertPyramidStructureGenerator::startPiece(std::int64_t seed, std::int32_t chunkX,
-                                                                              std::int32_t chunkZ) const {
-    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+                                                                              std::int32_t chunkZ,
+                                                                              bool forPlacement) const {
+    if (!forPlacement && !grid().isStructureChunk(seed, chunkX, chunkZ)) {
         return std::nullopt;
     }
 
@@ -157,7 +158,7 @@ std::optional<DesertPyramidPiece> DesertPyramidStructureGenerator::startPiece(st
     const std::int32_t centreX = chunkX * 16 + 8;
     const std::int32_t centreZ = chunkZ * 16 + 8;
     const std::int32_t stubY = surfaceHeightAt_(centreX, centreZ) - 1;
-    if (biomePath(biomeAt_(centreX, stubY, centreZ)) != kBiome) {
+    if (!forPlacement && biomePath(biomeAt_(centreX, stubY, centreZ)) != kBiome) {
         return std::nullopt;
     }
     // parity: `SinglePieceStructure.findGenerationPoint` refuses a start whose lowest corner, over
@@ -180,8 +181,8 @@ std::optional<DesertPyramidPiece> DesertPyramidStructureGenerator::startPiece(st
 }
 
 void DesertPyramidStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
-                                                std::int32_t chunkZ) const {
-    std::optional<DesertPyramidPiece> start = startPiece(seed, chunkX, chunkZ);
+                                                std::int32_t chunkZ, bool forPlacement) const {
+    std::optional<DesertPyramidPiece> start = startPiece(seed, chunkX, chunkZ, forPlacement);
     if (!start.has_value()) {
         return;
     }
@@ -200,11 +201,26 @@ void DesertPyramidStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed,
 
     piece.place(chunk, clip, seed, random);
     placeSuspiciousSand(chunk, clip, seed, piece);
+    if (forPlacement) {
+        // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+        return;
+    }
     chunk.structures().add(structure::StructureStartRecord{.structure = std::string{kName},
                                                            .chunkX = chunkX,
                                                            .chunkZ = chunkZ,
                                                            .fullBounds = piece.bounds(),
                                                            .pieces = {piece.bounds()}});
+}
+
+std::optional<structure::StructureBoundingBox>
+DesertPyramidStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    const std::optional<DesertPyramidPiece> piece = startPiece(seed, chunkX, chunkZ, /*forPlacement=*/true);
+    return piece.has_value() ? std::optional{piece->bounds()} : std::nullopt;
+}
+
+void DesertPyramidStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                              std::int32_t chunkZ) const {
+    placeFrom(chunk, seed, chunkX, chunkZ, /*forPlacement=*/true);
 }
 
 void DesertPyramidStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {

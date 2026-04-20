@@ -87,6 +87,11 @@ public:
     assembleAt(const wire::common::Identifier& structure, std::int32_t chunkX, std::int32_t chunkZ,
                std::int64_t seed) const;
 
+    /// Writes the part of `structure` assembled at (chunkX, chunkZ) that lands in `chunk`, reusing
+    /// `assembleAt` so a placed village is the assembled one.
+    void placeAt(Chunk& chunk, const wire::common::Identifier& structure, std::int32_t chunkX, std::int32_t chunkZ,
+                 std::int64_t seed) const;
+
     /// Assembles any template pool by name, as `/place jigsaw` does: just a start pool and a depth.
     ///
     /// parity: `PlaceCommand.placeJigsaw`; its `target` is accepted and ignored, since this assembly

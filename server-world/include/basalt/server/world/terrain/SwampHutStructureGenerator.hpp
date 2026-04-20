@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace basalt::server::world::terrain {
@@ -27,12 +28,25 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: the piece never leaves its start chunk, so the bounds
+    /// are that whole chunk. The grid and biome checks are skipped, as the command skips them.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ) const;
+
+    /// Writes the hut started at (chunkX, chunkZ) into `chunk`, like the worldgen pass does, but
+    /// without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
     /// Whether a hut starts in this chunk, which is what `/locate` asks.
     [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
 private:
+    /// The hut itself: orientation draw, settle and write. `forPlacement` skips the start record,
+    /// which `PlaceCommand.placeStructure` does not register.
+    void placeHut(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, bool forPlacement = false);
+
     BiomeAt biomeAt_;
     SurfaceHeightAt surfaceHeightAt_;
 };

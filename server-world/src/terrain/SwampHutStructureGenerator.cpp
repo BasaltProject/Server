@@ -282,20 +282,11 @@ bool SwampHutStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX
     return biomePath(biomeAt_(centreX, stubY, centreZ)) == kBiome;
 }
 
-void SwampHutStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
-    const std::int32_t chunkX = chunk.chunkX();
-    const std::int32_t chunkZ = chunk.chunkZ();
-    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
-        return;
-    }
-
+void SwampHutStructureGenerator::placeHut(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                          bool forPlacement) {
     // parity: `Structure.GenerationContext`'s own random, independent of the decoration stream.
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
-
-    if (!startsAt(seed, chunkX, chunkZ)) {
-        return;
-    }
 
     const StructureDirection orientation =
         kHorizontal[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(kHorizontal.size())))];
@@ -304,11 +295,42 @@ void SwampHutStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
         return;
     }
     piece.place(chunk);
+    if (forPlacement) {
+        // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+        return;
+    }
     chunk.structures().add(structure::StructureStartRecord{.structure = std::string{kName},
                                                            .chunkX = chunkX,
                                                            .chunkZ = chunkZ,
                                                            .fullBounds = piece.bounds(),
                                                            .pieces = {piece.bounds()}});
+}
+
+void SwampHutStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
+    const std::int32_t chunkX = chunk.chunkX();
+    const std::int32_t chunkZ = chunk.chunkZ();
+    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+        return;
+    }
+
+    // parity: `onTopOfChunkCenter` over `WORLD_SURFACE_WG`, which is where the biome is tested.
+    const std::int32_t centreX = chunkX * 16 + 8;
+    const std::int32_t centreZ = chunkZ * 16 + 8;
+    if (biomePath(biomeAt_(centreX, surfaceHeightAt_(centreX, centreZ) - 1, centreZ)) != kBiome) {
+        return;
+    }
+    placeHut(chunk, seed, chunkX, chunkZ);
+}
+
+std::optional<structure::StructureBoundingBox>
+SwampHutStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    static_cast<void>(seed);
+    return structure::StructureBoundingBox{chunkX * 16,      kOverworldHeight.minY(), chunkZ * 16,
+                                           chunkX * 16 + 15, kOverworldHeight.maxY(), chunkZ * 16 + 15};
+}
+
+void SwampHutStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    placeHut(chunk, seed, chunkX, chunkZ, /*forPlacement=*/true);
 }
 
 } // namespace basalt::server::world::terrain

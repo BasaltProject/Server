@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/world/StructureLocator.hpp>
+#include <basalt/server/runtime/world/StructurePlacer.hpp>
 #include <basalt/server/runtime/world/StructureTemplates.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
 #include <basalt/server/world/Chunk.hpp>
@@ -50,6 +51,9 @@ public:
         server::world::terrain::VillageStructureGenerator* camps = nullptr;
         /// The single-generator structures `/locate` can find.
         std::vector<StructureLocator> locators;
+        /// The structures `/place structure` can generate on the spot: each one the very generator
+        /// generation uses, like the locators.
+        std::vector<StructurePlacer> placers;
         server::world::terrain::StrongholdStructureGenerator* strongholds = nullptr;
         /// parity: `randomState().sampler().findSpawnPosition()`, in chunk coordinates.
         std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunk;

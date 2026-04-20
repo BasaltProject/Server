@@ -115,6 +115,13 @@ EndCityStructureGenerator::cityAt(std::int64_t seed, std::int32_t candidateChunk
     if (found != cities_.end()) {
         return found->second;
     }
+    return cities_.emplace(key, buildCity(seed, candidateChunkX, candidateChunkZ, /*forPlacement=*/false))
+        .first->second;
+}
+
+std::vector<endCityPieces::Piece> EndCityStructureGenerator::buildCity(std::int64_t seed, std::int32_t candidateChunkX,
+                                                                       std::int32_t candidateChunkZ,
+                                                                       bool forPlacement) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
     const StructureRotation rotation =
@@ -126,11 +133,50 @@ EndCityStructureGenerator::cityAt(std::int64_t seed, std::int32_t candidateChunk
         std::min({surfaceHeightAt(startX, startZ), surfaceHeightAt(startX, startZ + offsetZ),
                   surfaceHeightAt(startX + offsetX, startZ), surfaceHeightAt(startX + offsetX, startZ + offsetZ)});
     const std::string_view biome = biomeSource_->biomeAtQuart(startX >> 2, startY >> 2, startZ >> 2);
-    std::vector<endCityPieces::Piece> pieces;
-    if (startY >= kMinStartY && isEndCityBiome(biome)) {
-        pieces = endCityPieces::assemble(templateLoader_, StructurePos{startX, startY, startZ}, rotation, random);
+    // parity: `EndCityStructure.findGenerationPoint` keeps the y 60 floor and drops the biome test
+    // when `/place structure` asks with its always-true predicate.
+    if (startY < kMinStartY || (!forPlacement && !isEndCityBiome(biome))) {
+        return {};
     }
-    return cities_.emplace(key, std::move(pieces)).first->second;
+    return endCityPieces::assemble(templateLoader_, StructurePos{startX, startY, startZ}, rotation, random);
+}
+
+std::optional<structure::StructureBoundingBox>
+EndCityStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::scoped_lock lock{mutex_};
+    const std::vector<endCityPieces::Piece> pieces = buildCity(seed, chunkX, chunkZ, /*forPlacement=*/true);
+    if (pieces.empty()) {
+        return std::nullopt;
+    }
+    return unionOf(pieces);
+}
+
+void EndCityStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::scoped_lock lock{mutex_};
+    const std::vector<endCityPieces::Piece> pieces = buildCity(seed, chunkX, chunkZ, /*forPlacement=*/true);
+    if (pieces.empty()) {
+        return;
+    }
+    const StructureBoundingBox clip = chunkClip(chunk);
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
+    const std::int64_t decorationSeed =
+        random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+    random::setFeatureSeed(random, decorationSeed, kEndCityStructureIndex, kSurfaceStructuresStep);
+    for (const endCityPieces::Piece& piece : pieces) {
+        if (piece.piece == nullptr || !piece.boundingBox.intersects(clip)) {
+            continue;
+        }
+        piece.piece->placeInto(chunk, structure::TemplatePlacement{.position = piece.position,
+                                                                   .rotation = piece.rotation,
+                                                                   .mirror = StructureMirror::None,
+                                                                   .pivot = kZero,
+                                                                   .clipTo = clip,
+                                                                   .random = &random,
+                                                                   .ignoreStructureBlocks = true,
+                                                                   .ignoreAir = !piece.overwrite});
+        handleMarkers(chunk, piece, clip, random);
+    }
+    // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
 }
 
 std::vector<EndCityStructureGenerator::CityReference>

@@ -127,6 +127,23 @@ using wire::common::Identifier;
 
 } // namespace
 
+/// A `/place structure` placer over the generator's own placement methods, with any trailing
+/// variant argument (mineshaft type, ruin temperature, portal variant) bound into both calls.
+template <typename Generator, typename BoundsFn, typename PlaceFn, typename... Bound>
+[[nodiscard]] StructurePlacer makePlacer(Identifier id, Generator* generator, BoundsFn bounds, PlaceFn place,
+                                         Bound... bound) {
+    return StructurePlacer{
+        .id = std::move(id),
+        .boundsAt = [generator, bounds,
+                     bound...](std::int64_t seed, std::int32_t chunkX,
+                               std::int32_t chunkZ) { return (generator->*bounds)(seed, chunkX, chunkZ, bound...); },
+        .place =
+            [generator, place, bound...](server::world::Chunk& chunk, std::int64_t seed, std::int32_t startChunkX,
+                                         std::int32_t startChunkZ) {
+                (generator->*place)(chunk, seed, startChunkX, startChunkZ, bound...);
+            }};
+}
+
 /// One world's generator and everything it borrows, kept alive together.
 struct VanillaWorldGeneratorFactory::Built {
     // Declared in construction order: the router is read by the environment, which is read by every
@@ -464,6 +481,65 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                               })});
     }
     answer.strongholds = built->strongholds.get();
+    answer.placers.push_back(makePlacer(Identifier::vanilla(std::string{terrain::StrongholdStructureGenerator::kName}),
+                                        built->strongholds.get(), &terrain::StrongholdStructureGenerator::placeBoundsAt,
+                                        &terrain::StrongholdStructureGenerator::placeAt));
+    answer.placers.push_back(makePlacer(Identifier::vanilla(std::string{terrain::SwampHutStructureGenerator::kName}),
+                                        built->swampHuts.get(), &terrain::SwampHutStructureGenerator::placeBoundsAt,
+                                        &terrain::SwampHutStructureGenerator::placeAt));
+    answer.placers.push_back(makePlacer(
+        Identifier::vanilla(std::string{terrain::DesertPyramidStructureGenerator::kName}), built->desertPyramids.get(),
+        &terrain::DesertPyramidStructureGenerator::placeBoundsAt, &terrain::DesertPyramidStructureGenerator::placeAt));
+    answer.placers.push_back(makePlacer(
+        Identifier::vanilla(std::string{terrain::JungleTempleStructureGenerator::kName}), built->jungleTemples.get(),
+        &terrain::JungleTempleStructureGenerator::placeBoundsAt, &terrain::JungleTempleStructureGenerator::placeAt));
+    answer.placers.push_back(
+        makePlacer(Identifier::vanilla(std::string{terrain::WoodlandMansionStructureGenerator::kName}),
+                   built->mansions.get(), &terrain::WoodlandMansionStructureGenerator::placeBoundsAt,
+                   &terrain::WoodlandMansionStructureGenerator::placeAt));
+    answer.placers.push_back(makePlacer(
+        Identifier::vanilla(std::string{terrain::OceanMonumentStructureGenerator::kName}), built->oceanMonuments.get(),
+        &terrain::OceanMonumentStructureGenerator::placeBoundsAt, &terrain::OceanMonumentStructureGenerator::placeAt));
+    answer.placers.push_back(
+        makePlacer(Identifier::vanilla(std::string{terrain::BuriedTreasureStructureGenerator::kName}),
+                   built->buriedTreasures.get(), &terrain::BuriedTreasureStructureGenerator::placeBoundsAt,
+                   &terrain::BuriedTreasureStructureGenerator::placeAt));
+    answer.placers.push_back(makePlacer(Identifier::vanilla(std::string{terrain::IglooStructureGenerator::kName}),
+                                        built->igloos.get(), &terrain::IglooStructureGenerator::placeBoundsAt,
+                                        &terrain::IglooStructureGenerator::placeAt));
+    for (const auto& [name, type] : {std::pair{"mineshaft", structure::MineshaftType::Normal},
+                                     std::pair{"mineshaft_mesa", structure::MineshaftType::Mesa}}) {
+        answer.placers.push_back(makePlacer(Identifier::vanilla(name), built->mineshafts.get(),
+                                            &terrain::MineshaftStructureGenerator::placeBoundsAt,
+                                            &terrain::MineshaftStructureGenerator::placeAt, type));
+    }
+    for (const auto& [name, warm] : {std::pair{"ocean_ruin_cold", false}, std::pair{"ocean_ruin_warm", true}}) {
+        answer.placers.push_back(makePlacer(Identifier::vanilla(name), built->oceanRuins.get(),
+                                            &terrain::OceanRuinStructureGenerator::placeBoundsAt,
+                                            &terrain::OceanRuinStructureGenerator::placeAt, warm));
+    }
+    for (const auto& [name, beached] : {std::pair{"shipwreck", false}, std::pair{"shipwreck_beached", true}}) {
+        answer.placers.push_back(makePlacer(Identifier::vanilla(name), built->shipwrecks.get(),
+                                            &terrain::ShipwreckStructureGenerator::placeBoundsAt,
+                                            &terrain::ShipwreckStructureGenerator::placeAt, beached));
+    }
+    for (const terrain::JigsawStructureGenerator* jigsaw : {built->pillagerOutposts.get(), built->trailRuins.get(),
+                                                            built->ancientCities.get(), built->trialChambers.get()}) {
+        answer.placers.push_back(
+            makePlacer(Identifier::vanilla(jigsaw->name()), const_cast<terrain::JigsawStructureGenerator*>(jigsaw),
+                       &terrain::JigsawStructureGenerator::placeBoundsAt, &terrain::JigsawStructureGenerator::placeAt));
+    }
+    for (const terrain::RuinedPortalVariant& variant : ruinedPortalVariants::overworld(tags)) {
+        if (variant.name == "ruined_portal_nether") {
+            continue;
+        }
+        // The variant list is a temporary: bind the name by value, or the lambdas would hold a
+        // dangling view of a destroyed string.
+        answer.placers.push_back(makePlacer(Identifier::vanilla(variant.name), built->ruinedPortals.get(),
+                                            &terrain::RuinedPortalStructureGenerator::placeBoundsAt,
+                                            &terrain::RuinedPortalStructureGenerator::placeAt,
+                                            std::string{variant.name}));
+    }
     answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
         return terrain::realTerrainGenerator::generateTerrain(*world.overworldRouter, *world.overworldSurface, chunkX,
                                                               chunkZ, world.seed, world.generators);
@@ -629,6 +705,21 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
                                                              .equipment = world.equipment.get()}));
         }
     };
+    answer.placers.push_back(makePlacer(Identifier::vanilla("fortress"), built->netherStructures.get(),
+                                        &terrain::NetherStructureGenerator::placeBoundsAt,
+                                        &terrain::NetherStructureGenerator::placeAt,
+                                        terrain::NetherPlacedStructure::Fortress));
+    answer.placers.push_back(makePlacer(Identifier::vanilla("bastion_remnant"), built->netherStructures.get(),
+                                        &terrain::NetherStructureGenerator::placeBoundsAt,
+                                        &terrain::NetherStructureGenerator::placeAt,
+                                        terrain::NetherPlacedStructure::Bastion));
+    answer.placers.push_back(makePlacer(Identifier::vanilla("nether_fossil"), built->netherStructures.get(),
+                                        &terrain::NetherStructureGenerator::placeBoundsAt,
+                                        &terrain::NetherStructureGenerator::placeAt,
+                                        terrain::NetherPlacedStructure::Fossil));
+    answer.placers.push_back(makePlacer(Identifier::vanilla("ruined_portal_nether"), built->netherStructures.get(),
+                                        &terrain::NetherStructureGenerator::netherPortalBoundsAt,
+                                        &terrain::NetherStructureGenerator::netherPortalPlaceAt));
     built_.push_back(std::move(built));
     return answer;
 }
@@ -669,6 +760,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
         terrain::dimensionTerrainGenerator::decorateEnd(generated.chunk(), *world.endRouter, *world.endBiomes,
                                                         world.seed);
     };
+    answer.placers.push_back(makePlacer(Identifier::vanilla("end_city"), built->endCities.get(),
+                                        &terrain::EndCityStructureGenerator::placeBoundsAt,
+                                        &terrain::EndCityStructureGenerator::placeAt));
     built_.push_back(std::move(built));
     return answer;
 }

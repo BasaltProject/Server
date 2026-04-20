@@ -32,9 +32,23 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: every piece is clipped to its start chunk here, so the
+    /// bounds are that whole chunk. The grid and biome checks are skipped, as the command skips them.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ) const;
+
+    /// Writes the igloo started at (chunkX, chunkZ) into `chunk`, like the worldgen pass does, but
+    /// without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
 private:
+    /// parity: `IglooStructure.findGenerationPoint`'s draw order: the rotation, then the basement
+    /// decision, then the pieces. `forPlacement` skips the start record.
+    void placeIgloo(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                    bool forPlacement = false);
+
     [[nodiscard]] std::optional<structure::StructureBoundingBox>
     place(Chunk& chunk, const structure::StructureBoundingBox& clip, random::RandomSource& random,
           std::string_view name, structure::StructurePos start, structure::StructureRotation rotation,

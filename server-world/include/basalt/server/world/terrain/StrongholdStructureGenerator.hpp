@@ -39,6 +39,16 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: `StrongholdStructure.findGenerationPoint` never
+    /// refuses, so the bounds of the maze started at this chunk are always its pieces' union,
+    /// unless the layout came up empty.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ);
+
+    /// Writes the part of the maze started at (chunkX, chunkZ) that lands in `chunk`, like the
+    /// worldgen pass does, but without the ring and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
     /// The stronghold nearest to a block position, or nothing in a world with none. parity:
     /// `ChunkGenerator.getNearestGeneratedStructure` walks the whole ring list keeping the smallest
     /// squared distance from each ring chunk's centre at y 32, but reports that chunk's minimum

@@ -240,38 +240,77 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         if (!world.has_value()) {
             return std::unexpected{world.error()};
         }
-        const std::vector<Identifier> known = (*world)->structureSetIds();
-        if (known.empty()) {
-            return std::unexpected{CommandSyntaxError{
-                .component =
-                    Component::translatable("commands.place.structure.invalid",
-                                            {Component::text(id == nullptr ? std::string{} : id->toString())})}};
-        }
-        terrain::VillageStructureGenerator* villages = id == nullptr ? nullptr : (*world)->structureSetGenerator(*id);
-        if (villages == nullptr) {
-            return std::unexpected{CommandSyntaxError{
-                .component = Component::text("'" + (id == nullptr ? std::string{} : id->toString()) +
-                                             "' is not a structure this build generates. Available: " + joined(known) +
-                                             ". `/place template` places a structure file.")}};
-        }
         const std::array<std::int32_t, 3> at = resolveOrigin(context, positioned ? "pos" : "");
-        const std::optional<std::vector<structure::PlacedStructurePiece>> pieces =
-            villages->assembleAt(*id, at[0] >> 4, at[2] >> 4, (*world)->metadata().seed);
-        if (!pieces.has_value()) {
-            return std::unexpected{
-                CommandSyntaxError{.component = Component::translatable("commands.place.structure.failed",
-                                                                        {Component::text(id->toString())})}};
+        const std::int64_t seed = (*world)->metadata().seed;
+        const std::int32_t startChunkX = at[0] >> 4;
+        const std::int32_t startChunkZ = at[2] >> 4;
+        // parity: `start.getBoundingBox()` and `ChunkPos.rangeClosed` with `checkLoaded` first:
+        // every chunk the start covers has to be loaded before anything is written.
+        const auto placeCovered = [&context, world, seed, startChunkX, startChunkZ,
+                                   &at](const world::StructurePlacer& placer) -> Parsed<std::int32_t> {
+            const std::optional<StructureBoundingBox> bounds = placer.boundsAt(seed, startChunkX, startChunkZ);
+            if (!bounds.has_value()) {
+                return std::unexpected{
+                    CommandSyntaxError{.component = Component::translatable("commands.place.structure.failed",
+                                                                            {Component::text(placer.id.toString())})}};
+            }
+            for (std::int32_t chunkX = bounds->minX >> 4; chunkX <= (bounds->maxX >> 4); chunkX++) {
+                for (std::int32_t chunkZ = bounds->minZ >> 4; chunkZ <= (bounds->maxZ >> 4); chunkZ++) {
+                    server::world::Chunk* chunk = (*world)->state().chunkIfLoaded(chunkX, chunkZ);
+                    if (chunk == nullptr) {
+                        return std::unexpected{unloaded()};
+                    }
+                    // parity: the pieces read their neighbours through the level, so while one chunk
+                    // is written a cross-chunk read sees the loaded world, as `WorldGenRegion` does.
+                    const server::world::Chunk::ExternalStateScope readsThroughLevel{
+                        *chunk, [world](std::int32_t x, std::int32_t y, std::int32_t z) {
+                            return (*world)->state().blockState(x, y, z);
+                        }};
+                    placer.place(*chunk, seed, startChunkX, startChunkZ);
+                }
+            }
+            context.environment().syncChunks(**world, bounds->minX, bounds->minZ, bounds->maxX, bounds->maxZ);
+            context.success(Component::translatable(
+                                "commands.place.structure.success",
+                                {Component::text(placer.id.toString()), Component::text(std::to_string(at[0])),
+                                 Component::text(std::to_string(at[1])), Component::text(std::to_string(at[2]))}),
+                            true);
+            return 1;
+        };
+        terrain::VillageStructureGenerator* villages = id == nullptr ? nullptr : (*world)->structureSetGenerator(*id);
+        if (villages != nullptr) {
+            const std::optional<std::vector<structure::PlacedStructurePiece>> pieces =
+                villages->assembleAt(*id, startChunkX, startChunkZ, seed);
+            if (!pieces.has_value()) {
+                return std::unexpected{
+                    CommandSyntaxError{.component = Component::translatable("commands.place.structure.failed",
+                                                                            {Component::text(id->toString())})}};
+            }
+            if (const std::optional<CommandSyntaxError> failure = writePieces(context, **world, *pieces, *villages);
+                failure.has_value()) {
+                return std::unexpected{*failure};
+            }
+            context.success(Component::translatable(
+                                "commands.place.structure.success",
+                                {Component::text(id->toString()), Component::text(std::to_string(at[0])),
+                                 Component::text(std::to_string(at[1])), Component::text(std::to_string(at[2]))}),
+                            true);
+            return 1;
         }
-        if (const std::optional<CommandSyntaxError> failure = writePieces(context, **world, *pieces, *villages);
-            failure.has_value()) {
-            return std::unexpected{*failure};
+        if (id != nullptr) {
+            const auto placer = std::ranges::find((*world)->structurePlacers(), *id, &world::StructurePlacer::id);
+            if (placer != (*world)->structurePlacers().end()) {
+                return placeCovered(*placer);
+            }
         }
-        context.success(
-            Component::translatable("commands.place.structure.success",
-                                    {Component::text(id->toString()), Component::text(std::to_string(at[0])),
-                                     Component::text(std::to_string(at[1])), Component::text(std::to_string(at[2]))}),
-            true);
-        return 1;
+        std::vector<Identifier> known = (*world)->structureSetIds();
+        for (const world::StructurePlacer& placer : (*world)->structurePlacers()) {
+            known.push_back(placer.id);
+        }
+        return std::unexpected{CommandSyntaxError{
+            .component = Component::text("'" + (id == nullptr ? std::string{} : id->toString()) +
+                                         "' is not a structure this build generates. Available: " + joined(known) +
+                                         ". `/place template` places a structure file.")}};
     };
 
     /// parity: `PlaceCommand.placeJigsaw`, which grows a template pool at a position with no
@@ -327,9 +366,15 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                       [placeStructure](const CommandNodeBuilder& named) {
                           named.suggestsFromServer([](const SuggestionContext& context) {
                               const world::LoadedWorld* world = context.world();
-                              return context.matchingIds(world == nullptr
-                                                             ? terrain::VillageStructureGenerator::structureIds()
-                                                             : world->structureSetIds());
+                              std::vector<Identifier> ids = world == nullptr
+                                                                ? terrain::VillageStructureGenerator::structureIds()
+                                                                : world->structureSetIds();
+                              if (world != nullptr) {
+                                  for (const world::StructurePlacer& placer : world->structurePlacers()) {
+                                      ids.push_back(placer.id);
+                                  }
+                              }
+                              return context.matchingIds(ids);
                           });
                           named.executes([placeStructure](const CommandContext& context) {
                               return placeStructure(context, false);

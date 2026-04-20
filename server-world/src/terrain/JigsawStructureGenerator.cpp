@@ -70,21 +70,12 @@ std::int32_t JigsawStructureGenerator::surfaceHeightAt(std::int32_t x, std::int3
     return std::max(y + 1, kSeaLevel);
 }
 
-std::shared_ptr<const std::vector<PlacedStructurePiece>>
-JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
-                                         std::int64_t seed) {
-    const CandidateKey key{seed, candidateChunkX, candidateChunkZ};
-    {
-        const std::scoped_lock lock{mutex_};
-        const auto found = cache_.find(key);
-        if (found != cache_.end()) {
-            return found->second;
-        }
-    }
-
+std::vector<PlacedStructurePiece> JigsawStructureGenerator::buildStart(std::int32_t candidateChunkX,
+                                                                       std::int32_t candidateChunkZ, std::int64_t seed,
+                                                                       bool forPlacement) {
     Samplers samplers;
     std::vector<PlacedStructurePiece> assembled;
-    if (grid_.isStructureChunk(seed, candidateChunkX, candidateChunkZ)) {
+    if (forPlacement || grid_.isStructureChunk(seed, candidateChunkX, candidateChunkZ)) {
         random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
         random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
         // parity: a drawn start height is a uniform provider, so it costs a draw before the
@@ -140,12 +131,29 @@ JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int3
                                      .startJigsawName = settings_.startJigsawName,
                                      .poolAliases = std::move(resolvedAliases),
                                      .acceptStart =
-                                         [this](const StructurePos& stub) {
-                                             // The tag keeps its namespace and so does the biome name.
-                                             return biomes_.contains(biomeAt_(stub.x, stub.y, stub.z));
+                                         [this, forPlacement](const StructurePos& stub) {
+                                             // parity: `/place structure` passes an always-true biome
+                                             // predicate; generation tests the structure's own tag.
+                                             return forPlacement || biomes_.contains(biomeAt_(stub.x, stub.y, stub.z));
                                          }},
             random);
     }
+    return assembled;
+}
+
+std::shared_ptr<const std::vector<PlacedStructurePiece>>
+JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
+                                         std::int64_t seed) {
+    const CandidateKey key{seed, candidateChunkX, candidateChunkZ};
+    {
+        const std::scoped_lock lock{mutex_};
+        const auto found = cache_.find(key);
+        if (found != cache_.end()) {
+            return found->second;
+        }
+    }
+
+    std::vector<PlacedStructurePiece> assembled = buildStart(candidateChunkX, candidateChunkZ, seed, false);
 
     const std::scoped_lock lock{mutex_};
     const auto found = cache_.find(key);
@@ -157,6 +165,49 @@ JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int3
     }
     return cache_.emplace(key, std::make_shared<const std::vector<PlacedStructurePiece>>(std::move(assembled)))
         .first->second;
+}
+
+std::optional<std::vector<PlacedStructurePiece>>
+JigsawStructureGenerator::assembleAt(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed) {
+    std::vector<PlacedStructurePiece> assembled = buildStart(chunkX, chunkZ, seed, /*forPlacement=*/true);
+    if (assembled.empty()) {
+        return std::nullopt;
+    }
+    return assembled;
+}
+
+std::optional<structure::StructureBoundingBox>
+JigsawStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::optional<std::vector<PlacedStructurePiece>> assembled = assembleAt(chunkX, chunkZ, seed);
+    if (!assembled.has_value()) {
+        return std::nullopt;
+    }
+    std::optional<StructureBoundingBox> whole;
+    for (const PlacedStructurePiece& piece : *assembled) {
+        whole = whole.has_value() ? whole->encapsulating(piece.boundingBox) : piece.boundingBox;
+    }
+    return whole;
+}
+
+void JigsawStructureGenerator::placeAt(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed) {
+    const std::optional<std::vector<PlacedStructurePiece>> assembled = assembleAt(chunkX, chunkZ, seed);
+    if (!assembled.has_value()) {
+        return;
+    }
+    const StructureBoundingBox clip = chunkClip(chunk.chunkX(), chunk.chunkZ(), 0);
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
+    const std::int64_t decorationSeed =
+        random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+    random::setFeatureSeed(random, decorationSeed, settings_.structureIndex, settings_.step);
+    const std::optional<std::int64_t> worldSeed =
+        settings_.passWorldSeed ? std::optional<std::int64_t>{seed} : std::nullopt;
+    for (const PlacedStructurePiece& piece : *assembled) {
+        if (!piece.boundingBox.intersects(clip)) {
+            continue;
+        }
+        piece.element.place(templateLoader_, chunk, piece.position, piece.rotation, clip, random, worldSeed);
+    }
+    // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
 }
 
 std::vector<JigsawStructureGenerator::Start> JigsawStructureGenerator::nearbyStarts(std::int32_t chunkX,

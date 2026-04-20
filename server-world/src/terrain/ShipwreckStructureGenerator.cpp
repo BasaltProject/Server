@@ -182,6 +182,66 @@ void ShipwreckStructureGenerator::placeMarkerChests(Chunk& chunk, const structur
     }
 }
 
+std::optional<ShipwreckStructureGenerator::HullStart> ShipwreckStructureGenerator::hullStart(std::int64_t seed,
+                                                                                             std::int32_t chunkX,
+                                                                                             std::int32_t chunkZ,
+                                                                                             bool beached) const {
+    // parity: `context.random()`, a separate stream with the same seeding, so the rotation is its
+    // first draw whichever variant was asked for.
+    random::RandomSource pick = random::RandomSource::worldgen(random::RandomSource::legacy(0));
+    random::setLargeFeatureSeed(pick, seed, chunkX, chunkZ);
+    const StructureRotation rotation =
+        kRotations[static_cast<std::size_t>(pick.nextInt(static_cast<std::int32_t>(kRotations.size())))];
+    const std::span<const std::string_view> names =
+        beached ? std::span<const std::string_view>{kBeachedHulls} : std::span<const std::string_view>{kOceanHulls};
+    const structure::StructureTemplate* piece =
+        templateOf_(names[static_cast<std::size_t>(pick.nextInt(static_cast<std::int32_t>(names.size())))]);
+    if (piece == nullptr) {
+        return std::nullopt;
+    }
+    const StructurePos origin{chunkX * 16, 0, chunkZ * 16};
+    const std::optional<StructurePos> settled = settle(*piece, origin, beached, pick);
+    if (!settled.has_value()) {
+        return std::nullopt;
+    }
+    return HullStart{.piece = piece, .rotation = rotation, .settled = *settled};
+}
+
+std::optional<structure::StructureBoundingBox> ShipwreckStructureGenerator::placeBoundsAt(std::int64_t seed,
+                                                                                          std::int32_t chunkX,
+                                                                                          std::int32_t chunkZ,
+                                                                                          bool beached) const {
+    const std::optional<HullStart> start = hullStart(seed, chunkX, chunkZ, beached);
+    return start.has_value() ? std::optional{start->piece->getBoundingBox(start->settled, start->rotation, kPivot,
+                                                                          StructureMirror::None)}
+                             : std::nullopt;
+}
+
+void ShipwreckStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                          bool beached) const {
+    const std::optional<HullStart> start = hullStart(seed, chunkX, chunkZ, beached);
+    if (!start.has_value()) {
+        return;
+    }
+    const StructureBoundingBox clip{chunk.chunkX() * 16,      kOverworldHeight.minY(), chunk.chunkZ() * 16,
+                                    chunk.chunkX() * 16 + 15, kOverworldHeight.maxY(), chunk.chunkZ() * 16 + 15};
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
+    const std::int64_t decorationSeed =
+        random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+    random::setFeatureSeed(random, decorationSeed, beached ? kBeachedStructureIndex : kSunkStructureIndex,
+                           kSurfaceStructuresStep);
+    start->piece->placeInto(chunk, structure::TemplatePlacement{
+                                       .position = start->settled,
+                                       .rotation = start->rotation,
+                                       .mirror = StructureMirror::None,
+                                       .pivot = kPivot,
+                                       .clipTo = clip,
+                                       .blockProcessor = structure::templateBlockProcessors::ignoreStructureAndAir(),
+                                       .random = &random});
+    placeMarkerChests(chunk, *start->piece, start->settled, start->rotation, clip, random);
+    // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+}
+
 void ShipwreckStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
                                             std::int32_t chunkZ) const {
     if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {

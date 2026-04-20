@@ -45,6 +45,15 @@ public:
     [[nodiscard]] std::optional<NetherRuinedPortalStartSnapshot>
     startSnapshot(std::int64_t seed, std::int32_t candidateChunkX, std::int32_t candidateChunkZ);
 
+    /// parity: `PlaceCommand.placeStructure`: the bounds of the portal started at this chunk with
+    /// the biome check skipped, or nothing when its draw found nothing.
+    [[nodiscard]] std::optional<NetherRuinedPortalStartSnapshot>
+    placementSnapshot(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
+    /// Writes the part of the portal started at (chunkX, chunkZ) that lands in `chunk`, replaying
+    /// the same writes worldgen would make.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
 private:
     struct PortalStart;
     struct PortalWorld;
@@ -68,7 +77,7 @@ private:
     };
 
     [[nodiscard]] std::optional<PortalStart> createStart(std::int64_t seed, std::int32_t candidateChunkX,
-                                                         std::int32_t candidateChunkZ) const;
+                                                         std::int32_t candidateChunkZ, bool forPlacement = false) const;
 
     [[nodiscard]] std::int32_t findSuitableY(random::RandomSource& random, bool airPocket,
                                              const structure::StructureBoundingBox& boundingBox) const;

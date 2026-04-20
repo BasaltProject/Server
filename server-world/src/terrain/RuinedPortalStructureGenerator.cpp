@@ -343,6 +343,47 @@ RuinedPortalStructureGenerator::portalAt(std::int64_t seed, std::int32_t chunkX,
     return placed_.emplace(key, std::move(portal)).first->second;
 }
 
+std::vector<std::string> RuinedPortalStructureGenerator::variantNames() const {
+    std::vector<std::string> names;
+    names.reserve(variants_.size());
+    for (const RuinedPortalVariant& variant : variants_) {
+        names.push_back(variant.name);
+    }
+    return names;
+}
+
+std::optional<RuinedPortalStructureGenerator::Portal>
+RuinedPortalStructureGenerator::placementStart(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                               std::string_view variant) const {
+    for (const RuinedPortalVariant& candidate : variants_) {
+        if (candidate.name == variant) {
+            // parity: `RuinedPortalStructure.findGenerationPoint` for one structure, which is what
+            // `/place structure` runs: no variant draw and no biome test.
+            return generationPoint(chunkX, chunkZ, candidate, seed);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<structure::StructureBoundingBox>
+RuinedPortalStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                              std::string_view variant) const {
+    const std::optional<Portal> portal = placementStart(seed, chunkX, chunkZ, variant);
+    return portal.has_value() ? std::optional{portal->box} : std::nullopt;
+}
+
+void RuinedPortalStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                             std::string_view variant) const {
+    const std::optional<Portal> portal = placementStart(seed, chunkX, chunkZ, variant);
+    const StructureBoundingBox clip{chunk.chunkX() * 16,      kOverworldHeight.minY(), chunk.chunkZ() * 16,
+                                    chunk.chunkX() * 16 + 15, kOverworldHeight.maxY(), chunk.chunkZ() * 16 + 15};
+    if (!portal.has_value() || !portal->box.intersects(clip)) {
+        return;
+    }
+    // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
+    place(*portal, chunk, clip, seed);
+}
+
 void RuinedPortalStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
     const StructureBoundingBox clip{chunk.chunkX() * 16,      kOverworldHeight.minY(), chunk.chunkZ() * 16,
                                     chunk.chunkX() * 16 + 15, kOverworldHeight.maxY(), chunk.chunkZ() * 16 + 15};

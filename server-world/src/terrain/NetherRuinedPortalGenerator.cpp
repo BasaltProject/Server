@@ -390,8 +390,8 @@ std::int32_t NetherRuinedPortalGenerator::findSuitableY(random::RandomSource& ra
 }
 
 std::optional<NetherRuinedPortalGenerator::PortalStart>
-NetherRuinedPortalGenerator::createStart(std::int64_t seed, std::int32_t candidateChunkX,
-                                         std::int32_t candidateChunkZ) const {
+NetherRuinedPortalGenerator::createStart(std::int64_t seed, std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
+                                         bool forPlacement) const {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
     // parity: 26.3 sets the Nether portal's `air_pocket_probability` to 0, and a zero draws nothing.
@@ -412,7 +412,8 @@ NetherRuinedPortalGenerator::createStart(std::int64_t seed, std::int32_t candida
     const StructureBoundingBox unprojectedBox = piece->getBoundingBox(basePosition, rotation, pivot, mirror);
     const std::int32_t projectedY = findSuitableY(random, airPocket, unprojectedBox);
     const StructurePos position{basePosition.x, projectedY, basePosition.z};
-    if (!netherBiomes().contains(biomePath(biomeSource_->biomeAt(position.x, position.y, position.z)))) {
+    if (!forPlacement &&
+        !netherBiomes().contains(biomePath(biomeSource_->biomeAt(position.x, position.y, position.z)))) {
         return std::nullopt;
     }
     return PortalStart{.templateName = templateName,
@@ -438,6 +439,32 @@ NetherRuinedPortalGenerator::startSnapshot(std::int64_t seed, std::int32_t candi
                                            .mirror = start->mirror,
                                            .boundingBox = start->boundingBox,
                                            .airPocket = start->airPocket};
+}
+
+std::optional<NetherRuinedPortalStartSnapshot>
+NetherRuinedPortalGenerator::placementSnapshot(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::optional<PortalStart> start = createStart(seed, chunkX, chunkZ, /*forPlacement=*/true);
+    if (!start.has_value()) {
+        return std::nullopt;
+    }
+    return NetherRuinedPortalStartSnapshot{.templateName = start->templateName,
+                                           .position = start->position,
+                                           .rotation = start->rotation,
+                                           .mirror = start->mirror,
+                                           .boundingBox = start->boundingBox,
+                                           .airPocket = start->airPocket};
+}
+
+void NetherRuinedPortalGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
+    const std::optional<PortalStart> start = createStart(seed, chunkX, chunkZ, /*forPlacement=*/true);
+    const StructureBoundingBox clip{chunk.chunkX() * 16,      chunk.verticalBounds().minY(), chunk.chunkZ() * 16,
+                                    chunk.chunkX() * 16 + 15, chunk.verticalBounds().maxY(), chunk.chunkZ() * 16 + 15};
+    if (!start.has_value() || !start->effectIntersects(clip)) {
+        return;
+    }
+    // The replay is cached per (seed, chunk, ...), and a placed start equals the worldgen start
+    // wherever worldgen found one, so the cache cannot serve a different answer afterwards.
+    applyReplay(chunk, replay(seed, chunkX, chunkZ, *start));
 }
 
 void NetherRuinedPortalGenerator::fillBaseTerrain(Chunk& chunk) const {

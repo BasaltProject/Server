@@ -20,6 +20,9 @@
 
 namespace basalt::server::world::terrain {
 
+/// The Nether structures `/place structure` can generate, which is what the dimension's set holds.
+enum class NetherPlacedStructure : std::uint8_t { Fortress, Bastion, Fossil };
+
 /// Places Nether structure starts before decoration: weighted bastions, procedural fortresses,
 /// Nether ruined portals and the fossils, all wired from the 26.2 streams.
 ///
@@ -33,6 +36,25 @@ public:
                              structure::TemplateLoader templateLoader, PoolLookup poolLookup = nullptr);
 
     void generateInto(Chunk& chunk, std::int64_t seed);
+
+    /// parity: `PlaceCommand.placeStructure`, the three structures this generator makes. The bounds
+    /// a start of this kind at the given chunk would cover with the grid and biome checks skipped,
+    /// or nothing when the structure's own conditions reject the chunk.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox>
+    placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, NetherPlacedStructure structure);
+
+    /// Writes the part of the start of this kind at (chunkX, chunkZ) that lands in `chunk`, like the
+    /// worldgen pass does, but without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                 NetherPlacedStructure structure);
+
+    /// parity: `PlaceCommand.placeStructure` for `ruined_portal_nether`: the bounds of the portal
+    /// started at this chunk with the biome check skipped, or nothing when its draw found nothing.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox>
+    netherPortalBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+
+    /// Writes the part of the portal started at (chunkX, chunkZ) that lands in `chunk`.
+    void netherPortalPlaceAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
 
     /// parity: `Beardifier.forStructuresInChunk`, the sampler the chunk's context binds.
     [[nodiscard]] densityfunction::Sampler beardifierForChunk(std::int32_t chunkX, std::int32_t chunkZ,
@@ -80,7 +102,16 @@ private:
                                                                        std::int64_t seed);
 
     [[nodiscard]] std::optional<FossilStart> netherFossilStart(std::int32_t candidateChunkX,
-                                                               std::int32_t candidateChunkZ, std::int64_t seed);
+                                                               std::int32_t candidateChunkZ, std::int64_t seed,
+                                                               bool forPlacement = false);
+
+    /// A freshly assembled start of the kind `/place structure` asks for: no grid, no biome test,
+    /// not cached, so it can differ from what worldgen holds for the same chunk.
+    [[nodiscard]] std::vector<netherFortressPieces::Piece> fortressStart(std::int64_t seed, std::int32_t chunkX,
+                                                                         std::int32_t chunkZ) const;
+    [[nodiscard]] std::vector<structure::PlacedStructurePiece> bastionStart(std::int64_t seed, std::int32_t chunkX,
+                                                                            std::int32_t chunkZ) const;
+    [[nodiscard]] const structure::StructureTemplate* templateOf(std::string_view name) const;
 
     /// parity: `RuinedPortalPiece` reads the level, which during generation is the base column plus
     /// the lava sea, before any structure has written into it.

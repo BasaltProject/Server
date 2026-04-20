@@ -3,9 +3,11 @@
 #include <basalt/server/world/terrain/MineshaftStructureGenerator.hpp>
 #include <basalt/server/world/terrain/StructureReferenceOrder.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -169,6 +171,47 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
             }
         }
     }
+}
+
+std::optional<structure::StructureBoundingBox>
+MineshaftStructureGenerator::placeBoundsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                           structure::MineshaftType type) const {
+    const std::shared_ptr<const structure::mineshaftLayout::Assembly> assembly = assemblyOf(seed, chunkX, chunkZ, type);
+    if (assembly->pieces.empty()) {
+        return std::nullopt;
+    }
+    structure::StructureBoundingBox whole = assembly->pieces.front().box;
+    for (const structure::MineshaftPiece& piece : assembly->pieces) {
+        whole = whole.encapsulating(piece.box);
+    }
+    return whole;
+}
+
+void MineshaftStructureGenerator::placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                          structure::MineshaftType type) const {
+    const structure::StructureBoundingBox clip{chunk.chunkX() * 16,     kOverworldHeight.minY(),
+                                               chunk.chunkZ() * 16,     chunk.chunkX() * 16 + 15,
+                                               kOverworldHeight.maxY(), chunk.chunkZ() * 16 + 15};
+    // parity: the placed shaft draws from the same per-chunk, per-entry stream worldgen gives a
+    // chunk that holds it, so its content matches a naturally generated one.
+    std::int32_t index = 1;
+    for (const auto& [entryIndex, entryType] : kEntries) {
+        if (entryType == type) {
+            index = entryIndex;
+        }
+    }
+    random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
+    const std::int64_t decorationSeed =
+        random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
+    random::setFeatureSeed(random, decorationSeed, index, kUndergroundStructuresStep);
+    const std::shared_ptr<const structure::mineshaftLayout::Assembly> assembly = assemblyOf(seed, chunkX, chunkZ, type);
+    const structure::MineshaftBlocks blocks{type};
+    for (const structure::MineshaftPiece& piece : assembly->pieces) {
+        if (piece.box.intersects(clip)) {
+            structure::mineshaftFill::place(piece, blocks, chunk, clip, random, biomeAt_);
+        }
+    }
+    // parity: `PlaceCommand.placeStructure` writes the pieces but registers no start.
 }
 
 } // namespace basalt::server::world::terrain

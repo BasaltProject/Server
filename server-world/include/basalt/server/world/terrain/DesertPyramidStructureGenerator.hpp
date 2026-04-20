@@ -26,6 +26,16 @@ public:
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
+    /// parity: `PlaceCommand.placeStructure`: the settled bounds of the pyramid started at this
+    /// chunk with the grid and biome checks skipped, or nothing when its own conditions (the sea
+    /// level floor) reject the chunk.
+    [[nodiscard]] std::optional<structure::StructureBoundingBox> placeBoundsAt(std::int64_t seed, std::int32_t chunkX,
+                                                                               std::int32_t chunkZ) const;
+
+    /// Writes the part of the pyramid started at (chunkX, chunkZ) that lands in `chunk`, like the
+    /// worldgen pass does, but without the grid and biome checks and without recording a start.
+    void placeAt(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
+
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
     /// Whether a pyramid starts in this chunk, which is what `/locate` asks.
@@ -34,11 +44,13 @@ public:
     }
 
 private:
-    /// The settled piece of a pyramid starting in this chunk, or nothing.
+    /// The settled piece of a pyramid starting in this chunk, or nothing. `forPlacement` skips the
+    /// grid and biome checks, which is what `/place structure` does.
     [[nodiscard]] std::optional<DesertPyramidPiece> startPiece(std::int64_t seed, std::int32_t chunkX,
-                                                               std::int32_t chunkZ) const;
+                                                               std::int32_t chunkZ, bool forPlacement = false) const;
 
-    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
+    void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                   bool forPlacement = false) const;
 
     /// parity: `-random.nextInt(3)` off the placing chunk's own feature random, so in the jar the
     /// height depends on which chunk reached the pyramid first. Basalt draws it from the chunk the
