@@ -2,8 +2,8 @@
 #include <basalt/server/storage/VanillaPlayerData.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
-#include <cstdint>
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <utility>
@@ -130,7 +130,7 @@ void readEquipment(const NbtCompound* equipment, StoredInventory& inventory) {
 // parity: the `Score` and shoulder parrots a `.dat` keeps.
 [[nodiscard]] wire::nbt::NbtCompound entityDataOf(const wire::nbt::NbtCompound& root) {
     wire::nbt::NbtCompound kept;
-    for (const std::string_view key : {"Score", "ShoulderEntityLeft", "ShoulderEntityRight"}) {
+    for (const std::string_view key : {"Score", "ShoulderEntityLeft", "ShoulderEntityRight", "active_effects"}) {
         if (const wire::nbt::NbtTag* tag = root.find(key); tag != nullptr) {
             kept.set(std::string{key}, *tag);
         }

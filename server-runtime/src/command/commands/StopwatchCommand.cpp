@@ -1,3 +1,4 @@
+#include <expected>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
 
@@ -46,6 +47,33 @@ bool Stopwatches::restart(const Identifier& id) {
 }
 
 bool Stopwatches::remove(const Identifier& id) { return started_.erase(id) != 0; }
+
+wire::nbt::NbtCompound Stopwatches::encode() const {
+    const std::int64_t now = nowMillis_();
+    wire::nbt::NbtCompound stopwatches;
+    for (const auto& [id, started] : started_) {
+        stopwatches.putLong(id.toString(), now - started);
+    }
+    wire::nbt::NbtCompound out;
+    out.set("stopwatches", wire::nbt::NbtTag::ofCompound(std::move(stopwatches)));
+    return out;
+}
+
+void Stopwatches::restore(const wire::nbt::NbtCompound& packed) {
+    const wire::nbt::NbtCompound* stopwatches = packed.getCompound("stopwatches");
+    if (stopwatches == nullptr) {
+        return;
+    }
+    const std::int64_t now = nowMillis_();
+    for (std::size_t i = 0; i < stopwatches->size(); ++i) {
+        const std::int64_t* elapsed = stopwatches->values()[i].get<std::int64_t>();
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(stopwatches->names()[i]);
+        if (elapsed != nullptr && id.has_value()) {
+            started_.insert_or_assign(*id, now - *elapsed);
+        }
+    }
+}
 
 std::optional<double> Stopwatches::elapsedSeconds(const Identifier& id) const {
     const auto found = started_.find(id);

@@ -100,6 +100,29 @@ void BasaltServer::saveBossBars() const {
     }
 }
 
+void BasaltServer::saveStopwatches() const {
+    wire::nbt::NbtCompound root;
+    root.set("data", wire::nbt::NbtTag::ofCompound(stopwatches_->encode()));
+    root.putInt("DataVersion", server::datafix::kCurrentVersion);
+    const std::string path = worldRegistry_->defaultWorld().worldRoot() + "/stopwatches.nbt";
+    if (!wire::io::fileIO::writeBytes(path, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(root))))) {
+        logger_.warn([] { return std::string{"Could not save the stopwatches."}; });
+    }
+}
+
+void BasaltServer::loadStopwatches() {
+    const std::optional<std::vector<std::uint8_t>> bytes =
+        wire::io::fileIO::readBytes(worldRegistry_->defaultWorld().worldRoot() + "/stopwatches.nbt");
+    if (!bytes.has_value()) {
+        return;
+    }
+    const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::read(*bytes);
+    const wire::nbt::NbtCompound* file = read.has_value() ? read->tag.get<wire::nbt::NbtCompound>() : nullptr;
+    if (const wire::nbt::NbtCompound* data = file == nullptr ? nullptr : file->getCompound("data"); data != nullptr) {
+        stopwatches_->restore(*data);
+    }
+}
+
 void BasaltServer::loadBossBars() {
     const std::optional<std::vector<std::uint8_t>> bytes =
         wire::io::fileIO::readBytes(worldRegistry_->defaultWorld().worldRoot() + "/custom_boss_events.nbt");
