@@ -173,6 +173,9 @@ public:
 
     std::int32_t fireTicks = 0;
 
+    /// parity: `Player.lastDeathLocation`, what a recovery compass points at.
+    std::optional<wire::protocol::play::GlobalPos> lastDeath;
+
     struct RecordedScores {
         float health = std::numeric_limits<float>::denorm_min();
         std::int32_t food = std::numeric_limits<std::int32_t>::min();

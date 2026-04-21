@@ -130,7 +130,8 @@ void readEquipment(const NbtCompound* equipment, StoredInventory& inventory) {
 // parity: the `Score` and shoulder parrots a `.dat` keeps.
 [[nodiscard]] wire::nbt::NbtCompound entityDataOf(const wire::nbt::NbtCompound& root) {
     wire::nbt::NbtCompound kept;
-    for (const std::string_view key : {"Score", "ShoulderEntityLeft", "ShoulderEntityRight", "active_effects"}) {
+    for (const std::string_view key : {"Score", "ShoulderEntityLeft", "ShoulderEntityRight", "active_effects", "Air",
+                                       "Fire", "fall_distance", "AbsorptionAmount", "LastDeathLocation"}) {
         if (const wire::nbt::NbtTag* tag = root.find(key); tag != nullptr) {
             kept.set(std::string{key}, *tag);
         }

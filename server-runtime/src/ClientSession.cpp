@@ -199,6 +199,10 @@ void ClientSession::run() {
     }
     streaming_.store(false);
     lifecycle_->leavePlayIfPresent();
+    if (closeWhenDrained_.load()) {
+        // The goodbye is still queued when the read ended on purpose.
+        flushOutbox();
+    }
     outbox_.close();
     connection_.close();
 }
@@ -306,7 +310,10 @@ void ClientSession::disconnect(const wire::text::Component& reason) {
     if (!outbox_.isOpen()) {
         outbox_.close();
         connection_.close();
+        return;
     }
+    // A client that does not hang up would keep the session thread in `read` for as long as it likes.
+    connection_.shutdownRead();
 }
 
 void ClientSession::sendUncompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody) {

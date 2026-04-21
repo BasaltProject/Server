@@ -202,12 +202,16 @@ ChunkGenerationQueue::awaitAll(const std::vector<std::pair<std::int32_t, std::in
         request(chunkX, chunkZ, 0);
     }
     std::int64_t waited = 0;
-    while (world_->countMissing(positions) > 0 && waited < awaitTimeoutMillis_) {
+    // A stopped queue will never finish what was asked, and a server shutting down waits on this thread to end.
+    while (running_.load() && world_->countMissing(positions) > 0 && waited < awaitTimeoutMillis_) {
         if (sched::Owner* owner = world_->owner(); owner != nullptr && owner->isCurrent()) {
             static_cast<void>(owner->runPending());
         }
         wire::io::sleepFor(kAwaitPoll);
         waited += kAwaitPoll.count();
+    }
+    if (!running_.load()) {
+        return {};
     }
     std::vector<Chunk*> ready;
     ready.reserve(positions.size());

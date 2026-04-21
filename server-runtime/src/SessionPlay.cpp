@@ -430,6 +430,13 @@ player::PlayerConnection ClientSession::playerConnection() {
                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     };
     connection.sendCombatDeath = [this](const wire::text::Component& message) {
+        if (currentWorld_ != nullptr) {
+            playerSession()->lastDeath = wire::protocol::play::GlobalPos{
+                .dimensionName = currentWorld_->levelKey(),
+                .location = play::BlockPos{static_cast<std::int32_t>(std::floor(playerSession()->x)),
+                                           static_cast<std::int32_t>(std::floor(playerSession()->y)),
+                                           static_cast<std::int32_t>(std::floor(playerSession()->z))}};
+        }
         sendCompressed(wire::protocol::play::PlayerCombatKillPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::PlayerCombatKillPacket{.playerId = playerSession()->entityId(), .message = message}
                 .write(buffer);
