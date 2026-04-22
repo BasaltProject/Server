@@ -2,6 +2,7 @@
 
 #include <array>
 #include <map>
+#include <optional>
 #include <string>
 
 namespace basalt::server::datafix {
@@ -195,6 +196,233 @@ void splitThrownPotion(NbtCompound& entity, const Context&) {
                      itemId == "minecraft:lingering_potion" ? "minecraft:lingering_potion" : "minecraft:splash_potion");
 }
 
+/// parity: `ExtraDataFixUtils.fixInlineBlockPos`.
+void inlineBlockPos(NbtCompound& tag, std::string_view fieldX, std::string_view fieldY, std::string_view fieldZ,
+                    std::string_view newField) {
+    const auto number = [&tag](std::string_view key) -> std::optional<std::int32_t> {
+        const NbtTag* held = tag.find(key);
+        if (held == nullptr) {
+            return std::nullopt;
+        }
+        if (const auto* i = held->get<std::int32_t>(); i != nullptr) {
+            return *i;
+        }
+        if (const auto* b = held->get<std::int8_t>(); b != nullptr) {
+            return *b;
+        }
+        if (const auto* s = held->get<std::int16_t>(); s != nullptr) {
+            return *s;
+        }
+        if (const auto* l = held->get<std::int64_t>(); l != nullptr) {
+            return static_cast<std::int32_t>(*l);
+        }
+        if (const auto* d = held->get<double>(); d != nullptr) {
+            return static_cast<std::int32_t>(*d);
+        }
+        if (const auto* f = held->get<float>(); f != nullptr) {
+            return static_cast<std::int32_t>(*f);
+        }
+        return std::nullopt;
+    };
+    const std::optional<std::int32_t> x = number(fieldX);
+    const std::optional<std::int32_t> y = number(fieldY);
+    const std::optional<std::int32_t> z = number(fieldZ);
+    if (!x.has_value() || !y.has_value() || !z.has_value()) {
+        return;
+    }
+    tag.remove(fieldX);
+    tag.remove(fieldY);
+    tag.remove(fieldZ);
+    tag.putIntArray(newField, {*x, *y, *z});
+}
+
+// parity: `InlineBlockPosFormatFix`, for the entities that kept a position as three loose numbers.
+void inlineBlockPositions(NbtCompound& entity, const Context&) {
+    const std::string id = namespaced(entity.getString("id"));
+    inlineBlockPos(entity, "SleepingX", "SleepingY", "SleepingZ", "sleeping_pos");
+    if (id == "minecraft:vex") {
+        rename(entity, "LifeTicks", "life_ticks");
+        inlineBlockPos(entity, "BoundX", "BoundY", "BoundZ", "bound_pos");
+    } else if (id == "minecraft:phantom") {
+        rename(entity, "Size", "size");
+        inlineBlockPos(entity, "AX", "AY", "AZ", "anchor_pos");
+    } else if (id == "minecraft:turtle") {
+        entity.remove("TravelPosX");
+        entity.remove("TravelPosY");
+        entity.remove("TravelPosZ");
+        inlineBlockPos(entity, "HomePosX", "HomePosY", "HomePosZ", "home_pos");
+        rename(entity, "HasEgg", "has_egg");
+    } else if (id == "minecraft:item_frame" || id == "minecraft:glow_item_frame" || id == "minecraft:painting" ||
+               id == "minecraft:leash_knot") {
+        inlineBlockPos(entity, "TileX", "TileY", "TileZ", "block_pos");
+    }
+}
+
+void changeBaseValue(NbtCompound& entity, std::string_view attribute, double from, double to) {
+    NbtTag* held = entity.find("attributes");
+    NbtList* list = held == nullptr ? nullptr : held->get<NbtList>();
+    if (list == nullptr) {
+        return;
+    }
+    for (std::size_t i = 0; i < list->size(); ++i) {
+        NbtCompound* entry = (*list)[i].get<NbtCompound>();
+        if (entry == nullptr || namespaced(entry->getString("id")) != attribute) {
+            continue;
+        }
+        const NbtTag* base = entry->find("base");
+        const double* value = base == nullptr ? nullptr : base->get<double>();
+        if (value != nullptr && *value == from) {
+            entry->putDouble("base", to);
+        }
+    }
+}
+
+// parity: `EntityAttributeBaseValueFix` for the follow range fixes of 4187.
+void followRanges(NbtCompound& entity, const Context&) {
+    const std::string id = namespaced(entity.getString("id"));
+    constexpr std::string_view kRange = "minecraft:follow_range";
+    if (id == "minecraft:villager" || id == "minecraft:bee" || id == "minecraft:allay") {
+        changeBaseValue(entity, kRange, 48.0, 16.0);
+    } else if (id == "minecraft:llama") {
+        changeBaseValue(entity, kRange, 40.0, 16.0);
+    } else if (id == "minecraft:piglin_brute") {
+        changeBaseValue(entity, kRange, 16.0, 12.0);
+    } else if (id == "minecraft:warden") {
+        changeBaseValue(entity, kRange, 16.0, 24.0);
+    }
+}
+
+// parity: `PlayerEquipmentFix`.
+void playerEquipment(NbtCompound& player, const Context&) {
+    NbtTag* held = player.find("Inventory");
+    NbtList* inventory = held == nullptr ? nullptr : held->get<NbtList>();
+    if (inventory == nullptr) {
+        return;
+    }
+    NbtCompound equipment;
+    NbtList kept{NbtType::Compound, {}};
+    for (std::size_t i = 0; i < inventory->size(); ++i) {
+        NbtCompound* item = (*inventory)[i].get<NbtCompound>();
+        const NbtTag* slotTag = item == nullptr ? nullptr : item->find("Slot");
+        const auto* slot = slotTag == nullptr ? nullptr : slotTag->get<std::int8_t>();
+        std::string_view name;
+        if (slot != nullptr) {
+            name = *slot == 100    ? "feet"
+                   : *slot == 101  ? "legs"
+                   : *slot == 102  ? "chest"
+                   : *slot == 103  ? "head"
+                   : *slot == -106 ? "offhand"
+                                   : "";
+        }
+        if (name.empty()) {
+            kept.push((*inventory)[i]);
+        } else {
+            item->remove("Slot");
+            equipment.set(name, (*inventory)[i]);
+        }
+    }
+    player.set("Inventory", NbtTag::ofList(std::move(kept)));
+    if (!equipment.empty()) {
+        player.set("equipment", NbtTag::ofCompound(std::move(equipment)));
+    }
+}
+
+// parity: `AddFieldFix` for the locator bar icon style, on the players and the entities that have one.
+void locatorBarStyle(NbtCompound& entity, const Context&) {
+    NbtTag* held = entity.find("locator_bar_icon");
+    if (NbtCompound* icon = held == nullptr ? nullptr : held->get<NbtCompound>(); icon != nullptr) {
+        icon->putString("style", "minecraft:default");
+    }
+}
+
+// parity: `VillagerSetVillagerDataFinalized` and `ZombieVillagerSetVillagerDataFinalized`.
+void villagerDataFinalized(NbtCompound& entity, const Context&) { entity.putBoolean("VillagerDataFinalized", true); }
+
+std::string_view dyeName(std::int32_t id) {
+    static constexpr std::array<std::string_view, 16> kNames{
+        "white",      "orange", "magenta", "light_blue", "yellow", "lime",  "pink", "gray",
+        "light_gray", "cyan",   "purple",  "blue",       "brown",  "green", "red",  "black"};
+    return id >= 1 && id < 16 ? kNames[static_cast<std::size_t>(id)] : "white";
+}
+
+std::optional<std::int32_t> intOf(const NbtTag* held) {
+    if (held == nullptr) {
+        return std::nullopt;
+    }
+    if (const auto* i = held->get<std::int32_t>(); i != nullptr) {
+        return *i;
+    }
+    if (const auto* s = held->get<std::int16_t>(); s != nullptr) {
+        return *s;
+    }
+    if (const auto* b = held->get<std::int8_t>(); b != nullptr) {
+        return *b;
+    }
+    return std::nullopt;
+}
+
+NbtCompound* mutableCompound(NbtCompound& parent, std::string_view key) {
+    NbtTag* held = parent.find(key);
+    return held == nullptr ? nullptr : held->get<NbtCompound>();
+}
+
+// parity: `EntitySpawnerItemVariantComponentFix`.
+void bucketVariants(NbtCompound& stack, const Context&) {
+    const std::string id = namespaced(stack.getString("id"));
+    NbtCompound* components = mutableCompound(stack, "components");
+    if (components == nullptr) {
+        return;
+    }
+    if (id == "minecraft:painting") {
+        NbtCompound* data = mutableCompound(*components, "minecraft:entity_data");
+        if (data == nullptr || namespaced(data->getString("id")) != "minecraft:painting") {
+            return;
+        }
+        const NbtTag* variant = data->find("variant");
+        std::optional<NbtTag> moved = variant == nullptr ? std::nullopt : std::optional{*variant};
+        data->remove("variant");
+        if (data->size() == 1) {
+            components->remove("minecraft:entity_data");
+        }
+        if (moved.has_value()) {
+            components->set("minecraft:painting/variant", *moved);
+        }
+        return;
+    }
+    NbtCompound* bucket = mutableCompound(*components, "minecraft:bucket_entity_data");
+    if (bucket == nullptr) {
+        return;
+    }
+    if (id == "minecraft:salmon_bucket") {
+        if (const NbtTag* type = bucket->find("type"); type != nullptr) {
+            const NbtTag size = *type;
+            bucket->remove("type");
+            components->set("minecraft:salmon/size", size);
+        }
+    } else if (id == "minecraft:axolotl_bucket") {
+        if (const auto variant = intOf(bucket->find("Variant")); variant.has_value()) {
+            static constexpr std::array<std::string_view, 5> kNames{"lucy", "wild", "gold", "cyan", "blue"};
+            const std::string_view name =
+                *variant >= 1 && *variant <= 4 ? kNames[static_cast<std::size_t>(*variant)] : "lucy";
+            bucket->remove("Variant");
+            components->putString("minecraft:axolotl/variant", std::string{name});
+        }
+    } else if (id == "minecraft:tropical_fish_bucket") {
+        if (const auto packed = intOf(bucket->find("BucketVariantTag")); packed.has_value()) {
+            static const std::map<std::int32_t, std::string_view> kPatterns{
+                {1, "flopper"},   {256, "sunstreak"}, {257, "stripey"},   {512, "snooper"},
+                {513, "glitter"}, {768, "dasher"},    {769, "blockfish"}, {1024, "brinely"},
+                {1025, "betty"},  {1280, "spotty"},   {1281, "clayfish"}};
+            const auto pattern = kPatterns.find(*packed & 0xFFFF);
+            bucket->remove("BucketVariantTag");
+            components->putString("minecraft:tropical_fish/pattern",
+                                  std::string{pattern != kPatterns.end() ? pattern->second : "kob"});
+            components->putString("minecraft:tropical_fish/base_color", std::string{dyeName((*packed >> 16) & 255)});
+            components->putString("minecraft:tropical_fish/pattern_color", std::string{dyeName((*packed >> 24) & 255)});
+        }
+    }
+}
+
 // parity: `CopperGolemWeatherStateFix`.
 void copperGolemWeatherState(NbtCompound& entity, const Context&) {
     const NbtTag* held = entity.find("weather_state");
@@ -215,16 +443,23 @@ void copperGolemWeatherState(NbtCompound& entity, const Context&) {
 } // namespace
 
 void addEntityFixes(std::vector<Fix>& fixes) {
+    fixes.push_back({4299, Target::ItemStack, {}, bucketVariants});
     fixes.insert(fixes.end(), {
                                   {4067, Target::Entity, {}, splitBoat},
                                   {4081, Target::Entity, "minecraft:salmon", salmonSize},
                                   {4173, Target::Entity, "minecraft:tnt_minecart", tntMinecartFuse},
+                                  {4187, Target::Entity, {}, followRanges},
                                   {4293, Target::Entity, {}, dropChances},
                                   {4296, Target::Entity, "minecraft:area_effect_cloud", areaEffectCloudScale},
                                   {4300, Target::Entity, {}, saddleSlot},
                                   {4301, Target::Entity, {}, equipmentFormat},
                                   {4303, Target::Entity, {}, fallDistanceToDouble},
                                   {4306, Target::Entity, {}, splitThrownPotion},
+                                  {4312, Target::Entity, {}, playerEquipment},
+                                  {4314, Target::Entity, {}, inlineBlockPositions},
+                                  {4424, Target::Entity, {}, locatorBarStyle},
+                                  {4763, Target::Entity, "minecraft:villager", villagerDataFinalized},
+                                  {4763, Target::Entity, "minecraft:zombie_villager", villagerDataFinalized},
                                   {4535, Target::Entity, "minecraft:copper_golem", copperGolemWeatherState},
                               });
 }

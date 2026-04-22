@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
@@ -22,7 +23,7 @@ using LevelEvent = std::function<void(std::int32_t x, std::int32_t y, std::int32
 /// parity: `PointedDripstoneBlock.randomTick`.
 void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                random::RandomSource& random, std::vector<BlockChange>& changes, bool evaporates = false,
-               const LevelEvent& levelEvent = {});
+               const LevelEvent& levelEvent = {}, const WorldClock* clock = nullptr);
 
 } // namespace dripstoneGrowth
 
