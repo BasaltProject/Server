@@ -158,3 +158,56 @@ TEST_CASE("sign text saved as JSON becomes components with the new events") {
     CHECK(first->getCompound("hover_event")->getCompound("value")->getString("text") == "tip");
     CHECK(*fixed->getList("messages")->elements()[1].get<std::string>() == "plain");
 }
+
+TEST_CASE("entities saved before 1.21.5 get their equipment, drop chances and the splits") {
+    const auto item = [](std::string_view id) {
+        NbtCompound tag;
+        tag.putString("id", std::string{id});
+        tag.putInt("count", 1);
+        return tag;
+    };
+    NbtCompound horse;
+    horse.putString("id", "minecraft:horse");
+    horse.set("SaddleItem", NbtTag::ofCompound(item("minecraft:saddle")));
+    NbtList armor{NbtType::Compound, {}};
+    armor.push(NbtTag::ofCompound(NbtCompound{}));
+    armor.push(NbtTag::ofCompound(NbtCompound{}));
+    armor.push(NbtTag::ofCompound(item("minecraft:iron_chestplate")));
+    armor.push(NbtTag::ofCompound(NbtCompound{}));
+    horse.set("ArmorItems", NbtTag::ofList(armor));
+    NbtList chances{NbtType::Float, {}};
+    chances.push(NbtTag::ofFloat(0.085F));
+    chances.push(NbtTag::ofFloat(0.085F));
+    chances.push(NbtTag::ofFloat(1.0F));
+    chances.push(NbtTag::ofFloat(0.085F));
+    horse.set("ArmorDropChances", NbtTag::ofList(chances));
+    horse.putFloat("FallDistance", 2.5F);
+
+    NbtCompound boat;
+    boat.putString("id", "minecraft:boat");
+    boat.putString("Type", "birch");
+
+    NbtCompound potion;
+    potion.putString("id", "minecraft:potion");
+    potion.set("Item", NbtTag::ofCompound(item("minecraft:lingering_potion")));
+
+    NbtList entities{NbtType::Compound, {}};
+    entities.push(NbtTag::ofCompound(horse));
+    entities.push(NbtTag::ofCompound(boat));
+    entities.push(NbtTag::ofCompound(potion));
+    NbtCompound file;
+    file.set("Entities", NbtTag::ofList(entities));
+    basalt::server::datafix::upgrade(Domain::Entities, file, 3955);
+
+    const NbtCompound* fixedHorse = file.getList("Entities")->elements()[0].get<NbtCompound>();
+    const NbtCompound* equipment = fixedHorse->getCompound("equipment");
+    REQUIRE(equipment != nullptr);
+    CHECK(equipment->getCompound("chest")->getString("id") == "minecraft:iron_chestplate");
+    CHECK(equipment->getCompound("saddle")->getString("id") == "minecraft:saddle");
+    CHECK_FALSE(fixedHorse->contains("ArmorItems"));
+    CHECK(fixedHorse->getCompound("drop_chances")->getFloat("chest") == 1.0F);
+    CHECK(fixedHorse->getCompound("drop_chances")->getFloat("saddle") == 2.0F);
+    CHECK(fixedHorse->getDouble("fall_distance") == 2.5);
+    CHECK(file.getList("Entities")->elements()[1].get<NbtCompound>()->getString("id") == "minecraft:birch_boat");
+    CHECK(file.getList("Entities")->elements()[2].get<NbtCompound>()->getString("id") == "minecraft:lingering_potion");
+}

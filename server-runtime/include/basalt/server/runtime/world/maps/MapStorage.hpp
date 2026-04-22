@@ -19,6 +19,9 @@ public:
 
     explicit MapStorage(std::string directory = std::string{kDefaultDirectory}) : directory_(std::move(directory)) {}
 
+    /// A folder to read from when `maps/` has no such file, such as the `data/minecraft/maps` of a vanilla world.
+    void readAlsoFrom(std::string directory) { fallback_ = std::move(directory); }
+
     [[nodiscard]] std::unique_lock<std::mutex> lock() { return std::unique_lock{mutex_}; }
 
     [[nodiscard]] MapData* get(std::int32_t id);
@@ -46,7 +49,10 @@ public:
 private:
     [[nodiscard]] std::string pathOf(std::string_view name) const;
 
+    [[nodiscard]] std::optional<wire::nbt::NbtCompound> read(std::string_view name) const;
+
     std::string directory_;
+    std::string fallback_;
     std::mutex mutex_;
     /// A miss is kept too, so an unknown id is not a disk read every tick.
     std::map<std::int32_t, std::optional<MapData>> maps_;
