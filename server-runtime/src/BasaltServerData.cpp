@@ -1,4 +1,4 @@
-#include <basalt/server/datafix/DataFixer.hpp>
+#include <basalt/metamorph/datafix/DataFixer.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/datapack/RegistryValidation.hpp>
@@ -59,7 +59,7 @@ void BasaltServer::saveSchedule() const {
 void BasaltServer::saveScoreboard() const {
     wire::nbt::NbtCompound root;
     root.set("data", wire::nbt::NbtTag::ofCompound(scoreboard::pack(scoreboard_, teams_)));
-    root.putInt("DataVersion", server::datafix::kCurrentVersion);
+    root.putInt("DataVersion", metamorph::datafix::kCurrentVersion);
     const std::string path = worldRegistry_->defaultWorld().worldRoot() + "/scoreboard.nbt";
     if (!wire::io::fileIO::writeBytes(path, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(root))))) {
         logger_.warn([] { return std::string{"Could not save the scoreboard."}; });
@@ -93,7 +93,7 @@ void BasaltServer::loadScoreboard() {
 void BasaltServer::saveBossBars() const {
     wire::nbt::NbtCompound root;
     root.set("data", wire::nbt::NbtTag::ofCompound(bossBars_.encode()));
-    root.putInt("DataVersion", server::datafix::kCurrentVersion);
+    root.putInt("DataVersion", metamorph::datafix::kCurrentVersion);
     const std::string path = worldRegistry_->defaultWorld().worldRoot() + "/custom_boss_events.nbt";
     if (!wire::io::fileIO::writeBytes(path, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(root))))) {
         logger_.warn([] { return std::string{"Could not save the custom boss bars."}; });
@@ -103,7 +103,7 @@ void BasaltServer::saveBossBars() const {
 void BasaltServer::saveStopwatches() const {
     wire::nbt::NbtCompound root;
     root.set("data", wire::nbt::NbtTag::ofCompound(stopwatches_->encode()));
-    root.putInt("DataVersion", server::datafix::kCurrentVersion);
+    root.putInt("DataVersion", metamorph::datafix::kCurrentVersion);
     const std::string path = worldRegistry_->defaultWorld().worldRoot() + "/stopwatches.nbt";
     if (!wire::io::fileIO::writeBytes(path, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(root))))) {
         logger_.warn([] { return std::string{"Could not save the stopwatches."}; });

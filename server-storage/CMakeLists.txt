@@ -9,7 +9,7 @@ basalt_module(server-storage
         src/StorageNbt.cpp
         src/StoredPlayer.cpp
         src/VanillaPlayerData.cpp
-    DEPENDS basalt::server-datafix basalt::wire-common basalt::wire-nbt basalt::wire-sqlite
+    DEPENDS basalt::metamorph-datafix basalt::wire-common basalt::wire-nbt basalt::wire-sqlite
 )
 
 basalt_test(server-storage-test

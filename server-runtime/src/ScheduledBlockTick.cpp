@@ -621,6 +621,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             fill.has_value()) {
             world.state().setBlockState(x, y, z, fill->stateId);
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = fill->stateId});
+            // parity: `AbstractCauldronBlock.receiveStalactiteDrip` ends the fill with `BLOCK_CHANGE`.
+            world::vibrations::emit(world.state(), "block_change", x + 0.5, y + 0.5, z + 0.5,
+                                    world.clock().totalTicks());
             broadcaster_->sendEffects(watchers, x, y, z, fill->stateId,
                                       {world::blockEffect::Effect{.type = fill->levelEvent}});
             broadcaster_->notifyAround(world, watchers, x, y, z, here);
