@@ -18,6 +18,7 @@
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/bedrock/BedrockParticles.hpp>
 #include <basalt/wire/bedrock/BedrockSounds.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
@@ -818,13 +819,36 @@ void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
     for (const wire::text::Component& line : dialog.body) {
         content += content.empty() ? flatten(line) : "\n\n" + flatten(line);
     }
-    if (dialog.hasInputs) {
-        content += content.empty() ? "" : "\n\n";
-        content += "This dialog asks for something this edition cannot type here.";
-    }
 
     // Held rather than referenced: the click comes back long after whoever asked is gone.
     const auto held = std::make_shared<const world::dialogs::Dialog>(dialog);
+    const auto press = [this, held](const std::size_t at, const std::map<std::string, std::string>& values) {
+        if (at >= held->buttons.size()) {
+            return;
+        }
+        const world::dialogs::Button& pressed = held->buttons[at];
+        switch (pressed.press) {
+        case world::dialogs::Press::RunCommand:
+            command(pressed.value);
+            return;
+        case world::dialogs::Press::RunTemplate:
+            command(world::dialogs::instantiate(pressed.value, values));
+            return;
+        case world::dialogs::Press::ShowText:
+            if (session_ != nullptr && session_->connection().sendSystemMessage) {
+                session_->connection().sendSystemMessage(wire::text::Component::text(pressed.value));
+            }
+            return;
+        case world::dialogs::Press::OpenDialog:
+            if (pressed.next != nullptr) {
+                showDialog(*pressed.next);
+            }
+            return;
+        case world::dialogs::Press::None:
+            return;
+        }
+    };
+
     std::vector<std::string> buttons;
     std::vector<std::int32_t> which;
     buttons.reserve(held->buttons.size());
@@ -835,43 +859,140 @@ void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
     }
 
     std::uint32_t formId = 0;
+    std::string json;
+    OpenForm form;
+    if (held->inputs.empty()) {
+        form.slots = std::move(which);
+        form.onClick = [press](const std::int32_t at) {
+            if (at >= 0) {
+                press(static_cast<std::size_t>(at), {});
+            }
+        };
+        json = wire::bedrock::simpleFormJson(flatten(dialog.title), content, buttons);
+    } else {
+        using Control = wire::bedrock::FormControl;
+        std::vector<Control> controls;
+        if (!content.empty()) {
+            controls.push_back(Control{.kind = Control::Kind::Label, .text = content});
+        }
+        const std::size_t first = controls.size();
+        for (const world::dialogs::Input& input : held->inputs) {
+            Control control;
+            control.text = flatten(input.label);
+            switch (input.kind) {
+            case world::dialogs::InputKind::Text:
+                control.kind = Control::Kind::Input;
+                control.initialText = input.initialText;
+                break;
+            case world::dialogs::InputKind::Boolean:
+                control.kind = Control::Kind::Toggle;
+                control.initialToggle = input.initialBool;
+                break;
+            case world::dialogs::InputKind::NumberRange:
+                control.kind = Control::Kind::Slider;
+                control.min = std::min(input.start, input.end);
+                control.max = std::max(input.start, input.end);
+                control.step = input.step.value_or(0.0F);
+                control.initialNumber = input.initialNumber.value_or((input.start + input.end) / 2.0F);
+                break;
+            case world::dialogs::InputKind::SingleOption:
+                control.kind = Control::Kind::Dropdown;
+                for (std::size_t at = 0; at < input.options.size(); ++at) {
+                    const world::dialogs::Option& option = input.options[at];
+                    control.options.push_back(option.display.has_value() ? flatten(*option.display) : option.id);
+                    if (option.initial) {
+                        control.initialIndex = static_cast<std::int32_t>(at);
+                    }
+                }
+                break;
+            }
+            controls.push_back(std::move(control));
+        }
+        if (buttons.size() > 1) {
+            Control choice;
+            choice.kind = Control::Kind::Dropdown;
+            choice.text = "Action";
+            choice.options = buttons;
+            controls.push_back(std::move(choice));
+        }
+        json = wire::bedrock::customFormJson(flatten(dialog.title), controls);
+        form.onFields = [held, press, first](const std::string& data) {
+            const auto parsed = wire::common::parseJson(data);
+            const auto* answers = parsed.has_value() ? parsed->get<std::vector<wire::common::JsonValue>>() : nullptr;
+            if (answers == nullptr) {
+                return;
+            }
+            std::map<std::string, std::string> values;
+            for (std::size_t at = 0; at < held->inputs.size() && first + at < answers->size(); ++at) {
+                const world::dialogs::Input& input = held->inputs[at];
+                const wire::common::JsonValue& answer = (*answers)[first + at];
+                const auto number = [&answer]() -> std::optional<double> {
+                    if (const auto* whole = answer.get<std::int64_t>(); whole != nullptr) {
+                        return static_cast<double>(*whole);
+                    }
+                    if (const auto* real = answer.get<double>(); real != nullptr) {
+                        return *real;
+                    }
+                    return std::nullopt;
+                };
+                switch (input.kind) {
+                case world::dialogs::InputKind::Text:
+                    if (const auto* text = answer.get<std::string>(); text != nullptr) {
+                        values[input.key] = world::dialogs::escapeText(
+                            text->substr(0, static_cast<std::size_t>(std::max(input.maxLength, 0))));
+                    }
+                    break;
+                case world::dialogs::InputKind::Boolean:
+                    if (const auto* on = answer.get<bool>(); on != nullptr) {
+                        values[input.key] = *on ? input.onTrue : input.onFalse;
+                    }
+                    break;
+                case world::dialogs::InputKind::NumberRange:
+                    if (const auto value = number(); value.has_value()) {
+                        const float span = input.end - input.start;
+                        const float slider = span == 0.0F ? 0.5F : (static_cast<float>(*value) - input.start) / span;
+                        values[input.key] = world::dialogs::numberText(
+                            world::dialogs::scaledNumber(input, std::clamp(slider, 0.0F, 1.0F)));
+                    }
+                    break;
+                case world::dialogs::InputKind::SingleOption:
+                    if (const auto index = number();
+                        index.has_value() && *index >= 0.0 && static_cast<std::size_t>(*index) < input.options.size()) {
+                        values[input.key] = input.options[static_cast<std::size_t>(*index)].id;
+                    }
+                    break;
+                }
+            }
+            std::size_t button = 0;
+            if (held->buttons.size() > 1) {
+                const std::size_t slot = first + held->inputs.size();
+                if (slot >= answers->size()) {
+                    return;
+                }
+                const auto* index = (*answers)[slot].get<std::int64_t>();
+                if (index == nullptr || *index < 0) {
+                    return;
+                }
+                button = static_cast<std::size_t>(*index);
+            }
+            press(button, values);
+        };
+    }
     {
         const std::lock_guard<std::mutex> guard{formLock_};
         formId = nextFormId_++;
         openTitle_.clear();
-        form_ =
-            OpenForm{formId, std::move(which), [this, held](const std::int32_t at) {
-                         if (at < 0 || static_cast<std::size_t>(at) >= held->buttons.size()) {
-                             return;
-                         }
-                         const world::dialogs::Button& pressed = held->buttons[static_cast<std::size_t>(at)];
-                         switch (pressed.press) {
-                         case world::dialogs::Press::RunCommand:
-                             command(pressed.value);
-                             return;
-                         case world::dialogs::Press::ShowText:
-                             if (session_ != nullptr && session_->connection().sendSystemMessage) {
-                                 session_->connection().sendSystemMessage(wire::text::Component::text(pressed.value));
-                             }
-                             return;
-                         case world::dialogs::Press::OpenDialog:
-                             if (pressed.next != nullptr) {
-                                 showDialog(*pressed.next);
-                             }
-                             return;
-                         case world::dialogs::Press::None:
-                             return;
-                         }
-                     }};
+        form.id = formId;
+        form_ = std::move(form);
     }
     wire::io::ByteBuffer body;
-    wire::bedrock::writeModalFormRequest(body, formId,
-                                         wire::bedrock::simpleFormJson(flatten(dialog.title), content, buttons));
+    wire::bedrock::writeModalFormRequest(body, formId, json);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ModalFormRequest), body.toVector());
 }
 
 void BedrockPlayer::formAnswer(const std::uint32_t formId, const std::optional<std::string>& data) {
     std::function<void(std::int32_t)> onClick;
+    std::function<void(const std::string&)> onFields;
     std::int32_t slot = -1;
     {
         const std::lock_guard<std::mutex> guard{formLock_};
@@ -881,6 +1002,20 @@ void BedrockPlayer::formAnswer(const std::uint32_t formId, const std::optional<s
         if (!data.has_value()) {
             // Dismissed: the plugin hears nothing, as closing a window without clicking does on the other edition.
             form_.reset();
+            return;
+        }
+        if (form_->onFields) {
+            onFields = form_->onFields;
+            form_.reset();
+        }
+    }
+    if (onFields) {
+        onFields(*data);
+        return;
+    }
+    {
+        const std::lock_guard<std::mutex> guard{formLock_};
+        if (!form_.has_value() || form_->id != formId) {
             return;
         }
         const std::int32_t button = std::atoi(data->c_str());

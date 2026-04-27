@@ -1,6 +1,9 @@
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
 
+#include <array>
+#include <charconv>
+#include <cmath>
 #include <string_view>
 
 namespace basalt::server::runtime::world::dialogs {
@@ -64,11 +67,110 @@ void readBodyInto(const NbtTag& tag, std::vector<Component>& body) {
     return read.has_value() ? std::make_shared<const Dialog>(std::move(*read)) : nullptr;
 }
 
+[[nodiscard]] float numberOf(const NbtTag* tag, const float fallback) {
+    if (tag == nullptr) {
+        return fallback;
+    }
+    if (const auto* v = tag->get<float>(); v != nullptr) {
+        return *v;
+    }
+    if (const auto* v = tag->get<double>(); v != nullptr) {
+        return static_cast<float>(*v);
+    }
+    if (const auto* v = tag->get<std::int32_t>(); v != nullptr) {
+        return static_cast<float>(*v);
+    }
+    if (const auto* v = tag->get<std::int16_t>(); v != nullptr) {
+        return static_cast<float>(*v);
+    }
+    if (const auto* v = tag->get<std::int8_t>(); v != nullptr) {
+        return static_cast<float>(*v);
+    }
+    return fallback;
+}
+
+[[nodiscard]] bool flagOf(const NbtCompound& nbt, std::string_view key, const bool fallback) {
+    const NbtTag* tag = nbt.find(key);
+    if (tag == nullptr) {
+        return fallback;
+    }
+    if (const auto* v = tag->get<std::int8_t>(); v != nullptr) {
+        return *v != 0;
+    }
+    return fallback;
+}
+
+void readInputsInto(const NbtCompound& nbt, std::vector<Input>& inputs) {
+    const NbtList* listed = nbt.getList("inputs");
+    if (listed == nullptr) {
+        return;
+    }
+    for (const NbtTag& entry : *listed) {
+        const NbtCompound* one = entry.get<NbtCompound>();
+        if (one == nullptr) {
+            continue;
+        }
+        Input input;
+        input.key = std::string{one->getString("key")};
+        input.label = textOf(one->find("label"));
+        const std::string_view kind = kindOf(*one);
+        if (kind == "text") {
+            input.kind = InputKind::Text;
+            input.labelVisible = flagOf(*one, "label_visible", true);
+            input.initialText = std::string{one->getString("initial")};
+            input.maxLength =
+                one->contains("max_length") ? static_cast<std::int32_t>(numberOf(one->find("max_length"), 32.0F)) : 32;
+            input.multiline = one->getCompound("multiline") != nullptr;
+        } else if (kind == "boolean") {
+            input.kind = InputKind::Boolean;
+            input.initialBool = flagOf(*one, "initial", false);
+            input.onTrue = one->contains("on_true") ? std::string{one->getString("on_true")} : "true";
+            input.onFalse = one->contains("on_false") ? std::string{one->getString("on_false")} : "false";
+        } else if (kind == "number_range") {
+            input.kind = InputKind::NumberRange;
+            input.start = numberOf(one->find("start"), 0.0F);
+            input.end = numberOf(one->find("end"), 0.0F);
+            if (one->contains("initial")) {
+                input.initialNumber = numberOf(one->find("initial"), 0.0F);
+            }
+            if (one->contains("step")) {
+                input.step = numberOf(one->find("step"), 1.0F);
+            }
+        } else if (kind == "single_option") {
+            input.kind = InputKind::SingleOption;
+            input.labelVisible = flagOf(*one, "label_visible", true);
+            if (const NbtList* options = one->getList("options"); options != nullptr) {
+                for (const NbtTag& option : *options) {
+                    Option read;
+                    if (const auto* plain = option.get<std::string>(); plain != nullptr) {
+                        read.id = *plain;
+                    } else if (const NbtCompound* full = option.get<NbtCompound>(); full != nullptr) {
+                        read.id = std::string{full->getString("id")};
+                        read.initial = flagOf(*full, "initial", false);
+                        if (const NbtTag* display = full->find("display"); display != nullptr) {
+                            read.display = textOf(display);
+                        }
+                    }
+                    input.options.push_back(std::move(read));
+                }
+            }
+        } else {
+            continue;
+        }
+        inputs.push_back(std::move(input));
+    }
+}
+
 void readAction(const NbtCompound& action, Button& button, const ByName& byName, const int depth) {
     const std::string_view kind = kindOf(action);
     if (kind == "run_command") {
         button.press = Press::RunCommand;
         button.value = std::string{action.getString("command")};
+        return;
+    }
+    if (kind == "dynamic/run_command") {
+        button.press = Press::RunTemplate;
+        button.value = std::string{action.getString("template")};
         return;
     }
     if (kind == "show_dialog") {
@@ -143,8 +245,7 @@ std::optional<Dialog> readAt(const NbtCompound& nbt, const ByName& byName, const
     if (const NbtTag* body = nbt.find("body"); body != nullptr) {
         readBodyInto(*body, dialog.body);
     }
-    const NbtList* inputs = nbt.getList("inputs");
-    dialog.hasInputs = inputs != nullptr && !inputs->empty();
+    readInputsInto(nbt, dialog.inputs);
 
     if (kind == "notice") {
         // parity: a notice with no action of its own still has a button, which only closes it.
@@ -173,5 +274,89 @@ std::optional<Dialog> readAt(const NbtCompound& nbt, const ByName& byName, const
 } // namespace
 
 std::optional<Dialog> read(const NbtCompound& nbt, const ByName& byName) { return readAt(nbt, byName, 0); }
+
+std::string escapeText(const std::string_view text) {
+    std::string out;
+    for (const char c : text) {
+        switch (c) {
+        case '"':
+        case '\'':
+        case '\\':
+            out += '\\';
+            out += c;
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        default:
+            out += c;
+        }
+    }
+    return out;
+}
+
+std::string numberText(const float value) {
+    const auto whole = static_cast<std::int32_t>(value);
+    if (static_cast<float>(whole) == value) {
+        return std::to_string(whole);
+    }
+    std::array<char, 32> buffer{};
+    const auto [end, error] = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value);
+    return error == std::errc{} ? std::string{buffer.data(), end} : std::to_string(value);
+}
+
+float initialSlider(const Input& input) {
+    const float value = input.initialNumber.value_or((input.start + input.end) / 2.0F);
+    return input.start == input.end ? 0.5F : (value - input.start) / (input.end - input.start);
+}
+
+float scaledNumber(const Input& input, const float sliderValue) {
+    const float inRange = input.start + (input.end - input.start) * sliderValue;
+    if (!input.step.has_value()) {
+        return inRange;
+    }
+    const float initial = input.initialNumber.value_or((input.start + input.end) / 2.0F);
+    const float step = *input.step;
+    const auto stepsOut = static_cast<std::int32_t>(std::floor((inRange - initial) / step + 0.5F));
+    const float result = initial + static_cast<float>(stepsOut) * step;
+    const float position = input.start == input.end ? 0.5F : (result - input.start) / (input.end - input.start);
+    if (position >= 0.0F && position <= 1.0F) {
+        return result;
+    }
+    const std::int32_t sign = stepsOut > 0 ? 1 : (stepsOut < 0 ? -1 : 0);
+    return initial + static_cast<float>(stepsOut - sign) * step;
+}
+
+std::string instantiate(const std::string_view text, const std::map<std::string, std::string>& values) {
+    std::string out;
+    std::size_t at = 0;
+    while (at < text.size()) {
+        const std::size_t dollar = text.find("$(", at);
+        const std::size_t close = dollar == std::string_view::npos ? dollar : text.find(')', dollar);
+        if (close == std::string_view::npos) {
+            out += text.substr(at);
+            break;
+        }
+        out += text.substr(at, dollar - at);
+        const auto found = values.find(std::string{text.substr(dollar + 2, close - dollar - 2)});
+        if (found != values.end()) {
+            out += found->second;
+        }
+        at = close + 1;
+    }
+    return out;
+}
 
 } // namespace basalt::server::runtime::world::dialogs

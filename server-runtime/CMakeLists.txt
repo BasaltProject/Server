@@ -686,6 +686,12 @@ basalt_test(server-runtime-entity-selector-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-dialog-inputs-test
+    SOURCES
+        test/DialogInputsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-entity-nbt-test
     SOURCES
         test/EntityNbtTest.cpp
