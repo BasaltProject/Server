@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -534,6 +535,66 @@ server::plugins::PluginHandle SessionMenus::open(server::plugins::PluginPlayerRe
             }
         }
     }};
+}
+
+server::plugins::PluginHandle SessionMenus::openForm(server::plugins::PluginPlayerRef& player,
+                                                     const server::plugins::PluginForm& form,
+                                                     server::plugins::PluginFormAnswer onAnswer) {
+    player::PlayerSession* session = sessionOf(player);
+    if (session == nullptr || !session->connection().showForm) {
+        return server::plugins::PluginHandle{};
+    }
+    using server::plugins::PluginFormField;
+    const auto text = [](const std::string& written) { return wire::text::miniMessage::parse(written); };
+    world::dialogs::Dialog dialog;
+    dialog.title = text(form.title);
+    for (const std::string& line : form.body) {
+        dialog.body.push_back(text(line));
+    }
+    for (const PluginFormField& field : form.fields) {
+        world::dialogs::Input input;
+        input.key = field.key;
+        input.label = text(field.label);
+        switch (field.kind) {
+        case PluginFormField::Kind::Text:
+            input.kind = world::dialogs::InputKind::Text;
+            input.initialText = field.initialText;
+            input.maxLength = 256;
+            break;
+        case PluginFormField::Kind::Toggle:
+            input.kind = world::dialogs::InputKind::Boolean;
+            input.initialBool = field.initialToggle;
+            break;
+        case PluginFormField::Kind::Slider:
+            input.kind = world::dialogs::InputKind::NumberRange;
+            input.start = static_cast<float>(field.min);
+            input.end = static_cast<float>(field.max);
+            input.initialNumber = static_cast<float>(field.initialNumber);
+            if (field.step > 0.0) {
+                input.step = static_cast<float>(field.step);
+            }
+            break;
+        case PluginFormField::Kind::Choice:
+            input.kind = world::dialogs::InputKind::SingleOption;
+            for (const std::string& option : field.options) {
+                world::dialogs::Option entry;
+                entry.id = option;
+                entry.initial = option == field.initialOption;
+                input.options.push_back(std::move(entry));
+            }
+            break;
+        }
+        dialog.inputs.push_back(std::move(input));
+    }
+    for (const std::string& label : form.buttons) {
+        world::dialogs::Button button;
+        button.label = text(label);
+        button.press = world::dialogs::Press::Callback;
+        dialog.buttons.push_back(std::move(button));
+    }
+    dialog.submit = std::move(onAnswer);
+    session->connection().showForm(dialog);
+    return server::plugins::PluginHandle{};
 }
 
 void SessionMenus::close(server::plugins::PluginPlayerRef& player) {

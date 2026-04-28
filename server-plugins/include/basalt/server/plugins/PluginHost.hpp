@@ -209,6 +209,9 @@ public:
 
     void clicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, PluginPlayerRef& player, std::int32_t slot);
 
+    void formAnswered(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, PluginPlayerRef& player,
+                      const PluginForm& form, std::size_t button, const std::map<std::string, std::string>& values);
+
     void npcClicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, const std::string& playerUuid);
 
     void deliverPacket(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPacket& packet);

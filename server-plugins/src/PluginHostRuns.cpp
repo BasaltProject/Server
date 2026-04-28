@@ -242,6 +242,43 @@ void PluginHost::clicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler,
                           {}));
 }
 
+void PluginHost::formAnswered(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, PluginPlayerRef& player,
+                              const PluginForm& form, const std::size_t button,
+                              const std::map<std::string, std::string>& values) {
+    static_cast<void>(ask(plugin, handler, "form answer",
+                          [this, &plugin, &player, &form, button, &values](wire::lua::LuaArgs& args) {
+                              args.pushTable();
+                              pushPlayer(args, player.shared_from_this(), &services_->storage(), plugin.manifest.id,
+                                         &plugin.text);
+                              args.setField("player");
+                              args.pushInteger(static_cast<std::int64_t>(button) + 1);
+                              args.setField("button");
+                              args.pushTable();
+                              for (const PluginFormField& field : form.fields) {
+                                  const auto found = values.find(field.key);
+                                  if (found == values.end()) {
+                                      continue;
+                                  }
+                                  switch (field.kind) {
+                                  case PluginFormField::Kind::Toggle:
+                                      args.pushBoolean(found->second == "true");
+                                      break;
+                                  case PluginFormField::Kind::Slider:
+                                      args.pushNumber(std::strtod(found->second.c_str(), nullptr));
+                                      break;
+                                  case PluginFormField::Kind::Text:
+                                  case PluginFormField::Kind::Choice:
+                                      args.pushString(found->second);
+                                      break;
+                                  }
+                                  args.setField(field.key);
+                              }
+                              args.setField("values");
+                              return 1;
+                          },
+                          {}));
+}
+
 void PluginHost::npcClicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, const std::string& playerUuid) {
     const std::shared_ptr<PluginPlayerRef> player = services_->players().byUuid(playerUuid);
     if (player == nullptr) {

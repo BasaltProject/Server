@@ -178,6 +178,46 @@ void ClientSession::sendStonecutterRecipes() {
     sendCompressed(play::UpdateRecipesPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
 }
 
+void ClientSession::answerForm(const wire::protocol::play::ServerboundCustomClickActionPacket& packet) {
+    constexpr std::string_view kPrefix = "basalt:form/";
+    if (!packet.id.starts_with(kPrefix) || !packet.payload.has_value()) {
+        return;
+    }
+    const std::int32_t id = std::atoi(packet.id.c_str() + kPrefix.size());
+    const wire::nbt::NbtCompound* answer = packet.payload->get<wire::nbt::NbtCompound>();
+    std::shared_ptr<const world::dialogs::Dialog> dialog;
+    {
+        const std::lock_guard<std::mutex> guard{formsLock_};
+        const auto found = forms_.find(id);
+        if (found == forms_.end() || answer == nullptr) {
+            return;
+        }
+        dialog = std::move(found->second);
+        forms_.erase(found);
+    }
+    const wire::nbt::NbtTag* button = answer->find(world::dialogs::kButtonKey);
+    const auto* index = button == nullptr ? nullptr : button->get<std::int32_t>();
+    if (index == nullptr || *index < 0 || static_cast<std::size_t>(*index) >= dialog->buttons.size() ||
+        !dialog->submit) {
+        return;
+    }
+    std::map<std::string, std::string> values;
+    for (const world::dialogs::Input& input : dialog->inputs) {
+        const wire::nbt::NbtTag* held = answer->find(input.key);
+        if (held == nullptr) {
+            continue;
+        }
+        if (const auto* text = held->get<std::string>(); text != nullptr) {
+            values[input.key] = *text;
+        } else if (const auto* flag = held->get<std::int8_t>(); flag != nullptr) {
+            values[input.key] = *flag != 0 ? input.onTrue : input.onFalse;
+        } else if (const auto* number = held->get<float>(); number != nullptr) {
+            values[input.key] = world::dialogs::numberText(*number);
+        }
+    }
+    dialog->submit(static_cast<std::size_t>(*index), values);
+}
+
 void ClientSession::runCommand(const std::string& command, const chat::SignedArguments* signedArguments) {
     PlayerSession* session = playerSession_.get();
     command::CommandDispatcher* dispatcher = options_.commands;
@@ -375,6 +415,18 @@ player::PlayerConnection ClientSession::playerConnection() {
         sendPlayPacket(play::ShowDialogPacket::kId, [dialogId](wire::io::ByteBuffer& buffer) {
             play::ShowDialogPacket{.dialogId = dialogId}.write(buffer);
         });
+    };
+    connection.showForm = [this](const world::dialogs::Dialog& dialog) {
+        std::int32_t id = 0;
+        auto held = std::make_shared<const world::dialogs::Dialog>(dialog);
+        {
+            const std::lock_guard<std::mutex> guard{formsLock_};
+            id = nextFormId_++;
+            forms_[id] = held;
+        }
+        play::ShowDialogPacket packet;
+        packet.inlineDialog = world::dialogs::toNbt(*held, "basalt:form/" + std::to_string(id));
+        sendPlayPacket(play::ShowDialogPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     };
     connection.sendWaypoint = [this](const wire::common::Uuid& waypoint, std::int32_t, const std::string& style,
                                      const std::optional<std::int32_t>& color, const double x, const double y,
@@ -960,6 +1012,14 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const std::optional<play::SignUpdatePacket> packet = play::SignUpdatePacket::read(body);
         if (packet.has_value()) {
             blockInteraction_->writeSign(*packet);
+        }
+        return;
+    }
+    if (packetId == play::ServerboundCustomClickActionPacket::kId) {
+        const std::optional<play::ServerboundCustomClickActionPacket> packet =
+            play::ServerboundCustomClickActionPacket::read(body);
+        if (packet.has_value()) {
+            answerForm(*packet);
         }
         return;
     }

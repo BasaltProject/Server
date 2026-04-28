@@ -13,6 +13,7 @@ basalt_module(server-plugins
         src/PluginConfig.cpp
         src/PluginHost.cpp
         src/PluginHostRuns.cpp
+        src/PluginFormObject.cpp
         src/PluginMenuObject.cpp
         src/PluginObject.cpp
         src/PluginObjects.cpp
@@ -21,7 +22,6 @@ basalt_module(server-plugins
         src/PluginRegistrations.cpp
         src/PluginSurfaces.cpp
         src/PluginServiceRegistry.cpp
-        src/PluginText.cpp
         src/PluginToml.cpp
         src/PluginValues.cpp
     DEPENDS basalt::wire-common basalt::wire-io basalt::wire-lua basalt::wire-plugins

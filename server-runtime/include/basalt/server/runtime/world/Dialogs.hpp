@@ -22,6 +22,8 @@ enum class Press : std::uint8_t {
     ShowText,
     OpenDialog,
     RunTemplate,
+    /// A plugin's own form: the answer goes to `Dialog::submit` rather than to a command.
+    Callback,
 };
 
 /// parity: `InputControlTypes`.
@@ -73,7 +75,15 @@ struct Dialog {
     std::vector<Button> buttons;
     /// parity: `CommonDialogData.inputs`.
     std::vector<Input> inputs;
+    /// Called with the button pressed and what each input held, as text; set only on a plugin's own form.
+    std::function<void(std::size_t button, const std::map<std::string, std::string>& values)> submit;
 };
+
+/// The dialog as a `minecraft:multi_action` for a Java client, every button sending `actionId` back with its index.
+[[nodiscard]] wire::nbt::NbtCompound toNbt(const Dialog& dialog, std::string_view actionId);
+
+/// The key under which a `toNbt` button sends its index back.
+inline constexpr std::string_view kButtonKey = "basalt_button";
 
 /// parity: `ParsedTemplate.instantiate`, every `$(name)` replaced by what that input holds, or nothing.
 [[nodiscard]] std::string instantiate(std::string_view text, const std::map<std::string, std::string>& values);
