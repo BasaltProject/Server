@@ -16,6 +16,7 @@
 #include <basalt/wire/lua/LuaSandbox.hpp>
 #include <basalt/wire/plugins/PluginManifest.hpp>
 #include <basalt/wire/plugins/PluginPackage.hpp>
+#include <basalt/wire/plugins/PluginSignature.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -74,6 +75,9 @@ public:
     std::int32_t failures = 0;
 
     bool disabled = false;
+
+    /// Its bytecode carries a signature from a key the operator trusts.
+    bool bytecodeVerified = false;
 
     [[nodiscard]] CommandEntry* commandNamed(std::string_view name);
 };
@@ -157,6 +161,8 @@ public:
     void setApiInstaller(InstallApi install) { installApi_ = std::move(install); }
 
     void setAllowed(Allowed allowed) { allowed_ = std::move(allowed); }
+
+    void setTrustedKeys(std::vector<wire::plugins::signature::PublicKey> keys) { trustedKeys_ = std::move(keys); }
 
     [[nodiscard]] std::set<wire::plugins::PluginPermission> allowed(const std::string& pluginId) const;
 
@@ -270,6 +276,7 @@ private:
     PluginEventBus events_;
     PluginWatchdog watchdog_;
     Allowed allowed_;
+    std::vector<wire::plugins::signature::PublicKey> trustedKeys_;
     InstallApi installApi_;
     std::function<bool()> onPluginThread_;
     RecordTime recordTime_;

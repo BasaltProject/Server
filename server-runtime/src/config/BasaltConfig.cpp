@@ -318,6 +318,7 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
         config.pluginLanes =
             static_cast<std::int32_t>(std::max<std::int64_t>(plugins->integer("test-lanes").value_or(1), 1));
         config.orphanData = std::string{plugins->string("orphan-data").value_or(defaults.orphanData)};
+        config.pluginTrustedKeys = plugins->stringList("trusted-keys");
         if (const TomlTable* allow = plugins->table("allow"); allow != nullptr) {
             for (const std::string& id : allow->keys()) {
                 config.pluginAllowances.emplace(id, allow->stringList(id));
