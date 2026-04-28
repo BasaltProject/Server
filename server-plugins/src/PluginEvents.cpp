@@ -10,48 +10,7 @@ const PluginEventValue& nothing() {
     static const PluginEventValue absent{};
     return absent;
 }
-
-[[nodiscard]] bool equalsIgnoringCase(std::string_view left, std::string_view right) {
-    if (left.size() != right.size()) {
-        return false;
-    }
-    for (std::size_t index = 0; index < left.size(); ++index) {
-        if (std::tolower(static_cast<unsigned char>(left[index])) !=
-            std::tolower(static_cast<unsigned char>(right[index]))) {
-            return false;
-        }
-    }
-    return true;
-}
 } // namespace
-
-std::string_view priorityName(PluginEventPriority priority) {
-    switch (priority) {
-    case PluginEventPriority::First:
-        return "FIRST";
-    case PluginEventPriority::Early:
-        return "EARLY";
-    case PluginEventPriority::Normal:
-        return "NORMAL";
-    case PluginEventPriority::Late:
-        return "LATE";
-    case PluginEventPriority::Last:
-    default:
-        return "LAST";
-    }
-}
-
-std::optional<PluginEventPriority> priorityOf(std::string_view name) {
-    static constexpr PluginEventPriority kAll[] = {PluginEventPriority::First, PluginEventPriority::Early,
-                                                   PluginEventPriority::Normal, PluginEventPriority::Late,
-                                                   PluginEventPriority::Last};
-    for (const PluginEventPriority priority : kAll) {
-        if (equalsIgnoringCase(priorityName(priority), name)) {
-            return priority;
-        }
-    }
-    return std::nullopt;
-}
 
 PluginEventType::PluginEventType(std::string name, bool cancellable, std::vector<std::string> fields,
                                  std::vector<std::string> mutableFields)

@@ -1,6 +1,5 @@
 basalt_module(server-plugins
     SOURCES
-        src/PluginCommandSpec.cpp
         src/PluginEvents.cpp
         src/PluginEventTypes.cpp
         src/PluginDispatch.cpp
