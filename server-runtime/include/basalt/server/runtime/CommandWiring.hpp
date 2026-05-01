@@ -66,6 +66,7 @@ struct CommandWiring {
     wire::text::LangTable lang;
 
     std::function<server::plugins::PluginEventBus*()> pluginEvents;
+    std::function<world::RandomSequences&()> randomSequences;
     std::function<void()> stopServer;
     /// parity: a block a command knocks down drops its own items.
     std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,

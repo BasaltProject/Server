@@ -208,7 +208,6 @@ private:
     [[nodiscard]] std::unique_ptr<command::commands::FunctionRunner> makeFunctionRunner(std::int32_t permissionLevel);
 
     /// parity: the `scheduled_events` saved data.
-    [[nodiscard]] std::string schedulePath() const;
     void saveSchedule() const;
     void loadScoreboard();
     void saveScoreboard() const;

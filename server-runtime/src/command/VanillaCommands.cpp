@@ -138,8 +138,8 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
     if (hooks.testInstances != nullptr && hooks.functionRunner != nullptr) {
         add(std::make_shared<commands::TestCommand>(*hooks.testInstances, *hooks.functionRunner));
     }
-    if (hooks.worldSeed) {
-        add(std::make_shared<commands::RandomCommand>(hooks.worldSeed));
+    if (hooks.worldSeed && hooks.randomSequences) {
+        add(std::make_shared<commands::RandomCommand>(hooks.worldSeed, hooks.randomSequences));
     }
     if (hooks.nowMillis) {
         add(std::make_shared<commands::StopwatchCommand>(ownedState(hooks.nowMillis).stopwatches));

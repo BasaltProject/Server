@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/scoreboard/ScoreboardStorage.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
+#include <basalt/server/runtime/world/SavedDataFiles.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/wire/io/Compression.hpp>
 #include <basalt/wire/io/FileIO.hpp>
@@ -45,13 +46,9 @@ namespace {
 
 } // namespace
 
-std::string BasaltServer::schedulePath() const {
-    return worldRegistry_->defaultWorld().worldRoot() + "/scheduled_events.nbt";
-}
-
 void BasaltServer::saveSchedule() const {
-    if (!wire::io::fileIO::writeBytes(
-            schedulePath(), wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(functionSchedule_.toNbt())))) {
+    if (!world::savedData::write(worldRegistry_->defaultWorld().worldRoot(), "scheduled_events",
+                                 functionSchedule_.toNbt())) {
         logger_.warn([] { return std::string{"Could not save the scheduled functions."}; });
     }
 }
@@ -144,13 +141,10 @@ VanillaGameData::Jar BasaltServer::dataJar() const {
 }
 
 std::unique_ptr<command::commands::FunctionRunner> BasaltServer::makeFunctionRunner(std::int32_t permissionLevel) {
-    const std::optional<std::vector<std::uint8_t>> saved = wire::io::fileIO::readBytes(schedulePath());
-    if (saved.has_value()) {
-        const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::read(*saved);
-        if (const wire::nbt::NbtCompound* root = read.has_value() ? read->tag.get<wire::nbt::NbtCompound>() : nullptr;
-            root != nullptr) {
-            functionSchedule_.readNbt(*root);
-        }
+    if (const std::optional<wire::nbt::NbtCompound> saved =
+            world::savedData::read(worldRegistry_->defaultWorld().worldRoot(), "scheduled_events");
+        saved.has_value()) {
+        functionSchedule_.readNbt(*saved);
     }
     return std::make_unique<command::commands::FunctionRunner>(
         functions_,

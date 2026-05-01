@@ -142,6 +142,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     }
     const std::int64_t seed = wiring.worldSeed;
     hooks.worldSeed = [seed] { return seed; };
+    hooks.randomSequences = wiring.randomSequences;
     hooks.nowMillis = wiring.nowMillis;
     hooks.nowEpochSeconds = wiring.nowEpochSeconds;
     hooks.nextDouble = wiring.nextDouble;
