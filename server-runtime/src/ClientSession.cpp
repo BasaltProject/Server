@@ -13,6 +13,8 @@
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/multiversion/ProtocolVersions.hpp>
+#include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/protocol/PacketFraming.hpp>
 #include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
@@ -23,6 +25,9 @@
 #include <utility>
 
 namespace basalt::server::runtime {
+
+namespace mv = wire::multiversion;
+
 namespace {
 
 namespace play = wire::protocol::play;
@@ -227,6 +232,80 @@ void ClientSession::drainFrames() {
 }
 
 void ClientSession::handleFrame(wire::io::ByteBuffer& body) {
+    if (envelope_.has_value()) {
+        handleEnvelopeFrame(body);
+        return;
+    }
+    handleOriginalPacket(body);
+}
+
+void ClientSession::handleEnvelopeFrame(wire::io::ByteBuffer& body) {
+    namespace envelope = wire::protocol::sessionEnvelope;
+    const bool wasActive = envelope_->state() == envelope::EnvelopeEndpoint::State::kActive;
+    const envelope::EnvelopeEndpoint::Outcome outcome = envelope_->receive(body.readable());
+    if (!outcome.reply.empty()) {
+        sendEnvelopeControl(outcome.reply);
+    }
+    if (outcome.closed) {
+        connection_.close();
+        return;
+    }
+    if (!wasActive && envelope_->state() == envelope::EnvelopeEndpoint::State::kActive) {
+        activateEnvelope(*envelope_->agreed());
+        return;
+    }
+    if (outcome.packet.empty()) {
+        return;
+    }
+    wire::io::ByteBuffer original;
+    original.writeBytes(outcome.packet);
+    handleOriginalPacket(original);
+}
+
+void ClientSession::activateEnvelope(const wire::protocol::sessionEnvelope::Open& open) {
+    namespace envelope = wire::protocol::sessionEnvelope;
+    if (open.edition != envelope::Edition::Java || !handshake_.has_value()) {
+        sendEnvelopeControl(envelope_->close(envelope::CloseReason::Unsupported));
+        connection_.close();
+        return;
+    }
+    verdict_ = options_.protocolGate.verdictFor(open.protocol);
+    if (std::holds_alternative<mv::ProtocolVerdict::Refused>(verdict_.value)) {
+        sendEnvelopeControl(envelope_->close(envelope::CloseReason::Unsupported));
+        connection_.close();
+        return;
+    }
+    handshake_->protocolVersion = open.protocol;
+    translation_ = mv::java::javaTranslators::chainFor(open.protocol, options_.substitutionLabels);
+    logger_.debug([&open] { return "The proxy carries a client on protocol " + std::to_string(open.protocol) + "."; });
+    // Before 1.20.2 there is no configuration phase to acknowledge: the server walks its own by itself.
+    if (open.protocol < mv::protocolVersions::kV1_20_2) {
+        enterConfiguration();
+    }
+}
+
+void ClientSession::sendEnvelopeControl(std::span<const std::uint8_t> control) {
+    wire::io::ByteBuffer frame;
+    static_cast<void>(wire::protocol::packetFraming::writeCompressed(frame, control, options_.compressionThreshold));
+    writeToSocket(frame);
+}
+
+void ClientSession::frameOutgoing(std::span<const std::uint8_t> whole) {
+    wire::io::ByteBuffer frame;
+    if (envelope_.has_value()) {
+        const std::vector<std::uint8_t> carried = envelope_->data(whole);
+        if (carried.empty()) {
+            return;
+        }
+        static_cast<void>(
+            wire::protocol::packetFraming::writeCompressed(frame, carried, options_.compressionThreshold));
+    } else {
+        static_cast<void>(wire::protocol::packetFraming::writeCompressed(frame, whole, options_.compressionThreshold));
+    }
+    writeToSocket(frame);
+}
+
+void ClientSession::handleOriginalPacket(wire::io::ByteBuffer& body) {
     const std::int32_t packetId = wire::protocol::varInt::read(body);
     if (body.failed()) {
         return;
@@ -349,9 +428,7 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
         sendTranslated(translation_->chain(), id, std::span{bytes}.subspan(idBytes));
         return;
     }
-    wire::io::ByteBuffer frame;
-    static_cast<void>(wire::protocol::packetFraming::writeCompressed(frame, bytes, options_.compressionThreshold));
-    writeToSocket(frame);
+    frameOutgoing(bytes);
 }
 
 void ClientSession::sendTranslated(const wire::multiversion::ProtocolChain& chain, std::int32_t id,
@@ -361,10 +438,7 @@ void ClientSession::sendTranslated(const wire::multiversion::ProtocolChain& chai
         wire::io::ByteBuffer whole;
         wire::protocol::varInt::write(whole, translatedId);
         whole.writeBytes(translated);
-        wire::io::ByteBuffer frame;
-        static_cast<void>(
-            wire::protocol::packetFraming::writeCompressed(frame, whole.readable(), options_.compressionThreshold));
-        writeToSocket(frame);
+        frameOutgoing(whole.readable());
     });
 }
 

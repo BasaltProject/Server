@@ -32,6 +32,9 @@ std::int32_t ProxyLogin::beginQuery() {
     transactionId_ = id;
     if (forwarding_.mode == wire::auth::forwarding::ForwardingMode::Basalt) {
         challenge_ = wire::auth::forwarding::native::newRequest(forwarding_.backendId);
+        if (challenge_.has_value() && forwarding_.offerSessionEnvelope) {
+            challenge_->capabilities = wire::auth::forwarding::native::kCapabilitySessionEnvelope;
+        }
     }
     return transactionId_;
 }
@@ -85,6 +88,7 @@ ForwardingResult ProxyLogin::readNativeAnswer(std::span<const std::uint8_t> payl
     login.profileId = identity.profileId;
     login.name = std::move(identity.name);
     login.properties = std::move(identity.properties);
+    login.capabilities = identity.capabilities;
     return login;
 }
 

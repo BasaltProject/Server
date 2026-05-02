@@ -31,6 +31,7 @@
 #include <basalt/wire/multiversion/ProtocolGate.hpp>
 #include <basalt/wire/multiversion/SubstitutionLabels.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
+#include <basalt/wire/protocol/EnvelopeEndpoint.hpp>
 #include <basalt/wire/protocol/ProtocolState.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/handshake/HandshakePacket.hpp>
@@ -430,6 +431,20 @@ private:
 
     void handleFrame(wire::io::ByteBuffer& body);
 
+    /// One packet of the client as it speaks it, once any envelope around it is gone.
+    void handleOriginalPacket(wire::io::ByteBuffer& body);
+
+    /// A frame of the session envelope: the Open that starts it, or a packet of the client carried inside.
+    void handleEnvelopeFrame(wire::io::ByteBuffer& body);
+
+    /// Takes on the protocol the proxy says the client speaks, as if that client had connected here itself.
+    void activateEnvelope(const wire::protocol::sessionEnvelope::Open& open);
+
+    void sendEnvelopeControl(std::span<const std::uint8_t> control);
+
+    /// Frames one packet for the wire: inside a data frame once the envelope is active.
+    void frameOutgoing(std::span<const std::uint8_t> whole);
+
     void handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer& body);
 
     void handleHandshake(std::int32_t packetId, wire::io::ByteBuffer& body);
@@ -524,6 +539,8 @@ private:
     std::optional<wire::protocol::handshake::HandshakePacket> handshake_;
     wire::multiversion::ProtocolVerdict verdict_{wire::multiversion::ProtocolVerdict::Native{}};
     std::unique_ptr<wire::multiversion::java::JavaChain> translation_;
+    /// Present from the login the proxy selected the envelope for: the next frame it sends is the Open.
+    std::optional<wire::protocol::sessionEnvelope::EnvelopeEndpoint> envelope_;
     std::optional<wire::auth::Cfb8Cipher> decryptCipher_;
     std::optional<wire::auth::Cfb8Cipher> encryptCipher_;
     bool compressionEnabled_ = false;

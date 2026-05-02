@@ -371,6 +371,12 @@ void ClientSession::finishLogin(Uuid id, const std::string& name,
     sendCompressed(login::LoginFinishedPacket::kId, [&profile, sessionId](wire::io::ByteBuffer& buffer) {
         login::LoginFinishedPacket{.gameProfile = profile, .sessionId = sessionId}.write(buffer);
     });
+    // The proxy that selected the envelope sends its Open next; the client's own packets follow inside it.
+    if (proxy_.login().has_value() &&
+        (proxy_.login()->capabilities & wire::auth::forwarding::native::kCapabilitySessionEnvelope) != 0) {
+        envelope_.emplace();
+        return;
+    }
     // Before 1.20.2 there is no configuration phase to acknowledge: the server walks its own by itself.
     if (handshake_.has_value() && handshake_->protocolVersion < mv::protocolVersions::kV1_20_2) {
         enterConfiguration();

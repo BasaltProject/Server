@@ -170,6 +170,10 @@ trusted-keys = []
 # signature collected by another backend is useless here.
 backend-id = ""
 
+# Offers the session envelope to the proxy for mode = "basalt": when the proxy accepts, it forwards each
+# player's original packets and this server translates them, instead of the proxy doing it. Off by default.
+session-envelope = false
+
 # The tokens accepted for mode = "bungeeguard" or "safenet". More than one so a key
 # can be rotated without a restart of everything at once.
 tokens = []
