@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/TickLoop.hpp>
+#include <basalt/server/runtime/sched/Owner.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -119,6 +120,7 @@ std::int64_t TickLoop::nextAutosaveInterval() const {
 
 void TickLoop::start() {
     running_.store(true, std::memory_order_relaxed);
+    sched::Owner::tickThreadRunning(true);
     sweeper_ = std::thread{[this] { runSweeper(); }};
     ticker_ = std::thread{[this] { runTicks(); }};
 }
@@ -213,6 +215,7 @@ void TickLoop::stop() {
     if (sweeper_.joinable()) {
         sweeper_.join();
     }
+    sched::Owner::tickThreadRunning(false);
 }
 
 } // namespace basalt::server::runtime

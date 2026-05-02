@@ -1,9 +1,10 @@
 #pragma once
 
+#include <basalt/metamorph/region/LinearRegion.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
-#include <basalt/metamorph/region/LinearRegion.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
 #include <list>
@@ -51,6 +52,16 @@ public:
 
     /// Answers how many region files were rewritten: a region is recompressed whole however few of its chunks changed.
     std::size_t saveChunks(std::span<server::world::Chunk* const> chunks, std::int32_t timestamp);
+
+    /// A chunk as the owner thread saw it: the NBT is built there, and only the encoding and the writing are left.
+    struct Snapshot {
+        std::int32_t chunkX = 0;
+        std::int32_t chunkZ = 0;
+        wire::nbt::NbtCompound nbt;
+    };
+
+    /// `saveChunks` for snapshots; answers how many region files were rewritten.
+    std::size_t saveSnapshots(std::vector<Snapshot> snapshots, std::int32_t timestamp);
 
     std::size_t flush();
 

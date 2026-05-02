@@ -31,6 +31,14 @@ bool Owner::isCurrent() const noexcept { return boundThread_.load() == currentTh
 
 bool Owner::isClaimed() const noexcept { return boundThread_.load() != 0; }
 
+namespace {
+std::atomic<bool> gTickThreadRunning{false};
+} // namespace
+
+void Owner::tickThreadRunning(bool running) noexcept { gTickThreadRunning.store(running); }
+
+bool Owner::tickThreadRunning() noexcept { return gTickThreadRunning.load(); }
+
 std::size_t Owner::pending() const {
     const std::lock_guard<std::mutex> lock{mutex_};
     return incoming_.size() + atEnd_.size() + delayed_.size() + console_.size();
