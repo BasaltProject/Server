@@ -159,7 +159,7 @@ public:
     void encode(wire::nbt::NbtCompound& tag) const;
     void decode(const wire::nbt::NbtCompound& tag);
 
-    void load(std::string_view worldRoot);
+    void load(std::string_view worldRoot, std::string_view dimension);
     void save(std::string_view worldRoot);
 
 private:

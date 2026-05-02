@@ -289,8 +289,9 @@ void RaidManager::decode(const NbtCompound& tag) {
     }
 }
 
-void RaidManager::load(std::string_view worldRoot) {
-    if (const std::optional<NbtCompound> data = world::savedData::read(worldRoot, "raids"); data.has_value()) {
+void RaidManager::load(std::string_view worldRoot, std::string_view dimension) {
+    if (const std::optional<NbtCompound> data = world::savedData::read(worldRoot, "raids", dimension);
+        data.has_value()) {
         decode(*data);
     }
     dirty = false;

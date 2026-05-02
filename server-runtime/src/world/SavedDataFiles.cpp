@@ -1,4 +1,5 @@
 #include <basalt/metamorph/datafix/DataFixer.hpp>
+#include <basalt/metamorph/datafix/LevelData.hpp>
 #include <basalt/server/runtime/world/SavedDataFiles.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/io/Compression.hpp>
@@ -25,11 +26,31 @@ using wire::nbt::NbtTag;
 
 } // namespace
 
-std::optional<NbtCompound> read(const std::string_view worldRoot, const std::string_view name) {
+std::optional<NbtCompound> read(const std::string_view worldRoot, const std::string_view name,
+                                const std::string_view dimension) {
     const std::string own = std::string{worldRoot} + "/" + std::string{name} + ".nbt";
-    const std::string vanilla = std::string{worldRoot} + "/data/minecraft/" + std::string{name} + ".dat";
-    const bool imported = !wire::io::fileIO::exists(own);
-    std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(imported ? vanilla : own);
+    std::string path = own;
+    bool imported = false;
+    if (!wire::io::fileIO::exists(own)) {
+        imported = true;
+        const std::string file = std::string{name} + ".dat";
+        std::vector<std::string> candidates;
+        if (!dimension.empty()) {
+            candidates.push_back(std::string{worldRoot} + "/dimensions/minecraft/" + std::string{dimension} +
+                                 "/data/minecraft/" + file);
+        }
+        candidates.push_back(std::string{worldRoot} + "/data/minecraft/" + file);
+        // Before 26.1 the saved data of the overworld sat directly under `data/`.
+        candidates.push_back(std::string{worldRoot} + "/data/" + file);
+        path = candidates.front();
+        for (const std::string& candidate : candidates) {
+            if (wire::io::fileIO::exists(candidate)) {
+                path = candidate;
+                break;
+            }
+        }
+    }
+    std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(path);
     if (bytes.has_value()) {
         bytes = plain(std::move(*bytes));
     }
@@ -38,20 +59,24 @@ std::optional<NbtCompound> read(const std::string_view worldRoot, const std::str
     }
     const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> parsed = wire::nbt::nbtIO::read(*bytes);
     const NbtCompound* root = parsed.has_value() ? parsed->tag.get<NbtCompound>() : nullptr;
-    const NbtCompound* data = root == nullptr ? nullptr : root->getCompound("data");
-    if (data == nullptr) {
+    const NbtCompound* held = root == nullptr ? nullptr : root->getCompound("data");
+    if (held == nullptr) {
         wire::common::Logger{"world"}.warn(
             [&name] { return "The saved " + std::string{name} + " could not be read and is ignored."; });
         return std::nullopt;
     }
-    const std::int32_t version = root->getInt("DataVersion", 0);
-    if (imported && version != metamorph::datafix::kCurrentVersion) {
-        wire::common::Logger{"world"}.warn([&name, version] {
-            return "Imported " + std::string{name} + " from data version " + std::to_string(version) +
-                   " and read as if it were the current one.";
-        });
+    NbtCompound data = *held;
+    if (imported) {
+        const std::int32_t version = root->getInt("DataVersion", 0);
+        metamorph::datafix::upgradeSavedData(name, data, version);
+        if (version > metamorph::datafix::kCurrentVersion) {
+            wire::common::Logger{"world"}.warn([&name, version] {
+                return "Imported " + std::string{name} + " from data version " + std::to_string(version) +
+                       ", newer than this server.";
+            });
+        }
     }
-    return *data;
+    return data;
 }
 
 bool write(const std::string_view worldRoot, const std::string_view name, NbtCompound data) {
