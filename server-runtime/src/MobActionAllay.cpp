@@ -338,8 +338,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
     state.duplicationCooldown = std::max<std::int64_t>(state.duplicationCooldown - 1, 0);
 }
 
-/// parity: `VibrationSystem.Ticker` sending `VibrationParticleOption` from the note block toward the allay.
-/// Returns whether a player within range received it.
+/// parity: `VibrationSystem.Ticker` sending the vibration particle toward the allay; whether a player got it.
 [[nodiscard]] bool allayVibrationParticle(const std::vector<PlayerSession*>& watchers, const ServerEntity& allay,
                                           double eyeY, const allays::AllayState::Vibration& vibration,
                                           std::int32_t arrivalTicks, double alpha) {

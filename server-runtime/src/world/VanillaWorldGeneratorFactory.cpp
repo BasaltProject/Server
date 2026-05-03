@@ -578,8 +578,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
     const auto plainsEverywhere = [](std::int32_t, std::int32_t, std::int32_t) -> const std::string& {
         return kPlains;
     };
-    // parity: `FlatLevelSource` answers sea level -63 and min y 0, so its strongholds sit on top of the
-    // layers rather than under them.
+    // parity: `FlatLevelSource` answers sea level -63 and min y 0, so strongholds sit on top of the layers.
     built->strongholds = std::make_unique<terrain::StrongholdStructureGenerator>(
         structure::ConcentricRingsPlacement{32, 3, 128, biomesOf(tags, "minecraft:stronghold_biased_to"),
                                             plainsEverywhere},

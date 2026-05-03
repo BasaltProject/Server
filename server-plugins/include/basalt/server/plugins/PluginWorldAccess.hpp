@@ -223,7 +223,8 @@ public:
     [[nodiscard]] virtual std::optional<std::string> block(std::int32_t x, std::int32_t y, std::int32_t z) const = 0;
 
     /// The block with its properties, as `minecraft:oak_stairs[facing=east,half=top]`.
-    [[nodiscard]] virtual std::optional<std::string> blockState(std::int32_t x, std::int32_t y, std::int32_t z) const = 0;
+    [[nodiscard]] virtual std::optional<std::string> blockState(std::int32_t x, std::int32_t y,
+                                                                std::int32_t z) const = 0;
 
     /// Takes an id with optional properties, as `blockState` returns them.
     virtual bool setBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view block) = 0;

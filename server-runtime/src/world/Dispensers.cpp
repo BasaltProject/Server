@@ -459,8 +459,7 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
                        .left = minusOne(stack),
                        .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *placed}};
     }
-    // parity: the brush entry, which brushes an armadillo standing in the square in front and
-    // takes sixteen of the brush's durability for it.
+    // parity: the brush entry brushes an armadillo in the square in front and costs sixteen durability.
     if (stack.item == brush()) {
         for (entity::ServerEntity* armadillo : context.world.entities()) {
             if (armadillo->removed || armadillo->type().path() != "armadillo") {

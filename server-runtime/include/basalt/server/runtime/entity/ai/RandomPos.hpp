@@ -45,8 +45,7 @@ using Weight = std::function<double(std::int32_t x, std::int32_t y, std::int32_t
                                           random::RandomSource& random, std::int32_t horizontal, std::int32_t vertical,
                                           const Weight& weight = {});
 
-/// parity: `LandRandomPos.getPos` with `Hoglin.getWalkTargetValue`: a repellent square is worth
-/// minus one and crimson nylium underneath ten.
+/// parity: `LandRandomPos.getPos` with `Hoglin.getWalkTargetValue`: repellent minus one, crimson nylium ten.
 [[nodiscard]] std::optional<Spot> landPosHoglin(world::WorldState& world, const ServerEntity& mob,
                                                 random::RandomSource& random, std::int32_t horizontal,
                                                 std::int32_t vertical,

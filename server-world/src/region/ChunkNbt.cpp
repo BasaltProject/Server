@@ -567,7 +567,8 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     }
     if (saved > 0 && saved < kDataVersion) {
         NbtCompound upgraded = tag;
-        metamorph::datafix::upgrade(metamorph::datafix::Domain::Chunk, upgraded, saved, {.overworld = bounds.minY() == -64});
+        metamorph::datafix::upgrade(metamorph::datafix::Domain::Chunk, upgraded, saved,
+                                    {.overworld = bounds.minY() == -64});
         upgraded.putInt("DataVersion", kDataVersion);
         return read(upgraded, bounds);
     }

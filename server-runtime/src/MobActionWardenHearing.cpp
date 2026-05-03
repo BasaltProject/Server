@@ -77,8 +77,7 @@ struct Somebody {
     return top;
 }
 
-/// parity: `VibrationSystem.Ticker` sending `VibrationParticleOption` from the event toward the warden.
-/// Returns whether a player within range received it.
+/// parity: `VibrationSystem.Ticker` sending the vibration particle toward the warden; whether a player got it.
 [[nodiscard]] bool vibrationParticle(const std::vector<PlayerSession*>& watchers, const ServerEntity& warden,
                                      double eyeY, const brain::Heard& heard, std::int32_t arrivalTicks, double alpha) {
     const server::registry::ParticleType* type =

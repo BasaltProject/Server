@@ -25,8 +25,7 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kSides{
 
 void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    // Only the sections that hold a leaf or a log are worth walking: a chunk keeps two dozen and a
-    // forest touches two of them, so the whole column would be twenty times the work for nothing.
+    // Only sections holding a leaf or a log are walked: a forest touches two of two dozen.
     std::int32_t lowSection = -1;
     std::int32_t highSection = -1;
     for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
@@ -43,9 +42,7 @@ void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
     if (lowSection < 0) {
         return;
     }
-    // A leaf short of seven has a log within six steps, so six blocks round the chunk hold every path
-    // that decides one of its leaves. Measured from the logs alone and never from what a neighbour's
-    // leaf already says, the answer depends on the blocks and not on which chunk arrived first.
+    // A leaf short of seven has a log within six steps, so six blocks round the chunk decide all of its leaves.
     const std::int32_t firstY = std::max(bounds.minY(), bounds.minY() + lowSection * 16 - kMargin);
     const std::int32_t lastY = std::min(bounds.maxY(), bounds.minY() + highSection * 16 + 15 + kMargin);
     const std::int32_t height = lastY - firstY + 1;

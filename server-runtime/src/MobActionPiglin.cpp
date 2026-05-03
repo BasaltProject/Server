@@ -189,8 +189,7 @@ void MobActionSystem::piglinSense(world::LoadedWorld& world, entity::ai::MobCont
     Sense& sense = tSense;
     sense = Sense{};
     const double range = piglin.attributeWithModifiers("minecraft:follow_range");
-    // parity: `NearestLivingEntitySensor` fills `NEAREST_LIVING_ENTITIES` without a vision filter,
-    // which `PiglinSpecificSensor` only applies to the memories it names `NEAREST_VISIBLE_*`.
+    // parity: `NearestLivingEntitySensor` has no vision filter; `PiglinSpecificSensor` only filters `NEAREST_VISIBLE_*`.
     const double half = piglin.width() / 2.0;
     for (const ServerEntity* other : context.entities) {
         if (other == &piglin || other->removed || other->dying || other->health <= 0.0) {
