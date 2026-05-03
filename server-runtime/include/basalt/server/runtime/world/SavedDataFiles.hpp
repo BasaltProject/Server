@@ -7,8 +7,7 @@
 
 namespace basalt::server::runtime::world::savedData {
 
-/// The `data` of `<name>.nbt`, else of the vanilla file a copied world keeps it in; `dimension` is for per-dimension
-/// ones.
+/// The `data` of `<name>.nbt`, else of the vanilla file a copied world keeps; `dimension` is for per-dimension ones.
 [[nodiscard]] std::optional<wire::nbt::NbtCompound> read(std::string_view worldRoot, std::string_view name,
                                                          std::string_view dimension = {});
 
