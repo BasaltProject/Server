@@ -711,6 +711,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                       std::int32_t amount) { orbs_->award(world, x, y, z, amount); }});
     RedstoneTickSystem::Hooks redstoneHooks;
     plugins::worldEventHooks::redstone(redstoneHooks, eventSink_);
+    plugins::worldEventHooks::growth(redstoneHooks, eventSink_);
     redstone_ = std::make_unique<RedstoneTickSystem>(
         playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_,
         // parity: `BaseCommandBlock.performCommand`.

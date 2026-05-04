@@ -1,4 +1,5 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -74,6 +75,26 @@ void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
             event.set("item", itemOf(input));
             event.set("result", itemOf(result));
         });
+    };
+}
+
+void growth(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
+    hooks.mayChange = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                              std::int32_t from, std::int32_t to, std::string_view cause) {
+        const auto nameOf = [](const std::int32_t stateId) {
+            const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+            return block == nullptr ? std::string{"minecraft:air"} : block->toString();
+        };
+        const auto fill = [&](PluginEvent& event) {
+            event.set("world", std::string{worldName});
+            event.set("x", static_cast<std::int64_t>(x));
+            event.set("y", static_cast<std::int64_t>(y));
+            event.set("z", static_cast<std::int64_t>(z));
+            event.set("block", nameOf(from));
+            event.set("to_block", nameOf(to));
+            event.set("cause", std::string{cause});
+        };
+        return cause == "fade" ? sink.allowed(&blockFade, fill) : sink.allowed(&blockGrow, fill);
     };
 }
 

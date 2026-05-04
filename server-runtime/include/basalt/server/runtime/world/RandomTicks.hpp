@@ -25,7 +25,7 @@ inline constexpr std::int32_t kWalkMultiplier = 3;
 inline constexpr std::int32_t kWalkAddend = 1013904223;
 
 /// `cause` is `fade` when something is taken away and `grow` otherwise; only the families in this file ask.
-using MayChange = std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t from, std::int32_t to,
+using MayChange = std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t from, std::int32_t to,
                                      std::string_view cause)>;
 
 /// A struct rather than a world object so the families are testable without one.

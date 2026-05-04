@@ -19,6 +19,7 @@ using WorldOf = std::function<std::string(const entity::ServerEntity& entity)>;
 
 void explosions(ExplosionSystem::Hooks& hooks, const EventSink& sink);
 void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink);
+void growth(RedstoneTickSystem::Hooks& hooks, const EventSink& sink);
 void environment(EnvironmentTickSystem::Hooks& hooks, const EventSink& sink);
 void spawning(NaturalSpawningSystem::Hooks& hooks, const EventSink& sink);
 void pistons(BlockChangeBroadcaster::Hooks& hooks, const EventSink& sink);
