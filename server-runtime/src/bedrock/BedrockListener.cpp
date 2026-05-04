@@ -347,8 +347,6 @@ void BedrockListener::onConnect(RakSession& session) {
         }
         if (packet == BedrockPacket::PlayerAuthInput && entry.player) {
             const auto input = wire::bedrock::readPlayerAuthInput(body, entry.connection.protocolVersion());
-            // TEMPORARY: an input this server cannot read is a player who never moves, never digs
-            // and never places anything, and nothing else in the log says so.
             if (!input.has_value() && !entry.saidBadInput) {
                 entry.saidBadInput = true;
                 logger_.warn([&entry] {
@@ -357,16 +355,11 @@ void BedrockListener::onConnect(RakSession& session) {
                 });
             }
             if (input.has_value()) {
-                // Before the click, because it decides what the click means.
                 entry.player->setSneaking(input->sneaking);
                 entry.player->setStance(input->onGround, input->sprinting);
                 if (input->flying.has_value()) {
                     entry.player->setFlying(*input->flying);
                 }
-                // Zero is a click on a block; one is a click on the air and two is breaking, and
-                // neither of those puts anything down.
-                // TEMPORARY: what the client says it did with what it holds, which is the only way
-                // to tell a placement this server refuses from one it never heard.
                 if (input->itemUse.has_value()) {
                     logger_.debug([&input] {
                         return "item use " + std::to_string(input->itemUse->action) + " at " +
@@ -397,8 +390,6 @@ void BedrockListener::onConnect(RakSession& session) {
                     entry.player->stackRequest(*input->stackRequest);
                 }
                 for (const wire::bedrock::BedrockBlockAction& action : input->blockActions) {
-                    // TEMPORARY: what the client actually asks for when somebody digs, which is the
-                    // only way to tell a break this server refuses from one it never heard.
                     logger_.debug([&action] {
                         return "block action " + std::to_string(action.action) + " at " + std::to_string(action.x) +
                                ", " + std::to_string(action.y) + ", " + std::to_string(action.z);
@@ -626,7 +617,6 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
-        // Named once each: only a real client can say which of its many asks go unanswered.
         if (entry.unanswered.insert(static_cast<std::uint16_t>(packet)).second) {
             logger_.debug([packet] {
                 return "Nothing answers Bedrock " +
