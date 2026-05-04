@@ -39,6 +39,8 @@ public:
         std::function<std::optional<float>(const player::PlayerSession& player, float amount)> healed;
         std::function<void(const player::PlayerSession& player, const std::string& deathMessage)> died;
         std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> attackAllowed;
+        std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> mountAllowed;
+        std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& animal)> tameAllowed;
     };
 
     struct Options {

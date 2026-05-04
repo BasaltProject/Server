@@ -1,5 +1,5 @@
-#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/plugins/EventHooks.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
@@ -17,7 +17,9 @@ using server::plugins::pluginEventTypes::blockDamage;
 using server::plugins::pluginEventTypes::blockPlace;
 using server::plugins::pluginEventTypes::entityDamage;
 using server::plugins::pluginEventTypes::entityHeal;
+using server::plugins::pluginEventTypes::entityMount;
 using server::plugins::pluginEventTypes::entityShoot;
+using server::plugins::pluginEventTypes::entityTame;
 using server::plugins::pluginEventTypes::inventoryClick;
 using server::plugins::pluginEventTypes::inventoryOpen;
 using server::plugins::pluginEventTypes::inventoryTrade;
@@ -289,6 +291,21 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
             event.set("entity_type", type.empty() ? std::string{kPlayerType} : type);
             event.set("action", std::string{"attack"});
             event.set("hand", std::string{"main_hand"});
+        });
+    };
+    hooks.mountAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& vehicle) {
+        return sink.allowed(&entityMount, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            event.set("entity_id", static_cast<std::int64_t>(vehicle.entityId()));
+            event.set("entity_type", vehicle.type().toString());
+            event.set("mounting", true);
+        });
+    };
+    hooks.tameAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& animal) {
+        return sink.allowed(&entityTame, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            event.set("entity_id", static_cast<std::int64_t>(animal.entityId()));
+            event.set("entity_type", animal.type().toString());
         });
     };
     return hooks;

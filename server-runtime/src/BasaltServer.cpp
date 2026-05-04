@@ -827,6 +827,16 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             .mobSpawners = mobSpawners_.get()});
     // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory.
     RaidSystem::Hooks raidHooks;
+    raidHooks.raidFinished = [this](const world::LoadedWorld& world, const entity::Raid& raid, bool won) {
+        eventSink_.notify(&server::plugins::pluginEventTypes::raidFinish, [&](server::plugins::PluginEvent& event) {
+            event.set("world", world.name());
+            event.set("x", static_cast<std::int64_t>(raid.center[0]));
+            event.set("y", static_cast<std::int64_t>(raid.center[1]));
+            event.set("z", static_cast<std::int64_t>(raid.center[2]));
+            event.set("waves", static_cast<std::int64_t>(raid.groupsSpawned));
+            event.set("won", won);
+        });
+    };
     raidHooks.raidTriggered = [this](player::PlayerSession& player) {
         player::statAwards::award(player, "raid_trigger");
         advancementTriggers_->fire("voluntary_exile", player.name(), player.uuid().toString());

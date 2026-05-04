@@ -780,6 +780,9 @@ bool CombatHandler::tameOrSit(const world::LoadedWorld& world, PlayerSession& se
         broadcastEntityEvent(entity.entityId(), entity::taming::kEventTamingFailed);
         return true;
     }
+    if (hooks_.tameAllowed && !hooks_.tameAllowed(session, entity)) {
+        return true;
+    }
     entity.owner = session.uuid().toString();
     // parity: `TamableAnimal.tame` ends in `TAME_ANIMAL.trigger`.
     if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
@@ -796,6 +799,9 @@ bool CombatHandler::tameOrSit(const world::LoadedWorld& world, PlayerSession& se
 
 void CombatHandler::mount(PlayerSession& session, ServerEntity& vehicle) {
     if (session.vehicleId == vehicle.entityId()) {
+        return;
+    }
+    if (hooks_.mountAllowed && !hooks_.mountAllowed(session, vehicle)) {
         return;
     }
     // parity: `Entity.startRiding` leaves whatever it was on first.
