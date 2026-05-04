@@ -140,8 +140,9 @@ TEST_CASE("water washing a block away drops what breaking it would, and lava dro
 TEST_CASE("a plugin that refuses a piston stops it moving anything at all") {
     Fixture fixture{scratch("broadcaster-piston")};
     RealLootTables tables{fixture.jar()};
-    const BlockChangeBroadcaster::Hooks refuse{
-        .pistonAllowed = [](const LoadedWorld&, std::int32_t, std::int32_t, std::int32_t) { return false; }};
+    const BlockChangeBroadcaster::Hooks refuse{.pistonAllowed = [](const LoadedWorld&, std::int32_t, std::int32_t,
+                                                                   std::int32_t, bool,
+                                                                   std::string_view) { return false; }};
     BlockChangeBroadcaster broadcaster{fixture.registry, tables, refuse, {}};
 
     CHECK(broadcaster.finishPiston(*fixture.world, {1, 64, 1}, fixture.watchers()).empty());

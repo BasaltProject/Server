@@ -165,6 +165,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
         orbs_->spawn(world, x, y, z, value);
     };
     options.plugins = pluginHooks();
+    options.events = &eventSink_;
 
     // On the heap: the tick loop may hold a departed session, and its callbacks reach back into this connection.
     const std::shared_ptr<ClientSession> session =

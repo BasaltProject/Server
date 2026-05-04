@@ -213,11 +213,11 @@ struct PlayerConnection {
     std::function<void(const wire::text::Component& message)> sendCombatDeath;
 
     std::function<void(const std::string& title, std::int32_t rows,
-                       const std::map<std::int32_t, plugins::PluginItem>& items,
+                       const std::map<std::int32_t, server::plugins::PluginItem>& items,
                        std::function<void(std::int32_t)> onClick)>
         openPluginMenu;
 
-    std::function<void(const std::map<std::int32_t, plugins::PluginItem>& items)> refreshPluginMenu;
+    std::function<void(const std::map<std::int32_t, server::plugins::PluginItem>& items)> refreshPluginMenu;
 
     std::function<void()> closeOpenMenu;
 

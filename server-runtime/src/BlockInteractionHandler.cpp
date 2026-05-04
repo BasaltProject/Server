@@ -277,7 +277,7 @@ void BlockInteractionHandler::dropHeldItem(bool all) {
         return;
     }
     const std::int32_t dropCount = all ? held->count : 1;
-    if (hooks_.dropAllowed && !hooks_.dropAllowed(*session, held->id)) {
+    if (hooks_.dropAllowed && !hooks_.dropAllowed(*session, held->id, dropCount)) {
         owner_->sendInventorySlot(heldSlot);
         return;
     }
