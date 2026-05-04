@@ -56,6 +56,9 @@ std::optional<WorldMetadata> WorldMetadata::fromVanilla(const std::string& world
     } else if (const NbtCompound* old = level == nullptr ? nullptr : level->getCompound("WorldGenSettings");
                old != nullptr) {
         metadata.seed = old->getLong("seed");
+    } else if (level != nullptr && level->contains("RandomSeed")) {
+        // parity: `WorldGenSettingsFix` read the seed of a level older than 1.16 from `RandomSeed`.
+        metadata.seed = level->getLong("RandomSeed");
     }
     if (level != nullptr) {
         if (const NbtCompound* spawn = level->getCompound("spawn"); spawn != nullptr) {
