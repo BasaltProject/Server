@@ -77,6 +77,9 @@ std::optional<std::int32_t> resolve(const std::string& name, const bool containe
         if (*index < kArmourStart) {
             return *index - kHotbarSize;
         }
+        if (*index >= kArmourStart && *index < kArmourStart + 4) {
+            return kArmourStart + 3 - (*index - kArmourStart);
+        }
         return *index > kOffhand ? std::nullopt : std::optional{*index};
     }
     if (name.starts_with("hotbar.")) {
@@ -86,16 +89,16 @@ std::optional<std::int32_t> resolve(const std::string& name, const bool containe
     if (name.starts_with("inventory.")) {
         return indexIn(std::string_view{name}.substr(10), kMainSize);
     }
-    if (name == "armor.feet") {
+    if (name == "armor.head") {
         return kArmourStart;
     }
-    if (name == "armor.legs") {
+    if (name == "armor.chest") {
         return kArmourStart + 1;
     }
-    if (name == "armor.chest") {
+    if (name == "armor.legs") {
         return kArmourStart + 2;
     }
-    if (name == "armor.head") {
+    if (name == "armor.feet") {
         return kArmourStart + 3;
     }
     if (name == "weapon.offhand") {
