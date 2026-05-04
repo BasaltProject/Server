@@ -20,6 +20,13 @@ using wire::common::JsonValue;
     return value == nullptr ? nullptr : value->get<std::string>();
 }
 
+// parity: `PlayerStorageFileFix` moved `stats` and `advancements` under `players/`.
+[[nodiscard]] std::string playerFile(const std::string& savePath, std::string_view kind, const std::string& uuid) {
+    const std::string moved = savePath + "/players/" + std::string{kind} + "/" + uuid + ".json";
+    return wire::io::fileIO::readText(moved).has_value() ? moved
+                                                         : savePath + "/" + std::string{kind} + "/" + uuid + ".json";
+}
+
 } // namespace
 
 std::expected<ImportReport, std::string> importVanillaSave(const std::string& savePath,
@@ -73,10 +80,16 @@ std::expected<ImportReport, std::string> importVanillaSave(const std::string& sa
             report.failed++;
             continue;
         }
-        repository.save(*player);
+        storage::StoredPlayer imported = *player;
+        if (const std::optional<std::string> statistics =
+                wire::io::fileIO::readText(playerFile(savePath, "stats", *uuid));
+            statistics.has_value()) {
+            static_cast<void>(importVanillaStats(*statistics, imported.stats));
+        }
+        repository.save(imported);
         if (progress != nullptr) {
             if (const std::optional<std::string> advancements =
-                    wire::io::fileIO::readText(savePath + "/advancements/" + *uuid + ".json");
+                    wire::io::fileIO::readText(playerFile(savePath, "advancements", *uuid));
                 advancements.has_value()) {
                 static_cast<void>(importVanillaAdvancements(*advancements, *uuid, *progress));
             }
