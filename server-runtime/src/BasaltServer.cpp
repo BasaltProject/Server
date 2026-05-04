@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/PluginsCommand.hpp>
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
+#include <basalt/server/runtime/sched/OnOwner.hpp>
 #include <basalt/server/runtime/world/BiomeTagLoader.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -1036,6 +1037,31 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
 
     // The online count comes from the registry, not a second counter that could advertise numbers that never come down.
     ServerListStatus::Hooks listHooks;
+    listHooks.ping = [this](const std::optional<std::string>& address, const std::string& motd, std::int32_t online,
+                            std::int32_t max) {
+        return sched::onOwner<ServerListStatus::Hooks::Answer>(worldRegistry_->defaultWorld().owner(), [&, this] {
+            ServerListStatus::Hooks::Answer answer;
+            const server::plugins::PluginEvent* event = eventSink_.ask(
+                &server::plugins::pluginEventTypes::serverPing, [&](server::plugins::PluginEvent& filled) {
+                    filled.set("address", address.value_or(std::string{}));
+                    filled.set("motd", motd);
+                    filled.set("online", static_cast<std::int64_t>(online));
+                    filled.set("max_players", static_cast<std::int64_t>(max));
+                });
+            if (event == nullptr) {
+                return answer;
+            }
+            if (const auto* edited = std::get_if<std::string>(&event->get("motd"));
+                edited != nullptr && *edited != motd) {
+                answer.motd = *edited;
+            }
+            if (const auto* edited = std::get_if<std::int64_t>(&event->get("max_players"));
+                edited != nullptr && *edited != max) {
+                answer.maxPlayers = static_cast<std::int32_t>(*edited);
+            }
+            return answer;
+        });
+    };
     listHooks.playerByAddress = [this](const std::string& address) {
         return playerStore_->players().findNameByAddress(address);
     };
