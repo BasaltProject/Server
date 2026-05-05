@@ -1,9 +1,11 @@
+#include <basalt/server/runtime/command/DataArguments.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 
+#include <algorithm>
 #include <expected>
 #include <random>
 #include <string>
@@ -27,6 +29,30 @@ void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, st
                                                               .mainhand = opener->mainhand,
                                                               .scoreName = opener->name};
     }
+    // parity: `SlotProvider` over the `block_entity` being filled, read as its container slots.
+    context.slotsOf = [&world, at](std::string_view source, std::string_view range) {
+        std::vector<server::world::loot::ItemStack> found;
+        server::world::Chunk* chunk = world.state().chunkIfLoaded(at[0] >> 4, at[2] >> 4);
+        const server::world::ChunkBlockEntity* entity =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(at[0] & 15, at[1], at[2] & 15);
+        if (source != "block_entity" || entity == nullptr) {
+            return found;
+        }
+        const std::string path{entity->type().path()};
+        const std::optional<std::int32_t> size = containers::sizeOf(path);
+        const std::vector<command::SlotSourceValue>& ranges = command::slotRanges();
+        const auto named = std::ranges::find(ranges, range, &command::SlotSourceValue::name);
+        if (!size.has_value() || named == ranges.end()) {
+            return found;
+        }
+        const blockInventory::Slots held = blockInventory::readFor(path, entity->data(), *size);
+        for (const std::int32_t id : named->slots) {
+            if (id >= 0 && id < *size && held[static_cast<std::size_t>(id)].has_value()) {
+                found.push_back(*held[static_cast<std::size_t>(id)]);
+            }
+        }
+        return found;
+    };
     // parity: `Vec3.atCenterOf(worldPosition)`.
     tables.prepareAt(context, world, at[0] + 0.5, at[1] + 0.5, at[2] + 0.5);
     // parity: `withOptionalRandomSeed`.
