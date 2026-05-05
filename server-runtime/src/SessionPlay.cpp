@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
@@ -17,6 +18,7 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -26,6 +28,7 @@
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
+#include <basalt/wire/nbt/Snbt.hpp>
 #include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -180,7 +183,20 @@ void ClientSession::sendStonecutterRecipes() {
 
 void ClientSession::answerForm(const wire::protocol::play::ServerboundCustomClickActionPacket& packet) {
     constexpr std::string_view kPrefix = "basalt:form/";
-    if (!packet.id.starts_with(kPrefix) || !packet.payload.has_value()) {
+    if (!packet.id.starts_with(kPrefix)) {
+        // parity: `dynamic/custom` has no server behaviour of its own; plugins are the only listeners.
+        if (options_.events != nullptr && playerSession() != nullptr) {
+            options_.events->notify(
+                &server::plugins::pluginEventTypes::playerCustomClick, [&](server::plugins::PluginEvent& event) {
+                    plugins::EventSink::player(event, *playerSession());
+                    event.set("id", packet.id);
+                    event.set("payload",
+                              packet.payload.has_value() ? wire::nbt::snbt::stringify(*packet.payload) : std::string{});
+                });
+        }
+        return;
+    }
+    if (!packet.payload.has_value()) {
         return;
     }
     const std::int32_t id = std::atoi(packet.id.c_str() + kPrefix.size());

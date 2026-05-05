@@ -27,6 +27,7 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& playerFoodChange();
 [[nodiscard]] const PluginEventType& playerLevelChange();
 [[nodiscard]] const PluginEventType& playerSignChange();
+[[nodiscard]] const PluginEventType& playerCustomClick();
 [[nodiscard]] const PluginEventType& playerBucket();
 [[nodiscard]] const PluginEventType& blockBreak();
 [[nodiscard]] const PluginEventType& blockPlace();
