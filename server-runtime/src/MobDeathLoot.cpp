@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/command/DataArguments.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -63,6 +64,57 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     }
 }
 
+// parity: `SlotRanges` ids on a player, as `Inventory` slots: hotbar, main, the hands and the armour.
+[[nodiscard]] std::optional<std::int32_t> inventorySlotOf(std::int32_t id) {
+    constexpr std::int32_t kMainhand = 98;
+    constexpr std::int32_t kOffhand = 99;
+    constexpr std::int32_t kFeet = 100;
+    constexpr std::int32_t kHead = 103;
+    if (id >= 0 && id < 9) {
+        return player::PlayerInventory::kHotbarStart + id;
+    }
+    if (id >= 9 && id < 36) {
+        return id - 9;
+    }
+    if (id == kOffhand) {
+        return player::PlayerInventory::kOffhandSlot;
+    }
+    if (id >= kFeet && id <= kHead) {
+        return player::PlayerInventory::kArmourStart + (kHead - id);
+    }
+    static_cast<void>(kMainhand);
+    return std::nullopt;
+}
+
+[[nodiscard]] std::vector<::basalt::server::world::loot::ItemStack> slotsOfPlayer(const PlayerSession& player,
+                                                                                  std::string_view slots) {
+    std::vector<::basalt::server::world::loot::ItemStack> found;
+    const std::vector<command::SlotSourceValue>& ranges = command::slotRanges();
+    const auto range = std::ranges::find(ranges, slots, &command::SlotSourceValue::name);
+    if (range == ranges.end()) {
+        return found;
+    }
+    constexpr std::int32_t kMainhand = 98;
+    for (const std::int32_t id : range->slots) {
+        const std::optional<storage::StoredItemStack>* stack = nullptr;
+        if (id == kMainhand) {
+            stack = &player.inventory.heldItem();
+        } else if (const std::optional<std::int32_t> slot = inventorySlotOf(id); slot.has_value()) {
+            stack = &player.inventory.at(*slot);
+        }
+        std::optional<Identifier> item;
+        if (stack != nullptr && stack->has_value()) {
+            if (auto parsed = Identifier::parse((*stack)->id); parsed.has_value()) {
+                item = std::move(*parsed);
+            }
+        }
+        if (item.has_value()) {
+            found.push_back({.item = *item, .count = (*stack)->count, .components = (*stack)->components});
+        }
+    }
+    return found;
+}
+
 } // namespace
 
 ::basalt::server::world::loot::LootContext MobActionSystem::deathLootContext(world::LoadedWorld& world,
@@ -122,6 +174,10 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
         if (const PlayerSession* killer = players_->get(*dead.lastHurtByPlayer); killer != nullptr) {
             context.attackingPlayer = playerFacts(*killer);
             context.luck = killer->luck();
+            context.slotsOf = [killer](std::string_view source, std::string_view slots) {
+                const bool theirs = source == "attacker" || source == "killer" || source == "attacking_player";
+                return theirs ? slotsOfPlayer(*killer, slots) : std::vector<::basalt::server::world::loot::ItemStack>{};
+            };
         }
     }
     context.killedByPlayer = context.attackingPlayer.has_value();
