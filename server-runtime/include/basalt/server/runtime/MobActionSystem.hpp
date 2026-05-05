@@ -94,6 +94,7 @@ public:
         std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::int32_t fireTicks,
                            std::string_view cause)>
             combustAllowed;
+        std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& animal)> tameAllowed;
         std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& animal,
                            const entity::ServerEntity& partner)>
             breedAllowed;

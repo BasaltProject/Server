@@ -178,6 +178,13 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
             event.set("cause", std::string{cause});
         });
     };
+    hooks.tameAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& animal) {
+        return sink.allowed(&entityTame, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            event.set("entity_id", static_cast<std::int64_t>(animal.entityId()));
+            event.set("entity_type", animal.type().toString());
+        });
+    };
     hooks.breedAllowed = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& animal,
                                  const entity::ServerEntity& partner) {
         return sink.allowed(&entityBreed, [&](PluginEvent& event) {
