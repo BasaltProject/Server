@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
+#include <basalt/server/runtime/bedrock/BedrockCarry.hpp>
 #include <basalt/server/runtime/chat/SecureChat.hpp>
 #include <basalt/server/runtime/config/UiConfigs.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -179,6 +180,9 @@ public:
             statusProvider;
         std::int32_t compressionThreshold = 256;
         wire::auth::SessionService* onlineMode = nullptr;
+        /// Takes a Bedrock player a proxy carries; null when this server does not serve Bedrock.
+        std::function<std::shared_ptr<bedrock::Carried>(const bedrock::Identity&, std::unique_ptr<bedrock::Channel>)>
+            carryBedrock;
         wire::auth::forwarding::ProxyForwarding forwarding{};
         player::PlayerRegistry* playerRegistry = nullptr;
         std::map<std::string, world::LoadedWorld*, std::less<>> worlds;
@@ -445,6 +449,8 @@ private:
 
     /// Takes on the protocol the proxy says the client speaks, as if that client had connected here itself.
     void activateEnvelope(const wire::protocol::sessionEnvelope::Open& open);
+    void closeAfterGoodbye();
+    class BedrockChannel;
 
     void sendEnvelopeControl(std::span<const std::uint8_t> control);
 
@@ -547,6 +553,7 @@ private:
     std::unique_ptr<wire::multiversion::java::JavaChain> translation_;
     /// Present from the login the proxy selected the envelope for: the next frame it sends is the Open.
     std::optional<wire::protocol::sessionEnvelope::EnvelopeEndpoint> envelope_;
+    std::shared_ptr<bedrock::Carried> carried_;
     std::optional<wire::auth::Cfb8Cipher> decryptCipher_;
     std::optional<wire::auth::Cfb8Cipher> encryptCipher_;
     bool compressionEnabled_ = false;

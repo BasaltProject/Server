@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/bedrock/BedrockTypes.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/protocol/PacketFraming.hpp>
@@ -105,6 +106,9 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
 
 ClientSession::~ClientSession() {
     streaming_.store(false);
+    if (carried_ != nullptr) {
+        carried_->end();
+    }
     outbox_.close();
     // Joined here: this thread hands work to the world's owner, so nothing below means anything while it runs.
     if (outbound_.joinable()) {
@@ -217,6 +221,9 @@ void ClientSession::run() {
         }
     }
     streaming_.store(false);
+    if (carried_ != nullptr) {
+        carried_->end();
+    }
     lifecycle_->leavePlayIfPresent();
     if (closeWhenDrained_.load()) {
         // The goodbye is still queued when the read ended on purpose.
@@ -261,6 +268,9 @@ void ClientSession::handleEnvelopeFrame(wire::io::ByteBuffer& body) {
         sendEnvelopeControl(outcome.reply);
     }
     if (outcome.closed) {
+        if (carried_ != nullptr) {
+            carried_->end();
+        }
         connection_.close();
         return;
     }
@@ -271,13 +281,83 @@ void ClientSession::handleEnvelopeFrame(wire::io::ByteBuffer& body) {
     if (outcome.packet.empty()) {
         return;
     }
+    if (carried_ != nullptr) {
+        carried_->receive(outcome.packet);
+        return;
+    }
     wire::io::ByteBuffer original;
     original.writeBytes(outcome.packet);
     handleOriginalPacket(original);
 }
 
+class ClientSession::BedrockChannel final : public bedrock::Channel {
+public:
+    BedrockChannel(ClientSession& session, int protocol) : session_(session), protocol_(protocol) {}
+
+    [[nodiscard]] int protocolVersion() const override { return protocol_; }
+
+    void sendPacket(wire::bedrock::BedrockPacket packet, std::span<const std::uint8_t> body) override {
+        if (packet == wire::bedrock::BedrockPacket::Disconnect) {
+            // The words are all the proxy needs: it writes the disconnect of the client's own protocol.
+            wire::io::ByteBuffer reader;
+            reader.writeBytes(body);
+            static_cast<void>(wire::bedrock::readVarInt(reader));
+            static_cast<void>(wire::bedrock::readVarUInt(reader));
+            const std::string message = wire::bedrock::readString(reader);
+            session_.sendEnvelopeControl(session_.envelope_->disconnect(reader.failed() ? std::string{} : message));
+            return;
+        }
+        wire::io::ByteBuffer whole{body.size() + 2};
+        wire::bedrock::writeVarUInt(whole, static_cast<std::uint32_t>(packet));
+        whole.writeBytes(body);
+        session_.frameOutgoing(whole.readable());
+    }
+
+    void flush() override {}
+
+    void close() override { session_.closeAfterGoodbye(); }
+
+private:
+    ClientSession& session_;
+    int protocol_;
+};
+
+void ClientSession::closeAfterGoodbye() {
+    closeWhenDrained_.store(true);
+    if (!outbox_.isOpen()) {
+        outbox_.close();
+        connection_.close();
+        return;
+    }
+    connection_.shutdownRead();
+}
+
 void ClientSession::activateEnvelope(const wire::protocol::sessionEnvelope::Open& open) {
     namespace envelope = wire::protocol::sessionEnvelope;
+    if (open.edition == envelope::Edition::Bedrock) {
+        const std::optional<envelope::BedrockIdentity>& who = envelope_->identity();
+        if (!who.has_value() || !options_.carryBedrock) {
+            sendEnvelopeControl(envelope_->close(envelope::CloseReason::Unsupported));
+            connection_.close();
+            return;
+        }
+        carried_ = options_.carryBedrock(bedrock::Identity{.gamertag = who->gamertag,
+                                                           .xuid = who->xuid,
+                                                           .authenticated = who->authenticated,
+                                                           .address = who->address,
+                                                           .protocol = open.protocol,
+                                                           .skinId = who->skinId,
+                                                           .resourcePatch = who->resourcePatch,
+                                                           .skinWidth = who->skinWidth,
+                                                           .skinHeight = who->skinHeight,
+                                                           .skinPixels = who->skinPixels},
+                                         std::make_unique<BedrockChannel>(*this, open.protocol));
+        if (carried_ == nullptr) {
+            sendEnvelopeControl(envelope_->close(envelope::CloseReason::Unsupported));
+            connection_.close();
+        }
+        return;
+    }
     if (open.edition != envelope::Edition::Java || !handshake_.has_value()) {
         sendEnvelopeControl(envelope_->close(envelope::CloseReason::Unsupported));
         connection_.close();
