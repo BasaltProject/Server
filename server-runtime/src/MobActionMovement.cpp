@@ -291,6 +291,14 @@ void MobActionSystem::stepSound(world::LoadedWorld& world, ServerEntity& mob, co
     };
     const steps::Sound sound = steps::ownStep(mob, stateId, above, inLava, tagged).value_or(steps::blockStep(stateId));
     movementSound(world, mob, sound.name, sound.volume, sound.pitch);
+    // parity: `Horse.playGallopSound` breathes now and then, at four times the volume of a step.
+    if (sound.name == "entity.horse.gallop" && mob.type().path() == "horse") {
+        random::RandomSource breath = freshRandom();
+        if (breath.nextInt(10) == 0) {
+            movementSound(world, mob, mob.age < 0 ? "entity.horse.breathe_baby" : "entity.horse.breathe",
+                          sound.volume * 4.0F, sound.pitch);
+        }
+    }
     // parity: `walkingStepSound`'s chime off an amethyst block, a second apart at most.
     if (tagged("minecraft:crystal_sound_blocks", stateId) && mob.tickCount >= mob.lastCrystalSoundTick + 20) {
         mob.crystalSoundIntensity *=
