@@ -50,6 +50,8 @@ struct HorseState {
     std::int32_t dashCooldown = 0;
     bool dashing = false;
     bool hurt = false;
+    /// parity: `AbstractHorse.gallopSoundCounter`, the steps taken while ridden forward.
+    std::int32_t gallopSoundCounter = 0;
 };
 
 [[nodiscard]] bool isHorse(const wire::common::Identifier& type);
