@@ -231,7 +231,8 @@ void ClientSession::answerForm(const wire::protocol::play::ServerboundCustomClic
             values[input.key] = world::dialogs::numberText(*number);
         }
     }
-    dialog->submit(static_cast<std::size_t>(*index), values);
+    // Plugins run on the owner's thread, and the answer arrives on the one that reads this connection.
+    onOwner([dialog, button = static_cast<std::size_t>(*index), values] { dialog->submit(button, values); });
 }
 
 void ClientSession::runCommand(const std::string& command, const chat::SignedArguments* signedArguments) {
