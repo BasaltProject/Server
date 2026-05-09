@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Axolotls.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/Hoglins.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
@@ -14,6 +15,7 @@
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -261,10 +263,24 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         return mob.flight.resting && random.nextInt(4) != 0 ? std::nullopt : std::optional{own("ambient")};
     }
     if (path == "strider") {
-        return mob.panicTicks > 0 ? std::nullopt : std::optional{own("ambient")};
+        // parity: `Strider.getAmbientSound`, silent while panicking or while a `TemptGoal` follows somebody.
+        constexpr double kTemptRange = 10.0;
+        bool tempted = false;
+        for (const PlayerSession* player : watchersOf(world)) {
+            const std::optional<storage::StoredItemStack>& held = player->inventory.heldItem();
+            const double dx = player->x - mob.x;
+            const double dy = player->y - mob.y;
+            const double dz = player->z - mob.z;
+            tempted =
+                tempted || (held.has_value() && player->gamemode != Gamemode::Spectator &&
+                            (held->id == "minecraft:warped_fungus" || held->id == "minecraft:warped_fungus_on_stick") &&
+                            (dx * dx) + (dy * dy) + (dz * dz) <= kTemptRange * kTemptRange);
+        }
+        return mob.panicTicks > 0 || tempted ? std::nullopt : std::optional{own("ambient")};
     }
     if (path == "creaking") {
-        return mob.targetId.has_value() ? std::nullopt : std::optional{own("ambient")};
+        // parity: `Creaking.getAmbientSound`, silent while it is active.
+        return mob.creaking != nullptr && mob.creaking->active ? std::nullopt : std::optional{own("ambient")};
     }
     if (path == "shulker") {
         // parity: `Shulker.playAmbientSound`, silent while shut.
