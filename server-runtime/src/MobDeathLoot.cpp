@@ -14,6 +14,7 @@
 
 #include <array>
 #include <expected>
+#include <map>
 #include <string_view>
 
 namespace basalt::server::runtime {
@@ -139,18 +140,36 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     }
     world::RealLootTables* tables = lootTables_;
     tables->prepareAt(context, world, dead.x, dead.y, dead.z);
-    // parity: `SlotRanges` weapon slots of the mob itself; the model holds no other equipment.
-    context.slotsOf = [held = dead.heldItem, components = dead.heldItemComponents](std::string_view source,
-                                                                                   std::string_view slots) {
-        std::vector<::basalt::server::world::loot::ItemStack> found;
-        const bool weapon = slots == "weapon" || slots == "weapon.mainhand" || slots == "weapon.*";
-        if (source == "this" && weapon && held.has_value()) {
-            if (auto item = Identifier::parse(*held); item.has_value()) {
-                found.push_back({.item = std::move(*item), .count = 1, .components = components});
+    // parity: `SlotRanges` over the mob itself: its hands, armour, body and saddle.
+    {
+        using entity::mobEquipment::Slot;
+        std::map<std::string, std::vector<::basalt::server::world::loot::ItemStack>, std::less<>> worn;
+        const auto add = [&](std::string_view name, Slot slot) {
+            if (auto stack = entity::mobEquipment::get(dead, slot); stack.has_value()) {
+                worn[std::string{name}].push_back(*stack);
             }
+        };
+        add("weapon", Slot::MainHand);
+        add("weapon.mainhand", Slot::MainHand);
+        add("weapon.offhand", Slot::OffHand);
+        add("armor.head", Slot::Head);
+        add("armor.chest", Slot::Chest);
+        add("armor.legs", Slot::Legs);
+        add("armor.feet", Slot::Feet);
+        add("armor.body", Slot::Body);
+        add("saddle", Slot::Saddle);
+        for (const Slot slot : {Slot::MainHand, Slot::OffHand}) {
+            add("weapon.*", slot);
         }
-        return found;
-    };
+        for (const Slot slot : {Slot::Head, Slot::Chest, Slot::Legs, Slot::Feet, Slot::Body}) {
+            add("armor.*", slot);
+        }
+        context.slotsOf = [worn = std::move(worn)](std::string_view source, std::string_view slots) {
+            const auto found = worn.find(slots);
+            return source == "this" && found != worn.end() ? found->second
+                                                           : std::vector<::basalt::server::world::loot::ItemStack>{};
+        };
+    }
     // parity: `damage_source_properties` reads the source of the killing blow.
     if (!dead.lastDamageCause.empty() && options_.damageTypeTags != nullptr) {
         const Identifier type = world::triggerFacts::damageTypeOf(dead.lastDamageCause);
