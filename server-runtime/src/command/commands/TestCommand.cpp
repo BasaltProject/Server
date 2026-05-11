@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/BlockTests.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/RemainingCommands.hpp>
@@ -7,6 +8,8 @@
 #include <basalt/wire/protocol/play/UiPackets.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -198,8 +201,10 @@ void DialogCommand::build(const CommandNodeBuilder& root) const {
     });
 }
 
-TestCommand::TestCommand(const world::RealTestInstances& instances, FunctionRunner& runner)
-    : Command("test", permissionLevel::kGamemasters), instances_(&instances), runner_(&runner) {}
+TestCommand::TestCommand(const world::RealTestInstances& instances, FunctionRunner& runner,
+                         std::function<BlockTests*()> blockTests)
+    : Command("test", permissionLevel::kGamemasters), instances_(&instances), runner_(&runner),
+      blockTests_(std::move(blockTests)) {}
 
 void TestCommand::build(const CommandNodeBuilder& root) const {
     const auto runAll = [this](const CommandContext& context,
@@ -210,7 +215,53 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
         }
         std::int32_t passed = 0;
         std::int32_t skipped = 0;
+        std::int32_t started = 0;
         for (const world::TestInstance& instance : selected) {
+            BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr;
+            if (blockTests != nullptr && instance.type == Identifier::vanilla("block_based") &&
+                instance.structure.has_value()) {
+                // parity: `StructureGridSpawner`, each test in its own cell beside the last.
+                constexpr std::int32_t kCell = 32;
+                const Parsed<world::LoadedWorld*> where = context.world();
+                if (!where.has_value()) {
+                    return std::unexpected{where.error()};
+                }
+                const std::array<double, 3> here = context.source().position();
+                const std::array<std::int32_t, 3> origin{
+                    static_cast<std::int32_t>(std::floor(here[0])) + (started * kCell),
+                    static_cast<std::int32_t>(std::floor(here[1])), static_cast<std::int32_t>(std::floor(here[2]))};
+                const CommandEnvironment* environment = &context.environment();
+                const world::LoadedWorld* placedIn = *where;
+                const std::optional<std::string> refused = blockTests->start(
+                    **where, instance, origin,
+                    [this, environment](const BlockTests::Report& report) {
+                        if (report.passed) {
+                            failed_.erase(report.id);
+                            environment->broadcast(Component::text("  " + report.id.toString() + ": passed in " +
+                                                                   std::to_string(report.ticks) + " tick(s)"));
+                            return;
+                        }
+                        failed_.insert(report.id);
+                        std::vector<Component> why;
+                        if (report.failure.has_value()) {
+                            why.push_back(*report.failure);
+                        }
+                        environment->broadcast(
+                            Component::text("  " + report.id.toString() + ": failed, ")
+                                .append(report.failure.has_value() ? *report.failure : Component::text("no reason")));
+                    },
+                    [environment, placedIn](const server::world::structure::StructureBoundingBox& box) {
+                        environment->syncChunks(*placedIn, box.minX, box.minZ, box.maxX, box.maxZ);
+                    });
+                if (refused.has_value()) {
+                    failed_.insert(instance.id);
+                    context.source().sendSystemMessage(
+                        Component::text("  " + instance.id.toString() + ": cannot start, " + *refused));
+                    continue;
+                }
+                started++;
+                continue;
+            }
             if (!instance.isFunctionTest() || !instance.function.has_value()) {
                 skipped++;
                 context.source().sendSystemMessage(
@@ -228,7 +279,11 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
                 context.source().sendSystemMessage(Component::text("  " + instance.id.toString() + ": failed"));
             }
         }
-        const auto ran = static_cast<std::int32_t>(selected.size()) - skipped;
+        if (started > 0) {
+            context.source().sendSystemMessage(
+                Component::text("Started " + std::to_string(started) + " block based test(s); results follow."));
+        }
+        const auto ran = static_cast<std::int32_t>(selected.size()) - skipped - started;
         context.success(Component::text("Ran " + std::to_string(ran) + " test(s): " + std::to_string(passed) +
                                         " passed, " + std::to_string(ran - passed) + " failed, " +
                                         std::to_string(skipped) + " skipped."),

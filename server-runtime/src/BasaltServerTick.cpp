@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/BlockTests.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
@@ -206,6 +207,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Drowning tick", [this, &world] { environment_->tickSubmersion(world); });
                 step("Footstep tick", [this, &world] { redstone_->tickFootsteps(world); });
                 step("Warden warning tick", [this, &world] { shriekers_->tickTrackers(world); });
+                step("Block test tick", [this, &world] { blockTests_->tick(world); });
             }
             step("Inhabited-time tick", [this, &world, &region] { redstone_->tickInhabitedTime(world, region); });
             // parity: `ServerLevel.tick`.

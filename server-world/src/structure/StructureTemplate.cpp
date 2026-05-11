@@ -67,7 +67,7 @@ const std::set<std::string, std::less<>>& blockEntityBlocks() {
                       "trial_spawner", "vault",
                       "bell",          "comparator",
                       "sculk_sensor",  "calibrated_sculk_sensor",
-                      "ender_chest"});
+                      "ender_chest",   "test_block"});
         for (const std::string& color : dyeColors()) {
             built.insert(color + "_banner");
             built.insert(color + "_wall_banner");

@@ -131,6 +131,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     hooks.teams = wiring.teams;
     hooks.progress = wiring.progress;
     hooks.functionRunner = wiring.functionRunner;
+    hooks.blockTests = wiring.blockTests;
     if (wiring.gameData != nullptr) {
         hooks.advancements = &wiring.gameData->advancements;
         hooks.recipes = &wiring.gameData->recipes;

@@ -9,6 +9,10 @@
 #include <memory>
 #include <vector>
 
+namespace basalt::server::runtime {
+class BlockTests;
+}
+
 namespace basalt::server::runtime::world {
 class RealDialogs;
 class RealEnchantments;
@@ -36,6 +40,7 @@ struct VanillaCommandHooks {
     world::RealLootTables* lootTables = nullptr;
     world::RealTestInstances* testInstances = nullptr;
     commands::FunctionRunner* functionRunner = nullptr;
+    std::function<BlockTests*()> blockTests;
 
     std::function<std::int64_t()> worldSeed;
     std::function<world::RandomSequences&()> randomSequences;

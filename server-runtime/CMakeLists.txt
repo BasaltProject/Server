@@ -173,6 +173,7 @@ basalt_module(server-runtime-core
         src/CombatFireballs.cpp
         src/CombatSpit.cpp
         src/CombatHandler.cpp
+        src/BlockTests.cpp
         src/CombatSystem.cpp
         src/CombatWindCharges.cpp
         src/ContainerClicks.cpp
