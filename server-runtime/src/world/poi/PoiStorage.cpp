@@ -1,6 +1,6 @@
-#include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/metamorph/region/AnvilRegion.hpp>
 #include <basalt/metamorph/region/LinearRegion.hpp>
+#include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>

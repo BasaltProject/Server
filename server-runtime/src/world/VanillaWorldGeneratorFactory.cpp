@@ -583,8 +583,8 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
         structure::ConcentricRingsPlacement{32, 3, 128, biomesOf(tags, "minecraft:stronghold_biased_to"),
                                             plainsEverywhere},
         seed, plainsEverywhere, biomesOf(tags, "minecraft:has_structure/stronghold"), -63, 0);
-    built->generators = terrain::TerrainStructureGenerators{.village = built->village.get(),
-                                                            .stronghold = built->strongholds.get()};
+    built->generators =
+        terrain::TerrainStructureGenerators{.village = built->village.get(), .stronghold = built->strongholds.get()};
 
     Built& world = *built;
     Generators answer;

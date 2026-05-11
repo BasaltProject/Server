@@ -1,8 +1,8 @@
-#include <expected>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
 
 #include <cstdint>
+#include <expected>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {
