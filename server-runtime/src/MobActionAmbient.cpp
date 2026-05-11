@@ -266,13 +266,13 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
         // parity: `Strider.getAmbientSound`, silent while panicking or while a `TemptGoal` follows somebody.
         constexpr double kTemptRange = 10.0;
         bool tempted = false;
-        for (const PlayerSession* player : watchersOf(world)) {
+        for (const player::PlayerSession* player : watchersOf(world)) {
             const std::optional<storage::StoredItemStack>& held = player->inventory.heldItem();
             const double dx = player->x - mob.x;
             const double dy = player->y - mob.y;
             const double dz = player->z - mob.z;
             tempted =
-                tempted || (held.has_value() && player->gamemode != Gamemode::Spectator &&
+                tempted || (held.has_value() && player->gamemode != wire::protocol::play::Gamemode::Spectator &&
                             (held->id == "minecraft:warped_fungus" || held->id == "minecraft:warped_fungus_on_stick") &&
                             (dx * dx) + (dy * dy) + (dz * dz) <= kTemptRange * kTemptRange);
         }
