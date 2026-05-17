@@ -230,6 +230,75 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
             environment->syncChunks(*where, box.minX, box.minZ, box.maxX, box.maxZ);
         };
     };
+    // parity: `RetryOptions` from the command and the flaky tries of the test itself, as `ReportGameListener` counts
+    // them.
+    using Begin = std::function<std::optional<std::string>(BlockTests::Reporter)>;
+    const auto withRetries = [this, reporterFor](const CommandContext& context, const world::TestInstance& instance,
+                                                 Begin begin) -> std::optional<std::string> {
+        struct Tally {
+            std::int32_t made = 0;
+            std::int32_t ok = 0;
+        };
+        const auto* times = context.get<std::int32_t>("numberOfTimes");
+        const auto* until = context.get<bool>("untilFailed");
+        const std::int32_t tries = times == nullptr ? 1 : *times;
+        const bool halt = until != nullptr && *until;
+        const bool flaky = times == nullptr && instance.maxAttempts > 1;
+        const std::int32_t maxAttempts = instance.maxAttempts;
+        const std::int32_t required = instance.requiredSuccesses;
+        const CommandEnvironment* environment = &context.environment();
+        const BlockTests::Reporter plain = reporterFor(environment);
+        const auto tally = std::make_shared<Tally>();
+        using Callback = std::function<void(const BlockTests::Report&)>;
+        const auto self = std::make_shared<Callback>();
+        const std::weak_ptr<Callback> weak = self;
+        const auto again = [weak, begin]() {
+            if (const std::shared_ptr<Callback> strong = weak.lock(); strong != nullptr) {
+                static_cast<void>(begin([strong](const BlockTests::Report& next) { (*strong)(next); }));
+            }
+        };
+        *self = [tally, plain, again, tries, halt, flaky, maxAttempts, required,
+                 environment](const BlockTests::Report& report) {
+            tally->made++;
+            tally->ok += report.passed ? 1 : 0;
+            if (flaky) {
+                const std::string attempt = std::to_string(tally->made) + "/" + std::to_string(maxAttempts);
+                if (report.passed && tally->ok >= required) {
+                    plain(report);
+                } else if (report.passed) {
+                    environment->broadcast(Component::text("Flaky test " + report.id.toString() +
+                                                           " succeeded, attempt: " + attempt +
+                                                           " successes: " + std::to_string(tally->ok)));
+                    again();
+                } else if (maxAttempts - tally->made + tally->ok >= required) {
+                    environment->broadcast(Component::text(
+                        "Flaky test " + report.id.toString() + " failed, attempt: " + attempt +
+                        ", successes: " + std::to_string(tally->ok) + " (" + std::to_string(required) + " required)"));
+                    again();
+                } else {
+                    BlockTests::Report spent = report;
+                    spent.failure = Component::text("Not enough successes: " + std::to_string(tally->ok) + " out of " +
+                                                    std::to_string(tally->made) + " attempts, " +
+                                                    std::to_string(required) + " required");
+                    plain(spent);
+                }
+                return;
+            }
+            if (tries != 1) {
+                std::string head = "[Run: " + std::to_string(tally->made) + ", Ok: " + std::to_string(tally->ok) +
+                                   ", Fail: " + std::to_string(tally->made - tally->ok);
+                if (tries != 0) {
+                    head += ", Left: " + std::to_string(tries - tally->made);
+                }
+                environment->broadcast(Component::text(head + "]"));
+            }
+            plain(report);
+            if (tries != 1 && (tries == 0 || tally->made < tries) && !(halt && !report.passed)) {
+                again();
+            }
+        };
+        return begin([self](const BlockTests::Report& report) { (*self)(report); });
+    };
     /// The test instance blocks around the source: all within `radius`, or only the nearest one.
     const auto blocksAround = [](const CommandContext& context, BlockTests& tests, world::LoadedWorld& world,
                                  std::int32_t radius, bool onlyNearest) {
@@ -242,7 +311,7 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
         }
         return found;
     };
-    const auto runAll = [this, reporterFor,
+    const auto runAll = [this, withRetries,
                          syncAround](const CommandContext& context,
                                      const std::vector<world::TestInstance>& selected) -> Parsed<std::int32_t> {
         if (selected.empty()) {
@@ -269,8 +338,12 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
                                                              (started * kCell),
                                                          static_cast<std::int32_t>(std::floor(here[1])),
                                                          static_cast<std::int32_t>(std::floor(here[2])) + kZOffset};
-                const std::optional<std::string> refused = blockTests->start(
-                    **where, instance, origin, reporterFor(&context.environment()), syncAround(context, **where));
+                const std::optional<std::string> refused =
+                    withRetries(context, instance,
+                                [blockTests, world = *where, instance, origin,
+                                 placed = syncAround(context, **where)](BlockTests::Reporter reporter) {
+                                    return blockTests->start(*world, instance, origin, std::move(reporter), placed);
+                                });
                 if (refused.has_value()) {
                     failed_.insert(instance.id);
                     context.source().sendSystemMessage(
@@ -349,7 +422,7 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
     // parity: `TestFinder.Builder.allNearby` (15), `nearest` and `lookedAt` over the test instance blocks in the world.
     constexpr std::int32_t kNearby = 15;
     constexpr std::int32_t kFull = 250;
-    const auto runBlocks = [this, reporterFor, syncAround, blocksAround](const CommandContext& context,
+    const auto runBlocks = [this, withRetries, syncAround, blocksAround](const CommandContext& context,
                                                                          std::int32_t radius,
                                                                          bool onlyNearest) -> Parsed<std::int32_t> {
         BlockTests* blockTests = blockTests_ ? blockTests_() : nullptr;
@@ -367,8 +440,15 @@ void TestCommand::build(const CommandNodeBuilder& root) const {
         }
         std::int32_t started = 0;
         for (const BlockTests::Found& block : found) {
+            const world::TestInstance* known = instances_->find(block.test);
             const std::optional<std::string> refused =
-                blockTests->restart(**where, block, reporterFor(&context.environment()), syncAround(context, **where));
+                known == nullptr
+                    ? std::optional<std::string>{"there is no test " + block.test.toString()}
+                    : withRetries(context, *known,
+                                  [blockTests, world = *where, block,
+                                   placed = syncAround(context, **where)](BlockTests::Reporter reporter) {
+                                      return blockTests->restart(*world, block, std::move(reporter), placed);
+                                  });
             if (refused.has_value()) {
                 context.source().sendSystemMessage(
                     Component::text("  " + block.test.toString() + ": cannot start, " + *refused));

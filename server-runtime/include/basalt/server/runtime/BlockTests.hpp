@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/RealTestEnvironments.hpp>
 #include <basalt/server/runtime/world/RealTestInstances.hpp>
 #include <basalt/server/runtime/world/StructureTemplates.hpp>
 #include <basalt/server/world/structure/StructureBounds.hpp>
@@ -9,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -24,6 +26,10 @@ class PlayerSession;
 
 namespace world {
 class LoadedWorld;
+}
+
+namespace command {
+class CommandEnvironment;
 }
 
 /// parity: `BlockBasedTestInstance` run by `GameTestRunner`: a `test_instance_block`, its template with test blocks
@@ -42,6 +48,7 @@ public:
     using Placed = std::function<void(const server::world::structure::StructureBoundingBox&)>;
 
     BlockTests(world::StructureTemplates& templates, const world::RealTestInstances& instances,
+               const world::RealTestEnvironments& environments, const command::CommandEnvironment& environment,
                BlockChangeBroadcaster& broadcaster, player::PlayerRegistry& players);
 
     /// Puts a test instance block at `blockAt` with the template beside it and starts counting; why it cannot, if so.
@@ -54,7 +61,7 @@ public:
     [[nodiscard]] bool running() const noexcept { return !runs_.empty(); }
 
     /// Forgets every run without a report. parity: `/test stop`.
-    void stopAll() { runs_.clear(); }
+    void stopAll();
 
     /// Empties the space of every test instance block within `radius` of a point and answers how many.
     /// parity: `/test clearall`.
@@ -97,6 +104,7 @@ private:
         Layout layout;
         std::int32_t ticks = 0;
         Reporter reporter;
+        std::string environmentKey;
     };
 
     enum class Mode : std::uint8_t { Start, Log, Fail, Accept };
@@ -109,6 +117,8 @@ private:
     [[nodiscard]] std::optional<std::string> place(world::LoadedWorld& world, const world::TestInstance& instance,
                                                    const std::array<std::int32_t, 3>& blockAt, Layout& layout,
                                                    bool block);
+    void enter(world::LoadedWorld& world, Run& run);
+    void leave(Run& run);
     void finish(Run& run, bool passed, std::optional<wire::text::Component> failure);
     void powerStart(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at);
     void setBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
@@ -122,6 +132,15 @@ private:
 
     world::StructureTemplates* templates_;
     const world::RealTestInstances* instances_;
+    const world::RealTestEnvironments* environments_;
+    const command::CommandEnvironment* environment_;
+
+    struct Active {
+        std::function<void()> undo;
+        std::int32_t users = 0;
+    };
+
+    std::map<std::string, Active> active_;
     BlockChangeBroadcaster* broadcaster_;
     player::PlayerRegistry* players_;
     std::vector<Run> runs_;

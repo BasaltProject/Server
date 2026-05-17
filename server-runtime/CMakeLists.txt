@@ -393,6 +393,7 @@ basalt_module(server-runtime-core
         src/world/DialogNbt.cpp
         src/world/Dialogs.cpp
         src/world/RealDialogs.cpp
+        src/world/RealTestEnvironments.cpp
         src/world/RealTestInstances.cpp
         src/world/BlockInteractions.cpp
         src/world/ProjectileHits.cpp
