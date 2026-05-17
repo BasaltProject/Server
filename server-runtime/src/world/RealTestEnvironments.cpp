@@ -65,13 +65,14 @@ RealTestEnvironments::RealTestEnvironments(const RealTestInstances::Jar& jar, wi
 }
 
 std::function<void()> RealTestEnvironments::activate(const JsonValue& definition, LoadedWorld& world,
-                                                     const command::CommandEnvironment& environment) const {
-    return apply(definition, world, environment, 0);
+                                                     const command::CommandEnvironment& environment,
+                                                     const RunFunction& runFunction) const {
+    return apply(definition, world, environment, runFunction, 0);
 }
 
 std::function<void()> RealTestEnvironments::apply(const JsonValue& definition, LoadedWorld& world,
                                                   const command::CommandEnvironment& environment,
-                                                  const int depth) const {
+                                                  const RunFunction& runFunction, const int depth) const {
     if (depth > kMaxDepth) {
         return {};
     }
@@ -81,7 +82,7 @@ std::function<void()> RealTestEnvironments::apply(const JsonValue& definition, L
         if (found == named_.end()) {
             return {};
         }
-        return apply(found->second, world, environment, depth + 1);
+        return apply(found->second, world, environment, runFunction, depth + 1);
     }
     const JsonObject* object = definition.get<JsonObject>();
     const std::string* typeName = object == nullptr ? nullptr : stringAt(*object, "type");
@@ -96,7 +97,7 @@ std::function<void()> RealTestEnvironments::apply(const JsonValue& definition, L
         const JsonValue* list = object->find("definitions");
         const auto* items = list == nullptr ? nullptr : list->get<std::vector<JsonValue>>();
         for (const JsonValue& item : items == nullptr ? std::vector<JsonValue>{} : *items) {
-            if (std::function<void()> one = apply(item, world, environment, depth + 1); one) {
+            if (std::function<void()> one = apply(item, world, environment, runFunction, depth + 1); one) {
                 undone.push_back(std::move(one));
             }
         }
@@ -172,7 +173,24 @@ std::function<void()> RealTestEnvironments::apply(const JsonValue& definition, L
             }
         };
     }
-    // `function` and `timeline_attributes` need the function runner and the timelines, which a test run lacks.
+    if (type == "function") {
+        const auto named = [&object](std::string_view key) -> std::optional<Identifier> {
+            const std::string* text = stringAt(*object, key);
+            std::expected<Identifier, wire::common::IdentifierError> id =
+                text == nullptr ? std::unexpected{wire::common::IdentifierError{}} : Identifier::parse(*text);
+            return id.has_value() ? std::optional{*id} : std::nullopt;
+        };
+        const std::optional<Identifier> setup = named("setup");
+        const std::optional<Identifier> teardown = named("teardown");
+        if (setup.has_value() && runFunction) {
+            runFunction(*setup);
+        }
+        if (!teardown.has_value() || !runFunction) {
+            return {};
+        }
+        return [teardown, runFunction] { runFunction(*teardown); };
+    }
+    // `timeline_attributes` swaps the layers of an environment attribute system that this server does not keep.
     logger_.debug([&type] { return "A test environment of type " + type + " is not applied."; });
     return {};
 }

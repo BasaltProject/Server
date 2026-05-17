@@ -26,12 +26,16 @@ public:
     explicit RealTestEnvironments(const RealTestInstances::Jar& jar,
                                   wire::common::Logger logger = wire::common::Logger{"Tests"});
 
+    using RunFunction = std::function<void(const wire::common::Identifier& id)>;
+
     [[nodiscard]] std::function<void()> activate(const wire::common::JsonValue& definition, LoadedWorld& world,
-                                                 const command::CommandEnvironment& environment) const;
+                                                 const command::CommandEnvironment& environment,
+                                                 const RunFunction& runFunction) const;
 
 private:
     [[nodiscard]] std::function<void()> apply(const wire::common::JsonValue& definition, LoadedWorld& world,
-                                              const command::CommandEnvironment& environment, int depth) const;
+                                              const command::CommandEnvironment& environment,
+                                              const RunFunction& runFunction, int depth) const;
 
     wire::common::Logger logger_;
     std::map<wire::common::Identifier, wire::common::JsonValue> named_;

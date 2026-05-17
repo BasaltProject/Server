@@ -225,6 +225,7 @@ private:
 
     /// parity: `ServerFunctionManager.tick` and the scheduled functions of `TimerQueue`.
     void tickFunctions();
+    void runFunctionById(const wire::common::Identifier& id);
 
     /// parity: `PlayerList.reloadResources`.
     void resyncAfterReload();
