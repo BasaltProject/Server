@@ -20,7 +20,7 @@ class BlockChangeBroadcaster;
 namespace player {
 class PlayerRegistry;
 class PlayerSession;
-}
+} // namespace player
 
 namespace world {
 class LoadedWorld;
@@ -61,6 +61,22 @@ public:
     [[nodiscard]] std::int32_t clearAll(world::LoadedWorld& world, std::int32_t centerX, std::int32_t centerZ,
                                         std::int32_t radius);
 
+    struct Found {
+        wire::common::Identifier test;
+        std::array<std::int32_t, 3> at{};
+    };
+
+    /// The test instance blocks in the loaded chunks within `radius` of a point, nearest first.
+    [[nodiscard]] std::vector<Found> find(world::LoadedWorld& world, std::int32_t centerX, std::int32_t centerY,
+                                          std::int32_t centerZ, std::int32_t radius) const;
+
+    /// Starts the test a block already holds again, in place.
+    [[nodiscard]] std::optional<std::string> restart(world::LoadedWorld& world, const Found& block, Reporter reporter,
+                                                     const Placed& placed);
+
+    /// Puts the test back as its template has it and clears the block's status. parity: `resetTest`.
+    [[nodiscard]] std::optional<std::string> reset(world::LoadedWorld& world, const Found& block, const Placed& placed);
+
     /// Puts an empty test instance block of the given size at `blockAt`. parity: `/test create`.
     [[nodiscard]] std::optional<std::string> create(world::LoadedWorld& world, const wire::common::Identifier& id,
                                                     const std::array<std::int32_t, 3>& blockAt,
@@ -89,6 +105,10 @@ private:
                                   const std::string& rotation, std::int32_t padding) const;
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> blocksIn(world::LoadedWorld& world, const Run& run,
                                                                     Mode mode) const;
+    /// Clears the space, puts the template and the block there; the layout it used, or why it could not.
+    [[nodiscard]] std::optional<std::string> place(world::LoadedWorld& world, const world::TestInstance& instance,
+                                                   const std::array<std::int32_t, 3>& blockAt, Layout& layout,
+                                                   bool block);
     void finish(Run& run, bool passed, std::optional<wire::text::Component> failure);
     void powerStart(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at);
     void setBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
