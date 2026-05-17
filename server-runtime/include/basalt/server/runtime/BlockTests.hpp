@@ -19,18 +19,21 @@ class BlockChangeBroadcaster;
 
 namespace player {
 class PlayerRegistry;
+class PlayerSession;
 }
 
 namespace world {
 class LoadedWorld;
 }
 
-/// parity: `BlockBasedTestInstance` run by `GameTestRunner`: a template with test blocks, started and watched per tick.
+/// parity: `BlockBasedTestInstance` run by `GameTestRunner`: a `test_instance_block`, its template with test blocks
+/// inside a ring of barriers, started and watched per tick.
 class BlockTests {
 public:
     struct Report {
         wire::common::Identifier id;
         bool passed = false;
+        bool required = true;
         std::int32_t ticks = 0;
         std::optional<wire::text::Component> failure;
     };
@@ -38,11 +41,12 @@ public:
     using Reporter = std::function<void(const Report&)>;
     using Placed = std::function<void(const server::world::structure::StructureBoundingBox&)>;
 
-    BlockTests(world::StructureTemplates& templates, BlockChangeBroadcaster& broadcaster,
-               player::PlayerRegistry& players);
+    BlockTests(world::StructureTemplates& templates, const world::RealTestInstances& instances,
+               BlockChangeBroadcaster& broadcaster, player::PlayerRegistry& players);
 
+    /// Puts a test instance block at `blockAt` with the template beside it and starts counting; why it cannot, if so.
     [[nodiscard]] std::optional<std::string> start(world::LoadedWorld& world, const world::TestInstance& instance,
-                                                   const std::array<std::int32_t, 3>& origin, Reporter reporter,
+                                                   const std::array<std::int32_t, 3>& blockAt, Reporter reporter,
                                                    const Placed& placed);
 
     void tick(world::LoadedWorld& world);
@@ -52,36 +56,55 @@ public:
     /// Forgets every run without a report. parity: `/test stop`.
     void stopAll() { runs_.clear(); }
 
-    /// Empties the ground every test has been placed on in `world` and answers how many. parity: `/test clearall`.
-    [[nodiscard]] std::int32_t clearAll(world::LoadedWorld& world);
+    /// Empties the space of every test instance block within `radius` of a point and answers how many.
+    /// parity: `/test clearall`.
+    [[nodiscard]] std::int32_t clearAll(world::LoadedWorld& world, std::int32_t centerX, std::int32_t centerZ,
+                                        std::int32_t radius);
+
+    /// Puts an empty test instance block of the given size at `blockAt`. parity: `/test create`.
+    [[nodiscard]] std::optional<std::string> create(world::LoadedWorld& world, const wire::common::Identifier& id,
+                                                    const std::array<std::int32_t, 3>& blockAt,
+                                                    const std::array<std::int32_t, 3>& size, const Placed& placed);
 
 private:
+    struct Layout {
+        server::world::structure::StructureBoundingBox structure;
+        server::world::structure::StructureBoundingBox test;
+        std::array<std::int32_t, 3> startCorner{};
+    };
+
     struct Run {
         world::TestInstance instance;
         std::string worldName;
-        server::world::structure::StructureBoundingBox box;
+        std::array<std::int32_t, 3> blockAt{};
+        std::array<std::int32_t, 3> size{1, 1, 1};
+        Layout layout;
         std::int32_t ticks = 0;
         Reporter reporter;
     };
 
     enum class Mode : std::uint8_t { Start, Log, Fail, Accept };
 
+    [[nodiscard]] Layout layoutOf(const std::array<std::int32_t, 3>& blockAt, const std::array<std::int32_t, 3>& size,
+                                  const std::string& rotation, std::int32_t padding) const;
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> blocksIn(world::LoadedWorld& world, const Run& run,
                                                                     Mode mode) const;
     void finish(Run& run, bool passed, std::optional<wire::text::Component> failure);
     void powerStart(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at);
+    void setBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
+    void encase(world::LoadedWorld& world, const Layout& layout, bool skyAccess, bool barriers);
+    void clearSpace(world::LoadedWorld& world, const server::world::structure::StructureBoundingBox& box);
+    void writeBlockEntity(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
+                          const wire::common::Identifier& test, const std::array<std::int32_t, 3>& size,
+                          const std::string& rotation, const std::string& status,
+                          const std::optional<wire::text::Component>& error);
+    [[nodiscard]] std::vector<player::PlayerSession*> watchersOf(const world::LoadedWorld& world) const;
 
     world::StructureTemplates* templates_;
+    const world::RealTestInstances* instances_;
     BlockChangeBroadcaster* broadcaster_;
     player::PlayerRegistry* players_;
-
-    struct Placement {
-        std::string worldName;
-        server::world::structure::StructureBoundingBox box;
-    };
-
     std::vector<Run> runs_;
-    std::vector<Placement> placed_;
     std::vector<Report> finished_;
 };
 

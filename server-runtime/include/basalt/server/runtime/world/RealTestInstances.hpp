@@ -22,6 +22,8 @@ struct TestInstance {
     std::optional<wire::common::Identifier> structure;
     std::int32_t setupTicks = 0;
     std::string rotation = "none";
+    std::int32_t padding = 0;
+    bool skyAccess = false;
 
     [[nodiscard]] bool isFunctionTest() const;
 };
