@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/StructureBlocks.hpp>
 #include <basalt/server/world/structure/StructureTemplate.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
 
@@ -185,7 +186,7 @@ void BlockTests::encase(world::LoadedWorld& world, const Layout& layout, const b
 void BlockTests::writeBlockEntity(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
                                   const Identifier& test, const std::array<std::int32_t, 3>& size,
                                   const std::string& rotation, const std::string& status,
-                                  const std::optional<Component>& error) {
+                                  const std::optional<Component>& error, const bool ignoreEntities) {
     server::world::Chunk* chunk = world.state().chunkIfLoaded(at[0] >> 4, at[2] >> 4);
     if (chunk == nullptr) {
         return;
@@ -195,7 +196,7 @@ void BlockTests::writeBlockEntity(world::LoadedWorld& world, const std::array<st
     data.putString("test", test.toString());
     data.putIntArray("size", {size[0], size[1], size[2]});
     data.putString("rotation", rotation);
-    data.putBoolean("ignore_entities", false);
+    data.putBoolean("ignore_entities", ignoreEntities);
     data.putString("status", status);
     if (error.has_value()) {
         data.set("error_message", wire::text::componentNbt::serialize(*error));
@@ -563,6 +564,69 @@ void BlockTests::stopAll() {
         leave(run);
     }
     runs_.clear();
+}
+
+std::optional<Component> BlockTests::describe(const Identifier& test) const {
+    const world::TestInstance* instance = instances_->find(test);
+    if (instance == nullptr) {
+        return std::nullopt;
+    }
+    // parity: three rows, the type, the structure and the batch, each in blue after its label.
+    const auto row = [](const std::string& key, const std::string& value) {
+        return Component::translatable(key, {Component::text(value)}).append(Component::text("\n"));
+    };
+    const std::string environment =
+        instance->environment.has_value() && instance->environment->get<std::string>() != nullptr
+            ? *instance->environment->get<std::string>()
+            : "minecraft:default";
+    return row("test_instance.description.type", "block_based")
+        .append(row("test_instance.description.structure",
+                    instance->structure.has_value() ? instance->structure->toString() : std::string{}))
+        .append(row("test_instance.description.batch", environment));
+}
+
+std::optional<std::array<std::int32_t, 3>> BlockTests::sizeOf(const Identifier& test) const {
+    const world::TestInstance* instance = instances_->find(test);
+    const structure::StructureTemplate* found =
+        instance == nullptr || !instance->structure.has_value() ? nullptr : templates_->find(*instance->structure);
+    if (found == nullptr) {
+        return std::nullopt;
+    }
+    return std::array<std::int32_t, 3>{found->size().x, found->size().y, found->size().z};
+}
+
+void BlockTests::setBlockData(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at, const Identifier& test,
+                              const std::array<std::int32_t, 3>& size, const std::int32_t rotation,
+                              const bool ignoreEntities) {
+    static constexpr std::array<std::string_view, 4> kRotations{"none", "clockwise_90", "180", "counterclockwise_90"};
+    writeBlockEntity(world, at, test, size, std::string{kRotations[static_cast<std::size_t>(rotation & 3)]}, "cleared",
+                     std::nullopt, ignoreEntities);
+}
+
+std::optional<std::string> BlockTests::save(world::LoadedWorld& world, const Found& block, const bool exportToFiles) {
+    const world::TestInstance* instance = instances_->find(block.test);
+    if (instance == nullptr || !instance->structure.has_value()) {
+        return "Unable to save the test at " + std::to_string(block.at[0]) + ", " + std::to_string(block.at[1]) + ", " +
+               std::to_string(block.at[2]);
+    }
+    server::world::Chunk* chunk = world.state().chunkIfLoaded(block.at[0] >> 4, block.at[2] >> 4);
+    const server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(block.at[0] & 15, block.at[1], block.at[2] & 15);
+    const NbtCompound* data = entity == nullptr ? nullptr : entity->data().getCompound("data");
+    const auto size = data == nullptr ? std::vector<std::int32_t>{} : data->getIntArray("size");
+    if (size.size() != 3) {
+        return "The test block holds no size";
+    }
+    const Layout layout =
+        layoutOf(block.at, {size[0], size[1], size[2]}, std::string{data->getString("rotation")}, instance->padding);
+    const NbtCompound captured = world::structureBlocks::capture(
+        world.state(), {layout.structure.minX, layout.structure.minY, layout.structure.minZ},
+        {size[0], size[1], size[2]}, !data->getBoolean("ignore_entities"));
+    templates_->store(*instance->structure, captured, true);
+    if (exportToFiles) {
+        return "Test structure exporting is disabled";
+    }
+    return std::nullopt;
 }
 
 } // namespace basalt::server::runtime

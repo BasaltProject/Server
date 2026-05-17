@@ -97,6 +97,8 @@ public:
 
     /// parity: `handleSetStructureBlock`, for a player allowed game master blocks.
     void setStructureBlock(const wire::protocol::play::SetStructureBlockPacket& packet);
+    void setTestBlock(const wire::protocol::play::SetTestBlockPacket& packet);
+    void testInstanceBlockAction(const wire::protocol::play::TestInstanceBlockActionPacket& packet);
 
     /// parity: `Level.updateNeighborsAt`, which is what makes a torch fall off a broken wall.
     void notifyNeighbours(const wire::protocol::play::BlockPos& pos);
