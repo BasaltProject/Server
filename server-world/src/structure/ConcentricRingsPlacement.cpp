@@ -25,6 +25,15 @@ ConcentricRingsPlacement::ringPositions(const std::int64_t seed) const {
                                random::RandomSource& random) -> std::optional<std::pair<std::int32_t, std::int32_t>> {
         const std::int32_t originX = (chunkX << 4) + 8;
         const std::int32_t originZ = (chunkZ << 4) + 8;
+        if (fixedBiomeSource_) {
+            // parity: `FixedBiomeSource.findBiomeHorizontal` draws one random block position in the square.
+            if (!preferredBiomes_.contains(noiseBiomeAt_(0, 0, 0))) {
+                return std::nullopt;
+            }
+            const std::int32_t blockX = originX - kSearchRadius + random.nextInt(kSearchRadius * 2 + 1);
+            const std::int32_t blockZ = originZ - kSearchRadius + random.nextInt(kSearchRadius * 2 + 1);
+            return std::pair{blockX >> 4, blockZ >> 4};
+        }
         const std::int32_t centreQuartX = originX >> 2;
         const std::int32_t centreQuartZ = originZ >> 2;
         const std::int32_t radius = kSearchRadius >> 2;
