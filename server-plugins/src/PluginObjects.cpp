@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/plugins/PluginValue.hpp>
 
 #include <charconv>
 #include <cmath>
@@ -59,23 +60,15 @@ constexpr std::int32_t kFadeOut = 20;
     return out;
 }
 
-void pushStored(LuaArgs& lua, const std::string& stored) {
-    std::int64_t whole = 0;
-    const auto* end = stored.data() + stored.size();
-    if (std::from_chars(stored.data(), end, whole).ptr == end) {
-        lua.pushInteger(whole);
-        return;
+[[nodiscard]] std::optional<std::string> storedValue(LuaArgs& args) {
+    if (args.isNil(3)) {
+        return std::nullopt;
     }
-    double real = 0.0;
-    if (std::from_chars(stored.data(), end, real).ptr == end) {
-        lua.pushNumber(real);
-        return;
+    std::optional<std::string> encoded = wire::plugins::encodeValue(args, 3);
+    if (!encoded.has_value()) {
+        args.raise("a stored value is a boolean, a number or a string");
     }
-    if (stored == "true" || stored == "false") {
-        lua.pushBoolean(stored == "true");
-        return;
-    }
-    lua.pushString(stored);
+    return encoded;
 }
 } // namespace
 
@@ -316,14 +309,14 @@ void pushPlayerData(LuaArgs& lua, PluginStorage& storage, std::string pluginId, 
         if (!stored.has_value()) {
             args.pushNil();
         } else {
-            pushStored(args, *stored);
+            wire::plugins::pushValue(args, *stored);
         }
         return 1;
     });
     lua.setField("__index");
     wire::lua::pushHostFunction(lua, "data.newindex", [store, pluginId, uuid](LuaArgs& args) {
         const std::string key = args.checkString(2);
-        store->setPlayerValue(pluginId, uuid, key, args.isNil(3) ? std::nullopt : std::optional{args.toText(3)});
+        store->setPlayerValue(pluginId, uuid, key, storedValue(args));
         return 0;
     });
     lua.setField("__newindex");
