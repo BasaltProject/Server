@@ -572,12 +572,18 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
         upgraded.putInt("DataVersion", kDataVersion);
         return read(upgraded, bounds);
     }
-    const std::optional<ChunkStage> stage = stageOf(tag.getString("Status"));
+    // parity: `ChunkHeightAndBiomeFix` saves an old full chunk as empty with `below_zero_retrogen`, and the game then
+    // generates only the layers under zero; the terrain above is the old one.
+    const bool retrogen =
+        tag.getString("Status") == "minecraft:empty" && tag.getCompound("below_zero_retrogen") != nullptr;
+    const std::optional<ChunkStage> stage =
+        retrogen ? std::optional{ChunkStage::Full} : stageOf(tag.getString("Status"));
     if (!stage.has_value()) {
         return std::unexpected(ChunkNbtError{"saved before it had terrain", false});
     }
     Chunk chunk{tag.getInt("xPos"), tag.getInt("zPos"), bounds};
     chunk.setStage(*stage);
+    chunk.setNeedsRetrogen(retrogen && bounds.minY() == -64);
     if (*stage == ChunkStage::Full) {
         chunk.markLoadedComplete();
     }
@@ -671,9 +677,9 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
             const std::int32_t worldZ = tickTag->getInt("z");
             const std::int32_t localX = worldX - chunk.chunkX() * 16;
             const std::int32_t localZ = worldZ - chunk.chunkZ() * 16;
+            // A tick for a neighbour's block, which an old chunk may keep, belongs to that chunk's own list.
             if (!isInsideChunk(localX, y, localZ, bounds)) {
-                return std::unexpected(ChunkNbtError{
-                    std::format("scheduled tick {} at ({},{},{}) is outside its chunk", type, worldX, y, worldZ)});
+                continue;
             }
             const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(type);
             if (!id.has_value()) {
@@ -704,8 +710,13 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     }
 
     std::vector<NbtCompound> entities;
-    if (const NbtList* saved = tag.getList(kEntitiesKey)) {
-        for (const NbtTag& entry : *saved) {
+    // parity: a chunk saved before 1.17 holds its entities itself, under the plain `entities` key once upgraded.
+    const NbtList* savedEntities = tag.getList(kEntitiesKey);
+    if (savedEntities == nullptr) {
+        savedEntities = tag.getList("entities");
+    }
+    if (savedEntities != nullptr) {
+        for (const NbtTag& entry : *savedEntities) {
             if (const NbtCompound* entity = entry.get<NbtCompound>()) {
                 entities.push_back(*entity);
             }

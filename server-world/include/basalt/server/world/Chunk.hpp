@@ -134,6 +134,11 @@ public:
 
     void markLoadedComplete() noexcept { loadedComplete_ = true; }
 
+    /// A chunk saved before 1.18 keeps its terrain above zero and still needs the layers below it made.
+    [[nodiscard]] bool needsRetrogen() const noexcept { return needsRetrogen_; }
+
+    void setNeedsRetrogen(bool needed) noexcept { needsRetrogen_ = needed; }
+
     void setSavedEntities(std::vector<wire::nbt::NbtCompound> entities);
 
     [[nodiscard]] std::vector<wire::nbt::NbtCompound> takeSavedEntities();
@@ -281,6 +286,7 @@ private:
     std::vector<ChunkGeneratedEntity> generatedEntities_;
     std::vector<wire::nbt::NbtCompound> savedEntities_;
     bool loadedComplete_ = false;
+    bool needsRetrogen_ = false;
     std::vector<ChunkScheduledTick> blockTicks_;
     std::vector<ChunkScheduledTick> fluidTicks_;
     structure::ChunkStructures structures_;

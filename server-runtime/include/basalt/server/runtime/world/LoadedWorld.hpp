@@ -236,6 +236,7 @@ private:
     [[nodiscard]] server::world::Chunk generateChunk(std::int32_t chunkX, std::int32_t chunkZ);
 
     [[nodiscard]] std::optional<server::world::Chunk> loadOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ);
+    void restoreBelowZero(server::world::Chunk& chunk);
 
     [[nodiscard]] std::pair<std::int32_t, std::int32_t> climateSpawnChunk();
 
@@ -279,6 +280,8 @@ private:
     PortalIndex portals_;
     /// Declared ahead of the queue whose workers step it, so it outlives them.
     std::unique_ptr<server::world::terrain::ProtoChunks> protoChunks_;
+    std::function<server::world::terrain::realTerrainGenerator::GeneratedTerrain(std::int32_t, std::int32_t)>
+        terrainOf_;
     WorldState state_;
     ChunkGenerationQueue generationQueue_;
     std::array<double, 3> spawn_{8.5, 64.0, 8.5};
