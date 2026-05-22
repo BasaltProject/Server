@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealTestEnvironments.hpp>
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -25,6 +26,68 @@ constexpr int kMaxDepth = 8;
 [[nodiscard]] const std::string* stringAt(const JsonObject& object, std::string_view key) {
     const JsonValue* value = object.find(key);
     return value == nullptr ? nullptr : value->get<std::string>();
+}
+
+/// parity: a `Timeline` track sampled at `ticks` of its period, constant between keyframes unless it eases linearly.
+[[nodiscard]] std::optional<double> sampleTrack(const JsonObject& track, std::int64_t clockTicks, std::int64_t period) {
+    const JsonValue* list = track.find("keyframes");
+    const auto* frames = list == nullptr ? nullptr : list->get<std::vector<JsonValue>>();
+    if (frames == nullptr || frames->empty()) {
+        return std::nullopt;
+    }
+
+    struct Frame {
+        std::int64_t ticks;
+        double value;
+        bool numeric;
+    };
+
+    std::vector<Frame> parsed;
+    for (const JsonValue& frame : *frames) {
+        const JsonObject* object = frame.get<JsonObject>();
+        const JsonValue* value = object == nullptr ? nullptr : object->find("value");
+        const JsonValue* ticks = object == nullptr ? nullptr : object->find("ticks");
+        if (value == nullptr || ticks == nullptr) {
+            continue;
+        }
+        const std::int64_t at = ticks->get<std::int64_t>() != nullptr ? *ticks->get<std::int64_t>()
+                                : ticks->get<double>() != nullptr     ? static_cast<std::int64_t>(*ticks->get<double>())
+                                                                      : 0;
+        if (const bool* flag = value->get<bool>(); flag != nullptr) {
+            parsed.push_back({at, *flag ? 1.0 : 0.0, false});
+        } else if (const double* real = value->get<double>(); real != nullptr) {
+            parsed.push_back({at, *real, true});
+        } else if (const std::int64_t* whole = value->get<std::int64_t>(); whole != nullptr) {
+            parsed.push_back({at, static_cast<double>(*whole), true});
+        }
+    }
+    if (parsed.empty()) {
+        return std::nullopt;
+    }
+    std::ranges::sort(parsed, {}, &Frame::ticks);
+    const std::int64_t now = period > 0 ? clockTicks % period : clockTicks;
+    const Frame* before = &parsed.back();
+    const Frame* after = &parsed.front();
+    for (const Frame& frame : parsed) {
+        if (frame.ticks <= now) {
+            before = &frame;
+        }
+    }
+    for (auto frame = parsed.rbegin(); frame != parsed.rend(); ++frame) {
+        if (frame->ticks > now) {
+            after = &*frame;
+        }
+    }
+    const std::string* ease = stringAt(track, "ease");
+    if (!before->numeric || (ease != nullptr && withoutNamespace(*ease) == "constant") || before == after) {
+        return before->value;
+    }
+    const std::int64_t span = (after->ticks - before->ticks + (period > 0 ? period : 0)) % (period > 0 ? period : 1);
+    if (period <= 0 || span == 0) {
+        return before->value;
+    }
+    const double progress = static_cast<double>((now - before->ticks + period) % period) / static_cast<double>(span);
+    return before->value + (after->value - before->value) * progress;
 }
 
 /// parity: `TestEnvironmentDefinition.Weather.Type`.
@@ -51,6 +114,14 @@ RealTestEnvironments::RealTestEnvironments(const RealTestInstances::Jar& jar, wi
     : logger_(std::move(logger)) {
     if (!jar.entriesUnder || !jar.readText) {
         return;
+    }
+    for (const auto& [id, entry] : datapack::dataFiles(jar.entriesUnder, "timeline")) {
+        const std::optional<std::string> text = jar.readText(entry);
+        std::expected<JsonValue, wire::common::JsonError> parsed =
+            text.has_value() ? wire::common::parseJson(*text) : std::unexpected{wire::common::JsonError{}};
+        if (parsed.has_value()) {
+            timelines_.insert_or_assign(id, std::move(*parsed));
+        }
     }
     for (const auto& [id, entry] : datapack::dataFiles(jar.entriesUnder, "test_environment")) {
         const std::optional<std::string> text = jar.readText(entry);
@@ -190,7 +261,44 @@ std::function<void()> RealTestEnvironments::apply(const JsonValue& definition, L
         }
         return [teardown, runFunction] { runFunction(*teardown); };
     }
-    // `timeline_attributes` swaps the layers of an environment attribute system that this server does not keep.
+    if (type == "timeline_attributes") {
+        const JsonValue* list = object->find("timelines");
+        const auto* items = list == nullptr ? nullptr : list->get<std::vector<JsonValue>>();
+        auto before = std::make_shared<std::vector<std::pair<std::string, std::optional<double>>>>();
+        for (const JsonValue& item : items == nullptr ? std::vector<JsonValue>{} : *items) {
+            const JsonValue* held = &item;
+            if (const std::string* name = item.get<std::string>(); name != nullptr) {
+                const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(*name);
+                const auto found = id.has_value() ? timelines_.find(*id) : timelines_.end();
+                held = found == timelines_.end() ? nullptr : &found->second;
+            }
+            const JsonObject* timeline = held == nullptr ? nullptr : held->get<JsonObject>();
+            const JsonValue* tracks = timeline == nullptr ? nullptr : timeline->find("tracks");
+            const JsonObject* map = tracks == nullptr ? nullptr : tracks->get<JsonObject>();
+            if (map == nullptr) {
+                continue;
+            }
+            std::int64_t period = 0;
+            if (const JsonValue* length = timeline->find("period_ticks"); length != nullptr) {
+                period = length->get<std::int64_t>() != nullptr ? *length->get<std::int64_t>() : 0;
+            }
+            for (std::size_t at = 0; at < map->names().size(); ++at) {
+                const JsonObject* track = map->values()[at].get<JsonObject>();
+                const std::optional<double> value =
+                    track == nullptr ? std::nullopt : sampleTrack(*track, world.clock().totalTicks(), period);
+                if (value.has_value()) {
+                    const std::string& attribute = map->names()[at];
+                    before->emplace_back(attribute, world.attributeOverride(attribute));
+                    world.setAttributeOverride(attribute, value);
+                }
+            }
+        }
+        return [target, before] {
+            for (auto one = before->rbegin(); one != before->rend(); ++one) {
+                target->setAttributeOverride(one->first, one->second);
+            }
+        };
+    }
     logger_.debug([&type] { return "A test environment of type " + type + " is not applied."; });
     return {};
 }

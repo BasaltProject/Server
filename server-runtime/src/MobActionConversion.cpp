@@ -86,7 +86,9 @@ bool MobActionSystem::tickConversion(world::LoadedWorld& world, const std::vecto
         .inPowderSnow =
             isBlock(world, mob.x, mob.y, mob.z, "powder_snow") || isBlock(world, mob.x, eyeY, mob.z, "powder_snow"),
         // parity: `gameplay/piglins_zombify`, which only the Nether's dimension type turns off.
-        .piglinsZombify = world.declaration().dimension != config::WorldDimension::Nether,
+        .piglinsZombify =
+            world.attributeOverride("minecraft:gameplay/piglins_zombify")
+                .value_or(world.declaration().dimension != config::WorldDimension::Nether ? 1.0 : 0.0) != 0.0,
         .cureProgress =
             mob.conversionCountdown >= 0 && mob.type().path() == "zombie_villager" ? cureProgress(world, mob) : 1};
     const std::optional<conversions::Conversion> due = conversions::tick(mob, around);
