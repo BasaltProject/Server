@@ -215,6 +215,12 @@ void Chunk::setBiomeId(std::int32_t quartX, std::int32_t quartY, std::int32_t qu
     dirty_ = true;
 }
 
+bool Chunk::hasBiome(std::int32_t biomeId) const {
+    return std::ranges::any_of(sections_, [biomeId](const ChunkSection& section) {
+        return section.mayContainBiome([biomeId](std::int32_t id) { return id == biomeId; });
+    });
+}
+
 std::int32_t Chunk::biomeId(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) const {
     if (quartY < 0 || quartY >= bounds_.height() / 4) {
         throw std::out_of_range{"quartY out of world bounds"};

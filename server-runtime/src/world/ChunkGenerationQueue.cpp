@@ -75,6 +75,8 @@ ChunkGenerationQueue::~ChunkGenerationQueue() {
 }
 
 void ChunkGenerationQueue::runWorker() {
+    // The tick comes first: with every core generating, a late tick costs players more than a late chunk.
+    wire::io::lowerCurrentThreadPriority();
     std::int32_t idleSpins = 0;
     while (running_.load()) {
         bool generated = false;

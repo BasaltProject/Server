@@ -24,6 +24,7 @@
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/runtime/world/SummonAwards.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
+#include <basalt/server/world/GenerationMetrics.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/plugins/PluginSignature.hpp>
@@ -197,6 +198,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             pluginServices_->refreshCommands();
         }
     };
+    server::world::generationMetrics::setEnabled(config.generationMetrics);
     worldRegistry_ = std::make_unique<WorldRegistry>(
         config, worldsConfig, options_.generators, playerRegistry_, std::move(worldHooks),
         WorldRegistry::Options{.worldsRoot = options_.worldsRoot,

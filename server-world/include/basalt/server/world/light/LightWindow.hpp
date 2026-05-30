@@ -36,6 +36,12 @@ public:
     [[nodiscard]] std::optional<std::pair<std::size_t, std::size_t>>
     emitterSections(const std::function<std::int32_t(std::int32_t)>& emission) const;
 
+    /// Calls `found` for every block in the window from `bottomY` to `topY` whose state emits light.
+    void forEachEmitter(const std::function<std::int32_t(std::int32_t)>& emission, std::int32_t bottomY,
+                        std::int32_t topY,
+                        const std::function<void(std::int32_t windowX, std::int32_t y, std::int32_t windowZ,
+                                                 std::int32_t level)>& found) const;
+
 private:
     [[nodiscard]] const Chunk* chunkAt(std::int32_t offsetX, std::int32_t offsetZ) const;
 

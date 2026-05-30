@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/terrain/decoration/BiomePresence.hpp>
 #include <basalt/server/world/terrain/decoration/PatchRegion.hpp>
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleEnvironment.hpp>
@@ -17,11 +18,11 @@ namespace basalt::server::world::terrain::decoration {
 namespace caveSpeleothemDecoration {
 
 void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
-              ExternalStateReader externalBlockState = nullptr);
+              ExternalStateReader externalBlockState = nullptr, ExternalBiomeReader externalBiome = nullptr);
 
 void decorateFeatures(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
-                      std::int32_t firstIndex, std::int32_t lastIndex,
-                      ExternalStateReader externalBlockState = nullptr);
+                      std::int32_t firstIndex, std::int32_t lastIndex, ExternalStateReader externalBlockState = nullptr,
+                      ExternalBiomeReader externalBiome = nullptr);
 
 [[nodiscard]] const std::set<std::string, std::less<>>& placedIds();
 

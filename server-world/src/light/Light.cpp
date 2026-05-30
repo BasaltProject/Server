@@ -270,16 +270,9 @@ std::optional<std::vector<SectionLight>> compute(const LightWindow& window) {
     const std::int32_t bottomY = std::max(window.minY() + (static_cast<std::int32_t>(first) - 1) * 16, window.minY());
     const std::int32_t topY = std::min(window.minY() + (static_cast<std::int32_t>(last) + 2) * 16 - 1, window.maxY());
     LightSpread pass{window, bottomY, topY, 0};
-    for (std::int32_t z = 0; z < LightWindow::kWidth; ++z) {
-        for (std::int32_t x = 0; x < LightWindow::kWidth; ++x) {
-            for (std::int32_t y = bottomY; y <= topY; ++y) {
-                const std::int32_t emitted = emission(pass.stateAt(x, y, z));
-                if (emitted > 0) {
-                    pass.seed(x, y, z, emitted);
-                }
-            }
-        }
-    }
+    window.forEachEmitter(
+        emission, bottomY, topY,
+        [&pass](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t level) { pass.seed(x, y, z, level); });
     return pass.run();
 }
 

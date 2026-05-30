@@ -17,6 +17,12 @@ Chunk* ProtoRegion::chunkAt(const std::int32_t chunkX, const std::int32_t chunkZ
     return chunks_[static_cast<std::size_t>(((dx + 1) * 3) + dz + 1)];
 }
 
+std::optional<bool> ProtoRegion::chunkHasBiome(const std::int32_t chunkX, const std::int32_t chunkZ,
+                                               const std::int32_t biomeId) const {
+    const Chunk* chunk = chunkAt(chunkX, chunkZ);
+    return chunk == nullptr ? std::nullopt : std::optional{chunk->hasBiome(biomeId)};
+}
+
 std::optional<std::int32_t> ProtoRegion::blockStateIdAt(const std::int32_t worldX, const std::int32_t y,
                                                         const std::int32_t worldZ) const {
     const Chunk* chunk = chunkAt(worldX >> 4, worldZ >> 4);

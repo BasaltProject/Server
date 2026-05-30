@@ -84,6 +84,47 @@ void LightWindow::fillOpacity(std::span<std::uint8_t> into, std::int32_t bottomY
     }
 }
 
+void LightWindow::forEachEmitter(
+    const std::function<std::int32_t(std::int32_t)>& emission, std::int32_t bottomY, std::int32_t topY,
+    const std::function<void(std::int32_t, std::int32_t, std::int32_t, std::int32_t)>& found) const {
+    std::vector<std::int32_t> scratch(kBlocksPerSection);
+    for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+        for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+            const Chunk* chunk = chunkAt(offsetX, offsetZ);
+            if (chunk == nullptr) {
+                continue;
+            }
+            for (std::size_t index = 0; index < chunk->sectionCount(); ++index) {
+                const std::int32_t sectionMinY = minY_ + static_cast<std::int32_t>(index) * 16;
+                if (sectionMinY > topY || sectionMinY + 15 < bottomY) {
+                    continue;
+                }
+                const ChunkSection& section = chunk->section(index);
+                if (section.nonAirBlockCount() == 0 ||
+                    !section.mayContain([&emission](std::int32_t stateId) { return emission(stateId) > 0; })) {
+                    continue;
+                }
+                section.copyBlockStateIdsInto(scratch);
+                for (std::int32_t localY = 0; localY < 16; ++localY) {
+                    const std::int32_t y = sectionMinY + localY;
+                    if (y < bottomY || y > topY) {
+                        continue;
+                    }
+                    for (std::int32_t localZ = 0; localZ < 16; ++localZ) {
+                        for (std::int32_t localX = 0; localX < 16; ++localX) {
+                            const std::int32_t level =
+                                emission(scratch[static_cast<std::size_t>((localY * 16 + localZ) * 16 + localX)]);
+                            if (level > 0) {
+                                found((offsetX + 1) * 16 + localX, y, (offsetZ + 1) * 16 + localZ, level);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 std::int32_t LightWindow::stateAt(std::int32_t windowX, std::int32_t y, std::int32_t windowZ) const {
     if (y < minY_ || y > maxY_) {
         return registry::blocks::air().stateId;
