@@ -420,9 +420,11 @@ std::int32_t Aquifer::computeFluidType(std::int32_t x, std::int32_t y, std::int3
     return global.fluidType;
 }
 
-NoiseChunk::NoiseChunk(const NoiseRouter& router, densityfunction::Sampler beardifier, const DensityVolume& volume)
+NoiseChunk::NoiseChunk(const NoiseRouter& router, densityfunction::Sampler beardifier, const DensityVolume& volume,
+                       const blending::Blender* blender)
     : router_(&router), volume_(volume),
-      samplers_(densityfunction::SamplerContext::Options{.enableCaches = true, .beardifier = std::move(beardifier)}),
+      samplers_(densityfunction::SamplerContext::Options{
+          .enableCaches = true, .beardifier = std::move(beardifier), .blender = blender}),
       aquifer_(router, samplers_, volume) {}
 
 std::vector<float> NoiseChunk::finalDensity() {

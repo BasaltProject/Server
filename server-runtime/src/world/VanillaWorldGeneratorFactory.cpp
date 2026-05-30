@@ -510,9 +510,10 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                             &terrain::RuinedPortalStructureGenerator::placeAt,
                                             std::string{variant.name}));
     }
-    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
+    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ,
+                                       const server::world::blending::Blender* blender) {
         return terrain::realTerrainGenerator::generateTerrain(*world.overworldRouter, *world.overworldSurface, chunkX,
-                                                              chunkZ, world.seed, world.generators);
+                                                              chunkZ, world.seed, world.generators, blender);
     };
     answer.pipeline.adopt = [&world](server::world::Chunk chunk) {
         return terrain::realTerrainGenerator::adopt(*world.overworldSurface, std::move(chunk));
@@ -590,7 +591,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
     Generators answer;
     answer.villages = built->village.get();
     answer.strongholds = built->strongholds.get();
-    answer.pipeline.terrain = [](std::int32_t chunkX, std::int32_t chunkZ) {
+    answer.pipeline.terrain = [](std::int32_t chunkX, std::int32_t chunkZ, const server::world::blending::Blender*) {
         return terrain::realTerrainGenerator::GeneratedTerrain{
             server::world::flatWorldGenerator::generate(chunkX, chunkZ), nullptr, nullptr};
     };
@@ -644,7 +645,8 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
 
     Built& world = *built;
     Generators answer;
-    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
+    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ,
+                                       const server::world::blending::Blender*) {
         return terrain::realTerrainGenerator::GeneratedTerrain{
             terrain::dimensionTerrainGenerator::netherTerrain(*world.netherRouter, *world.netherBiomes, chunkX, chunkZ,
                                                               world.seed, world.netherStructures.get()),
@@ -717,7 +719,8 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
 
     Built& world = *built;
     Generators answer;
-    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
+    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ,
+                                       const server::world::blending::Blender*) {
         return terrain::realTerrainGenerator::GeneratedTerrain{
             terrain::dimensionTerrainGenerator::endTerrain(*world.endRouter, *world.endBiomes, chunkX, chunkZ,
                                                            world.seed, world.endCities.get()),

@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
+#include <basalt/server/world/blending/BlendingData.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/wire/protocol/play/BitStorage.hpp>
 
@@ -290,6 +291,19 @@ NbtCompound write(const Chunk& chunk) {
     tag.putLong("LastUpdate", 0);
     tag.putLong("InhabitedTime", chunk.inhabitedTime());
     tag.putString("Status", std::string{statusName(chunk.stage())});
+    if (const auto& blending = chunk.blendingData(); blending != nullptr) {
+        NbtCompound packed;
+        packed.putInt("min_section", blending->minSection());
+        packed.putInt("max_section", blending->maxSection());
+        if (const std::optional<std::vector<float>> heights = blending->packedHeights(); heights.has_value()) {
+            std::vector<NbtTag> values;
+            for (const float height : *heights) {
+                values.push_back(NbtTag::ofFloat(height));
+            }
+            packed.set("heights", NbtTag::ofList(NbtList{NbtType::Float, std::move(values)}));
+        }
+        tag.set("blending_data", NbtTag::ofCompound(std::move(packed)));
+    }
 
     PaletteScratch scratch;
     std::vector<NbtTag> sections;
@@ -585,6 +599,20 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     Chunk chunk{tag.getInt("xPos"), tag.getInt("zPos"), bounds};
     chunk.setStage(*stage);
     chunk.setNeedsRetrogen(retrogen && bounds.minY() == -64);
+    if (const NbtCompound* blending = tag.getCompound("blending_data");
+        blending != nullptr && blending->contains("min_section") && blending->contains("max_section")) {
+        std::optional<std::vector<float>> heights;
+        if (const NbtList* list = blending->getList("heights"); list != nullptr) {
+            std::vector<float> values;
+            for (const NbtTag& height : *list) {
+                values.push_back(height.get<float>() != nullptr ? *height.get<float>()
+                                                                : blending::BlendingData::kNoValue);
+            }
+            heights = std::move(values);
+        }
+        chunk.setBlendingData(std::make_shared<blending::BlendingData>(
+            blending->getInt("min_section"), blending->getInt("max_section"), std::move(heights)));
+    }
     if (*stage == ChunkStage::Full) {
         chunk.markLoadedComplete();
     }
@@ -599,7 +627,11 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
         if (sectionTag == nullptr) {
             return std::unexpected(ChunkNbtError{"section entry is not a compound"});
         }
-        const std::int32_t y = sectionTag->getByte("Y");
+        // parity: `CompoundTag.getByteOr`, which reads any number, since the 1.18 height fix writes `Y` as an int.
+        std::int32_t y = sectionTag->getByte("Y");
+        if (const NbtTag* held = sectionTag->find("Y"); held != nullptr && held->get<std::int32_t>() != nullptr) {
+            y = *held->get<std::int32_t>();
+        }
         const std::int32_t index = y - bounds.minSection();
         if (index < 0 || static_cast<std::size_t>(index) >= chunk.sectionCount()) {
             continue;

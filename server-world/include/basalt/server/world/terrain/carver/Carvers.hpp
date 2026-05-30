@@ -77,7 +77,8 @@ using TopMaterial =
 
 /// parity: `NoiseBasedChunkGenerator.generateCarvers` and `applyCarvingMask`.
 void carve(Chunk& chunk, std::int64_t seed, NoiseChunk& noiseChunk, const NoiseRouter& router, CarverRegistry& registry,
-           const CarverBiome& biomeAt, const TopMaterial& topMaterial);
+           const CarverBiome& biomeAt, const TopMaterial& topMaterial,
+           const std::function<bool(std::int32_t, std::int32_t, std::int32_t)>* filter = nullptr);
 
 void carveShape(Chunk& chunk, const NoiseRouter& router, const CarverBiome& biomeAt);
 

@@ -1,5 +1,6 @@
 #include "Nodes.hpp"
 
+#include <basalt/server/world/blending/Blender.hpp>
 #include <basalt/server/world/noise/JavaMath.hpp>
 
 #include <cmath>
@@ -571,6 +572,46 @@ bool PreparedCache::equals(const DensityFunction& other) const {
 
 Sampler makeCachingSampler(std::int32_t id, Sampler input) {
     return std::make_shared<const CachingSampler>(id, std::move(input));
+}
+
+namespace {
+/// parity: `BlendDensityFunction.Sampler`.
+class BlendDensitySampler final : public DensitySampler {
+public:
+    explicit BlendDensitySampler(Sampler input) : input_(std::move(input)) {}
+
+    [[nodiscard]] float sampleValue(SamplerContext& context, std::int32_t x, std::int32_t y,
+                                    std::int32_t z) const override {
+        const float input = input_->sampleValue(context, x, y, z);
+        const blending::Blender* blender = context.blender();
+        return blender != nullptr && !blender->isEmpty() ? blender->blendDensity(x, y, z, input) : input;
+    }
+
+    void sampleVolume(SamplerContext& context, DensityBuffer& output, const DensityVolume& volume) const override {
+        input_->sampleVolume(context, output, volume);
+        const blending::Blender* blender = context.blender();
+        if (blender == nullptr || blender->isEmpty()) {
+            return;
+        }
+        std::int32_t index = 0;
+        for (std::int32_t z = 0; z < volume.sizeZ; ++z) {
+            for (std::int32_t x = 0; x < volume.sizeX; ++x) {
+                for (std::int32_t y = 0; y < volume.sizeY; ++y) {
+                    output.set(index, blender->blendDensity(volume.blockX(x), volume.blockY(y), volume.blockZ(z),
+                                                            output.get(index)));
+                    ++index;
+                }
+            }
+        }
+    }
+
+private:
+    Sampler input_;
+};
+} // namespace
+
+Sampler BlendDensity::compile(CompileContext& context) const {
+    return std::make_shared<const BlendDensitySampler>(input_->compile(context));
 }
 
 Function BlendDensity::rewriteChildren(const Function& self, const RewriteRule& rule) const {

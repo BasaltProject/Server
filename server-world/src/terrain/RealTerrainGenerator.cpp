@@ -3,6 +3,7 @@
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/server/world/GenerationMetrics.hpp>
+#include <basalt/server/world/blending/Blender.hpp>
 #include <basalt/server/world/terrain/BubbleColumnFormation.hpp>
 #include <basalt/server/world/terrain/NoiseChunk.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
@@ -35,7 +36,7 @@ namespace basalt::server::world::terrain::realTerrainGenerator {
 namespace {
 
 void fillBiomes(Chunk& chunk, const surface::SurfaceRuleEnvironment& environment,
-                densityfunction::SamplerContext* context) {
+                densityfunction::SamplerContext* context, const blending::Blender* blender) {
     std::map<std::string, std::int32_t, std::less<>> idByName;
     // parity: `LevelChunkSection.fillBiomesFromNoise` x.
     const std::int32_t sections = chunk.verticalBounds().height() / 16;
@@ -45,6 +46,15 @@ void fillBiomes(Chunk& chunk, const surface::SurfaceRuleEnvironment& environment
                 const std::int32_t quartY = section * 4 + withinSection;
                 const std::int32_t blockY = chunk.verticalBounds().minY() + quartY * 4;
                 for (std::int32_t quartZ = 0; quartZ < 4; ++quartZ) {
+                    // parity: `Blender.getBiomeResolver`, an old chunk's biome wins close to its edge.
+                    if (blender != nullptr && !blender->isEmpty()) {
+                        if (const std::optional<std::int32_t> blended = blender->blendBiome(
+                                chunk.chunkX() * 4 + quartX, blockY >> 2, chunk.chunkZ() * 4 + quartZ);
+                            blended.has_value()) {
+                            chunk.setBiomeId(quartX, quartY, quartZ, *blended);
+                            continue;
+                        }
+                    }
                     const std::string& biome = environment.noiseBiomeAt(chunk.chunkX() * 4 + quartX, blockY >> 2,
                                                                         chunk.chunkZ() * 4 + quartZ, context);
                     auto found = idByName.find(biome);
@@ -75,7 +85,7 @@ GeneratedTerrain::GeneratedTerrain(GeneratedTerrain&&) noexcept = default;
 GeneratedTerrain& GeneratedTerrain::operator=(GeneratedTerrain&&) noexcept = default;
 
 GeneratedTerrain buildTerrain(const NoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
-                              Chunk chunk, densityfunction::Sampler beardifier) {
+                              Chunk chunk, densityfunction::Sampler beardifier, const blending::Blender* blender) {
     const std::int32_t chunkX = chunk.chunkX();
     const std::int32_t chunkZ = chunk.chunkZ();
     // parity: `ChunkGenerator.createBiomes` samples the climate through a cached context of its own.
@@ -83,9 +93,10 @@ GeneratedTerrain buildTerrain(const NoiseRouter& router, const surface::SurfaceR
         densityfunction::SamplerContext::Options{.enableCaches = true});
     auto biomes = std::make_unique<surface::ChunkBiomeEnvironment>(environment, biomeContext.get());
     generationMetrics::measure(generationMetrics::Phase::BiomeFill,
-                               [&] { fillBiomes(chunk, *biomes, biomeContext.get()); });
+                               [&] { fillBiomes(chunk, *biomes, biomeContext.get(), blender); });
     NoiseChunk noiseChunk{router, std::move(beardifier),
-                          densityfunction::DensityVolume{16, router.height, 16, chunkX * 16, router.minY, chunkZ * 16}};
+                          densityfunction::DensityVolume{16, router.height, 16, chunkX * 16, router.minY, chunkZ * 16},
+                          blender};
     generationMetrics::measure(generationMetrics::Phase::TerrainFill, [&] { fillNoise(chunk, noiseChunk, router); });
     const material::BiomeGetter biomeGetter = [&biomes](std::int32_t x, std::int32_t y,
                                                         std::int32_t z) -> const std::string& {
@@ -105,14 +116,15 @@ GeneratedTerrain buildTerrain(const NoiseRouter& router, const surface::SurfaceR
             return router.materialSystem->topMaterial(*router.materialRule, chunk, noiseChunk.samplers(), biomeGetter,
                                                       x, y, z, underFluid, router.minY, router.height);
         };
-        carver::carve(chunk, router.state->seed(), noiseChunk, router, *router.carvers, carverBiome, topMaterial);
+        carver::carve(chunk, router.state->seed(), noiseChunk, router, *router.carvers, carverBiome, topMaterial,
+                      blender != nullptr ? &blender->carvingFilter() : nullptr);
     });
     return GeneratedTerrain{std::move(chunk), std::move(biomeContext), std::move(biomes)};
 }
 
 GeneratedTerrain generateTerrain(const NoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
                                  std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
-                                 const TerrainStructureGenerators& generators) {
+                                 const TerrainStructureGenerators& generators, const blending::Blender* blender) {
     // parity: one `Beardifier` per chunk, summing every structure that adapts the terrain.
     StructureBeard beard;
     for (VillageStructureGenerator* set : {generators.camp, generators.village}) {
@@ -130,7 +142,7 @@ GeneratedTerrain generateTerrain(const NoiseRouter& router, const surface::Surfa
         generators.stronghold->addBeard(beard, chunkX, chunkZ, seed);
     }
     GeneratedTerrain terrain =
-        buildTerrain(router, environment, Chunk{chunkX, chunkZ}, structureBeardifier(std::move(beard)));
+        buildTerrain(router, environment, Chunk{chunkX, chunkZ}, structureBeardifier(std::move(beard)), blender);
     // parity: the `_WG` heightmaps stop updating here.
     terrain.chunk().freezeWorldgenHeights();
     return terrain;

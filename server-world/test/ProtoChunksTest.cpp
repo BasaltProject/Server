@@ -28,7 +28,7 @@ struct Recorder {
 
     [[nodiscard]] ProtoChunks::Hooks hooks() {
         ProtoChunks::Hooks hooks;
-        hooks.terrain = [this](std::int32_t chunkX, std::int32_t chunkZ) {
+        hooks.terrain = [this](std::int32_t chunkX, std::int32_t chunkZ, const blending::Blender*) {
             const std::lock_guard lock{mutex};
             terrains++;
             return realTerrainGenerator::GeneratedTerrain{Chunk{chunkX, chunkZ}, nullptr, nullptr};

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/blending/Blender.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
 
 #include <cstdint>
@@ -27,7 +28,10 @@ public:
 
     struct Hooks {
         std::function<std::optional<Stored>(std::int32_t, std::int32_t)> load;
-        std::function<realTerrainGenerator::GeneratedTerrain(std::int32_t, std::int32_t)> terrain;
+        std::function<realTerrainGenerator::GeneratedTerrain(std::int32_t, std::int32_t, const blending::Blender*)>
+            terrain;
+        /// The blender a new chunk next to old ones generates with; null when there is nothing to blend.
+        std::function<std::shared_ptr<const blending::Blender>(std::int32_t, std::int32_t)> blender;
         std::function<realTerrainGenerator::GeneratedTerrain(Chunk)> adopt;
         std::function<void(realTerrainGenerator::GeneratedTerrain&, ProtoRegion&)> decorate;
         std::function<void(Chunk&, bool generated)> finish;
