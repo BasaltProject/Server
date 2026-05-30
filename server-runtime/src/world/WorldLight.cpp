@@ -4,6 +4,7 @@
 #include <basalt/wire/protocol/play/NibbleArray.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 
 namespace basalt::server::runtime::world::worldLight {
@@ -37,24 +38,31 @@ using server::world::light::SectionLight;
         return 0;
     }
 
-    const Chunk::PackedLight* cached = sky ? chunk->cachedSkyLight() : chunk->cachedBlockLight();
-    Chunk::PackedLight computedHere;
+    Chunk::SharedLight cached = sky ? chunk->cachedSkyLight() : chunk->cachedBlockLight();
     if (cached == nullptr) {
+        // parity: a chunk is not lit, and so not ticking, until its neighbours stand; guessing before then only
+        // computes the same chunk again at every neighbour that arrives.
+        for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+            for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+                if (world.chunkIfLoaded((x >> 4) + offsetX, (z >> 4) + offsetZ) == nullptr) {
+                    return 0;
+                }
+            }
+        }
         const LightWindow::Neighbours neighbours = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
             return world.chunkIfLoaded(chunkX, chunkZ);
         };
         if (sky) {
-            computedHere = chunk->skyLight([chunk, &neighbours] {
+            cached = std::make_shared<const Chunk::PackedLight>(chunk->skyLight([chunk, &neighbours] {
                 return packAll(server::world::light::skyLight::compute(LightWindow{*chunk, neighbours}));
-            });
+            }));
         } else {
-            computedHere = chunk->blockLight([chunk, &neighbours] {
+            cached = std::make_shared<const Chunk::PackedLight>(chunk->blockLight([chunk, &neighbours] {
                 const std::optional<std::vector<SectionLight>> computed =
                     server::world::light::blockLight::compute(LightWindow{*chunk, neighbours});
                 return computed.has_value() ? packAll(*computed) : Chunk::PackedLight{};
-            });
+            }));
         }
-        cached = &computedHere;
     }
 
     const std::size_t section = static_cast<std::size_t>((y - chunk->verticalBounds().minY()) >> 4);
@@ -71,6 +79,31 @@ using server::world::light::SectionLight;
 }
 
 } // namespace
+
+void precompute(const std::array<Chunk*, 9>& window, const bool hasSkylight) {
+    Chunk* chunk = window[4];
+    const std::int32_t originX = chunk->chunkX() - 1;
+    const std::int32_t originZ = chunk->chunkZ() - 1;
+    const LightWindow::Neighbours neighbours = [&window, originX, originZ](std::int32_t chunkX,
+                                                                           std::int32_t chunkZ) -> const Chunk* {
+        const std::int32_t column = chunkX - originX;
+        const std::int32_t row = chunkZ - originZ;
+        return column < 0 || column > 2 || row < 0 || row > 2 ? nullptr
+                                                              : window[static_cast<std::size_t>(row * 3 + column)];
+    };
+    if (hasSkylight && (chunk->cachedSkyLight() == nullptr || chunk->lightIsStale())) {
+        static_cast<void>(chunk->skyLight([chunk, &neighbours] {
+            return packAll(server::world::light::skyLight::compute(LightWindow{*chunk, neighbours}));
+        }));
+    }
+    if (chunk->cachedBlockLight() == nullptr || chunk->lightIsStale()) {
+        static_cast<void>(chunk->blockLight([chunk, &neighbours] {
+            const std::optional<std::vector<SectionLight>> computed =
+                server::world::light::blockLight::compute(LightWindow{*chunk, neighbours});
+            return computed.has_value() ? packAll(*computed) : Chunk::PackedLight{};
+        }));
+    }
+}
 
 std::int32_t skyLight(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool hasSkylight) {
     return level(world, x, y, z, true, hasSkylight);

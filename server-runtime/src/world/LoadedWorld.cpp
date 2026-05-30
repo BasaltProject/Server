@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
 #include <basalt/server/world/LeafDistances.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
@@ -15,6 +16,7 @@
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
 #include <basalt/wire/io/FileIO.hpp>
+#include <basalt/wire/io/Platform.hpp>
 
 #include <algorithm>
 #include <atomic>
@@ -127,6 +129,42 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
         generationQueue_.usePipeline(protoChunks_.get());
     }
     state_.setHasSkylight(config::dimensionFacts(declaration_.dimension).hasSkylight);
+    state_.setOnNeighbourhoodComplete([this](std::int32_t chunkX, std::int32_t chunkZ, bool delayed) {
+        const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);
+        const std::lock_guard<std::mutex> lock{lightQueueMutex_};
+        if (lightQueue_.size() >= kLightQueueLimit || lightPending_.contains(key)) {
+            return;
+        }
+        const auto due = std::chrono::steady_clock::now() + (delayed ? kLightDebounce : std::chrono::milliseconds{0});
+        lightPending_.emplace(key, due);
+        lightQueue_.emplace(due, key);
+        lightWake_.notify_one();
+    });
+    lightWorker_ = std::jthread{[this](const std::stop_token stop) {
+        const bool skylight = config::dimensionFacts(declaration_.dimension).hasSkylight;
+        while (!stop.stop_requested()) {
+            std::int64_t key = 0;
+            {
+                std::unique_lock<std::mutex> lock{lightQueueMutex_};
+                if (!lightWake_.wait(lock, stop, [this] { return !lightQueue_.empty(); })) {
+                    return;
+                }
+                const auto due = lightQueue_.begin()->first;
+                if (due > std::chrono::steady_clock::now()) {
+                    lightWake_.wait_until(lock, stop, due, [] { return false; });
+                    continue;
+                }
+                key = lightQueue_.begin()->second;
+                lightQueue_.erase(lightQueue_.begin());
+                lightPending_.erase(key);
+            }
+            std::array<Chunk*, 9> window{};
+            if (state_.lightWindowFor(ChunkGenerationQueue::unpackX(key), ChunkGenerationQueue::unpackZ(key), window)) {
+                worldLight::precompute(window, skylight);
+            }
+            state_.lightDone();
+        }
+    }};
     state_.setSettlesGeneration(declaration_.type != config::WorldType::Debug);
     state_.poi().configure(worldRoot_ + "/poi", config::dimensionFacts(declaration_.dimension).chunkHeight);
     // Said rather than migrated: a world that looks empty is worse than a line in the log.
@@ -172,7 +210,10 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     updateSkyBrightness();
 }
 
-LoadedWorld::~LoadedWorld() = default;
+LoadedWorld::~LoadedWorld() {
+    lightWorker_.request_stop();
+    lightWorker_.join();
+}
 
 void LoadedWorld::setAttributeOverride(const std::string& name, std::optional<double> value) {
     const std::lock_guard lock{attributeMutex_};

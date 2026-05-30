@@ -1,6 +1,7 @@
 #include <basalt/server/world/PalettedContainer.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <mutex>
 #include <stdexcept>
@@ -101,8 +102,58 @@ void PalettedContainer::copyInto(std::span<std::int32_t> dest) const {
         std::fill_n(dest.begin(), size_, palette_[0]);
         return;
     }
+    const auto width = static_cast<unsigned>(bits_);
+    const std::uint64_t mask = (std::uint64_t{1} << width) - 1;
+    unsigned __int128 buffer = 0;
+    unsigned buffered = 0;
+    std::size_t nextWord = 0;
     for (std::size_t i = 0; i < size_; ++i) {
-        dest[i] = palette_[readRaw(words_, bits_, i)];
+        if (buffered < width) {
+            buffer |= static_cast<unsigned __int128>(words_[nextWord++]) << buffered;
+            buffered += 64;
+        }
+        dest[i] = palette_[static_cast<std::size_t>(static_cast<std::uint64_t>(buffer) & mask)];
+        buffer >>= width;
+        buffered -= width;
+    }
+}
+
+void PalettedContainer::copyMappedInto(std::span<std::uint8_t> dest, std::span<const std::int32_t> table,
+                                       std::uint8_t fallback) const {
+    if (dest.size() < size_) {
+        throw std::invalid_argument{"paletted container needs room for every value"};
+    }
+    const std::shared_lock<std::shared_mutex> guard{lock_};
+    std::array<std::uint8_t, 4096> mapped{};
+    std::vector<std::uint8_t> overflow;
+    std::uint8_t* lookup = mapped.data();
+    if (paletteSize_ > mapped.size()) {
+        overflow.resize(paletteSize_);
+        lookup = overflow.data();
+    }
+    for (std::size_t i = 0; i < paletteSize_; ++i) {
+        const std::int32_t value = palette_[i];
+        lookup[i] = value >= 0 && static_cast<std::size_t>(value) < table.size()
+                        ? static_cast<std::uint8_t>(table[static_cast<std::size_t>(value)])
+                        : fallback;
+    }
+    if (words_.empty()) {
+        std::fill_n(dest.begin(), size_, lookup[0]);
+        return;
+    }
+    const auto width = static_cast<unsigned>(bits_);
+    const std::uint64_t mask = (std::uint64_t{1} << width) - 1;
+    unsigned __int128 buffer = 0;
+    unsigned buffered = 0;
+    std::size_t nextWord = 0;
+    for (std::size_t i = 0; i < size_; ++i) {
+        if (buffered < width) {
+            buffer |= static_cast<unsigned __int128>(words_[nextWord++]) << buffered;
+            buffered += 64;
+        }
+        dest[i] = lookup[static_cast<std::uint64_t>(buffer) & mask];
+        buffer >>= width;
+        buffered -= width;
     }
 }
 

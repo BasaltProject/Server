@@ -23,6 +23,17 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kSides{
 
 } // namespace
 
+bool leafDistances::mayChangeNeighbours(const Chunk& chunk) {
+    for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
+        if (chunk.section(index).mayContain([](std::int32_t stateId) {
+                return registry::blockStateFamilies::isLeavesState(stateId) || treeBlockRules::isLogState(stateId);
+            })) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void leafDistances::settle(Chunk& chunk, const BlockAt& blockAt) {
     const ChunkHeight bounds = chunk.verticalBounds();
     // Only sections holding a leaf or a log are walked: a forest touches two of two dozen.

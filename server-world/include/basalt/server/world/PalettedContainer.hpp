@@ -24,6 +24,9 @@ public:
 
     void copyInto(std::span<std::int32_t> dest) const;
 
+    /// Writes `table[value]` for every value, or `fallback` for a value past the table.
+    void copyMappedInto(std::span<std::uint8_t> dest, std::span<const std::int32_t> table, std::uint8_t fallback) const;
+
     void setAll(std::span<const std::int32_t> values);
 
     [[nodiscard]] std::size_t distinctValueCount() const;

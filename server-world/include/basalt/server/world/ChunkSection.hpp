@@ -54,6 +54,9 @@ public:
 
     void copyBlockStateIdsInto(std::span<std::int32_t> dest) const;
 
+    void copyMappedBlockStatesInto(std::span<std::uint8_t> dest, std::span<const std::int32_t> table,
+                                   std::uint8_t fallback) const;
+
     void copyBiomeIdsInto(std::span<std::int32_t> dest) const;
 
     void setBlockStateIds(std::span<const std::int32_t> ids);

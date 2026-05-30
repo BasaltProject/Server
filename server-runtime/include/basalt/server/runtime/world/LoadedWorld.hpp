@@ -29,13 +29,19 @@
 #include <basalt/wire/common/timings/Timings.hpp>
 
 #include <array>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -297,6 +303,12 @@ private:
     std::optional<std::array<std::int32_t, 3>> spawnOverride_;
     bool movedSpawn_ = false;
     WorldClock clock_;
+    static constexpr std::size_t kLightQueueLimit = 4096;
+    static constexpr std::chrono::milliseconds kLightDebounce{80};
+    std::mutex lightQueueMutex_;
+    std::condition_variable_any lightWake_;
+    std::multimap<std::chrono::steady_clock::time_point, std::int64_t> lightQueue_;
+    std::unordered_map<std::int64_t, std::chrono::steady_clock::time_point> lightPending_;
     mutable std::mutex attributeMutex_;
     std::map<std::string, double, std::less<>> attributeOverrides_;
     WorldWeather weather_;
@@ -311,6 +323,7 @@ private:
     std::string difficulty_;
     bool difficultyLocked_ = false;
     std::optional<std::string> defaultGamemode_;
+    std::jthread lightWorker_;
 };
 
 } // namespace basalt::server::runtime::world

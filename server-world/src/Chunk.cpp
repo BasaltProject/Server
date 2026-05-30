@@ -5,6 +5,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/light/Light.hpp>
 #include <basalt/server/world/terrain/ProtoRegion.hpp>
 
 #include <algorithm>
@@ -129,10 +130,17 @@ std::int32_t Chunk::blockStateId(std::int32_t x, std::int32_t y, std::int32_t z)
     return sections_[sectionIndexFor(y)].blockStateId(x, y & 15, z);
 }
 
+bool changesLight(std::int32_t before, std::int32_t after) {
+    // Water running downhill, grass spreading and leaves decaying write blocks all the time and move no light.
+    return before != after && (light::skyLight::opacity(before) != light::skyLight::opacity(after) ||
+                               light::blockLight::emission(before) != light::blockLight::emission(after));
+}
+
 bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
     ChunkSection& section = sections_[sectionIndexFor(y)];
     if (!blockWriteObserver_) {
-        if (!blockEntities_.empty() && changesBlock(section.blockStateId(x, y & 15, z), stateId)) {
+        const std::int32_t before = section.blockStateId(x, y & 15, z);
+        if (!blockEntities_.empty() && changesBlock(before, stateId)) {
             removeBlockEntityAt(x, y, z);
         }
         if (!section.setBlockStateId(x, y & 15, z, stateId)) {
@@ -140,7 +148,9 @@ bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std:
         }
         dirty_ = true;
         updateHeights(x, y, z, stateId);
-        invalidateLight();
+        if (changesLight(before, stateId)) {
+            invalidateLight();
+        }
         return true;
     }
 
@@ -155,7 +165,7 @@ bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std:
         }
     }
     blockWriteObserver_(x, y, z, oldStateId, stateId);
-    if (changed) {
+    if (changed && changesLight(oldStateId, stateId)) {
         invalidateLight();
     }
     return changed;
@@ -169,29 +179,44 @@ void Chunk::removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z) 
 }
 
 Chunk::PackedLight Chunk::skyLight(const std::function<PackedLight()>& compute) {
-    const std::lock_guard<std::mutex> guard{*lightLock_};
-    if (!skyLight_.has_value()) {
-        skyLight_ = compute();
+    const std::lock_guard<std::mutex> guard{light_->lock};
+    SharedLight held = light_->sky.load();
+    if (held == nullptr || light_->staleSky.load()) {
+        light_->staleSky.store(false);
+        held = std::make_shared<const PackedLight>(compute());
+        light_->sky.store(held);
     }
-    return *skyLight_;
+    return *held;
 }
 
 Chunk::PackedLight Chunk::blockLight(const std::function<PackedLight()>& compute) {
-    const std::lock_guard<std::mutex> guard{*lightLock_};
-    if (!blockLight_.has_value()) {
-        blockLight_ = compute();
+    const std::lock_guard<std::mutex> guard{light_->lock};
+    SharedLight held = light_->block.load();
+    if (held == nullptr || light_->staleBlock.load()) {
+        light_->staleBlock.store(false);
+        held = std::make_shared<const PackedLight>(compute());
+        light_->block.store(held);
     }
-    return *blockLight_;
+    return *held;
 }
 
-const Chunk::PackedLight* Chunk::cachedSkyLight() const { return skyLight_.has_value() ? &*skyLight_ : nullptr; }
+Chunk::SharedLight Chunk::cachedSkyLight() const { return light_->sky.load(); }
 
-const Chunk::PackedLight* Chunk::cachedBlockLight() const { return blockLight_.has_value() ? &*blockLight_ : nullptr; }
+Chunk::SharedLight Chunk::cachedBlockLight() const { return light_->block.load(); }
+
+bool Chunk::lightIsStale() const { return light_->staleSky.load() || light_->staleBlock.load(); }
+
+void Chunk::markLightStale() {
+    light_->staleSky.store(true);
+    light_->staleBlock.store(true);
+}
 
 void Chunk::invalidateLight() {
-    const std::lock_guard<std::mutex> guard{*lightLock_};
-    skyLight_.reset();
-    blockLight_.reset();
+    const std::lock_guard<std::mutex> guard{light_->lock};
+    light_->sky.store(nullptr);
+    light_->block.store(nullptr);
+    light_->staleSky.store(false);
+    light_->staleBlock.store(false);
 }
 
 void Chunk::increaseInhabitedTime(std::int64_t delta) {

@@ -152,6 +152,28 @@ std::size_t WorldState::countMissing(const std::vector<std::pair<std::int32_t, s
     return missing;
 }
 
+bool WorldState::lightWindowFor(std::int32_t chunkX, std::int32_t chunkZ,
+                                std::array<server::world::Chunk*, 9>& window) {
+    lightBusy_.store(true);
+    const WorldReadLock lock{mutex_};
+    for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+        for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+            Chunk* found = chunkAtLocked(key(chunkX + offsetX, chunkZ + offsetZ));
+            if (found == nullptr) {
+                return false;
+            }
+            window[static_cast<std::size_t>((offsetZ + 1) * 3 + offsetX + 1)] = found;
+        }
+    }
+    return true;
+}
+
+void WorldState::lightDone() {
+    lightBusy_.store(false);
+    const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
+    graveyard_.clear();
+}
+
 std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
     const WorldWriteLock lock{mutex_};
     std::size_t removed = 0;
@@ -162,7 +184,11 @@ std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
         const std::int64_t chunkKey = key(chunk->chunkX(), chunk->chunkZ());
         const std::int32_t chunkX = chunk->chunkX();
         const std::int32_t chunkZ = chunk->chunkZ();
-        if (chunksByPos_.erase(chunkKey) != 0) {
+        if (auto node = chunksByPos_.extract(chunkKey); !node.empty()) {
+            if (lightBusy_.load()) {
+                const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
+                graveyard_.push_back(std::move(node.mapped()));
+            }
             pendingDecorations_.forgetGeneratedEntities(chunkKey);
             sculkSensors_.forgetChunk(chunkX, chunkZ);
             ++removed;
@@ -390,15 +416,28 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     }
     // parity: a debug world places its grid without updates, so nothing is settled after it.
     if (settlesGeneration_) {
+        // Most reads fall in the one chunk the last one did, so that chunk is kept rather than found again.
         const server::world::terrain::decoration::tree::leafDistances::BlockAt worldBlockAt =
-            [this](std::int32_t x, std::int32_t y, std::int32_t z) -> std::int32_t {
-            return blockStateLocked(x, y, z).value_or(0);
+            [this, cachedKey = std::int64_t{0}, cached = static_cast<Chunk*>(nullptr),
+             cachedValid = false](std::int32_t x, std::int32_t y, std::int32_t z) mutable -> std::int32_t {
+            const std::int64_t wanted = key(x >> 4, z >> 4);
+            if (!cachedValid || cachedKey != wanted) {
+                cached = chunkAtLocked(wanted);
+                cachedKey = wanted;
+                cachedValid = true;
+            }
+            if (cached == nullptr || y < cached->verticalBounds().minY() || y > cached->verticalBounds().maxY()) {
+                return 0;
+            }
+            return cached->blockStateId(x & 15, y, z & 15);
         };
+        const bool touchesNeighbours =
+            server::world::terrain::decoration::tree::leafDistances::mayChangeNeighbours(installed);
         if (!installed.loadedComplete()) {
             server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
         }
         // All eight: a diagonal neighbour's leaves are within six blocks of this chunk's logs too.
-        for (std::int32_t dx = -1; dx <= 1; ++dx) {
+        for (std::int32_t dx = -1; dx <= 1 && touchesNeighbours; ++dx) {
             for (std::int32_t dz = -1; dz <= 1; ++dz) {
                 if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz);
                     neighbour != nullptr && (dx != 0 || dz != 0) && !neighbour->loadedComplete()) {
@@ -458,6 +497,24 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     pendingDecorations_.addPendingGeneratedEntities(installed.takeGeneratedEntitiesMatching(
         [](const server::world::ChunkGeneratedEntity& entity) { return becomesLive(entity); }));
 
+    if (onNeighbourhoodComplete_) {
+        for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+            for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+                const std::int32_t candidateX = chunkX + offsetX;
+                const std::int32_t candidateZ = chunkZ + offsetZ;
+                bool complete = chunkAtLocked(key(candidateX, candidateZ)) != nullptr;
+                for (std::int32_t aroundZ = -1; aroundZ <= 1 && complete; ++aroundZ) {
+                    for (std::int32_t aroundX = -1; aroundX <= 1 && complete; ++aroundX) {
+                        complete = chunkAtLocked(key(candidateX + aroundX, candidateZ + aroundZ)) != nullptr;
+                    }
+                }
+                if (complete) {
+                    onNeighbourhoodComplete_(candidateX, candidateZ, false);
+                }
+            }
+        }
+    }
+
     // now stands. parity: vanilla relights a chunk's neighbourhood on load.
     for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
         for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
@@ -465,7 +522,10 @@ Chunk& WorldState::installLocked(Chunk chunk) {
                 continue;
             }
             if (Chunk* neighbour = chunkAtLocked(key(chunkX + offsetX, chunkZ + offsetZ)); neighbour != nullptr) {
-                neighbour->invalidateLight();
+                neighbour->markLightStale();
+                if (onNeighbourhoodComplete_) {
+                    onNeighbourhoodComplete_(chunkX + offsetX, chunkZ + offsetZ, true);
+                }
             }
         }
     }
@@ -633,11 +693,16 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
             shapeChanges_[shapeChangeCount_ % kShapeChangeMemory] = {x, y, z};
             ++shapeChangeCount_;
         }
-        for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
-            for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
-                if (Chunk* neighbour = chunkAtLocked(key((x >> 4) + offsetX, (z >> 4) + offsetZ));
-                    neighbour != nullptr) {
-                    neighbour->invalidateLight();
+        if (server::world::changesLight(was, stateId)) {
+            for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+                for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+                    if (Chunk* neighbour = chunkAtLocked(key((x >> 4) + offsetX, (z >> 4) + offsetZ));
+                        neighbour != nullptr) {
+                        neighbour->markLightStale();
+                        if (onNeighbourhoodComplete_) {
+                            onNeighbourhoodComplete_(neighbour->chunkX(), neighbour->chunkZ(), true);
+                        }
+                    }
                 }
             }
         }

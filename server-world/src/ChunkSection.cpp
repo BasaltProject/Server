@@ -69,6 +69,11 @@ std::vector<std::int32_t> ChunkSection::blockStateIds() const { return blockStat
 
 void ChunkSection::copyBlockStateIdsInto(std::span<std::int32_t> dest) const { blockStateIds_.copyInto(dest); }
 
+void ChunkSection::copyMappedBlockStatesInto(std::span<std::uint8_t> dest, std::span<const std::int32_t> table,
+                                             std::uint8_t fallback) const {
+    blockStateIds_.copyMappedInto(dest, table, fallback);
+}
+
 void ChunkSection::copyBiomeIdsInto(std::span<std::int32_t> dest) const { biomeIds_.copyInto(dest); }
 
 void ChunkSection::setBlockStateIds(std::span<const std::int32_t> ids) {
