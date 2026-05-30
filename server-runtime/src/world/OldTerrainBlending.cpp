@@ -66,6 +66,12 @@ std::shared_ptr<BlendingData> OldTerrainBlending::calculated(std::int32_t chunkX
 
 std::shared_ptr<const Blender> OldTerrainBlending::blenderFor(std::int32_t chunkX, std::int32_t chunkZ) {
     const std::lock_guard lock{mutex_};
+    // Verdicts for chunks that are not old are cheap to recompute, so they do not pile up as the world grows.
+    constexpr std::size_t kMaxVerdicts = 262144;
+    if (ages_.size() > kMaxVerdicts) {
+        ages_.clear();
+        std::erase_if(entries_, [](const auto& entry) { return entry.second.data == nullptr; });
+    }
     bool anyOld = false;
     for (std::int32_t dx = -kHeightBlendingRangeChunks; dx <= kHeightBlendingRangeChunks && !anyOld; ++dx) {
         for (std::int32_t dz = -kHeightBlendingRangeChunks; dz <= kHeightBlendingRangeChunks; ++dz) {
