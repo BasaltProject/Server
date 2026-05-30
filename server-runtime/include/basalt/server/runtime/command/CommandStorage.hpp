@@ -19,6 +19,9 @@ namespace basalt::server::runtime::command {
 
 [[nodiscard]] wire::nbt::NbtCompound entityNbtOf(const entity::ServerEntity& entity);
 
+/// parity: `ItemEntity.addAdditionalSaveData` plus the base entity fields a `data get` shows.
+[[nodiscard]] wire::nbt::NbtCompound entityNbtOf(const world::DroppedItem& item);
+
 /// parity: `CommandStorage`.
 class CommandStorage {
 public:
@@ -54,6 +57,7 @@ public:
     struct Entity {
         player::PlayerSession* player = nullptr;
         entity::ServerEntity* mob = nullptr;
+        const world::DroppedItem* item = nullptr;
         std::string name;
     };
 

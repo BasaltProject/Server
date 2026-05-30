@@ -463,12 +463,23 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
     if (entity::piglins::isPiglin(entity.type())) {
         dropPiglinInventory(world, entity);
     }
-    const server::world::loot::LootTable* table = lootTables_->forEntity(entity.type());
+    // parity: `Mob.getLootTable`, a `DeathLootTable` in the tag wins over `minecraft:entities/<type>`.
+    const server::world::loot::LootTable* table = nullptr;
+    if (entity.deathLootTable.has_value()) {
+        if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> named =
+                wire::common::Identifier::parse(*entity.deathLootTable);
+            named.has_value()) {
+            table = lootTables_->byId(*named);
+        }
+    } else {
+        table = lootTables_->forEntity(entity.type());
+    }
     if (table == nullptr) {
         return;
     }
-    // parity: `minecraft:entities/<type>`.
-    random::RandomSource scratch = freshRandom();
+    // parity: `LootTable.getRandomItems(params, seed)`, a nonzero seed gives the table its own random.
+    random::RandomSource scratch =
+        entity.deathLootTableSeed != 0 ? random::RandomSource::legacy(entity.deathLootTableSeed) : freshRandom();
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     const server::world::loot::LootContext context = deathLootContext(world, entity);

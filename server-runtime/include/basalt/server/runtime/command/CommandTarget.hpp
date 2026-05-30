@@ -33,6 +33,8 @@ public:
 
     [[nodiscard]] entity::ServerEntity* entity() const;
 
+    [[nodiscard]] const world::DroppedItem* item() const;
+
     [[nodiscard]] std::string name() const;
 
     [[nodiscard]] std::int32_t entityId() const;

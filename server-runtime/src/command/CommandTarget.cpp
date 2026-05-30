@@ -38,6 +38,11 @@ entity::ServerEntity* CommandTarget::entity() const {
     return found == nullptr ? nullptr : *found;
 }
 
+const world::DroppedItem* CommandTarget::item() const {
+    const world::DroppedItem* const* found = std::get_if<const world::DroppedItem*>(&what_);
+    return found == nullptr ? nullptr : *found;
+}
+
 std::string CommandTarget::name() const {
     if (player::PlayerSession* session = player(); session != nullptr) {
         return session->name();
