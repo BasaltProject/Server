@@ -131,6 +131,77 @@ Component resolveComponent(const std::string& text, const CommandSource& source,
     return result;
 }
 
+Component resolveContents(const Component& component, const CommandSource& source,
+                          const CommandEnvironment& environment, const CommandTarget* holder) {
+    const auto resolveAll = [&](const std::vector<Component>& list) {
+        std::vector<Component> resolved;
+        resolved.reserve(list.size());
+        for (const Component& one : list) {
+            resolved.push_back(resolveContents(one, source, environment, holder));
+        }
+        return resolved;
+    };
+    Component base = component;
+    if (const auto* score = component.as<Component::Score>(); score != nullptr) {
+        std::string name = score->name;
+        if (name == "*") {
+            name = holder != nullptr ? holder->scoreboardName() : std::string{};
+        } else if (name.starts_with('@')) {
+            StringReader reader{name};
+            const Parsed<EntitySelector> selector = EntitySelector::parse(reader, source, environment);
+            std::vector<CommandTarget> found;
+            if (selector.has_value()) {
+                found = selector->select(source, environment, false);
+            }
+            name = found.size() == 1 ? found.front().scoreboardName() : std::string{};
+        }
+        const scoreboard::Scoreboard* board = environment.options().scoreboard;
+        const std::optional<std::int32_t> value =
+            board == nullptr || name.empty() ? std::nullopt : board->score(name, score->objective);
+        base = value.has_value() ? Component::text(std::to_string(*value)) : Component::empty();
+        base = base.withStyle(component.style());
+    } else if (const auto* chosen = component.as<Component::Selector>(); chosen != nullptr) {
+        StringReader reader{chosen->pattern};
+        const Parsed<EntitySelector> selector = EntitySelector::parse(reader, source, environment);
+        if (!selector.has_value()) {
+            base = Component::empty().withStyle(component.style());
+        } else {
+            std::vector<Component> names;
+            const std::vector<CommandTarget> found = selector->select(source, environment, false);
+            const Component separator = chosen->separator != nullptr
+                                            ? resolveContents(*chosen->separator, source, environment, holder)
+                                            : Component::text(", ").color(wire::text::kGray);
+            for (const CommandTarget& target : found) {
+                names.push_back(joinNames({target}, environment));
+            }
+            base = Component::empty().withStyle(component.style());
+            if (!names.empty()) {
+                base = base.append(Component::join(separator, names));
+            }
+        }
+    } else if (const auto* translatable = component.as<Component::Translatable>(); translatable != nullptr) {
+        Component::Translatable copy = *translatable;
+        copy.args = resolveAll(translatable->args);
+        base = Component{Component::Payload{std::move(copy)}, component.style(), {}};
+    } else {
+        base = Component{component.payload(), component.style(), {}};
+    }
+    for (Component& child : resolveAll(component.children())) {
+        base = base.append(std::move(child));
+    }
+    return base;
+}
+
+const Component* resolvedComponent(const CommandContext& context, std::string_view name) {
+    const Component* given = context.get<Component>(name);
+    if (given == nullptr) {
+        return nullptr;
+    }
+    thread_local Component slot;
+    slot = resolveContents(*given, context.source(), context.environment());
+    return &slot;
+}
+
 chat::PlayerChatMessage resolveChatMessage(const CommandContext& context, std::string_view name) {
     const std::string* text = context.get<std::string>(name);
     const std::string content = text == nullptr ? std::string{} : *text;

@@ -1,6 +1,7 @@
 #include "ScoreboardCommand.hpp"
 
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 
@@ -157,7 +158,8 @@ void ScoreboardCommand::buildPlayers(const CommandNodeBuilder& root) const {
                             if (!objective.has_value()) {
                                 return std::unexpected{objective.error()};
                             }
-                            const auto* label = given ? context.get<Component>("name") : nullptr;
+                            const auto* label =
+                                given ? command::messageArguments::resolvedComponent(context, "name") : nullptr;
                             const std::vector<std::string>& holders = holdersOf(context, "targets");
                             for (const std::string& holder : holders) {
                                 scoreboard_->setDisplayName(holder, (*objective)->name,

@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
@@ -108,7 +109,10 @@ void TellRawCommand::build(const CommandNodeBuilder& root) const {
                     return Parsed<std::int32_t>{0};
                 }
                 for (player::PlayerSession* target : *players) {
-                    target->sendSystemMessage(*text);
+                    const CommandTarget holder{*target};
+                    const Component resolved = command::messageArguments::resolveContents(
+                        *text, context.source(), context.environment(), &holder);
+                    target->sendSystemMessage(resolved);
                 }
                 return Parsed<std::int32_t>{static_cast<std::int32_t>(players->size())};
             });

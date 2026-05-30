@@ -1,6 +1,7 @@
 #include "ScoreboardCommand.hpp"
 
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 
 #include <cstdint>
@@ -76,7 +77,7 @@ void ScoreboardCommand::buildObjectives(const CommandNodeBuilder& root) const {
                 return std::unexpected{CommandSyntaxError{
                     .component = Component::translatable("argument.criteria.invalid", {Component::text(*criteria)})}};
             }
-            const auto* label = named ? context.get<Component>("displayName") : nullptr;
+            const auto* label = named ? command::messageArguments::resolvedComponent(context, "displayName") : nullptr;
             Objective objective{.name = *name,
                                 .criterion = *criterion,
                                 .displayName = label == nullptr ? Component::text(*name) : *label,
@@ -187,7 +188,7 @@ void ScoreboardCommand::buildObjectives(const CommandNodeBuilder& root) const {
                         if (!objective.has_value()) {
                             return std::unexpected{objective.error()};
                         }
-                        const auto* wanted = context.get<Component>("displayName");
+                        const auto* wanted = command::messageArguments::resolvedComponent(context, "displayName");
                         if (wanted == nullptr) {
                             return 0;
                         }

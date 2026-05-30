@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/TeamCommand.hpp>
@@ -114,7 +115,8 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
                     CommandSyntaxError{.component = Component::translatable("commands.team.add.duplicate")}};
             }
             if (named) {
-                if (const auto* label = context.get<Component>("displayName"); label != nullptr) {
+                if (const auto* label = command::messageArguments::resolvedComponent(context, "displayName");
+                    label != nullptr) {
                     team->displayName = *label;
                 }
             }
@@ -253,33 +255,33 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
             for (const auto& [what, field] : std::array<std::pair<std::string_view, Component Team::*>, 3>{
                      {{"displayName", &Team::displayName}, {"prefix", &Team::prefix}, {"suffix", &Team::suffix}}}) {
                 named.literal(std::string{what}, [what, field, teamOf, changed](const CommandNodeBuilder& one) {
-                    one.argument(std::string{what}, componentArgument(),
-                                 [what, field, teamOf, changed](const CommandNodeBuilder& value) {
-                                     value.executes([what, field, teamOf,
-                                                     changed](const CommandContext& context) -> Parsed<std::int32_t> {
-                                         const auto team = teamOf(context);
-                                         if (!team.has_value()) {
-                                             return std::unexpected{team.error()};
-                                         }
-                                         const auto* wanted = context.get<Component>(what);
-                                         if (wanted == nullptr) {
-                                             return 0;
-                                         }
-                                         // parity: only the display name refuses a repeat.
-                                         if (what == "displayName" && (*team)->*field == *wanted) {
-                                             return std::unexpected{unchanged("name")};
-                                         }
-                                         (*team)->*field = *wanted;
-                                         changed(context, **team);
-                                         context.success(Component::translatable(
-                                                             "commands.team.option." +
-                                                                 std::string{what == "displayName" ? "name" : what} +
-                                                                 ".success",
-                                                             {(*team)->*field}),
-                                                         what == "displayName");
-                                         return 0;
-                                     });
-                                 });
+                    one.argument(
+                        std::string{what}, componentArgument(),
+                        [what, field, teamOf, changed](const CommandNodeBuilder& value) {
+                            value.executes([what, field, teamOf,
+                                            changed](const CommandContext& context) -> Parsed<std::int32_t> {
+                                const auto team = teamOf(context);
+                                if (!team.has_value()) {
+                                    return std::unexpected{team.error()};
+                                }
+                                const auto* wanted = command::messageArguments::resolvedComponent(context, what);
+                                if (wanted == nullptr) {
+                                    return 0;
+                                }
+                                // parity: only the display name refuses a repeat.
+                                if (what == "displayName" && (*team)->*field == *wanted) {
+                                    return std::unexpected{unchanged("name")};
+                                }
+                                (*team)->*field = *wanted;
+                                changed(context, **team);
+                                context.success(Component::translatable(
+                                                    "commands.team.option." +
+                                                        std::string{what == "displayName" ? "name" : what} + ".success",
+                                                    {(*team)->*field}),
+                                                what == "displayName");
+                                return 0;
+                            });
+                        });
                 });
             }
 
