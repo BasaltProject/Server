@@ -58,6 +58,12 @@ public:
     /// Only rolled on the tick thread.
     void useScoreboard(const scoreboard::Scoreboard* scoreboard) { scoreboard_ = scoreboard; }
 
+    void useTextResolver(
+        std::function<std::optional<wire::nbt::NbtTag>(const wire::nbt::NbtTag& component, std::string_view holder)>
+            resolver) {
+        textResolver_ = std::move(resolver);
+    }
+
     /// Unset, the stack is left blank.
     using ExplorationMaps = std::function<void(LoadedWorld& world, server::world::loot::ItemStack& stack,
                                                const server::world::loot::ExplorationMapRequest& request,
@@ -81,6 +87,7 @@ private:
     server::world::loot::LootReferences references_;
     const LootRegistries* registries_ = nullptr;
     const scoreboard::Scoreboard* scoreboard_ = nullptr;
+    std::function<std::optional<wire::nbt::NbtTag>(const wire::nbt::NbtTag&, std::string_view)> textResolver_;
     ExplorationMaps explorationMaps_;
     std::mutex mutex_;
     std::map<wire::common::Identifier, std::optional<server::world::loot::LootTable>> cache_;

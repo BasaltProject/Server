@@ -77,7 +77,9 @@ public:
                                                       bool add);
     [[nodiscard]] static LootFunction setDamage(FloatProvider damage, bool add);
     [[nodiscard]] static LootFunction setComponents(wire::nbt::NbtCompound components,
-                                                    std::vector<std::string> removed = {});
+                                                    std::vector<std::string> removed = {},
+                                                    std::optional<EntityTarget> resolveFor = std::nullopt,
+                                                    std::vector<std::string> resolveKeys = {});
     [[nodiscard]] static LootFunction setStewEffect(std::vector<std::pair<std::string, IntProvider>> effects);
     [[nodiscard]] static LootFunction setInstrument(std::vector<std::string> options);
     [[nodiscard]] static LootFunction sequence(std::vector<LootFunction> functions);

@@ -69,6 +69,7 @@ struct ComponentEdit {
     std::optional<wire::common::Identifier> id;
     std::int64_t seed = 0;
     EntityTarget entity = EntityTarget::This;
+    bool resolvesAgainstEntity = false;
     std::vector<AttributeModifierSpec> modifiers;
     bool replace = true;
     std::string component;

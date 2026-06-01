@@ -29,6 +29,8 @@ struct LootFunction::Parts {
     std::vector<LootFunction> onPass;
     std::vector<LootFunction> onFail;
     ExplorationMapRequest exploration;
+    std::optional<EntityTarget> resolveFor;
+    std::vector<std::string> resolveKeys;
 };
 
 [[nodiscard]] std::map<std::string, std::int32_t, std::less<>> enchantmentsOf(const ItemStack& stack);

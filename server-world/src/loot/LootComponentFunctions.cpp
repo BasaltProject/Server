@@ -396,8 +396,18 @@ ItemStack applyComponentEdit(const ComponentEdit& edit, ItemStack stack, random:
         return setCustomModelData(edit, std::move(stack), random, context);
     // parity: `SetLoreFunction.updateLore`.
     case ComponentEdit::Op::SetLore: {
+        std::vector<NbtTag> given = edit.values;
+        if (edit.resolvesAgainstEntity && context.resolveText) {
+            if (const std::optional<std::string> holder = scoreHolderOf(context, edit.entity); holder.has_value()) {
+                for (NbtTag& line : given) {
+                    if (std::optional<NbtTag> resolved = context.resolveText(line, *holder); resolved.has_value()) {
+                        line = std::move(*resolved);
+                    }
+                }
+            }
+        }
         const std::vector<NbtTag> lines =
-            edit.operation.apply(elementsOf(stack.components.find(kLore)), edit.values, kMaxLore);
+            edit.operation.apply(elementsOf(stack.components.find(kLore)), given, kMaxLore);
         if (lines.empty()) {
             static_cast<void>(stack.components.remove(kLore));
         } else {

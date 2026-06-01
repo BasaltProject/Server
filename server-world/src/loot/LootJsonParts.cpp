@@ -428,7 +428,15 @@ Parsed<LootFunction> parseComponentSetter(std::string_view type, const JsonObjec
     if (!ok) {
         return std::unexpected(LootTableParseError{"Component value NBT cannot hold"});
     }
-    return LootFunction::setComponents(std::move(components), std::move(removed));
+    std::optional<EntityTarget> resolveFor;
+    std::vector<std::string> resolveKeys;
+    if (type == "minecraft:set_name") {
+        resolveFor = entityTargetOf(function.find("entity"));
+        const std::optional<std::string> target = asString(function.find("target"));
+        resolveKeys.push_back(target == std::optional<std::string>{"item_name"} ? "minecraft:item_name"
+                                                                                : "minecraft:custom_name");
+    }
+    return LootFunction::setComponents(std::move(components), std::move(removed), resolveFor, std::move(resolveKeys));
 }
 
 } // namespace basalt::server::world::loot::lootTableJson::parts

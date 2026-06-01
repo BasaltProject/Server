@@ -137,6 +137,9 @@ struct LootContext {
     /// parity: `SlotProvider.getSlotsFromRange`.
     std::function<std::vector<ItemStack>(std::string_view source, std::string_view slots)> slotsOf;
     std::function<std::vector<wire::common::Identifier>(std::string_view registry)> registryEntries;
+    /// parity: `ComponentUtils.updateForEntity`, a text component with its selectors and scores filled in for `holder`.
+    std::function<std::optional<wire::nbt::NbtTag>(const wire::nbt::NbtTag& component, std::string_view holder)>
+        resolveText;
 };
 
 /// else the name its facts carry. parity: `LootContext.getOptionalParameter(...).getScoreboardName`.

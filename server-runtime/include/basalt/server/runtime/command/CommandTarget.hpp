@@ -6,6 +6,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <set>
 #include <string>
 #include <variant>
@@ -67,7 +68,7 @@ public:
     [[nodiscard]] double height() const;
 
 private:
-    std::variant<player::PlayerSession*, entity::ServerEntity*, const world::DroppedItem*> what_;
+    std::variant<player::PlayerSession*, entity::ServerEntity*, std::shared_ptr<const world::DroppedItem>> what_;
     std::string worldName_;
 };
 
