@@ -23,7 +23,8 @@ using LevelEvent = std::function<void(std::int32_t x, std::int32_t y, std::int32
 /// parity: `PointedDripstoneBlock.randomTick`.
 void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                random::RandomSource& random, std::vector<BlockChange>& changes, bool evaporates = false,
-               const LevelEvent& levelEvent = {}, const WorldClock* clock = nullptr);
+               const LevelEvent& levelEvent = {}, const WorldClock* clock = nullptr,
+               const LevelEvent& pushPlayersUp = {});
 
 } // namespace dripstoneGrowth
 

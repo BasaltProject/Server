@@ -68,7 +68,7 @@ void pushEntitiesUp(WorldState& world, std::int32_t x, std::int32_t y, std::int3
 
 void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                random::RandomSource& random, std::vector<BlockChange>& changes, const bool evaporates,
-               const LevelEvent& levelEvent, const WorldClock* clock) {
+               const LevelEvent& levelEvent, const WorldClock* clock, const LevelEvent& pushPlayersUp) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return;
@@ -84,6 +84,9 @@ void dripstone(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
                 const auto [cx, cy, cz] = *transfer->clay;
                 growthSupport::set(world, cx, cy, cz, registry::blocks::named("clay")->stateId, changes);
                 pushEntitiesUp(world, cx, cy, cz);
+                if (pushPlayersUp) {
+                    pushPlayersUp(cx, cy, cz, 0);
+                }
                 if (clock != nullptr) {
                     // parity: `PointedDripstoneBlock.maybeTransferFluid` ends the clay with `BLOCK_CHANGE`.
                     vibrations::emit(world, "block_change", cx + 0.5, cy + 0.5, cz + 0.5, clock->totalTicks());
