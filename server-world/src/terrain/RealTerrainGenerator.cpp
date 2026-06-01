@@ -108,9 +108,9 @@ GeneratedTerrain buildTerrain(const NoiseRouter& router, const surface::SurfaceR
     });
     generationMetrics::measure(generationMetrics::Phase::Carvers, [&] {
         // parity: the carvers' biome is the uncached climate resolver's, not the chunk's container.
-        const carver::CarverBiome carverBiome = [&environment](std::int32_t quartX, std::int32_t quartY,
-                                                               std::int32_t quartZ) -> const std::string& {
-            return environment.noiseBiomeAt(quartX, quartY, quartZ, nullptr);
+        const carver::CarverBiome carverBiome = [&biomes](std::int32_t quartX, std::int32_t quartY,
+                                                          std::int32_t quartZ) -> const std::string& {
+            return biomes->noiseBiomeAt(quartX, quartY, quartZ, nullptr);
         };
         const carver::TopMaterial topMaterial = [&](std::int32_t x, std::int32_t y, std::int32_t z, bool underFluid) {
             return router.materialSystem->topMaterial(*router.materialRule, chunk, noiseChunk.samplers(), biomeGetter,

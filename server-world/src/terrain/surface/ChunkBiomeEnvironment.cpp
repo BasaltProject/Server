@@ -29,10 +29,11 @@ const std::string& ChunkBiomeEnvironment::noiseBiomeAt(std::int32_t quartX, std:
                              ((static_cast<std::int64_t>(quartZ) & 0x1FFFFFLL) << 41);
     const auto found = noiseBiomes_.find(key);
     if (found != noiseBiomes_.end()) {
-        return found->second;
+        return *found->second;
     }
-    // References into an unordered_map stay valid across inserts.
-    return noiseBiomes_.emplace(key, delegate_->noiseBiomeAt(quartX, quartY, quartZ, context_)).first->second;
+    const std::string& named = delegate_->noiseBiomeAt(quartX, quartY, quartZ, context_);
+    noiseBiomes_.emplace(key, &named);
+    return named;
 }
 
 } // namespace basalt::server::world::terrain::surface

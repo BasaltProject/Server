@@ -30,7 +30,7 @@ private:
     densityfunction::SamplerContext* context_;
     std::optional<BiomeZoomer> zoomer_;
     // Mutable because the lookups are logically const: the cache is memoization, not state.
-    mutable std::unordered_map<std::int64_t, std::string> noiseBiomes_;
+    mutable std::unordered_map<std::int64_t, const std::string*> noiseBiomes_;
 };
 
 } // namespace basalt::server::world::terrain::surface
