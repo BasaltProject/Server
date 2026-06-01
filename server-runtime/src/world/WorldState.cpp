@@ -168,6 +168,23 @@ bool WorldState::lightWindowFor(std::int32_t chunkX, std::int32_t chunkZ,
     return true;
 }
 
+void WorldState::requestLight(std::int32_t chunkX, std::int32_t chunkZ) {
+    if (!onNeighbourhoodComplete_) {
+        return;
+    }
+    {
+        const WorldReadLock lock{mutex_};
+        for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+            for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+                if (chunkAtLocked(key(chunkX + offsetX, chunkZ + offsetZ)) == nullptr) {
+                    return;
+                }
+            }
+        }
+    }
+    onNeighbourhoodComplete_(chunkX, chunkZ, false);
+}
+
 void WorldState::lightDone() {
     lightBusy_.store(false);
     const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
@@ -262,7 +279,9 @@ void WorldState::queueBlockEvent(BlockEvent event) {
 
 void WorldState::recordGameEvent(GameEventRecord record) {
     const WorldWriteLock lock{mutex_};
-    std::erase_if(gameEvents_, [&record](const GameEventRecord& kept) { return kept.gameTime < record.gameTime - 1; });
+    const auto firstKept = std::ranges::find_if(
+        gameEvents_, [&record](const GameEventRecord& kept) { return kept.gameTime >= record.gameTime - 1; });
+    gameEvents_.erase(gameEvents_.begin(), firstKept);
     gameEvents_.push_back(std::move(record));
 }
 

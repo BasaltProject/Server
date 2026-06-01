@@ -258,6 +258,10 @@ private:
     /// Owner thread only: the entities stashed, the NBT of each chunk built and the chunk marked clean.
     [[nodiscard]] std::vector<RegionStore::Snapshot> snapshotOf(const std::vector<server::world::Chunk*>& chunks);
 
+    /// A few chunks per owner turn, so a long save never holds the tick.
+    [[nodiscard]] std::vector<RegionStore::Snapshot>
+    snapshotInBatches(const std::vector<std::pair<std::int32_t, std::int32_t>>& positions);
+
     /// parity: `RandomSupport.generateUniqueSeed`, what `RandomSource.create` starts from.
     [[nodiscard]] static random::RandomSource uniqueRandom();
 
@@ -303,6 +307,7 @@ private:
     std::optional<std::array<std::int32_t, 3>> spawnOverride_;
     bool movedSpawn_ = false;
     WorldClock clock_;
+    static constexpr std::size_t kSnapshotBatch = 8;
     static constexpr std::size_t kLightQueueLimit = 4096;
     static constexpr std::chrono::milliseconds kLightDebounce{80};
     std::mutex lightQueueMutex_;

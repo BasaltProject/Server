@@ -555,15 +555,12 @@ float randomTicks::growthSpeed(WorldState& world, std::int32_t x, std::int32_t y
     return diagonal ? speed / 2.0F : speed;
 }
 
-std::int32_t RandomTicks::nextWalk(const randomTicks::Context& context) {
-    const auto found = walks_.find(context.worldName);
-    const std::int32_t previous = found == walks_.end() ? static_cast<std::int32_t>(context.seed) : found->second;
+std::int32_t RandomTicks::nextWalk(std::int32_t& state) {
     // Wrapping is the point: vanilla's is a Java int and this walk depends on it overflowing.
-    const std::int32_t next = static_cast<std::int32_t>(
-        (static_cast<std::uint32_t>(previous) * static_cast<std::uint32_t>(randomTicks::kWalkMultiplier)) +
+    state = static_cast<std::int32_t>(
+        (static_cast<std::uint32_t>(state) * static_cast<std::uint32_t>(randomTicks::kWalkMultiplier)) +
         static_cast<std::uint32_t>(randomTicks::kWalkAddend));
-    walks_.insert_or_assign(std::string{context.worldName}, next);
-    return next >> 2;
+    return state >> 2;
 }
 
 std::vector<BlockChange> RandomTicks::tick(const randomTicks::Context& context,
@@ -573,9 +570,17 @@ std::vector<BlockChange> RandomTicks::tick(const randomTicks::Context& context,
         return {};
     }
     std::vector<BlockChange> changes;
+    const auto found = walks_.find(context.worldName);
+    std::int32_t walkState = found == walks_.end() ? static_cast<std::int32_t>(context.seed) : found->second;
     for (const std::array<std::int32_t, 2>& position : chunks) {
         const server::world::Chunk* chunk = context.world.chunkIfLoaded(position[0], position[1]);
         if (chunk == nullptr) {
+            continue;
+        }
+        // parity: a chunk ticks once it is lit, which the light thread gets to a moment after it stands.
+        if (context.world.lightsAsynchronously() &&
+            (chunk->cachedBlockLight() == nullptr || (context.hasSkylight && chunk->cachedSkyLight() == nullptr))) {
+            context.world.requestLight(position[0], position[1]);
             continue;
         }
         const std::int32_t minX = position[0] << 4;
@@ -587,17 +592,18 @@ std::vector<BlockChange> RandomTicks::tick(const randomTicks::Context& context,
             }
             const std::int32_t sectionY = chunk->verticalBounds().minY() + (static_cast<std::int32_t>(index) << 4);
             for (std::int32_t step = 0; step < speed; step++) {
-                const std::int32_t walk = nextWalk(context);
+                const std::int32_t walk = nextWalk(walkState);
                 const std::int32_t x = minX + (walk & 15);
                 const std::int32_t y = sectionY + ((walk >> 16) & 15);
                 const std::int32_t z = minZ + ((walk >> 8) & 15);
-                const std::optional<std::int32_t> stateId = context.world.blockState(x, y, z);
-                if (stateId.has_value() && registry::blockSupport::ticksRandomly(*stateId)) {
-                    act(context, x, y, z, *stateId, random, changes);
+                const std::int32_t stateId = chunk->blockStateId(x & 15, y, z & 15);
+                if (registry::blockSupport::ticksRandomly(stateId)) {
+                    act(context, x, y, z, stateId, random, changes);
                 }
             }
         }
     }
+    walks_.insert_or_assign(std::string{context.worldName}, walkState);
     return changes;
 }
 
