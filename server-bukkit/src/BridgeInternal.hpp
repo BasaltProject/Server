@@ -29,6 +29,10 @@ public:
 
     [[nodiscard]] const wire::common::Logger& log() const noexcept { return log_; }
 
+    [[nodiscard]] JNIEnv* env() const { return shim_->env(); }
+
+    void reportFailure(JNIEnv* env, std::string_view where) { reportJavaFailure(env, where); }
+
     [[nodiscard]] const plugins::PluginEventType* typeNamed(const std::string& name) const;
     void scheduleAfter(std::int64_t id, std::int32_t delay);
     void scheduleEvery(std::int64_t id, std::int32_t delay, std::int32_t period);
@@ -72,6 +76,8 @@ private:
 };
 
 void registerNatives(JNIEnv* env, jclass natives);
+void registerPacketNatives(JNIEnv* env, jclass natives);
+void registerWorldNatives(JNIEnv* env, jclass natives);
 
 [[nodiscard]] std::string toStd(JNIEnv* env, jstring text);
 [[nodiscard]] jstring toJava(JNIEnv* env, std::string_view text);

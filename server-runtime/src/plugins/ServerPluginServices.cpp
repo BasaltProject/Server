@@ -94,15 +94,21 @@ public:
                  const std::map<std::int32_t, server::plugins::PluginItem>&) override {}
 };
 
-class NoPackets final : public server::plugins::PluginPacketSender {
+class NoPackets final : public NamedPackets {
 public:
-    bool send(server::plugins::PluginPlayerRef&, std::string_view, std::span<const std::uint8_t>) override {
+    bool send(server::plugins::PluginPlayerRef&, const server::plugins::PacketAddress&, std::span<const std::uint8_t>,
+              bool) override {
         return false;
     }
 
-    [[nodiscard]] bool isKnown(std::string_view name) const override { return packetNames::isKnown(name); }
+    bool receive(server::plugins::PluginPlayerRef&, const server::plugins::PacketAddress&,
+                 std::span<const std::uint8_t>, bool) override {
+        return false;
+    }
 
-    [[nodiscard]] std::vector<std::string> names() const override { return packetNames::all(); }
+    [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint> endpointOf(server::plugins::PluginPlayerRef&) override {
+        return nullptr;
+    }
 };
 
 class NoChannels final : public server::plugins::PluginChannelSender {
@@ -325,6 +331,17 @@ bool DispatcherCommands::runAsConsole(std::string_view command) {
     return true;
 }
 
+bool DispatcherCommands::runAsPlayer(server::plugins::PluginPlayerRef& player, std::string_view command) {
+    if (!playerRunner_) {
+        return false;
+    }
+    std::string line{command};
+    if (line.starts_with('/')) {
+        line.erase(0, 1);
+    }
+    return playerRunner_(player.uuid(), line);
+}
+
 void DispatcherCommands::refresh() {
     for (const std::unique_ptr<Entry>& entry : entries_) {
         entry->node = add(*entry);
@@ -337,27 +354,39 @@ RootPaths::RootPaths(std::string root) : packages_(std::move(root) + "/plugins")
     }
 }
 
-bool SessionPackets::send(server::plugins::PluginPlayerRef& player, std::string_view name,
-                          std::span<const std::uint8_t> bytes) {
-    const std::optional<std::pair<wire::protocol::ProtocolState, std::int32_t>> id = packetNames::idOf(name);
-    if (!id.has_value()) {
-        return false;
-    }
-    const std::string uuid = player.uuid();
-    for (const player::PlayerSession* session : registry_->snapshot()) {
-        if (session->uuid().toString() != uuid || !session->connection().sendPlayPacket) {
-            continue;
-        }
-        session->connection().sendPlayPacket(id->second,
-                                             [bytes](wire::io::ByteBuffer& buffer) { buffer.writeBytes(bytes); });
-        return true;
-    }
-    return false;
+std::optional<server::plugins::PacketAddress> NamedPackets::resolve(std::string_view name) const {
+    return packetNames::resolve(name);
 }
 
-bool SessionPackets::isKnown(std::string_view name) const { return packetNames::isKnown(name); }
+std::optional<server::plugins::PacketScope> NamedPackets::scopeOf(std::string_view name) const {
+    return packetNames::scopeOf(name);
+}
 
-std::vector<std::string> SessionPackets::names() const { return packetNames::all(); }
+std::string NamedPackets::nameOf(const server::plugins::PacketAddress& address) const { return packetNames::of(address); }
+
+std::vector<std::string> NamedPackets::names() const { return packetNames::all(); }
+
+std::shared_ptr<server::plugins::PacketEndpoint> SessionPackets::endpointOf(server::plugins::PluginPlayerRef& player) {
+    const std::string uuid = player.uuid();
+    for (const player::PlayerSession* session : registry_->snapshot()) {
+        if (session->uuid().toString() == uuid && session->connection().packetEndpoint) {
+            return session->connection().packetEndpoint();
+        }
+    }
+    return nullptr;
+}
+
+bool SessionPackets::send(server::plugins::PluginPlayerRef& player, const server::plugins::PacketAddress& address,
+                          std::span<const std::uint8_t> bytes, bool intercept) {
+    const std::shared_ptr<server::plugins::PacketEndpoint> endpoint = endpointOf(player);
+    return endpoint != nullptr && endpoint->sendClientbound(address.id, bytes, intercept);
+}
+
+bool SessionPackets::receive(server::plugins::PluginPlayerRef& player, const server::plugins::PacketAddress& address,
+                             std::span<const std::uint8_t> bytes, bool intercept) {
+    const std::shared_ptr<server::plugins::PacketEndpoint> endpoint = endpointOf(player);
+    return endpoint != nullptr && endpoint->receiveServerbound(address.id, bytes, intercept);
+}
 
 bool SessionChannels::send(server::plugins::PluginPlayerRef& player, std::string_view channel,
                            std::span<const std::uint8_t> bytes) {

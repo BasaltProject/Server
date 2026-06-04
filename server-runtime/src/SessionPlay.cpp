@@ -302,6 +302,7 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.sendPlayPacket = [this](std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& write) {
         sendPlayPacket(id, write);
     };
+    connection.packetEndpoint = [this] { return endpoint(); };
     connection.broadcastEffects = [this](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                                          const std::vector<world::BlockEffect>& effects) {
         blockInteraction_->broadcastEffects(play::BlockPos{x, y, z}, stateId, effects);

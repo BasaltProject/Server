@@ -32,4 +32,9 @@ public final class Natives {
     public static native String blockAt(String world, int x, int y, int z);
     public static native boolean setBlockAt(String world, int x, int y, int z, String block);
     public static native long worldTime(String world);
+    public static native void packetTap(boolean on);
+    public static native void packetSend(long connection, int id, byte[] body);
+    public static native void packetReceive(long connection, int id, byte[] body);
+    public static native void packetClose(long connection);
+    public static native long packetConnectionOf(String uuid);
 }

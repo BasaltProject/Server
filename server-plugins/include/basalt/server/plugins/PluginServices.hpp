@@ -2,6 +2,7 @@
 
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
+#include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 
 #include <cstdint>
@@ -65,6 +66,12 @@ public:
                                          std::function<void(PluginCommandCall&)> run) = 0;
 
     virtual bool runAsConsole(std::string_view command) = 0;
+
+    virtual bool runAsPlayer(PluginPlayerRef& player, std::string_view command) {
+        static_cast<void>(player);
+        static_cast<void>(command);
+        return false;
+    }
 };
 
 class PluginPaths {
@@ -168,11 +175,25 @@ public:
     PluginPacketSender& operator=(PluginPacketSender&&) = delete;
     virtual ~PluginPacketSender() = default;
 
-    virtual bool send(PluginPlayerRef& player, std::string_view name, std::span<const std::uint8_t> bytes) = 0;
+    /// Sends a clientbound packet; the body is in the wire format of the player's protocol, `intercept` runs listeners.
+    virtual bool send(PluginPlayerRef& player, const PacketAddress& address, std::span<const std::uint8_t> bytes,
+                      bool intercept) = 0;
 
-    [[nodiscard]] virtual bool isKnown(std::string_view name) const = 0;
+    /// Handles a serverbound packet as if the player's client had sent it.
+    virtual bool receive(PluginPlayerRef& player, const PacketAddress& address, std::span<const std::uint8_t> bytes,
+                         bool intercept) = 0;
+
+    [[nodiscard]] virtual std::optional<PacketAddress> resolve(std::string_view name) const = 0;
+
+    /// Like `resolve`, and also the wildcard names such as `serverbound.*` or `clientbound.play.*`.
+    [[nodiscard]] virtual std::optional<PacketScope> scopeOf(std::string_view name) const = 0;
+
+    [[nodiscard]] virtual std::string nameOf(const PacketAddress& address) const = 0;
 
     [[nodiscard]] virtual std::vector<std::string> names() const = 0;
+
+    /// The connection of an online Java player, or null (a Bedrock player has no Java packets).
+    [[nodiscard]] virtual std::shared_ptr<PacketEndpoint> endpointOf(PluginPlayerRef& player) = 0;
 };
 
 class PluginChannelSender {

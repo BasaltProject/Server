@@ -28,7 +28,7 @@ import org.bukkit.plugin.messaging.Messenger;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.basaltmc.bukkit.gen.ServerBase;
 
-public final class BasaltServer extends ServerBase {
+public class BasaltServer extends ServerBase {
     public static final String kMinecraftVersion = "26.3";
 
     private static BasaltServer instance;
@@ -45,7 +45,7 @@ public final class BasaltServer extends ServerBase {
     private final Map<String, BasaltWorld> worlds = new LinkedHashMap<>();
     private final Thread primaryThread = Thread.currentThread();
 
-    BasaltServer(File root, File pluginsFolder) {
+    protected BasaltServer(File root, File pluginsFolder) {
         instance = this;
         this.root = root;
         this.pluginManager = new BasaltPluginManager(this, pluginsFolder);
@@ -78,7 +78,7 @@ public final class BasaltServer extends ServerBase {
     }
 
     synchronized BasaltPlayer player(UUID id, String name) {
-        return players.computeIfAbsent(id, key -> new BasaltPlayer(key, name));
+        return players.computeIfAbsent(id, key -> new org.bukkit.craftbukkit.entity.CraftPlayer(key, name));
     }
 
     synchronized void forget(UUID id) {

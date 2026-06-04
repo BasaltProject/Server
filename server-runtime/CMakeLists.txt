@@ -153,6 +153,7 @@ basalt_module(server-runtime-core
         src/plugins/EventSink.cpp
         src/plugins/WorldEventHooks.cpp
         src/plugins/PacketNames.cpp
+        src/plugins/PacketNameTable.cpp
         src/plugins/PluginsCommand.cpp
         src/plugins/ServerNpcs.cpp
         src/plugins/ServerPluginServices.cpp
@@ -160,6 +161,7 @@ basalt_module(server-runtime-core
         src/plugins/ServerWorldModel.cpp
         src/ChunkSimulationView.cpp
         src/ClientSession.cpp
+        src/ClientSessionPackets.cpp
         src/CommandWiring.cpp
         src/SessionLogin.cpp
         src/SessionPlay.cpp
