@@ -233,8 +233,11 @@ command::CommandNode* DispatcherCommands::add(Entry& entry) {
     Entry* target = &entry;
     sched::Owner* owner = owner_;
     return &dispatcher_->registerNode(entry.spec.name(), [target, owner](const command::CommandNodeBuilder& root) {
-        root.permission(
-            target->spec.permission.value_or("basalt.plugin." + target->pluginId + "." + target->spec.name()));
+        // An empty permission opens the command to everyone.
+        if (!target->spec.permission.has_value() || !target->spec.permission->empty()) {
+            root.permission(
+                target->spec.permission.value_or("basalt.plugin." + target->pluginId + "." + target->spec.name()));
+        }
         const auto arguments = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
         *arguments = [target, owner, arguments](const command::CommandNodeBuilder& builder, std::size_t index) {
             // An optional argument makes the command runnable without it, so every node from it onwards executes.

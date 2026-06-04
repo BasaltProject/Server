@@ -1,0 +1,19 @@
+# Bukkit plugin compatibility. Off by default.
+#
+
+enabled = false
+
+# Shim's libjvm.so (or the .dylib / .dll of your platform).
+libjvm = ""
+
+# Shim's classpath.jar: the Java class library Shim runs with.
+boot-classpath = ""
+
+# The Basalt Bukkit runtime jar, built together with the server (build/bukkit/basalt-bukkit.jar).
+runtime-jar = ""
+
+# A folder with the Bukkit API jar and its libraries (adventure, guava, gson, snakeyaml...), one jar each.
+libraries = ""
+
+# Where Bukkit plugin jars go.
+plugins = "plugins-bukkit"

@@ -155,6 +155,8 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         logger_.info([] { return "Plugins are off in server.toml."; });
     }
 
+    startBukkit();
+
     // Queued on the owner, since a decider only runs where the plugins do.
     worldRegistry_->scheduler().global().submit([this] {
         server::plugins::PluginEventBus& bus = plugins_->events();
@@ -307,6 +309,7 @@ void BasaltServer::shutdown() {
     static_cast<void>(server::plugins::emit(
         &plugins_->events(), &server::plugins::pluginEventTypes::serverStop(),
         [&players](server::plugins::PluginEvent& event) { event.set(0, static_cast<std::int32_t>(players.size())); }));
+    bukkit_.reset();
     plugins_->unloadAll();
     for (const auto& [name, world] : worldRegistry_->worlds()) {
         world->stopGenerating(kShutdownDrainTimeoutMillis);

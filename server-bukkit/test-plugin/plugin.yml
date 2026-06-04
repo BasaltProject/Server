@@ -1,0 +1,14 @@
+name: HelloBasalt
+version: 1.0.0
+main: org.basaltmc.hello.HelloPlugin
+api-version: "1.21"
+description: Exercises the Bukkit compatibility layer
+author: Basalt
+commands:
+  hello:
+    description: Greets the sender
+    usage: /hello [name]
+    aliases: [hi]
+  hellotime:
+    description: Reads the world time
+    usage: /hellotime
