@@ -22,10 +22,37 @@ void PluginChannelHost::listenOn(LoadedPlugin& plugin, const std::string& channe
     }));
 }
 
-bool PluginChannelHost::listeningOnChannel(std::string_view channel) const { return channels_.contains(channel); }
+PluginHandle PluginChannelHost::listenNative(const std::string& channel, NativeListener listener) {
+    const std::int64_t id = nextId_++;
+    native_[channel].push_back(NativeEntry{.id = id, .fn = std::move(listener)});
+    return PluginHandle{[this, channel, id] {
+        const auto found = native_.find(channel);
+        if (found == native_.end()) {
+            return;
+        }
+        std::erase_if(found->second, [id](const NativeEntry& entry) { return entry.id == id; });
+        if (found->second.empty()) {
+            native_.erase(found);
+        }
+    }};
+}
+
+bool PluginChannelHost::listeningOnChannel(std::string_view channel) const {
+    return channels_.contains(channel) || native_.contains(channel);
+}
 
 void PluginChannelHost::channelMessage(PluginHost& host, const std::string& channel, const std::string& playerUuid,
                                        std::span<const std::uint8_t> bytes) {
+    if (const auto natives = native_.find(channel); natives != native_.end()) {
+        // A copy, because a listener may register or drop one while this runs.
+        std::vector<NativeListener> listeners;
+        for (const NativeEntry& entry : natives->second) {
+            listeners.push_back(entry.fn);
+        }
+        for (const NativeListener& listener : listeners) {
+            listener(channel, playerUuid, bytes);
+        }
+    }
     const auto found = channels_.find(channel);
     if (found == channels_.end()) {
         return;

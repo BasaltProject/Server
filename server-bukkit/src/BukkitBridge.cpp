@@ -23,6 +23,7 @@ struct Boxes {
     jmethodID longValue = nullptr;
     jmethodID doubleValue = nullptr;
 };
+
 Boxes gBoxes;
 
 [[nodiscard]] std::string lowercase(std::string text) {
@@ -130,8 +131,9 @@ std::expected<void, std::string> BukkitBridge::boot() {
     eventMethod_ = env->GetStaticMethodID(runtime_, "event", "(Ljava/lang/String;IJ[Ljava/lang/Object;Z)Z");
     commandMethod_ =
         env->GetStaticMethodID(runtime_, "command", "(Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Z");
-    if (bootMethod_ == nullptr || shutdownMethod_ == nullptr || taskMethod_ == nullptr || eventMethod_ == nullptr ||
-        commandMethod_ == nullptr) {
+    channelMethod_ = env->GetStaticMethodID(runtime_, "channelMessage", "(Ljava/lang/String;Ljava/lang/String;[B)V");
+    if (channelMethod_ == nullptr || bootMethod_ == nullptr || shutdownMethod_ == nullptr || taskMethod_ == nullptr ||
+        eventMethod_ == nullptr || commandMethod_ == nullptr) {
         reportJavaFailure(env, "resolving BukkitRuntime entry points");
         return std::unexpected(std::string{"BukkitRuntime entry points not found"});
     }
@@ -157,6 +159,7 @@ void BukkitBridge::shutdown() {
         }
     }
     tasks_.clear();
+    channels_.clear();
     commands_.clear();
     eventHandles_.clear();
     plugins_->events().removeAll(kEventOwner);
@@ -178,9 +181,9 @@ void BukkitBridge::runTask(std::int64_t id) {
 
 void BukkitBridge::scheduleAfter(std::int64_t id, std::int32_t delay) {
     tasks_.insert_or_assign(id, services().tasks().after(delay, [this, id] {
-                                tasks_.erase(id);
-                                runTask(id);
-                            }));
+        tasks_.erase(id);
+        runTask(id);
+    }));
 }
 
 void BukkitBridge::scheduleEvery(std::int64_t id, std::int32_t delay, std::int32_t period) {
@@ -210,10 +213,9 @@ bool BukkitBridge::deliver(const std::string& event, std::int32_t priority, Snap
         }
     }
     jstring name = toJava(env, event);
-    const jboolean cancelled =
-        env->CallStaticBooleanMethod(runtime_, eventMethod_, name, static_cast<jint>(priority),
-                                     static_cast<jlong>(snapshot.generation), fields,
-                                     snapshot.cancelled ? JNI_TRUE : JNI_FALSE);
+    const jboolean cancelled = env->CallStaticBooleanMethod(runtime_, eventMethod_, name, static_cast<jint>(priority),
+                                                            static_cast<jlong>(snapshot.generation), fields,
+                                                            snapshot.cancelled ? JNI_TRUE : JNI_FALSE);
     bool result = snapshot.cancelled;
     if (env->ExceptionCheck() == JNI_TRUE) {
         reportJavaFailure(env, "event " + event);
@@ -268,8 +270,8 @@ bool BukkitBridge::subscribe(const std::string& event, std::int32_t priority) {
             }
             if (!plugins_->onPluginThread()) {
                 if (monitor || !fired.type().cancellable()) {
-                    static_cast<void>(services().tasks().after(
-                        0, [this, event, priority, moved = std::move(snapshot)]() mutable {
+                    static_cast<void>(
+                        services().tasks().after(0, [this, event, priority, moved = std::move(snapshot)]() mutable {
                             deliver(event, priority, moved);
                         }));
                 } else if (!warnedAboutThread_) {
@@ -312,8 +314,7 @@ bool BukkitBridge::runCommand(const std::string& name, plugins::PluginCommandCal
     return handled == JNI_TRUE;
 }
 
-void BukkitBridge::registerCommand(const std::string& plugin, const std::string& name,
-                                   const std::string& permission) {
+void BukkitBridge::registerCommand(const std::string& plugin, const std::string& name, const std::string& permission) {
     const std::string label = lowercase(name);
     auto spec = plugins::PluginCommandSpec::parse(label + " [args:text]");
     if (!spec.has_value()) {
@@ -332,5 +333,29 @@ void BukkitBridge::unregisterCommands(const std::string& plugin) {
         entry->second.remove();
     }
     commands_.erase(first, last);
+}
+} // namespace basalt::server::bukkit
+
+namespace basalt::server::bukkit {
+void BukkitBridge::listenChannel(const std::string& channel) {
+    if (channels_.contains(channel)) {
+        return;
+    }
+    channels_.emplace(channel, plugins_->listenNative(channel, [this](const std::string& name, const std::string& uuid,
+                                                                      std::span<const std::uint8_t> bytes) {
+        JNIEnv* env = shim_->env();
+        jbyteArray payload = env->NewByteArray(static_cast<jsize>(bytes.size()));
+        env->SetByteArrayRegion(payload, 0, static_cast<jsize>(bytes.size()),
+                                reinterpret_cast<const jbyte*>(bytes.data()));
+        jstring channelName = toJava(env, name);
+        jstring player = toJava(env, uuid);
+        env->CallStaticVoidMethod(runtime_, channelMethod_, channelName, player, payload);
+        if (env->ExceptionCheck() == JNI_TRUE) {
+            reportJavaFailure(env, "plugin message on " + name);
+        }
+        env->DeleteLocalRef(payload);
+        env->DeleteLocalRef(channelName);
+        env->DeleteLocalRef(player);
+    }));
 }
 } // namespace basalt::server::bukkit

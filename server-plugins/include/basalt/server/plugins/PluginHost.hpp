@@ -239,6 +239,10 @@ public:
 
     void listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn);
 
+    [[nodiscard]] PluginHandle listenNative(const std::string& channel, PluginChannelHost::NativeListener listener) {
+        return channels_.listenNative(channel, std::move(listener));
+    }
+
     [[nodiscard]] bool listeningOnChannel(std::string_view channel) const;
 
     void channelMessage(const std::string& channel, const std::string& playerUuid, std::span<const std::uint8_t> bytes);

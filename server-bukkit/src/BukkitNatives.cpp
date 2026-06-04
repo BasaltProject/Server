@@ -67,6 +67,21 @@ void JNICALL nativeUnregisterCommands(JNIEnv* env, jclass, jstring plugin) {
     BukkitBridge::current().unregisterCommands(toStd(env, plugin));
 }
 
+void JNICALL nativeListenChannel(JNIEnv* env, jclass, jstring channel) {
+    BukkitBridge::current().listenChannel(toStd(env, channel));
+}
+
+jboolean JNICALL nativeChannelSend(JNIEnv* env, jclass, jstring uuid, jstring channel, jbyteArray payload) {
+    const auto player = playerOf(env, uuid);
+    if (player == nullptr) {
+        return JNI_FALSE;
+    }
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(env->GetArrayLength(payload)));
+    env->GetByteArrayRegion(payload, 0, static_cast<jsize>(bytes.size()), reinterpret_cast<jbyte*>(bytes.data()));
+    return BukkitBridge::current().services().channels().send(*player, toStd(env, channel), bytes) ? JNI_TRUE
+                                                                                                   : JNI_FALSE;
+}
+
 jboolean JNICALL nativeConsole(JNIEnv* env, jclass, jstring line) {
     return BukkitBridge::current().services().commands().runAsConsole(toStd(env, line)) ? JNI_TRUE : JNI_FALSE;
 }
@@ -212,6 +227,11 @@ void registerNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativeRegisterCommand)},
         JNINativeMethod{const_cast<char*>("unregisterCommands"), const_cast<char*>("(Ljava/lang/String;)V"),
                         reinterpret_cast<void*>(&nativeUnregisterCommands)},
+        JNINativeMethod{const_cast<char*>("listenChannel"), const_cast<char*>("(Ljava/lang/String;)V"),
+                        reinterpret_cast<void*>(&nativeListenChannel)},
+        JNINativeMethod{const_cast<char*>("playerChannelSend"),
+                        const_cast<char*>("(Ljava/lang/String;Ljava/lang/String;[B)Z"),
+                        reinterpret_cast<void*>(&nativeChannelSend)},
         JNINativeMethod{const_cast<char*>("runConsoleCommand"), const_cast<char*>("(Ljava/lang/String;)Z"),
                         reinterpret_cast<void*>(&nativeConsole)},
         JNINativeMethod{const_cast<char*>("pluginFolder"), const_cast<char*>("(Ljava/lang/String;)Ljava/lang/String;"),
@@ -246,8 +266,7 @@ void registerNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativePlayerGive)},
         JNINativeMethod{const_cast<char*>("worlds"), const_cast<char*>("()[Ljava/lang/String;"),
                         reinterpret_cast<void*>(&nativeWorlds)},
-        JNINativeMethod{const_cast<char*>("blockAt"),
-                        const_cast<char*>("(Ljava/lang/String;III)Ljava/lang/String;"),
+        JNINativeMethod{const_cast<char*>("blockAt"), const_cast<char*>("(Ljava/lang/String;III)Ljava/lang/String;"),
                         reinterpret_cast<void*>(&nativeBlock)},
         JNINativeMethod{const_cast<char*>("setBlockAt"),
                         const_cast<char*>("(Ljava/lang/String;IIILjava/lang/String;)Z"),
