@@ -36,6 +36,7 @@ using server::plugins::pluginEventTypes::playerItemDamage;
 using server::plugins::pluginEventTypes::playerItemDrop;
 using server::plugins::pluginEventTypes::playerLevelChange;
 using server::plugins::pluginEventTypes::playerPickItem;
+using server::plugins::pluginEventTypes::playerQuit;
 using server::plugins::pluginEventTypes::playerRespawn;
 using server::plugins::pluginEventTypes::playerSignChange;
 using server::plugins::pluginEventTypes::playerTeleport;
@@ -194,6 +195,9 @@ PlayerLifecycle::Hooks lifecycle(ClientSession& owner, const EventSink& sink) {
             event.set("y", y);
             event.set("z", z);
         });
+    };
+    hooks.quit = [&sink](const player::PlayerSession& who, const std::optional<std::string>&) {
+        sink.notify(&playerQuit, [&](PluginEvent& event) { EventSink::player(event, who); });
     };
     hooks.gamemodeAllowed = [&sink](const player::PlayerSession& who, wire::protocol::play::Gamemode mode,
                                     wire::protocol::play::Gamemode previous) {
