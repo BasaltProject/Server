@@ -50,6 +50,7 @@ public final class BasaltServer extends ServerBase {
         this.root = root;
         this.pluginManager = new BasaltPluginManager(this, pluginsFolder);
         this.commandMap = new BasaltCommandMap(this);
+        this.pluginManager.commandMap(commandMap);
     }
 
     public static BasaltServer instance() {

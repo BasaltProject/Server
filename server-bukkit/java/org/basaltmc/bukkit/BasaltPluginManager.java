@@ -43,6 +43,8 @@ import org.basaltmc.bukkit.gen.PluginManagerBase;
 
 public final class BasaltPluginManager extends PluginManagerBase {
     private final BasaltServer server;
+    /** Read by name through reflection, as Spigot plugins have always done. */
+    private org.bukkit.command.CommandMap commandMap;
     private final File folder;
     private final List<Plugin> plugins = new ArrayList<>();
     private final Map<String, Plugin> byName = new HashMap<>();
@@ -57,6 +59,10 @@ public final class BasaltPluginManager extends PluginManagerBase {
         this.folder = folder;
         defaults.put(true, new HashSet<>());
         defaults.put(false, new HashSet<>());
+    }
+
+    void commandMap(org.bukkit.command.CommandMap map) {
+        this.commandMap = map;
     }
 
     File folder() {
