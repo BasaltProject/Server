@@ -1,23 +1,72 @@
 package org.basaltmc.bukkit;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import org.bukkit.Difficulty;
+import org.bukkit.GameRule;
+import org.bukkit.HeightMap;
 import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
+import org.bukkit.World;
+import org.bukkit.WorldType;
+import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.basaltmc.bukkit.gen.WorldBase;
+import org.bukkit.util.BoundingBox;
 
-/** A Basalt world by name; the blocks and time are read from the server when asked. */
 public final class BasaltWorld extends WorldBase {
+    private static final int kSeed = 0;
+    private static final int kMinY = 1;
+    private static final int kHeight = 2;
+    private static final int kSpawnX = 3;
+    private static final int kSpawnY = 4;
+    private static final int kSpawnZ = 5;
+    private static final int kDayTime = 6;
+    private static final int kRaining = 7;
+    private static final int kThundering = 8;
+    private static final int kGameTime = 9;
+
     private final String name;
     private final UUID id;
+    private World.Environment environment;
+    private boolean pvp = true;
 
     BasaltWorld(String name) {
         this.name = name;
         this.id = UUID.nameUUIDFromBytes(("basalt-world:" + name).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private long number(int index) {
+        long[] values = WorldNatives.worldNumbers(name);
+        return values == null ? 0L : values[index];
+    }
+
+    private String text(int index) {
+        String[] values = WorldNatives.worldStrings(name);
+        return values == null ? "" : values[index];
+    }
+
+    int stateAt(int x, int y, int z) {
+        return WorldNatives.state(name, x, y, z, true);
+    }
+
+    void putState(int x, int y, int z, int state) {
+        WorldNatives.setState(name, x, y, z, state, true);
+    }
+
+    Entity entity(int entityId) {
+        return EntityCore.make(this, entityId);
     }
 
     @Override
@@ -31,13 +80,101 @@ public final class BasaltWorld extends WorldBase {
     }
 
     @Override
-    public long getTime() {
-        return Natives.worldTime(name) % 24000L;
+    public NamespacedKey getKey() {
+        return NamespacedKey.fromString("minecraft:" + name.toLowerCase(Locale.ROOT));
     }
 
     @Override
-    public long getFullTime() {
-        return Natives.worldTime(name);
+    public net.kyori.adventure.key.Key key() {
+        return getKey();
+    }
+
+    @Override
+    public Environment getEnvironment() {
+        if (environment == null) {
+            String dimension = text(0);
+            environment = dimension.endsWith("nether") ? Environment.NETHER
+                : dimension.endsWith("end") ? Environment.THE_END : Environment.NORMAL;
+        }
+        return environment;
+    }
+
+    @Override
+    public long getSeed() {
+        return number(kSeed);
+    }
+
+    @Override
+    public int getMinHeight() {
+        return (int) number(kMinY);
+    }
+
+    @Override
+    public int getMaxHeight() {
+        return (int) (number(kMinY) + number(kHeight));
+    }
+
+    @Override
+    public int getLogicalHeight() {
+        return getMaxHeight();
+    }
+
+    @Override
+    public int getSeaLevel() {
+        return 63;
+    }
+
+    @Override
+    public File getWorldFolder() {
+        return new File(BasaltServer.instance().getWorldContainer(), text(1));
+    }
+
+    @Override
+    public WorldType getWorldType() {
+        return WorldType.NORMAL;
+    }
+
+    @Override
+    public boolean canGenerateStructures() {
+        return true;
+    }
+
+    @Override
+    public boolean isHardcore() {
+        return false;
+    }
+
+    @Override
+    public void setHardcore(boolean hardcore) {}
+
+    @Override
+    public boolean isNatural() {
+        return getEnvironment() == Environment.NORMAL;
+    }
+
+    @Override
+    public boolean hasSkyLight() {
+        return getEnvironment() != Environment.NETHER;
+    }
+
+    @Override
+    public boolean hasCeiling() {
+        return getEnvironment() == Environment.NETHER;
+    }
+
+    @Override
+    public double getCoordinateScale() {
+        return getEnvironment() == Environment.NETHER ? 8.0 : 1.0;
+    }
+
+    @Override
+    public org.bukkit.generator.ChunkGenerator getGenerator() {
+        return null;
+    }
+
+    @Override
+    public org.bukkit.generator.BiomeProvider getBiomeProvider() {
+        return null;
     }
 
     @Override
@@ -51,8 +188,278 @@ public final class BasaltWorld extends WorldBase {
     }
 
     @Override
-    public Location getSpawnLocation() {
-        return new Location(this, 0, 64, 0);
+    public int getHighestBlockYAt(int x, int z) {
+        return WorldNatives.highest(name, x, z, "motion_blocking", true);
+    }
+
+    @Override
+    public int getHighestBlockYAt(int x, int z, HeightMap heightMap) {
+        String kind = heightMap == HeightMap.WORLD_SURFACE || heightMap == HeightMap.WORLD_SURFACE_WG ? "surface"
+            : heightMap == HeightMap.OCEAN_FLOOR || heightMap == HeightMap.OCEAN_FLOOR_WG ? "ocean_floor"
+            : "motion_blocking";
+        return WorldNatives.highest(name, x, z, kind, true);
+    }
+
+    @Override
+    public int getHighestBlockYAt(Location location) {
+        return getHighestBlockYAt(location.getBlockX(), location.getBlockZ());
+    }
+
+    @Override
+    public int getHighestBlockYAt(Location location, HeightMap heightMap) {
+        return getHighestBlockYAt(location.getBlockX(), location.getBlockZ(), heightMap);
+    }
+
+    @Override
+    public Block getHighestBlockAt(int x, int z) {
+        return getBlockAt(x, getHighestBlockYAt(x, z), z);
+    }
+
+    @Override
+    public Block getHighestBlockAt(Location location) {
+        return getHighestBlockAt(location.getBlockX(), location.getBlockZ());
+    }
+
+    @Override
+    public Block getHighestBlockAt(int x, int z, HeightMap heightMap) {
+        return getBlockAt(x, getHighestBlockYAt(x, z, heightMap), z);
+    }
+
+    @Override
+    public Block getHighestBlockAt(Location location, HeightMap heightMap) {
+        return getHighestBlockAt(location.getBlockX(), location.getBlockZ(), heightMap);
+    }
+
+    @Override
+    public Biome getBiome(int x, int y, int z) {
+        String id = WorldNatives.biome(name, x, y, z);
+        return id == null ? null : Registry.BIOME.get(NamespacedKey.fromString(id));
+    }
+
+    @Override
+    public Biome getBiome(Location location) {
+        return getBiome(location.getBlockX(), location.getBlockY(), location.getBlockZ());
+    }
+
+    @Override
+    public Biome getComputedBiome(int x, int y, int z) {
+        return getBiome(x, y, z);
+    }
+
+    @Override
+    public void setBiome(int x, int y, int z, Biome biome) {
+        WorldNatives.setBiome(name, x, y, z, biome.getKey().toString());
+    }
+
+    @Override
+    public void setBiome(int x, int z, Biome biome) {
+        for (int y = getMinHeight(); y < getMaxHeight(); y += 4) {
+            setBiome(x, y, z, biome);
+        }
+    }
+
+    @Override
+    public double getTemperature(int x, int y, int z) {
+        return 0.8;
+    }
+
+    @Override
+    public double getHumidity(int x, int y, int z) {
+        return 0.4;
+    }
+
+    @Override
+    public org.bukkit.Chunk getChunkAt(int x, int z) {
+        return getChunkAt(x, z, true);
+    }
+
+    @Override
+    public org.bukkit.Chunk getChunkAt(int x, int z, boolean generate) {
+        if (generate) {
+            WorldNatives.loadChunk(name, x, z, true);
+        }
+        return new BasaltChunk(this, x, z);
+    }
+
+    @Override
+    public org.bukkit.Chunk getChunkAt(Block block) {
+        return getChunkAt(block.getX() >> 4, block.getZ() >> 4);
+    }
+
+    @Override
+    public void getChunkAtAsync(int x, int z, boolean generate, boolean urgent,
+            Consumer<? super org.bukkit.Chunk> callback) {
+        callback.accept(getChunkAt(x, z, generate));
+    }
+
+    @Override
+    public boolean isChunkLoaded(int x, int z) {
+        return WorldNatives.chunkLoaded(name, x, z);
+    }
+
+    @Override
+    public boolean isChunkLoaded(org.bukkit.Chunk chunk) {
+        return isChunkLoaded(chunk.getX(), chunk.getZ());
+    }
+
+    @Override
+    public boolean isChunkGenerated(int x, int z) {
+        return isChunkLoaded(x, z);
+    }
+
+    @Override
+    public boolean isChunkInUse(int x, int z) {
+        return isChunkLoaded(x, z);
+    }
+
+    @Override
+    public org.bukkit.Chunk[] getLoadedChunks() {
+        int[] flat = WorldNatives.loadedChunks(name);
+        org.bukkit.Chunk[] chunks = new org.bukkit.Chunk[flat.length / 2];
+        for (int i = 0; i < chunks.length; i++) {
+            chunks[i] = new BasaltChunk(this, flat[i * 2], flat[i * 2 + 1]);
+        }
+        return chunks;
+    }
+
+    @Override
+    public void loadChunk(org.bukkit.Chunk chunk) {
+        WorldNatives.loadChunk(name, chunk.getX(), chunk.getZ(), true);
+    }
+
+    @Override
+    public boolean loadChunk(int x, int z, boolean generate) {
+        return WorldNatives.loadChunk(name, x, z, generate);
+    }
+
+    @Override
+    public boolean unloadChunk(int x, int z, boolean save) {
+        return WorldNatives.unloadChunk(name, x, z);
+    }
+
+    @Override
+    public boolean unloadChunkRequest(int x, int z) {
+        return WorldNatives.unloadChunk(name, x, z);
+    }
+
+    @Override
+    public boolean refreshChunk(int x, int z) {
+        return isChunkLoaded(x, z);
+    }
+
+    @Override
+    public boolean isChunkForceLoaded(int x, int z) {
+        return false;
+    }
+
+    @Override
+    public void setChunkForceLoaded(int x, int z, boolean forced) {}
+
+    @Override
+    public Collection<org.bukkit.Chunk> getForceLoadedChunks() {
+        return List.of();
+    }
+
+    @Override
+    public Collection<Player> getPlayersSeeingChunk(int x, int z) {
+        return List.of();
+    }
+
+    @Override
+    public Collection<Player> getPlayersSeeingChunk(org.bukkit.Chunk chunk) {
+        return List.of();
+    }
+
+    @Override
+    public boolean getKeepSpawnInMemory() {
+        return false;
+    }
+
+    @Override
+    public void setKeepSpawnInMemory(boolean keep) {}
+
+    @Override
+    public void save() {
+        WorldNatives.saveWorld(name);
+    }
+
+    @Override
+    public void save(boolean flush) {
+        WorldNatives.saveWorld(name);
+    }
+
+    @Override
+    public boolean isAutoSave() {
+        return true;
+    }
+
+    @Override
+    public void setAutoSave(boolean value) {}
+
+    @Override
+    public List<Entity> getEntities() {
+        List<Entity> found = new ArrayList<>();
+        for (int entityId : WorldNatives.entityIds(name, 0, 0, true)) {
+            Entity entity = entity(entityId);
+            if (entity != null) {
+                found.add(entity);
+            }
+        }
+        for (Player player : getPlayers()) {
+            found.add(player);
+        }
+        return found;
+    }
+
+    @Override
+    public int getEntityCount() {
+        return getEntities().size();
+    }
+
+    @Override
+    public List<LivingEntity> getLivingEntities() {
+        List<LivingEntity> found = new ArrayList<>();
+        for (Entity entity : getEntities()) {
+            if (entity instanceof LivingEntity living) {
+                found.add(living);
+            }
+        }
+        return found;
+    }
+
+    @Override
+    public <T extends Entity> Collection<T> getEntitiesByClass(Class<T> type) {
+        List<T> found = new ArrayList<>();
+        for (Entity entity : getEntities()) {
+            if (type.isInstance(entity)) {
+                found.add(type.cast(entity));
+            }
+        }
+        return found;
+    }
+
+    @Override
+    @SafeVarargs
+    public final <T extends Entity> Collection<T> getEntitiesByClass(Class<T>... types) {
+        List<T> found = new ArrayList<>();
+        for (Class<T> type : types) {
+            found.addAll(getEntitiesByClass(type));
+        }
+        return found;
+    }
+
+    @Override
+    public Collection<Entity> getEntitiesByClasses(Class<?>... types) {
+        List<Entity> found = new ArrayList<>();
+        for (Entity entity : getEntities()) {
+            for (Class<?> type : types) {
+                if (type.isInstance(entity)) {
+                    found.add(entity);
+                    break;
+                }
+            }
+        }
+        return found;
     }
 
     @Override
@@ -64,6 +471,218 @@ public final class BasaltWorld extends WorldBase {
             }
         }
         return inside;
+    }
+
+    @Override
+    public Entity getEntity(UUID uuid) {
+        for (Entity entity : getEntities()) {
+            if (entity.getUniqueId().equals(uuid)) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public Collection<Entity> getNearbyEntities(Location location, double x, double y, double z,
+            Predicate<? super Entity> filter) {
+        List<Entity> found = new ArrayList<>();
+        for (Entity entity : getEntities()) {
+            Location there = entity.getLocation();
+            if (Math.abs(there.getX() - location.getX()) <= x && Math.abs(there.getY() - location.getY()) <= y
+                && Math.abs(there.getZ() - location.getZ()) <= z && (filter == null || filter.test(entity))) {
+                found.add(entity);
+            }
+        }
+        return found;
+    }
+
+    @Override
+    public Collection<Entity> getNearbyEntities(BoundingBox box, Predicate<? super Entity> filter) {
+        List<Entity> found = new ArrayList<>();
+        for (Entity entity : getEntities()) {
+            if (box.overlaps(entity.getBoundingBox()) && (filter == null || filter.test(entity))) {
+                found.add(entity);
+            }
+        }
+        return found;
+    }
+
+    @Override
+    public Entity spawnEntity(Location location, EntityType type) {
+        return spawnEntity(location, type, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM);
+    }
+
+    @Override
+    public Entity spawnEntity(Location location, EntityType type,
+            org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason reason) {
+        int spawned = WorldNatives.spawn(name, type.getKey().toString(), location.getX(), location.getY(),
+            location.getZ());
+        return spawned < 0 ? null : entity(spawned);
+    }
+
+    @Override
+    public Location getSpawnLocation() {
+        return new Location(this, number(kSpawnX), number(kSpawnY), number(kSpawnZ));
+    }
+
+    @Override
+    public boolean setSpawnLocation(Location location) {
+        WorldNatives.setSpawn(name, location.getBlockX(), location.getBlockY(), location.getBlockZ());
+        return true;
+    }
+
+    @Override
+    public boolean setSpawnLocation(int x, int y, int z, float angle) {
+        WorldNatives.setSpawn(name, x, y, z);
+        return true;
+    }
+
+    @Override
+    public long getTime() {
+        return number(kDayTime) % 24000L;
+    }
+
+    @Override
+    public void setTime(long time) {
+        WorldNatives.setTime(name, number(kDayTime) - number(kDayTime) % 24000L + Math.floorMod(time, 24000L));
+    }
+
+    @Override
+    public long getFullTime() {
+        return number(kDayTime);
+    }
+
+    @Override
+    public void setFullTime(long time) {
+        WorldNatives.setTime(name, time);
+    }
+
+    @Override
+    public boolean isDayTime() {
+        long time = getTime();
+        return time < 12000L || time >= 23000L;
+    }
+
+    @Override
+    public long getGameTime() {
+        return number(kGameTime);
+    }
+
+    @Override
+    public boolean hasStorm() {
+        return number(kRaining) != 0;
+    }
+
+    @Override
+    public void setStorm(boolean storm) {
+        WorldNatives.setWeather(name, storm, isThundering() && storm);
+    }
+
+    @Override
+    public boolean isThundering() {
+        return number(kThundering) != 0;
+    }
+
+    @Override
+    public void setThundering(boolean thundering) {
+        WorldNatives.setWeather(name, hasStorm() || thundering, thundering);
+    }
+
+    @Override
+    public int getWeatherDuration() {
+        return 6000;
+    }
+
+    @Override
+    public void setWeatherDuration(int ticks) {}
+
+    @Override
+    public int getThunderDuration() {
+        return 6000;
+    }
+
+    @Override
+    public void setThunderDuration(int ticks) {}
+
+    @Override
+    public int getClearWeatherDuration() {
+        return 0;
+    }
+
+    @Override
+    public void setClearWeatherDuration(int ticks) {}
+
+    @Override
+    public boolean getPVP() {
+        return pvp;
+    }
+
+    @Override
+    public void setPVP(boolean value) {
+        pvp = value;
+    }
+
+    @Override
+    public Difficulty getDifficulty() {
+        try {
+            return Difficulty.valueOf(text(2).toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return Difficulty.NORMAL;
+        }
+    }
+
+    @Override
+    public void setDifficulty(Difficulty difficulty) {
+        WorldNatives.setDifficulty(name, difficulty.name().toLowerCase(Locale.ROOT));
+    }
+
+    @Override
+    public int getViewDistance() {
+        return BasaltServer.instance().getViewDistance();
+    }
+
+    @Override
+    public int getSimulationDistance() {
+        return BasaltServer.instance().getSimulationDistance();
+    }
+
+    @Override
+    public String[] getGameRules() {
+        return WorldNatives.gameRules(name);
+    }
+
+    @Override
+    public String getGameRuleValue(String rule) {
+        return WorldNatives.gameRule(name, rule);
+    }
+
+    @Override
+    public boolean setGameRuleValue(String rule, String value) {
+        return WorldNatives.setGameRule(name, rule, value);
+    }
+
+    @Override
+    public boolean isGameRule(String rule) {
+        return WorldNatives.gameRule(name, rule) != null;
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T getGameRuleValue(GameRule<T> rule) {
+        String value = WorldNatives.gameRule(name, rule.getName());
+        if (value == null) {
+            return null;
+        }
+        if (rule.getType() == Boolean.class) {
+            return (T) Boolean.valueOf(value);
+        }
+        return (T) Integer.valueOf(value);
+    }
+
+    @Override
+    public <T> boolean setGameRule(GameRule<T> rule, T value) {
+        return WorldNatives.setGameRule(name, rule.getName(), String.valueOf(value));
     }
 
     @Override
@@ -79,14 +698,5 @@ public final class BasaltWorld extends WorldBase {
     @Override
     public String toString() {
         return "BasaltWorld{name=" + name + "}";
-    }
-
-    Material materialAt(int x, int y, int z) {
-        String id = Natives.blockAt(name, x, y, z);
-        if (id == null) {
-            return Material.AIR;
-        }
-        Material material = Material.matchMaterial(id);
-        return material == null ? Material.AIR : material;
     }
 }

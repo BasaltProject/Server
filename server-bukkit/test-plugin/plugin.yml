@@ -12,3 +12,6 @@ commands:
   hellotime:
     description: Reads the world time
     usage: /hellotime
+  probe:
+    description: Exercises the world, block, entity and player API
+    usage: /probe

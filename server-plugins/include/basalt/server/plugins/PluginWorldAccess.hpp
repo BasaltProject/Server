@@ -2,12 +2,15 @@
 
 #include <basalt/server/plugins/PluginEvents.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::plugins {
@@ -108,6 +111,52 @@ public:
     virtual bool setAttribute(std::string_view name, double value) = 0;
 
     [[nodiscard]] virtual std::vector<std::string> attributes() const = 0;
+
+    [[nodiscard]] virtual float yaw() const { return 0.0F; }
+
+    [[nodiscard]] virtual float pitch() const { return 0.0F; }
+
+    virtual bool teleport(std::string_view world, double x, double y, double z, float yaw, float pitch) {
+        static_cast<void>(yaw);
+        static_cast<void>(pitch);
+        return teleport(world, x, y, z);
+    }
+
+    /// The remote address as `host:port`, empty when unknown.
+    [[nodiscard]] virtual std::string address() const { return {}; }
+
+    /// The command permission level, 0 to 4.
+    [[nodiscard]] virtual std::int32_t permissionLevel() const { return 0; }
+
+    [[nodiscard]] virtual bool flying() const { return false; }
+
+    [[nodiscard]] virtual bool onGround() const { return false; }
+
+    [[nodiscard]] virtual std::int32_t entityId() const { return 0; }
+
+    /// Tells this player alone that a block looks different, without changing the world.
+    virtual void showBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(stateId);
+    }
+
+    virtual void setExperience(float progress, std::int32_t level) {
+        static_cast<void>(progress);
+        setLevel(level);
+    }
+
+    [[nodiscard]] virtual float experienceProgress() const { return 0.0F; }
+
+    /// Total experience points, as the level and progress add up.
+    [[nodiscard]] virtual std::int32_t experiencePoints() const { return 0; }
+
+    [[nodiscard]] virtual float saturation() const { return 0.0F; }
+
+    virtual void setHeldSlot(std::int32_t slot) { static_cast<void>(slot); }
+
+    [[nodiscard]] virtual bool sprinting() const { return false; }
 };
 
 class PluginEntityRef {
@@ -132,6 +181,35 @@ public:
     virtual void remove() = 0;
 
     virtual bool teleport(double x, double y, double z) = 0;
+
+    [[nodiscard]] virtual std::string uuid() const { return {}; }
+
+    [[nodiscard]] virtual std::array<float, 2> rotation() const { return {0.0F, 0.0F}; }
+
+    virtual bool setRotation(float yaw, float pitch) {
+        static_cast<void>(yaw);
+        static_cast<void>(pitch);
+        return false;
+    }
+
+    [[nodiscard]] virtual std::array<double, 3> velocity() const { return {0.0, 0.0, 0.0}; }
+
+    virtual bool setVelocity(double x, double y, double z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return false;
+    }
+
+    [[nodiscard]] virtual bool onGround() const { return false; }
+
+    [[nodiscard]] virtual std::int32_t age() const { return 0; }
+
+    [[nodiscard]] virtual double width() const { return 0.6; }
+
+    [[nodiscard]] virtual double height() const { return 1.8; }
+
+    [[nodiscard]] virtual std::optional<std::string> customName() const { return std::nullopt; }
 };
 
 class PluginHologramRef : public PluginEntityRef {
@@ -243,6 +321,167 @@ public:
     virtual bool setGameRule(std::string_view name, std::string_view value) = 0;
 
     [[nodiscard]] virtual std::vector<std::string> gameRules() const = 0;
+
+    /// The dimension id, as `minecraft:overworld`.
+    [[nodiscard]] virtual std::string dimension() const { return {}; }
+
+    [[nodiscard]] virtual std::int64_t seed() const { return 0; }
+
+    [[nodiscard]] virtual std::int32_t minHeight() const { return 0; }
+
+    /// The number of blocks from the lowest to the highest.
+    [[nodiscard]] virtual std::int32_t height() const { return 0; }
+
+    [[nodiscard]] virtual std::array<std::int32_t, 3> spawn() const { return {0, 64, 0}; }
+
+    virtual void setSpawn(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+    }
+
+    /// The time of day, 0 to 23999, which is not the same as the age of the world.
+    [[nodiscard]] virtual std::int64_t dayTime() const { return 0; }
+
+    virtual void setDayTime(std::int64_t ticks) { static_cast<void>(ticks); }
+
+    virtual void setWeather(bool raining, bool thundering) {
+        static_cast<void>(raining);
+        static_cast<void>(thundering);
+    }
+
+    virtual bool setDifficulty(std::string_view name) {
+        static_cast<void>(name);
+        return false;
+    }
+
+    /// The block state id at a position, or -1 when the chunk is not loaded and `load` is false.
+    [[nodiscard]] virtual std::int32_t stateAt(std::int32_t x, std::int32_t y, std::int32_t z, bool load) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(load);
+        return -1;
+    }
+
+    /// `notify` tells the players near it; false is for a caller that resends the chunk itself.
+    virtual bool setStateAt(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, bool notify) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(stateId);
+        static_cast<void>(notify);
+        return false;
+    }
+
+    /// Reads many positions at once: `positions` holds x, y, z triples and `out` one state id (or -1) per triple.
+    virtual std::int32_t readStates(std::span<const std::int32_t> positions, std::span<std::int32_t> out, bool load) {
+        static_cast<void>(positions);
+        static_cast<void>(out);
+        static_cast<void>(load);
+        return 0;
+    }
+
+    /// Writes many positions at once, returns how many changed.
+    virtual std::int32_t writeStates(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
+                                     bool notify) {
+        static_cast<void>(positions);
+        static_cast<void>(states);
+        static_cast<void>(notify);
+        return 0;
+    }
+
+    /// A 16 by 16 by 16 section as 4096 state ids ordered x fastest, then z, then y (index = y * 256 + z * 16 + x).
+    virtual bool readSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, bool load,
+                             std::span<std::int32_t> out) {
+        static_cast<void>(chunkX);
+        static_cast<void>(sectionY);
+        static_cast<void>(chunkZ);
+        static_cast<void>(load);
+        static_cast<void>(out);
+        return false;
+    }
+
+    virtual bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
+                              std::span<const std::int32_t> states, bool notify) {
+        static_cast<void>(chunkX);
+        static_cast<void>(sectionY);
+        static_cast<void>(chunkZ);
+        static_cast<void>(states);
+        static_cast<void>(notify);
+        return false;
+    }
+
+    [[nodiscard]] virtual std::optional<std::string> biomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return std::nullopt;
+    }
+
+    virtual bool setBiomeAt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view biome) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(biome);
+        return false;
+    }
+
+    /// The highest y whose block counts for `kind` (`surface`, `ocean_floor`, `motion_blocking`), or minHeight - 1.
+    [[nodiscard]] virtual std::int32_t highest(std::int32_t x, std::int32_t z, std::string_view kind, bool load) {
+        static_cast<void>(x);
+        static_cast<void>(z);
+        static_cast<void>(kind);
+        static_cast<void>(load);
+        return 0;
+    }
+
+    [[nodiscard]] virtual bool chunkLoaded(std::int32_t chunkX, std::int32_t chunkZ) const {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return false;
+    }
+
+    /// Loads or generates the chunk, and returns whether it is there afterwards.
+    virtual bool loadChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(generate);
+        return false;
+    }
+
+    /// Saves and drops a chunk nobody is using; false when a player still sees it.
+    virtual bool unloadChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return false;
+    }
+
+    /// Loaded chunks as x, z pairs.
+    [[nodiscard]] virtual std::vector<std::int32_t> loadedChunks() const { return {}; }
+
+    [[nodiscard]] virtual std::shared_ptr<PluginEntityRef> entityById(std::int32_t id) const {
+        static_cast<void>(id);
+        return nullptr;
+    }
+
+    [[nodiscard]] virtual std::shared_ptr<PluginEntityRef> entityByUuid(std::string_view uuid) const {
+        static_cast<void>(uuid);
+        return nullptr;
+    }
+
+    /// Entities in the chunk, which are the ones it will save.
+    [[nodiscard]] virtual std::vector<std::shared_ptr<PluginEntityRef>> entitiesIn(std::int32_t chunkX,
+                                                                                    std::int32_t chunkZ) const {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        return {};
+    }
+
+    virtual void save() {}
+
+    /// The world folder name on disk, under `worlds/`.
+    [[nodiscard]] virtual std::string folder() const { return {}; }
 };
 
 class PluginWorlds {
@@ -262,6 +501,54 @@ public:
 
     virtual std::shared_ptr<PluginWorldRef> create(std::string_view name, std::string_view dimension,
                                                    std::string_view type, std::optional<std::int64_t> seed) = 0;
+
+    /// A block state as `minecraft:oak_stairs[facing=east]` to its id, or -1.
+    [[nodiscard]] virtual std::int32_t stateId(std::string_view text) const {
+        static_cast<void>(text);
+        return -1;
+    }
+
+    /// The reverse of `stateId`; empty for an id that is not a state.
+    [[nodiscard]] virtual std::string stateText(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return {};
+    }
+
+    /// Every block in registry order as three entries each: its id, its first state id and its state count.
+    [[nodiscard]] virtual std::vector<std::string> blockTable() const { return {}; }
+
+    /// The properties of a block as name, then its values joined with `|`, for each in state-id stride order.
+    [[nodiscard]] virtual std::vector<std::string> blockProperties(std::string_view block) const {
+        static_cast<void>(block);
+        return {};
+    }
+
+    /// Facts about one state as bits: 1 blocks motion, 2 solid render (occludes), 4 full cube, 8 replaceable,
+    [[nodiscard]] virtual std::int32_t stateFlags(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return 0;
+    }
+
+    /// Destroy time, explosion resistance and whether the right tool is needed (1 or 0), or empty for an unknown block.
+    [[nodiscard]] virtual std::vector<double> blockHardness(std::string_view block) const {
+        static_cast<void>(block);
+        return {};
+    }
+
+    /// The biome ids, in registry order.
+    [[nodiscard]] virtual std::vector<std::string> biomeIds() const { return {}; }
+
+    /// The tags of `blocks`, `items`, `fluids` or `entity_types` as pairs: the tag id, then its members joined by `|`.
+    [[nodiscard]] virtual std::vector<std::string> tags(std::string_view registry) const {
+        static_cast<void>(registry);
+        return {};
+    }
+
+    /// The item ids, in registry order.
+    [[nodiscard]] virtual std::vector<std::string> itemIds() const { return {}; }
+
+    /// The entity type ids.
+    [[nodiscard]] virtual std::vector<std::string> entityTypeIds() const { return {}; }
 };
 
 class PluginPlaceholders {

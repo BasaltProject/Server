@@ -191,6 +191,84 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
         .reads("thundering", [world] { return PluginValue{world->thundering()}; })
         .reads("difficulty", [world] { return PluginValue{world->difficulty()}; })
         .reads("rules", [world] { return PluginValue{world->gameRules()}; })
+        .reads("dimension", [world] { return PluginValue{world->dimension()}; })
+        .reads("seed", [world] { return PluginValue{world->seed()}; })
+        .reads("min_height", [world] { return PluginValue{static_cast<std::int64_t>(world->minHeight())}; })
+        .reads("height", [world] { return PluginValue{static_cast<std::int64_t>(world->height())}; })
+        .reads("day_time", [world] { return PluginValue{world->dayTime()}; })
+        .method("biome",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::optional<std::string> biome =
+                        world->biomeAt(static_cast<std::int32_t>(args.checkInteger(base)),
+                                       static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                       static_cast<std::int32_t>(args.checkInteger(base + 2)));
+                    if (biome.has_value()) {
+                        args.pushString(*biome);
+                    } else {
+                        args.pushNil();
+                    }
+                    return 1;
+                })
+        .method("set_biome",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(world->setBiomeAt(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                       static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                       static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                       args.checkString(base + 3)));
+                    return 1;
+                })
+        .method("highest",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushInteger(world->highest(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                    static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                    args.isString(base + 2) ? args.toText(base + 2) : "motion_blocking",
+                                                    true));
+                    return 1;
+                })
+        .method("chunk_loaded",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(world->chunkLoaded(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                        static_cast<std::int32_t>(args.checkInteger(base + 1))));
+                    return 1;
+                })
+        .method("load_chunk",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(world->loadChunk(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                      static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                      args.isNil(base + 2) || args.booleanOr(base + 2, true)));
+                    return 1;
+                })
+        .method("unload_chunk",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(world->unloadChunk(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                        static_cast<std::int32_t>(args.checkInteger(base + 1))));
+                    return 1;
+                })
+        .method("set_time",
+                [world](LuaArgs& args) {
+                    world->setDayTime(args.checkInteger(firstArgument(args)));
+                    return 0;
+                })
+        .method("set_weather",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    world->setWeather(args.booleanOr(base, false), args.booleanOr(base + 1, false));
+                    return 0;
+                })
+        .method("set_spawn",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    world->setSpawn(static_cast<std::int32_t>(args.checkInteger(base)),
+                                    static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                    static_cast<std::int32_t>(args.checkInteger(base + 2)));
+                    return 0;
+                })
         .method("block",
                 [world](LuaArgs& args) {
                     const std::optional<PluginPoint> point = pointFrom(args, args.count() >= 2 ? 2 : 1);

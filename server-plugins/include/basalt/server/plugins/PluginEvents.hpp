@@ -59,6 +59,9 @@ public:
 
     void cancel(std::optional<std::string> message = std::nullopt);
 
+    /// Takes back a cancellation, as a listener that runs later and does not want the event stopped.
+    void restore();
+
     [[nodiscard]] std::int64_t generation() const noexcept { return generation_; }
 
     [[nodiscard]] bool live() const noexcept { return live_; }

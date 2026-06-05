@@ -458,6 +458,27 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                              std::optional<std::int64_t> seed) {
         return worldRegistry_->createWorld(name, dimension, type, seed);
     };
+    model.environment = [this]() -> const command::CommandEnvironment& { return *wired_.environment; };
+    model.tags = [this](std::string_view registry) {
+        const world::realBlockTags::TagMembers* source = registry == "blocks"   ? &vanillaData_.blockTags
+                                                         : registry == "items"  ? &vanillaData_.itemTags
+                                                         : registry == "fluids" ? &vanillaData_.fluidTags
+                                                         : registry == "entity_types" ? &vanillaData_.entityTags
+                                                                                      : nullptr;
+        std::vector<std::string> flat;
+        if (source == nullptr) {
+            return flat;
+        }
+        for (const auto& [tag, members] : *source) {
+            std::string joined;
+            for (const wire::common::Identifier& member : members) {
+                joined += joined.empty() ? member.toString() : "|" + member.toString();
+            }
+            flat.push_back(tag.toString());
+            flat.push_back(std::move(joined));
+        }
+        return flat;
+    };
     model.npcs = &npcs_;
     model.nextEntityId = [this] { return playerRegistry_.allocateEntityId(); };
 
@@ -493,6 +514,17 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         worldRegistry_->scheduler().global(), *wired_.dispatcher, [this] { return tickLoop_->ticksRun(); },
         [this]() -> const command::CommandSource* { return consoleSource_.get(); }, options_.pluginsRoot,
         std::move(parts));
+
+    pluginServices_->setPlayerRunner([this](const std::string& uuid, const std::string& line) {
+        for (player::PlayerSession* session : playerRegistry_.snapshot()) {
+            if (session->uuid().toString() == uuid) {
+                const command::PlayerCommandSource source{*session, live_->current()->groups};
+                static_cast<void>(wired_.dispatcher->execute(source, line));
+                return true;
+            }
+        }
+        return false;
+    });
 
     // Read once, not swapped by a reload: the limits are baked into a plugin's state when it loads.
     plugins_ = std::make_unique<server::plugins::PluginHost>(

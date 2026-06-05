@@ -52,6 +52,11 @@ void PluginEvent::cancel(std::optional<std::string> message) {
     }
 }
 
+void PluginEvent::restore() {
+    cancelled_ = false;
+    cancelMessage_.reset();
+}
+
 void PluginEvent::begin() {
     cancelled_ = false;
     cancelMessage_.reset();

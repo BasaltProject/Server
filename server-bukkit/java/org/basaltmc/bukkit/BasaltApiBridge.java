@@ -25,6 +25,11 @@ public final class BasaltApiBridge extends InternalAPIBridgeBase {
     }
 
     @Override
+    public org.bukkit.block.Biome constructLegacyCustomBiome() {
+        return new BasaltBiome("minecraft:custom", -1);
+    }
+
+    @Override
     public ComponentFlattener componentFlattener() {
         return ComponentFlattener.basic();
     }
