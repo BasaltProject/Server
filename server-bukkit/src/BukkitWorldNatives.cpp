@@ -254,7 +254,7 @@ jboolean JNICALL nativeWriteSection(JNIEnv* env, jclass, jstring name, jint chun
 }
 
 jint JNICALL nativeApplySections(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray sections,
-                                 jintArray states, jboolean resend) {
+                                 jintArray states, jboolean resend, jintArray previous) {
     const auto world = worldOf(env, name);
     if (world == nullptr) {
         return -1;
@@ -263,7 +263,13 @@ jint JNICALL nativeApplySections(JNIEnv* env, jclass, jstring name, jint chunkX,
     env->GetIntArrayRegion(sections, 0, static_cast<jsize>(ys.size()), ys.data());
     std::vector<std::int32_t> next(static_cast<std::size_t>(env->GetArrayLength(states)));
     env->GetIntArrayRegion(states, 0, static_cast<jsize>(next.size()), next.data());
-    return guarded<jint>(-1, [&] { return world->applySections(chunkX, chunkZ, ys, next, resend == JNI_TRUE); });
+    std::vector<std::int32_t> before(previous == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(previous)));
+    const jint changed = guarded<jint>(
+        -1, [&] { return world->applySections(chunkX, chunkZ, ys, next, resend == JNI_TRUE, before); });
+    if (previous != nullptr && changed >= 0) {
+        env->SetIntArrayRegion(previous, 0, static_cast<jsize>(before.size()), before.data());
+    }
+    return changed;
 }
 
 void JNICALL nativeResendChunks(JNIEnv* env, jclass, jstring name, jintArray chunks) {
@@ -590,7 +596,7 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("writeStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeWriteStates)),
         method("readSection", "(Ljava/lang/String;IIIZ[I)Z", reinterpret_cast<void*>(&nativeReadSection)),
         method("writeSection", "(Ljava/lang/String;III[IZ)Z", reinterpret_cast<void*>(&nativeWriteSection)),
-        method("applySections", "(Ljava/lang/String;II[I[IZ)I", reinterpret_cast<void*>(&nativeApplySections)),
+        method("applySections", "(Ljava/lang/String;II[I[IZ[I)I", reinterpret_cast<void*>(&nativeApplySections)),
         method("resendChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeResendChunks)),
         method("biome", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiome)),
         method("setBiome", "(Ljava/lang/String;IIILjava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetBiome)),
