@@ -158,16 +158,21 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public Location getLocation() {
-        return new Location(getWorld(), number(kX), number(kY), number(kZ));
+        double[] extra = WorldNatives.playerExtra(uuid);
+        return new Location(getWorld(), number(kX), number(kY), number(kZ), extra == null ? 0f : (float) extra[0],
+            extra == null ? 0f : (float) extra[1]);
     }
 
     @Override
     public Location getLocation(Location into) {
         if (into != null) {
-            into.setWorld(getWorld());
-            into.setX(number(kX));
-            into.setY(number(kY));
-            into.setZ(number(kZ));
+            Location here = getLocation();
+            into.setWorld(here.getWorld());
+            into.setX(here.getX());
+            into.setY(here.getY());
+            into.setZ(here.getZ());
+            into.setYaw(here.getYaw());
+            into.setPitch(here.getPitch());
         }
         return into;
     }
@@ -175,7 +180,8 @@ public class BasaltPlayer extends PlayerBase {
     @Override
     public boolean teleport(Location location) {
         World world = location.getWorld() == null ? getWorld() : location.getWorld();
-        return Natives.playerTeleport(uuid, world.getName(), location.getX(), location.getY(), location.getZ());
+        return WorldNatives.playerMove(uuid, world.getName(), location.getX(), location.getY(), location.getZ(),
+            location.getYaw(), location.getPitch());
     }
 
     @Override
@@ -247,7 +253,8 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public boolean isOp() {
-        return Natives.playerMay(uuid, "*");
+        double[] extra = WorldNatives.playerExtra(uuid);
+        return extra != null && extra[2] >= 2.0 || Natives.playerMay(uuid, "*");
     }
 
     @Override
@@ -321,7 +328,313 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public InetSocketAddress getAddress() {
+        String text = WorldNatives.playerAddress(uuid);
+        if (text == null || text.isEmpty()) {
+            return null;
+        }
+        int colon = text.lastIndexOf(':');
+        try {
+            return colon < 0 ? new InetSocketAddress(text, 0)
+                : new InetSocketAddress(text.substring(0, colon), Integer.parseInt(text.substring(colon + 1)));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private double extra(int index) {
+        double[] values = WorldNatives.playerExtra(uuid);
+        return values == null ? 0.0 : values[index];
+    }
+
+    private BasaltPlayerInventory inventory;
+    private final MetadataHolder metadata = new MetadataHolder();
+    private final java.util.Set<String> tags = new java.util.HashSet<>();
+
+    @Override
+    public int getEntityId() {
+        return (int) extra(6);
+    }
+
+    @Override
+    public org.bukkit.inventory.PlayerInventory getInventory() {
+        if (inventory == null) {
+            inventory = new BasaltPlayerInventory(this, uuid);
+        }
+        return inventory;
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemStack getItemInHand() {
+        return getInventory().getItemInMainHand();
+    }
+
+    @Override
+    public boolean teleport(Location location, PlayerTeleportEvent.TeleportCause cause,
+            io.papermc.paper.entity.TeleportFlag... flags) {
+        return teleport(location);
+    }
+
+    @Override
+    public boolean teleport(org.bukkit.entity.Entity destination) {
+        return teleport(destination.getLocation());
+    }
+
+    @Override
+    public boolean teleport(org.bukkit.entity.Entity destination, PlayerTeleportEvent.TeleportCause cause) {
+        return teleport(destination.getLocation());
+    }
+
+    @Override
+    public java.util.concurrent.CompletableFuture<Boolean> teleportAsync(Location location,
+            PlayerTeleportEvent.TeleportCause cause, io.papermc.paper.entity.TeleportFlag... flags) {
+        return java.util.concurrent.CompletableFuture.completedFuture(teleport(location));
+    }
+
+    @Override
+    public float getYaw() {
+        return (float) extra(0);
+    }
+
+    @Override
+    public float getPitch() {
+        return (float) extra(1);
+    }
+
+    @Override
+    public double getX() {
+        return number(kX);
+    }
+
+    @Override
+    public double getY() {
+        return number(kY);
+    }
+
+    @Override
+    public double getZ() {
+        return number(kZ);
+    }
+
+    @Override
+    public boolean isOnGround() {
+        return extra(4) != 0.0;
+    }
+
+    @Override
+    public boolean isSprinting() {
+        return extra(5) != 0.0;
+    }
+
+    @Override
+    public boolean isFlying() {
+        return extra(3) != 0.0;
+    }
+
+    @Override
+    public boolean getAllowFlight() {
+        return isFlying() || getGameMode() == GameMode.CREATIVE || getGameMode() == GameMode.SPECTATOR;
+    }
+
+    @Override
+    public void setAllowFlight(boolean flight) {}
+
+    @Override
+    public void setFlying(boolean value) {}
+
+    @Override
+    public float getExp() {
+        return (float) extra(7);
+    }
+
+    @Override
+    public void setExp(float exp) {
+        WorldNatives.playerExperience(uuid, exp, getLevel());
+    }
+
+    @Override
+    public void setLevel(int level) {
+        WorldNatives.playerExperience(uuid, getExp(), level);
+    }
+
+    @Override
+    public int getTotalExperience() {
+        return (int) extra(8);
+    }
+
+    @Override
+    public float getSaturation() {
+        return (float) extra(9);
+    }
+
+    @Override
+    public boolean performCommand(String command) {
+        return WorldNatives.playerCommand(uuid, command);
+    }
+
+    @Override
+    public void updateInventory() {}
+
+    @Override
+    public void setViewDistance(int distance) {}
+
+    @Override
+    public String getLocale() {
+        return "en_us";
+    }
+
+    @Override
+    public double getHeight() {
+        return 1.8;
+    }
+
+    @Override
+    public double getWidth() {
+        return 0.6;
+    }
+
+    @Override
+    public double getEyeHeight() {
+        return 1.62;
+    }
+
+    @Override
+    public double getEyeHeight(boolean ignorePose) {
+        return 1.62;
+    }
+
+    @Override
+    public Location getEyeLocation() {
+        Location here = getLocation();
+        here.setY(here.getY() + 1.62);
+        return here;
+    }
+
+    @Override
+    public org.bukkit.util.BoundingBox getBoundingBox() {
+        return new org.bukkit.util.BoundingBox(number(kX) - 0.3, number(kY), number(kZ) - 0.3, number(kX) + 0.3,
+            number(kY) + 1.8, number(kZ) + 0.3);
+    }
+
+    @Override
+    public org.bukkit.util.Vector getVelocity() {
+        return new org.bukkit.util.Vector();
+    }
+
+    @Override
+    public boolean isDead() {
+        return getHealth() <= 0.0;
+    }
+
+    @Override
+    public java.util.List<org.bukkit.entity.Entity> getNearbyEntities(double x, double y, double z) {
+        return new java.util.ArrayList<>(getWorld().getNearbyEntities(getLocation(), x, y, z,
+            entity -> !entity.equals(this)));
+    }
+
+    @Override
+    public void sendBlockChange(Location location, org.bukkit.block.data.BlockData data) {
+        WorldNatives.playerShowBlock(uuid, location.getBlockX(), location.getBlockY(), location.getBlockZ(),
+            BasaltBlockData.stateOf(data));
+    }
+
+    @Override
+    public void sendBlockChange(Location location, org.bukkit.Material material, byte data) {
+        sendBlockChange(location, material.createBlockData());
+    }
+
+    @Override
+    public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        WorldNatives.playerTitle(uuid, Text.mini(title == null ? "" : title), Text.mini(subtitle == null ? "" : subtitle),
+            fadeIn, stay, fadeOut);
+    }
+
+    @Override
+    public void sendTitle(String title, String subtitle) {
+        sendTitle(title, subtitle, 10, 70, 20);
+    }
+
+    @Override
+    public void showTitle(net.kyori.adventure.title.Title title) {
+        java.time.Duration in = title.times() == null ? java.time.Duration.ofMillis(500) : title.times().fadeIn();
+        java.time.Duration stay = title.times() == null ? java.time.Duration.ofMillis(3500) : title.times().stay();
+        java.time.Duration out = title.times() == null ? java.time.Duration.ofSeconds(1) : title.times().fadeOut();
+        WorldNatives.playerTitle(uuid, Text.mini(title.title()), Text.mini(title.subtitle()),
+            (int) (in.toMillis() / 50), (int) (stay.toMillis() / 50), (int) (out.toMillis() / 50));
+    }
+
+    @Override
+    public void playSound(Location location, String sound, float volume, float pitch) {
+        WorldNatives.playerSound(uuid, sound, volume, pitch);
+    }
+
+    @Override
+    public void setMetadata(String name, org.bukkit.metadata.MetadataValue value) {
+        metadata.set(name, value);
+    }
+
+    @Override
+    public java.util.List<org.bukkit.metadata.MetadataValue> getMetadata(String name) {
+        return metadata.get(name);
+    }
+
+    @Override
+    public boolean hasMetadata(String name) {
+        return metadata.has(name);
+    }
+
+    @Override
+    public void removeMetadata(String name, Plugin plugin) {
+        metadata.remove(name, plugin);
+    }
+
+    @Override
+    public Set<String> getScoreboardTags() {
+        return tags;
+    }
+
+    @Override
+    public boolean addScoreboardTag(String tag) {
+        return tags.add(tag);
+    }
+
+    @Override
+    public boolean removeScoreboardTag(String tag) {
+        return tags.remove(tag);
+    }
+
+    @Override
+    public org.bukkit.entity.Entity getVehicle() {
         return null;
+    }
+
+    @Override
+    public boolean isInsideVehicle() {
+        return false;
+    }
+
+    @Override
+    public java.util.List<org.bukkit.entity.Entity> getPassengers() {
+        return new java.util.ArrayList<>();
+    }
+
+    @Override
+    public boolean isPersistent() {
+        return true;
+    }
+
+    @Override
+    public int getTicksLived() {
+        return 0;
+    }
+
+    @Override
+    public org.bukkit.block.BlockFace getFacing() {
+        double yaw = ((getYaw() % 360) + 360) % 360;
+        if (yaw >= 315 || yaw < 45) {
+            return org.bukkit.block.BlockFace.SOUTH;
+        }
+        return yaw < 135 ? org.bukkit.block.BlockFace.WEST
+            : yaw < 225 ? org.bukkit.block.BlockFace.NORTH : org.bukkit.block.BlockFace.EAST;
     }
 
     @Override

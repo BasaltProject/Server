@@ -95,6 +95,15 @@ public class BasaltServer extends ServerBase {
         return null;
     }
 
+    org.bukkit.entity.Entity entityById(BasaltWorld world, int id) {
+        for (org.bukkit.entity.Player player : getOnlinePlayers()) {
+            if (player.getEntityId() == id) {
+                return player;
+            }
+        }
+        return world.entity(id);
+    }
+
     synchronized BasaltWorld world(String name) {
         return worlds.computeIfAbsent(name, BasaltWorld::new);
     }
@@ -263,6 +272,87 @@ public class BasaltServer extends ServerBase {
     public int broadcastMessage(String message) {
         return broadcast(net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer.legacySection()
             .deserialize(message), null);
+    }
+
+    @Override
+    public org.bukkit.block.data.BlockData createBlockData(org.bukkit.Material material) {
+        int state = Registries.defaultStateOf(material);
+        if (state < 0) {
+            throw new IllegalArgumentException(material + " is not a block");
+        }
+        return BasaltBlockData.of(state);
+    }
+
+    @Override
+    public org.bukkit.block.data.BlockData createBlockData(org.bukkit.Material material,
+            java.util.function.Consumer<? super org.bukkit.block.data.BlockData> consumer) {
+        org.bukkit.block.data.BlockData data = createBlockData(material);
+        if (consumer != null) {
+            consumer.accept(data);
+        }
+        return data;
+    }
+
+    @Override
+    public org.bukkit.block.data.BlockData createBlockData(String data) {
+        org.bukkit.block.data.BlockData parsed = BasaltBlockData.parse(data);
+        if (parsed == null) {
+            throw new IllegalArgumentException("Could not parse data: " + data);
+        }
+        return parsed;
+    }
+
+    @Override
+    public org.bukkit.block.data.BlockData createBlockData(org.bukkit.Material material, String data) {
+        if (data == null || data.isEmpty()) {
+            return createBlockData(material);
+        }
+        return createBlockData(data.startsWith("[") ? material.getKey() + data : data);
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T extends org.bukkit.Keyed> org.bukkit.Tag<T> getTag(String registry, org.bukkit.NamespacedKey tag,
+            Class<T> type) {
+        return (org.bukkit.Tag<T>) BasaltTag.all(registry, (Class) type).get(tag);
+    }
+
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public <T extends org.bukkit.Keyed> Iterable<org.bukkit.Tag<T>> getTags(String registry, Class<T> type) {
+        return (Iterable) java.util.List.copyOf(BasaltTag.all(registry, (Class) type).values());
+    }
+
+    @Override
+    public org.bukkit.entity.Entity getEntity(UUID id) {
+        for (World world : getWorlds()) {
+            org.bukkit.entity.Entity found = world.getEntity(id);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public io.papermc.paper.datapack.DatapackManager getDatapackManager() {
+        return (io.papermc.paper.datapack.DatapackManager) java.lang.reflect.Proxy.newProxyInstance(
+            getClass().getClassLoader(), new Class<?>[] {io.papermc.paper.datapack.DatapackManager.class},
+            (proxy, method, args) -> {
+                Class<?> type = method.getReturnType();
+                if (java.util.Collection.class.isAssignableFrom(type)) {
+                    return type == java.util.Set.class ? java.util.Set.of() : java.util.List.of();
+                }
+                if (type == boolean.class) {
+                    return false;
+                }
+                return null;
+            });
+    }
+
+    @Override
+    public boolean isTickingWorlds() {
+        return true;
     }
 
     @Override

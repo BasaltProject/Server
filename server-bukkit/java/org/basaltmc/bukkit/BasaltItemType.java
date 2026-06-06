@@ -43,12 +43,12 @@ public final class BasaltItemType extends ItemTypeTypedBase {
 
     @Override
     public ItemStack createItemStack() {
-        return new ItemStack(material(), 1);
+        return new BasaltItemStack(material(), 1);
     }
 
     @Override
     public ItemStack createItemStack(int amount) {
-        return new ItemStack(material(), amount);
+        return new BasaltItemStack(material(), amount);
     }
 
     @Override
