@@ -103,6 +103,10 @@ public final class BasaltPluginManager extends PluginManagerBase {
                     continue;
                 }
                 pending.add(new Candidate(file, description));
+            } catch (InvalidDescriptionException e) {
+                if (e.getMessage() == null || !e.getMessage().contains("does not contain")) {
+                    Natives.log(3, "Bukkit", "Could not read " + file.getName() + ": " + e.getMessage());
+                }
             } catch (Throwable t) {
                 Natives.log(3, "Bukkit", "Could not read " + file.getName() + ": " + t.getMessage());
             }

@@ -83,7 +83,6 @@ final class BasaltGetBlocks extends CharGetBlocks {
 
     @Override
     public char[] load(int layer) {
-        org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "load " + layer + " frozen=" + frozen);
         expire(layer);
         return super.load(layer);
     }
@@ -168,7 +167,6 @@ final class BasaltGetBlocks extends CharGetBlocks {
                 layers[used++] = layer;
             }
         }
-        org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "call " + chunkX + "," + chunkZ + " copy=" + createCopy + " key=" + copyKey);
         BasaltGetBlocks copy = createCopy ? new BasaltGetBlocks(world, chunkX, chunkZ, minY, maxY, true) : null;
         int[] previous = copy == null ? null : new int[used * 4096];
         if (used > 0) {
@@ -190,21 +188,13 @@ final class BasaltGetBlocks extends CharGetBlocks {
         }
         reset();
         if (finalize != null) {
-            try {
-                finalize.run();
-            } catch (Throwable t) {
-                java.io.StringWriter trace = new java.io.StringWriter();
-                t.printStackTrace(new java.io.PrintWriter(trace));
-                org.basaltmc.bukkit.Natives.log(3, "FAWE-Basalt", "finalize threw " + trace);
-                throw t;
-            }
+            finalize.run();
         }
         return null;
     }
 
     @Override
     public Map<BlockVector3, FaweCompoundTag> tiles() {
-        org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "tiles frozen=" + frozen);
         return Collections.emptyMap();
     }
 
@@ -241,20 +231,7 @@ final class BasaltGetBlocks extends CharGetBlocks {
 
     @Override
     public IChunkGet getCopy(int key) {
-        IChunkGet real = copies.remove(key);
-        if (real == null) {
-            return null;
-        }
-        return (IChunkGet) java.lang.reflect.Proxy.newProxyInstance(IChunkGet.class.getClassLoader(),
-            new Class<?>[] {IChunkGet.class}, (proxy, method, args) -> {
-                org.basaltmc.bukkit.Natives.log(1, "FAWE-Basalt", "copy." + method.getName());
-                try {
-                    return method.invoke(real, args);
-                } catch (java.lang.reflect.InvocationTargetException e) {
-                    org.basaltmc.bukkit.Natives.log(3, "FAWE-Basalt", "copy." + method.getName() + " threw " + e.getCause());
-                    throw e.getCause();
-                }
-            });
+        return copies.remove(key);
     }
 
     @Override

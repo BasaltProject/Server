@@ -100,6 +100,16 @@ public final class BukkitRuntime {
         }
     }
 
+    public static String[] pluginList() {
+        org.bukkit.plugin.Plugin[] plugins = server.pluginManagerImpl().getPlugins();
+        String[] rows = new String[plugins.length];
+        for (int index = 0; index < plugins.length; index++) {
+            rows[index] = plugins[index].getName() + "\t" + plugins[index].getDescription().getVersion() + "\t"
+                + (plugins[index].isEnabled() ? "1" : "0");
+        }
+        return rows;
+    }
+
     public static void shutdown() {
         if (server != null) {
             server.pluginManagerImpl().disablePlugins();

@@ -10,7 +10,6 @@ set(BASALT_VERSION "26.3.0-dev" CACHE STRING "Version stamped into the binary an
 
 option(BASALT_BUILD_TESTS "Build the test executables" ON)
 option(BASALT_BUILD_BENCH "Build the benchmark executables" OFF)
-option(BASALT_BUILD_BUKKIT "Build the Bukkit compatibility layer (needs Basalt Shim and a JDK)" OFF)
 option(BASALT_WERROR "Treat warnings as errors" OFF)
 set(BASALT_SANITIZE "" CACHE STRING "Comma-separated sanitizers: address, undefined, thread")
 
@@ -39,6 +38,8 @@ endif()
 add_subdirectory(wire)
 
 include(BasaltBinary)
+include(BasaltBukkit)
+basalt_probe_bukkit(BASALT_BUKKIT_ACTIVE)
 
 add_subdirectory(metamorph)
 
@@ -49,7 +50,10 @@ add_subdirectory(server-storage)
 add_subdirectory(server-assets)
 add_subdirectory(server-plugins)
 add_subdirectory(server-world)
-if(BASALT_BUILD_BUKKIT)
+if(BASALT_BUKKIT_ACTIVE)
     add_subdirectory(server-bukkit)
 endif()
 add_subdirectory(server-runtime)
+if(BASALT_BUKKIT_ACTIVE)
+    basalt_bukkit_runtime()
+endif()
