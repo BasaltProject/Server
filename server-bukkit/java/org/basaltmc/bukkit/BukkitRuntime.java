@@ -88,9 +88,14 @@ public final class BukkitRuntime {
             Bukkit.setServer(server);
             Natives.log(1, "Bukkit", "Loading Bukkit plugins from " + folder.getPath());
             BasaltPluginManager manager = server.pluginManagerImpl();
-            manager.loadPlugins(folder);
-            manager.enableAll(PluginLoadOrder.STARTUP);
-            manager.enableAll(PluginLoadOrder.POSTWORLD);
+            Blocks.begin();
+            try {
+                manager.loadPlugins(folder);
+                manager.enableAll(PluginLoadOrder.STARTUP);
+                manager.enableAll(PluginLoadOrder.POSTWORLD);
+            } finally {
+                Blocks.end();
+            }
             Natives.log(1, "Bukkit", manager.getPlugins().length + " Bukkit plugin(s) loaded");
             return true;
         } catch (Throwable t) {
@@ -121,12 +126,22 @@ public final class BukkitRuntime {
     }
 
     public static boolean event(String name, int priority, long generation, Object[] fields, boolean cancelled) {
-        return EventBridge.fire(name, priority, generation, fields, cancelled);
+        Blocks.begin();
+        try {
+            return EventBridge.fire(name, priority, generation, fields, cancelled);
+        } finally {
+            Blocks.end();
+        }
     }
 
     public static void channelMessage(String channel, String uuid, byte[] payload) {
-        BasaltPlayer player = server.player(java.util.UUID.fromString(uuid), null);
-        server.messengerImpl().dispatchIncomingMessage(player, channel, payload);
+        Blocks.begin();
+        try {
+            BasaltPlayer player = server.player(java.util.UUID.fromString(uuid), null);
+            server.messengerImpl().dispatchIncomingMessage(player, channel, payload);
+        } finally {
+            Blocks.end();
+        }
     }
 
     public static boolean command(String label, String senderName, boolean console, String args) {
@@ -135,6 +150,11 @@ public final class BukkitRuntime {
             return false;
         }
         String line = args == null || args.isEmpty() ? label : label + " " + args;
-        return server.dispatchCommand(sender, line);
+        Blocks.begin();
+        try {
+            return server.dispatchCommand(sender, line);
+        } finally {
+            Blocks.end();
+        }
     }
 }

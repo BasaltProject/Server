@@ -35,11 +35,13 @@ public final class BasaltNativeAccess implements WorldNativeAccess<long[], Integ
 
     @Override
     public Integer getBlockState(long[] chunk, BlockVector3 position) {
+        org.basaltmc.bukkit.Blocks.flushAll();
         return intern(WorldNatives.state(world, position.x(), position.y(), position.z(), true));
     }
 
     @Override
     public Integer setBlockState(long[] chunk, BlockVector3 position, Integer state) {
+        org.basaltmc.bukkit.Blocks.flushAll();
         return WorldNatives.setState(world, position.x(), position.y(), position.z(), state, true) ? state : null;
     }
 
@@ -58,7 +60,8 @@ public final class BasaltNativeAccess implements WorldNativeAccess<long[], Integ
 
     @Override
     public boolean updateTileEntity(BlockVector3 position, LinCompoundTag tag) {
-        return true;
+        org.basaltmc.bukkit.Blocks.flushAll();
+        return WorldNatives.setBlockEntityNbt(world, position.x(), position.y(), position.z(), TileNbt.write(tag));
     }
 
     @Override

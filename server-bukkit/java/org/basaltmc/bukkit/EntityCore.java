@@ -119,6 +119,7 @@ final class EntityCore {
         if (target.getWorld() != null && !target.getWorld().equals(world)) {
             return false;
         }
+        Blocks.flushAll();
         return WorldNatives.entityMove(world.getName(), id, target.getX(), target.getY(), target.getZ(),
             target.getYaw(), target.getPitch());
     }

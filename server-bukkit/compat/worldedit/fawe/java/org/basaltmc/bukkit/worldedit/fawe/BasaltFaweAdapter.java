@@ -43,7 +43,7 @@ public final class BasaltFaweAdapter extends BasaltWorldEditAdapter implements S
 
     @Override
     public com.fastasyncworldedit.core.extent.processor.lighting.RelighterFactory getRelighterFactory() {
-        return (mode, world, queue) -> new BasaltRelighter();
+        return (mode, world, queue) -> new BasaltRelighter(world.getName());
     }
 
     public Object fromNative(Tag foreign) {

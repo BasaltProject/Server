@@ -662,6 +662,13 @@ jboolean JNICALL nativeSetBlockEntityNbt(JNIEnv* env, jclass, jstring name, jint
                : JNI_FALSE;
 }
 
+jintArray JNICALL nativeBlockEntityPositions(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
+    const auto world = worldOf(env, name);
+    return intArray(env, world == nullptr ? std::vector<std::int32_t>{}
+                                          : guarded<std::vector<std::int32_t>>(
+                                                {}, [&] { return world->blockEntityPositions(chunkX, chunkZ); }));
+}
+
 jbyteArray JNICALL nativeEntityNbt(JNIEnv* env, jclass, jstring name, jint id) {
     const auto world = worldOf(env, name);
     if (world == nullptr) {
@@ -671,10 +678,10 @@ jbyteArray JNICALL nativeEntityNbt(JNIEnv* env, jclass, jstring name, jint id) {
                               std::nullopt, [&] { return world->entityNbt(id); }));
 }
 
-jboolean JNICALL nativeSpawnEntityNbt(JNIEnv* env, jclass, jstring name, jbyteArray nbt) {
+jint JNICALL nativeSpawnEntityNbt(JNIEnv* env, jclass, jstring name, jbyteArray nbt) {
     const auto world = worldOf(env, name);
     const std::vector<std::uint8_t> data = bytes(env, nbt);
-    return world != nullptr && guarded<bool>(false, [&] { return world->spawnEntityNbt(data); }) ? JNI_TRUE : JNI_FALSE;
+    return world == nullptr ? -1 : guarded<jint>(-1, [&] { return world->spawnEntityNbt(data); });
 }
 
 jboolean JNICALL nativeReadBiomes(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray out) {
@@ -751,8 +758,9 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("applyChunks", "(Ljava/lang/String;[I[I[IZ[I)I", reinterpret_cast<void*>(&nativeApplyChunks)),
         method("blockEntityNbt", "(Ljava/lang/String;III)[B", reinterpret_cast<void*>(&nativeBlockEntityNbt)),
         method("setBlockEntityNbt", "(Ljava/lang/String;III[B)Z", reinterpret_cast<void*>(&nativeSetBlockEntityNbt)),
+        method("blockEntityPositions", "(Ljava/lang/String;II)[I", reinterpret_cast<void*>(&nativeBlockEntityPositions)),
         method("entityNbt", "(Ljava/lang/String;I)[B", reinterpret_cast<void*>(&nativeEntityNbt)),
-        method("spawnEntityNbt", "(Ljava/lang/String;[B)Z", reinterpret_cast<void*>(&nativeSpawnEntityNbt)),
+        method("spawnEntityNbt", "(Ljava/lang/String;[B)I", reinterpret_cast<void*>(&nativeSpawnEntityNbt)),
         method("readBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeReadBiomes)),
         method("writeBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeWriteBiomes)),
         method("relightChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeRelightChunks)),

@@ -127,12 +127,14 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
             tasks.remove(id);
         }
         task.running = true;
+        Blocks.begin();
         try {
             task.body.accept(task);
         } catch (Throwable t) {
             Natives.log(3, "Bukkit", "Task #" + id + " for " + task.owner.getName() + " generated an exception");
             t.printStackTrace();
         } finally {
+            Blocks.end();
             task.running = false;
         }
     }

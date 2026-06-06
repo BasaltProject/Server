@@ -12,7 +12,9 @@ import com.sk89q.worldedit.world.biome.BiomeType;
 import com.sk89q.worldedit.world.biome.BiomeTypes;
 import com.sk89q.worldedit.world.block.BlockTypesCache;
 import com.sk89q.worldedit.world.block.BlockState;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +22,7 @@ import java.util.UUID;
 import java.util.concurrent.Future;
 import java.util.concurrent.locks.ReentrantLock;
 import org.basaltmc.bukkit.WorldNatives;
+import org.basaltmc.bukkit.worldedit.TileNbt;
 
 /** One chunk of a Basalt world as FAWE sees it: sections are read and written whole through the native services. */
 final class BasaltGetBlocks extends CharGetBlocks {
@@ -98,6 +101,8 @@ final class BasaltGetBlocks extends CharGetBlocks {
         if (data == null) {
             data = new char[4096];
         }
+        org.basaltmc.bukkit.Blocks.flushAll();
+        org.basaltmc.bukkit.Blocks.flushAll();
         int[] states = new int[4096];
         if (!WorldNatives.readSection(world, chunkX, layer + minSectionPosition, chunkZ, true, states)) {
             java.util.Arrays.fill(data, (char) 1);
@@ -182,6 +187,7 @@ final class BasaltGetBlocks extends CharGetBlocks {
                 org.basaltmc.bukkit.Natives.log(2, "FAWE-Basalt", "chunk " + chunkX + "," + chunkZ + " was not written");
             }
         }
+        applyExtras(set);
         if (copy != null) {
             for (int i = 0; i < used; i++) {
                 char[] ordinals = new char[4096];
@@ -199,19 +205,83 @@ final class BasaltGetBlocks extends CharGetBlocks {
         return null;
     }
 
+    private void applyExtras(IChunkSet set) {
+        Map<BlockVector3, FaweCompoundTag> tiles = set.tiles();
+        if (tiles != null) {
+            for (Map.Entry<BlockVector3, FaweCompoundTag> tile : tiles.entrySet()) {
+                BlockVector3 at = tile.getKey();
+                WorldNatives.setBlockEntityNbt(world, (chunkX << 4) + (at.x() & 15), at.y(), (chunkZ << 4) + (at.z() & 15),
+                    TileNbt.write(tile.getValue().linTag()));
+            }
+        }
+        Collection<FaweCompoundTag> entities = set.entities();
+        if (entities != null) {
+            for (FaweCompoundTag entity : entities) {
+                WorldNatives.spawnEntityNbt(world, TileNbt.write(entity.linTag()));
+            }
+        }
+        if (!set.hasBiomes()) {
+            return;
+        }
+        int[] ids = new int[((maxY + 1 - minY) >> 2) * 16];
+        java.util.Arrays.fill(ids, -1);
+        boolean any = false;
+        for (int qy = 0; qy < (maxY + 1 - minY) >> 2; qy++) {
+            for (int qz = 0; qz < 4; qz++) {
+                for (int qx = 0; qx < 4; qx++) {
+                    BiomeType wanted = set.getBiomeType(qx << 2, minY + (qy << 2), qz << 2);
+                    if (wanted != null) {
+                        ids[(qy * 4 + qz) * 4 + qx] = biomeIndex(wanted);
+                        any = true;
+                    }
+                }
+            }
+        }
+        if (any) {
+            WorldNatives.writeBiomes(world, chunkX, chunkZ, ids);
+        }
+    }
+
+    private static int biomeIndex(BiomeType biome) {
+        String[] ids = org.basaltmc.bukkit.Registries.biomeIds();
+        for (int i = 0; i < ids.length; i++) {
+            if (ids[i].equals(biome.id())) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
     @Override
     public Map<BlockVector3, FaweCompoundTag> tiles() {
-        return Collections.emptyMap();
+        int[] where = WorldNatives.blockEntityPositions(world, chunkX, chunkZ);
+        Map<BlockVector3, FaweCompoundTag> out = new java.util.HashMap<>();
+        for (int i = 0; i + 2 < where.length; i += 3) {
+            FaweCompoundTag tag = tile(where[i] & 15, where[i + 1], where[i + 2] & 15);
+            if (tag != null) {
+                out.put(BlockVector3.at(where[i] & 15, where[i + 1], where[i + 2] & 15), tag);
+            }
+        }
+        return out;
     }
 
     @Override
     public FaweCompoundTag tile(int x, int y, int z) {
-        return null;
+        org.basaltmc.bukkit.Blocks.flushAll();
+        byte[] nbt = WorldNatives.blockEntityNbt(world, (chunkX << 4) + x, y, (chunkZ << 4) + z);
+        return nbt == null ? null : FaweCompoundTag.of(TileNbt.read(nbt));
     }
 
     @Override
     public Collection<FaweCompoundTag> entities() {
-        return Collections.emptyList();
+        List<FaweCompoundTag> out = new ArrayList<>();
+        for (int id : WorldNatives.entityIds(world, chunkX, chunkZ, false)) {
+            byte[] nbt = WorldNatives.entityNbt(world, id);
+            if (nbt != null) {
+                out.add(FaweCompoundTag.of(TileNbt.read(nbt)));
+            }
+        }
+        return out;
     }
 
     @Override
@@ -221,7 +291,15 @@ final class BasaltGetBlocks extends CharGetBlocks {
 
     @Override
     public Set<Entity> getFullEntities() {
-        return Collections.emptySet();
+        Set<Entity> out = new java.util.HashSet<>();
+        org.bukkit.World bukkit = org.bukkit.Bukkit.getWorld(world);
+        for (int id : WorldNatives.entityIds(world, chunkX, chunkZ, false)) {
+            org.bukkit.entity.Entity found = org.basaltmc.bukkit.Entities.byId(bukkit, id);
+            if (found != null) {
+                out.add(com.sk89q.worldedit.bukkit.BukkitAdapter.adapt(found));
+            }
+        }
+        return out;
     }
 
     @Override
