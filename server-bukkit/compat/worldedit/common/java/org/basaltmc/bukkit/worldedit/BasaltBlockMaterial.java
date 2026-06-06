@@ -1,16 +1,15 @@
-package org.basaltmc.bukkit.fawe;
+package org.basaltmc.bukkit.worldedit;
 
-import com.fastasyncworldedit.core.nbt.FaweCompoundTag;
 import com.sk89q.jnbt.CompoundTag;
 import com.sk89q.worldedit.world.registry.BlockMaterial;
 import org.basaltmc.bukkit.WorldNatives;
 
 /** What FAWE asks about a block, answered from the flags and hardness the server keeps for the default state. */
-final class BasaltBlockMaterial implements BlockMaterial {
+public abstract class BasaltBlockMaterial implements BlockMaterial {
     private final int flags;
     private final double[] hardness;
 
-    BasaltBlockMaterial(String id, int defaultState) {
+    public BasaltBlockMaterial(String id, int defaultState) {
         flags = defaultState < 0 ? 0 : WorldNatives.stateFlags(defaultState);
         double[] facts = WorldNatives.blockHardness(id);
         hardness = facts == null ? new double[] {0, 0, 0} : facts;
@@ -115,27 +114,18 @@ final class BasaltBlockMaterial implements BlockMaterial {
         return false;
     }
 
-    @Override
     public int getLightOpacity() {
         return (flags >> 13) & 31;
     }
 
-    @Override
     public boolean isTile() {
         return false;
     }
 
-    @Override
     public CompoundTag getDefaultTile() {
         return null;
     }
 
-    @Override
-    public FaweCompoundTag defaultTile() {
-        return null;
-    }
-
-    @Override
     public int getMapColor() {
         return 0;
     }

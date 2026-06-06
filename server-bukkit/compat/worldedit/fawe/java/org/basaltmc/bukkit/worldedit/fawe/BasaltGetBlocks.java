@@ -1,4 +1,4 @@
-package org.basaltmc.bukkit.fawe;
+package org.basaltmc.bukkit.worldedit.fawe;
 
 import com.fastasyncworldedit.core.nbt.FaweCompoundTag;
 import com.fastasyncworldedit.core.queue.IChunk;

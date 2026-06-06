@@ -2,7 +2,7 @@
 
 set(BASALT_BUILD_BUKKIT "AUTO" CACHE STRING "Bukkit layer: ON, OFF, or AUTO (built when a JDK and its jni.h are found)")
 set(BASALT_SHIM_DIR "" CACHE PATH "A prebuilt Shim folder with libjvm and classpath.jar (empty builds the shim/ submodule)")
-set(BASALT_FAWE_JAR "" CACHE FILEPATH "A FastAsyncWorldEdit jar to compile the bundled adapter against (optional)")
+set(BASALT_ADDON_JARS "" CACHE STRING "Jars (WorldEdit, FastAsyncWorldEdit...) to compile the matching Bukkit add-ons against, separated by semicolons (optional)")
 
 function(basalt_probe_bukkit RESULT)
     string(TOUPPER "${BASALT_BUILD_BUKKIT}" _mode)
@@ -51,7 +51,7 @@ function(basalt_bukkit_runtime)
     endif()
     add_custom_target(basalt-bukkit-runtime ALL
         COMMAND ${CMAKE_SOURCE_DIR}/server-bukkit/scripts/build-bundle.sh ${CMAKE_BINARY_DIR}/bukkit-work ${CMAKE_BINARY_DIR}/bin/runtime
-                "${_shim}" "${BASALT_FAWE_JAR}"
+                "${_shim}" ${BASALT_ADDON_JARS}
         ${_deps}
         COMMENT "Assembling the Bukkit runtime folder"
         VERBATIM

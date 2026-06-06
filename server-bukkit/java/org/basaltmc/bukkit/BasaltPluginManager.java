@@ -193,7 +193,7 @@ public final class BasaltPluginManager extends PluginManagerBase {
         JavaPlugin plugin;
         try {
             loader = new BasaltPluginClassLoader(getClass().getClassLoader(), this, description, dataFolder, file);
-            Addons.attach(loader, description.getName());
+            Addons.attach(loader);
             Class<?> main = Class.forName(description.getMainClass(), true, loader);
             if (!JavaPlugin.class.isAssignableFrom(main)) {
                 throw new InvalidPluginException("main class '" + description.getMainClass() + "' does not extend JavaPlugin");
