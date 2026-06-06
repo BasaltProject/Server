@@ -412,10 +412,11 @@ public:
         return false;
     }
 
-    /// Writes whole sections of one chunk at once (4096 ids each, a negative id keeps the block); returns how many
+    /// Writes whole sections of one chunk (4096 ids each, negative keeps); returns blocks changed, -1 if out of range.
     virtual std::int32_t applySections(std::int32_t chunkX, std::int32_t chunkZ,
                                        std::span<const std::int32_t> sectionYs, std::span<const std::int32_t> states,
-                                       bool resend) {
+                                       bool resend, std::span<std::int32_t> previous) {
+        static_cast<void>(previous);
         static_cast<void>(chunkX);
         static_cast<void>(chunkZ);
         static_cast<void>(sectionYs);

@@ -171,6 +171,38 @@ bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std:
     return changed;
 }
 
+void Chunk::replaceSectionStates(std::size_t sectionIndex, std::span<const std::int32_t> next) {
+    ChunkSection& section = sections_[sectionIndex];
+    std::vector<std::int32_t> before(ChunkSection::kBlocks);
+    section.copyBlockStateIdsInto(before);
+    const std::int32_t baseY = (bounds_.minSection() + static_cast<std::int32_t>(sectionIndex)) << 4;
+    bool lightChanged = false;
+    for (std::size_t at = 0; at < ChunkSection::kBlocks; ++at) {
+        if (before[at] == next[at]) {
+            continue;
+        }
+        lightChanged = lightChanged || changesLight(before[at], next[at]);
+        if (!blockEntities_.empty() && changesBlock(before[at], next[at])) {
+            removeBlockEntityAt(static_cast<std::int32_t>(at & 15), baseY + static_cast<std::int32_t>(at >> 8),
+                                static_cast<std::int32_t>((at >> 4) & 15));
+        }
+    }
+    section.setBlockStateIds(next);
+    dirty_ = true;
+    heightsValid_ = false;
+    if (lightChanged) {
+        invalidateLight();
+    }
+    if (blockWriteObserver_) {
+        for (std::size_t at = 0; at < ChunkSection::kBlocks; ++at) {
+            if (before[at] != next[at]) {
+                blockWriteObserver_(static_cast<std::int32_t>(at & 15), baseY + static_cast<std::int32_t>(at >> 8),
+                                    static_cast<std::int32_t>((at >> 4) & 15), before[at], next[at]);
+            }
+        }
+    }
+}
+
 void Chunk::removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::int32_t removedKey = blockEntityKey(x, y, z);
     if (blockEntities_.erase(removedKey) != 0) {

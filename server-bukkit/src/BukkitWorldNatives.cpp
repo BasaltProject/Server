@@ -232,6 +232,11 @@ jboolean JNICALL nativeReadSection(JNIEnv* env, jclass, jstring name, jint chunk
         return JNI_FALSE;
     }
     std::vector<std::int32_t> read(4096);
+    // A loaded section is copied under the world's read lock, so no thread hop is needed.
+    if (world->readSection(chunkX, sectionY, chunkZ, false, read)) {
+        env->SetIntArrayRegion(out, 0, 4096, read.data());
+        return JNI_TRUE;
+    }
     const bool ok = guarded<bool>(
         false, [&] { return world->readSection(chunkX, sectionY, chunkZ, load == JNI_TRUE, read); });
     if (ok) {

@@ -73,6 +73,9 @@ public:
 
     bool setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
+    /// Replaces a whole section at once: block entities of changed blocks go, heights and light are marked stale.
+    void replaceSectionStates(std::size_t sectionIndex, std::span<const std::int32_t> next);
+
     [[nodiscard]] bool isDirty() const noexcept { return dirty_; }
 
     void markDirty() noexcept { dirty_ = true; }

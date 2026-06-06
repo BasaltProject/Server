@@ -730,6 +730,113 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     return true;
 }
 
+bool WorldState::copySection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
+                             std::span<std::int32_t> out) const {
+    const WorldReadLock lock{mutex_};
+    const Chunk* chunk = chunkAtLocked(key(chunkX, chunkZ));
+    if (chunk == nullptr || out.size() < server::world::ChunkSection::kBlocks) {
+        return false;
+    }
+    const std::int32_t index = sectionY - chunk->verticalBounds().minSection();
+    if (index < 0 || static_cast<std::size_t>(index) >= chunk->sectionCount()) {
+        return false;
+    }
+    chunk->section(static_cast<std::size_t>(index)).copyBlockStateIdsInto(out);
+    return true;
+}
+
+std::int32_t WorldState::replaceSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
+                                        std::span<const std::int32_t> next, std::span<std::int32_t> previous) {
+    mine("A section");
+    constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
+    const WorldWriteLock lock{mutex_};
+    Chunk* chunk = chunkAtLocked(key(chunkX, chunkZ));
+    if (chunk == nullptr || next.size() < kBlocks) {
+        return -1;
+    }
+    const std::int32_t index = sectionY - chunk->verticalBounds().minSection();
+    if (index < 0 || static_cast<std::size_t>(index) >= chunk->sectionCount()) {
+        return -1;
+    }
+    std::vector<std::int32_t> before(kBlocks);
+    chunk->section(static_cast<std::size_t>(index)).copyBlockStateIdsInto(before);
+    if (previous.size() >= kBlocks) {
+        std::ranges::copy(before, previous.begin());
+    }
+    std::vector<std::int32_t> merged(kBlocks);
+    std::vector<std::uint16_t> changed;
+    for (std::size_t at = 0; at < kBlocks; ++at) {
+        merged[at] = next[at] < 0 ? before[at] : next[at];
+        if (merged[at] != before[at]) {
+            changed.push_back(static_cast<std::uint16_t>(at));
+        }
+    }
+    if (changed.empty()) {
+        return 0;
+    }
+    chunk->replaceSectionStates(static_cast<std::size_t>(index), merged);
+    const std::int32_t baseX = chunkX << 4;
+    const std::int32_t baseY = sectionY << 4;
+    const std::int32_t baseZ = chunkZ << 4;
+    bool lightChanged = false;
+    std::size_t shapes = 0;
+    const auto moving = [](std::int32_t state) {
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(state);
+        return block != nullptr && block->path() == "moving_piston";
+    };
+    for (const std::uint16_t at : changed) {
+        const std::int32_t was = before[at];
+        const std::int32_t stateId = merged[at];
+        const std::int32_t x = baseX + (at & 15);
+        const std::int32_t y = baseY + (at >> 8);
+        const std::int32_t z = baseZ + ((at >> 4) & 15);
+        // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever.
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+        if (block != nullptr && block->path() != "moving_piston" && registry::blockEntityTypes::ofBlock(*block) != nullptr &&
+            chunk->blockEntityAt(x & 15, y, z & 15) == nullptr) {
+            chunk->setBlockEntity(
+                server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, blockEntityDefaults::of(*block, stateId)});
+        }
+        poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
+        if (!std::ranges::equal(registry::blockShapes::collisionBoxes(was), registry::blockShapes::collisionBoxes(stateId)) ||
+            moving(was) || moving(stateId)) {
+            ++shapes;
+        }
+        lightChanged = lightChanged || server::world::changesLight(was, stateId);
+        if (block != nullptr && (block->path() == "sculk_sensor" || block->path() == "calibrated_sculk_sensor")) {
+            sculkSensors_.remember(x, y, z, stateId);
+        } else if (registry::blockStateDefinitions::blockOf(was) != nullptr) {
+            sculkSensors_.remember(x, y, z, stateId);
+        }
+    }
+    if (shapes > 0) {
+        // The last kShapeChangeMemory entries are kept exactly; the count moves by all of them so readers see an overflow.
+        std::size_t skipped = 0;
+        std::size_t kept = 0;
+        for (std::size_t i = changed.size(); i-- > 0 && kept < kShapeChangeMemory;) {
+            const std::uint16_t at = changed[i];
+            shapeChanges_[(shapeChangeCount_ + kept) % kShapeChangeMemory] = {baseX + (at & 15), baseY + (at >> 8),
+                                                                              baseZ + ((at >> 4) & 15)};
+            ++kept;
+        }
+        static_cast<void>(skipped);
+        shapeChangeCount_ += std::max(kept, shapes);
+    }
+    if (lightChanged) {
+        for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+            for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+                if (Chunk* neighbour = chunkAtLocked(key(chunkX + offsetX, chunkZ + offsetZ)); neighbour != nullptr) {
+                    neighbour->markLightStale();
+                    if (onNeighbourhoodComplete_) {
+                        onNeighbourhoodComplete_(neighbour->chunkX(), neighbour->chunkZ(), true);
+                    }
+                }
+            }
+        }
+    }
+    return static_cast<std::int32_t>(changed.size());
+}
+
 std::uint64_t WorldState::shapeChangesSince(std::uint64_t seen, std::vector<std::array<std::int32_t, 3>>& changed,
                                             bool& overflowed) const {
     const WorldReadLock lock{mutex_};
