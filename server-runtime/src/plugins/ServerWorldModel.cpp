@@ -1,4 +1,7 @@
 #include <basalt/server/registry/BlockFluids.hpp>
+#include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
+#include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
@@ -492,29 +495,189 @@ public:
     std::int32_t applySections(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::int32_t> sectionYs,
                                std::span<const std::int32_t> states, bool resend,
                                std::span<std::int32_t> previous) override {
+        const std::array<std::int32_t, 3> chunk{chunkX, chunkZ, static_cast<std::int32_t>(sectionYs.size())};
+        return applyChunks(chunk, sectionYs, states, resend, previous);
+    }
+
+    std::int32_t applyChunks(std::span<const std::int32_t> chunks, std::span<const std::int32_t> sectionYs,
+                             std::span<const std::int32_t> states, bool resend,
+                             std::span<std::int32_t> previous) override {
         constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
+        constexpr std::size_t kBlockChangeLimit = 24;
         if (states.size() < sectionYs.size() * kBlocks) {
             return -1;
         }
-        ensureChunk(chunkX, chunkZ);
         std::int32_t changed = 0;
-        for (std::size_t section = 0; section < sectionYs.size(); ++section) {
-            std::span<std::int32_t> held;
-            if (previous.size() >= (section + 1) * kBlocks) {
-                held = previous.subspan(section * kBlocks, kBlocks);
-            }
-            const std::int32_t count = world_->state().replaceSection(
-                chunkX, sectionYs[section], chunkZ, states.subspan(section * kBlocks, kBlocks), held);
-            if (count < 0) {
+        bool failed = false;
+        std::size_t section = 0;
+        std::vector<std::int32_t> resent;
+        std::vector<std::uint16_t> offsets;
+        std::vector<std::uint16_t> chunkOffsets;
+        std::vector<std::int32_t> chunkStates;
+        for (std::size_t at = 0; at + 2 < chunks.size(); at += 3) {
+            const std::int32_t chunkX = chunks[at];
+            const std::int32_t chunkZ = chunks[at + 1];
+            const std::size_t count = static_cast<std::size_t>(std::max(chunks[at + 2], 0));
+            if (section + count > sectionYs.size()) {
                 return -1;
             }
-            changed += count;
+            ensureChunk(chunkX, chunkZ);
+            std::int32_t inChunk = 0;
+            chunkOffsets.clear();
+            chunkStates.clear();
+            for (std::size_t index = 0; index < count; ++index, ++section) {
+                std::span<std::int32_t> held;
+                if (previous.size() >= (section + 1) * kBlocks) {
+                    held = previous.subspan(section * kBlocks, kBlocks);
+                }
+                offsets.clear();
+                const std::span<const std::int32_t> next = states.subspan(section * kBlocks, kBlocks);
+                const std::int32_t done = world_->state().replaceSection(chunkX, sectionYs[section], chunkZ, next,
+                                                                         held, &offsets);
+                if (done < 0) {
+                    failed = true;
+                    continue;
+                }
+                inChunk += done;
+                if (inChunk <= static_cast<std::int32_t>(kBlockChangeLimit)) {
+                    for (const std::uint16_t offset : offsets) {
+                        chunkOffsets.push_back(static_cast<std::uint16_t>(offset));
+                        chunkStates.push_back(sectionYs[section]);
+                        chunkStates.push_back(next[offset]);
+                    }
+                }
+            }
+            changed += inChunk;
+            if (inChunk == 0 || !resend) {
+                continue;
+            }
+            if (inChunk <= static_cast<std::int32_t>(kBlockChangeLimit)) {
+                for (std::size_t one = 0; one < chunkOffsets.size(); ++one) {
+                    const std::uint16_t offset = chunkOffsets[one];
+                    tell((chunkX << 4) + (offset & 15), (chunkStates[one * 2] << 4) + (offset >> 8),
+                         (chunkZ << 4) + ((offset >> 4) & 15), chunkStates[one * 2 + 1]);
+                }
+            } else {
+                resent.push_back(chunkX);
+                resent.push_back(chunkZ);
+            }
         }
-        if (resend && changed > 0) {
-            const std::array<std::int32_t, 2> chunk{chunkX, chunkZ};
-            resendChunks(chunk);
+        if (!resent.empty()) {
+            resendChunks(resent);
         }
-        return changed;
+        return failed ? -1 : changed;
+    }
+
+    [[nodiscard]] std::uint64_t blockVersion() const override { return world_->state().blockVersion(); }
+
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> blockEntityNbt(std::int32_t x, std::int32_t y,
+                                                                          std::int32_t z) override {
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* held = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        if (held == nullptr) {
+            return std::nullopt;
+        }
+        wire::nbt::NbtCompound tag = held->data();
+        tag.putString("id", held->type().toString());
+        tag.putInt("x", x);
+        tag.putInt("y", y);
+        tag.putInt("z", z);
+        return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(tag)));
+    }
+
+    bool setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int32_t z, std::span<const std::uint8_t> nbt) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* held = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        const auto parsed = wire::nbt::nbtIO::read(nbt);
+        const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+        if (held == nullptr || given == nullptr) {
+            return false;
+        }
+        wire::nbt::NbtCompound data = *given;
+        for (const char* key : {"id", "x", "y", "z"}) {
+            data.remove(key);
+        }
+        server::world::ChunkBlockEntity next = held->withData(std::move(data));
+        const std::optional<std::int32_t> typeId = reg::blockEntityTypes::idOf(next.type());
+        chunk->setBlockEntity(next);
+        if (typeId.has_value() && players_) {
+            const wire::protocol::play::BlockEntityDataPacket packet{
+                .pos = {x, y, z}, .typeId = *typeId, .tag = next.data()};
+            for (const player::PlayerSession* player : players_()) {
+                if (player->worldName == world_->name() && player->connection().sendPlayPacket) {
+                    player->connection().sendPlayPacket(wire::protocol::play::BlockEntityDataPacket::kId,
+                                                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                }
+            }
+        }
+        return true;
+    }
+
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> entityNbt(std::int32_t entityId) override {
+        const entity::ServerEntity* found = world_->state().entity(entityId);
+        if (found == nullptr) {
+            return std::nullopt;
+        }
+        return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(entity::entityNbt::encode(*found)));
+    }
+
+    bool spawnEntityNbt(std::span<const std::uint8_t> nbt) override {
+        const auto parsed = wire::nbt::nbtIO::read(nbt);
+        const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+        if (given == nullptr) {
+            return false;
+        }
+        std::vector<wire::nbt::NbtCompound> saved;
+        saved.push_back(*given);
+        world_->state().addPendingEntities(std::move(saved));
+        return true;
+    }
+
+    bool readBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) override {
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        const std::int32_t cells = chunkHeight().height() / 4;
+        if (chunk == nullptr || out.size() < static_cast<std::size_t>(cells) * 16) {
+            return false;
+        }
+        for (std::int32_t qy = 0; qy < cells; ++qy) {
+            for (std::int32_t qz = 0; qz < 4; ++qz) {
+                for (std::int32_t qx = 0; qx < 4; ++qx) {
+                    out[static_cast<std::size_t>((qy * 4 + qz) * 4 + qx)] = chunk->biomeId(qx, qy, qz);
+                }
+            }
+        }
+        return true;
+    }
+
+    bool writeBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::int32_t> ids) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        const std::int32_t cells = chunkHeight().height() / 4;
+        if (chunk == nullptr || ids.size() < static_cast<std::size_t>(cells) * 16) {
+            return false;
+        }
+        for (std::int32_t qy = 0; qy < cells; ++qy) {
+            for (std::int32_t qz = 0; qz < 4; ++qz) {
+                for (std::int32_t qx = 0; qx < 4; ++qx) {
+                    const std::int32_t id = ids[static_cast<std::size_t>((qy * 4 + qz) * 4 + qx)];
+                    if (id >= 0) {
+                        chunk->setBiomeId(qx, qy, qz, id);
+                    }
+                }
+            }
+        }
+        const std::array<std::int32_t, 2> pair{chunkX, chunkZ};
+        resendChunks(pair);
+        return true;
+    }
+
+    void relightChunks(std::span<const std::int32_t> chunks) override {
+        for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
+            if (server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunks[at], chunks[at + 1]);
+                chunk != nullptr) {
+                chunk->markLightStale();
+            }
+        }
+        resendChunks(chunks);
     }
 
     void resendChunks(std::span<const std::int32_t> chunks) override {

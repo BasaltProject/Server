@@ -2,7 +2,10 @@
 
 #include <array>
 #include <chrono>
+#include <atomic>
 #include <exception>
+#include <memory>
+#include <mutex>
 #include <future>
 
 namespace basalt::server::bukkit {
@@ -565,6 +568,147 @@ void JNICALL nativeInventoryClear(JNIEnv* env, jclass, jstring uuid) {
         player->inventory().clear();
     }
 }
+
+// Worlds handed out by number so the hot version check needs no name lookup; they live as long as the process.
+constexpr std::size_t kMaxHandles = 256;
+std::array<std::shared_ptr<PluginWorldRef>, kMaxHandles> gHandleOwners;
+std::array<std::atomic<PluginWorldRef*>, kMaxHandles> gHandles{};
+std::atomic<std::int32_t> gHandleCount{0};
+std::mutex gHandleMutex;
+
+jint JNICALL nativeWorldHandle(JNIEnv* env, jclass, jstring name) {
+    const std::string wanted = toStd(env, name);
+    const std::lock_guard<std::mutex> lock{gHandleMutex};
+    const std::int32_t count = gHandleCount.load();
+    for (std::int32_t at = 0; at < count; ++at) {
+        if (gHandles[static_cast<std::size_t>(at)].load()->name() == wanted) {
+            return at;
+        }
+    }
+    const auto world = worlds().byName(wanted);
+    if (world == nullptr || count >= static_cast<std::int32_t>(kMaxHandles)) {
+        return -1;
+    }
+    gHandleOwners[static_cast<std::size_t>(count)] = world;
+    gHandles[static_cast<std::size_t>(count)].store(world.get());
+    gHandleCount.store(count + 1);
+    return count;
+}
+
+jlong JNICALL nativeBlockVersion(JNIEnv*, jclass, jint handle) {
+    if (handle < 0 || handle >= gHandleCount.load()) {
+        return -1;
+    }
+    return static_cast<jlong>(gHandles[static_cast<std::size_t>(handle)].load()->blockVersion());
+}
+
+[[nodiscard]] std::vector<std::int32_t> ints(JNIEnv* env, jintArray array) {
+    std::vector<std::int32_t> values(array == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(array)));
+    if (!values.empty()) {
+        env->GetIntArrayRegion(array, 0, static_cast<jsize>(values.size()), values.data());
+    }
+    return values;
+}
+
+[[nodiscard]] std::vector<std::uint8_t> bytes(JNIEnv* env, jbyteArray array) {
+    std::vector<std::uint8_t> values(array == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(array)));
+    if (!values.empty()) {
+        env->GetByteArrayRegion(array, 0, static_cast<jsize>(values.size()), reinterpret_cast<jbyte*>(values.data()));
+    }
+    return values;
+}
+
+[[nodiscard]] jbyteArray byteArray(JNIEnv* env, const std::optional<std::vector<std::uint8_t>>& values) {
+    if (!values.has_value()) {
+        return nullptr;
+    }
+    jbyteArray array = env->NewByteArray(static_cast<jsize>(values->size()));
+    env->SetByteArrayRegion(array, 0, static_cast<jsize>(values->size()), reinterpret_cast<const jbyte*>(values->data()));
+    return array;
+}
+
+jint JNICALL nativeApplyChunks(JNIEnv* env, jclass, jstring name, jintArray chunks, jintArray sections,
+                               jintArray states, jboolean resend, jintArray previous) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return -1;
+    }
+    const std::vector<std::int32_t> chunkList = ints(env, chunks);
+    const std::vector<std::int32_t> sectionList = ints(env, sections);
+    const std::vector<std::int32_t> next = ints(env, states);
+    std::vector<std::int32_t> before(previous == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(previous)));
+    const jint changed = guarded<jint>(
+        -1, [&] { return world->applyChunks(chunkList, sectionList, next, resend == JNI_TRUE, before); });
+    if (previous != nullptr && !before.empty()) {
+        env->SetIntArrayRegion(previous, 0, static_cast<jsize>(before.size()), before.data());
+    }
+    return changed;
+}
+
+jbyteArray JNICALL nativeBlockEntityNbt(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return nullptr;
+    }
+    return byteArray(env, guarded<std::optional<std::vector<std::uint8_t>>>(
+                              std::nullopt, [&] { return world->blockEntityNbt(x, y, z); }));
+}
+
+jboolean JNICALL nativeSetBlockEntityNbt(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jbyteArray nbt) {
+    const auto world = worldOf(env, name);
+    const std::vector<std::uint8_t> data = bytes(env, nbt);
+    return world != nullptr && guarded<bool>(false, [&] { return world->setBlockEntityNbt(x, y, z, data); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jbyteArray JNICALL nativeEntityNbt(JNIEnv* env, jclass, jstring name, jint id) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return nullptr;
+    }
+    return byteArray(env, guarded<std::optional<std::vector<std::uint8_t>>>(
+                              std::nullopt, [&] { return world->entityNbt(id); }));
+}
+
+jboolean JNICALL nativeSpawnEntityNbt(JNIEnv* env, jclass, jstring name, jbyteArray nbt) {
+    const auto world = worldOf(env, name);
+    const std::vector<std::uint8_t> data = bytes(env, nbt);
+    return world != nullptr && guarded<bool>(false, [&] { return world->spawnEntityNbt(data); }) ? JNI_TRUE : JNI_FALSE;
+}
+
+jboolean JNICALL nativeReadBiomes(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray out) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    std::vector<std::int32_t> read(static_cast<std::size_t>(env->GetArrayLength(out)));
+    const bool ok = guarded<bool>(false, [&] { return world->readBiomes(chunkX, chunkZ, read); });
+    if (ok) {
+        env->SetIntArrayRegion(out, 0, static_cast<jsize>(read.size()), read.data());
+    }
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+jboolean JNICALL nativeWriteBiomes(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray ids) {
+    const auto world = worldOf(env, name);
+    const std::vector<std::int32_t> next = ints(env, ids);
+    return world != nullptr && guarded<bool>(false, [&] { return world->writeBiomes(chunkX, chunkZ, next); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+void JNICALL nativeRelightChunks(JNIEnv* env, jclass, jstring name, jintArray chunks) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return;
+    }
+    const std::vector<std::int32_t> pairs = ints(env, chunks);
+    guarded<int>(0, [&] {
+        world->relightChunks(pairs);
+        return 0;
+    });
+}
 } // namespace
 
 void registerWorldNatives(JNIEnv* env, jclass natives) {
@@ -602,6 +746,16 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("readSection", "(Ljava/lang/String;IIIZ[I)Z", reinterpret_cast<void*>(&nativeReadSection)),
         method("writeSection", "(Ljava/lang/String;III[IZ)Z", reinterpret_cast<void*>(&nativeWriteSection)),
         method("applySections", "(Ljava/lang/String;II[I[IZ[I)I", reinterpret_cast<void*>(&nativeApplySections)),
+        method("worldHandle", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeWorldHandle)),
+        method("blockVersion", "(I)J", reinterpret_cast<void*>(&nativeBlockVersion)),
+        method("applyChunks", "(Ljava/lang/String;[I[I[IZ[I)I", reinterpret_cast<void*>(&nativeApplyChunks)),
+        method("blockEntityNbt", "(Ljava/lang/String;III)[B", reinterpret_cast<void*>(&nativeBlockEntityNbt)),
+        method("setBlockEntityNbt", "(Ljava/lang/String;III[B)Z", reinterpret_cast<void*>(&nativeSetBlockEntityNbt)),
+        method("entityNbt", "(Ljava/lang/String;I)[B", reinterpret_cast<void*>(&nativeEntityNbt)),
+        method("spawnEntityNbt", "(Ljava/lang/String;[B)Z", reinterpret_cast<void*>(&nativeSpawnEntityNbt)),
+        method("readBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeReadBiomes)),
+        method("writeBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeWriteBiomes)),
+        method("relightChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeRelightChunks)),
         method("resendChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeResendChunks)),
         method("biome", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiome)),
         method("setBiome", "(Ljava/lang/String;IIILjava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetBiome)),

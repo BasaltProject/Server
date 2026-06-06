@@ -425,6 +425,71 @@ public:
         return -1;
     }
 
+    /// Many chunks at once: (chunkX, chunkZ, sectionCount) triples, sectionYs, states; returns blocks changed or -1.
+    virtual std::int32_t applyChunks(std::span<const std::int32_t> chunks, std::span<const std::int32_t> sectionYs,
+                                     std::span<const std::int32_t> states, bool resend,
+                                     std::span<std::int32_t> previous) {
+        static_cast<void>(chunks);
+        static_cast<void>(sectionYs);
+        static_cast<void>(states);
+        static_cast<void>(resend);
+        static_cast<void>(previous);
+        return -1;
+    }
+
+    /// A block entity as a named NBT compound with id, x, y and z added; nothing when the position holds none.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> blockEntityNbt(std::int32_t x, std::int32_t y,
+                                                                                std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return std::nullopt;
+    }
+
+    /// Replaces the block entity data at a position from a named NBT compound; false when the block owns none.
+    virtual bool setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int32_t z,
+                                   std::span<const std::uint8_t> nbt) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(nbt);
+        return false;
+    }
+
+    /// An entity as the named NBT compound the world saves it as (id, Pos, Rotation, Motion, UUID...).
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> entityNbt(std::int32_t entityId) {
+        static_cast<void>(entityId);
+        return std::nullopt;
+    }
+
+    /// Brings an entity back from the NBT `entityNbt` gave (with Pos changed as wanted); it appears within a tick.
+    virtual bool spawnEntityNbt(std::span<const std::uint8_t> nbt) {
+        static_cast<void>(nbt);
+        return false;
+    }
+
+    /// The biome ids of a chunk's 4 by 4 by 4 cells, ordered (cellY * 4 + cellZ) * 4 + cellX; false when not loaded.
+    virtual bool readBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(out);
+        return false;
+    }
+
+    /// Writes biome ids in the same order (a negative id keeps the cell) and shows the chunk again to its watchers.
+    virtual bool writeBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::int32_t> ids) {
+        static_cast<void>(chunkX);
+        static_cast<void>(chunkZ);
+        static_cast<void>(ids);
+        return false;
+    }
+
+    /// Marks the light of the chunks (x, z pairs) stale so it is recomputed, and shows them again to their watchers.
+    virtual void relightChunks(std::span<const std::int32_t> chunks) { static_cast<void>(chunks); }
+
+    /// Changes whenever a block or chunk of this world does, so a section copy stays valid; zero when unsupported.
+    [[nodiscard]] virtual std::uint64_t blockVersion() const { return 0; }
+
     /// Sends the chunks (x, z pairs) again to every player in this world that is near them.
     virtual void resendChunks(std::span<const std::int32_t> chunks) { static_cast<void>(chunks); }
 

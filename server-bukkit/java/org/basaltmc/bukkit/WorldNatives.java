@@ -32,6 +32,16 @@ public final class WorldNatives {
     public static native boolean readSection(String world, int chunkX, int sectionY, int chunkZ, boolean load, int[] out);
     public static native boolean writeSection(String world, int chunkX, int sectionY, int chunkZ, int[] states, boolean notify);
     public static native int applySections(String world, int chunkX, int chunkZ, int[] sections, int[] states, boolean resend, int[] previous);
+    public static native int worldHandle(String world);
+    public static native long blockVersion(int handle);
+    public static native int applyChunks(String world, int[] chunks, int[] sections, int[] states, boolean resend, int[] previous);
+    public static native byte[] blockEntityNbt(String world, int x, int y, int z);
+    public static native boolean setBlockEntityNbt(String world, int x, int y, int z, byte[] nbt);
+    public static native byte[] entityNbt(String world, int id);
+    public static native boolean spawnEntityNbt(String world, byte[] nbt);
+    public static native boolean readBiomes(String world, int chunkX, int chunkZ, int[] out);
+    public static native boolean writeBiomes(String world, int chunkX, int chunkZ, int[] ids);
+    public static native void relightChunks(String world, int[] chunks);
     public static native void resendChunks(String world, int[] chunks);
     public static native String biome(String world, int x, int y, int z);
     public static native boolean setBiome(String world, int x, int y, int z, String biome);

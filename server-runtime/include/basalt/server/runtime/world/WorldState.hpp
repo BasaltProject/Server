@@ -242,7 +242,11 @@ public:
 
     /// Writes one section in one pass like `setBlockState` minus item spills; returns blocks changed, -1 if absent.
     std::int32_t replaceSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
-                                std::span<const std::int32_t> next, std::span<std::int32_t> previous);
+                                std::span<const std::int32_t> next, std::span<std::int32_t> previous,
+                                std::vector<std::uint16_t>* changedOffsets = nullptr);
+
+    /// Moves on whenever a block or the set of chunks changes, so a reader may keep what it copied while it holds.
+    [[nodiscard]] std::uint64_t blockVersion() const noexcept { return blockVersion_.load(std::memory_order_acquire); }
 
     [[nodiscard]] bool hasSculkSensorNear(double x, double y, double z, std::int32_t range) const;
 
@@ -332,6 +336,8 @@ public:
 
     void forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ);
 
+    void addPendingEntities(std::vector<wire::nbt::NbtCompound> saved);
+
     [[nodiscard]] std::vector<wire::nbt::NbtCompound> takePendingEntities();
 
     [[nodiscard]] std::vector<server::world::ChunkGeneratedEntity> takePendingGeneratedEntities();
@@ -401,6 +407,7 @@ private:
     std::vector<std::array<std::int32_t, 3>> slidesStarted_;
 
     mutable WorldMutex mutex_;
+    std::atomic<std::uint64_t> blockVersion_{0};
     LoadOrGenerate loadOrGenerate_;
     SongOutput songOutput_;
     LootUnpacker lootUnpacker_;
