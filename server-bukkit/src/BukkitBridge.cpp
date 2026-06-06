@@ -156,6 +156,7 @@ std::expected<void, std::string> BukkitBridge::boot() {
 }
 
 void BukkitBridge::shutdown() {
+    stopping_.store(true);
     JNIEnv* env = shim_->env();
     if (env != nullptr && runtime_ != nullptr) {
         env->CallStaticVoidMethod(runtime_, shutdownMethod_);
@@ -185,23 +186,34 @@ void BukkitBridge::runTask(std::int64_t id) {
 }
 
 void BukkitBridge::scheduleAfter(std::int64_t id, std::int32_t delay) {
-    tasks_.insert_or_assign(id, services().tasks().after(delay, [this, id] {
-        tasks_.erase(id);
+    plugins::PluginHandle handle = services().tasks().after(delay, [this, id] {
+        {
+            const std::lock_guard<std::mutex> lock{tasksMutex_};
+            tasks_.erase(id);
+        }
         runTask(id);
-    }));
+    });
+    const std::lock_guard<std::mutex> lock{tasksMutex_};
+    tasks_.insert_or_assign(id, std::move(handle));
 }
 
 void BukkitBridge::scheduleEvery(std::int64_t id, std::int32_t delay, std::int32_t period) {
-    tasks_.insert_or_assign(id, services().tasks().every(delay, period, [this, id] { runTask(id); }));
+    plugins::PluginHandle handle = services().tasks().every(delay, period, [this, id] { runTask(id); });
+    const std::lock_guard<std::mutex> lock{tasksMutex_};
+    tasks_.insert_or_assign(id, std::move(handle));
 }
 
 void BukkitBridge::cancelTask(std::int64_t id) {
-    const auto found = tasks_.find(id);
-    if (found == tasks_.end()) {
-        return;
+    plugins::PluginHandle handle;
+    {
+        const std::lock_guard<std::mutex> lock{tasksMutex_};
+        const auto found = tasks_.find(id);
+        if (found == tasks_.end()) {
+            return;
+        }
+        handle = std::move(found->second);
+        tasks_.erase(found);
     }
-    plugins::PluginHandle handle = std::move(found->second);
-    tasks_.erase(found);
     handle.remove();
 }
 

@@ -5,8 +5,10 @@
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <map>
+#include <mutex>
 #include <set>
 #include <string>
 #include <string_view>
@@ -30,6 +32,8 @@ public:
     [[nodiscard]] const wire::common::Logger& log() const noexcept { return log_; }
 
     [[nodiscard]] JNIEnv* env() const { return shim_->env(); }
+
+    [[nodiscard]] bool stopping() const noexcept { return stopping_.load(); }
 
     void reportFailure(JNIEnv* env, std::string_view where) { reportJavaFailure(env, where); }
 
@@ -67,12 +71,14 @@ private:
     jmethodID eventMethod_ = nullptr;
     jmethodID commandMethod_ = nullptr;
     jmethodID channelMethod_ = nullptr;
+    std::mutex tasksMutex_;
     std::map<std::int64_t, plugins::PluginHandle> tasks_;
     std::set<std::pair<std::string, std::int32_t>> subscribed_;
     std::multimap<std::string, plugins::PluginHandle> commands_;
     std::vector<plugins::PluginHandle> eventHandles_;
     std::map<std::string, plugins::PluginHandle> channels_;
     bool warnedAboutThread_ = false;
+    std::atomic<bool> stopping_{false};
 };
 
 void registerNatives(JNIEnv* env, jclass natives);

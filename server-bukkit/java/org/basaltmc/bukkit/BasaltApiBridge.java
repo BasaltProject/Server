@@ -30,6 +30,11 @@ public final class BasaltApiBridge extends InternalAPIBridgeBase {
     }
 
     @Override
+    public org.bukkit.inventory.ItemStack createEmptyStack() {
+        return new BasaltItemStack(org.bukkit.Material.AIR, 0);
+    }
+
+    @Override
     public ComponentFlattener componentFlattener() {
         return ComponentFlattener.basic();
     }

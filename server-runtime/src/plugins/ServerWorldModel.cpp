@@ -22,7 +22,10 @@
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
 
 #include <algorithm>
+#include <array>
 #include <charconv>
+#include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <utility>
 
@@ -491,6 +494,59 @@ public:
                        states[static_cast<std::size_t>(at)], notify);
         }
         return true;
+    }
+
+    std::int32_t applySections(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::int32_t> sectionYs,
+                               std::span<const std::int32_t> states, bool resend) override {
+        constexpr std::size_t kBlocks = server::world::ChunkSection::kBlocks;
+        if (states.size() < sectionYs.size() * kBlocks) {
+            return -1;
+        }
+        ensureChunk(chunkX, chunkZ);
+        std::array<std::int32_t, kBlocks> before{};
+        std::int32_t changed = 0;
+        for (std::size_t section = 0; section < sectionYs.size(); ++section) {
+            if (!readSection(chunkX, sectionYs[section], chunkZ, false, before)) {
+                return -1;
+            }
+            const std::span<const std::int32_t> next = states.subspan(section * kBlocks, kBlocks);
+            for (std::size_t at = 0; at < kBlocks; ++at) {
+                if (next[at] < 0 || next[at] == before[at]) {
+                    continue;
+                }
+                changed += world_->state().setBlockState((chunkX << 4) + static_cast<std::int32_t>(at & 15),
+                                                          (sectionYs[section] << 4) + static_cast<std::int32_t>(at >> 8),
+                                                          (chunkZ << 4) + static_cast<std::int32_t>((at >> 4) & 15),
+                                                          next[at])
+                               ? 1
+                               : 0;
+            }
+        }
+        if (resend && changed > 0) {
+            const std::array<std::int32_t, 2> chunk{chunkX, chunkZ};
+            resendChunks(chunk);
+        }
+        return changed;
+    }
+
+    void resendChunks(std::span<const std::int32_t> chunks) override {
+        if (!players_) {
+            return;
+        }
+        constexpr std::int32_t kWatchRadius = 16;
+        for (const player::PlayerSession* player : players_()) {
+            if (player->worldName != world_->name() || !player->connection().resendChunk) {
+                continue;
+            }
+            const std::int32_t playerChunkX = static_cast<std::int32_t>(std::floor(player->x)) >> 4;
+            const std::int32_t playerChunkZ = static_cast<std::int32_t>(std::floor(player->z)) >> 4;
+            for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
+                if (std::abs(chunks[at] - playerChunkX) <= kWatchRadius &&
+                    std::abs(chunks[at + 1] - playerChunkZ) <= kWatchRadius) {
+                    player->connection().resendChunk(chunks[at], chunks[at + 1]);
+                }
+            }
+        }
     }
 
     [[nodiscard]] std::optional<std::string> biomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const override {

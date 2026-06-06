@@ -200,6 +200,10 @@ jboolean JNICALL nativeSetBlock(JNIEnv* env, jclass, jstring world, jint x, jint
     return found != nullptr && found->setBlock(x, y, z, toStd(env, block)) ? JNI_TRUE : JNI_FALSE;
 }
 
+jboolean JNICALL nativeOnPluginThread(JNIEnv*, jclass) {
+    return BukkitBridge::current().plugins().onPluginThread() ? JNI_TRUE : JNI_FALSE;
+}
+
 jlong JNICALL nativeWorldTime(JNIEnv* env, jclass, jstring world) {
     const auto found = BukkitBridge::current().services().worlds().byName(toStd(env, world));
     return found == nullptr ? 0 : found->time();
@@ -212,6 +216,8 @@ void registerNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativeLog)},
         JNINativeMethod{const_cast<char*>("currentTick"), const_cast<char*>("()J"),
                         reinterpret_cast<void*>(&nativeTick)},
+        JNINativeMethod{const_cast<char*>("onPluginThread"), const_cast<char*>("()Z"),
+                        reinterpret_cast<void*>(&nativeOnPluginThread)},
         JNINativeMethod{const_cast<char*>("scheduleAfter"), const_cast<char*>("(JI)V"),
                         reinterpret_cast<void*>(&nativeAfter)},
         JNINativeMethod{const_cast<char*>("scheduleEvery"), const_cast<char*>("(JII)V"),

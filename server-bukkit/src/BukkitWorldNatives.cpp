@@ -1,7 +1,9 @@
 #include "BridgeInternal.hpp"
 
 #include <array>
+#include <chrono>
 #include <exception>
+#include <future>
 
 namespace basalt::server::bukkit {
 namespace {
@@ -47,15 +49,30 @@ using plugins::PluginWorldRef;
     return array;
 }
 
-// A thrown C++ exception must never cross into Java, so every world call that can touch a chunk goes through this.
+// No C++ exception may reach Java; a plugin worker thread has the call run on the tick thread and waits for it.
 template <typename Result, typename Body>
 [[nodiscard]] Result guarded(Result fallback, Body&& body) {
-    try {
-        return body();
-    } catch (const std::exception& error) {
-        BukkitBridge::current().log().warn([&error] { return std::string{"world call failed: "} + error.what(); });
-        return fallback;
+    const auto run = [&fallback, &body]() -> Result {
+        try {
+            return body();
+        } catch (const std::exception& error) {
+            BukkitBridge::current().log().warn([&error] { return std::string{"world call failed: "} + error.what(); });
+            return fallback;
+        }
+    };
+    BukkitBridge& bridge = BukkitBridge::current();
+    if (bridge.plugins().onPluginThread()) {
+        return run();
     }
+    std::promise<Result> done;
+    std::future<Result> result = done.get_future();
+    static_cast<void>(bridge.services().tasks().after(0, [&done, &run] { done.set_value(run()); }));
+    while (result.wait_for(std::chrono::milliseconds{50}) != std::future_status::ready) {
+        if (bridge.stopping()) {
+            return fallback;
+        }
+    }
+    return result.get();
 }
 
 jint JNICALL nativeStateId(JNIEnv* env, jclass, jstring text) { return worlds().stateId(toStd(env, text)); }
@@ -236,6 +253,32 @@ jboolean JNICALL nativeWriteSection(JNIEnv* env, jclass, jstring name, jint chun
     });
 }
 
+jint JNICALL nativeApplySections(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray sections,
+                                 jintArray states, jboolean resend) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return -1;
+    }
+    std::vector<std::int32_t> ys(static_cast<std::size_t>(env->GetArrayLength(sections)));
+    env->GetIntArrayRegion(sections, 0, static_cast<jsize>(ys.size()), ys.data());
+    std::vector<std::int32_t> next(static_cast<std::size_t>(env->GetArrayLength(states)));
+    env->GetIntArrayRegion(states, 0, static_cast<jsize>(next.size()), next.data());
+    return guarded<jint>(-1, [&] { return world->applySections(chunkX, chunkZ, ys, next, resend == JNI_TRUE); });
+}
+
+void JNICALL nativeResendChunks(JNIEnv* env, jclass, jstring name, jintArray chunks) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return;
+    }
+    std::vector<std::int32_t> pairs(static_cast<std::size_t>(env->GetArrayLength(chunks)));
+    env->GetIntArrayRegion(chunks, 0, static_cast<jsize>(pairs.size()), pairs.data());
+    guarded<int>(0, [&] {
+        world->resendChunks(pairs);
+        return 0;
+    });
+}
+
 jstring JNICALL nativeBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {
     const auto world = worldOf(env, name);
     return world == nullptr ? nullptr : javaOrNull(env, guarded<std::optional<std::string>>(std::nullopt, [&] {
@@ -245,8 +288,9 @@ jstring JNICALL nativeBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, j
 
 jboolean JNICALL nativeSetBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jstring biome) {
     const auto world = worldOf(env, name);
+    const std::string biomeName = world == nullptr ? std::string{} : toStd(env, biome);
     return world != nullptr &&
-                   guarded<bool>(false, [&] { return world->setBiomeAt(x, y, z, toStd(env, biome)); })
+                   guarded<bool>(false, [&] { return world->setBiomeAt(x, y, z, biomeName); })
                ? JNI_TRUE
                : JNI_FALSE;
 }
@@ -256,7 +300,8 @@ jint JNICALL nativeHighest(JNIEnv* env, jclass, jstring name, jint x, jint z, js
     if (world == nullptr) {
         return 0;
     }
-    return guarded<jint>(0, [&] { return world->highest(x, z, toStd(env, kind), load == JNI_TRUE); });
+    const std::string heightmap = toStd(env, kind);
+    return guarded<jint>(0, [&] { return world->highest(x, z, heightmap, load == JNI_TRUE); });
 }
 
 jboolean JNICALL nativeChunkLoaded(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
@@ -545,6 +590,8 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("writeStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeWriteStates)),
         method("readSection", "(Ljava/lang/String;IIIZ[I)Z", reinterpret_cast<void*>(&nativeReadSection)),
         method("writeSection", "(Ljava/lang/String;III[IZ)Z", reinterpret_cast<void*>(&nativeWriteSection)),
+        method("applySections", "(Ljava/lang/String;II[I[IZ)I", reinterpret_cast<void*>(&nativeApplySections)),
+        method("resendChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeResendChunks)),
         method("biome", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiome)),
         method("setBiome", "(Ljava/lang/String;IIILjava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetBiome)),
         method("highest", "(Ljava/lang/String;IILjava/lang/String;Z)I", reinterpret_cast<void*>(&nativeHighest)),

@@ -357,7 +357,7 @@ public class BasaltServer extends ServerBase {
 
     @Override
     public boolean isPrimaryThread() {
-        return Thread.currentThread() == primaryThread || Thread.currentThread().getName().equals("main");
+        return Thread.currentThread() == primaryThread || Natives.onPluginThread();
     }
 
     @Override

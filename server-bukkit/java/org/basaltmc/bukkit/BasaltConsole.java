@@ -119,7 +119,7 @@ public final class BasaltConsole extends ConsoleCommandSenderBase {
 
     @Override
     public org.bukkit.command.CommandSender.Spigot spigot() {
-        return new org.bukkit.command.CommandSender.Spigot();
+        return SpigotText.console(this::sendMessage);
     }
 
     @Override
