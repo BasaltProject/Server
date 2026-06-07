@@ -23,6 +23,7 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
     private final File dataFolder;
     private final File jar;
     private final ConcurrentHashMap<String, Class<?>> classes = new ConcurrentHashMap<>();
+    private volatile Map<String, String> addonProperties = Map.of();
     private JavaPlugin plugin;
 
     public BasaltPluginClassLoader(ClassLoader parent, BasaltPluginManager manager, PluginDescriptionFile description,
@@ -67,7 +68,6 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         return found;
     }
 
-    /** A class this loader defined itself, or null. Used by other plugins' loaders. */
     Class<?> ownClass(String name) {
         Class<?> cached = classes.get(name);
         if (cached != null) {
@@ -78,6 +78,14 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         } catch (ClassNotFoundException e) {
             return null;
         }
+    }
+
+    void setAddonProperties(Map<String, String> properties) {
+        addonProperties = Map.copyOf(properties);
+    }
+
+    Map<String, String> addonProperties() {
+        return addonProperties;
     }
 
     void addAddon(File addon) throws IOException {

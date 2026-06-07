@@ -198,10 +198,12 @@ public final class BasaltPluginManager extends PluginManagerBase {
             if (!JavaPlugin.class.isAssignableFrom(main)) {
                 throw new InvalidPluginException("main class '" + description.getMainClass() + "' does not extend JavaPlugin");
             }
-            plugin = (JavaPlugin) main.getDeclaredConstructor().newInstance();
+            plugin = (JavaPlugin) Addons.scoped(loader, () -> main.getDeclaredConstructor().newInstance());
         } catch (InvocationTargetException e) {
             throw new InvalidPluginException(e.getCause());
         } catch (ReflectiveOperationException | IOException | LinkageError e) {
+            throw new InvalidPluginException(e);
+        } catch (Throwable e) {
             throw new InvalidPluginException(e);
         }
         loaders.add(loader);
@@ -213,7 +215,10 @@ public final class BasaltPluginManager extends PluginManagerBase {
         addPermissions(description.getPermissions());
         plugin.getLogger().info("Loading " + description.getFullName());
         try {
-            plugin.onLoad();
+            Addons.scoped(plugin.getClass().getClassLoader(), () -> {
+                plugin.onLoad();
+                return null;
+            });
         } catch (Throwable t) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred in onLoad: " + t.getMessage(), t);
         }
@@ -271,7 +276,10 @@ public final class BasaltPluginManager extends PluginManagerBase {
             server.commandMapImpl().registerAll(plugin.getDescription().getName(), commands);
         }
         try {
-            PluginSwitch.enable((JavaPlugin) plugin);
+            Addons.scoped(plugin.getClass().getClassLoader(), () -> {
+                PluginSwitch.enable((JavaPlugin) plugin);
+                return null;
+            });
         } catch (Throwable t) {
             plugin.getLogger().log(Level.SEVERE,
                 "Error occurred while enabling " + plugin.getDescription().getFullName() + " (Is it up to date?)", t);
@@ -287,6 +295,7 @@ public final class BasaltPluginManager extends PluginManagerBase {
     public void disablePlugin(Plugin plugin) {
         if (plugin.isEnabled()) {
             try {
+                Natives.log(1, "Bukkit", "Disabling " + plugin.getDescription().getFullName());
                 callEvent(new PluginDisableEvent(plugin));
                 PluginSwitch.disable((JavaPlugin) plugin);
             } catch (Throwable t) {
