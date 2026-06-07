@@ -115,10 +115,37 @@ public final class BukkitRuntime {
         return rows;
     }
 
-    public static void shutdown() {
+    public static boolean shutdown() {
         if (server != null) {
             server.pluginManagerImpl().disablePlugins();
         }
+        org.basaltmc.bukkit.net.ChannelBridge.shutdown();
+        BasaltScheduler.shutdownWorkers();
+        return drainThreads();
+    }
+
+    private static boolean drainThreads() {
+        boolean clean = true;
+        long deadline = System.nanoTime() + 5_000_000_000L;
+        Thread self = Thread.currentThread();
+        for (Thread thread : Thread.getAllStackTraces().keySet()) {
+            if (thread == self || thread.isDaemon() || !thread.isAlive() || thread.getThreadGroup() == null
+                    || "main".equals(thread.getName())) {
+                continue;
+            }
+            thread.interrupt();
+            try {
+                thread.join(Math.max(1, (deadline - System.nanoTime()) / 1_000_000L));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            if (thread.isAlive()) {
+                clean = false;
+                Natives.log(2, "Bukkit", "Thread " + thread.getName() + " is still running at shutdown");
+            }
+        }
+        return clean;
     }
 
     public static void runTask(long id) {

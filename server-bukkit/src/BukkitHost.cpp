@@ -48,6 +48,11 @@ void BukkitHost::stop() {
         return;
     }
     stopped_ = true;
-    bridge_->shutdown();
+    shim_->beginShutdown();
+    if (bridge_->shutdown()) {
+        shim_->destroy();
+    } else {
+        ShimHost::markLeftRunning();
+    }
 }
 } // namespace basalt::server::bukkit

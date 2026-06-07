@@ -29,6 +29,16 @@ public:
 
     [[nodiscard]] JavaVM* vm() const noexcept { return vm_; }
 
+    /// True when Java threads outlived the shutdown, so the VM could not be destroyed and the process must _Exit.
+    [[nodiscard]] static bool leftRunning();
+    static void markLeftRunning();
+
+    /// Threads that exit from now on stay attached: detaching while Java still runs aborts the VM.
+    void beginShutdown();
+
+    /// Destroys the VM from the calling thread; no thread may use JNI afterwards, and env() returns null.
+    void destroy();
+
     /// The environment of the calling thread, attaching it to the VM on first use.
     [[nodiscard]] JNIEnv* env() const;
 

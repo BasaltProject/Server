@@ -35,6 +35,15 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
         return pool;
     }
 
+    static void shutdownWorkers() {
+        kWorkers.shutdownNow();
+        try {
+            kWorkers.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private final class Task implements BukkitTask {
         final long id;
         final Plugin owner;

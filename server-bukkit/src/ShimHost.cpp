@@ -1,6 +1,7 @@
 #include <basalt/server/bukkit/ShimHost.hpp>
 
 #include <array>
+#include <atomic>
 #include <dlfcn.h>
 
 namespace basalt::server::bukkit {
@@ -56,6 +57,10 @@ std::expected<std::unique_ptr<ShimHost>, std::string> ShimHost::create(const Shi
 
 namespace {
 // A connection thread attaches on first use and must leave the VM before it exits.
+std::atomic<bool> gDestroyed{false};
+std::atomic<bool> gStopping{false};
+std::atomic<bool> gLeftRunning{false};
+
 struct Attachment {
     JavaVM* vm = nullptr;
 
@@ -64,7 +69,7 @@ struct Attachment {
     Attachment& operator=(const Attachment&) = delete;
 
     ~Attachment() {
-        if (vm != nullptr) {
+        if (vm != nullptr && !gStopping.load()) {
             vm->DetachCurrentThread();
         }
     }
@@ -73,14 +78,31 @@ struct Attachment {
 thread_local Attachment tAttachment;
 } // namespace
 
+bool ShimHost::leftRunning() { return gLeftRunning.load(); }
+
+void ShimHost::markLeftRunning() { gLeftRunning.store(true); }
+
+void ShimHost::beginShutdown() { gStopping.store(true); }
+
+void ShimHost::destroy() {
+    if (gDestroyed.exchange(true)) {
+        return;
+    }
+    vm_->DestroyJavaVM();
+}
+
 JNIEnv* ShimHost::env() const {
     JNIEnv* env = nullptr;
+    if (gDestroyed.load()) {
+        return nullptr;
+    }
     if (vm_->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_8) == JNI_OK) {
         return env;
     }
-    if (vm_->AttachCurrentThread(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
+    if (vm_->AttachCurrentThreadAsDaemon(reinterpret_cast<void**>(&env), nullptr) != JNI_OK) {
         return nullptr;
     }
+
     tAttachment.vm = vm_;
     return env;
 }
