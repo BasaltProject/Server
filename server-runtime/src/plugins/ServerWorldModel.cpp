@@ -508,8 +508,15 @@ public:
             done(false);
             return;
         }
+        // Held while it is awaited, since the sweep drops requests nobody stands near.
+        const std::string token = "request:" + std::to_string(chunkX) + "," + std::to_string(chunkZ);
+        world_->holdChunks(token, {world::ChunkGenerationQueue::pack(chunkX, chunkZ)});
         world_->generationQueue().request(chunkX, chunkZ, priority);
-        awaitChunk(chunkX, chunkZ, 0, std::make_shared<std::function<void(bool)>>(std::move(done)));
+        awaitChunk(chunkX, chunkZ, 0,
+                   std::make_shared<std::function<void(bool)>>([this, token, done = std::move(done)](bool loaded) {
+                       done(loaded);
+                       world_->releaseChunks(token);
+                   }));
     }
 
     bool holdChunks(std::string_view token, std::span<const std::int32_t> chunks) override {

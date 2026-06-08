@@ -96,11 +96,19 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         syncedVersion = version;
     }
 
-    /** Writes every section a plugin replaced back to the world in one call. */
-    public synchronized boolean flush() {
+    /** Only the tick thread writes; other threads leave the sections for the next tick. */
+    public boolean flush() {
         if (sections == null) {
             return false;
         }
+        if (!org.basaltmc.bukkit.Natives.onPluginThread()) {
+            level.getChunkSource().noteHanded(this);
+            return false;
+        }
+        return writeBack();
+    }
+
+    private synchronized boolean writeBack() {
         int changed = 0;
         for (int i = 0; i < sections.length; i++) {
             if (sections[i] != baseline[i]) {
