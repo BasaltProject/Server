@@ -569,6 +569,22 @@ void LoadedWorld::saveDirty() {
     state_.poi().save();
 }
 
+void LoadedWorld::holdChunks(const std::string& token, const std::vector<std::int64_t>& keys) {
+    const std::lock_guard<std::mutex> lock{holdsMutex_};
+    holds_[token].insert(keys.begin(), keys.end());
+}
+
+void LoadedWorld::releaseChunks(const std::string& token) {
+    const std::lock_guard<std::mutex> lock{holdsMutex_};
+    holds_.erase(token);
+}
+
+bool LoadedWorld::isHeld(std::int32_t chunkX, std::int32_t chunkZ) const {
+    const std::lock_guard<std::mutex> lock{holdsMutex_};
+    const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);
+    return std::ranges::any_of(holds_, [key](const auto& entry) { return entry.second.contains(key); });
+}
+
 std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int32_t, std::int32_t>>& playerPositions,
                                            std::int32_t spawnRadiusChunks, std::int32_t retainMarginChunks) {
     const std::int32_t retainRadius = settings_.viewDistance + retainMarginChunks;
@@ -596,7 +612,7 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
             return true;
         }
         const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);
-        if (pending.contains(key) || nearForced(chunkX, chunkZ)) {
+        if (pending.contains(key) || nearForced(chunkX, chunkZ) || isHeld(chunkX, chunkZ)) {
             return true;
         }
         return nearAPlayer(chunkX, chunkZ);

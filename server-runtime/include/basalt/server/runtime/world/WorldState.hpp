@@ -240,6 +240,9 @@ public:
     [[nodiscard]] bool copySection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
                                    std::span<std::int32_t> out) const;
 
+    /// Copies every section of a chunk, lowest first, under one read lock. False when the chunk is not loaded.
+    [[nodiscard]] bool copySections(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) const;
+
     /// Writes one section in one pass like `setBlockState` minus item spills; returns blocks changed, -1 if absent.
     std::int32_t replaceSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
                                 std::span<const std::int32_t> next, std::span<std::int32_t> previous,

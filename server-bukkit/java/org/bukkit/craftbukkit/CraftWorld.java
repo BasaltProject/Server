@@ -3,7 +3,7 @@ package org.bukkit.craftbukkit;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.server.level.ServerLevel;
 import org.basaltmc.bukkit.gen.WorldBase;
-import org.basaltmc.bukkit.facade.TickQueue;
+import org.basaltmc.bukkit.WorldNatives;
 import org.bukkit.Chunk;
 
 /** What plugins cast a World to; the level behind it is made on first use. */
@@ -24,14 +24,8 @@ public abstract class CraftWorld extends WorldBase {
     }
 
     public CompletableFuture<Chunk> getChunkAtAsync(int x, int z, boolean generate, boolean urgent) {
-        CompletableFuture<Chunk> future = new CompletableFuture<>();
-        TickQueue.run(() -> {
-            try {
-                future.complete(getChunkAt(x, z, generate));
-            } catch (RuntimeException e) {
-                future.completeExceptionally(e);
-            }
-        });
-        return future;
+        CompletableFuture<Boolean> loaded = new CompletableFuture<>();
+        WorldNatives.requestChunk(getName(), x, z, generate, urgent ? 0 : 100, loaded);
+        return loaded.thenApply(ok -> ok ? getChunkAt(x, z, false) : null);
     }
 }

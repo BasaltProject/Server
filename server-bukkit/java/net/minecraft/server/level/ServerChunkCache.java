@@ -22,6 +22,7 @@ public class ServerChunkCache extends ChunkSource {
     private static final Set<ServerChunkCache> kAll = ConcurrentHashMap.newKeySet();
     private static final int kCapacity = 2048;
     private static final int kResendGraceTicks = 3;
+    private static final int kBlockChangeLimit = 64;
 
     public ChunkMap chunkMap;
     public BlockableEventLoop<Runnable> mainThreadProcessor;
@@ -31,16 +32,19 @@ public class ServerChunkCache extends ChunkSource {
     private final Map<Long, LevelChunk> chunks = new ConcurrentHashMap<>();
     private final Set<LevelChunk> handed = ConcurrentHashMap.newKeySet();
     private final Map<Long, Integer> unsent = new ConcurrentHashMap<>();
-    private final ThreadedLevelLightEngine lightEngine = new ThreadedLevelLightEngine();
+    private final java.util.List<Integer> changedBlocks = new java.util.ArrayList<>();
+    private final ThreadedLevelLightEngine lightEngine;
 
     protected ServerChunkCache() {
         this.level = null;
         this.world = null;
+        this.lightEngine = null;
     }
 
     ServerChunkCache(ServerLevel level) {
         this.level = level;
         this.world = level.getWorld().getName();
+        this.lightEngine = new ThreadedLevelLightEngine(world);
         this.chunkMap = new ChunkMap(this, world);
         kAll.add(this);
     }
@@ -56,6 +60,7 @@ public class ServerChunkCache extends ChunkSource {
             handed.remove(chunk);
             chunk.flush();
         }
+        flushBlockChanges();
         if (unsent.isEmpty()) {
             return;
         }
@@ -115,14 +120,71 @@ public class ServerChunkCache extends ChunkSource {
         return CompletableFuture.completedFuture(chunk == null ? ChunkResult.error("not loaded") : ChunkResult.of(chunk));
     }
 
-    public void addTicketAtLevel(TicketType ticketType, ChunkPos chunkPos, int value) {}
+    public void addTicketAtLevel(TicketType ticketType, ChunkPos chunkPos, int value) {
+        addTicketWithRadius(ticketType, chunkPos, 0);
+    }
 
-    public void addTicketWithRadius(TicketType type, ChunkPos pos, int radius) {}
+    public void addTicketWithRadius(TicketType type, ChunkPos pos, int radius) {
+        int reach = Math.max(radius, 0);
+        int[] chunks = new int[(2 * reach + 1) * (2 * reach + 1) * 2];
+        int at = 0;
+        for (int x = -reach; x <= reach; x++) {
+            for (int z = -reach; z <= reach; z++) {
+                chunks[at++] = pos.x() + x;
+                chunks[at++] = pos.z() + z;
+            }
+        }
+        WorldNatives.holdChunks(world, ticketToken(type, pos), chunks);
+    }
 
-    public void removeTicketAtLevel(TicketType ticketType, ChunkPos chunkPos, int value) {}
+    public void removeTicketAtLevel(TicketType ticketType, ChunkPos chunkPos, int value) {
+        WorldNatives.releaseChunks(world, ticketToken(ticketType, chunkPos));
+    }
+
+    private static String ticketToken(TicketType type, ChunkPos pos) {
+        return "ticket:" + type + ":" + pos.x() + "," + pos.z();
+    }
 
     public void blockChanged(BlockPos pos) {
-        noteChanged(pos.getX() >> 4, pos.getZ() >> 4);
+        synchronized (changedBlocks) {
+            changedBlocks.add(pos.getX());
+            changedBlocks.add(pos.getY());
+            changedBlocks.add(pos.getZ());
+        }
+    }
+
+    private void flushBlockChanges() {
+        int[] blocks;
+        synchronized (changedBlocks) {
+            if (changedBlocks.isEmpty()) {
+                return;
+            }
+            blocks = changedBlocks.stream().mapToInt(Integer::intValue).toArray();
+            changedBlocks.clear();
+        }
+        Map<Long, Integer> perChunk = new java.util.HashMap<>();
+        for (int i = 0; i < blocks.length; i += 3) {
+            perChunk.merge(ChunkPos.pack(blocks[i] >> 4, blocks[i + 2] >> 4), 1, Integer::sum);
+        }
+        int[] single = new int[blocks.length];
+        int kept = 0;
+        for (int i = 0; i < blocks.length; i += 3) {
+            long key = ChunkPos.pack(blocks[i] >> 4, blocks[i + 2] >> 4);
+            if (perChunk.get(key) > kBlockChangeLimit) {
+                continue;
+            }
+            System.arraycopy(blocks, i, single, kept, 3);
+            kept += 3;
+        }
+        if (kept > 0) {
+            WorldNatives.updateNeighbors(world, java.util.Arrays.copyOf(single, kept), 64);
+        }
+        for (Map.Entry<Long, Integer> entry : perChunk.entrySet()) {
+            if (entry.getValue() > kBlockChangeLimit) {
+                ChunkPos pos = ChunkPos.unpack(entry.getKey());
+                resend(pos.x(), pos.z());
+            }
+        }
     }
 
     public void close(boolean flag) {}

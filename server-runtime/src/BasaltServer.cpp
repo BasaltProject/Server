@@ -451,6 +451,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         return all;
     };
     model.defaultWorldName = [this] { return worldRegistry_->defaultWorld().name(); };
+    model.blocks = [this] { return broadcaster_.get(); };
     model.groups = [this]() -> const config::GroupsConfig& { return live_->current()->groups; };
     model.spawnMob = [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                             double z) { return spawning_->spawnMob(world, type, x, y, z, 0.0F, "plugin"); };
@@ -460,9 +461,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     model.environment = [this]() -> const command::CommandEnvironment& { return *wired_.environment; };
     model.tags = [this](std::string_view registry) {
-        const world::realBlockTags::TagMembers* source = registry == "blocks"   ? &vanillaData_.blockTags
-                                                         : registry == "items"  ? &vanillaData_.itemTags
-                                                         : registry == "fluids" ? &vanillaData_.fluidTags
+        const world::realBlockTags::TagMembers* source = registry == "blocks"         ? &vanillaData_.blockTags
+                                                         : registry == "items"        ? &vanillaData_.itemTags
+                                                         : registry == "fluids"       ? &vanillaData_.fluidTags
                                                          : registry == "entity_types" ? &vanillaData_.entityTags
                                                                                       : nullptr;
         std::vector<std::string> flat;

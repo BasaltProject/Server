@@ -9,10 +9,13 @@ import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import org.basaltmc.bukkit.Unsupported;
 public class ThreadedLevelLightEngine extends LevelLightEngine {
-    ThreadedLevelLightEngine() {
+    private final String world;
+
+    ThreadedLevelLightEngine(String world) {
+        this.world = world;
     }
     public void checkBlock(BlockPos pos) {
-        throw Unsupported.hit("net.minecraft.server.level.ThreadedLevelLightEngine.checkBlock");
+        org.basaltmc.bukkit.WorldNatives.updateNeighbors(world, new int[] {pos.getX(), pos.getY(), pos.getZ()}, 4);
     }
     public LayerLightEventListener getLayerListener(LightLayer lightLayer) {
         return new LayerLightEventListener() {

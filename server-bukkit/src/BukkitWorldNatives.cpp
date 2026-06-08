@@ -1,12 +1,12 @@
 #include "BridgeInternal.hpp"
 
 #include <array>
-#include <chrono>
 #include <atomic>
+#include <chrono>
 #include <exception>
+#include <future>
 #include <memory>
 #include <mutex>
-#include <future>
 
 namespace basalt::server::bukkit {
 namespace {
@@ -201,9 +201,8 @@ jboolean JNICALL nativeSetState(JNIEnv* env, jclass, jstring name, jint x, jint 
     if (world == nullptr) {
         return JNI_FALSE;
     }
-    return guarded<jboolean>(JNI_FALSE, [&] {
-        return world->setStateAt(x, y, z, state, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE;
-    });
+    return guarded<jboolean>(
+        JNI_FALSE, [&] { return world->setStateAt(x, y, z, state, notify == JNI_TRUE) ? JNI_TRUE : JNI_FALSE; });
 }
 
 jint JNICALL nativeReadStates(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray out, jboolean load) {
@@ -245,8 +244,8 @@ jboolean JNICALL nativeReadSection(JNIEnv* env, jclass, jstring name, jint chunk
         env->SetIntArrayRegion(out, 0, 4096, read.data());
         return JNI_TRUE;
     }
-    const bool ok = guarded<bool>(
-        false, [&] { return world->readSection(chunkX, sectionY, chunkZ, load == JNI_TRUE, read); });
+    const bool ok =
+        guarded<bool>(false, [&] { return world->readSection(chunkX, sectionY, chunkZ, load == JNI_TRUE, read); });
     if (ok) {
         env->SetIntArrayRegion(out, 0, 4096, read.data());
     }
@@ -277,8 +276,8 @@ jint JNICALL nativeApplySections(JNIEnv* env, jclass, jstring name, jint chunkX,
     std::vector<std::int32_t> next(static_cast<std::size_t>(env->GetArrayLength(states)));
     env->GetIntArrayRegion(states, 0, static_cast<jsize>(next.size()), next.data());
     std::vector<std::int32_t> before(previous == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(previous)));
-    const jint changed = guarded<jint>(
-        -1, [&] { return world->applySections(chunkX, chunkZ, ys, next, resend == JNI_TRUE, before); });
+    const jint changed =
+        guarded<jint>(-1, [&] { return world->applySections(chunkX, chunkZ, ys, next, resend == JNI_TRUE, before); });
     if (previous != nullptr && changed >= 0) {
         env->SetIntArrayRegion(previous, 0, static_cast<jsize>(before.size()), before.data());
     }
@@ -308,10 +307,8 @@ jstring JNICALL nativeBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, j
 jboolean JNICALL nativeSetBiome(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jstring biome) {
     const auto world = worldOf(env, name);
     const std::string biomeName = world == nullptr ? std::string{} : toStd(env, biome);
-    return world != nullptr &&
-                   guarded<bool>(false, [&] { return world->setBiomeAt(x, y, z, biomeName); })
-               ? JNI_TRUE
-               : JNI_FALSE;
+    return world != nullptr && guarded<bool>(false, [&] { return world->setBiomeAt(x, y, z, biomeName); }) ? JNI_TRUE
+                                                                                                           : JNI_FALSE;
 }
 
 jint JNICALL nativeHighest(JNIEnv* env, jclass, jstring name, jint x, jint z, jstring kind, jboolean load) {
@@ -339,7 +336,7 @@ jboolean JNICALL nativeLoadChunk(JNIEnv* env, jclass, jstring name, jint chunkX,
 jboolean JNICALL nativeUnloadChunk(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
     const auto world = worldOf(env, name);
     return world != nullptr && guarded<bool>(false, [&] { return world->unloadChunk(chunkX, chunkZ); }) ? JNI_TRUE
-                                                                                                          : JNI_FALSE;
+                                                                                                        : JNI_FALSE;
 }
 
 jintArray JNICALL nativeLoadedChunks(JNIEnv* env, jclass, jstring name) {
@@ -430,8 +427,8 @@ jint JNICALL nativeSpawn(JNIEnv* env, jclass, jstring name, jstring type, jdoubl
     if (world == nullptr) {
         return -1;
     }
-    const auto spawned = guarded<std::shared_ptr<PluginEntityRef>>(
-        nullptr, [&] { return world->spawn(toStd(env, type), x, y, z); });
+    const auto spawned =
+        guarded<std::shared_ptr<PluginEntityRef>>(nullptr, [&] { return world->spawn(toStd(env, type), x, y, z); });
     return spawned == nullptr ? -1 : spawned->id();
 }
 
@@ -628,7 +625,8 @@ jlong JNICALL nativeBlockVersion(JNIEnv*, jclass, jint handle) {
         return nullptr;
     }
     jbyteArray array = env->NewByteArray(static_cast<jsize>(values->size()));
-    env->SetByteArrayRegion(array, 0, static_cast<jsize>(values->size()), reinterpret_cast<const jbyte*>(values->data()));
+    env->SetByteArrayRegion(array, 0, static_cast<jsize>(values->size()),
+                            reinterpret_cast<const jbyte*>(values->data()));
     return array;
 }
 
@@ -642,8 +640,8 @@ jint JNICALL nativeApplyChunks(JNIEnv* env, jclass, jstring name, jintArray chun
     const std::vector<std::int32_t> sectionList = ints(env, sections);
     const std::vector<std::int32_t> next = ints(env, states);
     std::vector<std::int32_t> before(previous == nullptr ? 0 : static_cast<std::size_t>(env->GetArrayLength(previous)));
-    const jint changed = guarded<jint>(
-        -1, [&] { return world->applyChunks(chunkList, sectionList, next, resend == JNI_TRUE, before); });
+    const jint changed =
+        guarded<jint>(-1, [&] { return world->applyChunks(chunkList, sectionList, next, resend == JNI_TRUE, before); });
     if (previous != nullptr && !before.empty()) {
         env->SetIntArrayRegion(previous, 0, static_cast<jsize>(before.size()), before.data());
     }
@@ -669,9 +667,9 @@ jboolean JNICALL nativeSetBlockEntityNbt(JNIEnv* env, jclass, jstring name, jint
 
 jintArray JNICALL nativeBlockEntityPositions(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
     const auto world = worldOf(env, name);
-    return intArray(env, world == nullptr ? std::vector<std::int32_t>{}
-                                          : guarded<std::vector<std::int32_t>>(
-                                                {}, [&] { return world->blockEntityPositions(chunkX, chunkZ); }));
+    return intArray(env, world == nullptr ? std::vector<std::int32_t>{} : guarded<std::vector<std::int32_t>>({}, [&] {
+                        return world->blockEntityPositions(chunkX, chunkZ);
+                    }));
 }
 
 jbyteArray JNICALL nativeEntityNbt(JNIEnv* env, jclass, jstring name, jint id) {
@@ -679,8 +677,8 @@ jbyteArray JNICALL nativeEntityNbt(JNIEnv* env, jclass, jstring name, jint id) {
     if (world == nullptr) {
         return nullptr;
     }
-    return byteArray(env, guarded<std::optional<std::vector<std::uint8_t>>>(
-                              std::nullopt, [&] { return world->entityNbt(id); }));
+    return byteArray(
+        env, guarded<std::optional<std::vector<std::uint8_t>>>(std::nullopt, [&] { return world->entityNbt(id); }));
 }
 
 jint JNICALL nativeSpawnEntityNbt(JNIEnv* env, jclass, jstring name, jbyteArray nbt) {
@@ -721,6 +719,120 @@ void JNICALL nativeRelightChunks(JNIEnv* env, jclass, jstring name, jintArray ch
         return 0;
     });
 }
+
+jboolean JNICALL nativeReadSections(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jboolean load,
+                                    jintArray out) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    std::vector<std::int32_t> read(static_cast<std::size_t>(env->GetArrayLength(out)));
+    // A loaded chunk is copied under the world's read lock, so no thread hop is needed.
+    bool ok = world->readSections(chunkX, chunkZ, false, read);
+    if (!ok && load == JNI_TRUE) {
+        ok = guarded<bool>(false, [&] { return world->readSections(chunkX, chunkZ, true, read); });
+    }
+    if (ok) {
+        env->SetIntArrayRegion(out, 0, static_cast<jsize>(read.size()), read.data());
+    }
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+jint JNICALL nativeChunkStatus(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ) {
+    const auto world = worldOf(env, name);
+    return world == nullptr ? 0 : world->chunkStatus(chunkX, chunkZ);
+}
+
+// Holds a Java object across threads and lets go of it wherever it is last used.
+struct JavaRef {
+    explicit JavaRef(JNIEnv* env, jobject object) : ref(env->NewGlobalRef(object)) {}
+
+    JavaRef(const JavaRef&) = delete;
+    JavaRef& operator=(const JavaRef&) = delete;
+
+    ~JavaRef() {
+        if (JNIEnv* env = BukkitBridge::current().env(); env != nullptr && ref != nullptr) {
+            env->DeleteGlobalRef(ref);
+        }
+    }
+
+    jobject ref;
+};
+
+void JNICALL nativeRequestChunk(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jboolean generate,
+                                jint priority, jobject future) {
+    const auto world = worldOf(env, name);
+    const auto held = std::make_shared<JavaRef>(env, future);
+    const auto finish = [held](bool loaded) {
+        JNIEnv* callEnv = BukkitBridge::current().env();
+        if (callEnv == nullptr) {
+            return;
+        }
+        jclass booleanClass = callEnv->FindClass("java/lang/Boolean");
+        jmethodID valueOf = callEnv->GetStaticMethodID(booleanClass, "valueOf", "(Z)Ljava/lang/Boolean;");
+        jobject value = callEnv->CallStaticObjectMethod(booleanClass, valueOf, loaded ? JNI_TRUE : JNI_FALSE);
+        jclass futureClass = callEnv->FindClass("java/util/concurrent/CompletableFuture");
+        jmethodID complete = callEnv->GetMethodID(futureClass, "complete", "(Ljava/lang/Object;)Z");
+        callEnv->CallBooleanMethod(held->ref, complete, value);
+        callEnv->ExceptionClear();
+        callEnv->DeleteLocalRef(value);
+        callEnv->DeleteLocalRef(booleanClass);
+        callEnv->DeleteLocalRef(futureClass);
+    };
+    if (world == nullptr) {
+        finish(false);
+        return;
+    }
+    BukkitBridge& bridge = BukkitBridge::current();
+    const auto start = [world, chunkX, chunkZ, generate, priority, finish] {
+        world->requestChunk(chunkX, chunkZ, generate == JNI_TRUE, priority, finish);
+    };
+    if (bridge.plugins().onPluginThread()) {
+        start();
+    } else {
+        static_cast<void>(bridge.services().tasks().after(0, start));
+    }
+}
+
+jboolean JNICALL nativeHoldChunks(JNIEnv* env, jclass, jstring name, jstring token, jintArray chunks) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return JNI_FALSE;
+    }
+    const std::string holder = toStd(env, token);
+    const std::vector<std::int32_t> pairs = ints(env, chunks);
+    return guarded<bool>(false, [&] { return world->holdChunks(holder, pairs); }) ? JNI_TRUE : JNI_FALSE;
+}
+
+void JNICALL nativeReleaseChunks(JNIEnv* env, jclass, jstring name, jstring token) {
+    if (const auto world = worldOf(env, name); world != nullptr) {
+        const std::string holder = toStd(env, token);
+        guarded<int>(0, [&] {
+            world->releaseChunks(holder);
+            return 0;
+        });
+    }
+}
+
+jint JNICALL nativeUpdateNeighbors(JNIEnv* env, jclass, jstring name, jintArray positions, jint effects) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const std::vector<std::int32_t> at = ints(env, positions);
+    return guarded<jint>(0, [&] { return world->updateNeighbors(at, static_cast<std::uint32_t>(effects)); });
+}
+
+jint JNICALL nativeApplyChanges(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray states,
+                                jint effects) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const std::vector<std::int32_t> at = ints(env, positions);
+    const std::vector<std::int32_t> next = ints(env, states);
+    return guarded<jint>(0, [&] { return world->applyChanges(at, next, static_cast<std::uint32_t>(effects)); });
+}
 } // namespace
 
 void registerWorldNatives(JNIEnv* env, jclass natives) {
@@ -745,7 +857,8 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("setTime", "(Ljava/lang/String;J)V", reinterpret_cast<void*>(&nativeSetTime)),
         method("setWeather", "(Ljava/lang/String;ZZ)V", reinterpret_cast<void*>(&nativeSetWeather)),
         method("setSpawn", "(Ljava/lang/String;III)V", reinterpret_cast<void*>(&nativeSetSpawn)),
-        method("setDifficulty", "(Ljava/lang/String;Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetDifficulty)),
+        method("setDifficulty", "(Ljava/lang/String;Ljava/lang/String;)Z",
+               reinterpret_cast<void*>(&nativeSetDifficulty)),
         method("gameRule", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
                reinterpret_cast<void*>(&nativeGameRule)),
         method("setGameRule", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z",
@@ -764,12 +877,22 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("applyChunks", "(Ljava/lang/String;[I[I[IZ[I)I", reinterpret_cast<void*>(&nativeApplyChunks)),
         method("blockEntityNbt", "(Ljava/lang/String;III)[B", reinterpret_cast<void*>(&nativeBlockEntityNbt)),
         method("setBlockEntityNbt", "(Ljava/lang/String;III[B)Z", reinterpret_cast<void*>(&nativeSetBlockEntityNbt)),
-        method("blockEntityPositions", "(Ljava/lang/String;II)[I", reinterpret_cast<void*>(&nativeBlockEntityPositions)),
+        method("blockEntityPositions", "(Ljava/lang/String;II)[I",
+               reinterpret_cast<void*>(&nativeBlockEntityPositions)),
         method("entityNbt", "(Ljava/lang/String;I)[B", reinterpret_cast<void*>(&nativeEntityNbt)),
         method("spawnEntityNbt", "(Ljava/lang/String;[B)I", reinterpret_cast<void*>(&nativeSpawnEntityNbt)),
         method("readBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeReadBiomes)),
         method("writeBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeWriteBiomes)),
         method("relightChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeRelightChunks)),
+        method("readSections", "(Ljava/lang/String;IIZ[I)Z", reinterpret_cast<void*>(&nativeReadSections)),
+        method("chunkStatus", "(Ljava/lang/String;II)I", reinterpret_cast<void*>(&nativeChunkStatus)),
+        method("requestChunk", "(Ljava/lang/String;IIZILjava/util/concurrent/CompletableFuture;)V",
+               reinterpret_cast<void*>(&nativeRequestChunk)),
+        method("holdChunks", "(Ljava/lang/String;Ljava/lang/String;[I)Z", reinterpret_cast<void*>(&nativeHoldChunks)),
+        method("releaseChunks", "(Ljava/lang/String;Ljava/lang/String;)V",
+               reinterpret_cast<void*>(&nativeReleaseChunks)),
+        method("updateNeighbors", "(Ljava/lang/String;[II)I", reinterpret_cast<void*>(&nativeUpdateNeighbors)),
+        method("applyChanges", "(Ljava/lang/String;[I[II)I", reinterpret_cast<void*>(&nativeApplyChanges)),
         method("resendChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeResendChunks)),
         method("biome", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiome)),
         method("setBiome", "(Ljava/lang/String;IIILjava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetBiome)),
@@ -787,20 +910,24 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("entityHealth", "(Ljava/lang/String;ID)V", reinterpret_cast<void*>(&nativeEntityHealth)),
         method("entityRemove", "(Ljava/lang/String;I)V", reinterpret_cast<void*>(&nativeEntityRemove)),
         method("spawn", "(Ljava/lang/String;Ljava/lang/String;DDD)I", reinterpret_cast<void*>(&nativeSpawn)),
-        method("playerMove", "(Ljava/lang/String;Ljava/lang/String;DDDFF)Z", reinterpret_cast<void*>(&nativePlayerMove)),
+        method("playerMove", "(Ljava/lang/String;Ljava/lang/String;DDDFF)Z",
+               reinterpret_cast<void*>(&nativePlayerMove)),
         method("playerExtra", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativePlayerExtra)),
         method("playerAddress", "(Ljava/lang/String;)Ljava/lang/String;",
                reinterpret_cast<void*>(&nativePlayerAddress)),
         method("playerShowBlock", "(Ljava/lang/String;IIII)V", reinterpret_cast<void*>(&nativePlayerShowBlock)),
         method("playerExperience", "(Ljava/lang/String;FI)V", reinterpret_cast<void*>(&nativePlayerExperience)),
-        method("playerCommand", "(Ljava/lang/String;Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativePlayerCommand)),
+        method("playerCommand", "(Ljava/lang/String;Ljava/lang/String;)Z",
+               reinterpret_cast<void*>(&nativePlayerCommand)),
         method("playerTitle", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;III)V",
                reinterpret_cast<void*>(&nativePlayerTitle)),
         method("playerSound", "(Ljava/lang/String;Ljava/lang/String;FF)V", reinterpret_cast<void*>(&nativePlayerSound)),
         method("inventorySize", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeInventorySize)),
         method("inventoryHeld", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeInventoryHeld)),
-        method("inventoryGet", "(Ljava/lang/String;I)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeInventoryGet)),
-        method("inventorySet", "(Ljava/lang/String;I[Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeInventorySet)),
+        method("inventoryGet", "(Ljava/lang/String;I)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeInventoryGet)),
+        method("inventorySet", "(Ljava/lang/String;I[Ljava/lang/String;)V",
+               reinterpret_cast<void*>(&nativeInventorySet)),
         method("inventoryClear", "(Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeInventoryClear)),
     };
     env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size()));

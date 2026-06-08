@@ -11,6 +11,7 @@
 #include <basalt/wire/plugins/PluginToml.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <utility>
 
@@ -303,7 +304,181 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("biomes");
+    wire::lua::pushHostFunction(lua, "worlds.blocks", [server](LuaArgs& args) {
+        const std::vector<std::string> flat = server->services().worlds().blockTable();
+        args.pushTable();
+        for (std::size_t at = 0; at + 2 < flat.size(); at += 3) {
+            args.pushTable();
+            args.pushString(flat[at]);
+            args.setField("name");
+            args.pushInteger(std::stoll(flat[at + 1]));
+            args.setField("first_state");
+            args.pushInteger(std::stoll(flat[at + 2]));
+            args.setField("state_count");
+            args.setIndex(static_cast<std::int64_t>(at / 3) + 1);
+        }
+        return 1;
+    });
+    lua.setField("blocks");
+    wire::lua::pushHostFunction(lua, "worlds.block_properties", [server](LuaArgs& args) {
+        const std::vector<std::string> flat = server->services().worlds().blockProperties(args.checkString(1));
+        args.pushTable();
+        for (std::size_t at = 0; at + 1 < flat.size(); at += 2) {
+            args.pushTable();
+            args.pushString(flat[at]);
+            args.setField("name");
+            args.pushTable();
+            std::int64_t position = 1;
+            for (std::size_t from = 0; from <= flat[at + 1].size();) {
+                const std::size_t bar = flat[at + 1].find('|', from);
+                const std::size_t end = bar == std::string::npos ? flat[at + 1].size() : bar;
+                args.pushString(flat[at + 1].substr(from, end - from));
+                args.setIndex(position++);
+                from = end + 1;
+            }
+            args.setField("values");
+            args.setIndex(static_cast<std::int64_t>(at / 2) + 1);
+        }
+        return 1;
+    });
+    lua.setField("block_properties");
+    wire::lua::pushHostFunction(lua, "worlds.state_flags", [server](LuaArgs& args) {
+        const std::int32_t bits =
+            server->services().worlds().stateFlags(static_cast<std::int32_t>(args.checkInteger(1)));
+        args.pushTable();
+        const auto flag = [&args, bits](const char* name, std::int32_t mask) {
+            args.pushBoolean((bits & mask) != 0);
+            args.setField(name);
+        };
+        flag("blocks_motion", 1);
+        flag("occludes", 2);
+        flag("full_cube", 4);
+        flag("replaceable", 8);
+        flag("has_fluid", 16);
+        flag("has_collision", 32);
+        flag("conducts_redstone", 64);
+        flag("ticks_randomly", 128);
+        flag("air", 256);
+        flag("has_block_entity", 1 << 18);
+        args.pushInteger((bits >> 9) & 15);
+        args.setField("light_emission");
+        args.pushInteger((bits >> 13) & 31);
+        args.setField("light_opacity");
+        return 1;
+    });
+    lua.setField("state_flags");
+    wire::lua::pushHostFunction(lua, "worlds.block_hardness", [server](LuaArgs& args) {
+        const std::vector<double> facts = server->services().worlds().blockHardness(args.checkString(1));
+        if (facts.size() < 3) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushNumber(facts[0]);
+        args.setField("destroy_time");
+        args.pushNumber(facts[1]);
+        args.setField("explosion_resistance");
+        args.pushBoolean(facts[2] != 0.0);
+        args.setField("needs_tool");
+        return 1;
+    });
+    lua.setField("block_hardness");
+    wire::lua::pushHostFunction(lua, "worlds.block_info", [server](LuaArgs& args) {
+        const std::vector<double> facts =
+            server->services().worlds().blockInfo(static_cast<std::int32_t>(args.checkInteger(1)));
+        if (facts.size() < 7) {
+            args.pushNil();
+            return 1;
+        }
+        static constexpr std::array<const char*, 5> kPush{"normal", "destroy", "block", "ignore", "push_only"};
+        args.pushTable();
+        args.pushNumber(facts[0]);
+        args.setField("friction");
+        args.pushNumber(facts[1]);
+        args.setField("speed_factor");
+        args.pushNumber(facts[2]);
+        args.setField("jump_factor");
+        args.pushString(kPush[static_cast<std::size_t>(std::clamp(facts[3], 0.0, 4.0))]);
+        args.setField("push_reaction");
+        args.pushInteger(static_cast<std::int64_t>(facts[4]));
+        args.setField("map_color");
+        args.pushNumber(facts[5]);
+        args.setField("ignite_odds");
+        args.pushNumber(facts[6]);
+        args.setField("burn_odds");
+        return 1;
+    });
+    lua.setField("block_info");
+    wire::lua::pushHostFunction(lua, "worlds.items", [server](LuaArgs& args) {
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const std::string& item : server->services().worlds().itemIds()) {
+            args.pushString(item);
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("items");
+    wire::lua::pushHostFunction(lua, "worlds.entity_types", [server](LuaArgs& args) {
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const std::string& type : server->services().worlds().entityTypeIds()) {
+            args.pushString(type);
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("entity_types");
+    wire::lua::pushHostFunction(lua, "worlds.tags", [server](LuaArgs& args) {
+        const std::vector<std::string> flat = server->services().worlds().tags(args.checkString(1));
+        args.pushTable();
+        for (std::size_t at = 0; at + 1 < flat.size(); at += 2) {
+            args.pushTable();
+            std::int64_t position = 1;
+            for (std::size_t from = 0; from <= flat[at + 1].size() && !flat[at + 1].empty();) {
+                const std::size_t bar = flat[at + 1].find('|', from);
+                const std::size_t end = bar == std::string::npos ? flat[at + 1].size() : bar;
+                args.pushString(flat[at + 1].substr(from, end - from));
+                args.setIndex(position++);
+                from = end + 1;
+            }
+            args.setField(flat[at]);
+        }
+        return 1;
+    });
+    lua.setField("tags");
     lua.setGlobal("worlds");
+
+    wire::lua::installWaitingFunction(
+        *instance.sandbox, "request_chunk", [server, target, lane](LuaArgs& args, wire::lua::LuaCall::Resume resume) {
+            const std::shared_ptr<PluginWorldRef> world = server->services().worlds().byName(args.toText(1));
+            if (lane->deciderDepth > 0 || world == nullptr) {
+                resume();
+                return;
+            }
+            bool generate = true;
+            bool urgent = false;
+            if (args.isTable(4)) {
+                args.pushField(4, "generate");
+                generate = args.isNil(-1) ? true : args.toBoolean(-1);
+                args.pop(1);
+                args.pushField(4, "urgent");
+                urgent = !args.isNil(-1) && args.toBoolean(-1);
+                args.pop(1);
+            }
+            const auto immediate = std::make_shared<bool>(true);
+            world->requestChunk(static_cast<std::int32_t>(args.toInteger(2)),
+                                static_cast<std::int32_t>(args.toInteger(3)), generate, urgent ? 0 : 100,
+                                [server, target, lane, resume, immediate](bool) {
+                                    if (*immediate) {
+                                        resume();
+                                        return;
+                                    }
+                                    lane->sandbox->refill();
+                                    server->resuming(*target, resume);
+                                });
+            *immediate = false;
+        });
 
     wire::lua::installWaitingFunction(
         *instance.sandbox, "at", [server, target, lane](wire::lua::LuaCall::Resume resume) {

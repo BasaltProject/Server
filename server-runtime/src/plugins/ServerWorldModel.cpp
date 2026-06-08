@@ -1,7 +1,4 @@
 #include <basalt/server/registry/BlockFluids.hpp>
-#include <basalt/server/runtime/entity/EntityNbt.hpp>
-#include <basalt/wire/nbt/NbtIO.hpp>
-#include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
@@ -11,7 +8,9 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaTables.hpp>
 #include <basalt/server/registry/World.hpp>
+#include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
+#include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
@@ -20,17 +19,19 @@
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/light/Light.hpp>
-#include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
+#include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
 
 #include <algorithm>
 #include <array>
 #include <charconv>
 #include <cmath>
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
 #include <utility>
 
 namespace basalt::server::runtime::plugins {
@@ -434,8 +435,7 @@ public:
         return true;
     }
 
-    std::int32_t readStates(std::span<const std::int32_t> positions, std::span<std::int32_t> out,
-                            bool load) override {
+    std::int32_t readStates(std::span<const std::int32_t> positions, std::span<std::int32_t> out, bool load) override {
         const std::size_t count = std::min(positions.size() / 3, out.size());
         std::int32_t found = 0;
         for (std::size_t index = 0; index < count; ++index) {
@@ -472,10 +472,102 @@ public:
         return world_->state().copySection(chunkX, sectionY, chunkZ, out);
     }
 
+    bool readSections(std::int32_t chunkX, std::int32_t chunkZ, bool load, std::span<std::int32_t> out) override {
+        if (load) {
+            ensureChunk(chunkX, chunkZ);
+        }
+        return world_->state().copySections(chunkX, chunkZ, out);
+    }
+
+    [[nodiscard]] std::int32_t chunkStatus(std::int32_t chunkX, std::int32_t chunkZ) const override {
+        constexpr std::int32_t kSimulationRadius = 10;
+        if (!world_->state().isLoaded(chunkX, chunkZ)) {
+            return world_->generationQueue().pendingKeys().contains(world::ChunkGenerationQueue::pack(chunkX, chunkZ))
+                       ? 1
+                       : 0;
+        }
+        if (players_) {
+            for (const player::PlayerSession* player : players_()) {
+                if (player->worldName == world_->name() &&
+                    std::abs((static_cast<std::int32_t>(std::floor(player->x)) >> 4) - chunkX) <= kSimulationRadius &&
+                    std::abs((static_cast<std::int32_t>(std::floor(player->z)) >> 4) - chunkZ) <= kSimulationRadius) {
+                    return 3;
+                }
+            }
+        }
+        return 2;
+    }
+
+    void requestChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate, std::int32_t priority,
+                      std::function<void(bool)> done) override {
+        if (world_->state().isLoaded(chunkX, chunkZ)) {
+            done(true);
+            return;
+        }
+        if (!generate) {
+            done(false);
+            return;
+        }
+        world_->generationQueue().request(chunkX, chunkZ, priority);
+        awaitChunk(chunkX, chunkZ, 0, std::make_shared<std::function<void(bool)>>(std::move(done)));
+    }
+
+    bool holdChunks(std::string_view token, std::span<const std::int32_t> chunks) override {
+        std::vector<std::int64_t> keys;
+        for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
+            keys.push_back(world::ChunkGenerationQueue::pack(chunks[at], chunks[at + 1]));
+        }
+        world_->holdChunks(std::string{token}, keys);
+        return true;
+    }
+
+    void releaseChunks(std::string_view token) override { world_->releaseChunks(std::string{token}); }
+
+    std::int32_t updateNeighbors(std::span<const std::int32_t> positions, std::uint32_t effects) override {
+        BlockChangeBroadcaster* blocks = hooks_.blocks ? hooks_.blocks() : nullptr;
+        const std::vector<player::PlayerSession*> watchers =
+            players_ ? players_() : std::vector<player::PlayerSession*>{};
+        std::int32_t reached = 0;
+        std::vector<std::int32_t> stale;
+        for (std::size_t at = 0; at + 2 < positions.size(); at += 3) {
+            const std::int32_t x = positions[at];
+            const std::int32_t y = positions[at + 1];
+            const std::int32_t z = positions[at + 2];
+            if (!world_->state().isLoaded(x >> 4, z >> 4)) {
+                continue;
+            }
+            ++reached;
+            if ((effects & BlockEffects::kShapes) != 0 && blocks != nullptr) {
+                blocks->reshapeAround(*world_, watchers, x, y, z);
+            }
+            if ((effects & BlockEffects::kNeighbors) != 0 && blocks != nullptr) {
+                blocks->notifyAround(*world_, watchers, x, y, z, std::nullopt);
+            }
+            if ((effects & BlockEffects::kClients) != 0) {
+                tell(x, y, z, world_->state().blockState(x, y, z).value_or(0));
+            }
+            if ((effects & BlockEffects::kLight) != 0) {
+                stale.push_back(x >> 4);
+                stale.push_back(z >> 4);
+            }
+        }
+        if (!stale.empty()) {
+            std::ranges::sort(stale);
+            for (std::size_t at = 0; at + 1 < stale.size(); at += 2) {
+                if (server::world::Chunk* chunk = world_->state().chunkIfLoaded(stale[at], stale[at + 1]);
+                    chunk != nullptr) {
+                    chunk->markLightStale();
+                }
+            }
+        }
+        return reached;
+    }
+
     bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
                       std::span<const std::int32_t> states, bool notify) override {
         const std::int32_t index = sectionY - chunkHeight().minSection();
-        if (index < 0 || index >= chunkHeight().sectionCount() || states.size() < server::world::ChunkSection::kBlocks) {
+        if (index < 0 || index >= chunkHeight().sectionCount() ||
+            states.size() < server::world::ChunkSection::kBlocks) {
             return false;
         }
         ensureChunk(chunkX, chunkZ);
@@ -533,8 +625,8 @@ public:
                 }
                 offsets.clear();
                 const std::span<const std::int32_t> next = states.subspan(section * kBlocks, kBlocks);
-                const std::int32_t done = world_->state().replaceSection(chunkX, sectionYs[section], chunkZ, next,
-                                                                         held, &offsets);
+                const std::int32_t done =
+                    world_->state().replaceSection(chunkX, sectionYs[section], chunkZ, next, held, &offsets);
                 if (done < 0) {
                     failed = true;
                     continue;
@@ -574,7 +666,8 @@ public:
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> blockEntityNbt(std::int32_t x, std::int32_t y,
                                                                           std::int32_t z) override {
         const server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
-        const server::world::ChunkBlockEntity* held = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        const server::world::ChunkBlockEntity* held =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
         if (held == nullptr) {
             return std::nullopt;
         }
@@ -602,7 +695,8 @@ public:
 
     bool setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int32_t z, std::span<const std::uint8_t> nbt) override {
         server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
-        const server::world::ChunkBlockEntity* held = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        const server::world::ChunkBlockEntity* held =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
         const auto parsed = wire::nbt::nbtIO::read(nbt);
         const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
         if (held == nullptr || given == nullptr) {
@@ -620,8 +714,9 @@ public:
                 .pos = {x, y, z}, .typeId = *typeId, .tag = next.data()};
             for (const player::PlayerSession* player : players_()) {
                 if (player->worldName == world_->name() && player->connection().sendPlayPacket) {
-                    player->connection().sendPlayPacket(wire::protocol::play::BlockEntityDataPacket::kId,
-                                                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                    player->connection().sendPlayPacket(
+                        wire::protocol::play::BlockEntityDataPacket::kId,
+                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
                 }
             }
         }
@@ -794,7 +889,7 @@ public:
 
     bool unloadChunk(std::int32_t chunkX, std::int32_t chunkZ) override {
         server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
-        if (chunk == nullptr) {
+        if (chunk == nullptr || world_->isHeld(chunkX, chunkZ)) {
             return false;
         }
         const std::int32_t reach = world_->settings().viewDistance + 1;
@@ -838,7 +933,7 @@ public:
     }
 
     [[nodiscard]] std::vector<std::shared_ptr<PluginEntityRef>> entitiesIn(std::int32_t chunkX,
-                                                                            std::int32_t chunkZ) const override {
+                                                                           std::int32_t chunkZ) const override {
         std::vector<std::shared_ptr<PluginEntityRef>> refs;
         for (const entity::ServerEntity* alive : world_->state().entitiesIn(chunkX, chunkZ)) {
             if (!alive->removed) {
@@ -946,6 +1041,21 @@ private:
             }
         }
         return std::nullopt;
+    }
+
+    void awaitChunk(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t waited,
+                    std::shared_ptr<std::function<void(bool)>> done) {
+        constexpr std::int32_t kGiveUpTicks = 1200;
+        if (world_->state().isLoaded(chunkX, chunkZ)) {
+            (*done)(true);
+            return;
+        }
+        if (waited >= kGiveUpTicks) {
+            (*done)(false);
+            return;
+        }
+        world_->owner().schedule(
+            1, [this, chunkX, chunkZ, waited, done] { awaitChunk(chunkX, chunkZ, waited + 1, done); });
     }
 
     void ensureChunk(std::int32_t chunkX, std::int32_t chunkZ) {
@@ -1092,8 +1202,8 @@ std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
     if (reg::blockStateDefinitions::blockOf(stateId) == nullptr) {
         return {};
     }
-    const std::uint32_t color = reg::mapColors::argbOf(reg::mapColors::packed(
-        reg::mapColors::of(stateId), reg::mapColors::Brightness::High));
+    const std::uint32_t color =
+        reg::mapColors::argbOf(reg::mapColors::packed(reg::mapColors::of(stateId), reg::mapColors::Brightness::High));
     return {static_cast<double>(reg::blockMovement::frictionOf(stateId)),
             static_cast<double>(reg::blockMovement::speedFactorOf(stateId)),
             static_cast<double>(reg::blockMovement::jumpFactorOf(stateId)),

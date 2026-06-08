@@ -94,7 +94,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getBiomeManager");
     }
     public BlockEntity getBlockEntity(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getBlockEntity");
+        return null;
     }
     public BlockState getBlockState(BlockPos blockPos) {
         return Block.stateById(WorldNatives.state(world.getName(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), true));
@@ -228,7 +228,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.scheduleTick");
     }
     public void sendBlockUpdated(BlockPos blockPos, BlockState blockState, BlockState blockState2, int value) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.sendBlockUpdated");
+        getChunkSource().blockChanged(blockPos);
     }
     public boolean setBlock(BlockPos blockPos, BlockState blockState, int value) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.setBlock");
@@ -240,12 +240,12 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.structureManager");
     }
     public void updateNeighborsAt(BlockPos pos, Block sourceBlock) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.updateNeighborsAt");
+        WorldNatives.updateNeighbors(world.getName(), new int[] {pos.getX(), pos.getY(), pos.getZ()}, 1);
     }
     public void updateNeighbourForOutputSignal(BlockPos blockPos, Block block) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.updateNeighbourForOutputSignal");
+        return;
     }
     public void updatePOIOnBlockStateChange(BlockPos pos, BlockState oldState, BlockState newState) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.updatePOIOnBlockStateChange");
+        return;
     }
 }

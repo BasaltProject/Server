@@ -151,6 +151,78 @@ struct Spot {
     }
     return {intAt(lua, base), intAt(lua, base + 1), intAt(lua, base + 2), base + 3};
 }
+
+/// A list of { x, y, z } triples, flattened to x, y, z, x, y, z...
+[[nodiscard]] std::vector<std::int32_t> blockTriples(LuaArgs& lua, std::int32_t index) {
+    if (!lua.isTable(index)) {
+        lua.raise("expected a list of { x, y, z } positions");
+    }
+    std::vector<std::int32_t> out;
+    const std::int64_t length = lua.length(index);
+    for (std::int64_t position = 1; position <= length; position++) {
+        lua.pushIndex(index, position);
+        if (!lua.isTable(-1)) {
+            lua.raise("expected a list of { x, y, z } positions");
+        }
+        for (const std::int64_t part : {1, 2, 3}) {
+            lua.pushIndex(lua.top(), part);
+            out.push_back(static_cast<std::int32_t>(lua.toInteger(-1)));
+            lua.pop(1);
+        }
+        lua.pop(1);
+    }
+    return out;
+}
+
+/// Effects as a number, or as a list of names: neighbors, shapes, light, entities, poi, ticks, clients.
+[[nodiscard]] std::uint32_t effectsFrom(LuaArgs& lua, std::int32_t index) {
+    if (lua.isNumber(index)) {
+        return static_cast<std::uint32_t>(lua.toInteger(index));
+    }
+    if (!lua.isTable(index)) {
+        return PluginWorldRef::BlockEffects::kNeighbors | PluginWorldRef::BlockEffects::kShapes |
+               PluginWorldRef::BlockEffects::kClients;
+    }
+    std::uint32_t mask = 0;
+    const std::int64_t length = lua.length(index);
+    for (std::int64_t position = 1; position <= length; position++) {
+        lua.pushIndex(index, position);
+        const std::string name = lua.toText(-1);
+        lua.pop(1);
+        using Effects = PluginWorldRef::BlockEffects;
+        if (name == "neighbors") {
+            mask |= Effects::kNeighbors;
+        } else if (name == "shapes") {
+            mask |= Effects::kShapes;
+        } else if (name == "light") {
+            mask |= Effects::kLight;
+        } else if (name == "entities") {
+            mask |= Effects::kEntities;
+        } else if (name == "poi") {
+            mask |= Effects::kPoi;
+        } else if (name == "ticks") {
+            mask |= Effects::kTicks;
+        } else if (name == "clients") {
+            mask |= Effects::kClients;
+        } else {
+            lua.raise("'" + name + "' is not an effect (neighbors, shapes, light, entities, poi, ticks, clients)");
+        }
+    }
+    return mask;
+}
+
+[[nodiscard]] std::string_view statusName(std::int32_t status) {
+    switch (status) {
+    case 1:
+        return "queued";
+    case 2:
+        return "loaded";
+    case 3:
+        return "ticking";
+    default:
+        return "unloaded";
+    }
+}
 } // namespace
 
 void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldRef>& world,
@@ -246,6 +318,91 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
                         section += count;
                     }
                     return 2;
+                })
+        .method("chunk_sections",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::size_t count = static_cast<std::size_t>(std::max(world->height(), 0)) >> 4;
+                    std::vector<std::int32_t> all(count * kSectionBlocks);
+                    if (!world->readSections(intAt(args, base), intAt(args, base + 1),
+                                             args.isNil(base + 2) || args.booleanOr(base + 2, true), all)) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    args.pushTable();
+                    const std::int32_t first = world->minHeight() >> 4;
+                    for (std::size_t section = 0; section < count; section++) {
+                        pushInts(args,
+                                 std::span<const std::int32_t>{all}.subspan(section * kSectionBlocks, kSectionBlocks));
+                        args.setIndex(first + static_cast<std::int64_t>(section));
+                    }
+                    return 1;
+                })
+        .method("chunk_status",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushString(
+                        std::string{statusName(world->chunkStatus(intAt(args, base), intAt(args, base + 1)))});
+                    return 1;
+                })
+        .method("hold_chunks",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushBoolean(world->holdChunks(args.checkString(base), chunkPairs(args, base + 1)));
+                    return 1;
+                })
+        .method("release_chunks",
+                [world](LuaArgs& args) {
+                    world->releaseChunks(args.checkString(firstArgument(args)));
+                    return 0;
+                })
+        .method("update_neighbors",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    args.pushInteger(world->updateNeighbors(blockTriples(args, base), effectsFrom(args, base + 1)));
+                    return 1;
+                })
+        .method("apply_changes",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::vector<std::int32_t> at = blockTriples(args, base);
+                    std::vector<std::int32_t> states(at.size() / 3);
+                    if (!args.isTable(base + 1) || static_cast<std::size_t>(args.length(base + 1)) != states.size()) {
+                        args.raise("apply_changes(positions, states, effects) needs one state per position");
+                    }
+                    for (std::size_t index = 0; index < states.size(); index++) {
+                        args.pushIndex(base + 1, static_cast<std::int64_t>(index) + 1);
+                        states[index] = static_cast<std::int32_t>(args.toInteger(-1));
+                        args.pop(1);
+                    }
+                    args.pushInteger(world->applyChanges(at, states, effectsFrom(args, base + 2)));
+                    return 1;
+                })
+        .method("read_states",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::vector<std::int32_t> at = blockTriples(args, base);
+                    std::vector<std::int32_t> out(at.size() / 3, -1);
+                    world->readStates(at, out, args.isNil(base + 1) || args.booleanOr(base + 1, true));
+                    pushInts(args, out);
+                    return 1;
+                })
+        .method("write_states",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::vector<std::int32_t> at = blockTriples(args, base);
+                    std::vector<std::int32_t> states(at.size() / 3);
+                    if (!args.isTable(base + 1) || static_cast<std::size_t>(args.length(base + 1)) != states.size()) {
+                        args.raise("write_states(positions, states, notify) needs one state per position");
+                    }
+                    for (std::size_t index = 0; index < states.size(); index++) {
+                        args.pushIndex(base + 1, static_cast<std::int64_t>(index) + 1);
+                        states[index] = static_cast<std::int32_t>(args.toInteger(-1));
+                        args.pop(1);
+                    }
+                    args.pushInteger(
+                        world->writeStates(at, states, args.isNil(base + 2) || args.booleanOr(base + 2, true)));
+                    return 1;
                 })
         .method("resend_chunks",
                 [world](LuaArgs& args) {
