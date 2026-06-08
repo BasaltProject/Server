@@ -12,6 +12,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace basalt::server::plugins {
 inline constexpr std::int32_t kHotbarStart = 27;
@@ -50,11 +51,15 @@ struct WorldHooks {
 
     NpcClick onNpcClick;
     std::function<std::string(const std::string& text)> resolveText;
+    std::function<std::vector<std::string>()> biomeIds;
 };
 
 void pushNpc(wire::lua::LuaArgs& lua, std::shared_ptr<PluginNpcRef> npc);
 
 void pushHologram(wire::lua::LuaArgs& lua, std::shared_ptr<PluginHologramRef> hologram);
+
+void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldRef>& world,
+                         const std::shared_ptr<WorldHooks>& hooks);
 
 void pushWorld(wire::lua::LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks hooks = {});
 } // namespace basalt::server::plugins

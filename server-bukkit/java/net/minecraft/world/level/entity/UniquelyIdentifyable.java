@@ -1,0 +1,3 @@
+package net.minecraft.world.level.entity;
+public interface UniquelyIdentifyable {
+}

@@ -277,8 +277,31 @@ void pushEntity(LuaArgs& lua, std::shared_ptr<PluginEntityRef> entity) {
         .reads("z", [entity] { return PluginValue{entity->z()}; })
         .reads("health", [entity] { return PluginValue{entity->health()}; })
         .reads("alive", [entity] { return PluginValue{entity->alive()}; })
+        .reads("uuid", [entity] { return PluginValue{entity->uuid()}; })
+        .reads("yaw", [entity] { return PluginValue{static_cast<double>(entity->rotation()[0])}; })
+        .reads("pitch", [entity] { return PluginValue{static_cast<double>(entity->rotation()[1])}; })
+        .reads("on_ground", [entity] { return PluginValue{entity->onGround()}; })
+        .reads("age", [entity] { return PluginValue{static_cast<std::int64_t>(entity->age())}; })
+        .reads("width", [entity] { return PluginValue{entity->width()}; })
+        .reads("height", [entity] { return PluginValue{entity->height()}; })
+        .reads("custom_name",
+               [entity] {
+                   const std::optional<std::string> name = entity->customName();
+                   return name.has_value() ? PluginValue{*name} : PluginValue{};
+               })
         .pushes("pos",
                 [entity](LuaArgs& args) { pushPosition(args, entity->world(), entity->x(), entity->y(), entity->z()); })
+        .pushes("velocity",
+                [entity](LuaArgs& args) {
+                    const std::array<double, 3> velocity = entity->velocity();
+                    args.pushTable();
+                    args.pushNumber(velocity[0]);
+                    args.setField("x");
+                    args.pushNumber(velocity[1]);
+                    args.setField("y");
+                    args.pushNumber(velocity[2]);
+                    args.setField("z");
+                })
         .writes("health", [entity](LuaArgs& args, std::int32_t index) { entity->setHealth(args.checkNumber(index)); })
         .method("remove",
                 [entity](LuaArgs& args) {

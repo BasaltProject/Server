@@ -16,13 +16,14 @@ basalt_module(server-plugins
         src/PluginMenuObject.cpp
         src/PluginObject.cpp
         src/PluginObjects.cpp
+        src/PluginWorldBulk.cpp
         src/PluginWorldObjects.cpp
         src/PluginPacketRegistry.cpp
         src/PluginRegistrations.cpp
         src/PluginSurfaces.cpp
         src/PluginServiceRegistry.cpp
         src/PluginValues.cpp
-    DEPENDS basalt::wire-common basalt::wire-io basalt::wire-lua basalt::wire-plugins
+    DEPENDS basalt::wire-common basalt::wire-io basalt::wire-lua basalt::wire-nbt basalt::wire-plugins
     # The event view builds a metatable and holds a registry reference, which the argument facade
     # deliberately does not expose. `lua.h` stays out of every header here and lives in that one
     # `.cpp`, which is the same rule the rest of the project follows for a fat dependency.
@@ -63,3 +64,12 @@ basalt_test(server-plugins-json-test
     DEPENDS basalt::server-plugins
 )
 
+basalt_test(server-plugins-api-names-test
+    SOURCES
+        test/PluginApiNamesTest.cpp
+    DEPENDS basalt::server-plugins
+)
+
+target_compile_definitions(server-plugins-api-names-test
+    PRIVATE BASALT_PLUGINS_DIR="${CMAKE_CURRENT_SOURCE_DIR}"
+)
