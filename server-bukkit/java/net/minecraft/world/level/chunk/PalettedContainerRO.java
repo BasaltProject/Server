@@ -1,19 +1,38 @@
 package net.minecraft.world.level.chunk;
 
+import com.mojang.serialization.DataResult;
 import java.util.List;
 import java.util.Optional;
-import org.basaltmc.bukkit.Unsupported;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+import java.util.stream.LongStream;
+
 public interface PalettedContainerRO<T> {
-    public default Object get(int x, int y, int z) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.PalettedContainerRO.get");
-    }
-    public default PalettedContainer recreate() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.PalettedContainerRO.recreate");
+    T get(int x, int y, int z);
+
+    void getAll(Consumer<T> consumer);
+
+    int getSerializedSize();
+
+    int bitsPerEntry();
+
+    boolean maybeHas(Predicate<T> predicate);
+
+    PalettedContainerRO<T> copy();
+
+    PalettedContainer<T> recreate();
+
+    void count(PalettedContainer.CountConsumer<T> output);
+
+    PackedData<T> pack(Strategy<T> strategy);
+
+    interface Unpacker<T, C extends PalettedContainerRO<T>> {
+        DataResult<C> read(Strategy<T> strategy, PackedData<T> discData);
     }
 
-    public record PackedData(List paletteEntries, Optional storage, int bitsPerEntry) {
-        public PackedData(List list, Optional optional) {
-            this(null, null, 0);
+    record PackedData<T>(List<T> paletteEntries, Optional<LongStream> storage, int bitsPerEntry) {
+        public PackedData(List<T> paletteEntries, Optional<LongStream> storage) {
+            this(paletteEntries, storage, -1);
         }
     }
 }

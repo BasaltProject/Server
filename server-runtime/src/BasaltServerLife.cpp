@@ -231,6 +231,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                             }));
 
     tickLoop_->start();
+    enableBukkit();
     const double elapsedSeconds = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                                                           std::chrono::steady_clock::now() - startedAt)
                                                           .count()) /

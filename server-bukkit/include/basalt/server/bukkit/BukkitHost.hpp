@@ -33,9 +33,12 @@ public:
     BukkitHost& operator=(BukkitHost&&) = delete;
     ~BukkitHost();
 
-    /// Creates the Shim VM, boots the Java runtime and enables every plugin it finds.
+    /// Creates the Shim VM and boots the Java runtime; plugins are enabled later by `enable`.
     [[nodiscard]] static std::expected<std::unique_ptr<BukkitHost>, std::string> start(const BukkitOptions& options,
                                                                                        plugins::PluginHost& plugins);
+
+    /// Loads and enables every plugin; call it on the thread plugins treat as main (the tick thread).
+    bool enable();
 
     struct PluginState {
         std::string name;

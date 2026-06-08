@@ -1,8 +1,51 @@
 package net.minecraft.server.level;
 
-import org.basaltmc.bukkit.Unsupported;
 public interface ChunkResult<T> {
-    public default Object orElse(Object orElse) {
-        throw Unsupported.hit("net.minecraft.server.level.ChunkResult.orElse");
+    static <T> ChunkResult<T> of(T value) {
+        return new Success<>(value);
+    }
+
+    static <T> ChunkResult<T> error(String message) {
+        return new Fail<>(message);
+    }
+
+    boolean isSuccess();
+
+    T orElse(T orElse);
+
+    T orElseThrow(java.util.function.Supplier<? extends RuntimeException> supplier);
+
+    record Success<T>(T value) implements ChunkResult<T> {
+        @Override
+        public boolean isSuccess() {
+            return true;
+        }
+
+        @Override
+        public T orElse(T orElse) {
+            return value;
+        }
+
+        @Override
+        public T orElseThrow(java.util.function.Supplier<? extends RuntimeException> supplier) {
+            return value;
+        }
+    }
+
+    record Fail<T>(String message) implements ChunkResult<T> {
+        @Override
+        public boolean isSuccess() {
+            return false;
+        }
+
+        @Override
+        public T orElse(T orElse) {
+            return orElse;
+        }
+
+        @Override
+        public T orElseThrow(java.util.function.Supplier<? extends RuntimeException> supplier) {
+            throw supplier.get();
+        }
     }
 }

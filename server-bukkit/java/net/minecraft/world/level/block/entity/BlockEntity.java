@@ -9,6 +9,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import org.basaltmc.bukkit.Unsupported;
 public abstract class BlockEntity implements DebugValueSource, TypedInstance {
+    protected boolean remove;
     protected BlockEntity() {
     }
     public BlockPos getBlockPos() {

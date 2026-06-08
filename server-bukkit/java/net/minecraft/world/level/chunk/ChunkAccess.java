@@ -44,7 +44,14 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.ticks.TickContainerAccess;
 import org.basaltmc.bukkit.Unsupported;
 public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeResolver {
+    protected final ChunkPos chunkPos;
+    protected final LevelChunkSection[] sections;
+    protected volatile boolean unsaved;
+    protected volatile boolean lightCorrect;
+
     public ChunkAccess(ChunkPos chunkPos, UpgradeData upgradeData, LevelHeightAccessor levelHeightAccessor, PalettedContainerFactory palettedContainerFactory, long value, LevelChunkSection[] levelChunkSections, BlendingData blendingData) {
+        this.chunkPos = chunkPos;
+        this.sections = levelChunkSections;
     }
     public void addEntity(Entity entity) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.addEntity");
@@ -194,7 +201,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getPersistedStatus");
     }
     public ChunkPos getPos() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getPos");
+        return chunkPos;
     }
     public ShortList[] getPostProcessing() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getPostProcessing");
@@ -203,7 +210,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getReferencesForStructure");
     }
     public LevelChunkSection getSection(int sectionIndex) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSection");
+        return getSections()[sectionIndex];
     }
     public int getSectionIndex(int value) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSectionIndex");
@@ -215,10 +222,10 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSectionYFromSectionIndex");
     }
     public LevelChunkSection[] getSections() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSections");
+        return sections;
     }
     public int getSectionsCount() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSectionsCount");
+        return getSections().length;
     }
     public ChunkSkyLightSources getSkyLightSources() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.getSkyLightSources");
@@ -248,7 +255,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isInsideBuildHeight");
     }
     public boolean isLightCorrect() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isLightCorrect");
+        return lightCorrect;
     }
     public boolean isOldNoiseGeneration() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isOldNoiseGeneration");
@@ -260,7 +267,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isOutsideBuildHeight");
     }
     public boolean isUnsaved() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isUnsaved");
+        return unsaved;
     }
     public boolean isUpgrading() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isUpgrading");
@@ -269,7 +276,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.isYSpaceEmpty");
     }
     public void markUnsaved() {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.markUnsaved");
+        unsaved = true;
     }
     public ProblemReporter.PathElement problemPath() {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.problemPath");
@@ -302,7 +309,7 @@ public abstract class ChunkAccess implements LightChunk, StructureAccess, BiomeR
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setInhabitedTime");
     }
     public void setLightCorrect(boolean isLightCorrect) {
-        throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setLightCorrect");
+        lightCorrect = isLightCorrect;
     }
     public void setStartForStructure(Structure structure, StructureStart structureStart) {
         throw Unsupported.hit("net.minecraft.world.level.chunk.ChunkAccess.setStartForStructure");

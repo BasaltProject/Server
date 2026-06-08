@@ -86,8 +86,23 @@ public final class BukkitRuntime {
             folder.mkdirs();
             server = new org.bukkit.craftbukkit.CraftServer(new File(".").getAbsoluteFile(), folder);
             Bukkit.setServer(server);
+            return true;
+        } catch (Throwable t) {
+            t.printStackTrace();
+            Natives.log(3, "Bukkit", "Boot failed: " + t);
+            return false;
+        }
+    }
+
+    public static boolean enable(String pluginsFolder) {
+        try {
+            File folder = new File(pluginsFolder);
             Natives.log(1, "Bukkit", "Loading Bukkit plugins from " + folder.getPath());
             BasaltPluginManager manager = server.pluginManagerImpl();
+            server.schedulerImpl().runTaskTimer((Plugin) null, () -> {
+                net.minecraft.server.MinecraftServer.currentTick = (int) Natives.currentTick();
+                net.minecraft.server.level.ServerChunkCache.tickAll();
+            }, 1L, 1L);
             Blocks.begin();
             try {
                 manager.loadPlugins(folder);
@@ -100,7 +115,7 @@ public final class BukkitRuntime {
             return true;
         } catch (Throwable t) {
             t.printStackTrace();
-            Natives.log(3, "Bukkit", "Boot failed: " + t);
+            Natives.log(3, "Bukkit", "Enable failed: " + t);
             return false;
         }
     }
