@@ -31,7 +31,8 @@ public final class PropertyPool {
             return BooleanProperty.create(name);
         }
         if (isRange(values)) {
-            return IntegerProperty.create(name, Integer.parseInt(values[0]), Integer.parseInt(values[values.length - 1]));
+            int last = Integer.parseInt(values[values.length - 1]);
+            return IntegerProperty.create(name, Integer.parseInt(values[0]), last);
         }
         boolean directions = true;
         for (String value : values) {

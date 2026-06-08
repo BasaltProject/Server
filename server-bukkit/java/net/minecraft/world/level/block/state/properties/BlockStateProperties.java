@@ -5,10 +5,9 @@ import net.minecraft.util.StringRepresentable;
 
 public final class BlockStateProperties {
     public static final BooleanProperty SNOWY = BooleanProperty.create("snowy");
-    public static final EnumProperty<AxisXYZValue> AXIS_X_Y_Z = EnumProperty.create(
-            "axis", AxisXYZValue.class, AxisXYZValue.values());
-    public static final EnumProperty<AxisXZValue> AXIS_X_Z = EnumProperty.create(
-            "axis", AxisXZValue.class, AxisXZValue.values());
+    public static final EnumProperty<AxisValue> AXIS = EnumProperty.create("axis", AxisValue.class, AxisValue.values());
+    public static final EnumProperty<HorizontalAxisValue> HORIZONTAL_AXIS = EnumProperty.create(
+            "axis", HorizontalAxisValue.class, HorizontalAxisValue.values());
     public static final IntegerProperty STAGE = IntegerProperty.create("stage", 0, 1);
     public static final IntegerProperty AGE_4 = IntegerProperty.create("age", 0, 4);
     public static final IntegerProperty AGE_15 = IntegerProperty.create("age", 0, 15);
@@ -36,34 +35,30 @@ public final class BlockStateProperties {
             "facing", Direction.class, Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST,
             Direction.EAST);
     public static final BooleanProperty TRIGGERED = BooleanProperty.create("triggered");
-    public static final EnumProperty<InstrumentValue> INSTRUMENT = EnumProperty.create(
-            "instrument", InstrumentValue.class, InstrumentValue.values());
+    public static final EnumProperty<NoteblockInstrumentValue> NOTEBLOCK_INSTRUMENT = EnumProperty.create(
+            "instrument", NoteblockInstrumentValue.class, NoteblockInstrumentValue.values());
     public static final IntegerProperty NOTE = IntegerProperty.create("note", 0, 24);
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
     public static final BooleanProperty OCCUPIED = BooleanProperty.create("occupied");
-    public static final EnumProperty<PartValue> PART = EnumProperty.create("part", PartValue.class, PartValue.values());
-    public static final EnumProperty<ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthValue> SHAPE_NORTH_SOUTH_EAST_WEST_ASCENDING_EAST_ASCENDING_WEST_ASCENDING_NORTH_ASCENDING_SOUTH = EnumProperty.create(
-            "shape", ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthValue.class,
-            ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthValue.values());
-    public static final EnumProperty<ShapeStraightInnerLeftInnerRightOuterLeftOuterRightValue> SHAPE_STRAIGHT_INNER_LEFT_INNER_RIGHT_OUTER_LEFT_OUTER_RIGHT = EnumProperty.create(
-            "shape", ShapeStraightInnerLeftInnerRightOuterLeftOuterRightValue.class,
-            ShapeStraightInnerLeftInnerRightOuterLeftOuterRightValue.values());
-    public static final EnumProperty<ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthSouthEastSouthWestNorthWestNorthEastValue> SHAPE_NORTH_SOUTH_EAST_WEST_ASCENDING_EAST_ASCENDING_WEST_ASCENDING_NORTH_ASCENDING_SOUTH_SOUTH_EAST_SOUTH_WEST_NORTH_WEST_NORTH_EAST = EnumProperty.create(
-            "shape",
-            ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthSouthEastSouthWestNorthWestNorthEastValue.class,
-            ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthSouthEastSouthWestNorthWestNorthEastValue.values());
+    public static final EnumProperty<BedPartValue> BED_PART = EnumProperty.create(
+            "part", BedPartValue.class, BedPartValue.values());
+    public static final EnumProperty<RailShapeStraightValue> RAIL_SHAPE_STRAIGHT = EnumProperty.create(
+            "shape", RailShapeStraightValue.class, RailShapeStraightValue.values());
+    public static final EnumProperty<StairsShapeValue> STAIRS_SHAPE = EnumProperty.create(
+            "shape", StairsShapeValue.class, StairsShapeValue.values());
+    public static final EnumProperty<RailShapeValue> RAIL_SHAPE = EnumProperty.create(
+            "shape", RailShapeValue.class, RailShapeValue.values());
     public static final BooleanProperty EXTENDED = BooleanProperty.create("extended");
-    public static final EnumProperty<HalfUpperLowerValue> HALF_UPPER_LOWER = EnumProperty.create(
-            "half", HalfUpperLowerValue.class, HalfUpperLowerValue.values());
-    public static final EnumProperty<HalfTopBottomValue> HALF_TOP_BOTTOM = EnumProperty.create(
-            "half", HalfTopBottomValue.class, HalfTopBottomValue.values());
+    public static final EnumProperty<DoubleBlockHalfValue> DOUBLE_BLOCK_HALF = EnumProperty.create(
+            "half", DoubleBlockHalfValue.class, DoubleBlockHalfValue.values());
+    public static final EnumProperty<HalfValue> HALF = EnumProperty.create("half", HalfValue.class, HalfValue.values());
     public static final BooleanProperty SHORT = BooleanProperty.create("short");
-    public static final EnumProperty<TypeNormalStickyValue> TYPE_NORMAL_STICKY = EnumProperty.create(
-            "type", TypeNormalStickyValue.class, TypeNormalStickyValue.values());
-    public static final EnumProperty<TypeTopBottomDoubleValue> TYPE_TOP_BOTTOM_DOUBLE = EnumProperty.create(
-            "type", TypeTopBottomDoubleValue.class, TypeTopBottomDoubleValue.values());
-    public static final EnumProperty<TypeSingleLeftRightValue> TYPE_SINGLE_LEFT_RIGHT = EnumProperty.create(
-            "type", TypeSingleLeftRightValue.class, TypeSingleLeftRightValue.values());
+    public static final EnumProperty<PistonTypeValue> PISTON_TYPE = EnumProperty.create(
+            "type", PistonTypeValue.class, PistonTypeValue.values());
+    public static final EnumProperty<SlabTypeValue> SLAB_TYPE = EnumProperty.create(
+            "type", SlabTypeValue.class, SlabTypeValue.values());
+    public static final EnumProperty<ChestTypeValue> CHEST_TYPE = EnumProperty.create(
+            "type", ChestTypeValue.class, ChestTypeValue.values());
     public static final BooleanProperty UNSTABLE = BooleanProperty.create("unstable");
     public static final BooleanProperty SLOT_0_OCCUPIED = BooleanProperty.create("slot_0_occupied");
     public static final BooleanProperty SLOT_1_OCCUPIED = BooleanProperty.create("slot_1_occupied");
@@ -74,26 +69,26 @@ public final class BlockStateProperties {
     public static final EnumProperty<SideChainValue> SIDE_CHAIN = EnumProperty.create(
             "side_chain", SideChainValue.class, SideChainValue.values());
     public static final BooleanProperty EAST = BooleanProperty.create("east");
-    public static final EnumProperty<EastUpSideNoneValue> EAST_UP_SIDE_NONE = EnumProperty.create(
-            "east", EastUpSideNoneValue.class, EastUpSideNoneValue.values());
-    public static final EnumProperty<EastNoneLowTallValue> EAST_NONE_LOW_TALL = EnumProperty.create(
-            "east", EastNoneLowTallValue.class, EastNoneLowTallValue.values());
+    public static final EnumProperty<EastRedstoneValue> EAST_REDSTONE = EnumProperty.create(
+            "east", EastRedstoneValue.class, EastRedstoneValue.values());
+    public static final EnumProperty<EastWallValue> EAST_WALL = EnumProperty.create(
+            "east", EastWallValue.class, EastWallValue.values());
     public static final BooleanProperty NORTH = BooleanProperty.create("north");
-    public static final EnumProperty<NorthUpSideNoneValue> NORTH_UP_SIDE_NONE = EnumProperty.create(
-            "north", NorthUpSideNoneValue.class, NorthUpSideNoneValue.values());
-    public static final EnumProperty<NorthNoneLowTallValue> NORTH_NONE_LOW_TALL = EnumProperty.create(
-            "north", NorthNoneLowTallValue.class, NorthNoneLowTallValue.values());
+    public static final EnumProperty<NorthRedstoneValue> NORTH_REDSTONE = EnumProperty.create(
+            "north", NorthRedstoneValue.class, NorthRedstoneValue.values());
+    public static final EnumProperty<NorthWallValue> NORTH_WALL = EnumProperty.create(
+            "north", NorthWallValue.class, NorthWallValue.values());
     public static final BooleanProperty SOUTH = BooleanProperty.create("south");
-    public static final EnumProperty<SouthUpSideNoneValue> SOUTH_UP_SIDE_NONE = EnumProperty.create(
-            "south", SouthUpSideNoneValue.class, SouthUpSideNoneValue.values());
-    public static final EnumProperty<SouthNoneLowTallValue> SOUTH_NONE_LOW_TALL = EnumProperty.create(
-            "south", SouthNoneLowTallValue.class, SouthNoneLowTallValue.values());
+    public static final EnumProperty<SouthRedstoneValue> SOUTH_REDSTONE = EnumProperty.create(
+            "south", SouthRedstoneValue.class, SouthRedstoneValue.values());
+    public static final EnumProperty<SouthWallValue> SOUTH_WALL = EnumProperty.create(
+            "south", SouthWallValue.class, SouthWallValue.values());
     public static final BooleanProperty UP = BooleanProperty.create("up");
     public static final BooleanProperty WEST = BooleanProperty.create("west");
-    public static final EnumProperty<WestUpSideNoneValue> WEST_UP_SIDE_NONE = EnumProperty.create(
-            "west", WestUpSideNoneValue.class, WestUpSideNoneValue.values());
-    public static final EnumProperty<WestNoneLowTallValue> WEST_NONE_LOW_TALL = EnumProperty.create(
-            "west", WestNoneLowTallValue.class, WestNoneLowTallValue.values());
+    public static final EnumProperty<WestRedstoneValue> WEST_REDSTONE = EnumProperty.create(
+            "west", WestRedstoneValue.class, WestRedstoneValue.values());
+    public static final EnumProperty<WestWallValue> WEST_WALL = EnumProperty.create(
+            "west", WestWallValue.class, WestWallValue.values());
     public static final EnumProperty<CreakingHeartStateValue> CREAKING_HEART_STATE = EnumProperty.create(
             "creaking_heart_state", CreakingHeartStateValue.class, CreakingHeartStateValue.values());
     public static final BooleanProperty NATURAL = BooleanProperty.create("natural");
@@ -101,11 +96,12 @@ public final class BlockStateProperties {
     public static final IntegerProperty MOISTURE = IntegerProperty.create("moisture", 0, 7);
     public static final BooleanProperty LIT = BooleanProperty.create("lit");
     public static final IntegerProperty ROTATION = IntegerProperty.create("rotation", 0, 15);
-    public static final EnumProperty<HingeValue> HINGE = EnumProperty.create(
-            "hinge", HingeValue.class, HingeValue.values());
+    public static final EnumProperty<DoorHingeValue> DOOR_HINGE = EnumProperty.create(
+            "hinge", DoorHingeValue.class, DoorHingeValue.values());
     public static final BooleanProperty OPEN = BooleanProperty.create("open");
     public static final BooleanProperty ATTACHED = BooleanProperty.create("attached");
-    public static final EnumProperty<FaceValue> FACE = EnumProperty.create("face", FaceValue.class, FaceValue.values());
+    public static final EnumProperty<AttachFaceValue> ATTACH_FACE = EnumProperty.create(
+            "face", AttachFaceValue.class, AttachFaceValue.values());
     public static final IntegerProperty LAYERS = IntegerProperty.create("layers", 1, 8);
     public static final BooleanProperty HAS_RECORD = BooleanProperty.create("has_record");
     public static final IntegerProperty BITES = IntegerProperty.create("bites", 0, 6);
@@ -119,12 +115,12 @@ public final class BlockStateProperties {
     public static final BooleanProperty EYE = BooleanProperty.create("eye");
     public static final BooleanProperty DISARMED = BooleanProperty.create("disarmed");
     public static final BooleanProperty CONDITIONAL = BooleanProperty.create("conditional");
-    public static final EnumProperty<ModeCompareSubtractValue> MODE_COMPARE_SUBTRACT = EnumProperty.create(
-            "mode", ModeCompareSubtractValue.class, ModeCompareSubtractValue.values());
-    public static final EnumProperty<ModeSaveLoadCornerDataValue> MODE_SAVE_LOAD_CORNER_DATA = EnumProperty.create(
-            "mode", ModeSaveLoadCornerDataValue.class, ModeSaveLoadCornerDataValue.values());
-    public static final EnumProperty<ModeStartLogFailAcceptValue> MODE_START_LOG_FAIL_ACCEPT = EnumProperty.create(
-            "mode", ModeStartLogFailAcceptValue.class, ModeStartLogFailAcceptValue.values());
+    public static final EnumProperty<ComparatorModeValue> COMPARATOR_MODE = EnumProperty.create(
+            "mode", ComparatorModeValue.class, ComparatorModeValue.values());
+    public static final EnumProperty<StructureblockModeValue> STRUCTUREBLOCK_MODE = EnumProperty.create(
+            "mode", StructureblockModeValue.class, StructureblockModeValue.values());
+    public static final EnumProperty<TestBlockModeValue> TEST_BLOCK_MODE = EnumProperty.create(
+            "mode", TestBlockModeValue.class, TestBlockModeValue.values());
     public static final BooleanProperty INVERTED = BooleanProperty.create("inverted");
     public static final BooleanProperty ENABLED = BooleanProperty.create("enabled");
     public static final IntegerProperty EGGS = IntegerProperty.create("eggs", 1, 4);
@@ -136,8 +132,8 @@ public final class BlockStateProperties {
     public static final BooleanProperty DRAG = BooleanProperty.create("drag");
     public static final BooleanProperty BOTTOM = BooleanProperty.create("bottom");
     public static final BooleanProperty HAS_BOOK = BooleanProperty.create("has_book");
-    public static final EnumProperty<AttachmentValue> ATTACHMENT = EnumProperty.create(
-            "attachment", AttachmentValue.class, AttachmentValue.values());
+    public static final EnumProperty<BellAttachmentValue> BELL_ATTACHMENT = EnumProperty.create(
+            "attachment", BellAttachmentValue.class, BellAttachmentValue.values());
     public static final BooleanProperty SIGNAL_FIRE = BooleanProperty.create("signal_fire");
     public static final EnumProperty<OrientationValue> ORIENTATION = EnumProperty.create(
             "orientation", OrientationValue.class, OrientationValue.values());
@@ -174,7 +170,7 @@ public final class BlockStateProperties {
 
     public static void init() {}
 
-    public enum AxisXYZValue implements StringRepresentable {
+    public enum AxisValue implements StringRepresentable {
         X, Y, Z;
 
         @Override
@@ -188,7 +184,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum AxisXZValue implements StringRepresentable {
+    public enum HorizontalAxisValue implements StringRepresentable {
         X, Z;
 
         @Override
@@ -202,7 +198,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum InstrumentValue implements StringRepresentable {
+    public enum NoteblockInstrumentValue implements StringRepresentable {
         HARP, BASEDRUM, SNARE, HAT, BASS, FLUTE, BELL, GUITAR, CHIME, XYLOPHONE, IRON_XYLOPHONE, COW_BELL, DIDGERIDOO, BIT, BANJO, PLING, TRUMPET, TRUMPET_EXPOSED, TRUMPET_OXIDIZED, TRUMPET_WEATHERED, ZOMBIE, SKELETON, CREEPER, DRAGON, WITHER_SKELETON, PIGLIN, CUSTOM_HEAD;
 
         @Override
@@ -216,7 +212,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum PartValue implements StringRepresentable {
+    public enum BedPartValue implements StringRepresentable {
         HEAD, FOOT;
 
         @Override
@@ -230,7 +226,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthValue implements StringRepresentable {
+    public enum RailShapeStraightValue implements StringRepresentable {
         NORTH_SOUTH, EAST_WEST, ASCENDING_EAST, ASCENDING_WEST, ASCENDING_NORTH, ASCENDING_SOUTH;
 
         @Override
@@ -244,7 +240,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum ShapeStraightInnerLeftInnerRightOuterLeftOuterRightValue implements StringRepresentable {
+    public enum StairsShapeValue implements StringRepresentable {
         STRAIGHT, INNER_LEFT, INNER_RIGHT, OUTER_LEFT, OUTER_RIGHT;
 
         @Override
@@ -258,7 +254,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum ShapeNorthSouthEastWestAscendingEastAscendingWestAscendingNorthAscendingSouthSouthEastSouthWestNorthWestNorthEastValue implements StringRepresentable {
+    public enum RailShapeValue implements StringRepresentable {
         NORTH_SOUTH, EAST_WEST, ASCENDING_EAST, ASCENDING_WEST, ASCENDING_NORTH, ASCENDING_SOUTH, SOUTH_EAST, SOUTH_WEST, NORTH_WEST, NORTH_EAST;
 
         @Override
@@ -272,7 +268,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum HalfUpperLowerValue implements StringRepresentable {
+    public enum DoubleBlockHalfValue implements StringRepresentable {
         UPPER, LOWER;
 
         @Override
@@ -286,7 +282,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum HalfTopBottomValue implements StringRepresentable {
+    public enum HalfValue implements StringRepresentable {
         TOP, BOTTOM;
 
         @Override
@@ -300,7 +296,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum TypeNormalStickyValue implements StringRepresentable {
+    public enum PistonTypeValue implements StringRepresentable {
         NORMAL, STICKY;
 
         @Override
@@ -314,7 +310,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum TypeTopBottomDoubleValue implements StringRepresentable {
+    public enum SlabTypeValue implements StringRepresentable {
         TOP, BOTTOM, DOUBLE;
 
         @Override
@@ -328,7 +324,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum TypeSingleLeftRightValue implements StringRepresentable {
+    public enum ChestTypeValue implements StringRepresentable {
         SINGLE, LEFT, RIGHT;
 
         @Override
@@ -356,7 +352,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum EastUpSideNoneValue implements StringRepresentable {
+    public enum EastRedstoneValue implements StringRepresentable {
         UP, SIDE, NONE;
 
         @Override
@@ -370,7 +366,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum EastNoneLowTallValue implements StringRepresentable {
+    public enum EastWallValue implements StringRepresentable {
         NONE, LOW, TALL;
 
         @Override
@@ -384,7 +380,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum NorthUpSideNoneValue implements StringRepresentable {
+    public enum NorthRedstoneValue implements StringRepresentable {
         UP, SIDE, NONE;
 
         @Override
@@ -398,7 +394,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum NorthNoneLowTallValue implements StringRepresentable {
+    public enum NorthWallValue implements StringRepresentable {
         NONE, LOW, TALL;
 
         @Override
@@ -412,7 +408,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum SouthUpSideNoneValue implements StringRepresentable {
+    public enum SouthRedstoneValue implements StringRepresentable {
         UP, SIDE, NONE;
 
         @Override
@@ -426,7 +422,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum SouthNoneLowTallValue implements StringRepresentable {
+    public enum SouthWallValue implements StringRepresentable {
         NONE, LOW, TALL;
 
         @Override
@@ -440,7 +436,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum WestUpSideNoneValue implements StringRepresentable {
+    public enum WestRedstoneValue implements StringRepresentable {
         UP, SIDE, NONE;
 
         @Override
@@ -454,7 +450,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum WestNoneLowTallValue implements StringRepresentable {
+    public enum WestWallValue implements StringRepresentable {
         NONE, LOW, TALL;
 
         @Override
@@ -482,7 +478,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum HingeValue implements StringRepresentable {
+    public enum DoorHingeValue implements StringRepresentable {
         LEFT, RIGHT;
 
         @Override
@@ -496,7 +492,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum FaceValue implements StringRepresentable {
+    public enum AttachFaceValue implements StringRepresentable {
         FLOOR, WALL, CEILING;
 
         @Override
@@ -510,7 +506,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum ModeCompareSubtractValue implements StringRepresentable {
+    public enum ComparatorModeValue implements StringRepresentable {
         COMPARE, SUBTRACT;
 
         @Override
@@ -524,7 +520,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum ModeSaveLoadCornerDataValue implements StringRepresentable {
+    public enum StructureblockModeValue implements StringRepresentable {
         SAVE, LOAD, CORNER, DATA;
 
         @Override
@@ -538,7 +534,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum ModeStartLogFailAcceptValue implements StringRepresentable {
+    public enum TestBlockModeValue implements StringRepresentable {
         START, LOG, FAIL, ACCEPT;
 
         @Override
@@ -566,7 +562,7 @@ public final class BlockStateProperties {
         }
     }
 
-    public enum AttachmentValue implements StringRepresentable {
+    public enum BellAttachmentValue implements StringRepresentable {
         FLOOR, CEILING, SINGLE_WALL, DOUBLE_WALL;
 
         @Override
