@@ -162,6 +162,8 @@ basalt_module(server-runtime-core
         src/plugins/ServerObjectModel.cpp
         src/plugins/ServerWorldModel.cpp
         src/ChunkSimulationView.cpp
+        src/plugins/WorldBlockUpdates.cpp
+        src/plugins/WorldItemUse.cpp
         src/ClientSession.cpp
         src/ClientSessionPackets.cpp
         src/CommandWiring.cpp

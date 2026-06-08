@@ -152,14 +152,14 @@ std::size_t WorldState::countMissing(const std::vector<std::pair<std::int32_t, s
     return missing;
 }
 
-bool WorldState::lightWindowFor(std::int32_t chunkX, std::int32_t chunkZ,
-                                std::array<server::world::Chunk*, 9>& window) {
-    lightBusy_.store(true);
+bool WorldState::lightWindowFor(std::int32_t chunkX, std::int32_t chunkZ, std::array<server::world::Chunk*, 9>& window,
+                                const bool requireAll) {
+    lightBusy_.fetch_add(1);
     const WorldReadLock lock{mutex_};
     for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
         for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
             Chunk* found = chunkAtLocked(key(chunkX + offsetX, chunkZ + offsetZ));
-            if (found == nullptr) {
+            if (found == nullptr && (requireAll || (offsetX == 0 && offsetZ == 0))) {
                 return false;
             }
             window[static_cast<std::size_t>((offsetZ + 1) * 3 + offsetX + 1)] = found;
@@ -185,8 +185,24 @@ void WorldState::requestLight(std::int32_t chunkX, std::int32_t chunkZ) {
     onNeighbourhoodComplete_(chunkX, chunkZ, false);
 }
 
+void WorldState::markLightAround(const std::int32_t chunkX, const std::int32_t chunkZ) {
+    const WorldReadLock lock{mutex_};
+    for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
+        for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
+            if (Chunk* neighbour = chunkAtLocked(key(chunkX + offsetX, chunkZ + offsetZ)); neighbour != nullptr) {
+                neighbour->markLightStale();
+                if (onNeighbourhoodComplete_) {
+                    onNeighbourhoodComplete_(neighbour->chunkX(), neighbour->chunkZ(), true);
+                }
+            }
+        }
+    }
+}
+
 void WorldState::lightDone() {
-    lightBusy_.store(false);
+    if (lightBusy_.fetch_sub(1) > 1) {
+        return;
+    }
     const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
     graveyard_.clear();
 }
@@ -202,7 +218,7 @@ std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
         const std::int32_t chunkX = chunk->chunkX();
         const std::int32_t chunkZ = chunk->chunkZ();
         if (auto node = chunksByPos_.extract(chunkKey); !node.empty()) {
-            if (lightBusy_.load()) {
+            if (lightBusy_.load() > 0) {
                 const std::lock_guard<std::mutex> graveyard{graveyardMutex_};
                 graveyard_.push_back(std::move(node.mapped()));
             }
@@ -644,7 +660,7 @@ entity::entityCollision::BlockAt WorldState::lockedBlockAccessor() const {
 }
 
 bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
-                               SideEffects sideEffects) {
+                               SideEffects sideEffects, PoiTracking poiTracking) {
     mine("A block");
     const WorldWriteLock lock{mutex_};
     blockVersion_.fetch_add(1, std::memory_order_release);
@@ -704,7 +720,9 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
             chunk->setBlockEntity(
                 server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, blockEntityDefaults::of(*block, stateId)});
         }
-        poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
+        if (poiTracking == PoiTracking::kTrack) {
+            poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
+        }
         const std::span<const std::int32_t> before = registry::blockShapes::collisionBoxes(was);
         const std::span<const std::int32_t> after = registry::blockShapes::collisionBoxes(stateId);
         const auto moving = [](std::int32_t state) {

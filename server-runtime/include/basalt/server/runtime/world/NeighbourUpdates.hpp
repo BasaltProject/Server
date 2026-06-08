@@ -24,6 +24,21 @@ namespace neighbourUpdates {
 /// parity: `max-chained-neighbor-updates`.
 inline constexpr std::int32_t kMaxChainedNeighbourUpdates = 1000000;
 
+/// The parts of what `Level.setBlock` sets off, each one runnable alone.
+namespace phase {
+/// `affectNeighborsAfterRemoval` of the state that left.
+inline constexpr std::uint32_t kDeparture = 1;
+/// `onPlace` of the state that arrived, apart from the ticks it books.
+inline constexpr std::uint32_t kPlace = 2;
+/// The scheduled ticks and fluid wake-ups `onPlace` books.
+inline constexpr std::uint32_t kTicks = 4;
+/// `updateNeighbourShapes` and `updateIndirectNeighbourShapes`.
+inline constexpr std::uint32_t kShapes = 8;
+/// `updateNeighborsAt` and the comparator output signal.
+inline constexpr std::uint32_t kNeighbours = 16;
+inline constexpr std::uint32_t kAll = kDeparture | kPlace | kTicks | kShapes | kNeighbours;
+} // namespace phase
+
 using OnReshaped = std::function<void(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z)>;
 
 using OnBroken = OnReshaped;
@@ -79,6 +94,7 @@ struct Context {
     bool tntExplodes = true;
     /// parity: `LevelChunk.setBlockState`.
     bool railArrivalTells = true;
+    std::uint32_t phases = phase::kAll;
 };
 
 /// parity: the block's `updateShape` is `BlockInput.place`'s pre-shape.
@@ -94,6 +110,15 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                  std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
                  const OnReshaped& onReshaped = {}, ArrivedShape arrivedShape = ArrivedShape::Reshape,
                  const std::function<void()>& afterShapes = {});
+
+/// parity: `BlockState.handleNeighborChanged` for the block at (x, y, z), told by a block that was `source`.
+void neighbourChanged(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
+                      std::optional<std::int32_t> source, std::vector<BlockChange>& effects, const OnBroken& onBroken,
+                      const OnReshaped& onReshaped = {});
+
+/// parity: `BlockState.updateIndirectNeighbourShapes` for a block that is, or was, `stateId` at (x, y, z).
+void reshapeIndirect(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                     const OnReshaped& onReshaped = {});
 
 /// parity: `moveBlocks`.
 void reshapeOnly(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, const OnBroken& onBroken,

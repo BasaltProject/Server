@@ -406,6 +406,14 @@ std::vector<BlockChange> placed(WorldState& world, const std::string_view worldN
     return changes;
 }
 
+std::vector<BlockChange> reactAt(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
+                                 std::int32_t z, std::int64_t gameTime, random::RandomSource& random,
+                                 const bool tntExplodes, const std::optional<std::int32_t> told) {
+    std::vector<BlockChange> changes;
+    react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random, told);
+    return changes;
+}
+
 std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                                 std::int32_t z, std::int64_t gameTime, random::RandomSource& random,
                                 const bool tntExplodes, const bool itself, const std::optional<std::int32_t> told) {

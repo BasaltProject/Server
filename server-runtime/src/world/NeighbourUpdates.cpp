@@ -581,6 +581,93 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
     }
 }
 
+void reshapeIndirect(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                     const std::int32_t stateId, const OnReshaped& onReshaped) {
+    WorldState& world = context.world;
+    const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
+    const std::optional<std::int32_t> standing = world.blockState(x, y, z);
+    // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`.
+    const std::vector<redstoneWire::Step> steps = standing == stateId
+                                                      ? redstoneWire::acrossSteps(world, x, y, z)
+                                                      : redstoneWire::acrossSteps(world, x, y, z, stateId);
+    for (const redstoneWire::Step& at : steps) {
+        if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
+                world, at.x, at.y, at.z, world.blockState(at.x, at.y, at.z).value_or(0), at.towards);
+            drawn.has_value()) {
+            reshaped(drawn.value(), at.x, at.y, at.z);
+        }
+    }
+}
+
+void neighbourChanged(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                      const std::optional<std::int32_t> source, std::vector<BlockChange>& effects,
+                      const OnBroken& onBroken, const OnReshaped& onReshaped) {
+    WorldState& world = context.world;
+    const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
+    const OnBroken broken = onBroken ? onBroken : OnBroken{noop};
+    const std::optional<std::int32_t> standing = world.blockState(x, y, z);
+    if (!standing.has_value()) {
+        return;
+    }
+    // parity: `Level.removeBlock` writes with flag three.
+    if (dropUnsupportedComponent(context, x, y, z, broken).has_value()) {
+        Context gone = context;
+        gone.phases = phase::kDeparture | phase::kShapes | phase::kNeighbours;
+        afterChange(gone, x, y, z, standing, effects, broken, reshaped, ArrivedShape::NotPlaced);
+        return;
+    }
+    for (const BlockChange& change : redstoneReactors::reactAt(world, context.worldName, x, y, z, context.gameTime,
+                                                               context.random, context.tntExplodes, source)) {
+        reshaped(change.stateId, change.x, change.y, change.z);
+        // parity: a reactor answers a neighbour with `level.setBlock(pos, state, 2)`.
+        reshapeOnly(context, change.x, change.y, change.z, broken, reshaped);
+        if (!change.effects.empty()) {
+            effects.push_back(change);
+        }
+        redstoneComponents::watchFor(world, change.x, change.y, change.z);
+        Context tell = context;
+        tell.phases = phase::kNeighbours;
+        afterChange(tell, change.x, change.y, change.z, std::nullopt, effects, broken, reshaped,
+                    ArrivedShape::NotPlaced);
+    }
+    const pistons::Context piston{.world = world,
+                                  .worldName = context.worldName,
+                                  .minY = context.minY,
+                                  .maxY = context.maxY,
+                                  .random = context.random};
+    const auto armed = [&reshaped](const std::optional<BlockChange>& change) {
+        if (change.has_value()) {
+            reshaped(change->stateId, change->x, change->y, change->z);
+        }
+    };
+    if (source.has_value()) {
+        if (const std::optional<std::int32_t> bent =
+                rails::onNeighbourChange(world, context.worldName, x, y, z, *source);
+            bent.has_value()) {
+            reshaped(*bent, x, y, z);
+        }
+    }
+    armed(context.dispenser ? context.dispenser(world, x, y, z)
+                            : dispensers::onNeighbourChange(world, context.worldName, x, y, z));
+    armed(crafters::onNeighbourChange(world, context.worldName, x, y, z));
+    pistons::trigger(piston, x, y, z);
+    sponges::absorb(world, x, y, z, reshaped);
+    // parity: `FrostedIceBlock.neighborChanged`, which only listens to other frosted ice.
+    const wire::common::Identifier* told =
+        source.has_value() ? registry::blockStateDefinitions::blockOf(*source) : nullptr;
+    if (told != nullptr && told->path() == "frosted_ice") {
+        if (const std::optional<BlockChange> melted = scheduledBlocks::frostedIceHeard(world, x, y, z);
+            melted.has_value()) {
+            reshaped(melted->stateId, melted->x, melted->y, melted->z);
+            std::vector<BlockChange> chained;
+            scheduledBlocks::frostedIceChain(world, x, y, z, chained);
+            for (const BlockChange& gone : chained) {
+                reshaped(gone.stateId, gone.x, gone.y, gone.z);
+            }
+        }
+    }
+}
+
 void reshapeOnly(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                  const OnBroken& onBroken, const OnReshaped& onReshaped) {
     WorldState& world = context.world;
@@ -691,7 +778,8 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     WorldState& world = context.world;
     const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
     const OnBroken broken = onBroken ? onBroken : OnBroken{noop};
-    if (buildGolem(context, x, y, z, effects, broken, reshaped)) {
+    const auto runs = [&context](const std::uint32_t phase) { return (context.phases & phase) != 0; };
+    if (runs(phase::kPlace) && buildGolem(context, x, y, z, effects, broken, reshaped)) {
         return;
     }
     const blockSurvival::ScaffoldingHasFallen scaffolding = [&world](const WorldState&, std::int32_t sx,
@@ -702,7 +790,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: `RedStoneWireBlock.onPlace` tells the blocks over and under it.
     bool wireArrived = false;
     if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
-        arrived.has_value() && redstoneWire::isWire(*arrived) &&
+        runs(phase::kPlace) && arrived.has_value() && redstoneWire::isWire(*arrived) &&
         !(removed.has_value() && redstoneWire::isWire(*removed))) {
         wireArrived = true;
         // parity: `onPlace` settles this dust's own strength before it tells anybody.
@@ -716,7 +804,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*arrived);
         const std::string_view path = block == nullptr ? std::string_view{} : block->path();
         // parity: `PotentSulfurBlock.onPlace` raises `BLOCK_ACTIVATE` for a geyser that arrives.
-        if (path == "potent_sulfur") {
+        if (runs(phase::kPlace) && path == "potent_sulfur") {
             const std::map<std::string, std::string> properties =
                 registry::blockStateDefinitions::propertiesOf(*arrived);
             const auto state = properties.find("potent_sulfur_state");
@@ -726,7 +814,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             }
         }
         // parity: `ShelfBlock.affectNeighborsAfterRemoval`.
-        if (removed.has_value()) {
+        if (runs(phase::kDeparture) && removed.has_value()) {
             std::vector<BlockChange> parted;
             shelves::leftBehind(world, x, y, z, *removed, parted);
             for (const BlockChange& change : parted) {
@@ -743,7 +831,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             }
         }
         // parity: `ShelfBlock.onPlace`, which joins the chain for a shelf that arrives already.
-        if (shelves::isShelf(path)) {
+        if (runs(phase::kPlace) && shelves::isShelf(path)) {
             std::vector<BlockChange> joined;
             shelves::arrived(world, x, y, z, removed.has_value() && wasConnectedShelf(*removed), joined);
             for (const BlockChange& change : joined) {
@@ -752,15 +840,19 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     }
     // parity: `LiquidBlock.onPlace` books inside the write.
-    if (context.arrivedFluid) {
+    if (runs(phase::kTicks) && context.arrivedFluid) {
         context.arrivedFluid(x, y, z);
     }
-    settleArrivedSignal(context, x, y, z, removed, reshaped);
+    if (runs(phase::kPlace)) {
+        settleArrivedSignal(context, x, y, z, removed, reshaped);
+    }
     // parity: `ScaffoldingBlock.onPlace` really is an `onPlace`.
-    scheduledBlocks::scheduleScaffolding(world, x, y, z);
+    if (runs(phase::kTicks)) {
+        scheduledBlocks::scheduleScaffolding(world, x, y, z);
+    }
 
     // parity: `Level.setBlock` runs `updateIndirectNeighbourShapes` on the state that **left** as.
-    if (removed.has_value()) {
+    if (runs(phase::kShapes) && removed.has_value()) {
         for (const redstoneWire::Step& at : redstoneWire::acrossSteps(world, x, y, z, *removed)) {
             if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
                     world, at.x, at.y, at.z, world.blockState(at.x, at.y, at.z).value_or(0), at.towards);
@@ -770,7 +862,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     }
     // `updateShape`. parity: `CreakingHeartBlock` has no `onPlace`, only `updateShape`, so its turn
-    if (arrivedShape != ArrivedShape::NotPlaced) {
+    if (runs(phase::kShapes) && arrivedShape != ArrivedShape::NotPlaced) {
         // parity: `BlockInput.place` settles the pre-shape **before** the write.
         if (arrivedShape == ArrivedShape::Reshape) {
             if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
@@ -783,31 +875,38 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         // parity: `ObserverBlock.updateShape` on the observer itself.
         redstoneComponents::watchOnPlace(world, x, y, z);
     }
-    // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`.
-    for (const redstoneWire::Step& at : redstoneWire::acrossSteps(world, x, y, z)) {
-        if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
-                world, at.x, at.y, at.z, world.blockState(at.x, at.y, at.z).value_or(0), at.towards);
-            drawn.has_value()) {
-            reshaped(drawn.value(), at.x, at.y, at.z);
+    if (runs(phase::kShapes)) {
+        for (const redstoneWire::Step& at : redstoneWire::acrossSteps(world, x, y, z)) {
+            if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
+                    world, at.x, at.y, at.z, world.blockState(at.x, at.y, at.z).value_or(0), at.towards);
+                drawn.has_value()) {
+                reshaped(drawn.value(), at.x, at.y, at.z);
+            }
         }
     }
     // parity: `FallingBlock.onPlace` and its `updateShape`.
-    fallingBlocks::scheduleIfFalling(world, x, y, z, fallingBlocks::Asked::onPlace);
-    fallingBlocks::scheduleIfFalling(world, x, y + 1, z, fallingBlocks::Asked::updateShape);
-    // parity: `SnifferEggBlock.onPlace`.
-    scheduledBlocks::scheduleHatch(world, x, y, z, context.random.nextLong());
-    // parity: `FrostedIceBlock.onPlace`.
-    scheduledBlocks::scheduleFrostedIce(world, x, y, z, context.random);
-    // parity: `FireBlock.onPlace`.
-    if (const std::optional<std::int32_t> lit = world.blockState(x, y, z); lit.has_value() && fires::isFire(*lit)) {
-        fires::schedule(world, x, y, z, context.random);
+    if (runs(phase::kTicks)) {
+        fallingBlocks::scheduleIfFalling(world, x, y, z, fallingBlocks::Asked::onPlace);
+    }
+    if (runs(phase::kShapes)) {
+        fallingBlocks::scheduleIfFalling(world, x, y + 1, z, fallingBlocks::Asked::updateShape);
+    }
+    if (runs(phase::kTicks)) {
+        // parity: `SnifferEggBlock.onPlace`.
+        scheduledBlocks::scheduleHatch(world, x, y, z, context.random.nextLong());
+        // parity: `FrostedIceBlock.onPlace`.
+        scheduledBlocks::scheduleFrostedIce(world, x, y, z, context.random);
+        // parity: `FireBlock.onPlace`.
+        if (const std::optional<std::int32_t> lit = world.blockState(x, y, z); lit.has_value() && fires::isFire(*lit)) {
+            fires::schedule(world, x, y, z, context.random);
+        }
     }
     // parity: the neighbour update every redstone component listens to: the dust settles at once and.
     const Walk walk{.context = context, .scaffolding = scaffolding, .onReshaped = reshaped, .onBroken = broken};
     std::deque<Position> pending;
     pending.push_back({x, y, z});
     std::int32_t examined = 0;
-    while (!pending.empty() && examined < context.maxChainedUpdates) {
+    while (runs(phase::kShapes) && !pending.empty() && examined < context.maxChainedUpdates) {
         const Position at = pending.front();
         pending.pop_front();
         ++examined;
@@ -819,18 +918,22 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     }
     // parity: this is the tail of an ordinary write, `updateNeighboursOnBlockSet`.
     const std::vector<BlockChange> settled =
-        redstone::settle(world, context.worldName, x, y, z, {}, redstone::Asked::NeighboursOnly);
+        runs(phase::kNeighbours)
+            ? redstone::settle(world, context.worldName, x, y, z, {}, redstone::Asked::NeighboursOnly)
+            : std::vector<BlockChange>{};
     for (const BlockChange& change : settled) {
         reshaped(change.stateId, change.x, change.y, change.z);
     }
     const redstoneComponents::ContainerSignalAt reading = comparatorReading::of(world);
-    redstoneComponents::scheduleAround(world, context.worldName, x, y, z, true, reading);
+    if (runs(phase::kNeighbours)) {
+        redstoneComponents::scheduleAround(world, context.worldName, x, y, z, true, reading);
+    }
     // parity: `Level.setBlock` follows the neighbour updates with `updateNeighbourForOutputSignal`.
-    if (comparatorReading::exists(world, x, y, z)) {
+    if (runs(phase::kNeighbours) && comparatorReading::exists(world, x, y, z)) {
         redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
     }
     // parity: `Containers.updateNeighboursAfterDestroy`.
-    if (removed.has_value() && redstoneComponents::tellsComparatorsOnRemoval(*removed)) {
+    if (runs(phase::kDeparture) && removed.has_value() && redstoneComponents::tellsComparatorsOnRemoval(*removed)) {
         const std::optional<std::int32_t> nowHere = world.blockState(x, y, z);
         if (!nowHere.has_value() || !sameBlock(*removed, *nowHere)) {
             redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
@@ -841,7 +944,9 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         redstoneComponents::scheduleAroundWire(world, context.worldName, change.x, change.y, change.z, reading);
     }
     // parity: `ObserverBlock.updateShape`.
-    redstoneComponents::watchFor(world, x, y, z);
+    if (runs(phase::kNeighbours) || runs(phase::kShapes)) {
+        redstoneComponents::watchFor(world, x, y, z);
+    }
     for (const BlockChange& change : settled) {
         redstoneComponents::watchFor(world, change.x, change.y, change.z);
     }
@@ -871,11 +976,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     };
     // parity: the square that changed tells with the block that **left** on the world's road and with.
-    reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z), 0, false});
+    if (runs(phase::kNeighbours)) {
+        reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z), 0, false});
+    }
     // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from.
     const std::optional<std::int32_t> standing = world.blockState(x, y, z);
     std::vector<std::pair<redstoneComponents::Reach, std::int32_t>> reach;
-    if (standing.has_value() && !isObserverState(*standing)) {
+    if (runs(phase::kPlace) && standing.has_value() && !isObserverState(*standing)) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*standing, x, y, z)) {
             reach.emplace_back(at, *standing);
         }
@@ -884,9 +991,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     const bool changedBlock = !standing.has_value() || !removed.has_value() || !sameBlock(*removed, *standing);
     const bool railArrived = standing.has_value() && rails::isRail(*standing);
     // parity: `affectNeighborsAfterRemoval` for a dust.
-    const bool wireLeft = changedBlock && removed.has_value() && redstoneWire::isWire(*removed);
+    const bool wireLeft =
+        runs(phase::kDeparture) && changedBlock && removed.has_value() && redstoneWire::isWire(*removed);
     // parity: and this is the one line the two roads do not share: `LevelChunk.setBlockState` lets a.
-    if (removed.has_value() && (changedBlock || (railArrived && context.railArrivalTells))) {
+    if (runs(phase::kDeparture) && removed.has_value() && (changedBlock || (railArrived && context.railArrivalTells))) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*removed, x, y, z)) {
             reach.emplace_back(at, *removed);
         }
@@ -964,8 +1072,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     }
     // parity: `onPlace`.
-    for (const BlockChange& change : redstoneReactors::placed(world, context.worldName, x, y, z, context.gameTime,
-                                                              context.random, context.tntExplodes, removed)) {
+    for (const BlockChange& change : runs(phase::kPlace)
+                                         ? redstoneReactors::placed(world, context.worldName, x, y, z, context.gameTime,
+                                                                    context.random, context.tntExplodes, removed)
+                                         : std::vector<BlockChange>{}) {
         reshaped(change.stateId, change.x, change.y, change.z);
         if (!change.effects.empty()) {
             effects.push_back(change);
@@ -1124,19 +1234,23 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             }
         };
     // parity: the two roads hand along different blocks. `Level.setBlock` tells with.
-    tellAround(x, y, z, std::nullopt, std::nullopt, context.railArrivalTells ? removed : std::nullopt);
+    if (runs(phase::kNeighbours)) {
+        tellAround(x, y, z, std::nullopt, std::nullopt, context.railArrivalTells ? removed : std::nullopt);
+    }
     // parity: the reach above is an `updateNeighborsAt` like any other.
     for (const auto& [at, from] : reach) {
         tellAround(at.x, at.y, at.z, at.skip, from);
     }
-    if (const std::optional<BlockChange> armed = arm(x, y, z); armed.has_value()) {
-        reshaped(armed->stateId, armed->x, armed->y, armed->z);
+    if (runs(phase::kPlace)) {
+        if (const std::optional<BlockChange> armed = arm(x, y, z); armed.has_value()) {
+            reshaped(armed->stateId, armed->x, armed->y, armed->z);
+        }
+        if (const std::optional<BlockChange> armed = crafters::onNeighbourChange(world, context.worldName, x, y, z);
+            armed.has_value()) {
+            reshaped(armed->stateId, armed->x, armed->y, armed->z);
+        }
+        pistons::trigger(piston, x, y, z);
     }
-    if (const std::optional<BlockChange> armed = crafters::onNeighbourChange(world, context.worldName, x, y, z);
-        armed.has_value()) {
-        reshaped(armed->stateId, armed->x, armed->y, armed->z);
-    }
-    pistons::trigger(piston, x, y, z);
     // parity: and the same for every square a dust that moved reaches, which is the dust and its six.
     for (const BlockChange& change : settled) {
         for (const std::array<std::int32_t, 3>& at : redstoneComponents::wireReach(change.x, change.y, change.z)) {
@@ -1147,11 +1261,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: `LevelChunk.setBlockState` only runs `affectNeighborsAfterRemoval` when the block.
     const bool tripwireBlockChanged = !laid.has_value() || !removed.has_value() || !sameBlock(*removed, *laid);
     // parity: `TripWireBlock.onPlace`.
-    if (tripwireBlockChanged && laid.has_value() && tripwires::isWire(*laid)) {
+    if (runs(phase::kPlace) && tripwireBlockChanged && laid.has_value() && tripwires::isWire(*laid)) {
         tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
     }
     // parity: `TripWireBlock.affectNeighborsAfterRemoval`.
-    if (tripwireBlockChanged && removed.has_value() && tripwires::isHook(*removed)) {
+    if (runs(phase::kDeparture) && tripwireBlockChanged && removed.has_value() && tripwires::isHook(*removed)) {
         const std::map<std::string, std::string> gone = registry::blockStateDefinitions::propertiesOf(*removed);
         const auto attachedAt = gone.find("attached");
         const auto poweredAt = gone.find("powered");
@@ -1161,7 +1275,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             tripwires::calculateHook(world, x, y, z, context.gameTime, effects, -1, std::nullopt, *removed);
         }
     }
-    if (tripwireBlockChanged && removed.has_value() && tripwires::isWire(*removed)) {
+    if (runs(phase::kDeparture) && tripwireBlockChanged && removed.has_value() && tripwires::isWire(*removed)) {
         if (const std::optional<std::int32_t> live =
                 registry::blockStateDefinitions::stateIdOf(tripwires::wireBlock(), {{"powered", "true"}}, *removed);
             live.has_value()) {
@@ -1169,14 +1283,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     }
     // parity: `LiquidBlock`'s three hooks.
-    if (context.wakeFluids) {
+    if (runs(phase::kTicks) && context.wakeFluids) {
         context.wakeFluids(x, y, z);
     }
     // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
-    sponges::absorb(world, x, y, z, reshaped);
-    sponges::dryIfEvaporating(world, x, y, z, reshaped, context.evaporates);
+    if (runs(phase::kPlace)) {
+        sponges::absorb(world, x, y, z, reshaped);
+        sponges::dryIfEvaporating(world, x, y, z, reshaped, context.evaporates);
+    }
     // parity: `FrogspawnBlock.onPlace`, the same idea on a longer and rougher clock.
-    scheduledBlocks::scheduleFrogspawn(world, x, y, z, context.random.nextLong());
+    if (runs(phase::kTicks)) {
+        scheduledBlocks::scheduleFrogspawn(world, x, y, z, context.random.nextLong());
+    }
 }
 
 } // namespace basalt::server::runtime::world::neighbourUpdates

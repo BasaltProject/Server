@@ -105,6 +105,16 @@ void precompute(const std::array<Chunk*, 9>& window, const bool hasSkylight) {
     }
 }
 
+bool refresh(WorldState& world, const std::int32_t chunkX, const std::int32_t chunkZ, const bool hasSkylight) {
+    std::array<Chunk*, 9> window{};
+    const bool found = world.lightWindowFor(chunkX, chunkZ, window, false);
+    if (found) {
+        precompute(window, hasSkylight);
+    }
+    world.lightDone();
+    return found;
+}
+
 std::int32_t skyLight(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool hasSkylight) {
     return level(world, x, y, z, true, hasSkylight);
 }

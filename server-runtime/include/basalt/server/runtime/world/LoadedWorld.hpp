@@ -137,6 +137,9 @@ public:
 
     [[nodiscard]] ChunkGenerationQueue& generationQueue() noexcept { return generationQueue_; }
 
+    /// Recomputes the light of the chunks (packed keys) on the light thread, then runs `done` there with how many
+    void relightAsync(std::vector<std::int64_t> keys, std::function<void(std::int32_t)> done);
+
     [[nodiscard]] const std::array<double, 3>& spawn() const noexcept { return spawn_; }
 
     [[nodiscard]] float spawnYaw() const noexcept { return spawnYaw_; }
@@ -321,6 +324,7 @@ private:
     std::condition_variable_any lightWake_;
     std::multimap<std::chrono::steady_clock::time_point, std::int64_t> lightQueue_;
     std::unordered_map<std::int64_t, std::chrono::steady_clock::time_point> lightPending_;
+    std::deque<std::pair<std::vector<std::int64_t>, std::function<void(std::int32_t)>>> lightJobs_;
     mutable std::mutex attributeMutex_;
     std::map<std::string, double, std::less<>> attributeOverrides_;
     WorldWeather weather_;

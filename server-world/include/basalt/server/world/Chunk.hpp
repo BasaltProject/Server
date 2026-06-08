@@ -125,6 +125,9 @@ public:
 
     void markLightStale();
 
+    /// Replaces one section's packed light of a layer that has been computed; the next recompute overwrites it.
+    [[nodiscard]] bool storeLightSection(bool sky, std::size_t section, std::span<const std::uint8_t> bytes);
+
     [[nodiscard]] bool lightIsStale() const;
 
     void setBlockEntity(ChunkBlockEntity blockEntity);

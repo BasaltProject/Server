@@ -1,3 +1,6 @@
+#include "WorldBlockUpdates.hpp"
+#include "WorldItemUse.hpp"
+
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -18,9 +21,11 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/world/light/Light.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -530,48 +535,101 @@ public:
 
     void releaseChunks(std::string_view token) override { world_->releaseChunks(std::string{token}); }
 
-    std::int32_t updateNeighbors(std::span<const std::int32_t> positions, std::uint32_t effects) override {
-        BlockChangeBroadcaster* blocks = hooks_.blocks ? hooks_.blocks() : nullptr;
-        const std::vector<player::PlayerSession*> watchers =
-            players_ ? players_() : std::vector<player::PlayerSession*>{};
+    std::int32_t settleBlocks(std::span<const std::int32_t> positions, std::span<const std::int32_t> previous,
+                              std::uint32_t effects) override {
+        constexpr std::uint32_t kUpdates = BlockEffects::kNeighbors | BlockEffects::kShapes | BlockEffects::kTicks |
+                                           BlockEffects::kPlace | BlockEffects::kDeparture;
         std::int32_t reached = 0;
         std::vector<std::int32_t> stale;
         for (std::size_t at = 0; at + 2 < positions.size(); at += 3) {
-            const std::int32_t x = positions[at];
-            const std::int32_t y = positions[at + 1];
-            const std::int32_t z = positions[at + 2];
-            if (!world_->state().isLoaded(x >> 4, z >> 4)) {
+        if ((effects & kUpdates) != 0) {
+            reached = blockUpdates::settle(updateTarget(), positions, previous, effects);
+        }
+            if (!world_->state().isLoaded(positions[at] >> 4, positions[at + 2] >> 4)) {
                 continue;
             }
-            ++reached;
-            if ((effects & BlockEffects::kShapes) != 0 && blocks != nullptr) {
-                blocks->reshapeAround(*world_, watchers, x, y, z);
-            }
-            if ((effects & BlockEffects::kNeighbors) != 0 && blocks != nullptr) {
-                blocks->notifyAround(*world_, watchers, x, y, z, std::nullopt);
-            }
+            reached += (effects & kUpdates) == 0 ? 1 : 0;
             if ((effects & BlockEffects::kClients) != 0) {
-                tell(x, y, z, world_->state().blockState(x, y, z).value_or(0));
+                tell(positions[at], positions[at + 1], positions[at + 2],
+                     world_->state().blockState(positions[at], positions[at + 1], positions[at + 2]).value_or(0));
             }
             if ((effects & BlockEffects::kLight) != 0) {
-                stale.push_back(x >> 4);
-                stale.push_back(z >> 4);
+                stale.push_back(positions[at] >> 4);
+                stale.push_back(positions[at + 2] >> 4);
             }
         }
         if (!stale.empty()) {
-            std::ranges::sort(stale);
-            for (std::size_t at = 0; at + 1 < stale.size(); at += 2) {
-                if (server::world::Chunk* chunk = world_->state().chunkIfLoaded(stale[at], stale[at + 1]);
-                    chunk != nullptr) {
-                    chunk->markLightStale();
-                }
-            }
+            relightChunks(stale);
         }
         return reached;
     }
 
     bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
                       std::span<const std::int32_t> states, bool notify) override {
+    std::int32_t neighborChanged(std::span<const std::int32_t> positions,
+                                 std::span<const std::int32_t> sources) override {
+        return blockUpdates::neighbourChanged(updateTarget(), positions, sources);
+    }
+
+    std::int32_t updateShapes(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
+                              bool indirect) override {
+        return blockUpdates::shapes(updateTarget(), positions, states, indirect);
+    }
+
+    std::int32_t useItemOn(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face, std::string_view item,
+                           float yaw, float pitch) override {
+        ensureChunk(x >> 4, z >> 4);
+        return itemUse::placeBlockItem(
+            updateTarget(), item, itemUse::Click{.x = x, .y = y, .z = z, .face = face, .yaw = yaw, .pitch = pitch});
+    }
+
+    bool scheduleTick(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t delay, bool fluid) override {
+        const std::optional<std::int32_t> here = world_->state().blockState(x, y, z);
+        if (!here.has_value()) {
+            return false;
+        }
+        if (!fluid) {
+            const Identifier* block = reg::blockStateDefinitions::blockOf(*here);
+            if (block == nullptr || *here == reg::blocks::air().stateId) {
+                return false;
+            }
+            world_->state().scheduleBlockTick(x, y, z, *block, delay);
+            return true;
+        }
+        const std::optional<world::FluidKind> kind = world::fluidFlow::kindOf(*here);
+        if (!kind.has_value()) {
+            return false;
+        }
+        world_->state().scheduleFluidTick(x, y, z, world::fluidId(*kind, world::isSourceFluid(*here)), delay);
+        return true;
+    }
+
+    std::int32_t applyChanges(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
+                              std::uint32_t effects) override {
+        using World = world::WorldState;
+        const World::SideEffects spill =
+            (effects & BlockEffects::kEntities) != 0 ? World::SideEffects::kRun : World::SideEffects::kSkip;
+        const World::PoiTracking poi =
+            (effects & BlockEffects::kPoi) != 0 ? World::PoiTracking::kTrack : World::PoiTracking::kSkip;
+        const std::size_t count = std::min(positions.size() / 3, states.size());
+        std::vector<std::int32_t> changed;
+        std::vector<std::int32_t> before;
+        for (std::size_t index = 0; index < count; ++index) {
+            const std::int32_t x = positions[index * 3];
+            const std::int32_t y = positions[index * 3 + 1];
+            const std::int32_t z = positions[index * 3 + 2];
+            ensureChunk(x >> 4, z >> 4);
+            const std::int32_t was = world_->state().blockState(x, y, z).value_or(-1);
+            if (was < 0 || was == states[index] || !world_->state().setBlockState(x, y, z, states[index], spill, poi)) {
+                continue;
+            }
+            changed.insert(changed.end(), {x, y, z});
+            before.push_back(was);
+        }
+        static_cast<void>(settleBlocks(changed, before, effects));
+        return static_cast<std::int32_t>(changed.size() / 3);
+    }
+
         const std::int32_t index = sectionY - chunkHeight().minSection();
         if (index < 0 || index >= chunkHeight().sectionCount() ||
             states.size() < server::world::ChunkSection::kBlocks) {
@@ -798,32 +856,87 @@ public:
         return true;
     }
 
-    void relightChunks(std::span<const std::int32_t> chunks) override {
+    void lightJob(std::span<const std::int32_t> chunks, std::function<void(std::int32_t)> done) override {
+        std::vector<std::int64_t> keys;
         for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
-            if (server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunks[at], chunks[at + 1]);
-                chunk != nullptr) {
-                chunk->markLightStale();
-            }
+            keys.push_back(world::ChunkGenerationQueue::pack(chunks[at], chunks[at + 1]));
         }
-        resendChunks(chunks);
+        world_->relightAsync(std::move(keys), [world = world_, players = players_,
+                                               pairs = std::vector<std::int32_t>(chunks.begin(), chunks.end()),
+                                               done = std::move(done)](std::int32_t relit) {
+            showChunks(*world, players, pairs);
+            done(relit);
+        });
+    }
+
+    [[nodiscard]] std::int32_t lightAt(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t layer) override {
+        if (!world_->state().isLoaded(x >> 4, z >> 4)) {
+            return -1;
+        }
+        const bool sky = layer == 1;
+        world::worldLight::refresh(world_->state(), x >> 4, z >> 4, hasSkylight());
+        return sky ? world::worldLight::skyLight(world_->state(), x, y, z, hasSkylight())
+                   : world::worldLight::blockLight(world_->state(), x, y, z);
+    }
+
+    bool readLight(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, std::int32_t layer, bool load,
+                   std::span<std::uint8_t> out) override {
+        const bool sky = layer == 1;
+        if (load) {
+            ensureChunk(chunkX, chunkZ);
+        }
+        if (out.size() < kLightBytes || (sky && !hasSkylight()) ||
+            !world::worldLight::refresh(world_->state(), chunkX, chunkZ, hasSkylight())) {
+            return false;
+        }
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        const server::world::Chunk::SharedLight cached =
+            chunk == nullptr ? nullptr : (sky ? chunk->cachedSkyLight() : chunk->cachedBlockLight());
+        const std::int32_t index = sectionY - chunkHeight().minSection();
+        if (cached == nullptr || index < 0 || static_cast<std::size_t>(index) >= cached->size()) {
+            return false;
+        }
+        const std::vector<std::uint8_t>& bytes = (*cached)[static_cast<std::size_t>(index)];
+        std::ranges::fill(out.first(kLightBytes), std::uint8_t{0});
+        std::copy_n(bytes.begin(), std::min(bytes.size(), kLightBytes), out.begin());
+        return true;
+    }
+
+    bool writeLight(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, std::int32_t layer,
+                    std::span<const std::uint8_t> nibbles) override {
+        const bool sky = layer == 1;
+        if (nibbles.size() < kLightBytes || (sky && !hasSkylight()) ||
+            !world::worldLight::refresh(world_->state(), chunkX, chunkZ, hasSkylight())) {
+            return false;
+        }
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        const std::int32_t index = sectionY - chunkHeight().minSection();
+        return chunk != nullptr && index >= 0 &&
+               chunk->storeLightSection(sky, static_cast<std::size_t>(index), nibbles.first(kLightBytes));
+    }
+
+    void checkLight(std::span<const std::int32_t> positions) override {
+        for (std::size_t at = 0; at + 2 < positions.size(); at += 3) {
+            world_->state().markLightAround(positions[at] >> 4, positions[at + 2] >> 4);
+        }
     }
 
     void resendChunks(std::span<const std::int32_t> chunks) override {
-        if (!players_) {
-            return;
-        }
-        constexpr std::int32_t kWatchRadius = 16;
-        for (const player::PlayerSession* player : players_()) {
-            if (player->worldName != world_->name() || !player->connection().resendChunk) {
+        std::vector<std::int32_t> ready;
+        std::vector<std::int32_t> unlit;
+        std::vector<std::int64_t> keys;
+        for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
+            const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunks[at], chunks[at + 1]);
+            if (chunk == nullptr) {
                 continue;
             }
-            const std::int32_t playerChunkX = static_cast<std::int32_t>(std::floor(player->x)) >> 4;
-            const std::int32_t playerChunkZ = static_cast<std::int32_t>(std::floor(player->z)) >> 4;
-            for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
-                if (std::abs(chunks[at] - playerChunkX) <= kWatchRadius &&
-                    std::abs(chunks[at + 1] - playerChunkZ) <= kWatchRadius) {
-                    player->connection().resendChunk(chunks[at], chunks[at + 1]);
-                }
+            const bool lit = chunk->cachedBlockLight() != nullptr &&
+                             (!hasSkylight() || chunk->cachedSkyLight() != nullptr) && !chunk->lightIsStale();
+            std::vector<std::int32_t>& into = lit ? ready : unlit;
+            into.push_back(chunks[at]);
+            into.push_back(chunks[at + 1]);
+            if (!lit) {
+                keys.push_back(world::ChunkGenerationQueue::pack(chunks[at], chunks[at + 1]));
             }
         }
     }
@@ -884,6 +997,11 @@ public:
     }
 
     bool loadChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate) override {
+        showChunks(*world_, players_, ready);
+        if (!unlit.empty()) {
+            world_->relightAsync(std::move(keys), [world = world_, players = players_, pairs = std::move(unlit)](
+                                                      std::int32_t) { showChunks(*world, players, pairs); });
+        }
         if (world_->state().isLoaded(chunkX, chunkZ)) {
             return true;
         }
@@ -1128,6 +1246,46 @@ std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std:
 std::int32_t LoadedWorlds::stateId(std::string_view text) const {
     return LoadedWorldRef::parseState(text).value_or(-1);
 }
+
+    static constexpr std::size_t kLightBytes = 2048;
+
+    [[nodiscard]] bool hasSkylight() const {
+        return config::dimensionFacts(world_->declaration().dimension).hasSkylight;
+    }
+
+    static void showChunks(world::LoadedWorld& world,
+                           const std::function<std::vector<player::PlayerSession*>()>& players,
+                           std::span<const std::int32_t> chunks) {
+        if (!players || chunks.empty()) {
+            return;
+        }
+        constexpr std::int32_t kWatchRadius = 16;
+        for (const player::PlayerSession* player : players()) {
+            if (player->worldName != world.name() || !player->connection().resendChunk) {
+                continue;
+            }
+            const std::int32_t playerChunkX = static_cast<std::int32_t>(std::floor(player->x)) >> 4;
+            const std::int32_t playerChunkZ = static_cast<std::int32_t>(std::floor(player->z)) >> 4;
+            for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
+                if (std::abs(chunks[at] - playerChunkX) <= kWatchRadius &&
+                    std::abs(chunks[at + 1] - playerChunkZ) <= kWatchRadius) {
+                    player->connection().resendChunk(chunks[at], chunks[at + 1]);
+                }
+            }
+        }
+    }
+
+    [[nodiscard]] blockUpdates::Target updateTarget() const {
+        std::vector<player::PlayerSession*> watchers;
+        if (players_) {
+            for (player::PlayerSession* player : players_()) {
+                if (player->worldName == world_->name()) {
+                    watchers.push_back(player);
+                }
+            }
+        }
+        return blockUpdates::Target{*world_, hooks_.blocks ? hooks_.blocks() : nullptr, std::move(watchers)};
+    }
 
 std::string LoadedWorlds::stateText(std::int32_t stateId) const {
     const Identifier* block = reg::blockStateDefinitions::blockOf(stateId);

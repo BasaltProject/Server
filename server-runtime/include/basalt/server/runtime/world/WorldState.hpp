@@ -99,11 +99,14 @@ public:
     /// The global owner, since a fresh chunk belongs to no region and a region's would take every install.
     void setInstallOwner(sched::Owner* installOwner) { installOwner_ = installOwner; }
 
-    /// The chunk and its eight neighbours, held safe from unloading until `lightDone`; false when one is missing.
+    /// The chunk and its eight neighbours, pinned until `lightDone`; every call is paired with one `lightDone`.
     [[nodiscard]] bool lightWindowFor(std::int32_t chunkX, std::int32_t chunkZ,
-                                      std::array<server::world::Chunk*, 9>& window);
+                                      std::array<server::world::Chunk*, 9>& window, bool requireAll = true);
 
     void lightDone();
+
+    /// Marks the light of a chunk and the eight around it stale and queues it to be worked out again.
+    void markLightAround(std::int32_t chunkX, std::int32_t chunkZ);
 
     [[nodiscard]] bool lightsAsynchronously() const { return static_cast<bool>(onNeighbourhoodComplete_); }
 
@@ -233,8 +236,11 @@ public:
     /// parity: `Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`.
     enum class SideEffects : std::uint8_t { kRun, kSkip };
 
+    /// Whether a write keeps the points of interest in step with the blocks.
+    enum class PoiTracking : std::uint8_t { kTrack, kSkip };
+
     bool setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
-                       SideEffects sideEffects = SideEffects::kRun);
+                       SideEffects sideEffects = SideEffects::kRun, PoiTracking poiTracking = PoiTracking::kTrack);
 
     /// Copies a section's 4096 state ids under the read lock, so any thread may call it. False when it is not loaded.
     [[nodiscard]] bool copySection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
@@ -444,7 +450,7 @@ private:
     /// parity: the counter behind `ScheduledTick.subTickOrder`.
     std::int64_t nextTickOrder_ = 0;
     std::atomic<std::int64_t> chunkVersion_{0};
-    std::atomic<bool> lightBusy_{false};
+    std::atomic<std::int32_t> lightBusy_{0};
     std::mutex graveyardMutex_;
     std::vector<std::unique_ptr<server::world::Chunk>> graveyard_;
 

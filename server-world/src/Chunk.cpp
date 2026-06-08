@@ -243,6 +243,19 @@ void Chunk::markLightStale() {
     light_->staleBlock.store(true);
 }
 
+bool Chunk::storeLightSection(bool sky, std::size_t section, std::span<const std::uint8_t> bytes) {
+    const std::lock_guard<std::mutex> guard{light_->lock};
+    std::atomic<SharedLight>& layer = sky ? light_->sky : light_->block;
+    const SharedLight held = layer.load();
+    if (held == nullptr || section >= held->size()) {
+        return false;
+    }
+    auto replaced = std::make_shared<PackedLight>(*held);
+    (*replaced)[section].assign(bytes.begin(), bytes.end());
+    layer.store(std::move(replaced));
+    return true;
+}
+
 void Chunk::invalidateLight() {
     const std::lock_guard<std::mutex> guard{light_->lock};
     light_->sky.store(nullptr);
