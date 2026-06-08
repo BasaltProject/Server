@@ -1,5 +1,10 @@
 package net.minecraft.server.level;
 
+import net.minecraft.resources.Identifier;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.server.dedicated.DedicatedServer;
+import org.basaltmc.bukkit.facade.ServerAccess;
+import org.basaltmc.bukkit.WorldNatives;
 import ca.spottedleaf.moonrise.patches.chunk_system.level.entity.EntityLookup;
 import io.papermc.paper.configuration.WorldConfiguration;
 import io.papermc.paper.world.PaperWorldLoader;
@@ -49,9 +54,20 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public boolean captureTreeGeneration = false;
     public Map capturedBlockStates;
     public boolean noSave = false;
+    private CraftWorld world;
+    private ResourceKey<Level> dimension;
+    private final RandomSource random = RandomSource.create();
+
+    public ServerLevel(CraftWorld world) {
+        this.world = world;
+        String[] strings = WorldNatives.worldStrings(world.getName());
+        this.dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(
+            strings == null || strings[0].isEmpty() ? "minecraft:overworld" : strings[0]));
+    }
     public PaperLevelOverrides serverLevelData;
     public WorldGenSettings worldGenSettings;
     public ServerLevel(MinecraftServer minecraftServer, Executor executor, LevelStorageSource.LevelStorageAccess levelStorageAccess, WorldGenSettings worldGenSettings, ResourceKey resourceKey, LevelStem levelStem, boolean flag, long value, List list, boolean flag2, ResourceKey resourceKey2, World.Environment environment, ChunkGenerator chunkGenerator, BiomeProvider biomeProvider, SavedDataStorage savedDataStorage, PaperWorldLoader.LoadedWorldData loadedWorldData) {
+        throw new UnsupportedOperationException("A temporary server level cannot be made yet");
     }
     public boolean addFreshEntity(Entity entity, CreatureSpawnEvent.SpawnReason spawnReason) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.addFreshEntity");
@@ -63,7 +79,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.destroyBlock");
     }
     public ResourceKey dimension() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.dimension");
+        return dimension;
     }
     public Holder dimensionTypeRegistration() {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.dimensionTypeRegistration");
@@ -78,10 +94,11 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getBlockEntity");
     }
     public BlockState getBlockState(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getBlockState");
+        return Block.stateById(WorldNatives.state(world.getName(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), true));
     }
     public BlockState getBlockStateIfLoaded(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getBlockStateIfLoaded");
+        int id = WorldNatives.state(world.getName(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), false);
+        return id < 0 ? null : Block.stateById(id);
     }
     public LevelChunk getChunk(int value, int value2) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunk");
@@ -102,7 +119,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getChunkSource");
     }
     public CraftServer getCraftServer() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getCraftServer");
+        return (CraftServer) org.bukkit.Bukkit.getServer();
     }
     public DifficultyInstance getCurrentDifficultyAt(BlockPos pos) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getCurrentDifficultyAt");
@@ -114,46 +131,47 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getEntities");
     }
     public FluidState getFluidIfLoaded(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getFluidIfLoaded");
+        BlockState state = getBlockStateIfLoaded(blockPos);
+        return state == null ? null : state.getFluidState();
     }
     public int getHeight() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getHeight");
+        return world.getMaxHeight() - world.getMinHeight();
     }
     public ServerLevel getLevel() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getLevel");
+        return this;
     }
     public LevelLightEngine getLightEngine() {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getLightEngine");
     }
     public int getMaxY() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getMaxY");
+        return world.getMaxHeight() - 1;
     }
     public int getMinY() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getMinY");
+        return world.getMinHeight();
     }
     public ServerLevel getMinecraftWorld() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getMinecraftWorld");
+        return this;
     }
     public RandomSource getRandom() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getRandom");
+        return random;
     }
     public int getRawBrightness(BlockPos blockPos, int value) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getRawBrightness");
     }
     public int getSeaLevel() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getSeaLevel");
+        return 63;
     }
     public int getSectionIndex(int value) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getSectionIndex");
+        return (value >> 4) - (getMinY() >> 4);
     }
     public int getSectionsCount() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getSectionsCount");
+        return getHeight() >> 4;
     }
     public long getSeed() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getSeed");
+        return world.getSeed();
     }
     public MinecraftServer getServer() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getServer");
+        return DedicatedServer.instance();
     }
     public StructureTemplateManager getStructureTemplateManager() {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getStructureTemplateManager");
@@ -162,19 +180,19 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getUncachedNoiseBiome");
     }
     public CraftWorld getWorld() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getWorld");
+        return world;
     }
     public WorldBorder getWorldBorder() {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getWorldBorder");
     }
     public boolean isDebug() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.isDebug");
+        return false;
     }
     public boolean isInsideBuildHeight(int value) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.isInsideBuildHeight");
+        return value >= getMinY() && value <= getMaxY();
     }
     public boolean isOutsideBuildHeight(int value) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.isOutsideBuildHeight");
+        return value < getMinY() || value > getMaxY();
     }
     public boolean isOutsideBuildHeight(BlockPos blockPos) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.isOutsideBuildHeight");
@@ -192,7 +210,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.players");
     }
     public RegistryAccess registryAccess() {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.registryAccess");
+        return ServerAccess.registries();
     }
     public boolean removeBlock(BlockPos blockPos, boolean flag) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.removeBlock");

@@ -1,9 +1,7 @@
 package net.minecraft.core;
 
-import java.util.stream.Stream;
-import org.basaltmc.bukkit.Unsupported;
-public interface WritableRegistry<T> extends Registry {
-    public default Stream stream() {
-        throw Unsupported.hit("net.minecraft.core.WritableRegistry.stream");
-    }
+import net.minecraft.resources.ResourceKey;
+
+public interface WritableRegistry<T> extends Registry<T> {
+    Holder.Reference<T> register(ResourceKey<T> key, T value);
 }

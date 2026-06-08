@@ -1,3 +1,3 @@
 package net.minecraft.core;
-public interface HolderOwner<T> {
-}
+
+public interface HolderOwner<T> {}

@@ -1,14 +1,25 @@
 package net.minecraft.core;
 
 import net.minecraft.world.level.ChunkPos;
-import org.basaltmc.bukkit.Unsupported;
+
 public class SectionPos extends Vec3i {
-    protected SectionPos() {
+    protected SectionPos(int x, int y, int z) {
+        super(x, y, z);
     }
-    public static int blockToSectionCoord(int blockCoord) {
-        throw Unsupported.hit("net.minecraft.core.SectionPos.blockToSectionCoord");
+
+    public static SectionPos of(int x, int y, int z) {
+        return new SectionPos(x, y, z);
     }
+
     public static SectionPos of(ChunkPos pos, int sectionY) {
-        throw Unsupported.hit("net.minecraft.core.SectionPos.of");
+        return new SectionPos(pos.x(), sectionY, pos.z());
+    }
+
+    public static int blockToSectionCoord(int blockCoord) {
+        return blockCoord >> 4;
+    }
+
+    public static int sectionToBlockCoord(int sectionCoord) {
+        return sectionCoord << 4;
     }
 }

@@ -2,20 +2,46 @@ package net.minecraft.world.level.block.state.properties;
 
 import java.util.List;
 import java.util.Optional;
-import org.basaltmc.bukkit.Unsupported;
-public class EnumProperty<T> extends Property {
-    protected EnumProperty() {
+import net.minecraft.util.StringRepresentable;
+import org.basaltmc.bukkit.facade.PropertyPool;
+
+public final class EnumProperty<T extends Comparable<T> & StringRepresentable> extends Property<T> {
+    private final List<T> values;
+
+    public EnumProperty(String name, Class<T> clazz, List<T> values) {
+        super(name, clazz);
+        this.values = values;
     }
-    public String getName() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.properties.EnumProperty.getName");
+
+    @SafeVarargs
+    public static <T extends Comparable<T> & StringRepresentable> EnumProperty<T> create(String name, Class<T> clazz,
+            T... values) {
+        List<T> list = List.of(values);
+        return PropertyPool.intern("enum:" + name + ":" + list, () -> new EnumProperty<>(name, clazz, list));
     }
-    public List getPossibleValues() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.properties.EnumProperty.getPossibleValues");
+
+    @Override
+    public List<T> getPossibleValues() {
+        return values;
     }
-    public Optional getValue(String name) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.properties.EnumProperty.getValue");
+
+    @Override
+    public String getName(T value) {
+        return value.getSerializedName();
     }
-    public Class getValueClass() {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.properties.EnumProperty.getValueClass");
+
+    @Override
+    public Optional<T> getValue(String name) {
+        return values.stream().filter(value -> value.getSerializedName().equals(name)).findFirst();
+    }
+
+    @Override
+    public int getInternalIndex(T value) {
+        return values.indexOf(value);
+    }
+
+    @Override
+    public Class<T> getValueClass() {
+        return super.getValueClass();
     }
 }

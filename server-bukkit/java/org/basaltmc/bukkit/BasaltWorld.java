@@ -25,7 +25,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
 
-public final class BasaltWorld extends WorldBase {
+public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
     private static final int kSeed = 0;
     private static final int kMinY = 1;
     private static final int kHeight = 2;

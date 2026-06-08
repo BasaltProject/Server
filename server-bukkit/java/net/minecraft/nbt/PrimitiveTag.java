@@ -1,3 +1,3 @@
 package net.minecraft.nbt;
-public interface PrimitiveTag extends Tag {
-}
+
+public interface PrimitiveTag extends Tag {}

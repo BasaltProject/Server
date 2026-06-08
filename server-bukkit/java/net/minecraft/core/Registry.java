@@ -3,45 +3,67 @@ package net.minecraft.core;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagKey;
-import org.basaltmc.bukkit.Unsupported;
-public interface Registry<T> extends IdMap, HolderLookup.RegistryLookup {
-    public default IdMap asHolderIdMap() {
-        throw Unsupported.hit("net.minecraft.core.Registry.asHolderIdMap");
+
+public interface Registry<T> extends IdMap<T>, HolderLookup.RegistryLookup<T> {
+    @Override
+    ResourceKey<? extends Registry<T>> key();
+
+    Identifier getKey(T value);
+
+    Optional<ResourceKey<T>> getResourceKey(T value);
+
+    T getValue(ResourceKey<T> key);
+
+    T getValue(Identifier id);
+
+    default T getValueOrThrow(ResourceKey<T> key) {
+        T value = getValue(key);
+        if (value == null) {
+            throw new IllegalStateException("Missing key in " + key() + ": " + key);
+        }
+        return value;
     }
-    public default Optional get(Identifier id) {
-        throw Unsupported.hit("net.minecraft.core.Registry.get");
+
+    default Optional<T> getOptional(Identifier id) {
+        return Optional.ofNullable(getValue(id));
     }
-    public default Optional get(TagKey id) {
-        throw Unsupported.hit("net.minecraft.core.Registry.get");
+
+    default Optional<T> getOptional(ResourceKey<T> key) {
+        return Optional.ofNullable(getValue(key));
     }
-    public default int getId(Object thing) {
-        throw Unsupported.hit("net.minecraft.core.Registry.getId");
+
+    Optional<Holder.Reference<T>> get(Identifier id);
+
+    @Override
+    Optional<Holder.Reference<T>> get(ResourceKey<T> key);
+
+    Optional<Holder.Reference<T>> get(int id);
+
+    @Override
+    default Holder.Reference<T> getOrThrow(ResourceKey<T> key) {
+        return get(key).orElseThrow(() -> new IllegalStateException("Missing key in " + key() + ": " + key));
     }
-    public default Identifier getKey(Object thing) {
-        throw Unsupported.hit("net.minecraft.core.Registry.getKey");
-    }
-    public default Optional getOptional(Identifier key) {
-        throw Unsupported.hit("net.minecraft.core.Registry.getOptional");
-    }
-    public default Holder.Reference getOrThrow(ResourceKey resourceKey) {
-        throw Unsupported.hit("net.minecraft.core.Registry.getOrThrow");
-    }
-    public default Stream getTags() {
-        throw Unsupported.hit("net.minecraft.core.Registry.getTags");
-    }
-    public default Object getValue(Identifier key) {
-        throw Unsupported.hit("net.minecraft.core.Registry.getValue");
-    }
-    public default Object getValueOrThrow(ResourceKey key) {
-        throw Unsupported.hit("net.minecraft.core.Registry.getValueOrThrow");
-    }
-    public default Set keySet() {
-        throw Unsupported.hit("net.minecraft.core.Registry.keySet");
-    }
-    public default Holder wrapAsHolder(Object value) {
-        throw Unsupported.hit("net.minecraft.core.Registry.wrapAsHolder");
+
+    Set<Identifier> keySet();
+
+    Set<ResourceKey<T>> registryKeySet();
+
+    Holder<T> wrapAsHolder(T value);
+
+    IdMap<Holder<T>> asHolderIdMap();
+
+    @Override
+    Optional<HolderSet.Named<T>> get(TagKey<T> tag);
+
+    Stream<HolderSet.Named<T>> getTags();
+
+    boolean containsKey(Identifier id);
+
+    default Stream<T> stream() {
+        return StreamSupport.stream(spliterator(), false);
     }
 }

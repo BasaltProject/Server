@@ -7,13 +7,16 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import org.basaltmc.bukkit.Unsupported;
 public class EntityType<T> implements EntityTypeTest, FeatureElement {
-    protected EntityType() {
+    private final Identifier key;
+
+    public EntityType(Identifier key) {
+        this.key = key;
     }
     public Entity create(Level level, EntitySpawnReason reason) {
         throw Unsupported.hit("net.minecraft.world.entity.EntityType.create");
     }
     public static Identifier getKey(EntityType type) {
-        throw Unsupported.hit("net.minecraft.world.entity.EntityType.getKey");
+        return type.key;
     }
     public static Entity loadEntityRecursive(EntityType type, CompoundTag tag, Level level, EntitySpawnReason reason, EntityProcessor postLoad) {
         throw Unsupported.hit("net.minecraft.world.entity.EntityType.loadEntityRecursive");

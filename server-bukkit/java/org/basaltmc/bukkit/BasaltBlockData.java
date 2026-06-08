@@ -29,8 +29,11 @@ public final class BasaltBlockData implements InvocationHandler {
         this.state = state;
     }
 
-    /** The BlockData for a state id, as the most specific interface its material names. */
     public static BlockData of(int state) {
+        return org.bukkit.craftbukkit.block.data.CraftBlockData.wrap(proxy(state));
+    }
+
+    private static BlockData proxy(int state) {
         Material material = Registries.materialOfState(state);
         Class<?> specific = material.data;
         Class<?> face = BlockData.class.isAssignableFrom(specific) ? specific : BlockData.class;
@@ -53,11 +56,22 @@ public final class BasaltBlockData implements InvocationHandler {
         new java.util.concurrent.ConcurrentHashMap<>();
 
     public static int stateOf(BlockData data) {
-        if (data != null && Proxy.isProxyClass(data.getClass())
-            && Proxy.getInvocationHandler(data) instanceof BasaltBlockData own) {
-            return own.state;
+        BasaltBlockData handler = handler(data);
+        if (handler != null) {
+            return handler.state;
         }
         throw new IllegalArgumentException("Not block data made by this server: " + data);
+    }
+
+    private static BasaltBlockData handler(BlockData data) {
+        if (data instanceof org.bukkit.craftbukkit.block.data.CraftBlockData wrapped) {
+            return handler(wrapped.inner0());
+        }
+        if (data != null && Proxy.isProxyClass(data.getClass())
+            && Proxy.getInvocationHandler(data) instanceof BasaltBlockData own) {
+            return own;
+        }
+        return null;
     }
 
     public static BlockData parse(String text) {
@@ -130,9 +144,10 @@ public final class BasaltBlockData implements InvocationHandler {
         String name = method.getName();
         int count = args == null ? 0 : args.length;
         switch (name) {
-            case "equals":
-                return args[0] != null && Proxy.isProxyClass(args[0].getClass())
-                    && Proxy.getInvocationHandler(args[0]) instanceof BasaltBlockData other && other.state == state;
+            case "equals": {
+                BasaltBlockData other = args[0] instanceof BlockData data ? handler(data) : null;
+                return other != null && other.state == state;
+            }
             case "hashCode":
                 return state;
             case "toString":
@@ -334,8 +349,8 @@ public final class BasaltBlockData implements InvocationHandler {
     }
 
     private BlockData merge(BlockData other) {
-        BasaltBlockData data = (BasaltBlockData) Proxy.getInvocationHandler(other);
-        if (data.block() != block()) {
+        BasaltBlockData data = handler(other);
+        if (data == null || data.block() != block()) {
             throw new IllegalArgumentException("Cannot merge " + other.getMaterial() + " into "
                 + Registries.materialOfState(state));
         }
@@ -343,12 +358,13 @@ public final class BasaltBlockData implements InvocationHandler {
     }
 
     private boolean matches(BlockData other) {
-        return other != null && Proxy.isProxyClass(other.getClass()) && stateOf(other) == state;
+        BasaltBlockData data = handler(other);
+        return data != null && data.state == state;
     }
 
     private void copyInto(BlockData target) {
-        BasaltBlockData data = (BasaltBlockData) Proxy.getInvocationHandler(target);
-        if (data.block() == block()) {
+        BasaltBlockData data = handler(target);
+        if (data != null && data.block() == block()) {
             data.state = state;
         }
     }

@@ -7,11 +7,21 @@ import net.minecraft.world.level.chunk.ChunkSource;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.storage.SavedDataStorage;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.util.thread.BlockableEventLoop;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.basaltmc.bukkit.Unsupported;
 public class ServerChunkCache extends ChunkSource {
     protected ServerChunkCache() {
     }
     public ChunkMap chunkMap;
+    public BlockableEventLoop<Runnable> mainThreadProcessor;
+
+    public CompletableFuture<ChunkResult<ChunkAccess>> getChunkFutureMainThread(int x, int z, ChunkStatus status,
+            boolean load) {
+        throw Unsupported.hit("net.minecraft.server.level.ServerChunkCache.getChunkFutureMainThread");
+    }
     public void addTicketAtLevel(TicketType ticketType, ChunkPos chunkPos, int value) {
         throw Unsupported.hit("net.minecraft.server.level.ServerChunkCache.addTicketAtLevel");
     }
