@@ -2,8 +2,6 @@
 
 set(BASALT_BUILD_BUKKIT "AUTO" CACHE STRING "Bukkit layer: ON, OFF, or AUTO (built when a JDK and its jni.h are found)")
 set(BASALT_SHIM_DIR "" CACHE PATH "A prebuilt Shim folder with libjvm and classpath.jar (empty builds the shim/ submodule)")
-set(BASALT_ADDON_JARS "" CACHE STRING "Jars to compile the WorldEdit family add-ons against instead of the pinned downloads, separated by semicolons (optional)")
-option(BASALT_FETCH_ADDON_JARS "Download the pinned WorldEdit and FastAsyncWorldEdit jars (compile-only, hash-checked, never bundled)" ON)
 
 function(basalt_probe_bukkit RESULT)
     string(TOUPPER "${BASALT_BUILD_BUKKIT}" _mode)
@@ -54,13 +52,9 @@ function(basalt_bukkit_runtime)
             message(STATUS "Bukkit layer: shim/ is empty (git submodule update --init) and BASALT_SHIM_DIR is unset; no Shim in the runtime")
         endif()
     endif()
-    set(_fetch ${CMAKE_COMMAND} -E env BASALT_FETCH_ADDON_JARS=1)
-    if(NOT BASALT_FETCH_ADDON_JARS)
-        set(_fetch ${CMAKE_COMMAND} -E env BASALT_FETCH_ADDON_JARS=0)
-    endif()
     add_custom_target(basalt-bukkit-runtime ALL
-        COMMAND ${_fetch} ${CMAKE_SOURCE_DIR}/server-bukkit/scripts/build-bundle.sh ${CMAKE_BINARY_DIR}/bukkit-work ${CMAKE_BINARY_DIR}/bin/runtime
-                "${_shim}" ${BASALT_ADDON_JARS}
+        COMMAND ${CMAKE_SOURCE_DIR}/server-bukkit/scripts/build-bundle.sh ${CMAKE_BINARY_DIR}/bukkit-work ${CMAKE_BINARY_DIR}/bin/runtime
+                "${_shim}"
         ${_deps}
         COMMENT "Assembling the Bukkit runtime folder"
         VERBATIM

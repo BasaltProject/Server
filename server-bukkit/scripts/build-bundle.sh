@@ -5,7 +5,6 @@ root="$here/../.."
 work="${1:?work dir}"
 dest="${2:?runtime dir}"
 shim="${3:-}"
-jars=("${@:4}")
 
 skip() {
     echo "Bukkit runtime: skipped, $*" >&2
@@ -15,7 +14,7 @@ skip() {
 for tool in javac jar curl sha1sum; do
     command -v "$tool" >/dev/null || skip "$tool is not installed"
 done
-mkdir -p "$work" "$dest/lib" "$dest/shim" "$dest/addons"
+mkdir -p "$work" "$dest/lib" "$dest/shim"
 
 stale=1
 if [ -s "$work/basalt-bukkit.jar" ] && [ -s "$work/bukkit-api.jar" ] \
@@ -49,19 +48,6 @@ if [ -e "$work/bukkit-api.fetched" ]; then
 else
     cp -u "$work/bukkit-api.jar" "$dest/lib/"
     cp "$here/deps.txt" "$dest/libs.txt"
-fi
-
-if [ "${#jars[@]}" -eq 0 ] && [ "${BASALT_FETCH_ADDON_JARS:-1}" != 0 ]; then
-    "$here/fetch-addons.sh" "$work/addon-inputs" >"$work/fetch-addons.log" 2>&1 || true
-    grep -h "could not fetch" "$work/fetch-addons.log" >&2 || true
-    jars=("$work"/addon-inputs/*.jar)
-    [ -e "${jars[0]}" ] || jars=()
-fi
-if [ "${#jars[@]}" -gt 0 ]; then
-    rm -f "$work"/addons/*.jar
-    "$here/build-compat.sh" "$work" "${jars[@]}" >"$work/addons.log" 2>&1 \
-        && cp -u "$work"/addons/*.jar "$dest/addons/" \
-        || echo "Bukkit runtime: an add-on did not compile (see $work/addons.log)" >&2
 fi
 
 lib=libjvm.so

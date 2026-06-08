@@ -162,7 +162,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public FullChunkStatus getFullStatus() {
         return switch (WorldNatives.chunkStatus(world, locX, locZ)) {
             case 3 -> FullChunkStatus.ENTITY_TICKING;
-            case 2 -> FullChunkStatus.BLOCK_TICKING;
+            case 2 -> FullChunkStatus.FULL;
             default -> FullChunkStatus.INACCESSIBLE;
         };
     }

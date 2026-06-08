@@ -1,13 +1,12 @@
-# Bukkit and Paper plugin compatibility. Nothing here needs editing: drop a plugin .jar into `plugins/`
-# next to your Lua packages and it loads.
+# Bukkit and Paper plugin compatibility: drop a plugin .jar into `plugins/` and it loads; every key is optional.
 
-# "auto" starts Bukkit support when a Bukkit jar is present, true insists on it (a missing runtime is an error),
+# "auto" starts Bukkit support when a Bukkit jar is present, true insists on it, false never starts it.
 enabled = "auto"
 
-# Fetch the libraries the runtime is missing (Maven Central, the Paper API) into `.basalt/bukkit/lib/`,
+# Fetch missing runtime libraries into `.basalt/bukkit/lib/`, checked by SHA-1. Turn off without network.
 download = true
 
-# A folder that holds the runtime: shim/libjvm.so, shim/classpath.jar, basalt-bukkit.jar, lib/ and addons/.
+# A folder holding the runtime; empty looks in $BASALT_BUKKIT_HOME, `.basalt/bukkit/`, `runtime/`, then the binary dir.
 runtime = ""
 
 # Individual pieces, if they live somewhere else than the runtime folder.
