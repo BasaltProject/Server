@@ -61,6 +61,7 @@ public class ServerChunkCache extends ChunkSource {
             chunk.flush();
         }
         flushBlockChanges();
+        lightEngine.flush();
         if (unsent.isEmpty()) {
             return;
         }

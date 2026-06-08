@@ -2,20 +2,29 @@ package net.minecraft.world.phys;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import org.basaltmc.bukkit.Unsupported;
+
 public class BlockHitResult extends HitResult {
+    private final Vec3 location;
+    private final Direction direction;
+    private final BlockPos pos;
+    private final boolean inside;
+
     public BlockHitResult(Vec3 vec3, Direction direction, BlockPos blockPos, boolean flag) {
+        this.location = vec3;
+        this.direction = direction;
+        this.pos = blockPos;
+        this.inside = flag;
     }
     public BlockPos getBlockPos() {
-        throw Unsupported.hit("net.minecraft.world.phys.BlockHitResult.getBlockPos");
+        return pos;
     }
     public Direction getDirection() {
-        throw Unsupported.hit("net.minecraft.world.phys.BlockHitResult.getDirection");
+        return direction;
     }
     public Vec3 getLocation() {
-        throw Unsupported.hit("net.minecraft.world.phys.BlockHitResult.getLocation");
+        return location;
     }
     public boolean isInside() {
-        throw Unsupported.hit("net.minecraft.world.phys.BlockHitResult.isInside");
+        return inside;
     }
 }

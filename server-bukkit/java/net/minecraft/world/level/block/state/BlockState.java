@@ -19,6 +19,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.basaltmc.bukkit.Unsupported;
 import org.basaltmc.bukkit.WorldNatives;
+import org.basaltmc.bukkit.facade.Effects;
 import org.bukkit.craftbukkit.block.data.CraftBlockData;
 
 public class BlockState extends BlockBehaviour.BlockStateBase {
@@ -139,11 +140,11 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
     }
 
     public void onPlace(Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
-        return;
+        Effects.placed(level, pos, oldState);
     }
 
     public void handleNeighborChanged(Level level, BlockPos pos, Block neighbor, Orientation orientation, boolean movedByPiston) {
-        return;
+        Effects.neighborChanged(level, pos, neighbor == null ? null : neighbor.defaultBlockState());
     }
 
     public boolean triggerEvent(Level level, BlockPos pos, int id, int param) {
@@ -151,18 +152,16 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
     }
 
     public void updateNeighbourShapes(LevelAccessor level, BlockPos pos, int flags, int recursionLeft) {
-        if (level instanceof Level real) {
-            WorldNatives.updateNeighbors(real.getWorld().getName(), new int[] {pos.getX(), pos.getY(), pos.getZ()}, 2);
-        }
+        Effects.shapes(level, pos);
     }
 
     public void updateIndirectNeighbourShapes(LevelAccessor level, BlockPos pos, int flags, int recursionLeft) {
-        return;
+        Effects.indirectShapes(level, pos, this);
     }
 
     public InteractionResult useItemOn(ItemStack stack, Level level, Player player, InteractionHand hand,
             BlockHitResult hit) {
-        throw Unsupported.hit("net.minecraft.world.level.block.state.BlockState.useItemOn");
+        return InteractionResult.PASS;
     }
 
     @Override

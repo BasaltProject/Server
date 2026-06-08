@@ -20,6 +20,7 @@ import net.minecraft.world.level.levelgen.blending.BlendingData;
 import org.basaltmc.bukkit.WorldNatives;
 import org.basaltmc.bukkit.facade.Chunks;
 
+/** A loaded chunk seen through section objects. The sections are copies of the world's blocks; a plugin that swaps one */
 public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public Map blockEntities = new ConcurrentHashMap<BlockPos, BlockEntity>();
     public Map heightmaps = new EnumMap<Heightmap.Types, Heightmap>(Heightmap.Types.class);
@@ -62,6 +63,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         }
     }
 
+    /** Reads the world again into every section a plugin has not replaced, when the world moved since the last read. */
     private synchronized void refresh() {
         long version = WorldNatives.blockVersion(handle);
         if (version == syncedVersion) {
@@ -96,7 +98,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         syncedVersion = version;
     }
 
-    /** Only the tick thread writes; other threads leave the sections for the next tick. */
+    /** Writes every section a plugin replaced back to the world in one call. Only the tick thread writes; any other */
     public boolean flush() {
         if (sections == null) {
             return false;
@@ -223,7 +225,11 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
 
     public BlockState setBlockState(BlockPos pos, BlockState state, int flags) {
         BlockState previous = getBlockState(pos);
-        WorldNatives.setState(world, pos.getX(), pos.getY(), pos.getZ(), state.stateId(), (flags & 2) != 0);
+        if (previous.stateId() == state.stateId()) {
+            return null;
+        }
+        int applied = WorldNatives.applyChanges(world, new int[] {pos.getX(), pos.getY(), pos.getZ()},
+            new int[] {state.stateId()}, Effects.ofChunkFlags(flags));
         int index = (pos.getY() >> 4) - minSection;
         synchronized (this) {
             if (index >= 0 && index < sections.length && sections[index] == baseline[index]) {
@@ -231,7 +237,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
                 syncedVersion = -1;
             }
         }
-        return previous;
+        return applied > 0 ? previous : null;
     }
 
     @Override

@@ -5,6 +5,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.server.dedicated.DedicatedServer;
 import org.basaltmc.bukkit.facade.ServerAccess;
 import org.basaltmc.bukkit.WorldNatives;
+import org.basaltmc.bukkit.facade.Effects;
 import ca.spottedleaf.moonrise.patches.chunk_system.level.entity.EntityLookup;
 import io.papermc.paper.configuration.WorldConfiguration;
 import io.papermc.paper.world.PaperWorldLoader;
@@ -161,8 +162,10 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public RandomSource getRandom() {
         return random;
     }
-    public int getRawBrightness(BlockPos blockPos, int value) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.getRawBrightness");
+    public int getRawBrightness(BlockPos blockPos, int skyDampen) {
+        int block = Math.max(0, WorldNatives.lightAt(world.getName(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), 0));
+        int sky = Math.max(0, WorldNatives.lightAt(world.getName(), blockPos.getX(), blockPos.getY(), blockPos.getZ(), 1));
+        return Math.max(block, sky - skyDampen);
     }
     public int getSeaLevel() {
         return 63;
@@ -201,7 +204,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
         return value < getMinY() || value > getMaxY();
     }
     public boolean isOutsideBuildHeight(BlockPos blockPos) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.isOutsideBuildHeight");
+        return isOutsideBuildHeight(blockPos.getY());
     }
     public EntityLookup moonrise$getEntityLookup() {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.moonrise$getEntityLookup");
@@ -224,23 +227,48 @@ public class ServerLevel extends Level implements WorldGenLevel, ServerEntityGet
     public void removeBlockEntity(BlockPos blockPos) {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.removeBlockEntity");
     }
-    public void scheduleTick(BlockPos blockPos, Fluid fluid, int value) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.scheduleTick");
+    public void scheduleTick(BlockPos pos, Fluid fluid, int delay) {
+        WorldNatives.scheduleTick(world.getName(), pos.getX(), pos.getY(), pos.getZ(), delay, true);
+    }
+    public void scheduleTick(BlockPos pos, Block block, int delay) {
+        WorldNatives.scheduleTick(world.getName(), pos.getX(), pos.getY(), pos.getZ(), delay, false);
     }
     public void sendBlockUpdated(BlockPos blockPos, BlockState blockState, BlockState blockState2, int value) {
         getChunkSource().blockChanged(blockPos);
     }
-    public boolean setBlock(BlockPos blockPos, BlockState blockState, int value) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.setBlock");
+    public boolean setBlock(BlockPos pos, BlockState state, int flags) {
+        return setBlock(pos, state, flags, 512);
     }
-    public boolean setBlock(BlockPos blockPos, BlockState blockState, int value, int value2) {
-        throw Unsupported.hit("net.minecraft.server.level.ServerLevel.setBlock");
+    public boolean setBlock(BlockPos pos, BlockState state, int flags, int limit) {
+        if (isOutsideBuildHeight(pos.getY())) {
+            return false;
+        }
+        LevelChunk chunk = getChunk(pos.getX() >> 4, pos.getZ() >> 4);
+        BlockState old = chunk.setBlockState(pos, state, flags);
+        if (old == null) {
+            return false;
+        }
+        if (getBlockState(pos).stateId() == state.stateId()) {
+            if ((flags & 2) != 0) {
+                sendBlockUpdated(pos, old, state, flags);
+            }
+            if ((flags & 1) != 0) {
+                updateNeighborsAt(pos, old.getBlock());
+            }
+            if ((flags & 16) == 0 && limit > 0) {
+                int shapeFlags = flags & -34;
+                old.updateIndirectNeighbourShapes(this, pos, shapeFlags, limit - 1);
+                state.updateNeighbourShapes(this, pos, shapeFlags, limit - 1);
+                state.updateIndirectNeighbourShapes(this, pos, shapeFlags, limit - 1);
+            }
+        }
+        return true;
     }
     public StructureManager structureManager() {
         throw Unsupported.hit("net.minecraft.server.level.ServerLevel.structureManager");
     }
     public void updateNeighborsAt(BlockPos pos, Block sourceBlock) {
-        WorldNatives.updateNeighbors(world.getName(), new int[] {pos.getX(), pos.getY(), pos.getZ()}, 1);
+        Effects.neighborsAt(this, pos, sourceBlock.defaultBlockState());
     }
     public void updateNeighbourForOutputSignal(BlockPos blockPos, Block block) {
         return;
