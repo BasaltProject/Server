@@ -142,11 +142,36 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     });
     lightWorker_ = std::jthread{[this](const std::stop_token stop) {
         const bool skylight = config::dimensionFacts(declaration_.dimension).hasSkylight;
+        const auto recompute = [this, skylight](const std::int64_t wanted, const bool requireAll) {
+            std::array<Chunk*, 9> window{};
+            const bool found = state_.lightWindowFor(ChunkGenerationQueue::unpackX(wanted),
+                                                     ChunkGenerationQueue::unpackZ(wanted), window, requireAll);
+            if (found) {
+                if (!requireAll) {
+                    window[4]->markLightStale();
+                }
+                worldLight::precompute(window, skylight);
+            }
+            state_.lightDone();
+            return found;
+        };
+        const auto earliest = [this] {
+            auto next = std::chrono::steady_clock::time_point::max();
+            if (!lightQueue_.empty()) {
+                next = lightQueue_.begin()->first;
+            }
+            for (const auto& [key, later] : lightLater_) {
+                next = std::min(next, later.first);
+            }
+            return next;
+        };
         while (!stop.stop_requested()) {
             std::int64_t key = 0;
             {
                 std::unique_lock<std::mutex> lock{lightQueueMutex_};
-                if (!lightWake_.wait(lock, stop, [this] { return !lightQueue_.empty() || !lightJobs_.empty(); })) {
+                if (!lightWake_.wait(lock, stop, [this] {
+                        return !lightQueue_.empty() || !lightJobs_.empty() || !lightLater_.empty();
+                    })) {
                     return;
                 }
                 if (!lightJobs_.empty()) {
@@ -155,32 +180,33 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
                     lock.unlock();
                     std::int32_t relit = 0;
                     for (const std::int64_t wanted : job.first) {
-                        std::array<Chunk*, 9> window{};
-                        if (state_.lightWindowFor(ChunkGenerationQueue::unpackX(wanted),
-                                                  ChunkGenerationQueue::unpackZ(wanted), window, false)) {
-                            window[4]->markLightStale();
-                            worldLight::precompute(window, skylight);
-                            ++relit;
-                        }
-                        state_.lightDone();
+                        relit += recompute(wanted, false) ? 1 : 0;
                     }
                     job.second(relit);
                     continue;
                 }
-                const auto due = lightQueue_.begin()->first;
-                if (due > std::chrono::steady_clock::now()) {
-                    lightWake_.wait_until(lock, stop, due, [] { return false; });
+                const auto next = earliest();
+                if (next > std::chrono::steady_clock::now()) {
+                    lightWake_.wait_until(lock, stop, next, [&] { return !lightJobs_.empty() || earliest() < next; });
+                    continue;
+                }
+                if (const auto later = std::ranges::find_if(
+                        lightLater_, [next](const auto& entry) { return entry.second.first == next; });
+                    later != lightLater_.end()) {
+                    const std::int64_t wanted = later->first;
+                    auto then = std::move(later->second.second);
+                    lightLater_.erase(later);
+                    lock.unlock();
+                    if (recompute(wanted, false) && then) {
+                        then();
+                    }
                     continue;
                 }
                 key = lightQueue_.begin()->second;
                 lightQueue_.erase(lightQueue_.begin());
                 lightPending_.erase(key);
             }
-            std::array<Chunk*, 9> window{};
-            if (state_.lightWindowFor(ChunkGenerationQueue::unpackX(key), ChunkGenerationQueue::unpackZ(key), window)) {
-                worldLight::precompute(window, skylight);
-            }
-            state_.lightDone();
+            static_cast<void>(recompute(key, true));
         }
     }};
     state_.setSettlesGeneration(declaration_.type != config::WorldType::Debug);
@@ -232,6 +258,16 @@ void LoadedWorld::relightAsync(std::vector<std::int64_t> keys, std::function<voi
     {
         const std::lock_guard<std::mutex> lock{lightQueueMutex_};
         lightJobs_.emplace_back(std::move(keys), std::move(done));
+    }
+    lightWake_.notify_one();
+}
+
+void LoadedWorld::relightSoon(std::int32_t chunkX, std::int32_t chunkZ, std::chrono::milliseconds quiet,
+                              std::function<void()> then) {
+    {
+        const std::lock_guard<std::mutex> lock{lightQueueMutex_};
+        lightLater_.insert_or_assign(ChunkGenerationQueue::pack(chunkX, chunkZ),
+                                     std::pair{std::chrono::steady_clock::now() + quiet, std::move(then)});
     }
     lightWake_.notify_one();
 }

@@ -958,6 +958,14 @@ jboolean JNICALL nativeScheduleTick(JNIEnv* env, jclass, jstring name, jint x, j
                                                                                                          : JNI_FALSE;
 }
 
+jint JNICALL nativeValidState(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jint state) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return state;
+    }
+    return guarded<jint>(state, [&] { return world->validState(x, y, z, state); });
+}
+
 jint JNICALL nativeSettleBlocks(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray previous,
                                 jint effects) {
     const auto world = worldOf(env, name);
@@ -1079,6 +1087,7 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("checkLight", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeCheckLight)),
         method("useItemOn", "(Ljava/lang/String;IIIILjava/lang/String;FF)I", reinterpret_cast<void*>(&nativeUseItemOn)),
         method("scheduleTick", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeScheduleTick)),
+        method("validState", "(Ljava/lang/String;IIII)I", reinterpret_cast<void*>(&nativeValidState)),
         method("settleBlocks", "(Ljava/lang/String;[I[II)I", reinterpret_cast<void*>(&nativeSettleBlocks)),
         method("neighborChanged", "(Ljava/lang/String;[I[I)I", reinterpret_cast<void*>(&nativeNeighborChanged)),
         method("updateShapes", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeUpdateShapes)),

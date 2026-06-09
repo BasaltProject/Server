@@ -421,6 +421,49 @@ std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std:
     return rewrite(world, x, y, z, stateId, wanted);
 }
 
+std::int32_t validState(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                        const std::int32_t stateId) {
+    WorldState& world = context.world;
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return stateId;
+    }
+    std::map<std::string, std::string> wanted;
+    if (registry::blockConnections::isStairs(stateId)) {
+        // parity: `StairBlock.updateShape`.
+        const std::optional<std::string_view> shape =
+            registry::blockConnections::stairShape(stateId, stateAt(world, x, y, z - 1), stateAt(world, x, y, z + 1),
+                                                   stateAt(world, x - 1, y, z), stateAt(world, x + 1, y, z));
+        if (shape.has_value()) {
+            wanted["shape"] = std::string{*shape};
+        }
+    } else if (registry::blockConnections::isWall(stateId)) {
+        // parity: `WallBlock.updateShape`.
+        const std::optional<std::map<std::string, std::string>> sides =
+            context.wallShape
+                ? context.wallShape(stateId, stateAt(world, x, y, z - 1), stateAt(world, x, y, z + 1),
+                                    stateAt(world, x - 1, y, z), stateAt(world, x + 1, y, z),
+                                    stateAt(world, x, y + 1, z))
+                : walls::shapeOf(stateId, stateAt(world, x, y, z - 1), stateAt(world, x, y, z + 1),
+                                 stateAt(world, x - 1, y, z), stateAt(world, x + 1, y, z), stateAt(world, x, y + 1, z));
+        if (sides.has_value()) {
+            wanted = *sides;
+        }
+    } else if (registry::blockConnections::connects(stateId)) {
+        // parity: `CrossCollisionBlock.updateShape`.
+        for (const auto& [face, name] : kHorizontal) {
+            const std::int32_t neighbour =
+                stateAt(world, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
+            wanted[std::string{name}] =
+                registry::blockConnections::connectsTo(stateId, neighbour, face) ? "true" : "false";
+        }
+    }
+    if (wanted.empty()) {
+        return stateId;
+    }
+    return registry::blockStateDefinitions::stateIdOf(*block, wanted, stateId).value_or(stateId);
+}
+
 std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                                     std::optional<BlockFace> towards) {
     WorldState& world = context.world;

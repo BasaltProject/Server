@@ -137,8 +137,12 @@ public:
 
     [[nodiscard]] ChunkGenerationQueue& generationQueue() noexcept { return generationQueue_; }
 
-    /// Recomputes the light of the chunks (packed keys) on the light thread, then runs `done` there with how many
+    /// Recomputes light of chunks (packed keys) on the light thread, then runs `done` with how many were loaded.
     void relightAsync(std::vector<std::int64_t> keys, std::function<void(std::int32_t)> done);
+
+    /// Recomputes a chunk's light once quiet for `quiet`, then runs `then`; asking again defers and replaces `then`.
+    void relightSoon(std::int32_t chunkX, std::int32_t chunkZ, std::chrono::milliseconds quiet,
+                     std::function<void()> then);
 
     [[nodiscard]] const std::array<double, 3>& spawn() const noexcept { return spawn_; }
 
@@ -325,6 +329,8 @@ private:
     std::multimap<std::chrono::steady_clock::time_point, std::int64_t> lightQueue_;
     std::unordered_map<std::int64_t, std::chrono::steady_clock::time_point> lightPending_;
     std::deque<std::pair<std::vector<std::int64_t>, std::function<void(std::int32_t)>>> lightJobs_;
+    std::unordered_map<std::int64_t, std::pair<std::chrono::steady_clock::time_point, std::function<void()>>>
+        lightLater_;
     mutable std::mutex attributeMutex_;
     std::map<std::string, double, std::less<>> attributeOverrides_;
     WorldWeather weather_;

@@ -66,6 +66,7 @@ public final class WorldNatives {
     public static native int applyChanges(String world, int[] positions, int[] states, int effects);
     public static native int useItemOn(String world, int x, int y, int z, int face, String item, float yaw, float pitch);
     public static native boolean scheduleTick(String world, int x, int y, int z, int delay, boolean fluid);
+    public static native int validState(String world, int x, int y, int z, int state);
     public static native int settleBlocks(String world, int[] positions, int[] previous, int effects);
     public static native int neighborChanged(String world, int[] positions, int[] sources);
     public static native int updateShapes(String world, int[] positions, int[] states, boolean indirect);

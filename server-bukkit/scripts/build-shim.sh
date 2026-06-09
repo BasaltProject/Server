@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Builds Basalt Shim (the shim/ submodule) out of tree into <out>: libjvm.so and classpath.jar. Never fails the build.
+# Usage: build-shim.sh <shim source dir> <out dir> <wire zlib include dir>
 here="$(cd "$(dirname "$0")" && pwd)"
 src="$(realpath "${1:?shim source dir}")"
 out="$(realpath -m "${2:?out dir}")"

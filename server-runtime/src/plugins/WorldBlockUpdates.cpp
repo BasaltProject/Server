@@ -68,6 +68,11 @@ std::int32_t neighbourChanged(const Target& target, const std::span<const std::i
     return reached;
 }
 
+std::int32_t validState(const Target& target, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                        const std::int32_t stateId) {
+    return target.blocks == nullptr ? stateId : target.blocks->validState(target.world, x, y, z, stateId);
+}
+
 std::int32_t shapes(const Target& target, const std::span<const std::int32_t> positions,
                     const std::span<const std::int32_t> states, const bool indirect) {
     std::int32_t reached = 0;

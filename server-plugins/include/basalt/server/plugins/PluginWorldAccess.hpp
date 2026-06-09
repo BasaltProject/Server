@@ -520,6 +520,15 @@ public:
         return 0;
     }
 
+    /// What the state would settle to if it were put at the position (fences join, stairs turn), written nowhere.
+    [[nodiscard]] virtual std::int32_t validState(std::int32_t x, std::int32_t y, std::int32_t z,
+                                                  std::int32_t stateId) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return stateId;
+    }
+
     /// Lets blocks around each position reshape to fit it; `states` limits it to dust lines. Returns positions reached.
     virtual std::int32_t updateShapes(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
                                       bool indirect) {
@@ -673,7 +682,7 @@ public:
         return -1;
     }
 
-    /// A section's light as 2048 bytes, two levels each (index y * 256 + z * 16 + x, the low nibble first), brought up
+    /// A section's light as 2048 nibble-packed bytes (y * 256 + z * 16 + x); false when not loaded or lit yet.
     virtual bool readLight(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ, std::int32_t layer,
                            bool load, std::span<std::uint8_t> out) {
         static_cast<void>(chunkX);

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Builds the Bukkit runtime folder the server finds next to its binary.
+# Usage: build-bundle.sh <work dir> <runtime dir> [shim build dir]
+# It never fails the build: a missing JDK or network leaves a warning and a runtime the server explains at start-up.
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$here/../.."
 work="${1:?work dir}"

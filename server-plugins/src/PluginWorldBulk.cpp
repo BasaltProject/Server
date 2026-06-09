@@ -424,6 +424,13 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
                         static_cast<float>(args.isNumber(spot.next + 3) ? args.toNumber(spot.next + 3) : 0.0)));
                     return 1;
                 })
+        .method("valid_state",
+                [world](LuaArgs& args) {
+                    const Spot spot = spotAt(args, firstArgument(args));
+                    args.pushInteger(world->validState(spot.x, spot.y, spot.z,
+                                                       static_cast<std::int32_t>(args.toInteger(spot.next))));
+                    return 1;
+                })
         .method("schedule_tick",
                 [world](LuaArgs& args) {
                     const Spot spot = spotAt(args, firstArgument(args));
@@ -512,9 +519,13 @@ void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorld
         .method("light_section",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);
+                    const std::int32_t layer = layerFrom(args, base + 3);
+                    if (args.isNil(base + 5) || args.booleanOr(base + 5, true)) {
+                        static_cast<void>(world->lightAt(intAt(args, base) * 16, intAt(args, base + 1) * 16,
+                                                         intAt(args, base + 2) * 16, layer));
+                    }
                     std::vector<std::uint8_t> out(kLightSectionBytes);
-                    if (!world->readLight(intAt(args, base), intAt(args, base + 1), intAt(args, base + 2),
-                                          layerFrom(args, base + 3),
+                    if (!world->readLight(intAt(args, base), intAt(args, base + 1), intAt(args, base + 2), layer,
                                           args.isNil(base + 4) || args.booleanOr(base + 4, true), out)) {
                         args.pushNil();
                         return 1;

@@ -195,7 +195,7 @@ public class Block extends BlockBehaviour implements ItemLike {
     }
 
     public static BlockState updateFromNeighbourShapes(BlockState state, LevelAccessor level, BlockPos pos) {
-        return state;
+        return org.basaltmc.bukkit.facade.Effects.valid(level, pos, state);
     }
 
     public static boolean isShapeFullBlock(VoxelShape shape) {

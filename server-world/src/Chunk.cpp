@@ -247,10 +247,11 @@ bool Chunk::storeLightSection(bool sky, std::size_t section, std::span<const std
     const std::lock_guard<std::mutex> guard{light_->lock};
     std::atomic<SharedLight>& layer = sky ? light_->sky : light_->block;
     const SharedLight held = layer.load();
-    if (held == nullptr || section >= held->size()) {
+    if (held == nullptr || section >= sectionCount()) {
         return false;
     }
-    auto replaced = std::make_shared<PackedLight>(*held);
+    // A layer with nothing lit in it is kept as an empty list, which reads as dark everywhere.
+    auto replaced = std::make_shared<PackedLight>(held->empty() ? PackedLight(sectionCount()) : *held);
     (*replaced)[section].assign(bytes.begin(), bytes.end());
     layer.store(std::move(replaced));
     return true;

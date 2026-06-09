@@ -88,7 +88,12 @@ std::vector<SectionLight> LightSpread::centreSections() const {
         const std::int32_t sectionMinY = chunk.verticalBounds().minY() + static_cast<std::int32_t>(index) * 16;
         for (std::int32_t y = 0; y < 16; ++y) {
             const std::int32_t worldY = sectionMinY + y;
-            if (worldY < bottomY_ || worldY > topY_) {
+            if (worldY > topY_) {
+                continue;
+            }
+            // Beyond the band below nothing is lit; the band's lowest floor is more than a light's reach above it.
+            if (worldY < bottomY_) {
+                std::fill_n(values.begin() + y * 256, 256, 0);
                 continue;
             }
             for (std::int32_t z = 0; z < 16; ++z) {
