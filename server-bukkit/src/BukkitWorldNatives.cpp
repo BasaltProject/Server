@@ -648,6 +648,21 @@ jint JNICALL nativeApplyChunks(JNIEnv* env, jclass, jstring name, jintArray chun
     return changed;
 }
 
+jobjectArray JNICALL nativeBlockEntityTypes(JNIEnv* env, jclass) {
+    return stringArray(env, worlds().blockEntityTypes());
+}
+
+jint JNICALL nativeDataVersion(JNIEnv*, jclass) { return worlds().dataVersion(); }
+
+jbyteArray JNICALL nativeFixNbt(JNIEnv* env, jclass, jstring kind, jbyteArray nbt, jint fromVersion) {
+    const std::vector<std::uint8_t> data = bytes(env, nbt);
+    return byteArray(env, worlds().fixNbt(toStd(env, kind), data, fromVersion));
+}
+
+jstring JNICALL nativeFixName(JNIEnv* env, jclass, jstring kind, jstring text, jint fromVersion) {
+    return javaOrNull(env, worlds().fixName(toStd(env, kind), toStd(env, text), fromVersion));
+}
+
 jbyteArray JNICALL nativeBlockEntityNbt(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {
     const auto world = worldOf(env, name);
     if (world == nullptr) {
@@ -681,10 +696,41 @@ jbyteArray JNICALL nativeEntityNbt(JNIEnv* env, jclass, jstring name, jint id) {
         env, guarded<std::optional<std::vector<std::uint8_t>>>(std::nullopt, [&] { return world->entityNbt(id); }));
 }
 
-jint JNICALL nativeSpawnEntityNbt(JNIEnv* env, jclass, jstring name, jbyteArray nbt) {
+jint JNICALL nativeSpawnEntityNbt(JNIEnv* env, jclass, jstring name, jbyteArray nbt, jstring cause) {
     const auto world = worldOf(env, name);
     const std::vector<std::uint8_t> data = bytes(env, nbt);
-    return world == nullptr ? -1 : guarded<jint>(-1, [&] { return world->spawnEntityNbt(data); });
+    const std::string why = toStd(env, cause);
+    return world == nullptr ? -1 : guarded<jint>(-1, [&] { return world->spawnEntityNbt(data, why); });
+}
+
+jboolean JNICALL nativeCreateBlockEntity(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z, jbyteArray nbt) {
+    const auto world = worldOf(env, name);
+    const std::vector<std::uint8_t> data = bytes(env, nbt);
+    return world != nullptr && guarded<bool>(false, [&] { return world->createBlockEntity(x, y, z, data); })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+jboolean JNICALL nativeRemoveBlockEntity(JNIEnv* env, jclass, jstring name, jint x, jint y, jint z) {
+    const auto world = worldOf(env, name);
+    return world != nullptr && guarded<bool>(false, [&] { return world->removeBlockEntity(x, y, z); }) ? JNI_TRUE
+                                                                                                       : JNI_FALSE;
+}
+
+jint JNICALL nativeEntityByUuid(JNIEnv* env, jclass, jstring name, jstring uuid) {
+    const auto world = worldOf(env, name);
+    const std::string wanted = toStd(env, uuid);
+    return world == nullptr ? -1 : guarded<jint>(-1, [&] {
+        const std::shared_ptr<PluginEntityRef> found = world->entityByUuid(wanted);
+        return found == nullptr ? -1 : found->id();
+    });
+}
+
+jboolean JNICALL nativeRemoveEntityByUuid(JNIEnv* env, jclass, jstring name, jstring uuid) {
+    const auto world = worldOf(env, name);
+    const std::string wanted = toStd(env, uuid);
+    return world != nullptr && guarded<bool>(false, [&] { return world->removeEntityByUuid(wanted); }) ? JNI_TRUE
+                                                                                                       : JNI_FALSE;
 }
 
 jboolean JNICALL nativeReadBiomes(JNIEnv* env, jclass, jstring name, jint chunkX, jint chunkZ, jintArray out) {
@@ -823,52 +869,6 @@ jint JNICALL nativeUpdateNeighbors(JNIEnv* env, jclass, jstring name, jintArray 
     return guarded<jint>(0, [&] { return world->updateNeighbors(at, static_cast<std::uint32_t>(effects)); });
 }
 
-jint JNICALL nativeApplyChanges(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray states,
-                                jint effects) {
-    const auto world = worldOf(env, name);
-    if (world == nullptr) {
-        return 0;
-    }
-    const std::vector<std::int32_t> at = ints(env, positions);
-    const std::vector<std::int32_t> next = ints(env, states);
-    return guarded<jint>(0, [&] { return world->applyChanges(at, next, static_cast<std::uint32_t>(effects)); });
-}
-} // namespace
-
-void registerWorldNatives(JNIEnv* env, jclass natives) {
-    const auto method = [](const char* name, const char* signature, void* function) {
-        return JNINativeMethod{const_cast<char*>(name), const_cast<char*>(signature), function};
-    };
-    const std::array methods{
-        method("stateId", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeStateId)),
-        method("stateText", "(I)Ljava/lang/String;", reinterpret_cast<void*>(&nativeStateText)),
-        method("blockTable", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBlockTable)),
-        method("blockProperties", "(Ljava/lang/String;)[Ljava/lang/String;",
-               reinterpret_cast<void*>(&nativeBlockProperties)),
-        method("stateFlags", "(I)I", reinterpret_cast<void*>(&nativeStateFlags)),
-        method("blockHardness", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativeBlockHardness)),
-        method("blockInfo", "(I)[D", reinterpret_cast<void*>(&nativeBlockInfo)),
-        method("biomeIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiomeIds)),
-        method("itemIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeItemIds)),
-        method("tags", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeTags)),
-        method("entityTypes", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeEntityTypes)),
-        method("worldStrings", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeWorldStrings)),
-        method("worldNumbers", "(Ljava/lang/String;)[J", reinterpret_cast<void*>(&nativeWorldNumbers)),
-        method("setTime", "(Ljava/lang/String;J)V", reinterpret_cast<void*>(&nativeSetTime)),
-        method("setWeather", "(Ljava/lang/String;ZZ)V", reinterpret_cast<void*>(&nativeSetWeather)),
-        method("setSpawn", "(Ljava/lang/String;III)V", reinterpret_cast<void*>(&nativeSetSpawn)),
-        method("setDifficulty", "(Ljava/lang/String;Ljava/lang/String;)Z",
-               reinterpret_cast<void*>(&nativeSetDifficulty)),
-        method("gameRule", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-               reinterpret_cast<void*>(&nativeGameRule)),
-        method("setGameRule", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z",
-               reinterpret_cast<void*>(&nativeSetGameRule)),
-        method("gameRules", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeGameRules)),
-        method("saveWorld", "(Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeSaveWorld)),
-        method("state", "(Ljava/lang/String;IIIZ)I", reinterpret_cast<void*>(&nativeState)),
-        method("setState", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeSetState)),
-        method("readStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeReadStates)),
-        method("writeStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeWriteStates)),
 void JNICALL nativeLightJob(JNIEnv* env, jclass, jstring name, jintArray chunks, jobject future) {
     const auto world = worldOf(env, name);
     const auto held = std::make_shared<JavaRef>(env, future);
@@ -990,6 +990,52 @@ jint JNICALL nativeUpdateShapes(JNIEnv* env, jclass, jstring name, jintArray pos
     return guarded<jint>(0, [&] { return world->updateShapes(at, next, indirect != JNI_FALSE); });
 }
 
+jint JNICALL nativeApplyChanges(JNIEnv* env, jclass, jstring name, jintArray positions, jintArray states,
+                                jint effects) {
+    const auto world = worldOf(env, name);
+    if (world == nullptr) {
+        return 0;
+    }
+    const std::vector<std::int32_t> at = ints(env, positions);
+    const std::vector<std::int32_t> next = ints(env, states);
+    return guarded<jint>(0, [&] { return world->applyChanges(at, next, static_cast<std::uint32_t>(effects)); });
+}
+} // namespace
+
+void registerWorldNatives(JNIEnv* env, jclass natives) {
+    const auto method = [](const char* name, const char* signature, void* function) {
+        return JNINativeMethod{const_cast<char*>(name), const_cast<char*>(signature), function};
+    };
+    const std::array methods{
+        method("stateId", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeStateId)),
+        method("stateText", "(I)Ljava/lang/String;", reinterpret_cast<void*>(&nativeStateText)),
+        method("blockTable", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBlockTable)),
+        method("blockProperties", "(Ljava/lang/String;)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeBlockProperties)),
+        method("stateFlags", "(I)I", reinterpret_cast<void*>(&nativeStateFlags)),
+        method("blockHardness", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativeBlockHardness)),
+        method("blockInfo", "(I)[D", reinterpret_cast<void*>(&nativeBlockInfo)),
+        method("biomeIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiomeIds)),
+        method("itemIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeItemIds)),
+        method("tags", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeTags)),
+        method("entityTypes", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeEntityTypes)),
+        method("worldStrings", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeWorldStrings)),
+        method("worldNumbers", "(Ljava/lang/String;)[J", reinterpret_cast<void*>(&nativeWorldNumbers)),
+        method("setTime", "(Ljava/lang/String;J)V", reinterpret_cast<void*>(&nativeSetTime)),
+        method("setWeather", "(Ljava/lang/String;ZZ)V", reinterpret_cast<void*>(&nativeSetWeather)),
+        method("setSpawn", "(Ljava/lang/String;III)V", reinterpret_cast<void*>(&nativeSetSpawn)),
+        method("setDifficulty", "(Ljava/lang/String;Ljava/lang/String;)Z",
+               reinterpret_cast<void*>(&nativeSetDifficulty)),
+        method("gameRule", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeGameRule)),
+        method("setGameRule", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z",
+               reinterpret_cast<void*>(&nativeSetGameRule)),
+        method("gameRules", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeGameRules)),
+        method("saveWorld", "(Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeSaveWorld)),
+        method("state", "(Ljava/lang/String;IIIZ)I", reinterpret_cast<void*>(&nativeState)),
+        method("setState", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeSetState)),
+        method("readStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeReadStates)),
+        method("writeStates", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeWriteStates)),
         method("readSection", "(Ljava/lang/String;IIIZ[I)Z", reinterpret_cast<void*>(&nativeReadSection)),
         method("writeSection", "(Ljava/lang/String;III[IZ)Z", reinterpret_cast<void*>(&nativeWriteSection)),
         method("applySections", "(Ljava/lang/String;II[I[IZ[I)I", reinterpret_cast<void*>(&nativeApplySections)),
@@ -1001,7 +1047,18 @@ jint JNICALL nativeUpdateShapes(JNIEnv* env, jclass, jstring name, jintArray pos
         method("blockEntityPositions", "(Ljava/lang/String;II)[I",
                reinterpret_cast<void*>(&nativeBlockEntityPositions)),
         method("entityNbt", "(Ljava/lang/String;I)[B", reinterpret_cast<void*>(&nativeEntityNbt)),
-        method("spawnEntityNbt", "(Ljava/lang/String;[B)I", reinterpret_cast<void*>(&nativeSpawnEntityNbt)),
+        method("spawnEntityNbt", "(Ljava/lang/String;[BLjava/lang/String;)I",
+               reinterpret_cast<void*>(&nativeSpawnEntityNbt)),
+        method("blockEntityTypes", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBlockEntityTypes)),
+        method("dataVersion", "()I", reinterpret_cast<void*>(&nativeDataVersion)),
+        method("fixNbt", "(Ljava/lang/String;[BI)[B", reinterpret_cast<void*>(&nativeFixNbt)),
+        method("fixName", "(Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeFixName)),
+        method("createBlockEntity", "(Ljava/lang/String;III[B)Z", reinterpret_cast<void*>(&nativeCreateBlockEntity)),
+        method("removeBlockEntity", "(Ljava/lang/String;III)Z", reinterpret_cast<void*>(&nativeRemoveBlockEntity)),
+        method("entityByUuid", "(Ljava/lang/String;Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeEntityByUuid)),
+        method("removeEntityByUuid", "(Ljava/lang/String;Ljava/lang/String;)Z",
+               reinterpret_cast<void*>(&nativeRemoveEntityByUuid)),
         method("readBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeReadBiomes)),
         method("writeBiomes", "(Ljava/lang/String;II[I)Z", reinterpret_cast<void*>(&nativeWriteBiomes)),
         method("relightChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeRelightChunks)),
@@ -1014,6 +1071,17 @@ jint JNICALL nativeUpdateShapes(JNIEnv* env, jclass, jstring name, jintArray pos
                reinterpret_cast<void*>(&nativeReleaseChunks)),
         method("updateNeighbors", "(Ljava/lang/String;[II)I", reinterpret_cast<void*>(&nativeUpdateNeighbors)),
         method("applyChanges", "(Ljava/lang/String;[I[II)I", reinterpret_cast<void*>(&nativeApplyChanges)),
+        method("lightJob", "(Ljava/lang/String;[ILjava/util/concurrent/CompletableFuture;)V",
+               reinterpret_cast<void*>(&nativeLightJob)),
+        method("lightAt", "(Ljava/lang/String;IIII)I", reinterpret_cast<void*>(&nativeLightAt)),
+        method("readLight", "(Ljava/lang/String;IIIIZ)[B", reinterpret_cast<void*>(&nativeReadLight)),
+        method("writeLight", "(Ljava/lang/String;IIII[B)Z", reinterpret_cast<void*>(&nativeWriteLight)),
+        method("checkLight", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeCheckLight)),
+        method("useItemOn", "(Ljava/lang/String;IIIILjava/lang/String;FF)I", reinterpret_cast<void*>(&nativeUseItemOn)),
+        method("scheduleTick", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeScheduleTick)),
+        method("settleBlocks", "(Ljava/lang/String;[I[II)I", reinterpret_cast<void*>(&nativeSettleBlocks)),
+        method("neighborChanged", "(Ljava/lang/String;[I[I)I", reinterpret_cast<void*>(&nativeNeighborChanged)),
+        method("updateShapes", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeUpdateShapes)),
         method("resendChunks", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeResendChunks)),
         method("biome", "(Ljava/lang/String;III)Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiome)),
         method("setBiome", "(Ljava/lang/String;IIILjava/lang/String;)Z", reinterpret_cast<void*>(&nativeSetBiome)),
@@ -1054,14 +1122,3 @@ jint JNICALL nativeUpdateShapes(JNIEnv* env, jclass, jstring name, jintArray pos
     env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size()));
 }
 } // namespace basalt::server::bukkit
-        method("lightJob", "(Ljava/lang/String;[ILjava/util/concurrent/CompletableFuture;)V",
-               reinterpret_cast<void*>(&nativeLightJob)),
-        method("lightAt", "(Ljava/lang/String;IIII)I", reinterpret_cast<void*>(&nativeLightAt)),
-        method("readLight", "(Ljava/lang/String;IIIIZ)[B", reinterpret_cast<void*>(&nativeReadLight)),
-        method("writeLight", "(Ljava/lang/String;IIII[B)Z", reinterpret_cast<void*>(&nativeWriteLight)),
-        method("checkLight", "(Ljava/lang/String;[I)V", reinterpret_cast<void*>(&nativeCheckLight)),
-        method("useItemOn", "(Ljava/lang/String;IIIILjava/lang/String;FF)I", reinterpret_cast<void*>(&nativeUseItemOn)),
-        method("scheduleTick", "(Ljava/lang/String;IIIIZ)Z", reinterpret_cast<void*>(&nativeScheduleTick)),
-        method("settleBlocks", "(Ljava/lang/String;[I[II)I", reinterpret_cast<void*>(&nativeSettleBlocks)),
-        method("neighborChanged", "(Ljava/lang/String;[I[I)I", reinterpret_cast<void*>(&nativeNeighborChanged)),
-        method("updateShapes", "(Ljava/lang/String;[I[IZ)I", reinterpret_cast<void*>(&nativeUpdateShapes)),

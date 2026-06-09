@@ -2,7 +2,16 @@ package net.minecraft.util;
 
 import org.basaltmc.bukkit.Unsupported;
 public interface ProblemReporter {
-    public static ProblemReporter DISCARDING = null;
+    public static ProblemReporter DISCARDING = new ProblemReporter() {
+        @Override
+        public ProblemReporter forChild(ProblemReporter.PathElement path) {
+            return this;
+        }
+
+        @Override
+        public void report(ProblemReporter.Problem problem) {
+        }
+    };
     public default ProblemReporter forChild(ProblemReporter.PathElement path) {
         throw Unsupported.hit("net.minecraft.util.ProblemReporter.forChild");
     }
@@ -11,19 +20,25 @@ public interface ProblemReporter {
     }
 
     public static class Collector implements ProblemReporter {
+        private final java.util.List<Problem> problems = new java.util.concurrent.CopyOnWriteArrayList<>();
+
         public Collector() {
         }
         public ProblemReporter forChild(ProblemReporter.PathElement path) {
-            throw Unsupported.hit("net.minecraft.util.ProblemReporter.Collector.forChild");
+            return this;
         }
         public String getTreeReport() {
-            throw Unsupported.hit("net.minecraft.util.ProblemReporter.Collector.getTreeReport");
+            StringBuilder text = new StringBuilder();
+            for (Problem problem : problems) {
+                text.append(text.length() == 0 ? "" : "; ").append(problem);
+            }
+            return text.toString();
         }
         public boolean isEmpty() {
-            throw Unsupported.hit("net.minecraft.util.ProblemReporter.Collector.isEmpty");
+            return problems.isEmpty();
         }
         public void report(ProblemReporter.Problem problem) {
-            throw Unsupported.hit("net.minecraft.util.ProblemReporter.Collector.report");
+            problems.add(problem);
         }
     }
 

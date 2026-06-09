@@ -1,3 +1,4 @@
+#include "DataFix.hpp"
 #include "WorldBlockUpdates.hpp"
 #include "WorldItemUse.hpp"
 
@@ -20,12 +21,13 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
-#include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
-#include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/world/light/Light.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -540,11 +542,11 @@ public:
         constexpr std::uint32_t kUpdates = BlockEffects::kNeighbors | BlockEffects::kShapes | BlockEffects::kTicks |
                                            BlockEffects::kPlace | BlockEffects::kDeparture;
         std::int32_t reached = 0;
-        std::vector<std::int32_t> stale;
-        for (std::size_t at = 0; at + 2 < positions.size(); at += 3) {
         if ((effects & kUpdates) != 0) {
             reached = blockUpdates::settle(updateTarget(), positions, previous, effects);
         }
+        std::vector<std::int32_t> stale;
+        for (std::size_t at = 0; at + 2 < positions.size(); at += 3) {
             if (!world_->state().isLoaded(positions[at] >> 4, positions[at + 2] >> 4)) {
                 continue;
             }
@@ -564,8 +566,6 @@ public:
         return reached;
     }
 
-    bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
-                      std::span<const std::int32_t> states, bool notify) override {
     std::int32_t neighborChanged(std::span<const std::int32_t> positions,
                                  std::span<const std::int32_t> sources) override {
         return blockUpdates::neighbourChanged(updateTarget(), positions, sources);
@@ -630,6 +630,8 @@ public:
         return static_cast<std::int32_t>(changed.size() / 3);
     }
 
+    bool writeSection(std::int32_t chunkX, std::int32_t sectionY, std::int32_t chunkZ,
+                      std::span<const std::int32_t> states, bool notify) override {
         const std::int32_t index = sectionY - chunkHeight().minSection();
         if (index < 0 || index >= chunkHeight().sectionCount() ||
             states.size() < server::world::ChunkSection::kBlocks) {
@@ -728,6 +730,23 @@ public:
 
     [[nodiscard]] std::uint64_t blockVersion() const override { return world_->state().blockVersion(); }
 
+    void tellBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, const server::world::ChunkBlockEntity& made) {
+        const Identifier* entityType = reg::blockEntityTypes::ofBlock(made.type());
+        const std::optional<std::int32_t> typeId =
+            reg::blockEntityTypes::idOf(entityType != nullptr ? *entityType : made.type());
+        if (!typeId.has_value() || !players_) {
+            return;
+        }
+        const wire::protocol::play::BlockEntityDataPacket packet{
+            .pos = {x, y, z}, .typeId = *typeId, .tag = made.data()};
+        for (const player::PlayerSession* player : players_()) {
+            if (player->worldName == world_->name() && player->connection().sendPlayPacket) {
+                player->connection().sendPlayPacket(wire::protocol::play::BlockEntityDataPacket::kId,
+                                                    [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            }
+        }
+    }
+
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> blockEntityNbt(std::int32_t x, std::int32_t y,
                                                                           std::int32_t z) override {
         const server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
@@ -737,7 +756,8 @@ public:
             return std::nullopt;
         }
         wire::nbt::NbtCompound tag = held->data();
-        tag.putString("id", held->type().toString());
+        const Identifier* entityType = reg::blockEntityTypes::ofBlock(held->type());
+        tag.putString("id", (entityType != nullptr ? *entityType : held->type()).toString());
         tag.putInt("x", x);
         tag.putInt("y", y);
         tag.putInt("z", z);
@@ -772,19 +792,43 @@ public:
             data.remove(key);
         }
         server::world::ChunkBlockEntity next = held->withData(std::move(data));
-        const std::optional<std::int32_t> typeId = reg::blockEntityTypes::idOf(next.type());
         chunk->setBlockEntity(next);
-        if (typeId.has_value() && players_) {
-            const wire::protocol::play::BlockEntityDataPacket packet{
-                .pos = {x, y, z}, .typeId = *typeId, .tag = next.data()};
-            for (const player::PlayerSession* player : players_()) {
-                if (player->worldName == world_->name() && player->connection().sendPlayPacket) {
-                    player->connection().sendPlayPacket(
-                        wire::protocol::play::BlockEntityDataPacket::kId,
-                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-                }
+        tellBlockEntity(x, y, z, next);
+        return true;
+    }
+
+    bool createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, std::span<const std::uint8_t> nbt) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        const std::int32_t stateId = chunk == nullptr ? -1 : world_->state().blockState(x, y, z).value_or(-1);
+        const Identifier* block = stateId < 0 ? nullptr : reg::blockStateDefinitions::blockOf(stateId);
+        if (block == nullptr || reg::blockEntityTypes::ofBlock(*block) == nullptr) {
+            return false;
+        }
+        wire::nbt::NbtCompound data = world::blockEntityDefaults::of(*block, stateId);
+        if (!nbt.empty()) {
+            const auto parsed = wire::nbt::nbtIO::read(nbt);
+            const wire::nbt::NbtCompound* given =
+                parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+            if (given == nullptr) {
+                return false;
+            }
+            data = *given;
+            for (const char* key : {"id", "x", "y", "z"}) {
+                data.remove(key);
             }
         }
+        const server::world::ChunkBlockEntity made{x & 15, y, z & 15, *block, std::move(data)};
+        chunk->setBlockEntity(made);
+        tellBlockEntity(x, y, z, made);
+        return true;
+    }
+
+    bool removeBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        if (chunk == nullptr || chunk->blockEntityAt(x & 15, y, z & 15) == nullptr) {
+            return false;
+        }
+        chunk->removeBlockEntityAt(x & 15, y, z & 15);
         return true;
     }
 
@@ -796,11 +840,25 @@ public:
         return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(entity::entityNbt::encode(*found)));
     }
 
-    std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt) override {
+    std::int32_t spawnEntityNbt(std::span<const std::uint8_t> nbt, std::string_view cause) override {
         const auto parsed = wire::nbt::nbtIO::read(nbt);
         const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
         if (given == nullptr || !hooks_.nextEntityId) {
             return -1;
+        }
+        if (hooks_.spawnAllowed) {
+            const auto type = Identifier::parse(std::string{given->getString("id")});
+            std::array<double, 3> at{};
+            if (const wire::nbt::NbtList* pos = given->getList("Pos"); pos != nullptr && pos->size() >= 3) {
+                for (std::size_t axis = 0; axis < 3; ++axis) {
+                    if (const double* value = (*pos)[axis].get<double>(); value != nullptr) {
+                        at[axis] = *value;
+                    }
+                }
+            }
+            if (type.has_value() && !hooks_.spawnAllowed(*world_, *type, at[0], at[1], at[2], cause)) {
+                return -1;
+            }
         }
         const entity::entityNbt::AllocateEntityIdFor allocate = [this](const Identifier&) {
             return hooks_.nextEntityId();
@@ -939,6 +997,11 @@ public:
                 keys.push_back(world::ChunkGenerationQueue::pack(chunks[at], chunks[at + 1]));
             }
         }
+        showChunks(*world_, players_, ready);
+        if (!unlit.empty()) {
+            world_->relightAsync(std::move(keys), [world = world_, players = players_, pairs = std::move(unlit)](
+                                                      std::int32_t) { showChunks(*world, players, pairs); });
+        }
     }
 
     [[nodiscard]] std::optional<std::string> biomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const override {
@@ -997,11 +1060,6 @@ public:
     }
 
     bool loadChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate) override {
-        showChunks(*world_, players_, ready);
-        if (!unlit.empty()) {
-            world_->relightAsync(std::move(keys), [world = world_, players = players_, pairs = std::move(unlit)](
-                                                      std::int32_t) { showChunks(*world, players, pairs); });
-        }
         if (world_->state().isLoaded(chunkX, chunkZ)) {
             return true;
         }
@@ -1189,6 +1247,46 @@ private:
         }
     }
 
+    static constexpr std::size_t kLightBytes = 2048;
+
+    [[nodiscard]] bool hasSkylight() const {
+        return config::dimensionFacts(world_->declaration().dimension).hasSkylight;
+    }
+
+    static void showChunks(world::LoadedWorld& world,
+                           const std::function<std::vector<player::PlayerSession*>()>& players,
+                           std::span<const std::int32_t> chunks) {
+        if (!players || chunks.empty()) {
+            return;
+        }
+        constexpr std::int32_t kWatchRadius = 16;
+        for (const player::PlayerSession* player : players()) {
+            if (player->worldName != world.name() || !player->connection().resendChunk) {
+                continue;
+            }
+            const std::int32_t playerChunkX = static_cast<std::int32_t>(std::floor(player->x)) >> 4;
+            const std::int32_t playerChunkZ = static_cast<std::int32_t>(std::floor(player->z)) >> 4;
+            for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
+                if (std::abs(chunks[at] - playerChunkX) <= kWatchRadius &&
+                    std::abs(chunks[at + 1] - playerChunkZ) <= kWatchRadius) {
+                    player->connection().resendChunk(chunks[at], chunks[at + 1]);
+                }
+            }
+        }
+    }
+
+    [[nodiscard]] blockUpdates::Target updateTarget() const {
+        std::vector<player::PlayerSession*> watchers;
+        if (players_) {
+            for (player::PlayerSession* player : players_()) {
+                if (player->worldName == world_->name()) {
+                    watchers.push_back(player);
+                }
+            }
+        }
+        return blockUpdates::Target{*world_, hooks_.blocks ? hooks_.blocks() : nullptr, std::move(watchers)};
+    }
+
     void tell(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) const {
         if (!players_) {
             return;
@@ -1246,46 +1344,6 @@ std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std:
 std::int32_t LoadedWorlds::stateId(std::string_view text) const {
     return LoadedWorldRef::parseState(text).value_or(-1);
 }
-
-    static constexpr std::size_t kLightBytes = 2048;
-
-    [[nodiscard]] bool hasSkylight() const {
-        return config::dimensionFacts(world_->declaration().dimension).hasSkylight;
-    }
-
-    static void showChunks(world::LoadedWorld& world,
-                           const std::function<std::vector<player::PlayerSession*>()>& players,
-                           std::span<const std::int32_t> chunks) {
-        if (!players || chunks.empty()) {
-            return;
-        }
-        constexpr std::int32_t kWatchRadius = 16;
-        for (const player::PlayerSession* player : players()) {
-            if (player->worldName != world.name() || !player->connection().resendChunk) {
-                continue;
-            }
-            const std::int32_t playerChunkX = static_cast<std::int32_t>(std::floor(player->x)) >> 4;
-            const std::int32_t playerChunkZ = static_cast<std::int32_t>(std::floor(player->z)) >> 4;
-            for (std::size_t at = 0; at + 1 < chunks.size(); at += 2) {
-                if (std::abs(chunks[at] - playerChunkX) <= kWatchRadius &&
-                    std::abs(chunks[at + 1] - playerChunkZ) <= kWatchRadius) {
-                    player->connection().resendChunk(chunks[at], chunks[at + 1]);
-                }
-            }
-        }
-    }
-
-    [[nodiscard]] blockUpdates::Target updateTarget() const {
-        std::vector<player::PlayerSession*> watchers;
-        if (players_) {
-            for (player::PlayerSession* player : players_()) {
-                if (player->worldName == world_->name()) {
-                    watchers.push_back(player);
-                }
-            }
-        }
-        return blockUpdates::Target{*world_, hooks_.blocks ? hooks_.blocks() : nullptr, std::move(watchers)};
-    }
 
 std::string LoadedWorlds::stateText(std::int32_t stateId) const {
     const Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
@@ -1376,6 +1434,40 @@ std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
             static_cast<double>(color & 0xFFFFFFU),
             static_cast<double>(reg::fireOdds::igniteOdds(stateId)),
             static_cast<double>(reg::fireOdds::burnOdds(stateId))};
+}
+
+std::vector<std::string> LoadedWorlds::blockEntityTypes() const {
+    std::vector<std::string> pairs;
+    const reg::Registry<reg::BlockState>& blocks = reg::blocks::registry();
+    for (const std::int32_t defaultState : blocks.ids()) {
+        const Identifier* name = blocks.nameOf(defaultState);
+        if (const Identifier* type = reg::blockEntityTypes::ofBlock(*name); type != nullptr) {
+            pairs.push_back(name->toString());
+            pairs.push_back(type->toString());
+        }
+    }
+    return pairs;
+}
+
+std::int32_t LoadedWorlds::dataVersion() const { return dataFix::currentVersion(); }
+
+std::optional<std::vector<std::uint8_t>> LoadedWorlds::fixNbt(std::string_view kind, std::span<const std::uint8_t> nbt,
+                                                              std::int32_t fromVersion) const {
+    const auto parsed = wire::nbt::nbtIO::read(nbt);
+    const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+    if (given == nullptr) {
+        return std::nullopt;
+    }
+    std::optional<wire::nbt::NbtCompound> fixed = dataFix::fixDocument(kind, *given, fromVersion);
+    if (!fixed.has_value()) {
+        return std::nullopt;
+    }
+    return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(*fixed)));
+}
+
+std::optional<std::string> LoadedWorlds::fixName(std::string_view kind, std::string_view text,
+                                                 std::int32_t fromVersion) const {
+    return dataFix::fixName(kind, text, fromVersion);
 }
 
 std::vector<std::string> LoadedWorlds::biomeIds() const {

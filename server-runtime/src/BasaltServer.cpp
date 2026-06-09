@@ -482,6 +482,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     model.npcs = &npcs_;
     model.nextEntityId = [this] { return playerRegistry_.allocateEntityId(); };
+    model.spawnAllowed = [this](const world::LoadedWorld& world, const wire::common::Identifier& type, double x,
+                                double y, double z, std::string_view cause) {
+        return spawning_ == nullptr || spawning_->askSpawn(world, type, x, y, z, cause);
+    };
 
     const auto sessions = [this] { return playerRegistry_.snapshot(); };
     pluginPlayers_ = std::make_unique<plugins::RegistryPlayers>(playerRegistry_, model);

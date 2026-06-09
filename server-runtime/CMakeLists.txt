@@ -160,10 +160,11 @@ basalt_module(server-runtime-core
         src/plugins/ServerNpcs.cpp
         src/plugins/ServerPluginServices.cpp
         src/plugins/ServerObjectModel.cpp
+        src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
-        src/ChunkSimulationView.cpp
         src/plugins/WorldBlockUpdates.cpp
         src/plugins/WorldItemUse.cpp
+        src/ChunkSimulationView.cpp
         src/ClientSession.cpp
         src/ClientSessionPackets.cpp
         src/CommandWiring.cpp
@@ -688,7 +689,7 @@ basalt_module(server-runtime-core
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
+    DEPENDS basalt::metamorph-datafix basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 

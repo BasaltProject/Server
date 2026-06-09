@@ -3,9 +3,12 @@ package net.minecraft.world.level.chunk;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.debug.DebugValueSource;
@@ -19,8 +22,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.blending.BlendingData;
 import org.basaltmc.bukkit.WorldNatives;
 import org.basaltmc.bukkit.facade.Chunks;
+import org.basaltmc.bukkit.facade.NbtCodec;
+import org.basaltmc.bukkit.facade.Effects;
 
-/** A loaded chunk seen through section objects. The sections are copies of the world's blocks; a plugin that swaps one */
 public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public Map blockEntities = new ConcurrentHashMap<BlockPos, BlockEntity>();
     public Map heightmaps = new EnumMap<Heightmap.Types, Heightmap>(Heightmap.Types.class);
@@ -63,7 +67,6 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         }
     }
 
-    /** Reads the world again into every section a plugin has not replaced, when the world moved since the last read. */
     private synchronized void refresh() {
         long version = WorldNatives.blockVersion(handle);
         if (version == syncedVersion) {
@@ -91,6 +94,9 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
             LevelChunkSection built = new LevelChunkSection(factory,
                 uniform >= 0 ? null : java.util.Arrays.copyOfRange(all, i << 12, (i + 1) << 12), uniform,
                 held != null ? held.getBiomes() : null, biomeCells, i);
+            if (held != null) {
+                built.inheritBiomeState(held);
+            }
             sections[i] = built;
             baseline[i] = built;
             hashes[i] = hash;
@@ -98,7 +104,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
         syncedVersion = version;
     }
 
-    /** Writes every section a plugin replaced back to the world in one call. Only the tick thread writes; any other */
+    /** Only the tick thread writes; other threads leave the sections for the next tick. */
     public boolean flush() {
         if (sections == null) {
             return false;
@@ -112,45 +118,131 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
 
     private synchronized boolean writeBack() {
         int changed = 0;
+        boolean anyBiomes = false;
         for (int i = 0; i < sections.length; i++) {
             if (sections[i] != baseline[i]) {
                 changed++;
             }
+            if (sections[i] != null && sections[i].biomesChanged(baseline[i])) {
+                anyBiomes = true;
+            }
         }
-        if (changed == 0) {
+        if (changed == 0 && !anyBiomes) {
             return false;
         }
-        int[] ys = new int[changed];
-        int[] states = new int[changed << 12];
-        int at = 0;
-        for (int i = 0; i < sections.length; i++) {
-            if (sections[i] == baseline[i]) {
-                continue;
+        if (changed > 0) {
+            int[] ys = new int[changed];
+            int[] states = new int[changed << 12];
+            int at = 0;
+            for (int i = 0; i < sections.length; i++) {
+                if (sections[i] == baseline[i]) {
+                    continue;
+                }
+                ys[at] = minSection + i;
+                int[] ids = Chunks.ids(sections[i]);
+                System.arraycopy(ids, 0, states, at << 12, 4096);
+                hashes[i] = Chunks.hash(ids, 0);
+                at++;
             }
-            ys[at] = minSection + i;
-            int[] ids = Chunks.ids(sections[i]);
-            System.arraycopy(ids, 0, states, at << 12, 4096);
-            hashes[i] = Chunks.hash(ids, 0);
-            baseline[i] = sections[i];
-            at++;
+            WorldNatives.applyChunks(world, new int[] {locX, locZ, changed}, ys, states, false, null);
         }
-        WorldNatives.applyChunks(world, new int[] {locX, locZ, changed}, ys, states, false, null);
+        if (anyBiomes) {
+            writeBiomes();
+        }
+        for (int i = 0; i < sections.length; i++) {
+            baseline[i] = sections[i];
+            if (sections[i] != null) {
+                sections[i].markBiomesSaved();
+            }
+        }
         syncedVersion = WorldNatives.blockVersion(handle);
         unsaved = true;
         level.getChunkSource().noteChanged(locX, locZ);
         return true;
     }
 
+    private void writeBiomes() {
+        net.minecraft.core.IdMap<Holder<Biome>> map = level.palettedContainerFactory().biomeStrategy().globalMap();
+        int[] cells = new int[sections.length * 64];
+        java.util.Arrays.fill(cells, -1);
+        for (int i = 0; i < sections.length; i++) {
+            LevelChunkSection section = sections[i];
+            if (section == null || !section.biomesChanged(baseline[i])) {
+                continue;
+            }
+            int[] ids = ((PalettedContainer<Holder<Biome>>) section.getBiomes()).toIds(map::getId);
+            System.arraycopy(ids, 0, cells, i * 64, 64);
+            section.markBiomesSaved();
+        }
+        WorldNatives.writeBiomes(world, locX, locZ, cells);
+    }
+
     public Map getBlockEntities() {
-        return blockEntities;
+        Map<BlockPos, BlockEntity> found = new java.util.HashMap<>();
+        if (onTickThread()) {
+            flush();
+        }
+        int[] where = WorldNatives.blockEntityPositions(world, locX, locZ);
+        for (int i = 0; i + 2 < where.length; i += 3) {
+            BlockPos pos = new BlockPos(where[i], where[i + 1], where[i + 2]);
+            BlockEntity view = viewAt(pos);
+            if (view != null) {
+                found.put(pos, view);
+            }
+        }
+        return found;
+    }
+
+    public Set getBlockEntitiesPos() {
+        return getBlockEntities().keySet();
     }
 
     public BlockEntity getBlockEntity(BlockPos pos) {
-        return null;
+        return getBlockEntity(pos, EntityCreationType.IMMEDIATE);
     }
 
     public BlockEntity getBlockEntity(BlockPos pos, LevelChunk.EntityCreationType creationType) {
-        return null;
+        if (onTickThread()) {
+            flush();
+        }
+        BlockEntity view = viewAt(pos);
+        if (view == null && creationType == EntityCreationType.IMMEDIATE
+            && WorldNatives.createBlockEntity(world, pos.getX(), pos.getY(), pos.getZ(), new byte[0])) {
+            view = viewAt(pos);
+        }
+        return view;
+    }
+
+    public CompoundTag getBlockEntityNbt(BlockPos pos) {
+        return NbtCodec.fromBytes(WorldNatives.blockEntityNbt(world, pos.getX(), pos.getY(), pos.getZ()));
+    }
+
+    public CompoundTag getBlockEntityNbtForSaving(BlockPos pos, HolderLookup.Provider registryAccess) {
+        return getBlockEntityNbt(pos);
+    }
+
+    public void setBlockEntityNbt(CompoundTag tag) {
+        int x = tag.getIntOr("x", 0);
+        int y = tag.getIntOr("y", 0);
+        int z = tag.getIntOr("z", 0);
+        byte[] bytes = NbtCodec.toBytes(tag);
+        if (!WorldNatives.setBlockEntityNbt(world, x, y, z, bytes)) {
+            WorldNatives.createBlockEntity(world, x, y, z, bytes);
+        }
+    }
+
+    public void setBlockEntity(BlockEntity blockEntity) {
+        BlockPos pos = blockEntity.getBlockPos();
+        WorldNatives.createBlockEntity(world, pos.getX(), pos.getY(), pos.getZ(), NbtCodec.toBytes(blockEntity.nbt()));
+    }
+
+    private BlockEntity viewAt(BlockPos pos) {
+        CompoundTag nbt = getBlockEntityNbt(pos);
+        return nbt == null ? null : new BlockEntity(level, pos, nbt);
+    }
+
+    private static boolean onTickThread() {
+        return org.basaltmc.bukkit.Natives.onPluginThread();
     }
 
     public BlockState getBlockState(BlockPos pos) {
@@ -220,7 +312,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     private void removeBlockEntityTicker(BlockPos pos) {}
 
     public void removeBlockEntity(BlockPos pos) {
-        blockEntities.remove(pos);
+        WorldNatives.removeBlockEntity(world, pos.getX(), pos.getY(), pos.getZ());
     }
 
     public BlockState setBlockState(BlockPos pos, BlockState state, int flags) {
@@ -249,7 +341,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
     public boolean hasUnflushed() {
         synchronized (this) {
             for (int i = 0; i < sections.length; i++) {
-                if (sections[i] != baseline[i]) {
+                if (sections[i] != baseline[i] || (sections[i] != null && sections[i].biomesChanged(baseline[i]))) {
                     return true;
                 }
             }

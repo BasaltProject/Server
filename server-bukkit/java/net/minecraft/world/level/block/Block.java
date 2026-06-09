@@ -70,6 +70,12 @@ public class Block extends BlockBehaviour implements ItemLike {
         private EntityBlockImpl(int index) {
             super(index);
         }
+
+        @Override
+        public net.minecraft.world.level.block.entity.BlockEntity newBlockEntity(net.minecraft.core.BlockPos pos,
+                                                                                  net.minecraft.world.level.block.state.BlockState state) {
+            return org.basaltmc.bukkit.facade.BlockEntityTypes.detached(blockKey(), pos);
+        }
     }
 
     public int blockIndex() {

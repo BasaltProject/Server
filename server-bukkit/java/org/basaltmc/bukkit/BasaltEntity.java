@@ -33,6 +33,11 @@ public final class BasaltEntity extends EntityBase {
     }
 
     @Override
+    public net.minecraft.world.entity.Entity getHandle() {
+        return EntityBridge.handle(core.world, core.id, core.uuid, core.type.getKey().toString());
+    }
+
+    @Override
     public int getEntityId() {
         return core.id;
     }

@@ -47,6 +47,12 @@ public:
                           ChunkSimulationView& chunkSimulation, const world::SpawnEquipmentFinalizer& equipment,
                           Hooks hooks, Options options);
 
+    /// Asks the entity.spawn event for a spawn that does not come through the spawner, for the plugin API.
+    [[nodiscard]] bool askSpawn(const world::LoadedWorld& world, const wire::common::Identifier& type, double x,
+                                double y, double z, std::string_view reason) const {
+        return spawnAllowed(world, type, x, y, z, reason);
+    }
+
     entity::ServerEntity* spawnMob(world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                                    double z, float yaw = 0.0F, std::string_view reason = "natural",
                                    const std::function<void(entity::ServerEntity&)>& initialize = {});
