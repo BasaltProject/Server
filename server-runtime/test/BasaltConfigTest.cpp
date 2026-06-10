@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/config/ServerListConfig.hpp>
 #include <basalt/wire/common/logging/LogOutput.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
@@ -366,6 +367,37 @@ TEST_CASE("a server with no properties beside it gets the untouched default") {
     REQUIRE(config.has_value());
     CHECK(config->port == 25565);
     CHECK(*fileIO::readText(directory.pathOf("server.toml")) == kServerDefaultToml);
+}
+
+TEST_CASE("default MOTDs advertise support through Minecraft 26.3") {
+    const ConfigDirectory directory{scratch("motd-current-version-default")};
+    const auto config = ServerListConfig::load(directory);
+    REQUIRE(config.has_value());
+    REQUIRE(config->profiles().size() == 3);
+    for (const auto& profile : config->profiles()) {
+        REQUIRE(profile.motd.has_value());
+        REQUIRE(profile.motd->size() == 2);
+        CHECK(profile.motd->front().find("BASALT SERVER") != std::string::npos);
+        CHECK(profile.motd->front().find("[1.8-26.3]") != std::string::npos);
+        CHECK(profile.motd->front().find("26.2") == std::string::npos);
+    }
+}
+
+TEST_CASE("updated defaults still import a custom legacy MOTD without replacing maintenance") {
+    const ConfigDirectory directory{scratch("motd-current-version-import")};
+    const auto config = ServerListConfig::load(directory, "My server\\nWelcome");
+    REQUIRE(config.has_value());
+    for (const auto& profile : config->profiles()) {
+        REQUIRE(profile.motd.has_value());
+        if (profile.header.name == "maintenance") {
+            CHECK(profile.motd->front().find("BASALT SERVER") != std::string::npos);
+        } else {
+            CHECK(*profile.motd == std::vector<std::string>{"My server", "Welcome"});
+        }
+    }
+    const auto reloaded = ServerListConfig::load(directory, "Do not overwrite my configuration");
+    REQUIRE(reloaded.has_value());
+    CHECK(reloaded->defaultProfile().motd == config->defaultProfile().motd);
 }
 
 TEST_CASE("Java listen addresses are explicit literals with optional IPv6 dual stack") {
