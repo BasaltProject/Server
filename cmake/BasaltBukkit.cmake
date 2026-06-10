@@ -1,6 +1,7 @@
-# Decides whether the Bukkit compatibility layer is built, and builds its runtime folder next to the binary.
+# Decides whether the Bukkit compatibility layer is built, and embeds its runtime in the binary.
 
 set(BASALT_BUILD_BUKKIT "AUTO" CACHE STRING "Bukkit layer: ON, OFF, or AUTO (built when a JDK and its jni.h are found)")
+set(BASALT_BUKKIT_EMBED_DIR "${CMAKE_BINARY_DIR}/bukkit-embed" CACHE INTERNAL "Where the runtime pieces are staged before they are compiled in")
 set(BASALT_SHIM_DIR "" CACHE PATH "A prebuilt Shim folder with libjvm and classpath.jar (empty builds the shim/ submodule)")
 
 function(basalt_probe_bukkit RESULT)
@@ -53,10 +54,18 @@ function(basalt_bukkit_runtime)
         endif()
     endif()
     add_custom_target(basalt-bukkit-runtime ALL
-        COMMAND ${CMAKE_SOURCE_DIR}/server-bukkit/scripts/build-bundle.sh ${CMAKE_BINARY_DIR}/bukkit-work ${CMAKE_BINARY_DIR}/bin/runtime
+        COMMAND ${CMAKE_SOURCE_DIR}/server-bukkit/scripts/build-bundle.sh ${CMAKE_BINARY_DIR}/bukkit-work ${CMAKE_BINARY_DIR}/bukkit-runtime
                 "${_shim}"
         ${_deps}
-        COMMENT "Assembling the Bukkit runtime folder"
+        COMMENT "Assembling the Bukkit runtime"
         VERBATIM
     )
+    add_custom_target(basalt-bukkit-embed ALL
+        COMMAND ${CMAKE_COMMAND} -DSHIM=${_shim} -DRUNTIME=${CMAKE_BINARY_DIR}/bukkit-runtime -DOUT=${BASALT_BUKKIT_EMBED_DIR}
+                -P ${CMAKE_SOURCE_DIR}/cmake/StageBukkitRuntime.cmake
+        COMMENT "Staging the Bukkit runtime to embed"
+        VERBATIM
+    )
+    add_dependencies(basalt-bukkit-embed basalt-bukkit-runtime)
+    add_dependencies(server-bukkit basalt-bukkit-embed)
 endfunction()

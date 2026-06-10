@@ -30,7 +30,6 @@ basalt_module(server-runtime-core
         src/config/CompatibilityConfig.cpp
         src/bukkit/BukkitRuntimeFiles.cpp
         src/bukkit/JavaPluginScan.cpp
-        src/config/BukkitConfig.cpp
         src/config/ConfigDirectory.cpp
         src/config/ForwardingConfig.cpp
         src/config/GroupsConfig.cpp

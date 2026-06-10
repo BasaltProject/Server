@@ -20,18 +20,14 @@ namespace {
 } // namespace
 
 void BasaltServer::startBukkit() {
-    const config::BukkitConfig& settings = options_.bukkit;
     if (!config_->pluginsEnabled) {
         return;
     }
     const std::string folder = plugins_->services().paths().packages();
     bukkit::JavaPluginScan scan = bukkit::scanJavaPlugins(folder);
-    if (settings.mode != config::BukkitConfig::Mode::Off) {
-        for (const std::string& stranger : scan.strangers) {
-            logger_.warn([&] {
-                return std::format("{}/{} is not a plugin (no plugin.yml), so it is ignored.", folder, stranger);
-            });
-        }
+    for (const std::string& stranger : scan.strangers) {
+        logger_.warn(
+            [&] { return std::format("{}/{} is not a plugin (no plugin.yml), so it is ignored.", folder, stranger); });
     }
     std::error_code ignored;
     if (std::filesystem::is_directory("plugins-bukkit", ignored) &&
@@ -43,16 +39,9 @@ void BasaltServer::startBukkit() {
     }
     javaPlugins_ = std::move(scan.plugins);
     const std::size_t count = javaPlugins_.size();
-    if (settings.mode == config::BukkitConfig::Mode::Off) {
-        logger_.info([&] {
-            return std::format("{} Bukkit plugin(s) in {}/ are skipped: bukkit.toml sets enabled = false.", count,
-                               folder);
-        });
-        return;
-    }
 #ifdef BASALT_WITH_BUKKIT
     const wire::common::Logger bukkitLogger{"Bukkit"};
-    const std::expected<bukkit::BukkitRuntimeFiles, std::string> files = bukkit::locateRuntime(settings, bukkitLogger);
+    const std::expected<bukkit::BukkitRuntimeFiles, std::string> files = bukkit::locateRuntime(bukkitLogger);
     if (!files.has_value()) {
         logger_.error(
             [&] { return std::format("{} Bukkit plugin(s) in {}/ cannot load: {}.", count, folder, files.error()); });
@@ -73,8 +62,7 @@ void BasaltServer::startBukkit() {
 #else
     logger_.warn([&] {
         return std::format(
-            "{} Bukkit plugin(s) in {}/ cannot load: this build has no Bukkit support. Install a JDK and "
-            "rebuild, or use a release that includes it.",
+            "{} Bukkit plugin(s) in {}/ cannot load: this build has no Bukkit support, so use an official release.",
             count, folder);
     });
 #endif
