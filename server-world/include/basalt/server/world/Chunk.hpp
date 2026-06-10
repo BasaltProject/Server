@@ -6,6 +6,7 @@
 #include <basalt/server/world/structure/StructureBounds.hpp>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -13,6 +14,7 @@
 #include <mutex>
 #include <optional>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::world {
@@ -338,10 +340,25 @@ private:
     terrain::ProtoRegion* region_ = nullptr;
     ChunkStage stage_ = ChunkStage::Full;
 
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
+    using AtomicSharedLight = std::atomic<SharedLight>;
+#else
+    // Older libc++ lacks atomic<shared_ptr>. Keep the same sequentially consistent
+    // publication through its shared_ptr atomic operations instead.
+    struct AtomicSharedLight {
+        [[nodiscard]] SharedLight load() const { return std::atomic_load(&value_); }
+
+        void store(SharedLight value) { std::atomic_store(&value_, std::move(value)); }
+
+    private:
+        SharedLight value_;
+    };
+#endif
+
     struct LightCache {
         std::mutex lock;
-        std::atomic<SharedLight> sky;
-        std::atomic<SharedLight> block;
+        AtomicSharedLight sky;
+        AtomicSharedLight block;
         std::atomic<bool> staleSky{false};
         std::atomic<bool> staleBlock{false};
     };

@@ -245,7 +245,7 @@ void Chunk::markLightStale() {
 
 bool Chunk::storeLightSection(bool sky, std::size_t section, std::span<const std::uint8_t> bytes) {
     const std::lock_guard<std::mutex> guard{light_->lock};
-    std::atomic<SharedLight>& layer = sky ? light_->sky : light_->block;
+    AtomicSharedLight& layer = sky ? light_->sky : light_->block;
     const SharedLight held = layer.load();
     if (held == nullptr || section >= sectionCount()) {
         return false;
