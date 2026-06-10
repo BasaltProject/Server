@@ -1,6 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/runtime/entity/Axolotls.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/wire/common/Uuid.hpp>
@@ -12,6 +14,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <variant>
 #include <vector>
 
 using basalt::server::runtime::entity::AttributeOperation;
@@ -451,6 +454,56 @@ TEST_CASE("a generated entity is decoded through the same reader") {
     CHECK(entity->yaw == doctest::Approx(45.0F));
     CHECK(entity->villagerLevel == 2);
     CHECK(entity->profession == "toolsmith");
+}
+
+TEST_CASE("axolotl playing-dead updates never overwrite the integer variant") {
+    namespace entity = basalt::server::runtime::entity;
+    using Packet = basalt::wire::protocol::play::SetEntityDataPacket;
+    for (const std::int32_t variant : {1, 2}) {
+        CAPTURE(variant);
+        NbtCompound data;
+        data.putInt("Variant", variant);
+        const auto initial = entity::generatedEntityMetadata("axolotl", data);
+        bool foundVariant = false;
+        for (const auto& entry : initial) {
+            if (entry.index == 18) {
+                const auto* value = std::get_if<Packet::IntValue>(&entry.value);
+                REQUIRE(value != nullptr);
+                CHECK(value->value == variant);
+                foundVariant = true;
+            }
+        }
+        REQUIRE(foundVariant);
+
+        ServerEntity axolotl = entityOf("axolotl");
+        auto previous = entity::runtimeEntityMetadata(axolotl);
+        auto& state = entity::axolotls::stateOf(axolotl);
+        for (const bool playingDead : {false, true, false}) {
+            state.playDeadTicks = playingDead ? 200 : 0;
+            const auto current = entity::runtimeEntityMetadata(axolotl);
+            const Packet packet{.entityId = axolotl.entityId(), .entries = current.changesFrom(&previous)};
+            bool foundPlayingDead = false;
+            for (const auto& entry : packet.entries) {
+                CHECK(entry.index != 18);
+                if (entry.index == 19) {
+                    const auto* value = std::get_if<Packet::BoolValue>(&entry.value);
+                    REQUIRE(value != nullptr);
+                    CHECK(value->value == playingDead);
+                    foundPlayingDead = true;
+                }
+            }
+            REQUIRE(foundPlayingDead);
+            basalt::wire::io::ByteBuffer buffer;
+            packet.write(buffer);
+            const auto decoded = Packet::read(buffer);
+            REQUIRE(decoded.has_value());
+            CHECK(decoded->entityId == axolotl.entityId());
+            CHECK(decoded->entries == packet.entries);
+            CHECK(buffer.readableBytes() == 0);
+            CHECK(current.changesFrom(&current).empty());
+            previous = current;
+        }
+    }
 }
 
 TEST_CASE("a generated vehicle brings its riders with it") {

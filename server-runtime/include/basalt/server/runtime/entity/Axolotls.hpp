@@ -10,8 +10,9 @@ namespace basalt::server::runtime::entity {
 /// parity: `Axolotl`, `AxolotlAi`, `PlayDead` and `ValidatePlayDead`.
 namespace axolotls {
 
-/// parity: `DATA_PLAYING_DEAD`, after the variant.
-inline constexpr std::uint8_t kPlayingDeadDataIndex = 18;
+/// parity: `DATA_VARIANT`, followed by `DATA_PLAYING_DEAD`.
+inline constexpr std::uint8_t kVariantDataIndex = 18;
+inline constexpr std::uint8_t kPlayingDeadDataIndex = 19;
 inline constexpr std::int32_t kPlayDeadTime = 200;
 inline constexpr std::int32_t kHuntingCooldown = 2400;
 inline constexpr std::int32_t kRegenMax = 2400;
