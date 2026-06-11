@@ -52,6 +52,9 @@ constexpr std::uint8_t kEndermanCreepyDataIndex = 17;
 constexpr std::uint8_t kEndermanStaredAtDataIndex = 18;
 constexpr std::uint8_t kStingerCountDataIndex = 13;
 
+/// parity: `Fox.DATA_TYPE_ID`, before the byte-valued `DATA_FLAGS_ID` at 19.
+constexpr std::uint8_t kFoxVariantDataIndex = 18;
+
 /// parity: `ExperienceOrb.DATA_VALUE`.
 constexpr std::uint8_t kOrbValueDataIndex = 8;
 
@@ -362,7 +365,7 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
                             RegistryHolder::CowSoundVariant);
     } else if (type == "fox") {
         if (data.getString("Type") == "snow") {
-            entries.push_back(Entry{.index = 19, .value = SetEntityDataPacket::IntValue{.value = 1}});
+            entries.push_back(Entry{.index = kFoxVariantDataIndex, .value = SetEntityDataPacket::IntValue{.value = 1}});
         }
     } else if (type == "frog") {
         addRegistryMetadata(entries, data, "variant", 18, runtime::registry::vanillaRegistryData::frogVariants(),
