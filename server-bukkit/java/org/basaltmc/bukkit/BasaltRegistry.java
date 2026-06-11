@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.bukkit.Keyed;
@@ -16,10 +17,17 @@ import org.bukkit.Registry;
 
 public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
     private final Supplier<List<T>> source;
+    private final Function<NamespacedKey, T> open;
     private Map<NamespacedKey, T> entries;
 
     BasaltRegistry(Supplier<List<T>> source) {
+        this(source, null);
+    }
+
+    /** A registry the server cannot list in full still answers for a key a plugin names, through {@code open}. */
+    BasaltRegistry(Supplier<List<T>> source, Function<NamespacedKey, T> open) {
         this.source = source;
+        this.open = open;
     }
 
     private synchronized Map<NamespacedKey, T> entries() {
@@ -35,7 +43,13 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
 
     @Override
     public T get(NamespacedKey key) {
-        return entries().get(key);
+        T found = entries().get(key);
+        if (found == null && open != null) {
+            synchronized (this) {
+                found = entries().computeIfAbsent(key, open);
+            }
+        }
+        return found;
     }
 
     @Override

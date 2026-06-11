@@ -20,6 +20,7 @@
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -1505,6 +1506,50 @@ std::vector<std::string> LoadedWorlds::itemIds() const {
         ids.push_back("minecraft:" + std::string{name});
     }
     return ids;
+}
+
+std::vector<std::string> LoadedWorlds::registryIds(std::string_view registry) const {
+    const auto tableIds = [](auto table) {
+        std::vector<std::string> ids;
+        for (const auto& [id, name] : table) {
+            ids.push_back("minecraft:" + std::string{name});
+        }
+        return ids;
+    };
+    if (registry == "item") {
+        return itemIds();
+    }
+    if (registry == "entity_type") {
+        return entityTypeIds();
+    }
+    if (registry == "worldgen/biome") {
+        return biomeIds();
+    }
+    if (registry == "particle_type") {
+        return tableIds(reg::particleTypeIdsTable());
+    }
+    if (registry == "data_component_type") {
+        return tableIds(reg::dataComponentIdsTable());
+    }
+    if (registry == "block_entity_type") {
+        std::vector<std::string> ids;
+        for (const std::string_view name : reg::blockEntityTypeNamesTable()) {
+            ids.push_back("minecraft:" + std::string{name});
+        }
+        return ids;
+    }
+    static const std::vector<wire::protocol::configuration::RegistryDataPacket> synced =
+        registry::vanillaConfigurationRegistries::packets();
+    for (const wire::protocol::configuration::RegistryDataPacket& packet : synced) {
+        if (packet.registryId == "minecraft:" + std::string{registry}) {
+            std::vector<std::string> ids;
+            for (const wire::protocol::configuration::RegistryEntry& entry : packet.entries) {
+                ids.push_back(entry.key);
+            }
+            return ids;
+        }
+    }
+    return {};
 }
 
 std::vector<std::string> LoadedWorlds::entityTypeIds() const {

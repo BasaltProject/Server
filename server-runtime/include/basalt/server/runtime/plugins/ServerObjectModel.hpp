@@ -121,6 +121,7 @@ public:
     [[nodiscard]] std::vector<std::string> itemIds() const override;
     [[nodiscard]] std::vector<std::string> tags(std::string_view registry) const override;
     [[nodiscard]] std::vector<std::string> entityTypeIds() const override;
+    [[nodiscard]] std::vector<std::string> registryIds(std::string_view registry) const override;
 
 private:
     ModelHooks hooks_;

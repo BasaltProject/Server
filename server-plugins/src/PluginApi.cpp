@@ -477,6 +477,16 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("entity_types");
+    wire::lua::pushHostFunction(lua, "worlds.registry", [server](LuaArgs& args) {
+        args.pushTable();
+        std::int64_t position = 1;
+        for (const std::string& id : server->services().worlds().registryIds(args.checkString(1))) {
+            args.pushString(id);
+            args.setIndex(position++);
+        }
+        return 1;
+    });
+    lua.setField("registry");
     wire::lua::pushHostFunction(lua, "worlds.tags", [server](LuaArgs& args) {
         const std::vector<std::string> flat = server->services().worlds().tags(args.checkString(1));
         args.pushTable();

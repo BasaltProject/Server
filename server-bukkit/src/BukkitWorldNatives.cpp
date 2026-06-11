@@ -108,6 +108,10 @@ jobjectArray JNICALL nativeTags(JNIEnv* env, jclass, jstring registry) {
     return stringArray(env, worlds().tags(toStd(env, registry)));
 }
 
+jobjectArray JNICALL nativeRegistryIds(JNIEnv* env, jclass, jstring registry) {
+    return stringArray(env, worlds().registryIds(toStd(env, registry)));
+}
+
 jobjectArray JNICALL nativeEntityTypes(JNIEnv* env, jclass) { return stringArray(env, worlds().entityTypeIds()); }
 
 jobjectArray JNICALL nativeWorldStrings(JNIEnv* env, jclass, jstring name) {
@@ -1025,6 +1029,7 @@ void registerWorldNatives(JNIEnv* env, jclass natives) {
         method("blockInfo", "(I)[D", reinterpret_cast<void*>(&nativeBlockInfo)),
         method("biomeIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeBiomeIds)),
         method("itemIds", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeItemIds)),
+        method("registryIds", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeRegistryIds)),
         method("tags", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeTags)),
         method("entityTypes", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeEntityTypes)),
         method("worldStrings", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeWorldStrings)),

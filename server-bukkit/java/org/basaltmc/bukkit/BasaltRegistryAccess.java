@@ -7,7 +7,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
+import org.basaltmc.bukkit.gen.RegistryTypes;
 import org.bukkit.Keyed;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.block.BlockType;
 import org.bukkit.entity.EntityType;
@@ -23,11 +26,24 @@ public final class BasaltRegistryAccess implements RegistryAccess {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static synchronized <T extends Keyed> Registry<T> named(String name) {
-        return (Registry<T>) registries.computeIfAbsent(name, key -> new BasaltRegistry(() -> entriesOf(key)));
+    private static synchronized <T extends Keyed> Registry<T> named(String name, Class<?> type) {
+        return (Registry<T>) registries.computeIfAbsent(name, key -> genericRegistry(key, type));
     }
 
-    private static List<Keyed> entriesOf(String name) {
+    /** Entries come from the server's own registry when it has one; an interface type also answers for any key named. */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T extends Keyed> Registry<T> genericRegistry(String name, Class<?> type) {
+        Supplier<List<T>> source = () -> (List<T>) (List) entriesOf(name, type);
+        if (type != null && type.isInterface() && !BUILT_IN.contains(name)) {
+            Class<T> keyed = (Class<T>) type;
+            return new BasaltRegistry<T>(source, key -> KeyedProxy.of(keyed, key, -1));
+        }
+        return new BasaltRegistry<T>(source);
+    }
+
+    private static final java.util.Set<String> BUILT_IN = java.util.Set.of("block", "item", "worldgen/biome", "entity_type");
+
+    private static List<Keyed> entriesOf(String name, Class<?> type) {
         List<Keyed> out = new ArrayList<>();
         switch (name) {
             case "block":
@@ -47,13 +63,23 @@ public final class BasaltRegistryAccess implements RegistryAccess {
                 }
                 break;
             case "entity_type":
-                for (EntityType type : EntityType.values()) {
-                    if (type != EntityType.UNKNOWN) {
-                        out.add(type);
+                for (EntityType entity : EntityType.values()) {
+                    if (entity != EntityType.UNKNOWN) {
+                        out.add(entity);
                     }
                 }
                 break;
             default:
+                if (type != null && type.isInterface()) {
+                    String[] entryIds = WorldNatives.registryIds(name);
+                    for (int i = 0; i < entryIds.length; i++) {
+                        out.add(KeyedProxy.of((Class<? extends Keyed>) type, NamespacedKey.fromString(entryIds[i]), i));
+                    }
+                } else if (type != null && type.isEnum()) {
+                    for (Object constant : type.getEnumConstants()) {
+                        out.add((Keyed) constant);
+                    }
+                }
                 break;
         }
         return out;
@@ -61,11 +87,18 @@ public final class BasaltRegistryAccess implements RegistryAccess {
 
     @Override
     public <T extends Keyed> Registry<T> getRegistry(Class<T> type) {
-        return named(type.getSimpleName().toLowerCase(Locale.ROOT));
+        for (Map.Entry<String, Class<?>> entry : RegistryTypes.kByName.entrySet()) {
+            if (entry.getValue() == type) {
+                return named(entry.getKey(), type);
+            }
+        }
+        return named(type.getSimpleName().toLowerCase(Locale.ROOT), type);
     }
 
     @Override
     public <T extends Keyed> Registry<T> getRegistry(RegistryKey<T> key) {
-        return named(key.key().value());
+        String name = key.key().value();
+        Class<?> type = RegistryTypes.kByName.get(name);
+        return named(name, type);
     }
 }
