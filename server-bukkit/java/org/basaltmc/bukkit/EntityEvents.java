@@ -64,13 +64,57 @@ final class EntityEvents {
             f.put("exp", (long) death.getDroppedExp());
         });
         EventBridge.map("entity.spawn", CreatureSpawnEvent.class, f -> {
+            if (!mobType(f.text("entity_type"))) {
+                return null;
+            }
             Entity made = template(f);
             return made instanceof Mob ? new CreatureSpawnEvent((LivingEntity) made, spawnReason(f.text("reason")))
                 : null;
         });
         EventBridge.map("entity.spawn", EntitySpawnEvent.class, f -> {
+            if (mobType(f.text("entity_type"))) {
+                return null;
+            }
             Entity made = template(f);
-            return made instanceof Mob || made == null ? null : new EntitySpawnEvent(made);
+            return made == null ? null : new EntitySpawnEvent(made);
+        });
+        EventBridge.map("entity.add", com.destroystokyo.paper.event.entity.EntityAddToWorldEvent.class, f -> {
+            Entity added = f.entity();
+            if (added instanceof Cored real) {
+                Entity template = pending.remove(key(f));
+                if (template instanceof Cored staged) {
+                    staged.core().replayOnto(real.core());
+                }
+            }
+            return added == null ? null : new com.destroystokyo.paper.event.entity.EntityAddToWorldEvent(added,
+                added.getWorld());
+        });
+        EventBridge.map("item.spawn", org.bukkit.event.entity.ItemSpawnEvent.class, f -> {
+            BasaltWorld world = f.world();
+            org.bukkit.Material material = org.bukkit.Material.matchMaterial(f.text("item"));
+            if (world == null || material == null || material.isAir()) {
+                return null;
+            }
+            Entity item = org.basaltmc.bukkit.entity.EntityCore.template(world, EntityType.ITEM, f.real("x"),
+                f.real("y"), f.real("z"), 0f, 0f);
+            ((Cored) item).core().stageNbt("Item", org.basaltmc.bukkit.entity.EntityItems.toNbt(
+                new org.bukkit.inventory.ItemStack(material, (int) Math.max(1, f.whole("count")))));
+            return new org.bukkit.event.entity.ItemSpawnEvent((org.bukkit.entity.Item) item);
+        });
+        EventBridge.map("block.explode", org.bukkit.event.entity.ExplosionPrimeEvent.class, f -> {
+            Entity source = f.whole("entity_id") > 0 ? f.entity() : null;
+            return source == null ? null : new org.bukkit.event.entity.ExplosionPrimeEvent(source,
+                (float) f.real("power"), false);
+        }, (e, f) -> f.put("power", (double) ((org.bukkit.event.entity.ExplosionPrimeEvent) e).getRadius()));
+        EventBridge.map("block.explode", org.bukkit.event.entity.EntityExplodeEvent.class, f -> {
+            Entity source = f.whole("entity_id") > 0 ? f.entity() : null;
+            return source == null ? null : new org.bukkit.event.entity.EntityExplodeEvent(source, f.location(),
+                new ArrayList<>(), 1.0f, org.bukkit.ExplosionResult.DESTROY);
+        });
+        EventBridge.map("entity.mount", org.bukkit.event.vehicle.VehicleEnterEvent.class, f -> {
+            Entity mount = f.entity();
+            return mount instanceof org.bukkit.entity.Vehicle vehicle && f.player() != null && f.flag("mounting")
+                ? new org.bukkit.event.vehicle.VehicleEnterEvent(vehicle, f.player()) : null;
         });
         EventBridge.map("entity.heal", EntityRegainHealthEvent.class, f -> {
             Entity healed = f.entity();
@@ -127,14 +171,37 @@ final class EntityEvents {
         });
     }
 
+    private static final java.util.Map<String, Entity> pending = new java.util.concurrent.ConcurrentHashMap<>();
+    private static volatile boolean following;
+
+    private static String key(EventBridge.Fields f) {
+        return f.text("world") + ":" + f.text("entity_type") + ":" + Math.round(f.real("x") * 1000.0) + ":"
+            + Math.round(f.real("y") * 1000.0) + ":" + Math.round(f.real("z") * 1000.0);
+    }
+
+    private static boolean mobType(String key) {
+        EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(key);
+        return type != EntityType.UNKNOWN && type.getEntityClass() != null
+            && Mob.class.isAssignableFrom(type.getEntityClass());
+    }
+
     private static Entity template(EventBridge.Fields f) {
         EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(f.text("entity_type"));
         BasaltWorld world = f.world();
         if (type == EntityType.UNKNOWN || world == null) {
             return null;
         }
-        return org.basaltmc.bukkit.entity.EntityCore.template(world, type, f.real("x"), f.real("y"), f.real("z"), 0f,
-            0f);
+        if (!following) {
+            following = true;
+            Natives.subscribe("entity.add", org.bukkit.event.EventPriority.NORMAL.ordinal());
+        }
+        if (pending.size() > 256) {
+            pending.clear();
+        }
+        Entity made = org.basaltmc.bukkit.entity.EntityCore.template(world, type, f.real("x"), f.real("y"),
+            f.real("z"), 0f, 0f);
+        pending.put(key(f), made);
+        return made;
     }
 
     private static CreatureSpawnEvent.SpawnReason spawnReason(String name) {

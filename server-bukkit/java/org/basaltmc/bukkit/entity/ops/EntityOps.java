@@ -454,4 +454,47 @@ public interface EntityOps extends Entity, Cored {
         String kind = source.getDamageType().getKey().getKey();
         return isMarkedInvulnerable() && !kind.equals("out_of_world") && !kind.equals("generic_kill");
     }
+
+    default org.bukkit.persistence.PersistentDataContainer getPersistentDataContainer() {
+        return core().persistentData();
+    }
+
+    default boolean spawnAt(Location location, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason reason) {
+        if (!core().isTemplate()) {
+            throw new IllegalStateException("Entity has already been added to a world");
+        }
+        core().teleport(location);
+        return org.basaltmc.bukkit.entity.EntitySpawner.add(core().world, this, reason) != null;
+    }
+
+    default org.bukkit.entity.SpawnCategory getSpawnCategory() {
+        String category = core().text("category");
+        return switch (category == null ? "misc" : category) {
+            case "monster" -> org.bukkit.entity.SpawnCategory.MONSTER;
+            case "creature" -> org.bukkit.entity.SpawnCategory.ANIMAL;
+            case "ambient" -> org.bukkit.entity.SpawnCategory.AMBIENT;
+            case "axolotls" -> org.bukkit.entity.SpawnCategory.AXOLOTL;
+            case "underground_water_creature" -> org.bukkit.entity.SpawnCategory.WATER_UNDERGROUND_CREATURE;
+            case "water_creature" -> org.bukkit.entity.SpawnCategory.WATER_ANIMAL;
+            case "water_ambient" -> org.bukkit.entity.SpawnCategory.WATER_AMBIENT;
+            default -> org.bukkit.entity.SpawnCategory.MISC;
+        };
+    }
+
+    default org.bukkit.SoundCategory getSoundCategory() {
+        if (core().type == EntityType.PLAYER) {
+            return org.bukkit.SoundCategory.PLAYERS;
+        }
+        return "monster".equals(core().text("category")) ? org.bukkit.SoundCategory.HOSTILE
+            : org.bukkit.SoundCategory.NEUTRAL;
+    }
+
+    default org.bukkit.Location getOrigin() {
+        return null;
+    }
+
+    default boolean isUnderWater() {
+        return core().world.getBlockAt(getLocation().add(0, getHeight() * 0.85, 0)).getType()
+            == org.bukkit.Material.WATER;
+    }
 }

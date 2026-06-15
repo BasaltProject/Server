@@ -128,6 +128,10 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
         return made;
     }
 
+    public void adopt(int entityId, Entity entity) {
+        entityObjects.put(entityId, entity);
+    }
+
     @Override
     public String getName() {
         return name;
@@ -582,6 +586,17 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
     @Override
     public Entity spawnEntity(Location location, EntityType type) {
         return spawnEntity(location, type, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM);
+    }
+
+    @Override
+    public <T extends Entity> T createEntity(Location location, Class<T> type) {
+        return org.basaltmc.bukkit.entity.EntitySpawner.create(this, location, type);
+    }
+
+    @Override
+    public <T extends Entity> T addEntity(T entity) {
+        return org.basaltmc.bukkit.entity.EntitySpawner.add(this, entity,
+            org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM);
     }
 
     @Override

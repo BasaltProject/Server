@@ -349,7 +349,7 @@ public class BasaltPlayer extends PlayerBase {
 
     @Override
     public org.bukkit.inventory.EntityEquipment getEquipment() {
-        return (org.bukkit.inventory.EntityEquipment) getInventory();
+        return new org.basaltmc.bukkit.entity.BasaltPlayerEquipment(getInventory(), this);
     }
 
     private BasaltPlayerInventory inventory;

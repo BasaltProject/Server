@@ -38,13 +38,14 @@ public final class EntityCore {
     private static final Map<String, EntityType> types = new HashMap<>();
 
     public final BasaltWorld world;
-    public final int id;
-    public final UUID uuid;
+    public volatile int id;
+    public volatile UUID uuid;
     public final EntityType type;
     public final MetadataHolder metadata = new MetadataHolder();
     public final java.util.Set<String> tags = new java.util.HashSet<>();
 
-    private double[] staged;
+    private volatile double[] staged;
+    private Map<String, byte[]> stagedBlobs;
     private Map<String, Object> stagedProperties;
     private List<Object[]> stagedCalls;
 
@@ -67,11 +68,33 @@ public final class EntityCore {
         core.staged[kPitch] = pitch;
         core.stagedProperties = new HashMap<>();
         core.stagedCalls = new ArrayList<>();
+        core.stagedBlobs = new HashMap<>();
         return maker().make(type.name(), core);
     }
 
     public boolean isTemplate() {
         return staged != null;
+    }
+
+    /** Turns a template into the entity that now exists, keeping what it was told. */
+    public void bind(int realId, UUID realUuid) {
+        Map<String, Object> properties = stagedProperties;
+        List<Object[]> calls = stagedCalls;
+        id = realId;
+        uuid = realUuid;
+        staged = null;
+        stagedProperties = null;
+        stagedCalls = null;
+        for (Map.Entry<String, Object> entry : properties.entrySet()) {
+            set(entry.getKey(), entry.getValue());
+        }
+        for (Object[] call : calls) {
+            call((String) call[0], (Object[]) call[1]);
+        }
+    }
+
+    public double[] stagedNumbers() {
+        return staged;
     }
 
     /** Hands what a template was told to the entity that took its place. */
@@ -270,6 +293,10 @@ public final class EntityCore {
         return world;
     }
 
+    public org.bukkit.persistence.PersistentDataContainer persistentData() {
+        return PdcHook.of(this);
+    }
+
     public Object property(String name) {
         return staged != null ? stagedProperties.get(name) : EntityNatives.get(world.getName(), id, name);
     }
@@ -329,35 +356,63 @@ public final class EntityCore {
 
     public volatile org.bukkit.event.entity.EntityDamageEvent lastDamageCause;
 
+    private Object nbtValue(String path) {
+        if (staged != null) {
+            return stagedProperties.get("nbt:" + path);
+        }
+        return call("nbt_value", path);
+    }
+
     public boolean nbtFlag(String path) {
-        return call("nbt_value", path) instanceof Number value && value.longValue() != 0;
+        Object value = nbtValue(path);
+        return value instanceof Number number ? number.longValue() != 0 : value instanceof Boolean flag && flag;
     }
 
     public int nbtInt(String path) {
-        return call("nbt_value", path) instanceof Number value ? value.intValue() : 0;
+        return nbtValue(path) instanceof Number value ? value.intValue() : 0;
     }
 
     public int nbtInt(String path, int fallback) {
-        return call("nbt_value", path) instanceof Number value ? value.intValue() : fallback;
+        return nbtValue(path) instanceof Number value ? value.intValue() : fallback;
     }
 
     public double nbtReal(String path) {
-        return call("nbt_value", path) instanceof Number value ? value.doubleValue() : 0.0;
+        return nbtValue(path) instanceof Number value ? value.doubleValue() : 0.0;
     }
 
     public String nbtText(String path) {
-        return call("nbt_value", path) instanceof String value ? value : null;
+        return nbtValue(path) instanceof String value ? value : null;
     }
 
     public void nbtSet(String path, String type, Object value) {
+        if (staged != null) {
+            stagedProperties.put("nbt:" + path, value);
+        }
         call("nbt_set", path, type, value);
     }
 
     public byte[] nbt(String path) {
+        if (staged != null) {
+            return stagedBlobs.get(path);
+        }
         return call("nbt", path) instanceof byte[] value ? value : null;
     }
 
+    public void stageNbt(String path, byte[] compound) {
+        if (staged != null) {
+            stagedBlobs.put(path, compound);
+        }
+    }
+
     public void mergeNbt(byte[] patch) {
+        if (staged != null) {
+            net.minecraft.nbt.CompoundTag parsed = org.basaltmc.bukkit.facade.NbtCodec.fromBytes(patch);
+            for (String key : parsed.keySet()) {
+                if (parsed.get(key) instanceof net.minecraft.nbt.CompoundTag inner) {
+                    stagedBlobs.put(key, org.basaltmc.bukkit.facade.NbtCodec.toBytes(inner));
+                }
+            }
+        }
         call("merge_nbt", patch);
     }
 

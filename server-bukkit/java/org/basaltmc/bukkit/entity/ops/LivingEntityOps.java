@@ -11,6 +11,7 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.inventory.EntityEquipment;
@@ -19,11 +20,12 @@ import org.bukkit.potion.PotionEffectType;
 
 public interface LivingEntityOps extends LivingEntity, EntityOps {
     default double getHealth() {
-        return core().number(EntityCore.kHealth);
+        return core().isTemplate() ? (core().property("health") instanceof Number staged ? staged.doubleValue()
+            : getMaxHealth()) : core().number(EntityCore.kHealth);
     }
 
     default void setHealth(double health) {
-        if (Double.isNaN(health) || health < 0.0 || health > getMaxHealth()) {
+        if (!core().isTemplate() && (Double.isNaN(health) || health < 0.0 || health > getMaxHealth())) {
             throw new IllegalArgumentException("Health must be between 0 and " + getMaxHealth() + ", but was "
                 + health);
         }
@@ -35,7 +37,8 @@ public interface LivingEntityOps extends LivingEntity, EntityOps {
     }
 
     default double getMaxHealth() {
-        return core().real("max_health");
+        return core().isTemplate() && !(core().property("max_health") instanceof Number) ? 20.0
+            : core().real("max_health");
     }
 
     default void setMaxHealth(double health) {
@@ -320,5 +323,41 @@ public interface LivingEntityOps extends LivingEntity, EntityOps {
     default Entity getTargetEntity(int maxDistance, boolean ignoreBlocks) {
         org.bukkit.util.RayTraceResult result = rayTraceEntities(maxDistance, ignoreBlocks);
         return result == null ? null : result.getHitEntity();
+    }
+
+    default org.bukkit.entity.EntityCategory getCategory() {
+        EntityType type = core().type;
+        return org.bukkit.Tag.ENTITY_TYPES_UNDEAD.isTagged(type) ? org.bukkit.entity.EntityCategory.UNDEAD
+            : org.bukkit.Tag.ENTITY_TYPES_ARTHROPOD.isTagged(type) ? org.bukkit.entity.EntityCategory.ARTHROPOD
+            : org.bukkit.Tag.ENTITY_TYPES_ILLAGER.isTagged(type) ? org.bukkit.entity.EntityCategory.ILLAGER
+            : org.bukkit.Tag.ENTITY_TYPES_AQUATIC.isTagged(type) ? org.bukkit.entity.EntityCategory.WATER
+            : org.bukkit.entity.EntityCategory.NONE;
+    }
+
+    default boolean canBreatheUnderwater() {
+        return org.bukkit.Tag.ENTITY_TYPES_CAN_BREATHE_UNDER_WATER.isTagged(core().type);
+    }
+
+    default boolean hasLineOfSight(Entity other) {
+        return hasLineOfSight(other.getLocation().add(0, other.getHeight() * 0.85, 0));
+    }
+
+    default boolean hasLineOfSight(Location location) {
+        Location eye = getEyeLocation();
+        org.bukkit.util.Vector way = location.toVector().subtract(eye.toVector());
+        double distance = way.length();
+        if (distance < 1.0E-6) {
+            return true;
+        }
+        return core().world.rayTraceBlocks(eye, way.normalize(), distance, org.bukkit.FluidCollisionMode.NEVER,
+            true) == null;
+    }
+
+    default void attack(Entity target) {
+        double damage = getAttribute(Attribute.ATTACK_DAMAGE) == null ? 1.0
+            : getAttribute(Attribute.ATTACK_DAMAGE).getValue();
+        if (target instanceof LivingEntity living) {
+            living.damage(damage, this);
+        }
     }
 }
