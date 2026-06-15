@@ -497,6 +497,17 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                               const world::ActiveEffect& effect, std::int32_t sourceId) {
         return combat_ != nullptr && combat_->giveMobEffect(world, watchersIn(world), affected, effect, sourceId);
     };
+    model.explode = [this](world::LoadedWorld& world, double x, double y, double z, float power, bool breakBlocks,
+                           std::int32_t sourceEntityId) {
+        if (explosions_ == nullptr) {
+            return;
+        }
+        world::explosions::Spares spare;
+        if (!breakBlocks) {
+            spare = [](world::WorldState&, std::int32_t, std::int32_t, std::int32_t, std::int32_t) { return true; };
+        }
+        explosions_->blowUp(world, watchersIn(world), x, y, z, power, "explosion", std::max(sourceEntityId, 0), spare);
+    };
     model.spawnAs = [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                            double z, float yaw, std::string_view reason) {
         return spawning_ == nullptr ? nullptr : spawning_->spawnMob(world, type, x, y, z, yaw, reason);

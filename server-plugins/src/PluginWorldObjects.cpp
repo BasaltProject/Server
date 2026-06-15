@@ -439,6 +439,13 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
         }
         return 1;
     });
+    object.method("explode", [world](LuaArgs& args) {
+        const std::int32_t base = firstArgument(args);
+        args.pushBoolean(world->explode(args.checkNumber(base), args.checkNumber(base + 1), args.checkNumber(base + 2),
+                                        static_cast<float>(args.checkNumber(base + 3)), args.booleanOr(base + 4, true),
+                                        static_cast<std::int32_t>(args.integerOr(base + 5, -1))));
+        return 1;
+    });
     object.method("drop_item", [world](LuaArgs& args) {
         const std::int32_t base = firstArgument(args);
         const std::optional<PluginItem> item = itemFrom(args, base);

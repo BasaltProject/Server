@@ -630,6 +630,65 @@ public final class BasaltWorld extends org.bukkit.craftbukkit.CraftWorld {
     }
 
     @Override
+    public org.bukkit.entity.LightningStrike strikeLightning(Location location) {
+        return (org.bukkit.entity.LightningStrike) org.basaltmc.bukkit.entity.EntitySpawner.spawn(this, location,
+            EntityType.LIGHTNING_BOLT, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM, null);
+    }
+
+    @Override
+    public org.bukkit.entity.LightningStrike strikeLightningEffect(Location location) {
+        return (org.bukkit.entity.LightningStrike) org.basaltmc.bukkit.entity.EntitySpawner.spawn(this, location,
+            EntityType.LIGHTNING_BOLT, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM,
+            bolt -> ((org.basaltmc.bukkit.entity.Cored) bolt).core().set("bolt_visual_only", true));
+    }
+
+    @Override
+    public org.bukkit.entity.FallingBlock spawnFallingBlock(Location location, org.bukkit.block.data.BlockData data)
+            throws IllegalArgumentException {
+        int state = BasaltBlockData.stateOf(data);
+        return (org.bukkit.entity.FallingBlock) org.basaltmc.bukkit.entity.EntitySpawner.spawn(this, location,
+            EntityType.FALLING_BLOCK, org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM,
+            block -> ((org.basaltmc.bukkit.entity.Cored) block).core().set("object_data", state));
+    }
+
+    @Override
+    public <T extends org.bukkit.entity.AbstractArrow> T spawnArrow(Location location, org.bukkit.util.Vector direction,
+            float speed, float spread, Class<T> clazz) {
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        org.bukkit.util.Vector launch = direction.clone().normalize().multiply(speed).add(new org.bukkit.util.Vector(
+            random.nextGaussian() * 0.0075 * spread, random.nextGaussian() * 0.0075 * spread,
+            random.nextGaussian() * 0.0075 * spread));
+        return org.basaltmc.bukkit.entity.EntitySpawner.spawn(this, location, clazz,
+            org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.DEFAULT,
+            arrow -> ((org.basaltmc.bukkit.entity.Cored) arrow).core().velocity(launch));
+    }
+
+    private boolean blast(Entity source, double x, double y, double z, float power, boolean fire, boolean breakBlocks) {
+        if (fire) {
+            throw Unsupported.hit("World#createExplosion that sets fires");
+        }
+        Blocks.flushAll();
+        return EntityNatives.explode(name, x, y, z, power, breakBlocks, source == null ? -1 : source.getEntityId());
+    }
+
+    @Override
+    public boolean createExplosion(Entity source, Location location, float power, boolean fire, boolean breakBlocks,
+            boolean excludeSourceFromDamage) {
+        return blast(source, location.getX(), location.getY(), location.getZ(), power, fire, breakBlocks);
+    }
+
+    @Override
+    public boolean createExplosion(Location location, float power, boolean fire, boolean breakBlocks, Entity source) {
+        return blast(source, location.getX(), location.getY(), location.getZ(), power, fire, breakBlocks);
+    }
+
+    @Override
+    public boolean createExplosion(double x, double y, double z, float power, boolean fire, boolean breakBlocks,
+            Entity source) {
+        return blast(source, x, y, z, power, fire, breakBlocks);
+    }
+
+    @Override
     public org.bukkit.entity.Item dropItem(Location location, org.bukkit.inventory.ItemStack item,
             Consumer<? super org.bukkit.entity.Item> function) {
         return org.basaltmc.bukkit.entity.EntitySpawner.drop(this, location, item, 0.0, 0.0, 0.0, function);
