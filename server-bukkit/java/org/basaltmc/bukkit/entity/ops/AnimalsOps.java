@@ -24,4 +24,12 @@ public interface AnimalsOps extends Animals, org.basaltmc.bukkit.entity.Cored {
     default void setBreedCause(UUID uuid) {
         core().set("love_cause", uuid == null ? null : uuid.toString());
     }
+
+    default boolean isBreedItem(org.bukkit.Material material) {
+        return core().test("is_breed_item", material.getKey().toString());
+    }
+
+    default boolean isBreedItem(org.bukkit.inventory.ItemStack stack) {
+        return isBreedItem(stack.getType());
+    }
 }

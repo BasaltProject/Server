@@ -13,4 +13,8 @@ public interface BoatOps extends Boat, Cored {
             return Boat.Type.OAK;
         }
     }
+
+    default org.bukkit.Material getBoatMaterial() {
+        return getBoatType().getMaterial();
+    }
 }
