@@ -1,0 +1,42 @@
+package org.basaltmc.bukkit.entity.ops;
+
+import org.basaltmc.bukkit.entity.Cored;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.entity.AbstractHorse;
+import org.bukkit.entity.Horse;
+
+public interface AbstractHorseOps extends AbstractHorse, Cored {
+    default int getDomestication() {
+        return core().nbtInt("Temper");
+    }
+
+    default void setDomestication(int level) {
+        core().nbtSet("Temper", "int", Math.max(0, Math.min(getMaxDomestication(), level)));
+    }
+
+    default int getMaxDomestication() {
+        return 100;
+    }
+
+    default double getJumpStrength() {
+        return getAttribute(Attribute.JUMP_STRENGTH).getValue();
+    }
+
+    default void setJumpStrength(double strength) {
+        if (strength < 0.0) {
+            throw new IllegalArgumentException("Jump strength cannot be less than zero");
+        }
+        getAttribute(Attribute.JUMP_STRENGTH).setBaseValue(strength);
+    }
+
+    default Horse.Variant getVariant() {
+        return switch (core().type.getKey().getKey()) {
+            case "donkey" -> Horse.Variant.DONKEY;
+            case "mule" -> Horse.Variant.MULE;
+            case "skeleton_horse" -> Horse.Variant.SKELETON_HORSE;
+            case "zombie_horse" -> Horse.Variant.UNDEAD_HORSE;
+            case "llama" -> Horse.Variant.LLAMA;
+            default -> Horse.Variant.HORSE;
+        };
+    }
+}

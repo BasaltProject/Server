@@ -50,7 +50,7 @@ public final class BasaltTag<T extends Keyed> implements Tag<T> {
             case Tag.REGISTRY_BLOCKS, Tag.REGISTRY_ITEMS:
                 return Material.matchMaterial(id);
             case Tag.REGISTRY_ENTITY_TYPES:
-                EntityType type = EntityCore.typeOf(id);
+                EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(id);
                 return type == EntityType.UNKNOWN ? null : type;
             default:
                 return null;

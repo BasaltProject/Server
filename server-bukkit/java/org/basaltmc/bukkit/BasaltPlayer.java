@@ -96,20 +96,8 @@ public class BasaltPlayer extends PlayerBase {
         return isOnline();
     }
 
-    @Override
-    public double getHealth() {
-        return number(kHealth);
-    }
 
-    @Override
-    public void setHealth(double health) {
-        Natives.playerSetHealth(uuid, health);
-    }
 
-    @Override
-    public double getMaxHealth() {
-        return 20.0;
-    }
 
     @Override
     public int getFoodLevel() {
@@ -345,6 +333,23 @@ public class BasaltPlayer extends PlayerBase {
     private double extra(int index) {
         double[] values = WorldNatives.playerExtra(uuid);
         return values == null ? 0.0 : values[index];
+    }
+
+    private org.basaltmc.bukkit.entity.EntityCore entityCore;
+
+    @Override
+    public synchronized org.basaltmc.bukkit.entity.EntityCore core() {
+        BasaltWorld world = (BasaltWorld) getWorld();
+        int entityId = getEntityId();
+        if (entityCore == null || entityCore.world != world || entityCore.id != entityId) {
+            entityCore = new org.basaltmc.bukkit.entity.EntityCore(world, entityId, id, EntityType.PLAYER);
+        }
+        return entityCore;
+    }
+
+    @Override
+    public org.bukkit.inventory.EntityEquipment getEquipment() {
+        return (org.bukkit.inventory.EntityEquipment) getInventory();
     }
 
     private BasaltPlayerInventory inventory;
@@ -606,30 +611,10 @@ public class BasaltPlayer extends PlayerBase {
         return tags.remove(tag);
     }
 
-    @Override
-    public org.bukkit.entity.Entity getVehicle() {
-        return null;
-    }
 
-    @Override
-    public boolean isInsideVehicle() {
-        return false;
-    }
 
-    @Override
-    public java.util.List<org.bukkit.entity.Entity> getPassengers() {
-        return new java.util.ArrayList<>();
-    }
 
-    @Override
-    public boolean isPersistent() {
-        return true;
-    }
 
-    @Override
-    public int getTicksLived() {
-        return 0;
-    }
 
     @Override
     public org.bukkit.block.BlockFace getFacing() {
