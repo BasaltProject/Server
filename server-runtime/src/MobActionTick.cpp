@@ -274,6 +274,15 @@ using BrainTick = void (MobActionSystem::*)(world::LoadedWorld&, entity::ai::Mob
 
 } // namespace
 
+void MobActionSystem::retarget(world::LoadedWorld& world, ServerEntity& mob,
+                               const std::optional<std::int32_t>& previous) {
+    if (!hooks_.targetChanged) {
+        return;
+    }
+    std::optional<std::int32_t> next = mob.targetId;
+    mob.targetId = hooks_.targetChanged(world, mob, previous, next) ? next : previous;
+}
+
 void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                 const std::vector<entity::ai::PlayerView>& views,
                                 const std::vector<ServerEntity*>& living, random::RandomSource& random) {
@@ -457,12 +466,21 @@ void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& g
 }
 
 void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntity& entity) {
+    dropDeathInventories(world, entity);
+    spawnLoot(world, entity, deathLootOf(world, entity));
+}
+
+void MobActionSystem::dropDeathInventories(world::LoadedWorld& world, const ServerEntity& entity) {
     if (entity::allays::isAllay(entity.type())) {
         dropAllayInventory(world, entity);
     }
     if (entity::piglins::isPiglin(entity.type())) {
         dropPiglinInventory(world, entity);
     }
+}
+
+std::vector<server::world::loot::ItemStack> MobActionSystem::deathLootOf(world::LoadedWorld& world,
+                                                                         const ServerEntity& entity) {
     // parity: `Mob.getLootTable`, a `DeathLootTable` in the tag wins over `minecraft:entities/<type>`.
     const server::world::loot::LootTable* table = nullptr;
     if (entity.deathLootTable.has_value()) {
@@ -475,7 +493,7 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
         table = lootTables_->forEntity(entity.type());
     }
     if (table == nullptr) {
-        return;
+        return {};
     }
     // parity: `LootTable.getRandomItems(params, seed)`, a nonzero seed gives the table its own random.
     random::RandomSource scratch =
@@ -483,8 +501,13 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     const server::world::loot::LootContext context = deathLootContext(world, entity);
-    for (const server::world::loot::ItemStack& stack : table->generate(random, context.luck, std::nullopt, context)) {
-        if (server::registry::items::registry().byName(stack.item) == nullptr) {
+    return table->generate(random, context.luck, std::nullopt, context);
+}
+
+void MobActionSystem::spawnLoot(world::LoadedWorld& world, const ServerEntity& entity,
+                                const std::vector<server::world::loot::ItemStack>& stacks) {
+    for (const server::world::loot::ItemStack& stack : stacks) {
+        if (stack.count <= 0 || server::registry::items::registry().byName(stack.item) == nullptr) {
             continue;
         }
         world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
@@ -495,6 +518,13 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
                                                    .y = entity.y + (entity.height() / 2.0),
                                                    .z = entity.z,
                                                    .components = stack.components});
+    }
+}
+
+void MobActionSystem::askDeathDrops(world::LoadedWorld& world, const ServerEntity& entity,
+                                    std::vector<server::world::loot::ItemStack>& drops, std::int32_t& experience) {
+    if (hooks_.deathDrops) {
+        hooks_.deathDrops(world, entity, drops, experience);
     }
 }
 

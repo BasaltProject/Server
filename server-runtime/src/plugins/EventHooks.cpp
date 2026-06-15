@@ -256,6 +256,7 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
                 }
             }
             filled.set("attacker_name", attacker);
+            filled.set("attacker_id", static_cast<std::int64_t>(sourceEntityId.value_or(-1)));
         });
         if (event == nullptr) {
             return amount;

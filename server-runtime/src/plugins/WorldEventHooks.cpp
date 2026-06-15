@@ -229,6 +229,98 @@ void pistons(BlockChangeBroadcaster::Hooks& hooks, const EventSink& sink) {
 }
 
 void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf) {
+    hooks.targetChanged = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& mob,
+                                  const std::optional<std::int32_t>& previous, std::optional<std::int32_t>& next) {
+        const server::plugins::PluginEvent* event = sink.ask(&entityTarget, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+            filled.set("entity_type", mob.type().toString());
+            filled.set("world", world.name());
+            filled.set("target_id", static_cast<std::int64_t>(next.value_or(-1)));
+            filled.set("previous_id", static_cast<std::int64_t>(previous.value_or(-1)));
+            filled.set("reason", std::string{next.has_value() ? "closest" : "forget"});
+        });
+        if (event == nullptr) {
+            return true;
+        }
+        if (event->cancelled()) {
+            return false;
+        }
+        const auto* edited = std::get_if<std::int64_t>(&event->get("target_id"));
+        if (edited != nullptr) {
+            next = *edited < 0 ? std::nullopt : std::optional{static_cast<std::int32_t>(*edited)};
+        }
+        return true;
+    };
+    hooks.deathDrops = [&sink, worldOf](const world::LoadedWorld& world, const entity::ServerEntity& mob,
+                                        std::vector<server::world::loot::ItemStack>& drops,
+                                        std::int32_t& experience) {
+        std::string lines;
+        for (const server::world::loot::ItemStack& stack : drops) {
+            lines += (lines.empty() ? "" : "\n") + stack.item.toString() + "|" + std::to_string(stack.count);
+        }
+        const server::plugins::PluginEvent* event = sink.ask(&entityDrops, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+            filled.set("entity_type", mob.type().toString());
+            filled.set("world", world.name());
+            filled.set("x", mob.x);
+            filled.set("y", mob.y);
+            filled.set("z", mob.z);
+            filled.set("drops", lines);
+            filled.set("exp", static_cast<std::int64_t>(experience));
+            filled.set("killer_id", static_cast<std::int64_t>(mob.lastBlame.causingId.value_or(-1)));
+        });
+        if (event == nullptr) {
+            return;
+        }
+        if (const auto* paid = std::get_if<std::int64_t>(&event->get("exp")); paid != nullptr) {
+            experience = static_cast<std::int32_t>(std::max<std::int64_t>(0, *paid));
+        }
+        const auto* edited = std::get_if<std::string>(&event->get("drops"));
+        if (edited == nullptr || *edited == lines) {
+            return;
+        }
+        std::vector<server::world::loot::ItemStack> next;
+        std::vector<bool> used(drops.size(), false);
+        for (std::size_t from = 0; from <= edited->size();) {
+            const std::size_t end = std::min(edited->find('\n', from), edited->size());
+            const std::string line = edited->substr(from, end - from);
+            from = end + 1;
+            const std::size_t bar = line.find('|');
+            if (bar == std::string::npos) {
+                continue;
+            }
+            const auto item = wire::common::Identifier::parse(line.substr(0, bar));
+            const std::int32_t count = std::atoi(line.c_str() + bar + 1);
+            if (!item.has_value() || count <= 0) {
+                continue;
+            }
+            bool kept = false;
+            for (std::size_t at = 0; at < drops.size() && !kept; ++at) {
+                if (!used[at] && drops[at].item == *item && drops[at].count == count) {
+                    used[at] = true;
+                    next.push_back(drops[at]);
+                    kept = true;
+                }
+            }
+            if (!kept) {
+                next.push_back(server::world::loot::ItemStack{.item = *item, .count = count, .components = {}});
+            }
+        }
+        drops = std::move(next);
+    };
+    hooks.effectAllowed = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& mob,
+                                  const world::ActiveEffect& effect, std::string_view action) {
+        return sink.allowed(&entityPotionEffect, [&](PluginEvent& event) {
+            event.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
+            event.set("entity_type", mob.type().toString());
+            event.set("world", world.name());
+            event.set("effect", effect.effect.toString());
+            event.set("amplifier", static_cast<std::int64_t>(effect.amplifier));
+            event.set("duration", static_cast<std::int64_t>(effect.remainingTicks));
+            event.set("action", std::string{action});
+            event.set("cause", std::string{"unknown"});
+        });
+    };
     hooks.combustAllowed = [&sink, worldOf](const world::LoadedWorld& world, const entity::ServerEntity& mob,
                                             std::int32_t fireTicks, std::string_view cause) {
         return sink.allowed(&entityCombust, [&](PluginEvent& event) {
@@ -256,7 +348,8 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         });
     };
     hooks.combat.damaged = [&sink, worldOf](const entity::ServerEntity& mob, float amount, std::string_view cause,
-                                            const std::optional<std::string>& attackerName) -> std::optional<float> {
+                                            const std::optional<std::string>& attackerName,
+                                            const std::optional<std::int32_t>& attackerId) -> std::optional<float> {
         const server::plugins::PluginEvent* event = sink.ask(&entityDamage, [&](PluginEvent& filled) {
             filled.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
             filled.set("entity_type", mob.type().toString());
@@ -264,6 +357,7 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
             filled.set("cause", std::string{cause});
             filled.set("amount", static_cast<double>(amount));
             filled.set("attacker_name", attackerName.value_or(std::string{}));
+            filled.set("attacker_id", static_cast<std::int64_t>(attackerId.value_or(-1)));
         });
         if (event == nullptr) {
             return amount;
@@ -274,7 +368,8 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         const auto* edited = std::get_if<double>(&event->get("amount"));
         return edited == nullptr ? amount : static_cast<float>(*edited);
     };
-    hooks.combat.died = [&sink, worldOf](const entity::ServerEntity& mob, const std::optional<std::string>& killer) {
+    hooks.combat.died = [&sink, worldOf](const entity::ServerEntity& mob, const std::optional<std::string>& killer,
+                                         const std::optional<std::int32_t>& killerId) {
         sink.notify(&entityDeath, [&](PluginEvent& event) {
             event.set("entity_id", static_cast<std::int64_t>(mob.entityId()));
             event.set("entity_type", mob.type().toString());
@@ -283,6 +378,7 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
             event.set("y", mob.y);
             event.set("z", mob.z);
             event.set("killer_name", killer.value_or(std::string{}));
+            event.set("killer_id", static_cast<std::int64_t>(killerId.value_or(-1)));
         });
     };
 }

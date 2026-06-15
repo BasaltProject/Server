@@ -31,9 +31,12 @@ struct Result {
 
 struct Hooks {
     std::function<std::optional<float>(const ServerEntity& entity, float amount, std::string_view cause,
-                                       const std::optional<std::string>& attackerName)>
+                                       const std::optional<std::string>& attackerName,
+                                       const std::optional<std::int32_t>& attackerId)>
         damaged;
-    std::function<void(const ServerEntity& entity, const std::optional<std::string>& attackerName)> died;
+    std::function<void(const ServerEntity& entity, const std::optional<std::string>& attackerName,
+                       const std::optional<std::int32_t>& killerId)>
+        died;
 };
 
 [[nodiscard]] std::int64_t nextRaidBarStamp();

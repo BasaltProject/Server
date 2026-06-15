@@ -223,7 +223,11 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
                              return player->entityId() == entity.passengerIds.front();
                          });
     if (!entity.noAi && !steered) {
+        const std::optional<std::int32_t> targeted = entity.targetId;
         actions_->tickMobAi(world, entity, views, living, random);
+        if (entity.targetId != targeted) {
+            actions_->retarget(world, entity, targeted);
+        }
         if (entity.type().path() == "dolphin") {
             actions_->dolphinPicksUp(world, entity);
         }

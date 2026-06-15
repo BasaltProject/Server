@@ -165,6 +165,9 @@ basalt_module(server-runtime-core
         src/ContainerPluginWindow.cpp
         src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
+        src/plugins/EntityOps.cpp
+        src/plugins/PlayerEntityOps.cpp
+        src/plugins/DroppedItemOps.cpp
         src/plugins/WorldBlockUpdates.cpp
         src/plugins/WorldItemUse.cpp
         src/ChunkSimulationView.cpp

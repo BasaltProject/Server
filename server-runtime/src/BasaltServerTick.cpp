@@ -441,15 +441,23 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         const bool experienceTaken = living && drinkBySculk(world, *dead);
         // parity: `Entity.die` drops the entity's own loot table where it stood.
         const bool mobDrops = world.gameRules().get(world::gameRules::kMobDrops);
+        std::vector<server::world::loot::ItemStack> loot;
+        std::int32_t experience = 0;
         if (!living || entity::deathDrops::dropsLoot(*dead, mobDrops)) {
-            mobActions_->dropDeathLoot(world, *dead);
+            mobActions_->dropDeathInventories(world, *dead);
+            loot = mobActions_->deathLootOf(world, *dead);
             if (WitherSystem::isWither(*dead)) {
                 withers_->dropStar(world, *dead);
             }
         }
         if (living && !experienceTaken && entity::deathDrops::dropsExperience(*dead, mobDrops)) {
             random::RandomSource random = random::RandomSource::legacy(scratchSeed());
-            orbs_->award(world, dead->x, dead->y, dead->z, entity::deathDrops::experienceReward(*dead, random));
+            experience = entity::deathDrops::experienceReward(*dead, random);
+        }
+        mobActions_->askDeathDrops(world, *dead, loot, experience);
+        mobActions_->spawnLoot(world, *dead, loot);
+        if (experience > 0) {
+            orbs_->award(world, dead->x, dead->y, dead->z, experience);
         }
         // parity: `AbstractMinecartContainer.remove`.
         if (const std::optional<std::int32_t> size = world::containers::sizeOf(dead->type().path());

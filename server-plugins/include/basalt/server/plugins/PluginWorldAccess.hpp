@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/plugins/PluginEntityOps.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
@@ -219,6 +220,26 @@ public:
     [[nodiscard]] virtual double height() const { return 1.8; }
 
     [[nodiscard]] virtual std::optional<std::string> customName() const { return std::nullopt; }
+
+    /// A named live property, see `kEntityProperties`; nullopt when the entity has no such thing.
+    [[nodiscard]] virtual std::optional<PluginEntityValue> property(std::string_view name) const {
+        static_cast<void>(name);
+        return std::nullopt;
+    }
+
+    virtual bool setProperty(std::string_view name, const PluginEntityValue& value) {
+        static_cast<void>(name);
+        static_cast<void>(value);
+        return false;
+    }
+
+    /// A named operation, see `kEntityOperations`; nullopt when the entity cannot do it.
+    virtual std::optional<PluginEntityValue> invoke(std::string_view operation,
+                                                    const std::vector<PluginEntityValue>& arguments) {
+        static_cast<void>(operation);
+        static_cast<void>(arguments);
+        return std::nullopt;
+    }
 };
 
 class PluginHologramRef : public PluginEntityRef {
@@ -324,6 +345,27 @@ public:
                                               std::function<void(const std::string&)> onClick) = 0;
 
     virtual std::shared_ptr<PluginEntityRef> spawn(std::string_view type, double x, double y, double z) = 0;
+
+    /// Puts a stack (its NBT) on the ground; answers the new entity id, or -1.
+    virtual std::int32_t dropItem(std::span<const std::uint8_t> stack, double x, double y, double z, double velocityX,
+                                  double velocityY, double velocityZ) {
+        static_cast<void>(stack);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(velocityX);
+        static_cast<void>(velocityY);
+        static_cast<void>(velocityZ);
+        return -1;
+    }
+
+    /// Like `spawn`, with a facing and the reason the spawn event reports.
+    virtual std::shared_ptr<PluginEntityRef> spawnAs(std::string_view type, double x, double y, double z, float yaw,
+                                                     std::string_view reason) {
+        static_cast<void>(yaw);
+        static_cast<void>(reason);
+        return spawn(type, x, y, z);
+    }
 
     [[nodiscard]] virtual std::optional<std::string> gameRule(std::string_view name) const = 0;
 

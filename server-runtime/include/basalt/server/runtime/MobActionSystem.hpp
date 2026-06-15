@@ -94,6 +94,15 @@ public:
         std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::int32_t fireTicks,
                            std::string_view cause)>
             combustAllowed;
+        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob,
+                           const std::optional<std::int32_t>& previous, std::optional<std::int32_t>& next)>
+            targetChanged;
+        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob,
+                           const world::ActiveEffect& effect, std::string_view action)>
+            effectAllowed;
+        std::function<void(const world::LoadedWorld& world, const entity::ServerEntity& mob,
+                           std::vector<server::world::loot::ItemStack>& drops, std::int32_t& experience)>
+            deathDrops;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& animal)> tameAllowed;
         std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& animal,
                            const entity::ServerEntity& partner)>
@@ -132,6 +141,9 @@ public:
     MobActionSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions,
                     NaturalSpawningSystem& spawning, CombatSystem& combat, RaidSystem& raids,
                     world::RealLootTables& lootTables, Worlds worlds, Hooks hooks, Options options);
+
+    /// Asks plugins about a target the goals just picked and puts the old one back when they refuse.
+    void retarget(world::LoadedWorld& world, entity::ServerEntity& mob, const std::optional<std::int32_t>& previous);
 
     void swing(entity::ServerEntity& mob) override;
 
@@ -377,6 +389,20 @@ public:
     void releaseVillagerPois(world::LoadedWorld& world, entity::ServerEntity& villager);
 
     void dropDeathLoot(world::LoadedWorld& world, const entity::ServerEntity& entity);
+
+    void dropDeathInventories(world::LoadedWorld& world, const entity::ServerEntity& entity);
+
+    /// What a mob's loot table gives for this death, before anything is spawned.
+    [[nodiscard]] std::vector<server::world::loot::ItemStack> deathLootOf(world::LoadedWorld& world,
+                                                                          const entity::ServerEntity& entity);
+
+    /// Spawns the stacks where the mob stood.
+    void spawnLoot(world::LoadedWorld& world, const entity::ServerEntity& entity,
+                   const std::vector<server::world::loot::ItemStack>& stacks);
+
+    /// Lets plugins change the drops and the experience of a death before they happen.
+    void askDeathDrops(world::LoadedWorld& world, const entity::ServerEntity& entity,
+                       std::vector<server::world::loot::ItemStack>& drops, std::int32_t& experience);
 
     void breed(world::LoadedWorld& world, entity::ServerEntity& animal, entity::ServerEntity& partner);
 

@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/nbt/NbtIO.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -425,6 +426,42 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
             }
             return 1;
         });
+    object.method("spawn_as", [world](LuaArgs& args) {
+        const std::int32_t base = firstArgument(args);
+        const std::shared_ptr<PluginEntityRef> made =
+            world->spawnAs(args.checkString(base), args.checkNumber(base + 1), args.checkNumber(base + 2),
+                           args.checkNumber(base + 3), static_cast<float>(args.numberOr(base + 4, 0.0)),
+                           args.isString(base + 5) ? args.checkString(base + 5) : std::string{"plugin"});
+        if (made == nullptr) {
+            args.pushNil();
+        } else {
+            pushEntity(args, made);
+        }
+        return 1;
+    });
+    object.method("drop_item", [world](LuaArgs& args) {
+        const std::int32_t base = firstArgument(args);
+        const std::optional<PluginItem> item = itemFrom(args, base);
+        if (!item.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        wire::nbt::NbtCompound stack;
+        stack.putString("id", item->id);
+        stack.putInt("count", item->count);
+        const std::vector<std::uint8_t> bytes =
+            wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(stack)));
+        const std::int32_t id =
+            world->dropItem(bytes, args.checkNumber(base + 1), args.checkNumber(base + 2), args.checkNumber(base + 3),
+                            args.numberOr(base + 4, 0.0), args.numberOr(base + 5, 0.0), args.numberOr(base + 6, 0.0));
+        const std::shared_ptr<PluginEntityRef> made = id < 0 ? nullptr : world->entityById(id);
+        if (made == nullptr) {
+            args.pushNil();
+        } else {
+            pushEntity(args, made);
+        }
+        return 1;
+    });
     addBulkWorldMethods(object, world, shared);
     std::move(object).push(lua);
 }

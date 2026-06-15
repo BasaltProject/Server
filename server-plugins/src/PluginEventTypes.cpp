@@ -157,13 +157,16 @@ const PluginEventType& blockPlace() {
 
 const PluginEventType& entityDamage() {
     static const PluginEventType type{
-        "entity.damage", true, {"entity_id", "entity_type", "world", "cause", "amount", "attacker_name"}, {"amount"}};
+        "entity.damage",
+        true,
+        {"entity_id", "entity_type", "world", "cause", "amount", "attacker_name", "attacker_id"},
+        {"amount"}};
     return type;
 }
 
 const PluginEventType& entityDeath() {
     static const PluginEventType type{
-        "entity.death", false, {"entity_id", "entity_type", "world", "x", "y", "z", "killer_name"}};
+        "entity.death", false, {"entity_id", "entity_type", "world", "x", "y", "z", "killer_name", "killer_id"}};
     return type;
 }
 
@@ -453,6 +456,30 @@ const PluginEventType& raidFinish() {
     return type;
 }
 
+const PluginEventType& entityDrops() {
+    static const PluginEventType type{"entity.drops",
+                                      false,
+                                      {"entity_id", "entity_type", "world", "x", "y", "z", "drops", "exp", "killer_id"},
+                                      {"drops", "exp"}};
+    return type;
+}
+
+const PluginEventType& entityTarget() {
+    static const PluginEventType type{"entity.target",
+                                      true,
+                                      {"entity_id", "entity_type", "world", "target_id", "previous_id", "reason"},
+                                      {"target_id"}};
+    return type;
+}
+
+const PluginEventType& entityPotionEffect() {
+    static const PluginEventType type{
+        "entity.potion_effect",
+        true,
+        {"entity_id", "entity_type", "world", "effect", "amplifier", "duration", "action", "cause"}};
+    return type;
+}
+
 const PluginEventType& entityCombust() {
     static const PluginEventType type{"entity.combust", true, {"entity_id", "entity_type", "world", "ticks", "cause"}};
     return type;
@@ -533,6 +560,9 @@ const std::vector<const PluginEventType*>& all() {
                                                            &playerPortal(),
                                                            &raidFinish(),
                                                            &entityCombust(),
+                                                           &entityTarget(),
+                                                           &entityDrops(),
+                                                           &entityPotionEffect(),
                                                            &blockFade(),
                                                            &playerCustomClick(),
                                                            &inventoryDrag(),

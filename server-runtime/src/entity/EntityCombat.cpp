@@ -80,6 +80,11 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     if (entity.removed || entity.health <= 0.0) {
         return {};
     }
+    // parity: `Entity.isInvulnerableTo`, which only the void and `/kill` get past.
+    if (entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("Invulnerable") && cause != "out_of_world" &&
+        cause != "generic_kill") {
+        return {};
+    }
     // parity: `Allay.hurtServer`, which the player it likes cannot hurt.
     if (entity.allay != nullptr && entity.allay->likedPlayerEntity.has_value() &&
         blamed.causingId == entity.allay->likedPlayerEntity) {
@@ -141,7 +146,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     }
     // Every mob hit comes through here; a plugin may veto or scale it but never sees a hit that was not going to land.
     if (hooks.damaged) {
-        const std::optional<float> allowed = hooks.damaged(entity, amount, cause, attackerName);
+        const std::optional<float> allowed = hooks.damaged(entity, amount, cause, attackerName, blamed.causingId);
         if (!allowed.has_value() || *allowed <= 0.0F) {
             return {};
         }
@@ -203,7 +208,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         entity.horse->hurt = true;
     }
     if (died && hooks.died) {
-        hooks.died(entity, attackerName);
+        hooks.died(entity, attackerName, blamed.causingId);
     }
     return {.landed = true, .died = died, .damage = reduced};
 }
