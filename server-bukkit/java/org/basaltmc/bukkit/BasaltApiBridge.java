@@ -35,6 +35,11 @@ public final class BasaltApiBridge extends InternalAPIBridgeBase {
     }
 
     @Override
+    public org.bukkit.inventory.ItemStack deserializeItem(byte[] bytes) {
+        return BasaltItemStack.restore(bytes);
+    }
+
+    @Override
     public org.bukkit.damage.DamageSource.Builder createDamageSourceBuilder(org.bukkit.damage.DamageType type) {
         return new BasaltDamageSource.Builder(type);
     }

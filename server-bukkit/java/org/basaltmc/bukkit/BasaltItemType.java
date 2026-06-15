@@ -8,6 +8,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ItemType;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.basaltmc.bukkit.gen.ItemTypeTypedBase;
+import org.basaltmc.bukkit.item.ItemData;
+import org.basaltmc.bukkit.item.ItemMetas;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public final class BasaltItemType extends ItemTypeTypedBase {
@@ -38,7 +40,7 @@ public final class BasaltItemType extends ItemTypeTypedBase {
 
     @Override
     public Class getItemMetaClass() {
-        return ItemMeta.class;
+        return ItemMetas.metaClass(material());
     }
 
     @Override
@@ -53,12 +55,16 @@ public final class BasaltItemType extends ItemTypeTypedBase {
 
     @Override
     public ItemStack createItemStack(Consumer consumer) {
-        return createItemStack();
+        return createItemStack(1, consumer);
     }
 
     @Override
     public ItemStack createItemStack(int amount, Consumer consumer) {
-        return createItemStack(amount);
+        ItemStack stack = createItemStack(amount);
+        ItemMeta meta = stack.getItemMeta();
+        consumer.accept(meta);
+        stack.setItemMeta(meta);
+        return stack;
     }
 
     @Override
@@ -74,17 +80,17 @@ public final class BasaltItemType extends ItemTypeTypedBase {
 
     @Override
     public int getMaxStackSize() {
-        return 64;
+        return ItemData.of(key.toString()).maxStackSize();
     }
 
     @Override
     public short getMaxDurability() {
-        return 0;
+        return (short) ItemData.of(key.toString()).maxDamage();
     }
 
     @Override
     public boolean isEdible() {
-        return false;
+        return ItemData.of(key.toString()).food() != null;
     }
 
     @Override
@@ -94,7 +100,18 @@ public final class BasaltItemType extends ItemTypeTypedBase {
 
     @Override
     public boolean isFuel() {
-        return false;
+        return ItemData.of(key.toString()).burnTicks() > 0;
+    }
+
+    @Override
+    public int getBurnDuration() {
+        return ItemData.of(key.toString()).burnTicks();
+    }
+
+    @Override
+    public ItemType getCraftingRemainingItem() {
+        String remainder = ItemData.of(key.toString()).craftingRemainder();
+        return remainder == null ? null : org.bukkit.Registry.ITEM.get(NamespacedKey.fromString(remainder));
     }
 
     @Override

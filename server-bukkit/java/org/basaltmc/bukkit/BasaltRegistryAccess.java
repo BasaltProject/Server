@@ -62,6 +62,21 @@ public final class BasaltRegistryAccess implements RegistryAccess {
                     out.add(new BasaltBiome(ids[i], i));
                 }
                 break;
+            case "data_component_type":
+                out.addAll(org.basaltmc.bukkit.datacomponent.ComponentType.list().stream()
+                    .map(entry -> (Keyed) entry).toList());
+                break;
+            case "menu":
+                out.addAll(org.basaltmc.bukkit.inv.MenuTypes.list());
+                break;
+            case "mob_effect":
+                out.addAll(org.basaltmc.bukkit.item.BasaltPotionEffectType.all());
+                break;
+            case "enchantment":
+                for (String enchantmentId : InventoryNatives.enchantmentIds()) {
+                    out.add(new org.basaltmc.bukkit.item.BasaltEnchantment(NamespacedKey.fromString(enchantmentId)));
+                }
+                break;
             case "entity_type":
                 for (EntityType entity : EntityType.values()) {
                     if (entity != EntityType.UNKNOWN) {

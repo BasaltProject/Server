@@ -11,6 +11,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.basaltmc.bukkit.gen.PlayerInventoryBase;
+import org.basaltmc.bukkit.inv.InventoryOps;
 
 /** Slots: 0-8 hotbar, 9-35 rest, 36-39 armor boots up, 40 off hand. */
 public final class BasaltPlayerInventory extends PlayerInventoryBase {
@@ -47,12 +48,13 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public ItemStack getItem(int slot) {
-        return Items.fromStrings(WorldNatives.inventoryGet(uuid, basaltSlot(slot)));
+        ItemStack found = Items.fromBytes(InventoryNatives.playerItem(uuid, basaltSlot(slot)));
+        return found instanceof BasaltItemStack own ? own.bound(stored -> setItem(slot, stored)) : found;
     }
 
     @Override
     public void setItem(int slot, ItemStack item) {
-        WorldNatives.inventorySet(uuid, basaltSlot(slot), Items.toStrings(item));
+        InventoryNatives.setPlayerItem(uuid, basaltSlot(slot), Items.toBytes(item));
     }
 
     @Override
@@ -210,191 +212,90 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public void setHeldItemSlot(int slot) {
-        throw Unsupported.hit("PlayerInventory#setHeldItemSlot");
+        if (slot < 0 || slot > 8) {
+            throw new IllegalArgumentException("Slot must be between 0 and 8, got " + slot);
+        }
+        InventoryNatives.setHeldSlot(uuid, slot);
     }
 
     @Override
     public HashMap<Integer, ItemStack> addItem(ItemStack... items) {
-        HashMap<Integer, ItemStack> left = new HashMap<>();
-        for (int i = 0; i < items.length; i++) {
-            if (items[i] == null || items[i].getType().isAir() || items[i].getAmount() <= 0) {
-                continue;
-            }
-            ItemStack remaining = items[i].clone();
-            int max = Math.max(1, remaining.getMaxStackSize());
-            for (int slot = 0; slot < 36 && remaining.getAmount() > 0; slot++) {
-                ItemStack there = getItem(slot);
-                if (there != null && there.isSimilar(remaining) && there.getAmount() < max) {
-                    int moved = Math.min(max - there.getAmount(), remaining.getAmount());
-                    there.setAmount(there.getAmount() + moved);
-                    setItem(slot, there);
-                    remaining.setAmount(remaining.getAmount() - moved);
-                }
-            }
-            for (int slot = 0; slot < 36 && remaining.getAmount() > 0; slot++) {
-                if (getItem(slot) == null) {
-                    int moved = Math.min(max, remaining.getAmount());
-                    ItemStack placed = remaining.clone();
-                    placed.setAmount(moved);
-                    setItem(slot, placed);
-                    remaining.setAmount(remaining.getAmount() - moved);
-                }
-            }
-            if (remaining.getAmount() > 0) {
-                left.put(i, remaining);
-            }
-        }
-        return left;
+        return InventoryOps.add(this, 36, items);
     }
 
     @Override
     public HashMap<Integer, ItemStack> removeItem(ItemStack... items) {
-        HashMap<Integer, ItemStack> left = new HashMap<>();
-        for (int i = 0; i < items.length; i++) {
-            int toTake = items[i].getAmount();
-            for (int slot = 0; slot < kSize && toTake > 0; slot++) {
-                ItemStack there = getItem(slot);
-                if (there != null && there.isSimilar(items[i])) {
-                    int taken = Math.min(there.getAmount(), toTake);
-                    toTake -= taken;
-                    there.setAmount(there.getAmount() - taken);
-                    setItem(slot, there.getAmount() > 0 ? there : null);
-                }
-            }
-            if (toTake > 0) {
-                ItemStack rest = items[i].clone();
-                rest.setAmount(toTake);
-                left.put(i, rest);
-            }
-        }
-        return left;
+        return InventoryOps.remove(this, 36, items);
     }
 
     @Override
     public HashMap<Integer, ItemStack> removeItemAnySlot(ItemStack... items) {
-        return removeItem(items);
+        return InventoryOps.remove(this, kSize, items);
     }
 
     @Override
     public boolean contains(Material material) {
-        return first(material) >= 0;
+        return InventoryOps.first(this, material) >= 0;
     }
 
     @Override
     public boolean contains(ItemStack item) {
-        return first(item) >= 0;
+        return InventoryOps.contains(this, item);
     }
 
     @Override
     public boolean contains(Material material, int amount) {
-        return count(material) >= amount;
+        return InventoryOps.contains(this, material, amount);
     }
 
     @Override
     public boolean contains(ItemStack item, int amount) {
-        return count(item.getType()) >= amount;
+        return InventoryOps.contains(this, item, amount);
     }
 
     @Override
     public boolean containsAtLeast(ItemStack item, int amount) {
-        return count(item.getType()) >= amount;
-    }
-
-    private int count(Material material) {
-        int total = 0;
-        for (int slot = 0; slot < kSize; slot++) {
-            ItemStack there = getItem(slot);
-            if (there != null && there.getType() == material) {
-                total += there.getAmount();
-            }
-        }
-        return total;
+        return InventoryOps.contains(this, item, amount);
     }
 
     @Override
     public HashMap<Integer, ? extends ItemStack> all(Material material) {
-        HashMap<Integer, ItemStack> found = new HashMap<>();
-        for (int slot = 0; slot < kSize; slot++) {
-            ItemStack there = getItem(slot);
-            if (there != null && there.getType() == material) {
-                found.put(slot, there);
-            }
-        }
-        return found;
+        return InventoryOps.all(this, material);
     }
 
     @Override
     public HashMap<Integer, ? extends ItemStack> all(ItemStack item) {
-        HashMap<Integer, ItemStack> found = new HashMap<>();
-        for (int slot = 0; slot < kSize; slot++) {
-            ItemStack there = getItem(slot);
-            if (there != null && there.equals(item)) {
-                found.put(slot, there);
-            }
-        }
-        return found;
+        return InventoryOps.all(this, item);
     }
 
     @Override
     public int first(Material material) {
-        for (int slot = 0; slot < kSize; slot++) {
-            ItemStack there = getItem(slot);
-            if (there != null && there.getType() == material) {
-                return slot;
-            }
-        }
-        return -1;
+        return InventoryOps.first(this, material);
     }
 
     @Override
     public int first(ItemStack item) {
-        for (int slot = 0; slot < kSize; slot++) {
-            ItemStack there = getItem(slot);
-            if (there != null && there.isSimilar(item)) {
-                return slot;
-            }
-        }
-        return -1;
+        return InventoryOps.first(this, item);
     }
 
     @Override
     public int firstEmpty() {
-        for (int slot = 0; slot < 36; slot++) {
-            if (getItem(slot) == null) {
-                return slot;
-            }
-        }
-        return -1;
+        return InventoryOps.firstEmpty(this, 36);
     }
 
     @Override
     public boolean isEmpty() {
-        for (int slot = 0; slot < kSize; slot++) {
-            if (getItem(slot) != null) {
-                return false;
-            }
-        }
-        return true;
+        return InventoryOps.isEmpty(this);
     }
 
     @Override
     public void remove(Material material) {
-        for (int slot = 0; slot < kSize; slot++) {
-            ItemStack there = getItem(slot);
-            if (there != null && there.getType() == material) {
-                setItem(slot, null);
-            }
-        }
+        InventoryOps.remove(this, material);
     }
 
     @Override
     public void remove(ItemStack item) {
-        for (int slot = 0; slot < kSize; slot++) {
-            ItemStack there = getItem(slot);
-            if (there != null && there.isSimilar(item)) {
-                setItem(slot, null);
-            }
-        }
+        InventoryOps.remove(this, item);
     }
 
     @Override
