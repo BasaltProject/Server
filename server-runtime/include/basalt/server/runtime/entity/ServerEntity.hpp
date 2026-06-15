@@ -447,6 +447,9 @@ public:
 
     std::optional<wire::nbt::NbtCompound> sourceNbt;
 
+    /// What plugins keep on the entity, saved as `PublicBukkitValues` and given back by `entity_data`.
+    wire::nbt::NbtCompound pluginData;
+
     std::shared_ptr<enderDragon::DragonState> dragon;
 
     std::shared_ptr<fishingHooks::HookState> hook;

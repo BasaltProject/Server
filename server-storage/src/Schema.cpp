@@ -149,6 +149,15 @@ CREATE TABLE IF NOT EXISTS plugin_data (
 );
 
 CREATE INDEX IF NOT EXISTS plugin_data_by_plugin ON plugin_data(plugin);
+
+-- What plugins keep on a holder that is not a row of plugin_data (a player, online or not): one NBT
+-- compound per holder, read and written whole, in the same form an entity or a chunk saves it.
+CREATE TABLE IF NOT EXISTS holder_data (
+    kind TEXT NOT NULL,
+    id TEXT NOT NULL,
+    data BLOB NOT NULL,
+    PRIMARY KEY (kind, id)
+);
 )";
 }
 } // namespace basalt::server::storage::schema

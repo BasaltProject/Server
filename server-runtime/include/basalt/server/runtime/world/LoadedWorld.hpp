@@ -236,6 +236,11 @@ public:
 
     void saveMetadata();
 
+    /// What plugins keep on the world, read from `plugin_data.nbt` the first time and written back by `save`.
+    [[nodiscard]] wire::nbt::NbtCompound pluginData();
+
+    void setPluginData(wire::nbt::NbtCompound data);
+
     /// Skipped for a void world (its platform sits under the saved point) and for a spawn moved by `/setworldspawn`.
     void warmSpawnArea();
 
@@ -340,6 +345,9 @@ private:
     server::world::terrain::BiomeZoomer biomeZoomer_;
     WorldBorder border_;
     std::set<std::int64_t> forcedChunks_;
+    std::mutex pluginDataMutex_;
+    std::optional<wire::nbt::NbtCompound> pluginData_;
+    bool pluginDataDirty_ = false;
     mutable std::mutex holdsMutex_;
     std::map<std::string, std::set<std::int64_t>> holds_;
     std::int64_t gameTime_ = 0;

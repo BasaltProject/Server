@@ -23,6 +23,7 @@ namespace chunkNbt {
 inline constexpr std::int32_t kDataVersion = metamorph::datafix::kCurrentVersion;
 
 inline constexpr std::string_view kEntitiesKey = "basalt_entities";
+inline constexpr std::string_view kPluginDataKey = "ChunkBukkitValues";
 inline constexpr std::string_view kGeneratedEntitiesKey = "basalt_generated_entities";
 
 [[nodiscard]] wire::nbt::NbtCompound write(const Chunk& chunk);

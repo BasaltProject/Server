@@ -2,6 +2,7 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginFormObject.hpp>
 #include <basalt/server/plugins/PluginMenuObject.hpp>
+#include <basalt/server/plugins/PluginMiscApi.hpp>
 #include <basalt/server/plugins/PluginObject.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/server/plugins/PluginRecipeApi.hpp>
@@ -1030,5 +1031,6 @@ void install(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, s
     installMessaging(lua, plugin, host);
     installListeners(lua, instance, plugin, host);
     installGranted(lua, plugin, host);
+    installMisc(lua, plugin, host);
 }
 } // namespace basalt::server::plugins::pluginApi

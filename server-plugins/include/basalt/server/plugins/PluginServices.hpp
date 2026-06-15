@@ -1,9 +1,15 @@
 #pragma once
 
+#include <basalt/server/plugins/PluginAccess.hpp>
+#include <basalt/server/plugins/PluginAdvancements.hpp>
+#include <basalt/server/plugins/PluginBossBars.hpp>
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
+#include <basalt/server/plugins/PluginDatapacks.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
-#include <basalt/server/plugins/PluginInventories.hpp>
+#include <basalt/server/plugins/PluginMaps.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
+#include <basalt/server/plugins/PluginScoreboards.hpp>
+#include <basalt/server/plugins/PluginServerControl.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 
 #include <cstdint>
@@ -115,6 +121,21 @@ public:
     virtual std::int64_t purge(std::string_view pluginId) {
         static_cast<void>(pluginId);
         return 0;
+    }
+
+    /// The NBT compound plugins keep on a holder the world does not save (kind "player", id the uuid).
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> holderData(std::string_view kind,
+                                                                              std::string_view id) {
+        static_cast<void>(kind);
+        static_cast<void>(id);
+        return std::nullopt;
+    }
+
+    /// An empty span forgets the holder's data.
+    virtual void setHolderData(std::string_view kind, std::string_view id, std::span<const std::uint8_t> data) {
+        static_cast<void>(kind);
+        static_cast<void>(id);
+        static_cast<void>(data);
     }
 };
 
@@ -238,9 +259,18 @@ public:
 
     virtual bool at(std::string_view world, double x, double z, std::function<void()> task) = 0;
 
-    [[nodiscard]] virtual PluginInventories& inventories() {
-        static PluginInventories kNone;
-        return kNone;
-    }
+    [[nodiscard]] virtual PluginAccess& access() { return PluginAccess::unavailable(); }
+
+    [[nodiscard]] virtual PluginScoreboards& scoreboards() { return PluginScoreboards::unavailable(); }
+
+    [[nodiscard]] virtual PluginBossBars& bossBars() { return PluginBossBars::unavailable(); }
+
+    [[nodiscard]] virtual PluginAdvancements& advancements() { return PluginAdvancements::unavailable(); }
+
+    [[nodiscard]] virtual PluginServerControl& serverControl() { return PluginServerControl::unavailable(); }
+
+    [[nodiscard]] virtual PluginDatapacks& datapacks() { return PluginDatapacks::unavailable(); }
+
+    [[nodiscard]] virtual PluginMaps& maps() { return PluginMaps::unavailable(); }
 };
 } // namespace basalt::server::plugins

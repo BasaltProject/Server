@@ -67,6 +67,34 @@ void PlayerSession::setChatSession(std::optional<wire::protocol::play::RemoteCha
     chatSession_ = std::move(session);
 }
 
+std::optional<bool> PlayerSession::permissionGrant(const std::string_view node) const {
+    std::optional<bool> exact;
+    std::optional<bool> wildcard;
+    std::size_t bestLength = 0;
+    for (const auto& [source, grants] : permissionGrants) {
+        for (const auto& [pattern, granted] : grants) {
+            if (pattern == node) {
+                exact = exact.value_or(true) && granted;
+                continue;
+            }
+            if (!pattern.ends_with('*')) {
+                continue;
+            }
+            const std::string_view prefix = std::string_view{pattern}.substr(0, pattern.size() - 1);
+            if ((!prefix.empty() && prefix.back() != '.') || !node.starts_with(prefix)) {
+                continue;
+            }
+            if (!wildcard.has_value() || prefix.size() > bestLength) {
+                wildcard = granted;
+                bestLength = prefix.size();
+            } else if (prefix.size() == bestLength) {
+                wildcard = *wildcard && granted;
+            }
+        }
+    }
+    return exact.has_value() ? exact : wildcard;
+}
+
 void PlayerSession::resetForRespawn() {
     health_ = maxHealth_;
     food.reset();

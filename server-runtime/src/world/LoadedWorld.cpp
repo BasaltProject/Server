@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/SavedDataFiles.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
 #include <basalt/server/world/LeafDistances.hpp>
@@ -629,6 +630,24 @@ void LoadedWorld::saveDirty() {
     randomSequences_.save(worldRoot_);
     raids_.save(worldRoot_);
     state_.poi().save();
+    const std::lock_guard<std::mutex> lock{pluginDataMutex_};
+    if (pluginDataDirty_ && pluginData_.has_value()) {
+        pluginDataDirty_ = !savedData::write(worldRoot_, "plugin_data", *pluginData_);
+    }
+}
+
+wire::nbt::NbtCompound LoadedWorld::pluginData() {
+    const std::lock_guard<std::mutex> lock{pluginDataMutex_};
+    if (!pluginData_.has_value()) {
+        pluginData_ = savedData::read(worldRoot_, "plugin_data").value_or(wire::nbt::NbtCompound{});
+    }
+    return *pluginData_;
+}
+
+void LoadedWorld::setPluginData(wire::nbt::NbtCompound data) {
+    const std::lock_guard<std::mutex> lock{pluginDataMutex_};
+    pluginData_ = std::move(data);
+    pluginDataDirty_ = true;
 }
 
 void LoadedWorld::holdChunks(const std::string& token, const std::vector<std::int64_t>& keys) {

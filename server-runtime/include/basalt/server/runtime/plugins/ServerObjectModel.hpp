@@ -180,6 +180,11 @@ public:
 
     std::int64_t purge(std::string_view pluginId) override;
 
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> holderData(std::string_view kind,
+                                                                      std::string_view id) override;
+
+    void setHolderData(std::string_view kind, std::string_view id, std::span<const std::uint8_t> data) override;
+
 private:
     std::function<storage::PlayerStore*()> store_;
 };

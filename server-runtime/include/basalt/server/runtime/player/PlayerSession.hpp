@@ -65,6 +65,11 @@ public:
 
     std::optional<std::string> group;
 
+    /// What each plugin grants or denies this session over the group; one answer wins by specificity.
+    std::map<std::string, std::map<std::string, bool, std::less<>>, std::less<>> permissionGrants;
+
+    [[nodiscard]] std::optional<bool> permissionGrant(std::string_view node) const;
+
     std::string worldName;
 
     wire::protocol::play::Gamemode gamemode = wire::protocol::play::Gamemode::Survival;

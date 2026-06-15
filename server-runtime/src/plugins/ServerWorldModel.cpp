@@ -57,6 +57,8 @@ using server::plugins::PluginHologramRef;
 using server::plugins::PluginWorldRef;
 using wire::common::Identifier;
 
+constexpr std::string_view kBukkitValues = "PublicBukkitValues";
+
 const Identifier& textDisplay() {
     static const Identifier kType = Identifier::vanilla("text_display");
     return kType;
@@ -915,6 +917,89 @@ public:
         return first;
     }
 
+    [[nodiscard]] static std::vector<std::uint8_t> packedData(const wire::nbt::NbtCompound& data) {
+        return wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(data));
+    }
+
+    [[nodiscard]] static std::optional<wire::nbt::NbtCompound> unpackedData(std::span<const std::uint8_t> nbt) {
+        const auto parsed = wire::nbt::nbtIO::read(nbt);
+        const wire::nbt::NbtCompound* given = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+        return given == nullptr ? std::nullopt : std::optional{*given};
+    }
+
+    [[nodiscard]] std::vector<std::uint8_t> pluginData() override { return packedData(world_->pluginData()); }
+
+    bool setPluginData(std::span<const std::uint8_t> nbt) override {
+        std::optional<wire::nbt::NbtCompound> given = unpackedData(nbt);
+        if (!given.has_value()) {
+            return false;
+        }
+        world_->setPluginData(std::move(*given));
+        return true;
+    }
+
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> chunkPluginData(std::int32_t chunkX,
+                                                                           std::int32_t chunkZ) override {
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        return chunk == nullptr ? std::nullopt : std::optional{packedData(chunk->pluginData())};
+    }
+
+    bool setChunkPluginData(std::int32_t chunkX, std::int32_t chunkZ, std::span<const std::uint8_t> nbt) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
+        std::optional<wire::nbt::NbtCompound> given = unpackedData(nbt);
+        if (chunk == nullptr || !given.has_value()) {
+            return false;
+        }
+        chunk->setPluginData(std::move(*given));
+        return true;
+    }
+
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> blockEntityPluginData(std::int32_t x, std::int32_t y,
+                                                                                 std::int32_t z) override {
+        const server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* held =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        if (held == nullptr) {
+            return std::nullopt;
+        }
+        const wire::nbt::NbtCompound* kept = held->data().getCompound(kBukkitValues);
+        return packedData(kept == nullptr ? wire::nbt::NbtCompound{} : *kept);
+    }
+
+    bool setBlockEntityPluginData(std::int32_t x, std::int32_t y, std::int32_t z,
+                                  std::span<const std::uint8_t> nbt) override {
+        server::world::Chunk* chunk = world_->state().chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* held =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        std::optional<wire::nbt::NbtCompound> given = unpackedData(nbt);
+        if (held == nullptr || !given.has_value()) {
+            return false;
+        }
+        wire::nbt::NbtCompound data = held->data();
+        if (given->empty()) {
+            data.remove(kBukkitValues);
+        } else {
+            data.set(kBukkitValues, wire::nbt::NbtTag::ofCompound(std::move(*given)));
+        }
+        chunk->setBlockEntity(held->withData(std::move(data)));
+        return true;
+    }
+
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> entityPluginData(std::int32_t entityId) override {
+        const entity::ServerEntity* found = world_->state().entity(entityId);
+        return found == nullptr ? std::nullopt : std::optional{packedData(found->pluginData)};
+    }
+
+    bool setEntityPluginData(std::int32_t entityId, std::span<const std::uint8_t> nbt) override {
+        entity::ServerEntity* found = world_->state().entity(entityId);
+        std::optional<wire::nbt::NbtCompound> given = unpackedData(nbt);
+        if (found == nullptr || !given.has_value()) {
+            return false;
+        }
+        found->pluginData = std::move(*given);
+        return true;
+    }
+
     bool readBiomes(std::int32_t chunkX, std::int32_t chunkZ, std::span<std::int32_t> out) override {
         const server::world::Chunk* chunk = world_->state().chunkIfLoaded(chunkX, chunkZ);
         const std::int32_t cells = chunkHeight().height() / 4;
@@ -1732,6 +1817,19 @@ std::map<std::string, std::int64_t> DatabasePluginStorage::namespaces() {
     }
     const std::map<std::string, std::int64_t, std::less<>> counted = store->pluginData().namespaces();
     return std::map<std::string, std::int64_t>{counted.begin(), counted.end()};
+}
+
+std::optional<std::vector<std::uint8_t>> DatabasePluginStorage::holderData(std::string_view kind, std::string_view id) {
+    storage::PlayerStore* store = store_();
+    return store == nullptr || !store->isOpen() ? std::nullopt : store->pluginData().holder(kind, id);
+}
+
+void DatabasePluginStorage::setHolderData(std::string_view kind, std::string_view id,
+                                          std::span<const std::uint8_t> data) {
+    storage::PlayerStore* store = store_();
+    if (store != nullptr && store->isOpen()) {
+        store->pluginData().setHolder(kind, id, data);
+    }
 }
 
 std::int64_t DatabasePluginStorage::purge(std::string_view pluginId) {

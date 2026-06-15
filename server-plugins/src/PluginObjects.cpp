@@ -499,6 +499,21 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                     args.pushBoolean(player->may(args.checkString(firstArgument(args))));
                     return 1;
                 })
+        .method("grant",
+                [player, pluginId](LuaArgs& args) {
+                    player->setPermission(pluginId, args.checkString(firstArgument(args)), true);
+                    return 0;
+                })
+        .method("deny",
+                [player, pluginId](LuaArgs& args) {
+                    player->setPermission(pluginId, args.checkString(firstArgument(args)), false);
+                    return 0;
+                })
+        .method("revoke",
+                [player, pluginId](LuaArgs& args) {
+                    player->setPermission(pluginId, args.checkString(firstArgument(args)), std::nullopt);
+                    return 0;
+                })
         .method("give",
                 [player](LuaArgs& args) {
                     const std::int32_t first = firstArgument(args);

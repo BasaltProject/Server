@@ -33,7 +33,9 @@ std::string PlayerCommandSource::name() const { return player_->name(); }
 wire::text::Component PlayerCommandSource::displayName() const { return wire::text::Component::text(player_->name()); }
 
 std::int32_t PlayerCommandSource::permissionLevel() const {
-    return groups_->resolve(player_->group, kAdminPermission) ? permissionLevel::kOwners : permissionLevel::kAll;
+    const std::optional<bool> granted = player_->permissionGrant(kAdminPermission);
+    return granted.value_or(groups_->resolve(player_->group, kAdminPermission)) ? permissionLevel::kOwners
+                                                                                : permissionLevel::kAll;
 }
 
 std::array<double, 3> PlayerCommandSource::position() const { return {player_->x, player_->y, player_->z}; }
@@ -45,7 +47,10 @@ void PlayerCommandSource::sendSystemMessage(const wire::text::Component& message
 }
 
 bool PlayerCommandSource::hasPermission(std::optional<std::string_view> node) const {
-    return node.has_value() && groups_->resolve(player_->group, *node);
+    if (!node.has_value()) {
+        return false;
+    }
+    return player_->permissionGrant(*node).value_or(groups_->resolve(player_->group, *node));
 }
 
 CommandBlockSource::CommandBlockSource(std::array<double, 3> at, std::string name, bool speaks,

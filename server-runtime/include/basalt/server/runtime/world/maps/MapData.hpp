@@ -152,6 +152,19 @@ public:
     [[nodiscard]] std::optional<wire::protocol::play::MapItemDataPacket> nextUpdate(std::int32_t mapId,
                                                                                     Holder& holder) const;
 
+    /// What a plugin may change of a map's frame: where it looks, how far, and how it is followed.
+    void reframe(std::int32_t centerX, std::int32_t centerZ, std::int8_t scale, bool trackingPosition,
+                 bool unlimitedTracking, bool locked, std::string dimension) {
+        centerX_ = centerX;
+        centerZ_ = centerZ;
+        scale_ = scale;
+        trackingPosition_ = trackingPosition;
+        unlimitedTracking_ = unlimitedTracking;
+        locked_ = locked;
+        dimension_ = std::move(dimension);
+        dirty_ = true;
+    }
+
     [[nodiscard]] bool isDirty() const noexcept { return dirty_; }
 
     void clearDirty() noexcept { dirty_ = false; }
