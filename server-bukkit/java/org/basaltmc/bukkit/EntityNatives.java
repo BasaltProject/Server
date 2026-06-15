@@ -10,5 +10,7 @@ public final class EntityNatives {
         double vz);
     public static native boolean explode(String world, double x, double y, double z, float power, boolean breakBlocks,
         int source);
+    public static native byte[] snbtToNbt(String snbt);
+    public static native String nbtToSnbt(byte[] nbt);
     public static native int spawnAs(String world, String type, double x, double y, double z, float yaw, String reason);
 }

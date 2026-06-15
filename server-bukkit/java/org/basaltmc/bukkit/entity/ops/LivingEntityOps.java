@@ -360,4 +360,51 @@ public interface LivingEntityOps extends LivingEntity, EntityOps {
             living.damage(damage, this);
         }
     }
+
+    private List<org.bukkit.block.Block> sightLine(java.util.Set<org.bukkit.Material> transparent, int maxDistance,
+            int keep) {
+        List<org.bukkit.block.Block> blocks = new ArrayList<>();
+        org.bukkit.util.BlockIterator iterator = new org.bukkit.util.BlockIterator(this, Math.min(maxDistance, 120));
+        while (iterator.hasNext()) {
+            org.bukkit.block.Block block = iterator.next();
+            blocks.add(block);
+            if (keep != 0 && blocks.size() > keep) {
+                blocks.remove(0);
+            }
+            org.bukkit.Material material = block.getType();
+            if (transparent == null ? !material.isAir() : !transparent.contains(material)) {
+                break;
+            }
+        }
+        return blocks;
+    }
+
+    default List<org.bukkit.block.Block> getLineOfSight(java.util.Set<org.bukkit.Material> transparent,
+            int maxDistance) {
+        return sightLine(transparent, maxDistance, 0);
+    }
+
+    default org.bukkit.block.Block getTargetBlock(java.util.Set<org.bukkit.Material> transparent, int maxDistance) {
+        return sightLine(transparent, maxDistance, 1).get(0);
+    }
+
+    default List<org.bukkit.block.Block> getLastTwoTargetBlocks(java.util.Set<org.bukkit.Material> transparent,
+            int maxDistance) {
+        return sightLine(transparent, maxDistance, 2);
+    }
+
+    default org.bukkit.util.RayTraceResult rayTraceBlocks(double maxDistance, org.bukkit.FluidCollisionMode mode) {
+        Location eye = getEyeLocation();
+        return core().world.rayTraceBlocks(eye, eye.getDirection(), maxDistance, mode, false);
+    }
+
+    default org.bukkit.block.Block getTargetBlockExact(int maxDistance, org.bukkit.FluidCollisionMode mode) {
+        org.bukkit.util.RayTraceResult result = rayTraceBlocks(maxDistance, mode);
+        return result == null ? null : result.getHitBlock();
+    }
+
+    default org.bukkit.block.BlockFace getTargetBlockFace(int maxDistance, org.bukkit.FluidCollisionMode mode) {
+        org.bukkit.util.RayTraceResult result = rayTraceBlocks(maxDistance, mode);
+        return result == null ? null : result.getHitBlockFace();
+    }
 }

@@ -254,6 +254,13 @@ const Accessors& accessors() {
         all["sitting"] = field(&ServerEntity::sitting);
         all["tamed_horse"] = field(&ServerEntity::tamedHorse);
         all["fuse"] = field(&ServerEntity::fuse);
+        all["display_text"] = Accessor{[](const ServerEntity& entity) -> Value {
+                                           return entity.displayText.has_value() ? Value{*entity.displayText} : Value{};
+                                       },
+                                       [](ServerEntity& entity, const Value& value) {
+                                           entity.displayText = asText(value);
+                                           return true;
+                                       }};
         all["object_data"] = field(&ServerEntity::objectData);
         all["bolt_visual_only"] = field(&ServerEntity::boltVisualOnly);
         all["bolt_life"] = field(&ServerEntity::boltLife);

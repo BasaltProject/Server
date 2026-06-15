@@ -1,5 +1,8 @@
 #include "BridgeInternal.hpp"
 
+#include <basalt/wire/nbt/NbtIO.hpp>
+#include <basalt/wire/nbt/Snbt.hpp>
+
 #include <array>
 #include <chrono>
 #include <exception>
@@ -237,13 +240,32 @@ jboolean JNICALL nativeExplode(JNIEnv* env, jclass, jstring world, jdouble x, jd
                : JNI_FALSE;
 }
 
+jbyteArray JNICALL nativeSnbtToNbt(JNIEnv* env, jclass, jstring text) {
+    const auto parsed = wire::nbt::snbt::parse(toStd(env, text));
+    if (!parsed.has_value() || parsed->get<wire::nbt::NbtCompound>() == nullptr) {
+        return nullptr;
+    }
+    const std::vector<std::uint8_t> bytes = wire::nbt::nbtIO::write(*parsed);
+    jbyteArray array = env->NewByteArray(static_cast<jsize>(bytes.size()));
+    env->SetByteArrayRegion(array, 0, static_cast<jsize>(bytes.size()), reinterpret_cast<const jbyte*>(bytes.data()));
+    return array;
+}
+
+jstring JNICALL nativeNbtToSnbt(JNIEnv* env, jclass, jbyteArray nbt) {
+    const jsize length = env->GetArrayLength(nbt);
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(length));
+    env->GetByteArrayRegion(nbt, 0, length, reinterpret_cast<jbyte*>(bytes.data()));
+    const auto parsed = wire::nbt::nbtIO::read(bytes);
+    return parsed.has_value() ? toJava(env, wire::nbt::snbt::stringify(parsed->tag)) : nullptr;
+}
+
 } // namespace
 
 void registerEntityNatives(JNIEnv* env, jclass natives) {
     const auto method = [](const char* name, const char* signature, void* function) {
         return JNINativeMethod{const_cast<char*>(name), const_cast<char*>(signature), function};
     };
-    const std::array<JNINativeMethod, 6> methods{
+    const std::array<JNINativeMethod, 8> methods{
         method("get", "(Ljava/lang/String;ILjava/lang/String;)Ljava/lang/Object;", reinterpret_cast<void*>(&nativeGet)),
         method("set", "(Ljava/lang/String;ILjava/lang/String;Ljava/lang/Object;)Z",
                reinterpret_cast<void*>(&nativeSet)),
@@ -253,6 +275,8 @@ void registerEntityNatives(JNIEnv* env, jclass natives) {
                reinterpret_cast<void*>(&nativeSpawnAs)),
         method("dropItem", "(Ljava/lang/String;[BDDDDDD)I", reinterpret_cast<void*>(&nativeDropItem)),
         method("explode", "(Ljava/lang/String;DDDFZI)Z", reinterpret_cast<void*>(&nativeExplode)),
+        method("snbtToNbt", "(Ljava/lang/String;)[B", reinterpret_cast<void*>(&nativeSnbtToNbt)),
+        method("nbtToSnbt", "([B)Ljava/lang/String;", reinterpret_cast<void*>(&nativeNbtToSnbt)),
     };
     env->RegisterNatives(natives, methods.data(), static_cast<jint>(methods.size()));
 }

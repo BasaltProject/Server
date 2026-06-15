@@ -345,6 +345,7 @@ void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
                                    world::TriggerEvent{.items = {{"item", *item}}});
                 }
             },
+        .resurrectAllowed = context.resurrectAllowed,
         .interactFinished =
             [world = context.world, triggers = context.triggers](const PlayerSession& player) {
                 if (world::LoadedWorld* here = world ? world() : nullptr; here != nullptr) {
