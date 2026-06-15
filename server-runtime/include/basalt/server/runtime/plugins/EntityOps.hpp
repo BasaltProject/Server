@@ -15,6 +15,10 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 }
 
+namespace basalt::server::runtime::player {
+class PlayerSession;
+}
+
 namespace basalt::server::runtime::plugins {
 struct ModelHooks;
 }
@@ -24,6 +28,7 @@ namespace basalt::server::runtime::plugins::entityOps {
 struct Environment {
     const ModelHooks* hooks = nullptr;
     world::LoadedWorld* world = nullptr;
+    std::function<std::vector<player::PlayerSession*>()> players;
 };
 
 [[nodiscard]] std::optional<server::plugins::PluginEntityValue>

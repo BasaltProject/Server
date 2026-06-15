@@ -411,6 +411,24 @@ public:
                                           player->yaw);
             return true;
         }
+        if (operation == "mount") {
+            entity::ServerEntity* vehicle =
+                world_->state().entity(static_cast<std::int32_t>(asInt(at(arguments, 0), -1)));
+            if (vehicle == nullptr || vehicle->removed || player->vehicleId == vehicle->entityId()) {
+                return false;
+            }
+            if (player->vehicleId.has_value() && player->connection().dismount) {
+                player->connection().dismount();
+            }
+            player->vehicleId = vehicle->entityId();
+            vehicle->passengerIds.push_back(entityId_);
+            for (player::PlayerSession* watcher : sessions_()) {
+                if (watcher->worldName == world_->name() && watcher->connection().sendPassengers) {
+                    watcher->connection().sendPassengers(vehicle->entityId(), vehicle->passengerIds);
+                }
+            }
+            return true;
+        }
         if (operation == "dismount") {
             if (!player->vehicleId.has_value() || !player->connection().dismount) {
                 return false;

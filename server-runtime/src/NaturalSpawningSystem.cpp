@@ -102,7 +102,11 @@ ServerEntity* NaturalSpawningSystem::spawnMob(world::LoadedWorld& world, const I
     if (initialize) {
         initialize(*entity);
     }
-    return &world.state().spawnEntity(std::move(entity));
+    ServerEntity& added = world.state().spawnEntity(std::move(entity));
+    if (hooks_.spawned) {
+        hooks_.spawned(world, added, reason);
+    }
+    return &added;
 }
 
 ServerEntity* NaturalSpawningSystem::spawnSkeletonTrap(world::LoadedWorld& world, std::int32_t x, std::int32_t y,
