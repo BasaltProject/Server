@@ -60,6 +60,9 @@ lootOf(const std::optional<storage::StoredItemStack>& stack) {
 } // namespace
 
 void ContainerMenuController::openMountMenu(PlayerSession& session, entity::ServerEntity& mount) {
+    if (!mayOpen("mount", std::nullopt)) {
+        return;
+    }
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
         return;
@@ -176,6 +179,9 @@ void ContainerMenuController::quickMoveMount(PlayerSession& session, const MenuS
 }
 
 void ContainerMenuController::openEntityChest(PlayerSession& session, entity::ServerEntity& vehicle) {
+    if (!mayOpen("chest", std::nullopt)) {
+        return;
+    }
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
         return;

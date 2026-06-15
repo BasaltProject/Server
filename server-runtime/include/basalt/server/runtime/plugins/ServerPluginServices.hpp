@@ -138,6 +138,7 @@ public:
         server::plugins::PluginMenus* menus = nullptr;
         server::plugins::PluginPacketSender* packets = nullptr;
         server::plugins::PluginChannelSender* channels = nullptr;
+        server::plugins::PluginInventories* inventories = nullptr;
         std::function<sched::Owner*(const std::string& world, double x, double z)> ownerAt;
     };
 
@@ -158,6 +159,7 @@ public:
     [[nodiscard]] server::plugins::PluginMenus& menus() override;
     [[nodiscard]] server::plugins::PluginPacketSender& packets() override;
     [[nodiscard]] server::plugins::PluginChannelSender& channels() override;
+    [[nodiscard]] server::plugins::PluginInventories& inventories() override;
 
     bool at(std::string_view world, double x, double z, std::function<void()> task) override;
 

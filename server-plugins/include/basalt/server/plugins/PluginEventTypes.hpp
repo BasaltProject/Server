@@ -65,6 +65,14 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& playerEffect();
 [[nodiscard]] const PluginEventType& inventoryOpen();
 [[nodiscard]] const PluginEventType& inventoryClose();
+[[nodiscard]] const PluginEventType& inventoryDrag();
+[[nodiscard]] const PluginEventType& inventoryChanged();
+[[nodiscard]] const PluginEventType& inventoryPrepare();
+[[nodiscard]] const PluginEventType& inventoryTake();
+[[nodiscard]] const PluginEventType& inventoryEnchantPrepare();
+[[nodiscard]] const PluginEventType& inventoryEnchant();
+[[nodiscard]] const PluginEventType& furnaceBurn();
+[[nodiscard]] const PluginEventType& furnaceStart();
 [[nodiscard]] const PluginEventType& inventoryClick();
 [[nodiscard]] const PluginEventType& inventorySmelt();
 [[nodiscard]] const PluginEventType& inventoryMoveItem();

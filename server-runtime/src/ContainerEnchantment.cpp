@@ -43,6 +43,9 @@ constexpr std::size_t kRows = 3;
 } // namespace
 
 void ContainerMenuController::openEnchantmentMenu(PlayerSession& session, const BlockPos& pos) {
+    if (!mayOpen("enchanting", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::enchantment(allocateContainerId());
     openBlock = pos;
@@ -79,6 +82,7 @@ void ContainerMenuController::rollEnchantmentOffers() {
     enchantmentCosts_ = {0, 0, 0};
     enchantmentClues_ = {-1, -1, -1};
     enchantmentLevels_ = {-1, -1, -1};
+    enchantmentRows_ = {};
     world::LoadedWorld* world = owner_->currentWorld();
     if (session == nullptr || world == nullptr || !openBlock.has_value() || !input.has_value() ||
         !world::itemEnchantability::valueOf(input->id).has_value() || alreadyEnchanted(*input)) {
@@ -104,8 +108,12 @@ void ContainerMenuController::rollEnchantmentOffers() {
     const world::EnchantmentBooks books{.enchantments = owner_->options().enchantments,
                                         .itemTags = owner_->options().itemTags,
                                         .enchantmentTags = owner_->options().enchantmentTags};
-    const std::array<world::enchanting::Row, 3> rows =
+    std::array<world::enchanting::Row, 3> rows =
         world::enchanting::roll(books, *input, session->enchantmentSeed, shelves);
+    if (hooks_.enchantPrepared && !hooks_.enchantPrepared(*input, shelves, rows)) {
+        rows = {};
+    }
+    enchantmentRows_ = rows;
     for (std::size_t row = 0; row < kRows; ++row) {
         enchantmentCosts_[row] = rows[row].cost;
         if (!rows[row].clue.has_value()) {
@@ -139,21 +147,20 @@ void ContainerMenuController::takeEnchantmentOffer(PlayerSession& session, const
                   session.experience.level() < enchantmentCosts_[static_cast<std::size_t>(row)])) {
         return;
     }
-    const world::EnchantmentBooks books{.enchantments = owner_->options().enchantments,
-                                        .itemTags = owner_->options().itemTags,
-                                        .enchantmentTags = owner_->options().enchantmentTags};
-    // parity: the row is worked out again from the same seed, which is what makes what was shown.
-    // and what goes on the item the same thing.
-    const std::array<world::enchanting::Row, 3> rows =
-        world::enchanting::roll(books, *input, session.enchantmentSeed, shelvesAround_);
-    const std::vector<world::enchanting::Offer>& offers = rows[static_cast<std::size_t>(row)].offers;
+    // parity: the rows were worked out from the seed when they were shown, which is what goes on the item.
+    std::vector<world::enchanting::Offer> offers = enchantmentRows_[static_cast<std::size_t>(row)].offers;
     if (offers.empty()) {
+        return;
+    }
+    std::int32_t levelsSpent = price;
+    if (hooks_.enchantAllowed && !hooks_.enchantAllowed(*input, row, levelsSpent, offers)) {
+        sendInventory();
         return;
     }
     input = world::enchanting::applied(*input, offers);
 
     if (!free) {
-        session.experience.giveLevels(-price);
+        session.experience.giveLevels(-levelsSpent);
         if (session.connection().syncExperience) {
             session.connection().syncExperience();
         }

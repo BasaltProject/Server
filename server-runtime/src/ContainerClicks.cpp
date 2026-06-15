@@ -88,6 +88,13 @@ bool sameItem(const storage::StoredItemStack& left, const storage::StoredItemSta
 } // namespace
 
 void ContainerMenuController::handleContainerClick(const ServerboundContainerClickPacket& packet) {
+    handleContainerClickChecked(packet);
+    if (pluginMenu_.has_value() && pluginEditable_ && hooks_.changed) {
+        hooks_.changed();
+    }
+}
+
+void ContainerMenuController::handleContainerClickChecked(const ServerboundContainerClickPacket& packet) {
     PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
         return;
@@ -115,8 +122,17 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
         }
     }
 
+    if (packet.mode != ServerboundContainerClickPacket::Mode::QuickCraft && !pluginMenu_.has_value()) {
+        if (const std::optional<MenuSlot> clicked = openMenu.slotAt(slotIndex);
+            clicked.has_value() &&
+            !resultMayBeTaken(*clicked, packet.mode == ServerboundContainerClickPacket::Mode::QuickMove)) {
+            sendInventory();
+            return;
+        }
+    }
+
     // A plugin's window: a click is a button press, told as the plugin's slot, never the player's own.
-    if (pluginMenu_.has_value()) {
+    if (pluginMenu_.has_value() && !pluginEditable_) {
         const std::optional<MenuSlot> clicked = openMenu.slotAt(slotIndex);
         if (clicked.has_value() && pluginMenuClick_) {
             if (const auto* block = std::get_if<player::menuSlot::Block>(&*clicked); block != nullptr) {
@@ -311,6 +327,19 @@ bool ContainerMenuController::handleQuickCraft(PlayerSession& session, const Ser
         return false;
     }
     if (stage == kQuickCraftEnd && quickCraftActive_) {
+        if (hooks_.dragAllowed) {
+            std::string slots;
+            for (const std::int32_t slot : quickCraftSlots_) {
+                slots += slots.empty() ? std::to_string(slot) : "," + std::to_string(slot);
+            }
+            const std::string_view kind = quickCraftType_ == 1 ? "single" : quickCraftType_ == 2 ? "clone" : "even";
+            if (!hooks_.dragAllowed(kind, slots)) {
+                quickCraftActive_ = false;
+                quickCraftSlots_.clear();
+                sendInventory();
+                return false;
+            }
+        }
         distributeQuickCraft(session);
         quickCraftActive_ = false;
         quickCraftSlots_.clear();

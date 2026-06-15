@@ -3,12 +3,13 @@
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
-#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -74,43 +75,23 @@ constexpr std::string_view kMaxHealthId = "minecraft:max_health";
     return name.find(':') != std::string_view::npos ? std::string{name} : "minecraft:" + std::string{name};
 }
 
-[[nodiscard]] PluginItem itemOf(const storage::StoredItemStack& stack) {
-    PluginItem item{.id = stack.id, .count = stack.count};
-    if (stack.components.contains(item::itemComponents::kCustomName)) {
-        item.name = std::string{stack.components.getString(item::itemComponents::kCustomName)};
-    }
-    item.damage = stack.components.getInt(item::itemComponents::kDamage);
-    for (const auto& [id, level] : player::enchantmentLevels(stack)) {
-        item.enchantments.emplace(id.toString(), level);
-    }
-    return item;
-}
-
-[[nodiscard]] storage::StoredItemStack storedOf(const PluginItem& item) {
-    wire::nbt::NbtCompound components;
-    if (item.name.has_value()) {
-        components.set(item::itemComponents::kCustomName, wire::nbt::NbtTag::ofString(*item.name));
-    }
-    if (item.damage > 0) {
-        components.set(item::itemComponents::kDamage, wire::nbt::NbtTag::ofInt(item.damage));
-    }
-    if (!item.enchantments.empty()) {
-        wire::nbt::NbtCompound levels;
-        for (const auto& [id, level] : item.enchantments) {
-            levels.set(id, wire::nbt::NbtTag::ofInt(level));
-        }
-        components.set(item::itemComponents::kEnchantments, wire::nbt::NbtTag::ofCompound(levels));
-    }
-    return storage::StoredItemStack{
-        .id = item.id, .count = std::max(item.count, 1), .components = std::move(components)};
-}
-
 // Every write re-sends the window, or a slot changed behind the client's back is a ghost item until the next click.
 class SessionInventoryRef final : public PluginInventory {
 public:
     explicit SessionInventoryRef(std::function<player::PlayerSession*()> session) : session_(std::move(session)) {}
 
     [[nodiscard]] std::int32_t size() const override { return storage::StoredInventory::kPlayerSlots; }
+
+    void setHeldSlot(std::int32_t slot) override {
+        player::PlayerSession* player = session_();
+        if (player == nullptr || slot < 0 || slot >= player::PlayerInventory::kHotbarSize) {
+            return;
+        }
+        player->inventory.setHeldSlot(slot);
+        if (player->connection().setHeldSlot) {
+            player->connection().setHeldSlot(slot);
+        }
+    }
 
     [[nodiscard]] std::int32_t heldSlot() const override {
         const player::PlayerSession* player = session_();
@@ -123,7 +104,7 @@ public:
             return std::nullopt;
         }
         const std::optional<storage::StoredItemStack>& stack = player->inventory.at(slot);
-        return stack.has_value() ? std::optional{itemOf(*stack)} : std::nullopt;
+        return stack.has_value() ? std::optional{pluginItemOf(*stack)} : std::nullopt;
     }
 
     void set(std::int32_t slot, const std::optional<PluginItem>& item) override {
@@ -131,7 +112,7 @@ public:
         if (player == nullptr) {
             return;
         }
-        player->inventory.set(slot, item.has_value() ? std::optional{storedOf(*item)} : std::nullopt);
+        player->inventory.set(slot, item.has_value() ? std::optional{storedItemOf(*item)} : std::nullopt);
         if (player->connection().sendInventoryAll) {
             player->connection().sendInventoryAll();
         }
@@ -142,7 +123,7 @@ public:
         if (player == nullptr) {
             return item.count;
         }
-        const std::int32_t left = player->inventory.add(storedOf(item));
+        const std::int32_t left = player->inventory.add(storedItemOf(item));
         if (player->connection().sendInventoryAll) {
             player->connection().sendInventoryAll();
         }
@@ -357,6 +338,11 @@ public:
     }
 
     [[nodiscard]] PluginInventory& inventory() override { return inventory_; }
+
+    [[nodiscard]] server::plugins::PluginWindow* window() override {
+        player::PlayerSession* player = session();
+        return player == nullptr || !player->connection().window ? nullptr : player->connection().window();
+    }
 
     void title(std::string_view title, std::string_view subtitle, std::int32_t fadeIn, std::int32_t stay,
                std::int32_t fadeOut) override {

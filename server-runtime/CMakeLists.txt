@@ -159,6 +159,10 @@ basalt_module(server-runtime-core
         src/plugins/ServerNpcs.cpp
         src/plugins/ServerPluginServices.cpp
         src/plugins/ServerObjectModel.cpp
+        src/plugins/ServerInventories.cpp
+        src/plugins/PluginItemConversion.cpp
+        src/plugins/PluginRecipeNbt.cpp
+        src/ContainerPluginWindow.cpp
         src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
         src/plugins/WorldBlockUpdates.cpp

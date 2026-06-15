@@ -2,7 +2,6 @@
 
 #include <basalt/server/plugins/PluginApi.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
-#include <basalt/server/runtime/bukkit/JavaPluginScan.hpp>
 #include <basalt/server/runtime/AreaEffectCloudSystem.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
@@ -41,6 +40,7 @@
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
+#include <basalt/server/runtime/bukkit/JavaPluginScan.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
@@ -50,6 +50,7 @@
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/plugins/ServerInventories.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
@@ -284,6 +285,7 @@ private:
     std::unique_ptr<plugins::RegistryPlaceholders> pluginPlaceholders_;
     std::unique_ptr<plugins::DatabasePluginStorage> pluginStorage_;
     std::unique_ptr<plugins::SessionMenus> pluginMenus_;
+    std::unique_ptr<plugins::ServerInventories> pluginInventories_;
     std::unique_ptr<plugins::SessionPackets> pluginPackets_;
     std::unique_ptr<plugins::SessionChannels> pluginChannels_;
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;

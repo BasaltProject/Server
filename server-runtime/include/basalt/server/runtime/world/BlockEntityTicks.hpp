@@ -34,8 +34,15 @@ struct Hooks {
     /// parity: the Bukkit `InventoryMoveItemEvent` a hopper fires before it moves anything.
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z)> allowHopperMove;
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
-                       const server::world::loot::ItemStack* input, const server::world::loot::ItemStack* result)>
+                       const server::world::loot::ItemStack& input, server::world::loot::ItemStack& result,
+                       std::string_view recipe)>
         allowSmelt;
+    std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
+                       const server::world::loot::ItemStack& fuel, std::int32_t& burnTicks)>
+        furnaceBurn;
+    std::function<void(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
+                       const server::world::loot::ItemStack& source, std::int32_t totalTicks, std::string_view recipe)>
+        furnaceStarted;
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
     std::function<bool(const wire::common::Identifier& block)> doesNotBlockHoppers;
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> gatewayBeam;

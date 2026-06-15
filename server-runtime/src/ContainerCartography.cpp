@@ -24,6 +24,9 @@ constexpr std::int32_t kCartographyMenu = 23;
 } // namespace
 
 void ContainerMenuController::openCartographyTable(PlayerSession& session, const BlockPos& pos) {
+    if (!mayOpen("cartography_table", pos)) {
+        return;
+    }
     returnCraftingGrid(session);
     openMenu = Menu::cartographyTable(allocateContainerId());
     openBlock = pos;

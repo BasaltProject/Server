@@ -1,6 +1,7 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/plugins/WorldEventHooks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
@@ -16,10 +17,6 @@ void here(PluginEvent& event, const world::LoadedWorld& world, const std::int32_
     event.set("x", static_cast<std::int64_t>(x));
     event.set("y", static_cast<std::int64_t>(y));
     event.set("z", static_cast<std::int64_t>(z));
-}
-
-[[nodiscard]] std::string itemOf(const server::world::loot::ItemStack* stack) {
-    return stack == nullptr ? std::string{} : stack->item.toString();
 }
 
 } // namespace
@@ -64,16 +61,80 @@ void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
         });
     };
     hooks.allowSmelt = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-                               std::string_view cooker, const server::world::loot::ItemStack* input,
-                               const server::world::loot::ItemStack* result) {
-        return sink.allowed(&inventorySmelt, [&](PluginEvent& event) {
+                               std::string_view cooker, const server::world::loot::ItemStack& input,
+                               server::world::loot::ItemStack& result, std::string_view recipe) {
+        const auto describe = [](const server::world::loot::ItemStack& stack) {
+            return snbtOf(storage::StoredItemStack{
+                .id = stack.item.toString(), .count = stack.count, .components = stack.components});
+        };
+        const server::plugins::PluginEvent* answered = sink.ask(&inventorySmelt, [&](PluginEvent& event) {
             event.set("world", std::string{worldName});
             event.set("x", static_cast<std::int64_t>(x));
             event.set("y", static_cast<std::int64_t>(y));
             event.set("z", static_cast<std::int64_t>(z));
             event.set("cooker", std::string{cooker});
-            event.set("item", itemOf(input));
-            event.set("result", itemOf(result));
+            event.set("item", input.item.toString());
+            event.set("result", result.item.toString());
+            event.set("source", describe(input));
+            event.set("output", describe(result));
+            event.set("recipe", std::string{recipe});
+        });
+        if (answered == nullptr) {
+            return true;
+        }
+        if (answered->cancelled()) {
+            return false;
+        }
+        if (const auto* text = std::get_if<std::string>(&answered->get("output")); text != nullptr) {
+            if (const std::optional<storage::StoredItemStack> chosen = stackFromSnbt(*text); chosen.has_value()) {
+                const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+                    wire::common::Identifier::parse(chosen->id);
+                if (id.has_value()) {
+                    result = server::world::loot::ItemStack{
+                        .item = *id, .count = chosen->count, .components = chosen->components};
+                }
+            }
+        }
+        return true;
+    };
+    hooks.furnaceBurn = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                                std::string_view cooker, const server::world::loot::ItemStack& fuel,
+                                std::int32_t& burnTicks) {
+        const server::plugins::PluginEvent* answered = sink.ask(&furnaceBurn, [&](PluginEvent& event) {
+            event.set("world", std::string{worldName});
+            event.set("x", static_cast<std::int64_t>(x));
+            event.set("y", static_cast<std::int64_t>(y));
+            event.set("z", static_cast<std::int64_t>(z));
+            event.set("cooker", std::string{cooker});
+            event.set("fuel", snbtOf(storage::StoredItemStack{
+                                  .id = fuel.item.toString(), .count = fuel.count, .components = fuel.components}));
+            event.set("burn_time", static_cast<std::int64_t>(burnTicks));
+        });
+        if (answered == nullptr) {
+            return true;
+        }
+        if (answered->cancelled()) {
+            return false;
+        }
+        if (const auto* value = std::get_if<std::int64_t>(&answered->get("burn_time")); value != nullptr) {
+            burnTicks = static_cast<std::int32_t>(*value);
+        }
+        return true;
+    };
+    hooks.furnaceStarted = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                                   std::string_view cooker, const server::world::loot::ItemStack& source,
+                                   std::int32_t total, std::string_view recipe) {
+        sink.notify(&furnaceStart, [&](PluginEvent& event) {
+            event.set("world", std::string{worldName});
+            event.set("x", static_cast<std::int64_t>(x));
+            event.set("y", static_cast<std::int64_t>(y));
+            event.set("z", static_cast<std::int64_t>(z));
+            event.set("cooker", std::string{cooker});
+            event.set("source",
+                      snbtOf(storage::StoredItemStack{
+                          .id = source.item.toString(), .count = source.count, .components = source.components}));
+            event.set("total", static_cast<std::int64_t>(total));
+            event.set("recipe", std::string{recipe});
         });
     };
 }

@@ -170,7 +170,6 @@ public:
         std::function<void(const player::PlayerSession& player, bool sneaking)> sneakChanged;
         std::function<void(const player::PlayerSession& player, std::int32_t slot, std::int32_t fromSlot)>
             heldSlotChanged;
-        std::function<void(const player::PlayerSession& player, std::string_view kind)> menuClosed;
     };
 
     struct Options {

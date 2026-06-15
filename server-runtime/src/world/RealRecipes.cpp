@@ -22,11 +22,23 @@ namespace crafting = server::world::crafting;
 
 } // namespace
 
-RealRecipes::RealRecipes(const Jar& jar, wire::common::Logger logger) : logger_(std::move(logger)) {
+RealRecipes::RealRecipes(const Jar& jar, wire::common::Logger logger) : logger_(std::move(logger)), jar_(jar) {
     if (jar.readText && jar.entriesUnder) {
         load(jar);
     }
-    for (const crafting::Recipe& recipe : recipes_) {
+    index();
+}
+
+void RealRecipes::index() {
+    cooking_.clear();
+    stonecutting_.clear();
+    smithing_.clear();
+    brewing_.clear();
+    for (std::size_t at = 0; at < recipes_.size(); ++at) {
+        if (!live_[at]) {
+            continue;
+        }
+        const crafting::Recipe& recipe = recipes_[at];
         switch (recipe.kind) {
         case crafting::RecipeKind::Cooking:
             cooking_[recipe.cooker].push_back(&recipe);
@@ -66,8 +78,6 @@ void RealRecipes::load(const Jar& jar) {
 
     const std::vector<std::pair<Identifier, std::string>> entries = datapack::dataFiles(jar.entriesUnder, "recipe");
     std::int32_t skipped = 0;
-    // Reserved up front: a parsed recipe is handed out by pointer, so the vector must not grow later.
-    recipes_.reserve(entries.size());
     for (const auto& [id, entry] : entries) {
         ids_.insert(id);
         const std::optional<std::string> text = jar.readText(entry);
@@ -86,6 +96,7 @@ void RealRecipes::load(const Jar& jar) {
         recipes_.push_back(*recipe);
         recipes_.back().id = id.toString();
         parsedIds_.push_back(id);
+        live_.push_back(true);
     }
     logger_.info([&] {
         return "Loaded " + std::to_string(recipes_.size()) + " crafting recipe(s) (" + std::to_string(skipped) +
@@ -94,8 +105,67 @@ void RealRecipes::load(const Jar& jar) {
 }
 
 const crafting::Recipe* RealRecipes::recipeFor(const Identifier& id) const {
-    const auto found = std::ranges::find(parsedIds_, id);
-    return found == parsedIds_.end() ? nullptr : &recipes_[static_cast<std::size_t>(found - parsedIds_.begin())];
+    for (std::size_t at = 0; at < parsedIds_.size(); ++at) {
+        if (live_[at] && parsedIds_[at] == id) {
+            return &recipes_[at];
+        }
+    }
+    return nullptr;
+}
+
+bool RealRecipes::add(const Identifier& id, crafting::Recipe recipe) {
+    if (ids_.contains(id)) {
+        return false;
+    }
+    recipe.id = id.toString();
+    recipes_.push_back(std::move(recipe));
+    parsedIds_.push_back(id);
+    live_.push_back(true);
+    ids_.insert(id);
+    index();
+    return true;
+}
+
+bool RealRecipes::remove(const Identifier& id) {
+    bool removed = false;
+    for (std::size_t at = 0; at < parsedIds_.size(); ++at) {
+        if (live_[at] && parsedIds_[at] == id) {
+            live_[at] = false;
+            removed = true;
+        }
+    }
+    if (ids_.erase(id) > 0 || removed) {
+        index();
+        return true;
+    }
+    return false;
+}
+
+std::vector<Identifier> RealRecipes::listed() const {
+    std::vector<Identifier> out;
+    for (std::size_t at = 0; at < parsedIds_.size(); ++at) {
+        if (live_[at]) {
+            out.push_back(parsedIds_[at]);
+        }
+    }
+    return out;
+}
+
+void RealRecipes::clear() {
+    std::ranges::fill(live_, false);
+    ids_.clear();
+    index();
+}
+
+void RealRecipes::restore() {
+    recipes_.clear();
+    parsedIds_.clear();
+    live_.clear();
+    ids_.clear();
+    if (jar_.readText && jar_.entriesUnder) {
+        load(jar_);
+    }
+    index();
 }
 
 const std::vector<const crafting::Recipe*>& RealRecipes::cooking(crafting::Cooker cooker) const {
@@ -140,16 +210,19 @@ const crafting::Recipe* RealRecipes::smithingFor(const server::world::loot::Item
 }
 
 const Identifier* RealRecipes::nameOf(const crafting::Recipe* recipe) const {
-    if (recipe == nullptr || recipes_.empty() || recipe < recipes_.data() ||
-        recipe >= recipes_.data() + recipes_.size()) {
-        return nullptr;
+    for (std::size_t at = 0; at < recipes_.size(); ++at) {
+        if (&recipes_[at] == recipe) {
+            return &parsedIds_[at];
+        }
     }
-    const auto index = static_cast<std::size_t>(recipe - recipes_.data());
-    return index < parsedIds_.size() ? &parsedIds_[index] : nullptr;
+    return nullptr;
 }
 
 std::optional<RealRecipes::Match> RealRecipes::recipeMatching(const crafting::CraftingInput& input) const {
     for (std::size_t index = 0; index < recipes_.size(); ++index) {
+        if (!live_[index]) {
+            continue;
+        }
         // parity: `RecipeManager.getRecipeFor(RecipeType.CRAFTING, ...)`.
         const crafting::RecipeKind kind = recipes_[index].kind;
         if (kind != crafting::RecipeKind::Shaped && kind != crafting::RecipeKind::Shapeless &&

@@ -263,6 +263,12 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         }
         return;
     }
+    if (pluginMenu_.has_value()) {
+        if (index >= 0 && static_cast<std::size_t>(index) < pluginMenu_->size()) {
+            (*pluginMenu_)[static_cast<std::size_t>(index)] = stack;
+        }
+        return;
+    }
     if (openEnderChest_) {
         PlayerSession* session = owner_->playerSession();
         if (session == nullptr || index < 0 || static_cast<std::size_t>(index) >= session->enderChest.size()) {
@@ -650,6 +656,8 @@ void ContainerMenuController::recomputeSmithingResult() {
     smithingSlots_[Menu::kSmithingResult] = assembled.has_value() ? std::optional{storedOf(*assembled)} : std::nullopt;
     const wire::common::Identifier* name = recipes->nameOf(recipe);
     recipeUsed_ = name != nullptr && assembled.has_value() ? std::optional{*name} : std::nullopt;
+    std::int32_t noCost = 0;
+    announceResult("smithing", smithingSlots_[Menu::kSmithingResult], noCost);
 }
 
 void ContainerMenuController::takeSmithingResult() {
@@ -747,6 +755,8 @@ void ContainerMenuController::recomputeCraftingResult() {
         }
     }
     recipeUsed_ = craftingResult_.has_value() ? std::optional{match->id} : std::nullopt;
+    std::int32_t noCost = 0;
+    announceResult("crafting", craftingResult_, noCost);
 }
 
 std::vector<std::optional<storage::StoredItemStack>> ContainerMenuController::craftingRemainders() const {

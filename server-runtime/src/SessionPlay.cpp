@@ -90,7 +90,11 @@ std::string oneDecimal(double value) {
 menuItemsOf(const std::map<std::int32_t, server::plugins::PluginItem>& items) {
     std::map<std::int32_t, PluginMenuItem> drawn;
     for (const auto& [slot, item] : items) {
-        drawn.emplace(slot, PluginMenuItem{.id = item.id, .count = item.count, .name = item.name, .lore = item.lore});
+        drawn.emplace(slot, PluginMenuItem{.id = item.id,
+                                           .count = item.count,
+                                           .name = item.name,
+                                           .lore = item.lore,
+                                           .components = item.components});
     }
     return drawn;
 }
@@ -522,6 +526,7 @@ player::PlayerConnection ClientSession::playerConnection() {
         menus_->refreshPluginMenu(menuItemsOf(items));
     };
     connection.closeOpenMenu = [this] { menus_->closeOpenMenu(); };
+    connection.window = [this]() -> server::plugins::PluginWindow* { return menus_.get(); };
     return connection;
 }
 
@@ -888,10 +893,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     if (packetId == play::ContainerClosePacket::kServerboundId) {
         static_cast<void>(play::ContainerClosePacket::read(body));
         if (session != nullptr) {
-            if (options_.plugins.menuClosed) {
-                options_.plugins.menuClosed(*session, menus_->openMenu.containerId() == 0 ? "player" : "container");
-            }
-            menus_->closeOpenMenu(*session);
+            menus_->closeOpenMenu(*session, "player");
         }
         return;
     }

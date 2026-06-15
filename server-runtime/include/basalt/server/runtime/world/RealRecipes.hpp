@@ -5,6 +5,7 @@
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <map>
 #include <optional>
@@ -34,6 +35,19 @@ public:
     };
 
     explicit RealRecipes(const Jar& jar, wire::common::Logger logger = wire::common::Logger{"Recipes"});
+
+    /// Adds a recipe a plugin made; false when the id is taken. Recipes already handed out stay valid.
+    bool add(const wire::common::Identifier& id, server::world::crafting::Recipe recipe);
+
+    /// Takes a recipe out of every lookup; false when there is none by that id.
+    bool remove(const wire::common::Identifier& id);
+
+    /// Every recipe of the datapack and every one added since, in the order they were made.
+    [[nodiscard]] std::vector<wire::common::Identifier> listed() const;
+
+    /// Drops everything, or puts back only what the datapack had.
+    void clear();
+    void restore();
 
     [[nodiscard]] std::size_t size() const noexcept { return recipes_.size(); }
 
@@ -79,10 +93,13 @@ public:
 
 private:
     void load(const Jar& jar);
+    void index();
 
     wire::common::Logger logger_;
-    std::vector<server::world::crafting::Recipe> recipes_;
-    std::vector<wire::common::Identifier> parsedIds_;
+    Jar jar_;
+    std::deque<server::world::crafting::Recipe> recipes_;
+    std::deque<wire::common::Identifier> parsedIds_;
+    std::deque<bool> live_;
     std::set<wire::common::Identifier> ids_;
     std::map<server::world::crafting::Cooker, std::vector<const server::world::crafting::Recipe*>> cooking_;
     std::vector<const server::world::crafting::Recipe*> stonecutting_;

@@ -19,6 +19,8 @@ struct ItemStack {
     wire::common::Identifier item;
     std::int32_t count = 0;
     wire::nbt::NbtCompound components;
+
+    friend bool operator==(const ItemStack&, const ItemStack&) = default;
 };
 
 struct LootTable;

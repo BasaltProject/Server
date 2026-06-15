@@ -441,7 +441,7 @@ void PlayerLifecycle::leavePlayIfPresent() {
     // Leaving while asleep would leave the bed occupied forever.
     owner_->wakeUp();
     // Leaving with a chest open would leave its lid up.
-    owner_->menus().closeOpenMenu(*session);
+    owner_->menus().closeOpenMenu(*session, "disconnect");
     // parity: `PlayerList.remove` awards it before the player is saved.
     player::statAwards::award(*session, "leave_game");
     // Before leaving the registry, so a save elsewhere cannot write a half-gone player.
