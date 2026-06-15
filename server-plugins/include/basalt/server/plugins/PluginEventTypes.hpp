@@ -87,6 +87,9 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& entityTarget();
 [[nodiscard]] const PluginEventType& entityAdd();
 [[nodiscard]] const PluginEventType& entityResurrect();
+[[nodiscard]] const PluginEventType& entityLaunch();
+[[nodiscard]] const PluginEventType& vehicleDamage();
+[[nodiscard]] const PluginEventType& vehicleDestroy();
 [[nodiscard]] const PluginEventType& entityDrops();
 [[nodiscard]] const PluginEventType& entityPotionEffect();
 [[nodiscard]] const PluginEventType& blockFade();

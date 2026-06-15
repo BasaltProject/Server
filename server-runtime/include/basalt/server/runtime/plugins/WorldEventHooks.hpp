@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
+#include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 
 #include <functional>
@@ -24,5 +25,6 @@ void environment(EnvironmentTickSystem::Hooks& hooks, const EventSink& sink);
 void spawning(NaturalSpawningSystem::Hooks& hooks, const EventSink& sink);
 void pistons(BlockChangeBroadcaster::Hooks& hooks, const EventSink& sink);
 void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf);
+void vehicles(VehicleSystem::Hooks& hooks, const EventSink& sink);
 
 } // namespace basalt::server::runtime::plugins::worldEventHooks

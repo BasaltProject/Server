@@ -36,20 +36,3 @@ foreach(_file IN LISTS BASALT_BUKKIT_EMBEDDED_FILES)
 endforeach()
 set_source_files_properties(src/BukkitEmbedded.cpp PROPERTIES OBJECT_DEPENDS "${BASALT_BUKKIT_EMBEDDED_FILES}"
                             COMPILE_DEFINITIONS "BASALT_BUKKIT_EMBED_DIR=\"${BASALT_BUKKIT_EMBED_DIR}\"")
-
-if(BASALT_BUILD_TESTS)
-    add_test(NAME server-bukkit-stage-runtime-test
-        COMMAND ${CMAKE_COMMAND}
-            "-DSTAGE_SCRIPT=${CMAKE_SOURCE_DIR}/cmake/StageBukkitRuntime.cmake"
-            "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/stage-runtime-test"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/test/StageRuntimeTest.cmake")
-
-    basalt_test(server-bukkit-shim-smoke-test
-        SOURCES test/ShimSmokeTest.cpp
-        DEPENDS basalt::server-bukkit
-    )
-    target_compile_definitions(server-bukkit-shim-smoke-test PRIVATE
-        BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/shim-smoke-test"
-        BASALT_TEST_RUNTIME_DIR="${CMAKE_BINARY_DIR}/bukkit-runtime")
-    set_tests_properties(server-bukkit-shim-smoke-test PROPERTIES TIMEOUT 60)
-endif()

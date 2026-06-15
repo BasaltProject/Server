@@ -146,7 +146,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     }
     // Every mob hit comes through here; a plugin may veto or scale it but never sees a hit that was not going to land.
     if (hooks.damaged) {
-        const std::optional<float> allowed = hooks.damaged(entity, amount, cause, attackerName, blamed.causingId);
+        const std::optional<float> allowed = hooks.damaged(entity, amount, cause, attackerName, blamed.causingId, blamed.directId);
         if (!allowed.has_value() || *allowed <= 0.0F) {
             return {};
         }

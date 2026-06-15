@@ -597,6 +597,39 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
+    // Projectiles are created in many places; the newest ids are the ones nobody has been asked about yet.
+    {
+        static constexpr std::array<std::string_view, 19> kProjectiles{
+            "arrow",          "spectral_arrow",    "trident",         "snowball",         "egg",
+            "ender_pearl",    "experience_bottle", "splash_potion",   "lingering_potion", "fireball",
+            "small_fireball", "dragon_fireball",   "wither_skull",    "wind_charge",      "breeze_wind_charge",
+            "llama_spit",     "shulker_bullet",    "firework_rocket", "fishing_bobber"};
+        const auto known = launchWatermarks_.find(world.name());
+        std::int32_t newest = known == launchWatermarks_.end() ? 0 : known->second;
+        const std::int32_t previous = newest;
+        for (entity::ServerEntity* candidate : living) {
+            newest = std::max(newest, candidate->entityId());
+            if (known == launchWatermarks_.end() || candidate->entityId() <= previous ||
+                std::ranges::find(kProjectiles, candidate->type().path()) == kProjectiles.end()) {
+                continue;
+            }
+            const bool allowed = eventSink_.allowed(
+                &server::plugins::pluginEventTypes::entityLaunch, [&](server::plugins::PluginEvent& filled) {
+                    filled.set("entity_id", static_cast<std::int64_t>(candidate->entityId()));
+                    filled.set("entity_type", candidate->type().toString());
+                    filled.set("world", world.name());
+                    filled.set("x", candidate->x);
+                    filled.set("y", candidate->y);
+                    filled.set("z", candidate->z);
+                    filled.set("shooter_id", static_cast<std::int64_t>(candidate->ownerId.value_or(-1)));
+                });
+            if (!allowed) {
+                candidate->removed = true;
+            }
+        }
+        launchWatermarks_.insert_or_assign(world.name(), newest);
+    }
+
     // parity: `TargetingConditions.forCombat`.
     const double playerWidth = registry::entityTypeShapes::widthOf(playerType());
     const double playerHeight = registry::entityTypeShapes::heightOf(playerType());

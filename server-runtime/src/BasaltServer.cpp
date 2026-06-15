@@ -1120,6 +1120,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        const std::function<void(std::int32_t eventId)>& broadcastEvent) {
                     return mobSpawners_ != nullptr && mobSpawners_->tick(world, data, pos, broadcastEvent);
                 }});
+    VehicleSystem::Hooks vehicleHooks;
+    plugins::worldEventHooks::vehicles(vehicleHooks, eventSink_);
+    vehicles_->setHooks(std::move(vehicleHooks));
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_, *pushes_);
 
     // The online count comes from the registry, not a second counter that could advertise numbers that never come down.
