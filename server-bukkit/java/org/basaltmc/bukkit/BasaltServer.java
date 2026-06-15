@@ -34,6 +34,7 @@ public class BasaltServer extends ServerBase {
     private static BasaltServer instance;
 
     private final Logger logger = Logger.getLogger("Minecraft");
+    private volatile boolean worldsReady;
     private final File root;
     private final BasaltPluginManager pluginManager;
     private final BasaltScheduler scheduler = new BasaltScheduler();
@@ -229,9 +230,21 @@ public class BasaltServer extends ServerBase {
         return matches;
     }
 
+    /** Plugins that load at STARTUP see no worlds, as on any Bukkit server, until the worlds are announced. */
+    void announceWorlds() {
+        worldsReady = true;
+        for (World world : getWorlds()) {
+            getPluginManager().callEvent(new org.bukkit.event.world.WorldInitEvent(world));
+            getPluginManager().callEvent(new org.bukkit.event.world.WorldLoadEvent(world));
+        }
+    }
+
     @Override
     public List<World> getWorlds() {
         List<World> all = new ArrayList<>();
+        if (!worldsReady) {
+            return all;
+        }
         for (String name : Natives.worlds()) {
             all.add(world(name));
         }
@@ -240,6 +253,9 @@ public class BasaltServer extends ServerBase {
 
     @Override
     public World getWorld(String name) {
+        if (!worldsReady) {
+            return null;
+        }
         for (String known : Natives.worlds()) {
             if (known.equalsIgnoreCase(name)) {
                 return world(known);
