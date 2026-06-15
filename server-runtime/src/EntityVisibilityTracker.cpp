@@ -160,6 +160,7 @@ void EntityVisibilityTracker::forgetEverythingDrawn() {
     lastEntityPositions_.clear();
     lastRuntimeEntityMetadata_.clear();
     lastPassengers_.clear();
+    lastMobEquipment_.clear();
 }
 
 void EntityVisibilityTracker::syncSummonedEntities() {
@@ -180,6 +181,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                 lastRuntimeEntityMetadata_.erase(entity->entityId());
                 lastPassengers_.erase(entity->entityId());
                 lastLeashHolders_.erase(entity->entityId());
+                lastMobEquipment_.erase(entity->entityId());
                 owner_->sendPlayPacket(RemoveEntitiesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                     RemoveEntitiesPacket{.entityIds = {entity->entityId()}}.write(buffer);
                 });
@@ -239,32 +241,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                     SetEntityDataPacket{.entityId = entity->entityId(), .entries = metadata}.write(buffer);
                 });
             }
-            if (entity->sourceNbt.has_value()) {
-                std::vector<SetEquipmentPacket::Slot> equipment;
-                for (const entity::GeneratedEquipment& slot : entity::generatedEntityEquipment(*entity->sourceNbt)) {
-                    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(slot.item);
-                    const server::registry::Item* item =
-                        id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
-                    if (item == nullptr) {
-                        continue;
-                    }
-                    world::RealEnchantments* enchantments = owner_->options().enchantments;
-                    equipment.push_back(SetEquipmentPacket::Slot{
-                        .type = slot.slot,
-                        .stack = wire::protocol::play::WireItemStack{
-                            .itemId = item->protocolId,
-                            .count = slot.count,
-                            .components = item::itemComponentCodecs::toWire(
-                                slot.components, [enchantments](const Identifier& name) {
-                                    return enchantments == nullptr ? std::nullopt : enchantments->protocolIdOf(name);
-                                })}});
-                }
-                if (!equipment.empty()) {
-                    owner_->sendPlayPacket(SetEquipmentPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                        SetEquipmentPacket{.entityId = entity->entityId(), .slots = equipment}.write(buffer);
-                    });
-                }
-            }
+            syncMobEquipment(*entity);
             if (const std::vector<wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot> attributes =
                     pairingAttributes(*entity);
                 !attributes.empty()) {
@@ -291,6 +268,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                 SetEntityDataPacket{.entityId = entity->entityId(), .entries = changes}.write(buffer);
             });
         }
+        syncMobEquipment(*entity);
         syncLeash(*entity);
         const auto last = lastEntityPositions_.find(entity->entityId());
         const bool first = last == lastEntityPositions_.end();
@@ -431,6 +409,50 @@ void EntityVisibilityTracker::syncLeash(const ServerEntity& entity) {
         lastLeashHolders_.insert_or_assign(entity.entityId(), *holder);
     } else {
         lastLeashHolders_.erase(entity.entityId());
+    }
+}
+
+void EntityVisibilityTracker::syncMobEquipment(const entity::ServerEntity& entity) {
+    std::vector<entity::GeneratedEquipment> worn;
+    if (entity.sourceNbt.has_value()) {
+        worn = entity::generatedEntityEquipment(*entity.sourceNbt);
+    }
+    std::vector<entity::GeneratedEquipment>& known = lastMobEquipment_[entity.entityId()];
+    const auto same = [](const entity::GeneratedEquipment& left, const entity::GeneratedEquipment& right) {
+        return left.slot == right.slot && left.item == right.item && left.count == right.count &&
+               left.components == right.components;
+    };
+    if (std::ranges::equal(known, worn, same)) {
+        return;
+    }
+    world::RealEnchantments* enchantments = owner_->options().enchantments;
+    std::vector<SetEquipmentPacket::Slot> slots;
+    for (const entity::GeneratedEquipment& before : known) {
+        if (std::ranges::none_of(worn, [&](const entity::GeneratedEquipment& now) { return now.slot == before.slot; })) {
+            slots.push_back(SetEquipmentPacket::Slot{.type = before.slot, .stack = std::nullopt});
+        }
+    }
+    for (const entity::GeneratedEquipment& slot : worn) {
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(slot.item);
+        const server::registry::Item* item =
+            id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
+        if (item == nullptr) {
+            continue;
+        }
+        slots.push_back(SetEquipmentPacket::Slot{
+            .type = slot.slot,
+            .stack = wire::protocol::play::WireItemStack{
+                .itemId = item->protocolId,
+                .count = slot.count,
+                .components = item::itemComponentCodecs::toWire(slot.components, [enchantments](const Identifier& name) {
+                    return enchantments == nullptr ? std::nullopt : enchantments->protocolIdOf(name);
+                })}});
+    }
+    known = std::move(worn);
+    if (!slots.empty()) {
+        owner_->sendPlayPacket(SetEquipmentPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            SetEquipmentPacket{.entityId = entity.entityId(), .slots = slots}.write(buffer);
+        });
     }
 }
 
