@@ -84,6 +84,7 @@ public final class BukkitRuntime {
             folder.mkdirs();
             server = new org.bukkit.craftbukkit.CraftServer(new File(".").getAbsoluteFile(), folder);
             Bukkit.setServer(server);
+            org.basaltmc.bukkit.misc.Serializables.register();
             return true;
         } catch (Throwable t) {
             t.printStackTrace();

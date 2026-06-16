@@ -34,6 +34,12 @@ public final class BasaltPluginClassLoader extends URLClassLoader implements Con
         this.jar = jar;
     }
 
+    public void addLibraries(java.util.List<URL> libraries) {
+        for (URL library : libraries) {
+            addURL(library);
+        }
+    }
+
     public String pluginName() {
         return description.getName();
     }
