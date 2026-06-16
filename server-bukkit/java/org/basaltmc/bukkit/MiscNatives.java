@@ -107,4 +107,7 @@ public final class MiscNatives {
     public static native int[] locateStructure(String world, String structure, int x, int z, int cells);
     public static native int[] locateBiome(String world, String[] biomes, int x, int y, int z, int radius, int step);
     public static native int[] shapeBoxes(int stateId);
+    public static native String[] dragonFight(String world);
+    public static native void setDragonPreviouslyKilled(String world, boolean value);
+    public static native String[] playerProfile(String uuid);
 }

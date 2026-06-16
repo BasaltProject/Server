@@ -39,6 +39,11 @@ final class KeyedProxy implements InvocationHandler {
                 break;
             case "ordinal":
                 return ordinal;
+            case "getValue":
+                if (type == org.bukkit.map.MapCursor.Type.class) {
+                    return (byte) ordinal;
+                }
+                break;
             case "name":
                 return key.getKey().toUpperCase(java.util.Locale.ROOT);
             case "toString":

@@ -97,6 +97,9 @@ public:
 
     [[nodiscard]] virtual bool may(std::string_view permission) const = 0;
 
+    /// The profile properties the player logged in with (their skin), as name, value and signature triples.
+    [[nodiscard]] virtual std::vector<std::array<std::string, 3>> profileProperties() const { return {}; }
+
     /// What `source` (a plugin) grants or denies this player over their group; nothing withdraws it.
     virtual void setPermission(std::string_view source, std::string_view node, std::optional<bool> granted) {
         static_cast<void>(source);
@@ -709,6 +712,24 @@ public:
         static_cast<void>(nbt);
         static_cast<void>(cause);
         return -1;
+    }
+
+    /// The ender dragon fight of an End world: whether it was won before, the exit portal, the respawn stage and
+    /// gateways.
+    struct DragonFightFacts {
+        bool previouslyKilled = false;
+        std::optional<std::array<std::int32_t, 3>> portal;
+        /// "start", "preparing_to_summon_pillars", "summoning_pillars", "summoning_dragon", "end", or empty.
+        std::string respawnStage;
+        std::int32_t gatewaysLeft = 0;
+        std::string dragonUuid;
+    };
+
+    [[nodiscard]] virtual std::optional<DragonFightFacts> dragonFight() { return std::nullopt; }
+
+    virtual bool setDragonPreviouslyKilled(bool value) {
+        static_cast<void>(value);
+        return false;
     }
 
     /// The block x and z of the start of the nearest structure of this kind, searching `cells` placement cells out.
