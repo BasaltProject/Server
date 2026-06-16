@@ -98,4 +98,10 @@ public final class MiscNatives {
     public static native byte[] mapColors(int id);
     public static native String[] mapCarriers(int id);
     public static native void mapShow(String uuid, int id, byte[] colors, int[] cursors, String[] captions);
+    public static native double[] tmPace();
+    public static native String[] resourcePack();
+    public static native boolean lootHas(String table);
+    public static native String[] lootTables();
+    public static native String[] lootRoll(String table, String world, double x, double y, double z, float luck,
+        long seed, String looter);
 }

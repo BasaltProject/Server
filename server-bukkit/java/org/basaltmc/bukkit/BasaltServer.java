@@ -472,11 +472,6 @@ public class BasaltServer extends MiscServer {
     }
 
     @Override
-    public double[] getTPS() {
-        return new double[] {20.0, 20.0, 20.0};
-    }
-
-    @Override
     public Warning.WarningState getWarningState() {
         return Warning.WarningState.DEFAULT;
     }

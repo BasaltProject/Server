@@ -856,6 +856,58 @@ void JNICALL nativeMapShow(JNIEnv* env, jclass, jstring uuid, jint id, jbyteArra
         return true;
     }));
 }
+
+jdoubleArray JNICALL nativeTmPace(JNIEnv* env, jclass) {
+    const std::array<double, 4> pace =
+        jni::onServer<std::array<double, 4>>({20.0, 20.0, 20.0, 0.0}, [] { return control().pace(); });
+    jdoubleArray array = env->NewDoubleArray(static_cast<jsize>(pace.size()));
+    env->SetDoubleArrayRegion(array, 0, static_cast<jsize>(pace.size()), pace.data());
+    return array;
+}
+
+jobjectArray JNICALL nativeResourcePack(JNIEnv* env, jclass) {
+    const auto pack = jni::onServer<std::optional<plugins::PluginResourcePack>>(
+        std::nullopt, [] { return control().resourcePack(); });
+    if (!pack.has_value()) {
+        return nullptr;
+    }
+    return jni::stringArrayOf(env, {pack->id, pack->url, pack->hash, pack->required ? "1" : "0", pack->prompt});
+}
+
+[[nodiscard]] plugins::PluginLoot& loot() { return BukkitBridge::current().services().loot(); }
+
+jboolean JNICALL nativeLootHas(JNIEnv* env, jclass, jstring table) {
+    const std::string text = toStd(env, table);
+    return flag(jni::onServer<bool>(false, [&] { return loot().has(text); }));
+}
+
+jobjectArray JNICALL nativeLootTables(JNIEnv* env, jclass) {
+    return jni::stringArrayOf(env, jni::onServer<std::vector<std::string>>({}, [] { return loot().tables(); }));
+}
+
+jobjectArray JNICALL nativeLootRoll(JNIEnv* env, jclass, jstring table, jstring world, jdouble x, jdouble y, jdouble z,
+                                    jfloat luck, jlong seed, jstring looter) {
+    const std::string id = toStd(env, table);
+    const plugins::PluginLootRoll rolled{.world = toStd(env, world),
+                                         .x = x,
+                                         .y = y,
+                                         .z = z,
+                                         .luck = luck,
+                                         .seed = seed,
+                                         .looter = looter == nullptr ? std::string{} : toStd(env, looter)};
+    const auto items = jni::onServer<std::optional<std::vector<plugins::PluginLootItem>>>(
+        std::nullopt, [&] { return loot().roll(id, rolled); });
+    if (!items.has_value()) {
+        return nullptr;
+    }
+    std::vector<std::string> flat;
+    for (const plugins::PluginLootItem& item : *items) {
+        flat.push_back(item.item);
+        flat.push_back(std::to_string(item.count));
+        flat.push_back(item.components);
+    }
+    return jni::stringArrayOf(env, flat);
+}
 } // namespace
 
 void registerMiscNatives(JNIEnv* env, jclass natives) {
@@ -965,6 +1017,12 @@ void registerMiscNatives(JNIEnv* env, jclass natives) {
         method("mapColors", "(I)[B", reinterpret_cast<void*>(&nativeMapColors)),
         method("mapCarriers", "(I)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeMapCarriers)),
         method("mapShow", "(Ljava/lang/String;I[B[I[Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeMapShow)),
+        method("tmPace", "()[D", reinterpret_cast<void*>(&nativeTmPace)),
+        method("resourcePack", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeResourcePack)),
+        method("lootHas", "(Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeLootHas)),
+        method("lootTables", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeLootTables)),
+        method("lootRoll", "(Ljava/lang/String;Ljava/lang/String;DDDFJLjava/lang/String;)[Ljava/lang/String;",
+               reinterpret_cast<void*>(&nativeLootRoll)),
         method("playerPermissions", "(Ljava/lang/String;[Ljava/lang/String;[Z)V",
                reinterpret_cast<void*>(&nativePlayerPermissions)),
     };

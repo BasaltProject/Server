@@ -467,6 +467,10 @@ server::plugins::PluginMaps& ServerPluginServices::maps() {
     return parts_.maps == nullptr ? server::plugins::PluginMaps::unavailable() : *parts_.maps;
 }
 
+server::plugins::PluginLoot& ServerPluginServices::loot() {
+    return parts_.loot == nullptr ? server::plugins::PluginLoot::unavailable() : *parts_.loot;
+}
+
 bool ServerPluginServices::at(std::string_view world, double x, double z, std::function<void()> task) {
     sched::Owner* target = parts_.ownerAt ? parts_.ownerAt(std::string{world}, x, z) : nullptr;
     if (target == nullptr) {

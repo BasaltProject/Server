@@ -13,11 +13,13 @@ public:
     struct Hooks {
         std::function<TickLoop*()> tickLoop;
         std::string bugReportLink;
+        std::function<std::optional<server::plugins::PluginResourcePack>()> resourcePack;
     };
 
     explicit ServerControl(Hooks hooks);
 
     [[nodiscard]] float tickRate() override;
+    [[nodiscard]] std::array<double, 4> pace() override;
     void setTickRate(float rate) override;
     [[nodiscard]] bool frozen() override;
     void setFrozen(bool value) override;
@@ -29,6 +31,7 @@ public:
     bool stopSprinting() override;
     [[nodiscard]] std::vector<server::plugins::PluginServerLink> links() override;
     void setLinks(std::vector<server::plugins::PluginServerLink> links) override;
+    [[nodiscard]] std::optional<server::plugins::PluginResourcePack> resourcePack() override;
 
 private:
     Hooks hooks_;
