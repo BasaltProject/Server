@@ -1,6 +1,8 @@
 package org.basaltmc.bukkit.persistence;
 
+import org.basaltmc.bukkit.Blocks;
 import org.basaltmc.bukkit.MiscNatives;
+import org.basaltmc.bukkit.WorldNatives;
 import org.bukkit.craftbukkit.persistence.CraftPersistentDataContainer;
 
 /** The containers of the holders the server stores itself; each reads and writes the server's own copy. */
@@ -13,13 +15,23 @@ public final class PdcStores {
     }
 
     public static CraftPersistentDataContainer chunk(String world, int chunkX, int chunkZ) {
-        return new CraftPersistentDataContainer(new BytesPdcStore(() -> MiscNatives.chunkData(world, chunkX, chunkZ),
-            bytes -> MiscNatives.setChunkData(world, chunkX, chunkZ, bytes)));
+        return new CraftPersistentDataContainer(new BytesPdcStore(() -> {
+            byte[] found = MiscNatives.chunkData(world, chunkX, chunkZ);
+            if (found == null && WorldNatives.loadChunk(world, chunkX, chunkZ, true)) {
+                found = MiscNatives.chunkData(world, chunkX, chunkZ);
+            }
+            return found;
+        }, bytes -> MiscNatives.setChunkData(world, chunkX, chunkZ, bytes)));
     }
 
     public static CraftPersistentDataContainer blockEntity(String world, int x, int y, int z) {
-        return new CraftPersistentDataContainer(new BytesPdcStore(() -> MiscNatives.blockEntityData(world, x, y, z),
-            bytes -> MiscNatives.setBlockEntityData(world, x, y, z, bytes)));
+        return new CraftPersistentDataContainer(new BytesPdcStore(() -> {
+            Blocks.flushAll();
+            return MiscNatives.blockEntityData(world, x, y, z);
+        }, bytes -> {
+            Blocks.flushAll();
+            MiscNatives.setBlockEntityData(world, x, y, z, bytes);
+        }));
     }
 
     public static CraftPersistentDataContainer entity(String world, int entityId) {
