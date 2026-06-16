@@ -711,6 +711,31 @@ public:
         return -1;
     }
 
+    /// The block x and z of the start of the nearest structure of this kind, searching `cells` placement cells out.
+    [[nodiscard]] virtual std::optional<std::array<std::int32_t, 2>>
+    locateStructure(std::string_view structure, std::int32_t x, std::int32_t z, std::int32_t cells, bool skipExisting) {
+        static_cast<void>(structure);
+        static_cast<void>(x);
+        static_cast<void>(z);
+        static_cast<void>(cells);
+        static_cast<void>(skipExisting);
+        return std::nullopt;
+    }
+
+    /// The nearest block of one of these biomes, looking out in rings of `step` blocks up to `radius`.
+    [[nodiscard]] virtual std::optional<std::array<std::int32_t, 3>> locateBiome(const std::vector<std::string>& biomes,
+                                                                                 std::int32_t x, std::int32_t y,
+                                                                                 std::int32_t z, std::int32_t radius,
+                                                                                 std::int32_t step) {
+        static_cast<void>(biomes);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(radius);
+        static_cast<void>(step);
+        return std::nullopt;
+    }
+
     /// What plugins keep on the world, as a named NBT compound (empty compound when nothing is kept).
     [[nodiscard]] virtual std::vector<std::uint8_t> pluginData() { return {}; }
 
