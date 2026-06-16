@@ -942,6 +942,13 @@ jintArray JNICALL nativeLocateBiome(JNIEnv* env, jclass, jstring world, jobjectA
     env->SetIntArrayRegion(array, 0, 3, at->data());
     return array;
 }
+
+jintArray JNICALL nativeShapeBoxes(JNIEnv* env, jclass, jint state) {
+    const std::vector<std::int32_t> boxes = BukkitBridge::current().services().worlds().collisionBoxes(state);
+    jintArray array = env->NewIntArray(static_cast<jsize>(boxes.size()));
+    env->SetIntArrayRegion(array, 0, static_cast<jsize>(boxes.size()), boxes.data());
+    return array;
+}
 } // namespace
 
 void registerMiscNatives(JNIEnv* env, jclass natives) {
@@ -1061,6 +1068,7 @@ void registerMiscNatives(JNIEnv* env, jclass natives) {
                reinterpret_cast<void*>(&nativeLocateStructure)),
         method("locateBiome", "(Ljava/lang/String;[Ljava/lang/String;IIIII)[I",
                reinterpret_cast<void*>(&nativeLocateBiome)),
+        method("shapeBoxes", "(I)[I", reinterpret_cast<void*>(&nativeShapeBoxes)),
         method("playerPermissions", "(Ljava/lang/String;[Ljava/lang/String;[Z)V",
                reinterpret_cast<void*>(&nativePlayerPermissions)),
     };

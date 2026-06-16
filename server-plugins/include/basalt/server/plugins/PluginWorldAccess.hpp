@@ -990,6 +990,12 @@ public:
         return {};
     }
 
+    /// The collision boxes of a block state, six numbers each (min then max corner) in 32nds of a block.
+    [[nodiscard]] virtual std::vector<std::int32_t> collisionBoxes(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return {};
+    }
+
     /// Physical facts about one state: friction, speed, jump, push reaction, map colour 0xRRGGBB, fire odds.
     [[nodiscard]] virtual std::vector<double> blockInfo(std::int32_t stateId) const {
         static_cast<void>(stateId);

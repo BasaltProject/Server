@@ -367,4 +367,21 @@ public final class BasaltBlock extends BlockBase {
     public String toString() {
         return "BasaltBlock{world=" + world.getName() + ",x=" + x + ",y=" + y + ",z=" + z + "}";
     }
+
+    @Override
+    public org.bukkit.util.RayTraceResult rayTrace(org.bukkit.Location start, org.bukkit.util.Vector direction,
+            double maxDistance, org.bukkit.FluidCollisionMode fluidCollisionMode) {
+        return org.basaltmc.bukkit.misc.RayTracing.block(this, start.toVector(), direction, maxDistance,
+            fluidCollisionMode, false);
+    }
+
+    @Override
+    public org.bukkit.util.BoundingBox getBoundingBox() {
+        return org.basaltmc.bukkit.misc.Shapes.bounds(state(), x, y, z);
+    }
+
+    @Override
+    public org.bukkit.util.VoxelShape getCollisionShape() {
+        return org.basaltmc.bukkit.misc.Shapes.shape(state());
+    }
 }

@@ -169,6 +169,8 @@ public final class BasaltBlockData implements InvocationHandler {
                     copyInto((BlockData) args[0]);
                 }
                 return null;
+            case "getCollisionShape":
+                return org.basaltmc.bukkit.misc.Shapes.shape(state);
             case "getLightEmission":
                 return (WorldNatives.stateFlags(state) >> 9) & 15;
             case "isOccluding":
