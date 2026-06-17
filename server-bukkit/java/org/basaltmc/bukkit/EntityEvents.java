@@ -121,6 +121,76 @@ final class EntityEvents {
             return mount instanceof org.bukkit.entity.Vehicle vehicle && f.player() != null && f.flag("mounting")
                 ? new org.bukkit.event.vehicle.VehicleEnterEvent(vehicle, f.player()) : null;
         });
+
+        EventBridge.map("entity.mount", org.bukkit.event.vehicle.VehicleExitEvent.class, f -> {
+            Entity mount = f.entity();
+            return mount instanceof org.bukkit.entity.Vehicle vehicle && f.player() != null && !f.flag("mounting")
+                ? new org.bukkit.event.vehicle.VehicleExitEvent(vehicle, f.player()) : null;
+        });
+        EventBridge.map("entity.mount", org.bukkit.event.entity.EntityDismountEvent.class, f -> {
+            Entity mount = f.entity();
+            return mount == null || f.player() == null || f.flag("mounting") ? null
+                : new org.bukkit.event.entity.EntityDismountEvent(f.player(), mount);
+        });
+        EventBridge.map("hanging.place", org.bukkit.event.hanging.HangingPlaceEvent.class, f -> {
+            EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(f.text("entity_type"));
+            BasaltWorld world = f.world();
+            if (world == null || f.player() == null || type == EntityType.UNKNOWN) {
+                return null;
+            }
+            Entity made = org.basaltmc.bukkit.entity.EntityCore.template(world, type, f.whole("x") + 0.5, f.whole("y"),
+                f.whole("z") + 0.5, 0f, 0f);
+            return made instanceof org.bukkit.entity.Hanging hanging ? new org.bukkit.event.hanging.HangingPlaceEvent(
+                hanging, f.player(), f.block(), PlayerEvents.face(f.text("face")),
+                org.bukkit.inventory.EquipmentSlot.HAND) : null;
+        });
+        EventBridge.map("hanging.break", org.bukkit.event.hanging.HangingBreakByEntityEvent.class, f -> {
+            Entity hanging = f.entity();
+            Entity remover = BasaltServer.instance().entityById(f.world(), (int) f.whole("remover_id"));
+            return hanging instanceof org.bukkit.entity.Hanging made && remover != null
+                ? new org.bukkit.event.hanging.HangingBreakByEntityEvent(made, remover,
+                    DamageSource.builder(DamageType.PLAYER_ATTACK).build()) : null;
+        });
+
+        EventBridge.map("entity.shoot", org.bukkit.event.entity.EntityShootBowEvent.class, f -> {
+            Entity shooter = f.entity();
+            BasaltWorld world = f.world();
+            EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(f.text("projectile"));
+            if (!(shooter instanceof LivingEntity living) || world == null || type == EntityType.UNKNOWN) {
+                return null;
+            }
+            Entity arrow = org.basaltmc.bukkit.entity.EntityCore.template(world, type, shooter.getLocation().getX(),
+                shooter.getLocation().getY() + 1.5, shooter.getLocation().getZ(), 0f, 0f);
+            org.bukkit.inventory.ItemStack bow = living.getEquipment() == null ? null
+                : living.getEquipment().getItemInMainHand();
+            return new org.bukkit.event.entity.EntityShootBowEvent(living, bow, arrow, (float) f.real("power"));
+        });
+        EventBridge.map("entity.breed", org.bukkit.event.entity.EntityBreedEvent.class, f -> {
+            Entity mother = f.entity();
+            Entity father = BasaltServer.instance().entityById(f.world(), (int) f.whole("partner_id"));
+            EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(f.text("entity_type"));
+            if (!(mother instanceof LivingEntity m) || !(father instanceof LivingEntity d) || f.world() == null
+                || type == EntityType.UNKNOWN) {
+                return null;
+            }
+            Entity child = org.basaltmc.bukkit.entity.EntityCore.template(f.world(), type, m.getLocation().getX(),
+                m.getLocation().getY(), m.getLocation().getZ(), 0f, 0f);
+            return child instanceof LivingEntity baby ? new org.bukkit.event.entity.EntityBreedEvent(baby, m, d, null,
+                null, 0) : null;
+        });
+
+        EventBridge.map("projectile.hit", org.bukkit.event.entity.ProjectileHitEvent.class, f -> {
+            Entity shot = f.entity();
+            if (!(shot instanceof org.bukkit.entity.Projectile projectile)) {
+                return null;
+            }
+            if (f.whole("hit_id") >= 0) {
+                Entity struck = BasaltServer.instance().entityById(f.world(), (int) f.whole("hit_id"));
+                return struck == null ? new org.bukkit.event.entity.ProjectileHitEvent(projectile)
+                    : new org.bukkit.event.entity.ProjectileHitEvent(projectile, struck);
+            }
+            return new org.bukkit.event.entity.ProjectileHitEvent(projectile, f.block());
+        });
         EventBridge.map("entity.resurrect", org.bukkit.event.entity.EntityResurrectEvent.class, f -> {
             Entity who = f.entity();
             return who instanceof LivingEntity living ? new org.bukkit.event.entity.EntityResurrectEvent(living,
