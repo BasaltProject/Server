@@ -120,6 +120,40 @@ final class BlockEvents {
             return block == null ? null : new org.bukkit.event.block.BlockPhysicsEvent(block, block.getBlockData(),
                 block);
         });
+
+        EventBridge.map("block.drops", org.bukkit.event.block.BlockDropItemEvent.class, f -> {
+            Block block = f.block();
+            BasaltWorld world = f.world();
+            Player who = f.player();
+            if (block == null || world == null || who == null) {
+                return null;
+            }
+            List<org.bukkit.entity.Item> items = new ArrayList<>();
+            for (String line : f.text("drops").split("\n")) {
+                int bar = line.indexOf('|');
+                ItemStack stack = bar < 0 ? null : PlayerEvents.stackOf(line.substring(0, bar),
+                    Integer.parseInt(line.substring(bar + 1)));
+                if (stack != null) {
+                    Entity item = org.basaltmc.bukkit.entity.EntityCore.template(world,
+                        org.bukkit.entity.EntityType.ITEM, block.getX() + 0.5, block.getY() + 0.5, block.getZ() + 0.5,
+                        0f, 0f);
+                    ((org.basaltmc.bukkit.entity.Cored) item).core().stageNbt("Item",
+                        org.basaltmc.bukkit.entity.EntityItems.toNbt(stack));
+                    items.add((org.bukkit.entity.Item) item);
+                }
+            }
+            return new org.bukkit.event.block.BlockDropItemEvent(block, block.getState(), who, items);
+        }, (e, f) -> {
+            StringBuilder lines = new StringBuilder();
+            for (org.bukkit.entity.Item item : ((org.bukkit.event.block.BlockDropItemEvent) e).getItems()) {
+                ItemStack stack = item.getItemStack();
+                if (stack != null && !stack.getType().isAir() && stack.getAmount() > 0) {
+                    lines.append(lines.length() == 0 ? "" : "\n").append(stack.getType().getKey()).append('|')
+                        .append(stack.getAmount());
+                }
+            }
+            f.put("drops", lines.toString());
+        });
         EventBridge.map("block.dispense", org.bukkit.event.block.BlockDispenseEvent.class, f -> {
             Block block = f.block();
             ItemStack stack = PlayerEvents.stackOf(f.text("item"), 1);

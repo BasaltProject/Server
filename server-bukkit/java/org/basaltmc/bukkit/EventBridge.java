@@ -196,7 +196,8 @@ final class EventBridge {
         map("player.item_held", PlayerItemHeldEvent.class,
             f -> new PlayerItemHeldEvent(f.player(), (int) f.whole("from_slot"), (int) f.whole("slot")));
         map("block.break", BlockBreakEvent.class, f -> new BlockBreakEvent(
-            f.world().getBlockAt((int) f.whole("x"), (int) f.whole("y"), (int) f.whole("z")), f.player()));
+            f.world().getBlockAt((int) f.whole("x"), (int) f.whole("y"), (int) f.whole("z")), f.player()),
+            (e, f) -> f.put("drop_items", ((BlockBreakEvent) e).isDropItems()));
         map("world.load", WorldLoadEvent.class, f -> new WorldLoadEvent(BasaltServer.instance().world(f.text("world"))));
         map("world.save", WorldSaveEvent.class, f -> new WorldSaveEvent(BasaltServer.instance().world(f.text("world"))));
         map("server.load", ServerLoadEvent.class, f -> new ServerLoadEvent(ServerLoadEvent.LoadType.STARTUP));

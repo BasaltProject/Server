@@ -33,6 +33,26 @@ final class WorldEvents {
                 f.whole("time") - f.whole("from_time"));
         });
 
+
+        EventBridge.map("raid.finish", org.bukkit.event.raid.RaidFinishEvent.class, f -> {
+            if (!f.flag("won") || f.world() == null) {
+                return null;
+            }
+            org.bukkit.Location at = new org.bukkit.Location(f.world(), f.real("x"), f.real("y"), f.real("z"));
+            return new org.bukkit.event.raid.RaidFinishEvent(new BasaltRaid(at, org.bukkit.Raid.RaidStatus.VICTORY,
+                (int) f.whole("waves")), f.world(), new java.util.ArrayList<>());
+        });
+        EventBridge.map("raid.finish", org.bukkit.event.raid.RaidStopEvent.class, f -> {
+            if (f.flag("won") || f.world() == null) {
+                return null;
+            }
+            org.bukkit.Location at = new org.bukkit.Location(f.world(), f.real("x"), f.real("y"), f.real("z"));
+            return new org.bukkit.event.raid.RaidStopEvent(new BasaltRaid(at, org.bukkit.Raid.RaidStatus.LOSS,
+                (int) f.whole("waves")), f.world(), org.bukkit.event.raid.RaidStopEvent.Reason.FINISHED);
+        });
+        EventBridge.map("world.chunk_load", org.bukkit.event.world.ChunkPopulateEvent.class, f -> !f.flag("generated")
+            ? null : new org.bukkit.event.world.ChunkPopulateEvent(
+                f.world().getChunkAt((int) f.whole("chunk_x"), (int) f.whole("chunk_z"), false)));
         EventBridge.map("world.structure_grow", org.bukkit.event.world.StructureGrowEvent.class, f -> {
             BasaltWorld world = f.world();
             String species = f.text("species");

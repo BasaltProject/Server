@@ -147,8 +147,10 @@ const PluginEventType& playerBucket() {
 }
 
 const PluginEventType& blockBreak() {
-    static const PluginEventType type{
-        "block.break", true, {"player_name", "player_uuid", "world", "x", "y", "z", "block"}};
+    static const PluginEventType type{"block.break",
+                                      true,
+                                      {"player_name", "player_uuid", "world", "x", "y", "z", "block", "drop_items"},
+                                      {"drop_items"}};
     return type;
 }
 
@@ -659,6 +661,12 @@ const PluginEventType& playerInteractAir() {
     return type;
 }
 
+const PluginEventType& blockDrops() {
+    static const PluginEventType type{
+        "block.drops", true, {"player_name", "player_uuid", "world", "x", "y", "z", "block", "drops"}, {"drops"}};
+    return type;
+}
+
 const std::vector<const PluginEventType*>& all() {
     static const std::vector<const PluginEventType*> every{&playerJoin(),
                                                            &playerQuit(),
@@ -769,7 +777,8 @@ const std::vector<const PluginEventType*>& all() {
                                                            &hangingBreak(),
                                                            &serverTickEnd(),
                                                            &projectileHit(),
-                                                           &playerInteractAir()};
+                                                           &playerInteractAir(),
+                                                           &blockDrops()};
     return every;
 }
 } // namespace basalt::server::plugins::pluginEventTypes

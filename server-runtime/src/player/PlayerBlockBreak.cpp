@@ -186,7 +186,8 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
 
 void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const Identifier& block,
                  const std::int32_t stateId, const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                 const wire::nbt::NbtCompound* carried, const storage::StoredItemStack* tool) {
+                 const wire::nbt::NbtCompound* carried, const storage::StoredItemStack* tool,
+                 const PlayerSession* breaker) {
     // parity: `Block.popResource` reads the `block_drops` rule.
     if (!world.gameRules().get(world::gameRules::kBlockDrops)) {
         return;
@@ -221,7 +222,11 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
         return registry == "item" && itemTags != nullptr && world::realItemTags::contains(*itemTags, tag, id);
     };
     context.lootTables->prepareAt(lootContext, world, x + 0.5, y + 0.5, z + 0.5);
-    for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, lootContext)) {
+    std::vector<server::world::loot::ItemStack> generated = table->generate(random, 0.0F, std::nullopt, lootContext);
+    if (context.blockDrops) {
+        context.blockDrops(breaker, world.name(), x, y, z, stateId, generated);
+    }
+    for (const server::world::loot::ItemStack& stack : generated) {
         wire::nbt::NbtCompound components = stack.components;
         if (carried != nullptr && stack.item == block) {
             components.set(world::shulkers::kContainer, wire::nbt::NbtTag::ofCompound(*carried));
@@ -329,7 +334,8 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     PlayerSession* session = &player;
     const BlockPos pos{x, y, z};
     // Cancelling puts the block back on the digger's screen, since the client already broke it locally.
-    if (context.breakAllowed && !context.breakAllowed(*session, x, y, z, broken.value_or(0))) {
+    bool dropItems = true;
+    if (context.breakAllowed && !context.breakAllowed(*session, x, y, z, broken.value_or(0), dropItems)) {
         acknowledge(context);
         if (context.putBack) {
             context.putBack(*session, x, y, z, broken.value_or(0));
@@ -400,9 +406,10 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     // parity: `DoublePlantBlock.playerWillDestroy` drops the half first.
     const bool dropsBeforeRemoval = session->gamemode == Gamemode::Survival && broken.has_value() &&
                                     brokenBlock != nullptr && reg::blockStateFamilies::isDoublePlantState(*broken);
-    if (dropsBeforeRemoval) {
+    if (dropsBeforeRemoval && dropItems) {
         const std::optional<storage::StoredItemStack> held = session->inventory.heldItem();
-        dropLootFor(context, world, *brokenBlock, *broken, x, y, z, nullptr, held.has_value() ? &*held : nullptr);
+        dropLootFor(context, world, *brokenBlock, *broken, x, y, z, nullptr, held.has_value() ? &*held : nullptr,
+                    session);
     }
     const bool songPlaying = brokenBlock != nullptr && *brokenBlock == world::jukeboxes::block() &&
                              world::jukeboxes::isPlayingAt(world.state(), x, y, z);
@@ -468,8 +475,10 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
                                          return tags != nullptr && world::realBlockTags::contains(*tags, tag, block);
                                      });
         if (correctTool) {
-            dropLootFor(context, world, *brokenBlock, broken.value_or(0), x, y, z,
-                        carried.has_value() ? &*carried : nullptr, held.has_value() ? &*held : nullptr);
+            if (dropItems) {
+                dropLootFor(context, world, *brokenBlock, broken.value_or(0), x, y, z,
+                            carried.has_value() ? &*carried : nullptr, held.has_value() ? &*held : nullptr, session);
+            }
             // parity: `spawnAfterBreak(..., true)` after the drops.
             const bool silkTouch = held.has_value() && enchantmentLevel(*held, Identifier::vanilla("silk_touch")) > 0;
             random::RandomSource random = random::RandomSource::legacy(seedFrom(context));

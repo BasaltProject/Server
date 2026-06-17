@@ -192,6 +192,7 @@ player::BreakContext BlockInteractionHandler::breakContext() {
         return std::ranges::contains(features, std::string{"minecraft:minecart_improvements"});
     };
     context.breakAllowed = hooks_.breakAllowed;
+    context.blockDrops = hooks_.blockDrops;
     context.itemSpawnAllowed = hooks_.itemSpawnAllowed;
     context.itemDamageAllowed = hooks_.itemDamageAllowed;
     context.bedLeft = hooks_.bedLeft;

@@ -47,8 +47,12 @@ struct BreakContext {
     std::function<std::int64_t()> nextSeed;
 
     std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                       std::int32_t stateId)>
+                       std::int32_t stateId, bool& dropItems)>
         breakAllowed;
+    /// Said with what a broken block is about to drop; a listener may change the list, an empty one drops nothing.
+    std::function<void(const PlayerSession* player, const std::string& world, std::int32_t x, std::int32_t y,
+                       std::int32_t z, std::int32_t stateId, std::vector<server::world::loot::ItemStack>& drops)>
+        blockDrops;
     std::function<bool(std::string_view worldName, double x, double y, double z, const std::string& item,
                        std::int32_t count, std::string_view cause)>
         itemSpawnAllowed;
@@ -105,7 +109,8 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
 
 void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const wire::common::Identifier& block,
                  std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z,
-                 const wire::nbt::NbtCompound* carried, const storage::StoredItemStack* tool = nullptr);
+                 const wire::nbt::NbtCompound* carried, const storage::StoredItemStack* tool = nullptr,
+                 const PlayerSession* breaker = nullptr);
 
 [[nodiscard]] std::optional<std::int32_t> meltedIce(const BreakContext& context, world::LoadedWorld& world,
                                                     std::optional<std::int32_t> broken, std::int32_t x, std::int32_t y,
