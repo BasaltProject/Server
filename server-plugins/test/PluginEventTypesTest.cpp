@@ -61,7 +61,7 @@ TEST_CASE("the table of events is the frozen kotlin's table") {
         joined += describe(*type);
     }
     CHECK(names.size() == 111);
-    CHECK(checksumOf(joined) == 4980808382263798226LL);
+    CHECK(checksumOf(joined) == -7331258060578523352LL);
 
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world,message,silent|message,silent");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world,message,silent|message,silent");

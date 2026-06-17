@@ -163,8 +163,11 @@ final class EventBridge {
         map("player.quit", PlayerQuitEvent.class, f -> new PlayerQuitEvent(f.player(),
             Component.translatable("multiplayer.player.left", Component.text(f.text("player_name"))),
             PlayerQuitEvent.QuitReason.DISCONNECTED),
-            (e, f) -> announce(((PlayerQuitEvent) e).quitMessage(),
-                Component.translatable("multiplayer.player.left", Component.text(f.text("player_name"))), f));
+            (e, f) -> {
+                PlayerEvents.forget(((PlayerQuitEvent) e).getPlayer().getUniqueId());
+                announce(((PlayerQuitEvent) e).quitMessage(),
+                    Component.translatable("multiplayer.player.left", Component.text(f.text("player_name"))), f);
+            });
         map("player.chat", AsyncPlayerChatEvent.class,
             f -> new AsyncPlayerChatEvent(true, f.player(), f.text("message"), new HashSet<>(
                 BasaltServer.instance().getOnlinePlayers())),

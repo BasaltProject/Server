@@ -27,7 +27,10 @@ const PluginEventType& playerCommand() {
 
 const PluginEventType& playerDeath() {
     static const PluginEventType type{
-        "player.death", false, {"player_name", "player_uuid", "world", "x", "y", "z", "cause"}};
+        "player.death",
+        false,
+        {"player_name", "player_uuid", "world", "x", "y", "z", "cause", "message", "silent"},
+        {"message", "silent"}};
     return type;
 }
 

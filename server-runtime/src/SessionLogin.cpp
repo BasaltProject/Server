@@ -23,6 +23,7 @@
 #include <basalt/wire/protocol/handshake/HandshakePacket.hpp>
 #include <basalt/wire/protocol/login/LoginPackets.hpp>
 #include <basalt/wire/protocol/login/LoginPluginPackets.hpp>
+#include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/status/StatusPackets.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
@@ -38,6 +39,8 @@ namespace {
 
 namespace login = wire::protocol::login;
 namespace mv = wire::multiversion;
+
+constexpr std::int32_t kConfigurationCustomPayloadId = 0x02;
 namespace reg = server::registry;
 
 using wire::common::Identifier;
@@ -492,6 +495,22 @@ void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuf
             pendingMainHand_ = information->mainHand;
             pendingChatVisibility_ = information->chatFlags;
             pendingViewDistance_ = information->viewDistance;
+            pendingOptions_ = player::ClientOptions{.locale = information->locale,
+                                                    .viewDistance = information->viewDistance,
+                                                    .particleStatus = information->particleStatus,
+                                                    .chatColors = information->chatColors,
+                                                    .textFiltering = information->enableTextFiltering,
+                                                    .serverListings = information->enableServerListing};
+        }
+        return;
+    }
+    if (packetId == kConfigurationCustomPayloadId) {
+        const std::optional<wire::protocol::play::CustomPayloadPacket> payload =
+            wire::protocol::play::CustomPayloadPacket::read(body);
+        if (payload.has_value() && payload->channel == wire::protocol::play::CustomPayloadPacket::kBrandChannel) {
+            wire::io::ByteBuffer data;
+            data.writeBytes(payload->data);
+            pendingBrand_ = wire::protocol::readString(data, 64);
         }
     }
 }
@@ -565,6 +584,9 @@ void ClientSession::sendRegistriesThenFinish() {
 void ClientSession::handleResourcePackResponse(
     const wire::protocol::configuration::ResourcePackResponsePacket& response, bool configuring) {
     // parity: `ServerCommonPacketListenerImpl.handleResourcePackResponse`.
+    if (playerSession_ != nullptr) {
+        playerSession_->extras.packStatus = response.action;
+    }
     if (!configuring && options_.events != nullptr && playerSession_ != nullptr) {
         constexpr std::array<std::string_view, 8> kStatuses{"loaded",        "declined",   "failed_download",
                                                             "accepted",      "downloaded", "invalid_url",
