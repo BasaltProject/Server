@@ -27,6 +27,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <future>
+#include <memory>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -150,6 +152,16 @@ void ClientSession::onOwner(std::function<void()> work) {
         }
         guard->running.fetch_sub(1);
     }));
+}
+
+bool ClientSession::onOwnerWait(std::function<void()> work, std::chrono::milliseconds timeout) {
+    auto done = std::make_shared<std::promise<void>>();
+    std::future<void> finished = done->get_future();
+    onOwner([work = std::move(work), done] {
+        work();
+        done->set_value();
+    });
+    return finished.wait_for(timeout) == std::future_status::ready;
 }
 
 void ClientSession::handOverToRegionOf(world::LoadedWorld& world) {

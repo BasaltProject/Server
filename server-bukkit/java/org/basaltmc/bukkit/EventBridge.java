@@ -157,10 +157,14 @@ final class EventBridge {
         WorldEvents.install();
         ServerEvents.install();
         map("player.join", PlayerJoinEvent.class, f -> new PlayerJoinEvent(f.player(),
-            Component.translatable("multiplayer.player.joined", Component.text(f.text("player_name")))));
+            Component.translatable("multiplayer.player.joined", Component.text(f.text("player_name")))),
+            (e, f) -> announce(((PlayerJoinEvent) e).joinMessage(),
+                Component.translatable("multiplayer.player.joined", Component.text(f.text("player_name"))), f));
         map("player.quit", PlayerQuitEvent.class, f -> new PlayerQuitEvent(f.player(),
             Component.translatable("multiplayer.player.left", Component.text(f.text("player_name"))),
-            PlayerQuitEvent.QuitReason.DISCONNECTED));
+            PlayerQuitEvent.QuitReason.DISCONNECTED),
+            (e, f) -> announce(((PlayerQuitEvent) e).quitMessage(),
+                Component.translatable("multiplayer.player.left", Component.text(f.text("player_name"))), f));
         map("player.chat", AsyncPlayerChatEvent.class,
             f -> new AsyncPlayerChatEvent(true, f.player(), f.text("message"), new HashSet<>(
                 BasaltServer.instance().getOnlinePlayers())),
@@ -200,8 +204,12 @@ final class EventBridge {
             org.bukkit.event.block.Action action = f.text("action").startsWith("left")
                 ? org.bukkit.event.block.Action.LEFT_CLICK_BLOCK : org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK;
             return new org.bukkit.event.player.PlayerInteractEvent(f.player(), action, f.stack("item"), f.block(),
-                org.bukkit.block.BlockFace.SELF, org.bukkit.inventory.EquipmentSlot.HAND);
+                PlayerEvents.face(f.text("face")), PlayerEvents.hand(f.text("hand")));
         });
+        map("player.interact_air", org.bukkit.event.player.PlayerInteractEvent.class,
+            f -> new org.bukkit.event.player.PlayerInteractEvent(f.player(),
+                org.bukkit.event.block.Action.RIGHT_CLICK_AIR, f.stack("item"), null,
+                org.bukkit.block.BlockFace.SELF, PlayerEvents.hand(f.text("hand"))));
         map("block.damage", org.bukkit.event.player.PlayerInteractEvent.class,
             f -> new org.bukkit.event.player.PlayerInteractEvent(f.player(),
                 org.bukkit.event.block.Action.LEFT_CLICK_BLOCK, f.stack("item"), f.block(),
@@ -215,7 +223,13 @@ final class EventBridge {
                 org.bukkit.inventory.EquipmentSlot.HAND);
         });
         map("player.respawn", org.bukkit.event.player.PlayerRespawnEvent.class,
-            f -> new org.bukkit.event.player.PlayerRespawnEvent(f.player(), f.location(), false));
+            f -> new org.bukkit.event.player.PlayerRespawnEvent(f.player(), f.location(), false),
+            (e, f) -> {
+                Location at = ((org.bukkit.event.player.PlayerRespawnEvent) e).getRespawnLocation();
+                f.put("x", at.getX());
+                f.put("y", at.getY());
+                f.put("z", at.getZ());
+            });
         map("player.world_change", org.bukkit.event.player.PlayerChangedWorldEvent.class,
             f -> new org.bukkit.event.player.PlayerChangedWorldEvent(f.player(),
                 BasaltServer.instance().world(f.text("from_world"))));
@@ -251,6 +265,14 @@ final class EventBridge {
         map("server.command", ServerCommandEvent.class,
             f -> new ServerCommandEvent(BasaltServer.instance().consoleImpl(), f.text("command")),
             (e, f) -> f.put("command", ((ServerCommandEvent) e).getCommand()));
+    }
+
+    private static void announce(Component chosen, Component vanilla, Fields f) {
+        if (chosen == null) {
+            f.put("silent", true);
+        } else if (!chosen.equals(vanilla)) {
+            f.put("message", net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().serialize(chosen));
+        }
     }
 
     private static GameMode gameMode(String name) {

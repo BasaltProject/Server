@@ -3,6 +3,7 @@
 #include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginServerControl.hpp>
 #include <basalt/server/registry/ItemFood.hpp>
+#include <basalt/server/runtime/Announcement.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/bedrock/BedrockCarry.hpp>
 #include <basalt/server/runtime/chat/SecureChat.hpp>
@@ -166,7 +167,7 @@ public:
         std::function<bool(const player::PlayerSession& player)> swapHandsAllowed;
         std::function<bool(std::string& message)> broadcastAllowed;
 
-        std::function<void(const player::PlayerSession& player)> joined;
+        std::function<Announcement(const player::PlayerSession& player)> joined;
         std::function<void(const player::PlayerSession& player, bool sprinting)> sprintChanged;
         std::function<void(const player::PlayerSession& player, bool sneaking)> sneakChanged;
         std::function<void(const player::PlayerSession& player, std::int32_t slot, std::int32_t fromSlot)>
@@ -315,6 +316,9 @@ public:
     [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint> endpoint() const;
 
     void disconnect(const wire::text::Component& reason);
+
+    /// Runs `work` on the owner and waits for it, up to `timeout`; false when it had not finished by then.
+    [[nodiscard]] bool onOwnerWait(std::function<void()> work, std::chrono::milliseconds timeout);
 
     [[nodiscard]] ContainerMenuController& menus() noexcept { return *menus_; }
 

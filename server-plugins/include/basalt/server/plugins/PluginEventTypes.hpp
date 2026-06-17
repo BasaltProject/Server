@@ -115,6 +115,7 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& hangingBreak();
 [[nodiscard]] const PluginEventType& serverTickEnd();
 [[nodiscard]] const PluginEventType& projectileHit();
+[[nodiscard]] const PluginEventType& playerInteractAir();
 
 [[nodiscard]] const std::vector<const PluginEventType*>& all();
 

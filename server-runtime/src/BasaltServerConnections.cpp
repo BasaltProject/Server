@@ -71,6 +71,17 @@ void fillPlayer(server::plugins::PluginEvent& event, const player::PlayerSession
     event.set(2, player.worldName);
 }
 
+[[nodiscard]] Announcement announcementOf(const server::plugins::PluginEvent& event) {
+    Announcement announcement;
+    if (const auto* text = std::get_if<std::string>(&event.get("message")); text != nullptr) {
+        announcement.text = *text;
+    }
+    if (const auto* silent = std::get_if<bool>(&event.get("silent")); silent != nullptr) {
+        announcement.silent = *silent;
+    }
+    return announcement;
+}
+
 [[nodiscard]] std::string textOf(const server::plugins::PluginEventValue& value, const std::string& fallback) {
     const std::string* edited = std::get_if<std::string>(&value);
     return edited == nullptr ? fallback : *edited;
@@ -326,9 +337,10 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         if (miscServices_.scoreboards != nullptr) {
             miscServices_.scoreboards->joined(player);
         }
-        static_cast<void>(
+        const server::plugins::PluginEvent* joined =
             server::plugins::emit(bus, &server::plugins::pluginEventTypes::playerJoin(),
-                                  [&player](server::plugins::PluginEvent& filled) { fillPlayer(filled, player); }));
+                                  [&player](server::plugins::PluginEvent& filled) { fillPlayer(filled, player); });
+        return joined == nullptr ? Announcement{} : announcementOf(*joined);
     };
     hooks.sprintChanged = [bus](const player::PlayerSession& player, bool sprinting) {
         static_cast<void>(server::plugins::emit(bus, &server::plugins::pluginEventTypes::playerSprint(),

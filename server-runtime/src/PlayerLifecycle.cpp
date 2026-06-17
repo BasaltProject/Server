@@ -25,6 +25,7 @@
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 #include <basalt/wire/text/Component.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -247,15 +248,18 @@ void PlayerLifecycle::respawn() {
     if (respawnWorld == nullptr) {
         return;
     }
-    const double spawnX = stored.has_value() ? stored->x : respawnWorld->spawn()[0];
-    const double spawnY = stored.has_value() ? stored->y : respawnWorld->spawn()[1];
-    const double spawnZ = stored.has_value() ? stored->z : respawnWorld->spawn()[2];
+    double spawnX = stored.has_value() ? stored->x : respawnWorld->spawn()[0];
+    double spawnY = stored.has_value() ? stored->y : respawnWorld->spawn()[1];
+    double spawnZ = stored.has_value() ? stored->z : respawnWorld->spawn()[2];
     session->resetForRespawn();
     session->x = spawnX;
     session->y = spawnY;
     session->z = spawnZ;
     if (hooks_.respawned) {
         hooks_.respawned(*session, *respawnWorld, spawnX, spawnY, spawnZ);
+        session->x = spawnX;
+        session->y = spawnY;
+        session->z = spawnZ;
     }
 
     owner_->entityTracker().forgetEverythingDrawn();
@@ -456,13 +460,18 @@ void PlayerLifecycle::leavePlayIfPresent() {
         owner_->options().advancements->leave(session->uuid().toString());
     }
     owner_->logger().info([&] { return session->name() + " left the game"; });
+    Announcement farewell;
     if (hooks_.quit) {
-        hooks_.quit(*session,
-                    owner_->currentWorld() == nullptr ? std::nullopt : std::optional{owner_->currentWorld()->name()});
+        farewell = hooks_.quit(
+            *session, owner_->currentWorld() == nullptr ? std::nullopt : std::optional{owner_->currentWorld()->name()});
     }
     // parity: `ServerGamePacketListenerImpl.onDisconnect`.
-    owner_->broadcastToEveryone(Component::translatable("multiplayer.player.left", {Component::text(session->name())})
-                                    .color(wire::text::kYellow));
+    if (!farewell.silent) {
+        owner_->broadcastToEveryone(farewell.text.empty() ? Component::translatable("multiplayer.player.left",
+                                                                                    {Component::text(session->name())})
+                                                                .color(wire::text::kYellow)
+                                                          : wire::text::miniMessage::parse(farewell.text));
+    }
     for (PlayerSession* other : registry->snapshot()) {
         if (!other->connection().sendPlayPacket) {
             continue;
