@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/player/ExperienceData.hpp>
 #include <basalt/server/runtime/player/FoodData.hpp>
 #include <basalt/server/runtime/player/PlayerConnection.hpp>
+#include <basalt/server/runtime/player/PlayerExtras.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerStats.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -219,6 +220,8 @@ public:
     bool dead = false;
 
     bool flying = false;
+
+    PlayerExtras extras;
 
     [[nodiscard]] bool mayFly() const noexcept;
 

@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerTabList.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -176,7 +177,8 @@ void EntityVisibilityTracker::syncSummonedEntities() {
         if (entity->removed) {
             continue;
         }
-        if (!visibleTo(*entity, me) || !inTrackingRange(*entity, session->x, session->z, viewDistance)) {
+        if (!visibleTo(*entity, me) || session->extras.hiddenEntities.contains(entity->entityId()) ||
+            !inTrackingRange(*entity, session->x, session->z, viewDistance)) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());
@@ -490,7 +492,10 @@ void EntityVisibilityTracker::syncPlayers() {
     }
     std::vector<PlayerSession*> visible;
     for (PlayerSession* other : registry->snapshot()) {
-        if (other->uuid() != session->uuid() && other->worldName == session->worldName) {
+        const bool hidden =
+            session->extras.hiddenEntities.contains(other->entityId()) ||
+            (other->extras.hiddenByDefault && !session->extras.shownEntities.contains(other->entityId()));
+        if (other->uuid() != session->uuid() && other->worldName == session->worldName && !hidden) {
             visible.push_back(other);
         }
     }
@@ -508,6 +513,9 @@ void EntityVisibilityTracker::syncPlayers() {
                                                        .chatSession = other->chatSession()}})
                 .write(buffer);
         });
+        if (player::hasCustomListEntry(*other)) {
+            player::sendListEntry(*session, *other);
+        }
         owner_->sendPlayPacket(SpawnEntityPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             SpawnEntityPacket{.entityId = other->entityId(),
                               .uuid = other->uuid(),
@@ -555,6 +563,17 @@ void EntityVisibilityTracker::syncPlayers() {
     }
     if (gone.empty()) {
         return;
+    }
+    std::vector<wire::common::Uuid> unlisted;
+    for (const PlayerSession* other : registry->snapshot()) {
+        if (other->worldName == session->worldName && std::ranges::find(gone, other->entityId()) != gone.end()) {
+            unlisted.push_back(other->uuid());
+        }
+    }
+    if (!unlisted.empty()) {
+        owner_->sendPlayPacket(wire::protocol::play::PlayerInfoRemovePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::PlayerInfoRemovePacket{.players = unlisted}.write(buffer);
+        });
     }
     for (const std::int32_t entityId : gone) {
         trackedPlayers_.erase(entityId);

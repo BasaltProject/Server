@@ -472,6 +472,7 @@ void ClientSession::sendKeepAliveIfDue() {
     }
     lastKeepAlive_ = now;
     const std::int64_t token = options_.nextSeed ? options_.nextSeed() : 0;
+    keepAliveToken_ = token;
     sendCompressed(play::PlayKeepAlivePacket::kClientboundId, [token](wire::io::ByteBuffer& buffer) {
         play::PlayKeepAlivePacket{.keepAliveId = token}.write(buffer);
     });

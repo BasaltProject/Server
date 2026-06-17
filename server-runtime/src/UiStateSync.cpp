@@ -47,7 +47,9 @@ void UiStateSync::syncHealth() {
         return;
     }
     owner_->sendCompressed(wire::protocol::play::SetHealthPacket::kId, [session](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::SetHealthPacket{.health = session->health(),
+        const float scale =
+            session->extras.healthScale.has_value() ? *session->extras.healthScale / session->maxHealth() : 1.0F;
+        wire::protocol::play::SetHealthPacket{.health = session->health() * scale,
                                               .food = session->food.foodLevel(),
                                               .saturation = session->food.saturationLevel()}
             .write(buffer);
@@ -177,13 +179,39 @@ void UiStateSync::tickUi() {
 }
 
 void UiStateSync::sendTime(const world::LoadedWorld& world) {
-    const wire::protocol::play::SetTimePacket packet = command::timePacketOf(world);
+    wire::protocol::play::SetTimePacket packet = command::timePacketOf(world);
+    if (const PlayerSession* session = owner_->playerSession();
+        session != nullptr && session->extras.timeOverride.has_value() && !packet.clocks.empty()) {
+        const std::int64_t offset = *session->extras.timeOverride;
+        packet.clocks.front().totalTicks =
+            session->extras.timeRelative ? packet.clocks.front().totalTicks + offset : offset;
+        if (!session->extras.timeRelative) {
+            packet.clocks.front().rate = 0.0F;
+        }
+    }
     owner_->sendPlayPacket(wire::protocol::play::SetTimePacket::kId,
                            [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
 }
 
 void UiStateSync::sendWeather(const world::WorldWeather& weather) {
     using wire::protocol::play::GameEventPacket;
+    if (const PlayerSession* session = owner_->playerSession();
+        session != nullptr && session->extras.rainOverride.has_value()) {
+        const float rain = *session->extras.rainOverride;
+        const float thunder = session->extras.thunderOverride;
+        owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            GameEventPacket{.event = rain > 0.0F ? GameEventPacket::kStartRaining : GameEventPacket::kStopRaining,
+                            .param = 0.0F}
+                .write(buffer);
+        });
+        owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            GameEventPacket{.event = GameEventPacket::kRainLevelChange, .param = rain}.write(buffer);
+        });
+        owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            GameEventPacket{.event = GameEventPacket::kThunderLevelChange, .param = thunder}.write(buffer);
+        });
+        return;
+    }
     // parity: `PlayerList.sendLevelInfo`.
     owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         GameEventPacket{.event = weather.raining ? GameEventPacket::kStartRaining : GameEventPacket::kStopRaining,
@@ -228,7 +256,9 @@ void UiStateSync::sendAbilities() {
             wire::protocol::play::ClientboundPlayerAbilitiesPacket{.invulnerable = session->invulnerable(),
                                                                    .flying = session->flying,
                                                                    .mayFly = session->mayFly(),
-                                                                   .instabuild = session->instabuild()}
+                                                                   .instabuild = session->instabuild(),
+                                                                   .flyingSpeed = session->extras.flySpeed,
+                                                                   .walkingSpeed = session->extras.walkSpeed}
                 .write(buffer);
         });
 }

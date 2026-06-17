@@ -599,6 +599,9 @@ private:
     std::unique_ptr<VillagerTradeController> trades_;
 
     std::chrono::steady_clock::time_point lastKeepAlive_ = std::chrono::steady_clock::now();
+    std::int64_t keepAliveToken_ = 0;
+    player::ClientOptions pendingOptions_;
+    std::string pendingBrand_;
     std::atomic<bool> streaming_{false};
     std::atomic<bool> tickTaskPending_{false};
     std::atomic<bool> closeWhenDrained_{false};

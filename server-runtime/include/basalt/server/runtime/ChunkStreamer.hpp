@@ -34,6 +34,11 @@ public:
     /// parity: `ServerPlayer.requestedViewDistance`.
     void setRequestedViewDistance(std::int32_t distance);
 
+    [[nodiscard]] std::vector<std::pair<std::int32_t, std::int32_t>> sentChunks() const;
+
+    /// A plugin's own distance for this player, in place of the server's until it is cleared.
+    void overrideViewDistance(std::optional<std::int32_t> distance);
+
     /// parity: `ChunkMap.getPlayerViewDistance`.
     [[nodiscard]] std::int32_t trackedRadius() const;
 
@@ -61,6 +66,7 @@ private:
     ClientSession* owner_;
     server::world::ChunkTracker chunkTracker_;
     std::int32_t viewRadius_ = 0;
+    std::optional<std::int32_t> viewOverride_;
     /// parity: `ServerPlayer.requestedViewDistance`, two until the client says otherwise.
     std::int32_t requestedViewDistance_ = kMinViewDistance;
     std::int32_t centerChunkX_ = 0;

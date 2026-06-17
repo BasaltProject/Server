@@ -32,11 +32,14 @@ float PlayerSession::luck() const {
 }
 
 bool PlayerSession::mayFly() const noexcept {
+    return extras.allowFlight.value_or(gamemode == wire::protocol::play::Gamemode::Creative ||
+                                       gamemode == wire::protocol::play::Gamemode::Spectator);
+}
+
+bool PlayerSession::invulnerable() const noexcept {
     return gamemode == wire::protocol::play::Gamemode::Creative ||
            gamemode == wire::protocol::play::Gamemode::Spectator;
 }
-
-bool PlayerSession::invulnerable() const noexcept { return mayFly(); }
 
 bool PlayerSession::instabuild() const noexcept { return gamemode == wire::protocol::play::Gamemode::Creative; }
 
