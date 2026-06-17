@@ -238,6 +238,24 @@ public abstract class MiscServer extends ServerBase {
     }
 
     @Override
+    public java.util.List<org.bukkit.entity.Entity> selectEntities(org.bukkit.command.CommandSender sender,
+            String selector) {
+        String[] flat = MiscNatives.select(selector,
+            sender instanceof Player player ? player.getUniqueId().toString() : null);
+        if (flat == null || flat.length == 0 || "error".equals(flat[0])) {
+            throw new IllegalArgumentException(flat != null && flat.length > 1 ? flat[1] : "invalid selector");
+        }
+        java.util.List<org.bukkit.entity.Entity> out = new java.util.ArrayList<>();
+        for (int i = 1; i + 2 < flat.length; i += 3) {
+            org.bukkit.entity.Entity found = getEntity(UUID.fromString(flat[i]));
+            if (found != null) {
+                out.add(found);
+            }
+        }
+        return out;
+    }
+
+    @Override
     public OfflinePlayer getOfflinePlayer(UUID id) {
         Player online = getPlayer(id);
         if (online != null) {

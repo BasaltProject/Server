@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/plugins/ServerLoot.hpp>
 #include <basalt/server/runtime/plugins/ServerMaps.hpp>
 #include <basalt/server/runtime/plugins/ServerScoreboards.hpp>
+#include <basalt/server/runtime/plugins/ServerSelectors.hpp>
 
 #include <memory>
 
@@ -23,6 +24,7 @@ struct MiscServices {
     std::unique_ptr<ServerDatapacks> datapacks;
     std::unique_ptr<ServerMaps> maps;
     std::unique_ptr<ServerLoot> loot;
+    std::unique_ptr<ServerSelectors> selectors;
 };
 
 } // namespace basalt::server::runtime::plugins

@@ -543,6 +543,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         plugins::ServerMaps::Hooks{.storage = &mapStorage_, .sessions = sessions, .worldFor = model.worldFor});
     miscServices_.loot = std::make_unique<plugins::ServerLoot>(plugins::ServerLoot::Hooks{
         .tables = &vanillaData_.lootTables, .worldFor = model.worldFor, .sessions = sessions});
+    miscServices_.selectors = std::make_unique<plugins::ServerSelectors>(plugins::ServerSelectors::Hooks{
+        .environment = model.environment,
+        .console = [this]() -> const command::CommandSource* { return consoleSource_.get(); },
+        .sessions = sessions});
     miscServices_.control = std::make_unique<plugins::ServerControl>(plugins::ServerControl::Hooks{
         .tickLoop = [this] { return tickLoop_.get(); },
         .bugReportLink = config.bugReportLink,
@@ -576,6 +580,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     parts.datapacks = miscServices_.datapacks.get();
     parts.maps = miscServices_.maps.get();
     parts.loot = miscServices_.loot.get();
+    parts.selectors = miscServices_.selectors.get();
     parts.ownerAt = [this](const std::string& name, double x, double z) -> sched::Owner* {
         const std::map<std::string, world::LoadedWorld*> loaded = worldRegistry_->worlds();
         const auto found = loaded.find(name);
