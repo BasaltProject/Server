@@ -340,7 +340,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                                                  world::comparatorReading::of(world.state()));
         }
         // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
-        if (!hooks_.dispenseAllowed || hooks_.dispenseAllowed(world, x, y, z)) {
+        const wire::common::Identifier* ticking = registry::blockStateDefinitions::blockOf(here);
+        const bool dispenser = ticking != nullptr && (ticking->path() == "dispenser" || ticking->path() == "dropper");
+        if (!dispenser || !hooks_.dispenseAllowed || hooks_.dispenseAllowed(world, x, y, z)) {
             const world::fluidFlow::Context context{.world = world.state(),
                                                     .gameRules = world.gameRules(),
                                                     .random = random,

@@ -59,7 +59,12 @@ final class WorldEvents {
             return new org.bukkit.event.world.EntitiesUnloadEvent(chunk, java.util.List.of(chunk.getEntities()));
         });
         EventBridge.map("world.game_rule_change", io.papermc.paper.event.world.WorldGameRuleChangeEvent.class, f -> {
-            GameRule<?> rule = GameRule.getByName(f.text("rule"));
+            GameRule<?> rule;
+            try {
+                rule = GameRule.getByName(f.text("rule"));
+            } catch (Throwable unavailable) {
+                return null;
+            }
             Object sender = f.text("player_name").isEmpty() ? BasaltServer.instance().consoleImpl()
                 : BasaltServer.instance().playerByName(f.text("player_name"));
             return rule == null || f.world() == null ? null : new io.papermc.paper.event.world.WorldGameRuleChangeEvent(
