@@ -106,7 +106,8 @@ public:
         return false;
     }
 
-    [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint> endpointOf(server::plugins::PluginPlayerRef&) override {
+    [[nodiscard]] std::shared_ptr<server::plugins::PacketEndpoint>
+    endpointOf(server::plugins::PluginPlayerRef&) override {
         return nullptr;
     }
 };
@@ -362,7 +363,9 @@ std::optional<server::plugins::PacketScope> NamedPackets::scopeOf(std::string_vi
     return packetNames::scopeOf(name);
 }
 
-std::string NamedPackets::nameOf(const server::plugins::PacketAddress& address) const { return packetNames::of(address); }
+std::string NamedPackets::nameOf(const server::plugins::PacketAddress& address) const {
+    return packetNames::of(address);
+}
 
 std::vector<std::string> NamedPackets::names() const { return packetNames::all(); }
 
@@ -437,6 +440,10 @@ server::plugins::PluginPacketSender& ServerPluginServices::packets() {
 
 server::plugins::PluginChannelSender& ServerPluginServices::channels() {
     return parts_.channels == nullptr ? noChannels() : *parts_.channels;
+}
+
+server::plugins::PluginInventories& ServerPluginServices::inventories() {
+    return parts_.inventories == nullptr ? PluginServices::inventories() : *parts_.inventories;
 }
 
 server::plugins::PluginAccess& ServerPluginServices::access() {

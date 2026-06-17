@@ -6,6 +6,7 @@
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginDatapacks.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
+#include <basalt/server/plugins/PluginInventories.hpp>
 #include <basalt/server/plugins/PluginLoot.hpp>
 #include <basalt/server/plugins/PluginMaps.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
@@ -261,6 +262,10 @@ public:
 
     virtual bool at(std::string_view world, double x, double z, std::function<void()> task) = 0;
 
+    [[nodiscard]] virtual PluginInventories& inventories() {
+        static PluginInventories kNone;
+        return kNone;
+    }
     [[nodiscard]] virtual PluginAccess& access() { return PluginAccess::unavailable(); }
 
     [[nodiscard]] virtual PluginScoreboards& scoreboards() { return PluginScoreboards::unavailable(); }

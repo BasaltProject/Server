@@ -50,6 +50,7 @@
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/plugins/ServerInventories.hpp>
 #include <basalt/server/runtime/plugins/ServerMiscServices.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
@@ -144,6 +145,8 @@ private:
 
     void updateCriterion(std::string_view criterion, std::string_view holder,
                          const std::function<std::int32_t(std::int32_t)>& update);
+
+    [[nodiscard]] std::vector<player::PlayerSession*> watchersIn(const world::LoadedWorld& world);
 
     void tickBoat(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& boat);
@@ -285,6 +288,7 @@ private:
     std::unique_ptr<plugins::RegistryPlaceholders> pluginPlaceholders_;
     std::unique_ptr<plugins::DatabasePluginStorage> pluginStorage_;
     std::unique_ptr<plugins::SessionMenus> pluginMenus_;
+    std::unique_ptr<plugins::ServerInventories> pluginInventories_;
     std::unique_ptr<plugins::SessionPackets> pluginPackets_;
     std::unique_ptr<plugins::SessionChannels> pluginChannels_;
     plugins::MiscServices miscServices_;
@@ -309,6 +313,8 @@ private:
     std::unique_ptr<SculkCatalystSystem> sculkCatalysts_;
     std::unique_ptr<ConduitSystem> conduits_;
     std::unique_ptr<CombatSystem> combat_;
+    entity::entityCombat::Hooks mobCombatHooks_;
+    std::map<std::string, std::int32_t> launchWatermarks_;
     std::unique_ptr<FireworkSystem> fireworks_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
     std::unique_ptr<EndFightSystem> endFight_;

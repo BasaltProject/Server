@@ -57,7 +57,7 @@ public final class BasaltPermissible extends PermissibleBase {
         }
     }
 
-    /** Hands the attachments' answers to the server (a trailing star is no wildcard to Bukkit, so it stays here). */
+    /** Hands the attachments' answers to the server. */
     public void publish() {
         if (id == null) {
             return;
@@ -67,13 +67,9 @@ public final class BasaltPermissible extends PermissibleBase {
         boolean[] values = new boolean[effective.size()];
         int index = 0;
         for (PermissionAttachmentInfo info : effective) {
-            if (info.getPermission().endsWith("*")) {
-                continue;
-            }
             nodes.add(info.getPermission().toLowerCase(Locale.ROOT));
             values[index++] = info.getValue();
         }
-        MiscNatives.playerPermissions(id.toString(), nodes.toArray(new String[0]),
-            java.util.Arrays.copyOf(values, nodes.size()));
+        MiscNatives.playerPermissions(id.toString(), nodes.toArray(new String[0]), values);
     }
 }

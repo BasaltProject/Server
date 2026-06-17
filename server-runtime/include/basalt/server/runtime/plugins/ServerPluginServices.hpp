@@ -138,6 +138,7 @@ public:
         server::plugins::PluginMenus* menus = nullptr;
         server::plugins::PluginPacketSender* packets = nullptr;
         server::plugins::PluginChannelSender* channels = nullptr;
+        server::plugins::PluginInventories* inventories = nullptr;
         server::plugins::PluginAccess* access = nullptr;
         server::plugins::PluginScoreboards* scoreboards = nullptr;
         server::plugins::PluginBossBars* bossBars = nullptr;
@@ -167,6 +168,7 @@ public:
     [[nodiscard]] server::plugins::PluginMenus& menus() override;
     [[nodiscard]] server::plugins::PluginPacketSender& packets() override;
     [[nodiscard]] server::plugins::PluginChannelSender& channels() override;
+    [[nodiscard]] server::plugins::PluginInventories& inventories() override;
     [[nodiscard]] server::plugins::PluginAccess& access() override;
     [[nodiscard]] server::plugins::PluginScoreboards& scoreboards() override;
     [[nodiscard]] server::plugins::PluginBossBars& bossBars() override;

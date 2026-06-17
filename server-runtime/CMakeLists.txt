@@ -159,6 +159,10 @@ basalt_module(server-runtime-core
         src/plugins/ServerNpcs.cpp
         src/plugins/ServerPluginServices.cpp
         src/plugins/ServerObjectModel.cpp
+        src/plugins/ServerInventories.cpp
+        src/plugins/PluginItemConversion.cpp
+        src/plugins/PluginRecipeNbt.cpp
+        src/ContainerPluginWindow.cpp
         src/plugins/ServerAccess.cpp
         src/plugins/ServerScoreboards.cpp
         src/plugins/ServerBossBars.cpp
@@ -170,6 +174,9 @@ basalt_module(server-runtime-core
         src/plugins/ServerSelectors.cpp
         src/plugins/DataFix.cpp
         src/plugins/ServerWorldModel.cpp
+        src/plugins/EntityOps.cpp
+        src/plugins/PlayerEntityOps.cpp
+        src/plugins/DroppedItemOps.cpp
         src/plugins/WorldBlockUpdates.cpp
         src/plugins/WorldItemUse.cpp
         src/ChunkSimulationView.cpp
