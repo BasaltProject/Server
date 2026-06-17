@@ -366,6 +366,11 @@ public class BasaltPlayer extends PlayerBase {
     }
 
     @Override
+    public Location getRespawnLocation(boolean loadLocationAndValidate) {
+        return OfflineSupport.respawnLocation(id);
+    }
+
+    @Override
     public boolean isBanned() {
         return OfflineSupport.isBanned(id);
     }

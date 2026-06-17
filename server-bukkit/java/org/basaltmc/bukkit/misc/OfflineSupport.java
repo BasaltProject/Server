@@ -73,6 +73,13 @@ public final class OfflineSupport {
         return Access.byUuid(id) != null || Bukkit.getPlayer(id) != null;
     }
 
+    public static Location respawnLocation(UUID id) {
+        String[] point = MiscNatives.spawnPoint(id.toString());
+        World world = point == null ? null : Bukkit.getWorld(point[0]);
+        return world == null ? null : new Location(world, Double.parseDouble(point[1]), Double.parseDouble(point[2]),
+            Double.parseDouble(point[3]));
+    }
+
     public static Location lastLocation(UUID id) {
         Access.Known known = Access.byUuid(id);
         if (known == null) {

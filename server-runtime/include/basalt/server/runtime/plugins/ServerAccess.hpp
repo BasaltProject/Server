@@ -26,6 +26,7 @@ public:
     [[nodiscard]] std::optional<server::plugins::PluginKnownPlayer> playerByUuid(std::string_view uuid) override;
     [[nodiscard]] std::optional<server::plugins::PluginKnownPlayer> playerByName(std::string_view name) override;
     [[nodiscard]] std::vector<server::plugins::PluginKnownPlayer> knownPlayers() override;
+    [[nodiscard]] std::optional<server::plugins::PluginKnownPlayer> spawnPoint(std::string_view uuid) override;
     [[nodiscard]] bool isOperator(std::string_view uuid) override;
     bool setOperator(std::string_view uuid, bool value) override;
     [[nodiscard]] std::vector<server::plugins::PluginKnownPlayer> operators() override;

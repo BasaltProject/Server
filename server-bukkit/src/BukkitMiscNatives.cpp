@@ -1010,6 +1010,17 @@ jobjectArray JNICALL nativeSelect(JNIEnv* env, jclass, jstring selector, jstring
     }
     return jni::stringArrayOf(env, flat);
 }
+
+jobjectArray JNICALL nativeSpawnPoint(JNIEnv* env, jclass, jstring uuid) {
+    const std::string text = toStd(env, uuid);
+    const auto point =
+        accessCall<std::optional<plugins::PluginKnownPlayer>>(std::nullopt, [&] { return access().spawnPoint(text); });
+    if (!point.has_value()) {
+        return nullptr;
+    }
+    return jni::stringArrayOf(
+        env, {point->world, std::to_string(point->x), std::to_string(point->y), std::to_string(point->z)});
+}
 } // namespace
 
 void registerMiscNatives(JNIEnv* env, jclass natives) {
@@ -1030,6 +1041,7 @@ void registerMiscNatives(JNIEnv* env, jclass natives) {
         method("knownPlayer", "(Ljava/lang/String;Z)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeKnownPlayer)),
         method("knownPlayerNumbers", "(Ljava/lang/String;)[D", reinterpret_cast<void*>(&nativeKnownPlayerNumbers)),
         method("knownPlayers", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeKnownPlayers)),
+        method("spawnPoint", "(Ljava/lang/String;)[Ljava/lang/String;", reinterpret_cast<void*>(&nativeSpawnPoint)),
         method("isOperator", "(Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeIsOperator)),
         method("setOperator", "(Ljava/lang/String;Z)Z", reinterpret_cast<void*>(&nativeSetOperator)),
         method("operators", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeOperators)),
