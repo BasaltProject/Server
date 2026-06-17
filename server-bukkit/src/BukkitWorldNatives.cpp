@@ -1,4 +1,5 @@
 #include "BridgeInternal.hpp"
+#include "ServerThreadCall.hpp"
 
 #include <array>
 #include <atomic>
@@ -63,19 +64,7 @@ template <typename Result, typename Body>
             return fallback;
         }
     };
-    BukkitBridge& bridge = BukkitBridge::current();
-    if (bridge.plugins().onPluginThread()) {
-        return run();
-    }
-    std::promise<Result> done;
-    std::future<Result> result = done.get_future();
-    static_cast<void>(bridge.services().tasks().after(0, [&done, &run] { done.set_value(run()); }));
-    while (result.wait_for(std::chrono::milliseconds{50}) != std::future_status::ready) {
-        if (bridge.stopping()) {
-            return fallback;
-        }
-    }
-    return result.get();
+    return callOnPluginThread(BukkitBridge::current(), fallback, run);
 }
 
 jint JNICALL nativeStateId(JNIEnv* env, jclass, jstring text) { return worlds().stateId(toStd(env, text)); }
@@ -801,7 +790,7 @@ struct JavaRef {
     JavaRef& operator=(const JavaRef&) = delete;
 
     ~JavaRef() {
-        if (JNIEnv* env = BukkitBridge::current().env(); env != nullptr && ref != nullptr) {
+        if (JNIEnv* env = BukkitBridge::liveEnv(); env != nullptr && ref != nullptr) {
             env->DeleteGlobalRef(ref);
         }
     }
@@ -814,7 +803,7 @@ void JNICALL nativeRequestChunk(JNIEnv* env, jclass, jstring name, jint chunkX, 
     const auto world = worldOf(env, name);
     const auto held = std::make_shared<JavaRef>(env, future);
     const auto finish = [held](bool loaded) {
-        JNIEnv* callEnv = BukkitBridge::current().env();
+        JNIEnv* callEnv = BukkitBridge::liveEnv();
         if (callEnv == nullptr) {
             return;
         }
@@ -877,7 +866,7 @@ void JNICALL nativeLightJob(JNIEnv* env, jclass, jstring name, jintArray chunks,
     const auto world = worldOf(env, name);
     const auto held = std::make_shared<JavaRef>(env, future);
     const auto finish = [held](std::int32_t relit) {
-        JNIEnv* callEnv = BukkitBridge::current().env();
+        JNIEnv* callEnv = BukkitBridge::liveEnv();
         if (callEnv == nullptr) {
             return;
         }

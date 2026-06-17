@@ -5,12 +5,11 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
-#include <future>
-#include <memory>
+#include <thread>
 
 namespace basalt::server::bukkit {
 namespace {
-BukkitBridge* gCurrent = nullptr;
+std::atomic<BukkitBridge*> gCurrent{nullptr};
 
 constexpr std::string_view kEventOwner = "bukkit";
 
@@ -96,10 +95,30 @@ jstring toJava(JNIEnv* env, std::string_view text) { return env->NewStringUTF(st
 
 BukkitBridge::BukkitBridge(ShimHost& shim, plugins::PluginHost& plugins, BukkitOptions options)
     : shim_(&shim), plugins_(&plugins), options_(std::move(options)) {
-    gCurrent = this;
+    gCurrent.store(this);
 }
 
-BukkitBridge& BukkitBridge::current() { return *gCurrent; }
+BukkitBridge::~BukkitBridge() { seal(); }
+
+BukkitBridge* BukkitBridge::live() { return gCurrent.load(); }
+
+JNIEnv* BukkitBridge::liveEnv() {
+    BukkitBridge* bridge = gCurrent.load();
+    return bridge == nullptr ? nullptr : bridge->env();
+}
+
+void BukkitBridge::seal() { gCurrent.store(nullptr); }
+
+BukkitBridge& BukkitBridge::current() {
+    BukkitBridge* bridge = gCurrent.load();
+    // A Java thread that outlives the server must not run against the freed model: it waits here until the process
+    // ends.
+    while (bridge == nullptr) {
+        std::this_thread::sleep_for(std::chrono::hours{1});
+        bridge = gCurrent.load();
+    }
+    return *bridge;
+}
 
 std::expected<void, std::string> BukkitBridge::boot() {
     JNIEnv* env = shim_->env();
@@ -145,11 +164,6 @@ std::expected<void, std::string> BukkitBridge::boot() {
     }
     if (jclass miscNatives = env->FindClass("org/basaltmc/bukkit/MiscNatives"); miscNatives != nullptr) {
         registerMiscNatives(env, miscNatives);
-    } else {
-        env->ExceptionClear();
-    }
-    if (jclass playerNatives = env->FindClass("org/basaltmc/bukkit/PlayerNatives"); playerNatives != nullptr) {
-        registerPlayerNatives(env, playerNatives);
     } else {
         env->ExceptionClear();
     }
@@ -360,29 +374,6 @@ bool BukkitBridge::subscribe(const std::string& event, std::int32_t priority) {
                 snapshot.values.push_back(fired.get(static_cast<std::int32_t>(index)));
             }
             if (!plugins_->onPluginThread()) {
-                if (event == "player.login" && !monitor) {
-                    auto shared = std::make_shared<Snapshot>(std::move(snapshot));
-                    auto done = std::make_shared<std::promise<void>>();
-                    std::future<void> finished = done->get_future();
-                    static_cast<void>(services().tasks().after(0, [this, event, priority, shared, done] {
-                        shared->cancelled = deliver(event, priority, *shared);
-                        done->set_value();
-                    }));
-                    if (finished.wait_for(std::chrono::seconds(10)) != std::future_status::ready) {
-                        return;
-                    }
-                    for (std::size_t index = 0; index < shared->values.size(); ++index) {
-                        if (fired.type().isMutable(fired.type().fields()[index])) {
-                            fired.set(static_cast<std::int32_t>(index), shared->values[index]);
-                        }
-                    }
-                    if (shared->cancelled) {
-                        fired.cancel();
-                    } else if (fired.cancelled()) {
-                        fired.restore();
-                    }
-                    return;
-                }
                 if (monitor || !fired.type().cancellable()) {
                     static_cast<void>(
                         services().tasks().after(0, [this, event, priority, moved = std::move(snapshot)]() mutable {

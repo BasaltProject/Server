@@ -20,7 +20,14 @@ class BukkitBridge {
 public:
     BukkitBridge(ShimHost& shim, plugins::PluginHost& plugins, BukkitOptions options);
 
+    BukkitBridge(const BukkitBridge&) = delete;
+    BukkitBridge& operator=(const BukkitBridge&) = delete;
+    ~BukkitBridge();
+
     [[nodiscard]] static BukkitBridge& current();
+    [[nodiscard]] static BukkitBridge* live();
+    static void seal();
+    [[nodiscard]] static JNIEnv* liveEnv();
 
     [[nodiscard]] std::expected<void, std::string> boot();
     bool enable();
