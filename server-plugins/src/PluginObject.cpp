@@ -15,6 +15,7 @@ struct Fields {
     std::map<std::string, PluginObject::Pusher, std::less<>> pushers;
     std::map<std::string, PluginObject::Writer, std::less<>> writers;
     std::map<std::string, PluginObject::Method, std::less<>> methods;
+    std::shared_ptr<const PluginObject::Fallback> fallback;
 
     [[nodiscard]] std::string names() const {
         std::set<std::string> all;
@@ -30,6 +31,9 @@ struct Fields {
         std::string out;
         for (const std::string& name : all) {
             out += out.empty() ? name : ", " + name;
+        }
+        if (fallback != nullptr && !fallback->names.empty()) {
+            out += out.empty() ? fallback->names : ", " + fallback->names;
         }
         return out;
     }
@@ -74,6 +78,11 @@ PluginObject& PluginObject::writes(std::string name, Writer writer) {
     return *this;
 }
 
+PluginObject& PluginObject::fallback(std::shared_ptr<const Fallback> fallback) {
+    fallback_ = std::move(fallback);
+    return *this;
+}
+
 PluginObject& PluginObject::method(std::string name, Method body) {
     methods_.emplace(std::move(name), std::move(body));
     return *this;
@@ -84,7 +93,8 @@ void PluginObject::push(wire::lua::LuaArgs& lua) && {
                                                   .readers = std::move(readers_),
                                                   .pushers = std::move(pushers_),
                                                   .writers = std::move(writers_),
-                                                  .methods = std::move(methods_)});
+                                                  .methods = std::move(methods_),
+                                                  .fallback = std::move(fallback_)});
     lua.pushTable();
     lua.pushTable();
     wire::lua::pushHostFunction(lua, fields->kind + ".index", [fields](wire::lua::LuaArgs& args) {
@@ -98,6 +108,16 @@ void PluginObject::push(wire::lua::LuaArgs& lua) && {
             return 1;
         }
         const auto reader = fields->readers.find(key);
+        if (reader == fields->readers.end() && fields->fallback != nullptr) {
+            if (const auto method = fields->fallback->method(key); method.has_value()) {
+                wire::lua::pushHostFunction(args, fields->kind + "." + key, *method);
+                return 1;
+            }
+            if (const auto read = fields->fallback->reader(key); read.has_value()) {
+                pushValue(args, (*read)());
+                return 1;
+            }
+        }
         if (reader == fields->readers.end()) {
             args.raise("a " + fields->kind + " has no '" + key + "'; it has " + fields->names());
         }
@@ -108,6 +128,12 @@ void PluginObject::push(wire::lua::LuaArgs& lua) && {
     wire::lua::pushHostFunction(lua, fields->kind + ".newindex", [fields](wire::lua::LuaArgs& args) {
         const std::string key = args.checkString(2);
         const auto writer = fields->writers.find(key);
+        if (writer == fields->writers.end() && fields->fallback != nullptr) {
+            if (const auto write = fields->fallback->writer(key); write.has_value()) {
+                (*write)(args, 3);
+                return 0;
+            }
+        }
         if (writer == fields->writers.end()) {
             const bool readable = fields->readers.contains(key) || fields->pushers.contains(key);
             args.raise(readable ? "'" + key + "' of a " + fields->kind + " can be read but not changed"

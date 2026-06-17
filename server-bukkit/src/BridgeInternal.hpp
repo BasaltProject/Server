@@ -92,6 +92,7 @@ void registerWorldNatives(JNIEnv* env, jclass natives);
 void registerInventoryNatives(JNIEnv* env, jclass natives);
 void registerEntityNatives(JNIEnv* env, jclass natives);
 void registerMiscNatives(JNIEnv* env, jclass natives);
+void registerPlayerNatives(JNIEnv* env, jclass natives);
 
 [[nodiscard]] std::string toStd(JNIEnv* env, jstring text);
 [[nodiscard]] jstring toJava(JNIEnv* env, std::string_view text);

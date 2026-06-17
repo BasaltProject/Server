@@ -536,6 +536,7 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                                               args.checkNumber(base + 2)));
             return 1;
         });
+    bindPlayerOperations(object, player);
     std::move(object).push(lua);
 }
 } // namespace basalt::server::plugins

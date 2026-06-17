@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/PlayerOps.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
@@ -259,8 +260,10 @@ public:
         return player == nullptr ? 0.0 : player->z;
     }
 
-    // No latency is measured yet, so this answers zero rather than a meaningless number.
-    [[nodiscard]] std::int32_t ping() const override { return 0; }
+    [[nodiscard]] std::int32_t ping() const override {
+        const player::PlayerSession* player = session();
+        return player == nullptr ? 0 : player->extras.pingMillis;
+    }
 
     [[nodiscard]] bool sneaking() const override {
         const player::PlayerSession* player = session();
@@ -580,6 +583,35 @@ public:
     [[nodiscard]] float saturation() const override {
         const player::PlayerSession* player = session();
         return player == nullptr ? 0.0F : player->food.saturationLevel();
+    }
+
+    [[nodiscard]] std::optional<server::plugins::PluginEntityValue> property(std::string_view name) const override {
+        player::PlayerSession* player = session();
+        if (player == nullptr) {
+            return std::nullopt;
+        }
+        playerOps::Context context{*player, *registry_, hooks_};
+        return playerOps::dispatch(context, playerOps::Verb::Get, name, {});
+    }
+
+    bool setProperty(std::string_view name, const server::plugins::PluginEntityValue& value) override {
+        player::PlayerSession* player = session();
+        if (player == nullptr) {
+            return false;
+        }
+        playerOps::Context context{*player, *registry_, hooks_};
+        const auto done = playerOps::dispatch(context, playerOps::Verb::Set, name, {value});
+        return done.has_value() && playerOps::asBool(*done);
+    }
+
+    std::optional<server::plugins::PluginEntityValue>
+    invoke(std::string_view operation, const std::vector<server::plugins::PluginEntityValue>& arguments) override {
+        player::PlayerSession* player = session();
+        if (player == nullptr) {
+            return std::nullopt;
+        }
+        playerOps::Context context{*player, *registry_, hooks_};
+        return playerOps::dispatch(context, playerOps::Verb::Call, operation, arguments);
     }
 
 private:

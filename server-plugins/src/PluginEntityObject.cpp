@@ -6,9 +6,8 @@
 #include <vector>
 
 namespace basalt::server::plugins {
-namespace {
 
-[[nodiscard]] PluginEntityValue valueAt(wire::lua::LuaArgs& lua, std::int32_t index) {
+PluginEntityValue entityValueAt(wire::lua::LuaArgs& lua, std::int32_t index) {
     if (lua.isBoolean(index)) {
         return lua.toBoolean(index);
     }
@@ -34,6 +33,8 @@ namespace {
     return std::monostate{};
 }
 
+namespace {
+
 [[nodiscard]] std::vector<std::string_view> split(std::string_view text) {
     std::vector<std::string_view> parts;
     while (!text.empty()) {
@@ -55,14 +56,14 @@ void bindEntityOperations(PluginObject& object, const std::shared_ptr<PluginEnti
         const std::int32_t base = firstArgument(args);
         std::vector<PluginEntityValue> arguments;
         for (std::int32_t index = base + 1; index <= args.count(); ++index) {
-            arguments.push_back(valueAt(args, index));
+            arguments.push_back(entityValueAt(args, index));
         }
         pushValue(args, entity->invoke(args.checkString(base), arguments).value_or(PluginEntityValue{}));
         return 1;
     });
     object.method("set", [entity](wire::lua::LuaArgs& args) {
         const std::int32_t base = firstArgument(args);
-        args.pushBoolean(entity->setProperty(args.checkString(base), valueAt(args, base + 1)));
+        args.pushBoolean(entity->setProperty(args.checkString(base), entityValueAt(args, base + 1)));
         return 1;
     });
     for (const EntityPropertySpec& spec : kEntityProperties) {
@@ -70,7 +71,7 @@ void bindEntityOperations(PluginObject& object, const std::shared_ptr<PluginEnti
         object.reads(name, [entity, name] { return entity->property(name).value_or(PluginValue{}); });
         if (spec.writable) {
             object.writes(name, [entity, name](wire::lua::LuaArgs& args, std::int32_t index) {
-                if (!entity->setProperty(name, valueAt(args, index))) {
+                if (!entity->setProperty(name, entityValueAt(args, index))) {
                     static_cast<void>(args.fail("entity cannot set " + name));
                 }
             });
@@ -83,7 +84,7 @@ void bindEntityOperations(PluginObject& object, const std::shared_ptr<PluginEnti
         object.method(name, [entity, name, columnNames = std::move(columnNames)](wire::lua::LuaArgs& args) {
             std::vector<PluginEntityValue> arguments;
             for (std::int32_t index = firstArgument(args); index <= args.count(); ++index) {
-                arguments.push_back(valueAt(args, index));
+                arguments.push_back(entityValueAt(args, index));
             }
             const std::optional<PluginEntityValue> result = entity->invoke(name, arguments);
             const auto* rows = result.has_value() ? std::get_if<std::vector<std::string>>(&*result) : nullptr;

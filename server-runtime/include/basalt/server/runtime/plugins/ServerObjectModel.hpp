@@ -41,7 +41,9 @@ class PlaceholderRegistry;
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
-}
+class PlayerProgress;
+class RealRecipes;
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 class BlockChangeBroadcaster;
@@ -81,6 +83,9 @@ struct ModelHooks {
     std::function<void(world::LoadedWorld& world, double x, double y, double z, float power, bool breakBlocks,
                        std::int32_t sourceEntityId)>
         explode;
+    std::function<world::PlayerProgress*()> progress;
+    std::function<world::RealRecipes*()> recipes;
+    std::function<storage::PlayerStore*()> store;
 };
 
 [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>

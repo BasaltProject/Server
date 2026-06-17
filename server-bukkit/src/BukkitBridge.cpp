@@ -145,6 +145,11 @@ std::expected<void, std::string> BukkitBridge::boot() {
     } else {
         env->ExceptionClear();
     }
+    if (jclass playerNatives = env->FindClass("org/basaltmc/bukkit/PlayerNatives"); playerNatives != nullptr) {
+        registerPlayerNatives(env, playerNatives);
+    } else {
+        env->ExceptionClear();
+    }
     bootMethod_ = env->GetStaticMethodID(runtime_, "boot", "(Ljava/lang/String;Ljava/lang/String;)Z");
     enableMethod_ = env->GetStaticMethodID(runtime_, "enable", "(Ljava/lang/String;)Z");
     shutdownMethod_ = env->GetStaticMethodID(runtime_, "shutdown", "()Z");

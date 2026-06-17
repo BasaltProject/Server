@@ -158,6 +158,11 @@ basalt_module(server-runtime-core
         src/plugins/PluginsCommand.cpp
         src/plugins/ServerNpcs.cpp
         src/plugins/ServerPluginServices.cpp
+        src/plugins/PlayerOps.cpp
+        src/plugins/PlayerOpsHud.cpp
+        src/plugins/PlayerOpsMisc.cpp
+        src/plugins/PlayerOpsState.cpp
+        src/plugins/PlayerOpsView.cpp
         src/plugins/ServerObjectModel.cpp
         src/plugins/ServerInventories.cpp
         src/plugins/PluginItemConversion.cpp
@@ -365,6 +370,7 @@ basalt_module(server-runtime-core
         src/player/PlayerDamage.cpp
         src/player/PlayerParticles.cpp
         src/player/PlayerSounds.cpp
+        src/player/PlayerTabList.cpp
         src/player/PlayerRegistry.cpp
         src/player/Menu.cpp
         src/player/PlayerInventory.cpp
