@@ -48,9 +48,18 @@ public:
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::string_view cause)>
             igniteAllowed;
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t toX, std::int32_t toY, std::int32_t toZ)>
+            flowAllowed;
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t stateId, std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ)>
+            burnAllowed;
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
             dispenseAllowed;
         world::randomTicks::MayChange mayChange;
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t stateId)>
+            structureAllowed;
         std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z)> allowHopperMove;
         std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::string_view cooker, const server::world::loot::ItemStack& input,

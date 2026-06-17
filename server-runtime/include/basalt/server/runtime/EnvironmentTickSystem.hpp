@@ -49,6 +49,7 @@ public:
         std::function<std::optional<std::int32_t>(const player::PlayerSession& player, std::int32_t now,
                                                   std::int32_t before)>
             foodChanged;
+        std::function<void(player::PlayerSession& player)> armorWatch;
     };
 
     /// The storm's own stream, which is not the level's: a strike must not shift what else spawns.

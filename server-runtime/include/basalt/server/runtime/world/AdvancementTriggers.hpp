@@ -65,6 +65,7 @@ public:
         ItemTagMembers itemTagMembers;
         EntityTagged entityTagged;
         Announce announce;
+        std::function<void(std::string_view player, const wire::common::Identifier& advancement)> completed;
         AwardExperience awardExperience;
         AwardRecipe awardRecipe;
         server::world::loot::TagLookup tags;

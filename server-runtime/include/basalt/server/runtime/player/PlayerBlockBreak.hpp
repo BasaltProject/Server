@@ -72,6 +72,15 @@ struct BreakContext {
                        std::int32_t z)>
         creakingHeartBroken;
     std::function<void(PlayerSession& player)> dismount;
+    std::function<void(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)> bedLeft;
+    std::function<bool(const PlayerSession& player, std::string_view state, std::int32_t hookId, std::int32_t& exp)>
+        fishing;
+    std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                       std::int32_t stateId)>
+        fertilizeAllowed;
+    std::function<bool(const PlayerSession& player, std::string_view type, std::int32_t x, std::int32_t y,
+                       std::int32_t z, std::string_view face)>
+        hangingAllowed;
 };
 
 [[nodiscard]] std::vector<PlayerSession*> playersIn(const BreakContext& context, std::string_view worldName);

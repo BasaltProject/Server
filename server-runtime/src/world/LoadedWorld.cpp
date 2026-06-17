@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/sched/OnOwner.hpp>
@@ -322,6 +323,15 @@ sched::Owner& LoadedWorld::ownerOf(std::int32_t x, std::int32_t z) const {
 }
 
 void LoadedWorld::setSpawn(std::int32_t x, std::int32_t y, std::int32_t z, float yaw) {
+    events().notify(&server::plugins::pluginEventTypes::worldSpawnChange, [&](server::plugins::PluginEvent& event) {
+        event.set("world", name());
+        event.set("x", static_cast<std::int64_t>(x));
+        event.set("y", static_cast<std::int64_t>(y));
+        event.set("z", static_cast<std::int64_t>(z));
+        event.set("from_x", static_cast<std::int64_t>(std::floor(spawn_[0])));
+        event.set("from_y", static_cast<std::int64_t>(std::floor(spawn_[1])));
+        event.set("from_z", static_cast<std::int64_t>(std::floor(spawn_[2])));
+    });
     spawn_ = {x + 0.5, static_cast<double>(y), z + 0.5};
     spawnYaw_ = yaw;
     spawnOverride_ = std::array<std::int32_t, 3>{x, y, z};

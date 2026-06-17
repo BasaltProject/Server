@@ -198,7 +198,11 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         if (login == nullptr || !login->cancelled()) {
             return std::nullopt;
         }
-        return login->cancelMessage().value_or("");
+        if (login->cancelMessage().has_value()) {
+            return *login->cancelMessage();
+        }
+        const auto* message = std::get_if<std::string>(&login->get("message"));
+        return message == nullptr ? std::string{} : *message;
     };
 
     hooks.packets = &host->packets();

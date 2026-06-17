@@ -186,12 +186,21 @@ bool hangFrameFor(const BreakContext& context, PlayerSession& player, world::Loa
     const std::array<std::int32_t, 3> at = beyond(hit);
     // The two enums are both in vanilla's `Direction` order, which is what makes this a cast.
     const auto facing = static_cast<reg::BlockFace>(static_cast<std::uint8_t>(hit.direction));
+    constexpr std::array<std::string_view, 6> kFaceNames{"down", "up", "north", "south", "west", "east"};
+    const auto allowedHere = [&] {
+        const auto index = static_cast<std::size_t>(hit.direction);
+        return !context.hangingAllowed || context.hangingAllowed(player, type.path(), at[0], at[1], at[2],
+                                                                 index < kFaceNames.size() ? kFaceNames[index] : "up");
+    };
     // parity: `PaintingItem.useOn` picks the biggest art that fits.
     if (type.path() == "painting") {
         random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
         const std::optional<registry::vanillaRegistryData::Painting> art =
             world::paintings::fitting(world.state(), at[0], at[1], at[2], facing, random);
         if (!art.has_value()) {
+            return false;
+        }
+        if (!allowedHere()) {
             return false;
         }
         const std::array<double, 3> middle =
@@ -217,6 +226,9 @@ bool hangFrameFor(const BreakContext& context, PlayerSession& player, world::Loa
         return true;
     }
     if (!world::itemFrames::canHang(world.state(), at[0], at[1], at[2], facing)) {
+        return false;
+    }
+    if (!allowedHere()) {
         return false;
     }
     const std::array<double, 3> hangs = world::itemFrames::hangingAt(at[0], at[1], at[2], facing);

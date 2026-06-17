@@ -160,6 +160,8 @@ public:
 
     /// parity: `Player.attackStrengthTicker`.
     std::int32_t ticksSinceSwing = 0;
+    std::array<std::string, 4> armorSeen{};
+    bool armorKnown = false;
 
     FoodData food;
     ExperienceData experience;

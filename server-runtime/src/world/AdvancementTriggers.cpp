@@ -461,7 +461,9 @@ void AdvancementTriggers::reward(std::string_view player, std::string_view uuid,
 
 void AdvancementTriggers::complete(std::string_view player, std::string_view uuid, const Identifier& id,
                                    const adv::Advancement& advancement) {
-    static_cast<void>(id);
+    if (hooks_.completed) {
+        hooks_.completed(player, id);
+    }
     reward(player, uuid, advancement.rewards);
     if (!advancement.display.has_value() || !advancement.display->announceToChat || !hooks_.announce) {
         return;

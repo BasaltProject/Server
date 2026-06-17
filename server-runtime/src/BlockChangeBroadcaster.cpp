@@ -112,7 +112,7 @@ std::int64_t BlockChangeBroadcaster::nextSeed() const { return options_.nextSeed
 
 world::neighbourUpdates::Context BlockChangeBroadcaster::updateContext(world::LoadedWorld& world,
                                                                        random::RandomSource& random) const {
-    return contextOf(
+    world::neighbourUpdates::Context context = contextOf(
         world, random,
         [this, &world](world::golemPatterns::Golem kind, double gx, double gy, double gz) {
             if (hooks_.summonGolem) {
@@ -124,6 +124,13 @@ world::neighbourUpdates::Context BlockChangeBroadcaster::updateContext(world::Lo
             return block != nullptr && options_.blockTags != nullptr &&
                    world::realBlockTags::contains(*options_.blockTags, "minecraft:copper", *block);
         });
+    if (hooks_.physicsAllowed && hooks_.physicsWatched && hooks_.physicsWatched()) {
+        context.physicsAllowed = [this, &world](std::int32_t x, std::int32_t y, std::int32_t z,
+                                                std::optional<std::int32_t> source) {
+            return hooks_.physicsAllowed(world, x, y, z, source);
+        };
+    }
+    return context;
 }
 
 void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,

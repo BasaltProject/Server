@@ -70,6 +70,10 @@ public:
         std::function<void(world::LoadedWorld& world, double x, double y, double z,
                            const server::world::loot::ItemStack& stack)>
             dropItem;
+        /// Said when a projectile strikes a block (hitId < 0) or an entity.
+        std::function<void(world::LoadedWorld& world, const entity::ServerEntity& projectile, std::int32_t hitId,
+                           std::int32_t x, std::int32_t y, std::int32_t z)>
+            projectileHit;
     };
 
     CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions, Hooks hooks, Options options);

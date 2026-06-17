@@ -17,6 +17,7 @@ struct VitalsContext {
 
     std::function<std::optional<std::int32_t>(const PlayerSession& player, std::int32_t now, std::int32_t before)>
         foodChanged;
+    std::function<void(PlayerSession& player)> armorWatch;
 };
 
 void tickVitals(PlayerSession& player, const VitalsContext& context);

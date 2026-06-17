@@ -30,6 +30,7 @@
 #include <basalt/wire/plugins/PluginSignature.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -117,6 +118,21 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         // Resolved, not serialized: a client translates the key itself and a log cannot.
         logger_.info([this, &message] { return wire::text::resolvePlainText(message, options_.lang); });
+    };
+    triggerHooks.completed = [this](std::string_view name, const wire::common::Identifier& advancement) {
+        if (!eventSink_.listening(&server::plugins::pluginEventTypes::playerAdvancement)) {
+            return;
+        }
+        for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+            if (player->name() != name) {
+                continue;
+            }
+            eventSink_.notify(&server::plugins::pluginEventTypes::playerAdvancement,
+                              [&](server::plugins::PluginEvent& event) {
+                                  plugins::EventSink::player(event, *player);
+                                  event.set("advancement", advancement.toString());
+                              });
+        }
     };
     triggerHooks.entityTagged = [this](const wire::common::Identifier& type, std::string_view tag) {
         return world::realEntityTypeTags::membersOf(vanillaData_.entityTags,
@@ -285,16 +301,28 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     placeholders_.registerProvider("basalt_server", placeholder::serverPlaceholders(std::move(facts)));
 
-    tickLoop_ = std::make_unique<TickLoop>(
-        TickLoop::Options{.saveIntervalSeconds = worldRegistry_->defaultWorld().settings().saveIntervalSeconds,
-                          .onSaveInterval =
-                              [this] {
-                                  if (saveControl_ != nullptr && saveControl_->enabled()) {
-                                      persistence_->persistEverything();
-                                  }
-                              },
-                          .onUnloadInterval = [this] { persistence_->unloadUnreachableChunks(); },
-                          .onTick = [this](bool worldRuns) { tickWorlds(worldRuns); }});
+    tickLoop_ = std::make_unique<TickLoop>(TickLoop::Options{
+        .saveIntervalSeconds = worldRegistry_->defaultWorld().settings().saveIntervalSeconds,
+        .onSaveInterval =
+            [this] {
+                if (saveControl_ != nullptr && saveControl_->enabled()) {
+                    persistence_->persistEverything();
+                }
+            },
+        .onUnloadInterval = [this] { persistence_->unloadUnreachableChunks(); },
+        .onTick =
+            [this](bool worldRuns) {
+                const auto began = std::chrono::steady_clock::now();
+                tickWorlds(worldRuns);
+                eventSink_.notify(
+                    &server::plugins::pluginEventTypes::serverTickEnd, [&](server::plugins::PluginEvent& event) {
+                        const double took =
+                            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - began).count();
+                        event.set("tick", tickLoop_->ticksRun());
+                        event.set("duration_ms", took);
+                        event.set("remaining_ms", 50.0 - took);
+                    });
+            }});
 
     functionRunner_ = makeFunctionRunner(config.functionPermissionLevel);
     consoleSource_ = std::make_unique<command::ConsoleCommandSource>(
@@ -690,7 +718,20 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                           ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                                                    .nextDouble = [] { return scratchDouble(); }});
     orbs_ = std::make_unique<ExperienceOrbSystem>(
-        playerRegistry_, ExperienceOrbSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+        playerRegistry_,
+        ExperienceOrbSystem::Options{
+            .nextSeed = [] { return scratchSeed(); },
+            .gained =
+                [this](const player::PlayerSession& who, std::int32_t amount, std::int32_t orbId) {
+                    const server::plugins::PluginEvent* event = eventSink_.ask(
+                        &server::plugins::pluginEventTypes::playerExpChange, [&](server::plugins::PluginEvent& filled) {
+                            plugins::EventSink::player(filled, who);
+                            filled.set("amount", static_cast<std::int64_t>(amount));
+                            filled.set("source_id", static_cast<std::int64_t>(orbId));
+                        });
+                    const auto* edited = event == nullptr ? nullptr : std::get_if<std::int64_t>(&event->get("amount"));
+                    return edited == nullptr ? amount : static_cast<std::int32_t>(std::max<std::int64_t>(0, *edited));
+                }});
     fishing_ = std::make_unique<FishingSystem>(playerRegistry_, *orbs_,
                                                FishingSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     mapStorage_.readAlsoFrom(worldRegistry_->defaultWorld().worldRoot() + "/data/minecraft/maps");
@@ -823,6 +864,20 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                                .velocityZ = (scratchDouble() * 0.2) - 0.1,
                                                                .pickupDelay = world::kSpawnedPickupDelay,
                                                                .components = stack.components});
+                },
+            .projectileHit =
+                [this](world::LoadedWorld& world, const entity::ServerEntity& projectile, std::int32_t hitId,
+                       std::int32_t x, std::int32_t y, std::int32_t z) {
+                    eventSink_.notify(&server::plugins::pluginEventTypes::projectileHit,
+                                      [&](server::plugins::PluginEvent& event) {
+                                          event.set("entity_id", static_cast<std::int64_t>(projectile.entityId()));
+                                          event.set("entity_type", projectile.type().toString());
+                                          event.set("world", world.name());
+                                          event.set("hit_id", static_cast<std::int64_t>(hitId));
+                                          event.set("x", static_cast<std::int64_t>(x));
+                                          event.set("y", static_cast<std::int64_t>(y));
+                                          event.set("z", static_cast<std::int64_t>(z));
+                                      });
                 }});
     fireworks_ = std::make_unique<FireworkSystem>(playerRegistry_, *combat_,
                                                   FireworkSystem::Options{.nextSeed = [] { return scratchSeed(); }});

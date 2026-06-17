@@ -41,6 +41,9 @@ public:
         std::function<void(const player::PlayerSession& player, const std::string& deathMessage)> died;
         std::function<bool(const player::PlayerSession& player, std::int32_t targetEntityId)> attackAllowed;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> mountAllowed;
+        std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& vehicle)> dismountAllowed;
+        std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& hanging)>
+            hangingBreakAllowed;
         std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& animal)> tameAllowed;
     };
 

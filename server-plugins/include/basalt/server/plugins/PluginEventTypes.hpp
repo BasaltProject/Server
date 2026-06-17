@@ -93,6 +93,28 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& entityDrops();
 [[nodiscard]] const PluginEventType& entityPotionEffect();
 [[nodiscard]] const PluginEventType& blockFade();
+[[nodiscard]] const PluginEventType& playerKick();
+[[nodiscard]] const PluginEventType& playerToggleFlight();
+[[nodiscard]] const PluginEventType& playerAnimation();
+[[nodiscard]] const PluginEventType& playerJump();
+[[nodiscard]] const PluginEventType& playerEditBook();
+[[nodiscard]] const PluginEventType& playerExpChange();
+[[nodiscard]] const PluginEventType& playerArmorChange();
+[[nodiscard]] const PluginEventType& playerAdvancement();
+[[nodiscard]] const PluginEventType& playerResourcePack();
+[[nodiscard]] const PluginEventType& playerClientOptions();
+[[nodiscard]] const PluginEventType& playerFish();
+[[nodiscard]] const PluginEventType& playerTabComplete();
+[[nodiscard]] const PluginEventType& blockBurn();
+[[nodiscard]] const PluginEventType& blockFertilize();
+[[nodiscard]] const PluginEventType& blockFromTo();
+[[nodiscard]] const PluginEventType& blockPhysics();
+[[nodiscard]] const PluginEventType& worldStructureGrow();
+[[nodiscard]] const PluginEventType& worldSpawnChange();
+[[nodiscard]] const PluginEventType& hangingPlace();
+[[nodiscard]] const PluginEventType& hangingBreak();
+[[nodiscard]] const PluginEventType& serverTickEnd();
+[[nodiscard]] const PluginEventType& projectileHit();
 
 [[nodiscard]] const std::vector<const PluginEventType*>& all();
 

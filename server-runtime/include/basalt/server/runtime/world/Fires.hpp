@@ -45,6 +45,14 @@ struct Surroundings {
     bool canSpread = true;
     /// parity: the End's `infiniburn` tag, the only one with bedrock in it.
     bool bedrockBurnsForever = false;
+    /// Asked before fire is laid on a block (x, y, z) from the fire at (fromX, fromY, fromZ).
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t fromX, std::int32_t fromY,
+                       std::int32_t fromZ)>
+        igniteAllowed;
+    /// Asked before the fire at (fromX, fromY, fromZ) burns the block at (x, y, z).
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, std::int32_t fromX,
+                       std::int32_t fromY, std::int32_t fromZ)>
+        burnAllowed;
 };
 
 /// `difficulty` is what `/difficulty` last set, since a harder world spreads fire further.

@@ -180,6 +180,10 @@ bool useBoneMealFor(const BreakContext& context, PlayerSession& player, world::L
     if (!existing.has_value() || !world::boneMeal::grows(*existing)) {
         return false;
     }
+    if (context.fertilizeAllowed && !context.fertilizeAllowed(player, x, y, z, *existing)) {
+        spendOne(context, player, heldSlot, held);
+        return true;
+    }
     random::RandomSource random = random::RandomSource::legacy(seedOf(context));
     std::optional<world::BlockChange> grown = world::boneMeal::apply(world.state(), x, y, z, random);
     if (grown.has_value()) {

@@ -315,7 +315,8 @@ const PluginEventType& itemSpawn() {
 }
 
 const PluginEventType& playerLogin() {
-    static const PluginEventType type{"player.login", true, {"player_name", "player_uuid", "address"}};
+    static const PluginEventType type{
+        "player.login", true, {"player_name", "player_uuid", "address", "message"}, {"message"}};
     return type;
 }
 
@@ -518,6 +519,137 @@ const PluginEventType& blockFade() {
     return type;
 }
 
+const PluginEventType& playerKick() {
+    static const PluginEventType type{
+        "player.kick", true, {"player_name", "player_uuid", "world", "reason", "cause"}, {"reason"}};
+    return type;
+}
+
+const PluginEventType& playerToggleFlight() {
+    static const PluginEventType type{"player.toggle_flight", true, {"player_name", "player_uuid", "world", "flying"}};
+    return type;
+}
+
+const PluginEventType& playerAnimation() {
+    static const PluginEventType type{"player.animation", true, {"player_name", "player_uuid", "world", "hand"}};
+    return type;
+}
+
+const PluginEventType& playerJump() {
+    static const PluginEventType type{
+        "player.jump", true, {"player_name", "player_uuid", "world", "from_x", "from_y", "from_z", "x", "y", "z"}};
+    return type;
+}
+
+const PluginEventType& playerEditBook() {
+    static const PluginEventType type{"player.edit_book",
+                                      true,
+                                      {"player_name", "player_uuid", "world", "slot", "signing", "title", "pages"},
+                                      {"title", "pages", "signing"}};
+    return type;
+}
+
+const PluginEventType& playerExpChange() {
+    static const PluginEventType type{
+        "player.exp_change", false, {"player_name", "player_uuid", "world", "amount", "source_id"}, {"amount"}};
+    return type;
+}
+
+const PluginEventType& playerArmorChange() {
+    static const PluginEventType type{
+        "player.armor_change", false, {"player_name", "player_uuid", "world", "slot", "old_item", "new_item"}};
+    return type;
+}
+
+const PluginEventType& playerAdvancement() {
+    static const PluginEventType type{
+        "player.advancement", false, {"player_name", "player_uuid", "world", "advancement"}};
+    return type;
+}
+
+const PluginEventType& playerResourcePack() {
+    static const PluginEventType type{
+        "player.resource_pack", false, {"player_name", "player_uuid", "world", "pack_id", "status"}};
+    return type;
+}
+
+const PluginEventType& playerClientOptions() {
+    static const PluginEventType type{
+        "player.client_options",
+        false,
+        {"player_name", "player_uuid", "world", "locale", "view_distance", "chat_colors", "main_hand", "skin_parts"}};
+    return type;
+}
+
+const PluginEventType& playerFish() {
+    static const PluginEventType type{
+        "player.fish", true, {"player_name", "player_uuid", "world", "state", "hook_id", "caught_id", "exp"}, {"exp"}};
+    return type;
+}
+
+const PluginEventType& playerTabComplete() {
+    static const PluginEventType type{
+        "player.tab_complete", true, {"player_name", "player_uuid", "world", "buffer", "completions"}, {"completions"}};
+    return type;
+}
+
+const PluginEventType& blockBurn() {
+    static const PluginEventType type{
+        "block.burn", true, {"world", "x", "y", "z", "block", "igniter_x", "igniter_y", "igniter_z"}};
+    return type;
+}
+
+const PluginEventType& blockFertilize() {
+    static const PluginEventType type{
+        "block.fertilize", true, {"player_name", "player_uuid", "world", "x", "y", "z", "block"}};
+    return type;
+}
+
+const PluginEventType& blockFromTo() {
+    static const PluginEventType type{
+        "block.from_to", true, {"world", "x", "y", "z", "block", "to_x", "to_y", "to_z", "face"}};
+    return type;
+}
+
+const PluginEventType& blockPhysics() {
+    static const PluginEventType type{"block.physics", true, {"world", "x", "y", "z", "block", "source_block"}};
+    return type;
+}
+
+const PluginEventType& worldStructureGrow() {
+    static const PluginEventType type{"world.structure_grow", true, {"world", "x", "y", "z", "species", "player_name"}};
+    return type;
+}
+
+const PluginEventType& worldSpawnChange() {
+    static const PluginEventType type{
+        "world.spawn_change", false, {"world", "x", "y", "z", "from_x", "from_y", "from_z"}};
+    return type;
+}
+
+const PluginEventType& hangingPlace() {
+    static const PluginEventType type{
+        "hanging.place", true, {"world", "x", "y", "z", "entity_type", "face", "player_name", "player_uuid"}};
+    return type;
+}
+
+const PluginEventType& hangingBreak() {
+    static const PluginEventType type{
+        "hanging.break", true, {"entity_id", "entity_type", "world", "x", "y", "z", "cause", "remover_id"}};
+    return type;
+}
+
+const PluginEventType& serverTickEnd() {
+    static const PluginEventType type{"server.tick_end", false, {"tick", "duration_ms", "remaining_ms"}};
+    return type;
+}
+
+const PluginEventType& projectileHit() {
+    static const PluginEventType type{
+        "projectile.hit", false, {"entity_id", "entity_type", "world", "hit_id", "x", "y", "z"}};
+    return type;
+}
+
 const std::vector<const PluginEventType*>& all() {
     static const std::vector<const PluginEventType*> every{&playerJoin(),
                                                            &playerQuit(),
@@ -605,7 +737,29 @@ const std::vector<const PluginEventType*>& all() {
                                                            &inventoryEnchantPrepare(),
                                                            &inventoryEnchant(),
                                                            &furnaceBurn(),
-                                                           &furnaceStart()};
+                                                           &furnaceStart(),
+                                                           &playerKick(),
+                                                           &playerToggleFlight(),
+                                                           &playerAnimation(),
+                                                           &playerJump(),
+                                                           &playerEditBook(),
+                                                           &playerExpChange(),
+                                                           &playerArmorChange(),
+                                                           &playerAdvancement(),
+                                                           &playerResourcePack(),
+                                                           &playerClientOptions(),
+                                                           &playerFish(),
+                                                           &playerTabComplete(),
+                                                           &blockBurn(),
+                                                           &blockFertilize(),
+                                                           &blockFromTo(),
+                                                           &blockPhysics(),
+                                                           &worldStructureGrow(),
+                                                           &worldSpawnChange(),
+                                                           &hangingPlace(),
+                                                           &hangingBreak(),
+                                                           &serverTickEnd(),
+                                                           &projectileHit()};
     return every;
 }
 } // namespace basalt::server::plugins::pluginEventTypes

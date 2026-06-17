@@ -191,7 +191,8 @@ bool isSapling(std::int32_t stateId) {
 }
 
 std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                 std::int32_t stateId, random::RandomSource& random, const Flowering& flowering) {
+                                 std::int32_t stateId, random::RandomSource& random, const Flowering& flowering,
+                                 const MayGrow& mayGrow) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return {};
@@ -215,6 +216,9 @@ std::vector<BlockChange> advance(WorldState& world, std::int32_t x, std::int32_t
         return changes;
     }
 
+    if (mayGrow && !mayGrow()) {
+        return {};
+    }
     // parity: `TreeGrower.growTree`.
     if (const std::optional<const trees::TreeConfiguration*> mega = pick(grower.megaTrees, random);
         mega.has_value() && *mega != nullptr) {

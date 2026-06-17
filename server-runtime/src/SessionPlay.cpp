@@ -275,7 +275,35 @@ void ClientSession::sendSuggestions(const play::CommandSuggestionRequestPacket& 
         return;
     }
     command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
-    const command::SuggestionResult result = dispatcher->suggest(source, request.command);
+    command::SuggestionResult result = dispatcher->suggest(source, request.command);
+    if (options_.events != nullptr) {
+        std::string joined;
+        for (const wire::protocol::play::CommandSuggestion& suggestion : result.suggestions) {
+            joined += (joined.empty() ? "" : "\n") + suggestion.text;
+        }
+        const server::plugins::PluginEvent* asked = options_.events->ask(
+            &server::plugins::pluginEventTypes::playerTabComplete, [&](server::plugins::PluginEvent& event) {
+                plugins::EventSink::player(event, *session);
+                event.set("buffer", request.command);
+                event.set("completions", joined);
+            });
+        if (asked != nullptr) {
+            if (asked->cancelled()) {
+                result.suggestions.clear();
+            } else if (const auto* edited = std::get_if<std::string>(&asked->get("completions"));
+                       edited != nullptr && *edited != joined) {
+                result.suggestions.clear();
+                for (std::size_t from = 0; from < edited->size();) {
+                    const std::size_t end = std::min(edited->find('\n', from), edited->size());
+                    if (end > from) {
+                        result.suggestions.push_back(
+                            {.text = edited->substr(from, end - from), .tooltip = std::nullopt});
+                    }
+                    from = end + 1;
+                }
+            }
+        }
+    }
     sendPlayPacket(play::CommandSuggestionsPacket::kId, [&request, &result](wire::io::ByteBuffer& buffer) {
         play::CommandSuggestionsPacket{
             .id = request.id, .start = result.start, .length = result.length, .suggestions = result.suggestions}
@@ -859,7 +887,17 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const std::optional<play::ServerboundPlayerAbilitiesPacket> abilities =
             play::ServerboundPlayerAbilitiesPacket::read(body);
         if (session != nullptr && abilities.has_value()) {
-            session->flying = abilities->flying && session->mayFly();
+            const bool wants = abilities->flying && session->mayFly();
+            if (wants != session->flying && options_.events != nullptr &&
+                !options_.events->allowed(&server::plugins::pluginEventTypes::playerToggleFlight,
+                                          [&](server::plugins::PluginEvent& event) {
+                                              plugins::EventSink::player(event, *session);
+                                              event.set("flying", wants);
+                                          })) {
+                uiState_->sendAbilities();
+                return;
+            }
+            session->flying = wants;
         }
         return;
     }
@@ -984,7 +1022,44 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     if (packetId == play::ServerboundEditBookPacket::kId) {
         const std::optional<play::ServerboundEditBookPacket> packet = play::ServerboundEditBookPacket::read(body);
         if (packet.has_value() && session != nullptr) {
-            if (player::editBookFor(*session, packet->slot, packet->pages, packet->title)) {
+            std::vector<std::string> pages = packet->pages;
+            std::optional<std::string> title = packet->title;
+            if (options_.events != nullptr) {
+                std::string joined;
+                for (std::size_t page = 0; page < pages.size(); ++page) {
+                    joined += (page == 0 ? "" : "\f") + pages[page];
+                }
+                const server::plugins::PluginEvent* edit = options_.events->ask(
+                    &server::plugins::pluginEventTypes::playerEditBook, [&](server::plugins::PluginEvent& event) {
+                        plugins::EventSink::player(event, *session);
+                        event.set("slot", static_cast<std::int64_t>(packet->slot));
+                        event.set("signing", title.has_value());
+                        event.set("title", title.value_or(std::string{}));
+                        event.set("pages", joined);
+                    });
+                if (edit != nullptr) {
+                    if (edit->cancelled()) {
+                        return;
+                    }
+                    if (const auto* text = std::get_if<std::string>(&edit->get("pages"));
+                        text != nullptr && *text != joined) {
+                        pages.clear();
+                        for (std::size_t from = 0; from <= text->size();) {
+                            const std::size_t end = std::min(text->find('\f', from), text->size());
+                            pages.push_back(text->substr(from, end - from));
+                            from = end + 1;
+                        }
+                    }
+                    const auto* signing = std::get_if<bool>(&edit->get("signing"));
+                    const auto* name = std::get_if<std::string>(&edit->get("title"));
+                    if (signing != nullptr && !*signing) {
+                        title.reset();
+                    } else if (name != nullptr && (title.has_value() || (signing != nullptr && *signing))) {
+                        title = *name;
+                    }
+                }
+            }
+            if (player::editBookFor(*session, packet->slot, pages, title)) {
                 menus_->sendInventoryAll();
             }
         }
@@ -1099,6 +1174,14 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         return;
     }
     if (packetId == play::kPunchId) {
+        if (options_.events != nullptr && playerSession_ != nullptr &&
+            !options_.events->allowed(&server::plugins::pluginEventTypes::playerAnimation,
+                                      [&](server::plugins::PluginEvent& event) {
+                                          plugins::EventSink::player(event, *playerSession_);
+                                          event.set("hand", std::string{"main_hand"});
+                                      })) {
+            return;
+        }
         blockInteraction_->handlePunch();
         return;
     }
@@ -1176,6 +1259,17 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         if (chunkStreamer_ != nullptr) {
             chunkStreamer_->setRequestedViewDistance(information->viewDistance);
+        }
+        if (session != nullptr && options_.events != nullptr) {
+            options_.events->notify(
+                &server::plugins::pluginEventTypes::playerClientOptions, [&](server::plugins::PluginEvent& event) {
+                    plugins::EventSink::player(event, *session);
+                    event.set("locale", information->locale);
+                    event.set("view_distance", static_cast<std::int64_t>(information->viewDistance));
+                    event.set("chat_colors", information->chatColors);
+                    event.set("main_hand", std::string{information->mainHand == 0 ? "left" : "right"});
+                    event.set("skin_parts", static_cast<std::int64_t>(information->skinParts));
+                });
         }
         if (session != nullptr) {
             session->chatVisibility.store(

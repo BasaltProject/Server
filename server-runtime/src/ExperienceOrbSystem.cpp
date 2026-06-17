@@ -290,6 +290,9 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
         if (repaired && player->connection().sendInventoryAll) {
             player->connection().sendInventoryAll();
         }
+        if (remaining > 0 && options_.gained) {
+            remaining = options_.gained(*player, remaining, orb.entityId());
+        }
         if (remaining > 0) {
             player->experience.givePoints(remaining);
         }

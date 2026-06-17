@@ -434,6 +434,15 @@ player::BreakContext BasaltServer::breakContext() {
     context.triggers = advancementTriggers_.get();
     context.nextDouble = [] { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); };
     context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
+    context.bedLeft = [this](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z) {
+        eventSink_.notify(&server::plugins::pluginEventTypes::playerBed, [&](server::plugins::PluginEvent& event) {
+            plugins::EventSink::player(event, who);
+            event.set("x", static_cast<std::int64_t>(x));
+            event.set("y", static_cast<std::int64_t>(y));
+            event.set("z", static_cast<std::int64_t>(z));
+            event.set("entering", false);
+        });
+    };
     context.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         if (orbs_ != nullptr) {
             orbs_->award(world, x, y, z, amount);

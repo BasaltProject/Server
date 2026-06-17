@@ -15,6 +15,7 @@ namespace {
 using server::plugins::PluginEvent;
 using server::plugins::pluginEventTypes::blockBreak;
 using server::plugins::pluginEventTypes::blockDamage;
+using server::plugins::pluginEventTypes::blockFertilize;
 using server::plugins::pluginEventTypes::blockPlace;
 using server::plugins::pluginEventTypes::entityDamage;
 using server::plugins::pluginEventTypes::entityHeal;
@@ -22,6 +23,8 @@ using server::plugins::pluginEventTypes::entityMount;
 using server::plugins::pluginEventTypes::entityResurrect;
 using server::plugins::pluginEventTypes::entityShoot;
 using server::plugins::pluginEventTypes::entityTame;
+using server::plugins::pluginEventTypes::hangingBreak;
+using server::plugins::pluginEventTypes::hangingPlace;
 using server::plugins::pluginEventTypes::inventoryChanged;
 using server::plugins::pluginEventTypes::inventoryClick;
 using server::plugins::pluginEventTypes::inventoryClose;
@@ -37,6 +40,7 @@ using server::plugins::pluginEventTypes::playerBed;
 using server::plugins::pluginEventTypes::playerBucket;
 using server::plugins::pluginEventTypes::playerDeath;
 using server::plugins::pluginEventTypes::playerEffect;
+using server::plugins::pluginEventTypes::playerFish;
 using server::plugins::pluginEventTypes::playerGamemodeChange;
 using server::plugins::pluginEventTypes::playerInteract;
 using server::plugins::pluginEventTypes::playerInteractEntity;
@@ -176,6 +180,47 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             EventSink::player(event, who);
             position(event, x, y, z);
             event.set("entering", true);
+        });
+    };
+    hooks.fishing = [&sink](const player::PlayerSession& who, std::string_view state, std::int32_t hookId,
+                            std::int32_t& exp) {
+        const server::plugins::PluginEvent* event = sink.ask(&playerFish, [&](PluginEvent& filled) {
+            EventSink::player(filled, who);
+            filled.set("state", std::string{state});
+            filled.set("hook_id", static_cast<std::int64_t>(hookId));
+            filled.set("caught_id", static_cast<std::int64_t>(-1));
+            filled.set("exp", static_cast<std::int64_t>(exp));
+        });
+        if (event == nullptr) {
+            return true;
+        }
+        if (const auto* paid = std::get_if<std::int64_t>(&event->get("exp")); paid != nullptr) {
+            exp = static_cast<std::int32_t>(std::max<std::int64_t>(0, *paid));
+        }
+        return !event->cancelled();
+    };
+    hooks.hangingAllowed = [&sink](const player::PlayerSession& who, std::string_view type, std::int32_t x,
+                                   std::int32_t y, std::int32_t z, std::string_view face) {
+        return sink.allowed(&hangingPlace, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            position(event, x, y, z);
+            event.set("entity_type", "minecraft:" + std::string{type});
+            event.set("face", std::string{face});
+        });
+    };
+    hooks.fertilizeAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
+                                     std::int32_t stateId) {
+        return sink.allowed(&blockFertilize, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            position(event, x, y, z);
+            event.set("block", blockNameOf(stateId));
+        });
+    };
+    hooks.bedLeft = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z) {
+        sink.notify(&playerBed, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            position(event, x, y, z);
+            event.set("entering", false);
         });
     };
     hooks.itemSpawnAllowed = [&sink](std::string_view worldName, double x, double y, double z, const std::string& item,
@@ -322,6 +367,26 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
             event.set("entity_id", static_cast<std::int64_t>(vehicle.entityId()));
             event.set("entity_type", vehicle.type().toString());
             event.set("mounting", true);
+        });
+    };
+    hooks.hangingBreakAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& hanging) {
+        return sink.allowed(&hangingBreak, [&](PluginEvent& event) {
+            event.set("entity_id", static_cast<std::int64_t>(hanging.entityId()));
+            event.set("entity_type", hanging.type().toString());
+            event.set("world", who.worldName);
+            event.set("x", hanging.x);
+            event.set("y", hanging.y);
+            event.set("z", hanging.z);
+            event.set("cause", std::string{"entity"});
+            event.set("remover_id", static_cast<std::int64_t>(who.entityId()));
+        });
+    };
+    hooks.dismountAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& vehicle) {
+        return sink.allowed(&entityMount, [&](PluginEvent& event) {
+            EventSink::player(event, who);
+            event.set("entity_id", static_cast<std::int64_t>(vehicle.entityId()));
+            event.set("entity_type", vehicle.type().toString());
+            event.set("mounting", false);
         });
     };
     hooks.tameAllowed = [&sink](const player::PlayerSession& who, const entity::ServerEntity& animal) {

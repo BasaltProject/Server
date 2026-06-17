@@ -168,7 +168,10 @@ bool FishingSystem::useRod(const player::BreakContext& context, PlayerSession& p
 
 void FishingSystem::cast(const player::BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                          std::int32_t slot) {
-    static_cast<void>(context);
+    std::int32_t unusedExp = 0;
+    if (context.fishing && !context.fishing(player, "fishing", -1, unusedExp)) {
+        return;
+    }
     const registry::EntityTypeEntry* entry = registry::entityTypes::of(Identifier::vanilla(std::string{kHookType}));
     const std::optional<storage::StoredItemStack> rod = player.inventory.at(slot);
     if (entry == nullptr) {
@@ -234,6 +237,16 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
         return 0;
     }
     std::int32_t wear = 0;
+    if (context.fishing) {
+        std::int32_t noExp = 0;
+        const bool caughtThing = state->hookedIn.has_value();
+        if (caughtThing || (state->nibble <= 0 && !hook.onGround)) {
+            static_cast<void>(
+                context.fishing(player, caughtThing ? "caught_entity" : "reel_in", hook.entityId(), noExp));
+        } else if (state->nibble <= 0) {
+            static_cast<void>(context.fishing(player, "in_ground", hook.entityId(), noExp));
+        }
+    }
     if (state->hookedIn.has_value()) {
         const double pullX = (player.x - hook.x) * 0.1;
         const double pullY = (player.y - hook.y) * 0.1;
@@ -291,6 +304,10 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
             // parity: `FishingHook.retrieve` rolls with the rod's luck plus the player's own.
             const float luck = static_cast<float>(state->luck) + player.luck();
             for (const server::world::loot::ItemStack& stack : table->generate(roll, luck, std::nullopt, lootContext)) {
+                std::int32_t experience = state->random.nextInt(6) + 1;
+                if (context.fishing && !context.fishing(player, "caught_fish", hook.entityId(), experience)) {
+                    continue;
+                }
                 const double xa = player.x - hook.x;
                 const double ya = player.y - hook.y;
                 const double za = player.z - hook.z;
@@ -308,7 +325,7 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
                 dropped.components = stack.components;
                 dropped.pickupDelay = 0;
                 static_cast<void>(world.state().spawnItem(std::move(dropped)));
-                orbs_->spawn(world, player.x, player.y + 0.5, player.z + 0.5, state->random.nextInt(6) + 1);
+                orbs_->spawn(world, player.x, player.y + 0.5, player.z + 0.5, experience);
                 if (context.triggers != nullptr) {
                     world::TriggerEvent caught{.entities = {{"entity", world::triggerFacts::ofEntity(world, hook)}},
                                                .items = {{"item", world::TriggerItem{.item = stack.item,

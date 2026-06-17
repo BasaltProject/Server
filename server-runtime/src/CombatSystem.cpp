@@ -356,6 +356,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
 
 void CombatSystem::hitBlock(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                             const ServerEntity& projectile, const entity::BlockHit& hit, bool byArrow) {
+    if (options_.projectileHit) {
+        options_.projectileHit(world, projectile, -1, hit.x, hit.y, hit.z);
+    }
     // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed, owning player included.
     emitVibration(world, "projectile_land", hit.x, hit.y, hit.z,
                   {.entity = projectile.uuid(), .projectileOwner = projectileOwnerOf(world, watchers, projectile)});

@@ -936,6 +936,9 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
                                                         0.0, kDefaultPickupDelay, shown->components);
         }
     } else {
+        if (hooks_.hangingBreakAllowed && !hooks_.hangingBreakAllowed(session, frame)) {
+            return;
+        }
         frame.removed = true;
         if (drops) {
             owner_->blockInteraction().spawnDroppedItem(frame.type(), 1, frame.x, frame.y, frame.z);
