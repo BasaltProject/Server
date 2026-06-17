@@ -14,11 +14,10 @@ import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionAttachment;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
-import org.basaltmc.bukkit.gen.PlayerBase;
 import org.basaltmc.bukkit.misc.BasaltPermissible;
 import org.basaltmc.bukkit.misc.OfflineSupport;
 
-public class BasaltPlayer extends PlayerBase {
+public class BasaltPlayer extends org.basaltmc.bukkit.player.PlayerLiving {
     private static final int kHealth = 0;
     private static final int kFood = 1;
     private static final int kLevel = 2;
@@ -110,21 +109,6 @@ public class BasaltPlayer extends PlayerBase {
     @Override
     public Component name() {
         return Component.text(name);
-    }
-
-    @Override
-    public String getDisplayName() {
-        return name;
-    }
-
-    @Override
-    public Component displayName() {
-        return Component.text(name);
-    }
-
-    @Override
-    public String getPlayerListName() {
-        return name;
     }
 
     @Override
@@ -433,11 +417,6 @@ public class BasaltPlayer extends PlayerBase {
     }
 
     @Override
-    public org.bukkit.entity.Player.Spigot spigot() {
-        return SpigotText.player(this::sendMessage, null);
-    }
-
-    @Override
     public InetSocketAddress getAddress() {
         String text = WorldNatives.playerAddress(uuid);
         if (text == null || text.isEmpty()) {
@@ -549,27 +528,6 @@ public class BasaltPlayer extends PlayerBase {
     }
 
     @Override
-    public boolean isSprinting() {
-        return extra(5) != 0.0;
-    }
-
-    @Override
-    public boolean isFlying() {
-        return extra(3) != 0.0;
-    }
-
-    @Override
-    public boolean getAllowFlight() {
-        return isFlying() || getGameMode() == GameMode.CREATIVE || getGameMode() == GameMode.SPECTATOR;
-    }
-
-    @Override
-    public void setAllowFlight(boolean flight) {}
-
-    @Override
-    public void setFlying(boolean value) {}
-
-    @Override
     public float getExp() {
         return (float) extra(7);
     }
@@ -603,14 +561,6 @@ public class BasaltPlayer extends PlayerBase {
     @Override
     public void updateInventory() {
         InventoryNatives.windowResync(uuid);
-    }
-
-    @Override
-    public void setViewDistance(int distance) {}
-
-    @Override
-    public String getLocale() {
-        return "en_us";
     }
 
     @Override
@@ -660,42 +610,6 @@ public class BasaltPlayer extends PlayerBase {
     public java.util.List<org.bukkit.entity.Entity> getNearbyEntities(double x, double y, double z) {
         return new java.util.ArrayList<>(getWorld().getNearbyEntities(getLocation(), x, y, z,
             entity -> !entity.equals(this)));
-    }
-
-    @Override
-    public void sendBlockChange(Location location, org.bukkit.block.data.BlockData data) {
-        WorldNatives.playerShowBlock(uuid, location.getBlockX(), location.getBlockY(), location.getBlockZ(),
-            BasaltBlockData.stateOf(data));
-    }
-
-    @Override
-    public void sendBlockChange(Location location, org.bukkit.Material material, byte data) {
-        sendBlockChange(location, material.createBlockData());
-    }
-
-    @Override
-    public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        WorldNatives.playerTitle(uuid, Text.mini(title == null ? "" : title), Text.mini(subtitle == null ? "" : subtitle),
-            fadeIn, stay, fadeOut);
-    }
-
-    @Override
-    public void sendTitle(String title, String subtitle) {
-        sendTitle(title, subtitle, 10, 70, 20);
-    }
-
-    @Override
-    public void showTitle(net.kyori.adventure.title.Title title) {
-        java.time.Duration in = title.times() == null ? java.time.Duration.ofMillis(500) : title.times().fadeIn();
-        java.time.Duration stay = title.times() == null ? java.time.Duration.ofMillis(3500) : title.times().stay();
-        java.time.Duration out = title.times() == null ? java.time.Duration.ofSeconds(1) : title.times().fadeOut();
-        WorldNatives.playerTitle(uuid, Text.mini(title.title()), Text.mini(title.subtitle()),
-            (int) (in.toMillis() / 50), (int) (stay.toMillis() / 50), (int) (out.toMillis() / 50));
-    }
-
-    @Override
-    public void playSound(Location location, String sound, float volume, float pitch) {
-        WorldNatives.playerSound(uuid, sound, volume, pitch);
     }
 
     @Override
