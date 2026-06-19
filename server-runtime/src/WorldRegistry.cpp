@@ -123,7 +123,9 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
 std::map<std::string, world::LoadedWorld*> WorldRegistry::worlds() const {
     std::map<std::string, world::LoadedWorld*> all;
     for (const std::unique_ptr<world::LoadedWorld>& world : owned_) {
-        all.insert_or_assign(world->name(), world.get());
+        if (!unloaded_.contains(world->name())) {
+            all.insert_or_assign(world->name(), world.get());
+        }
     }
     return all;
 }
@@ -145,9 +147,17 @@ world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::
         return nullptr;
     }
     for (const std::unique_ptr<world::LoadedWorld>& world : owned_) {
-        if (world->name() == name) {
+        if (world->name() != name) {
+            continue;
+        }
+        if (!unloaded_.erase(name)) {
             return nullptr;
         }
+        logger_.info([&name] { return "Brought back world '" + name + "'."; });
+        if (hooks_.worldLoaded) {
+            scheduler_.global().schedule(0, [this, name] { hooks_.worldLoaded(name); });
+        }
+        return world.get();
     }
     const config::WorldDeclaration declaration{
         .name = name, .dimension = dimension, .type = type, .seed = seed, .isDefault = false};
@@ -168,6 +178,31 @@ world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::
         scheduler_.global().schedule(0, [this, name] { hooks_.worldLoaded(name); });
     }
     return made;
+}
+
+bool WorldRegistry::unloadWorld(const std::string& name, const bool save) {
+    if (name == defaultName_ || unloaded_.contains(name)) {
+        return false;
+    }
+    for (const std::unique_ptr<world::LoadedWorld>& world : owned_) {
+        if (world->name() != name) {
+            continue;
+        }
+        for (const player::PlayerSession* player : players_->snapshot()) {
+            if (player->worldName == name) {
+                return false;
+            }
+        }
+        if (save) {
+            world->saveDirty();
+            world->flushRegions();
+            world->saveMetadata();
+        }
+        unloaded_.insert(name);
+        logger_.info([&name] { return "Unloaded world '" + name + "'."; });
+        return true;
+    }
+    return false;
 }
 
 void WorldRegistry::onConfigsReloaded() {

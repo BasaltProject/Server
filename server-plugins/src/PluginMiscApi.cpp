@@ -673,5 +673,6 @@ void installMisc(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     installBossBars(lua, plugin, host);
     installAccess(lua, host);
     installServerTables(lua, host);
+    installSettings(lua, host);
 }
 } // namespace basalt::server::plugins::pluginApi

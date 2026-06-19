@@ -1616,6 +1616,10 @@ std::shared_ptr<PluginWorldRef> LoadedWorlds::create(std::string_view name, std:
     return made == nullptr ? nullptr : std::make_shared<LoadedWorldRef>(*made, hooks_, players_);
 }
 
+bool LoadedWorlds::unload(std::string_view name, bool save) {
+    return hooks_->unloadWorld && hooks_->unloadWorld(std::string{name}, save);
+}
+
 std::int32_t LoadedWorlds::stateId(std::string_view text) const {
     return LoadedWorldRef::parseState(text).value_or(-1);
 }

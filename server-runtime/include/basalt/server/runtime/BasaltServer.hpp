@@ -292,6 +292,7 @@ private:
     std::unique_ptr<plugins::SessionPackets> pluginPackets_;
     std::unique_ptr<plugins::SessionChannels> pluginChannels_;
     plugins::MiscServices miscServices_;
+    plugins::ServerSettings settings_;
     std::unique_ptr<plugins::ServerPluginServices> pluginServices_;
     std::unique_ptr<server::plugins::PluginHost> plugins_;
     std::shared_ptr<void> bukkit_;

@@ -1003,6 +1003,13 @@ public:
                                                    std::string_view type, std::optional<std::int64_t> seed) = 0;
 
     /// A block state as `minecraft:oak_stairs[facing=east]` to its id, or -1.
+    /// Takes a world that holds no player out of play, saving it first when asked; false for the default world.
+    virtual bool unload(std::string_view name, bool save) {
+        static_cast<void>(name);
+        static_cast<void>(save);
+        return false;
+    }
+
     [[nodiscard]] virtual std::int32_t stateId(std::string_view text) const {
         static_cast<void>(text);
         return -1;

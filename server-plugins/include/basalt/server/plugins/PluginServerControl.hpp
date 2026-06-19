@@ -73,6 +73,21 @@ public:
     virtual void setLinks(std::vector<PluginServerLink> links) { static_cast<void>(links); }
 
     [[nodiscard]] virtual std::optional<PluginResourcePack> resourcePack() { return std::nullopt; }
+
+    [[nodiscard]] virtual std::vector<std::string> settingKeys() { return {}; }
+
+    /// One setting of the server as text: its message of the day, player cap, ports, default game mode.
+    [[nodiscard]] virtual std::optional<std::string> setting(std::string_view key) {
+        static_cast<void>(key);
+        return std::nullopt;
+    }
+
+    /// False when the key does not exist, cannot be changed while the server runs, or the value does not fit.
+    virtual bool setSetting(std::string_view key, std::string_view value) {
+        static_cast<void>(key);
+        static_cast<void>(value);
+        return false;
+    }
 };
 
 inline PluginServerControl& PluginServerControl::unavailable() {

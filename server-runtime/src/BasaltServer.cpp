@@ -487,6 +487,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                              std::optional<std::int64_t> seed) {
         return worldRegistry_->createWorld(name, dimension, type, seed);
     };
+    model.unloadWorld = [this](const std::string& name, bool save) { return worldRegistry_->unloadWorld(name, save); };
     model.environment = [this]() -> const command::CommandEnvironment& { return *wired_.environment; };
     model.tags = [this](std::string_view registry) {
         const world::realBlockTags::TagMembers* source = registry == "blocks"         ? &vanillaData_.blockTags
@@ -581,6 +582,12 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         .environment = model.environment,
         .console = [this]() -> const command::CommandSource* { return consoleSource_.get(); },
         .sessions = sessions});
+    settings_.use(plugins::ServerSettings::Hooks{
+        .config = [this]() -> const config::BasaltConfig& { return *config_; },
+        .serverList = [this]() -> const config::ServerListConfig& { return live_->current()->serverList; },
+        .worlds = model.allWorlds,
+        .idleTimeout = [this] { return idleTimeoutMinutes_; },
+        .setIdleTimeout = [this](std::int32_t minutes) { idleTimeoutMinutes_ = minutes; }});
     miscServices_.control = std::make_unique<plugins::ServerControl>(plugins::ServerControl::Hooks{
         .tickLoop = [this] { return tickLoop_.get(); },
         .bugReportLink = config.bugReportLink,
@@ -595,7 +602,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 .hash = config_->resourcePackSha1,
                 .required = config_->requireResourcePack,
                 .prompt = config_->resourcePackPrompt};
-        }});
+        },
+        .settings = &settings_});
 
     plugins::ServerPluginServices::Parts parts;
     parts.players = pluginPlayers_.get();
@@ -1240,22 +1248,30 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                             std::int32_t max) {
         return sched::onOwner<ServerListStatus::Hooks::Answer>(worldRegistry_->defaultWorld().owner(), [&, this] {
             ServerListStatus::Hooks::Answer answer;
+            const std::string shownMotd = settings_.motdOverride().value_or(motd);
+            const std::int32_t shownMax = settings_.maxPlayersOverride().value_or(max);
+            if (shownMotd != motd) {
+                answer.motd = shownMotd;
+            }
+            if (shownMax != max) {
+                answer.maxPlayers = shownMax;
+            }
             const server::plugins::PluginEvent* event = eventSink_.ask(
                 &server::plugins::pluginEventTypes::serverPing, [&](server::plugins::PluginEvent& filled) {
                     filled.set("address", address.value_or(std::string{}));
-                    filled.set("motd", motd);
+                    filled.set("motd", shownMotd);
                     filled.set("online", static_cast<std::int64_t>(online));
-                    filled.set("max_players", static_cast<std::int64_t>(max));
+                    filled.set("max_players", static_cast<std::int64_t>(shownMax));
                 });
             if (event == nullptr) {
                 return answer;
             }
             if (const auto* edited = std::get_if<std::string>(&event->get("motd"));
-                edited != nullptr && *edited != motd) {
+                edited != nullptr && *edited != shownMotd) {
                 answer.motd = *edited;
             }
             if (const auto* edited = std::get_if<std::int64_t>(&event->get("max_players"));
-                edited != nullptr && *edited != max) {
+                edited != nullptr && *edited != shownMax) {
                 answer.maxPlayers = static_cast<std::int32_t>(*edited);
             }
             return answer;
