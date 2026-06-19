@@ -154,6 +154,12 @@ final class EventBridge {
         InventoryEvents.register();
         PlayerEvents.install();
         BlockEvents.install();
+        HookBlockEvents.install();
+        HookEntityEvents.install();
+        HookPlayerEvents.install();
+        HookWorldEvents.install();
+        HookVehicleEvents.install();
+        HookInventoryEvents.install();
         WorldEvents.install();
         ServerEvents.install();
         map("player.join", PlayerJoinEvent.class, f -> new PlayerJoinEvent(f.player(),
@@ -251,7 +257,8 @@ final class EventBridge {
         map("player.interact_entity", org.bukkit.event.player.PlayerInteractEntityEvent.class, f -> {
             org.bukkit.entity.Entity target = f.entity();
             return target == null || f.text("action").equals("attack") ? null
-                : new org.bukkit.event.player.PlayerInteractEntityEvent(f.player(), target);
+                : new org.bukkit.event.player.PlayerInteractEntityEvent(f.player(), target,
+                    PlayerEvents.hand(f.text("hand")));
         });
         map("world.chunk_load", org.bukkit.event.world.ChunkLoadEvent.class,
             f -> new org.bukkit.event.world.ChunkLoadEvent(
