@@ -344,6 +344,8 @@ public:
     [[nodiscard]] virtual std::shared_ptr<PluginPlayerRef> byUuid(std::string_view uuid) const = 0;
 };
 
+class PluginWorldEnv;
+
 class PluginWorldRef {
 public:
     PluginWorldRef() = default;
@@ -977,6 +979,9 @@ public:
 
     /// The world folder name on disk, under `worlds/`.
     [[nodiscard]] virtual std::string folder() const { return {}; }
+
+    /// The physical-world operations (effects, border, drops, signals); null where the world offers none.
+    [[nodiscard]] virtual PluginWorldEnv* env() { return nullptr; }
 };
 
 class PluginWorlds {
@@ -1040,6 +1045,28 @@ public:
     [[nodiscard]] virtual std::vector<double> blockInfo(std::int32_t stateId) const {
         static_cast<void>(stateId);
         return {};
+    }
+
+    /// The sound type of one state: volume, pitch, then the break, step, place, hit and fall sound ids.
+    [[nodiscard]] virtual std::vector<std::string> blockSounds(std::int32_t stateId) const {
+        static_cast<void>(stateId);
+        return {};
+    }
+
+    /// Whether a tool (an item id, empty for a hand) is right for the drops of a state, then its mining speed.
+    [[nodiscard]] virtual std::vector<double> toolFacts(std::string_view item, std::int32_t stateId) const {
+        static_cast<void>(item);
+        static_cast<void>(stateId);
+        return {};
+    }
+
+    /// The state turned `rotation` quarter turns clockwise (0 to 3) after a mirror (0 none, 1 left-right, 2
+    /// front-back).
+    [[nodiscard]] virtual std::int32_t transformState(std::int32_t stateId, std::int32_t rotation,
+                                                      std::int32_t mirror) const {
+        static_cast<void>(rotation);
+        static_cast<void>(mirror);
+        return stateId;
     }
 
     /// Which blocks own a block entity, as pairs: the block id, then the id of its block entity type.

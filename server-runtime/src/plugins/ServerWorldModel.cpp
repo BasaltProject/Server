@@ -8,6 +8,7 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/MapColors.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaTables.hpp>
@@ -25,17 +26,19 @@
 #include <basalt/server/runtime/plugins/EntityOps.hpp>
 #include <basalt/server/runtime/plugins/PlayerEntityOps.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
+#include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
-#include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
+#include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/light/Light.hpp>
+#include <basalt/server/world/structure/StructureTemplate.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
@@ -300,7 +303,10 @@ class LoadedWorldRef final : public PluginWorldRef {
 public:
     LoadedWorldRef(world::LoadedWorld& world, std::shared_ptr<const ModelHooks> hooks,
                    std::function<std::vector<player::PlayerSession*>()> players)
-        : world_(&world), shared_(std::move(hooks)), hooks_(*shared_), players_(std::move(players)) {}
+        : world_(&world), shared_(std::move(hooks)), hooks_(*shared_), players_(std::move(players)),
+          env_(world, shared_, players_) {}
+
+    [[nodiscard]] server::plugins::PluginWorldEnv* env() override { return &env_; }
 
     [[nodiscard]] std::string name() const override { return world_->name(); }
 
@@ -1569,6 +1575,7 @@ private:
     std::shared_ptr<const ModelHooks> shared_;
     const ModelHooks& hooks_;
     std::function<std::vector<player::PlayerSession*>()> players_;
+    ServerWorldEnv env_;
 };
 
 } // namespace
@@ -1702,6 +1709,45 @@ std::vector<double> LoadedWorlds::blockInfo(std::int32_t stateId) const {
             static_cast<double>(color & 0xFFFFFFU),
             static_cast<double>(reg::fireOdds::igniteOdds(stateId)),
             static_cast<double>(reg::fireOdds::burnOdds(stateId))};
+}
+
+std::vector<std::string> LoadedWorlds::blockSounds(std::int32_t stateId) const {
+    if (reg::blockStateDefinitions::blockOf(stateId) == nullptr) {
+        return {};
+    }
+    const reg::BlockSoundTypeEntry& type = reg::blockSounds::of(stateId);
+    return {std::to_string(type.volume),
+            std::to_string(type.pitch),
+            "minecraft:" + std::string{type.breakSound},
+            "minecraft:" + std::string{type.stepSound},
+            "minecraft:" + std::string{type.placeSound},
+            "minecraft:" + std::string{type.hitSound},
+            "minecraft:" + std::string{type.fallSound}};
+}
+
+std::int32_t LoadedWorlds::transformState(std::int32_t stateId, std::int32_t rotation, std::int32_t mirror) const {
+    if (reg::blockStateDefinitions::blockOf(stateId) == nullptr) {
+        return stateId;
+    }
+    return server::world::structure::StructureTemplate::transformedStateId(
+        stateId, reg::blockStateDefinitions::propertiesOf(stateId),
+        static_cast<server::world::structure::StructureMirror>(std::clamp(mirror, 0, 2)),
+        static_cast<server::world::structure::StructureRotation>(std::clamp(rotation, 0, 3)));
+}
+
+std::vector<double> LoadedWorlds::toolFacts(std::string_view item, std::int32_t stateId) const {
+    const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return {};
+    }
+    const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(std::string{item});
+    const Identifier* tool = item.empty() || !parsed.has_value() ? nullptr : &*parsed;
+    const world::realBlockTags::TagMembers* tags = hooks_->blockTags;
+    const reg::TagContains contains = [tags](std::string_view tag, const Identifier& member) {
+        return tags != nullptr && world::realBlockTags::contains(*tags, tag, member);
+    };
+    return {reg::itemTools::isCorrectForDrops(tool, *block, contains) ? 1.0 : 0.0,
+            static_cast<double>(reg::itemTools::miningSpeed(tool, *block, contains))};
 }
 
 std::vector<std::int32_t> LoadedWorlds::collisionBoxes(std::int32_t stateId) const {

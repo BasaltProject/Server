@@ -64,6 +64,8 @@ void pushNpc(wire::lua::LuaArgs& lua, std::shared_ptr<PluginNpcRef> npc);
 
 void pushHologram(wire::lua::LuaArgs& lua, std::shared_ptr<PluginHologramRef> hologram);
 
+void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldRef>& world);
+
 void addBulkWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldRef>& world,
                          const std::shared_ptr<WorldHooks>& hooks);
 

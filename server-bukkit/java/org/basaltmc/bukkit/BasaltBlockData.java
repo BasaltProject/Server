@@ -25,6 +25,10 @@ public final class BasaltBlockData implements InvocationHandler {
 
     private int state;
 
+    void setState(int value) {
+        state = value;
+    }
+
     private BasaltBlockData(int state) {
         this.state = state;
     }
@@ -91,7 +95,7 @@ public final class BasaltBlockData implements InvocationHandler {
         return Registries.propertiesOf(block());
     }
 
-    private String get(String name) {
+    String get(String name) {
         Registries.Properties properties = properties();
         int index = properties.indexOf(name);
         if (index < 0) {
@@ -102,7 +106,7 @@ public final class BasaltBlockData implements InvocationHandler {
         return values[(offset / properties.strides()[index]) % values.length];
     }
 
-    private void set(String name, String value) {
+    void set(String name, String value) {
         Registries.Properties properties = properties();
         int index = properties.indexOf(name);
         if (index < 0) {
@@ -143,6 +147,10 @@ public final class BasaltBlockData implements InvocationHandler {
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         String name = method.getName();
         int count = args == null ? 0 : args.length;
+        Object special = BlockDataSpecials.call(this, state, method, name, args);
+        if (special != BlockDataSpecials.kNone) {
+            return special;
+        }
         switch (name) {
             case "equals": {
                 BasaltBlockData other = args[0] instanceof BlockData data ? handler(data) : null;
@@ -183,23 +191,10 @@ public final class BasaltBlockData implements InvocationHandler {
                 double[] facts = WorldNatives.blockHardness(Registries.blockName(block()));
                 return facts != null && facts[2] != 0.0;
             }
-            case "isPreferredTool":
-                return false;
-            case "getDestroySpeed": {
-                double[] facts = WorldNatives.blockHardness(Registries.blockName(block()));
-                return facts == null ? 0.0f : (float) facts[0];
-            }
-            case "getPistonMoveReaction":
-                return PistonMoveReaction.MOVE;
-            case "isSupported":
-                return true;
             case "isFaceSturdy":
                 return (WorldNatives.stateFlags(state) & 4) != 0;
             case "createBlockState":
                 return new BasaltBlockState(null, 0, 0, 0, of(state));
-            case "rotate":
-            case "mirror":
-                throw Unsupported.hit("BlockData#" + name);
             case "getFaces":
                 return faces(true);
             case "getAllowedFaces":
@@ -247,6 +242,8 @@ public final class BasaltBlockData implements InvocationHandler {
         String property = null;
         if (name.startsWith("get") && count == 0) {
             property = snake(name.substring(3));
+        } else if (name.startsWith("has") && count == 0) {
+            property = snake(name.substring(3));
         } else if (name.startsWith("is") && count == 0) {
             property = snake(name.substring(2));
         } else if (name.startsWith("set") && count == 1) {
@@ -258,6 +255,9 @@ public final class BasaltBlockData implements InvocationHandler {
                 return null;
             }
             String value = get(property);
+            if (value == null && count == 0) {
+                value = get("has_" + property);
+            }
             if (value == null) {
                 if (method.isDefault()) {
                     return InvocationHandler.invokeDefault(proxy, method, args);
@@ -272,7 +272,7 @@ public final class BasaltBlockData implements InvocationHandler {
         throw Unsupported.hit("BlockData#" + name);
     }
 
-    private String[] valuesOf(String property) {
+    String[] valuesOf(String property) {
         Registries.Properties properties = properties();
         int index = properties.indexOf(property);
         return index < 0 ? new String[0] : properties.values()[index];

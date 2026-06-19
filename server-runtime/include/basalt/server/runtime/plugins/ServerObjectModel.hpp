@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/plugins/ServerNpcs.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
@@ -41,8 +42,7 @@ class PlaceholderRegistry;
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
-class PlayerProgress;
-class RealRecipes;
+class RealLootTables;
 } // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
@@ -66,6 +66,9 @@ struct ModelHooks {
     std::function<std::vector<std::string>(std::string_view registry)> tags;
     std::function<BlockChangeBroadcaster*()> blocks;
     NpcRegistry* npcs = nullptr;
+    world::RealLootTables* lootTables = nullptr;
+    const world::realBlockTags::TagMembers* blockTags = nullptr;
+    const world::realBlockTags::TagMembers* itemTags = nullptr;
     std::function<std::int32_t()> nextEntityId;
     std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                        double z, std::string_view cause)>
@@ -83,9 +86,6 @@ struct ModelHooks {
     std::function<void(world::LoadedWorld& world, double x, double y, double z, float power, bool breakBlocks,
                        std::int32_t sourceEntityId)>
         explode;
-    std::function<world::PlayerProgress*()> progress;
-    std::function<world::RealRecipes*()> recipes;
-    std::function<storage::PlayerStore*()> store;
 };
 
 [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef>
@@ -131,6 +131,10 @@ public:
     [[nodiscard]] std::vector<double> blockHardness(std::string_view block) const override;
     [[nodiscard]] std::vector<double> blockInfo(std::int32_t stateId) const override;
     [[nodiscard]] std::vector<std::int32_t> collisionBoxes(std::int32_t stateId) const override;
+    [[nodiscard]] std::vector<std::string> blockSounds(std::int32_t stateId) const override;
+    [[nodiscard]] std::int32_t transformState(std::int32_t stateId, std::int32_t rotation,
+                                              std::int32_t mirror) const override;
+    [[nodiscard]] std::vector<double> toolFacts(std::string_view item, std::int32_t stateId) const override;
     [[nodiscard]] std::vector<std::string> blockEntityTypes() const override;
     [[nodiscard]] std::int32_t dataVersion() const override;
     [[nodiscard]] std::optional<std::vector<std::uint8_t>>

@@ -166,12 +166,12 @@ public final class BasaltBlock extends BlockBase {
 
     @Override
     public byte getLightFromSky() {
-        return 0;
+        return (byte) Math.max(0, WorldNatives.lightAt(world.getName(), x, y, z, 1));
     }
 
     @Override
     public byte getLightFromBlocks() {
-        return (byte) ((flags() >> 9) & 15);
+        return (byte) Math.max(0, WorldNatives.lightAt(world.getName(), x, y, z, 0));
     }
 
     @Override
@@ -234,29 +234,99 @@ public final class BasaltBlock extends BlockBase {
         return (flags() & 2) != 0;
     }
 
+    private static final BlockFace[] kSides = {BlockFace.DOWN, BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH,
+        BlockFace.WEST, BlockFace.EAST};
+
+    private int signalTowards(BlockFace face, boolean direct) {
+        int side = java.util.Arrays.asList(kSides).indexOf(face);
+        Blocks.flushAll();
+        return side < 0 ? 0 : WorldEnvNatives.signal(world.getName(), x + face.getModX(), y + face.getModY(),
+            z + face.getModZ(), side, direct);
+    }
+
     @Override
     public boolean isBlockPowered() {
+        for (BlockFace face : kSides) {
+            if (signalTowards(face, true) > 0) {
+                return true;
+            }
+        }
         return false;
     }
 
     @Override
     public boolean isBlockIndirectlyPowered() {
-        return false;
+        return getBlockPower(BlockFace.SELF) > 0;
+    }
+
+    @Override
+    public boolean isBlockFacePowered(BlockFace face) {
+        return signalTowards(face, true) > 0;
+    }
+
+    @Override
+    public boolean isBlockFaceIndirectlyPowered(BlockFace face) {
+        return signalTowards(face, false) > 0;
+    }
+
+    @Override
+    public int getBlockPower(BlockFace face) {
+        if (face == BlockFace.SELF) {
+            int power = 0;
+            for (BlockFace side : kSides) {
+                power = Math.max(power, signalTowards(side, false));
+            }
+            return power;
+        }
+        return signalTowards(face, false);
     }
 
     @Override
     public PistonMoveReaction getPistonMoveReaction() {
-        return PistonMoveReaction.MOVE;
+        return BlockDataSpecials.reaction(state());
     }
 
     @Override
     public double getTemperature() {
-        return 0.8;
+        return WorldEnvNatives.temperature(world.getName(), x, y, z);
     }
 
     @Override
     public double getHumidity() {
-        return 0.4;
+        throw Unsupported.hit("Block#getHumidity");
+    }
+
+    @Override
+    public com.destroystokyo.paper.block.BlockSoundGroup getSoundGroup() {
+        return BlockDataSpecials.soundsOf(state());
+    }
+
+    @Override
+    public float getBreakSpeed(org.bukkit.entity.Player player) {
+        return (float) WorldEnvNatives.breakSpeed(world.getName(), player.getUniqueId().toString(), x, y, z);
+    }
+
+    @Override
+    public boolean applyBoneMeal(BlockFace face) {
+        Blocks.flushAll();
+        return WorldEnvNatives.boneMeal(world.getName(), x, y, z);
+    }
+
+    @Override
+    public void tick() {
+        Blocks.flushAll();
+        WorldNatives.scheduleTick(world.getName(), x, y, z, 0, false);
+    }
+
+    @Override
+    public void fluidTick() {
+        Blocks.flushAll();
+        WorldNatives.scheduleTick(world.getName(), x, y, z, 0, true);
+    }
+
+    @Override
+    public void randomTick() {
+        throw Unsupported.hit("Block#randomTick");
     }
 
     @Override
@@ -284,38 +354,96 @@ public final class BasaltBlock extends BlockBase {
         if (isEmpty()) {
             return false;
         }
-        world.putState(x, y, z, Registries.defaultStateOf(Material.AIR));
-        return true;
+        Blocks.flushAll();
+        int before = state();
+        String[] enchants = enchantmentIds(tool);
+        boolean broken = WorldEnvNatives.breakBlock(world.getName(), x, y, z, toolId(tool), enchants,
+            enchantmentLevels(tool, enchants), tool == null || BlockDataSpecials.preferredTool(before, tool));
+        if (broken && (triggerEffect || forceEffect)) {
+            WorldEnvNatives.levelEvent(world.getName(), 2001, x, y, z, before, false);
+        }
+        return broken;
+    }
+
+    private static String toolId(ItemStack tool) {
+        return tool == null || tool.getType().isAir() ? "" : tool.getType().getKey().toString();
+    }
+
+    private static String[] enchantmentIds(ItemStack tool) {
+        if (tool == null) {
+            return new String[0];
+        }
+        return tool.getEnchantments().keySet().stream().map(enchantment -> enchantment.getKey().toString())
+            .toArray(String[]::new);
+    }
+
+    private static int[] enchantmentLevels(ItemStack tool, String[] ids) {
+        int[] levels = new int[ids.length];
+        for (int i = 0; i < ids.length; i++) {
+            levels[i] = tool.getEnchantmentLevel(
+                org.bukkit.Registry.ENCHANTMENT.get(org.bukkit.NamespacedKey.fromString(ids[i])));
+        }
+        return levels;
+    }
+
+    private List<ItemStack> drops(ItemStack tool, boolean byEntity) {
+        Blocks.flushAll();
+        if (tool != null && !BlockDataSpecials.preferredTool(state(), tool)) {
+            return List.of();
+        }
+        String[] enchants = enchantmentIds(tool);
+        String[] flat = WorldEnvNatives.blockDrops(world.getName(), x, y, z, toolId(tool), enchants,
+            enchantmentLevels(tool, enchants), byEntity);
+        List<ItemStack> out = new java.util.ArrayList<>();
+        for (int i = 0; flat != null && i + 2 < flat.length; i += 3) {
+            Material material = Material.matchMaterial(flat[i]);
+            if (material == null || material.isAir()) {
+                continue;
+            }
+            java.util.Map<String, Object> components = org.basaltmc.bukkit.item.Nbt.compound();
+            if (!flat[i + 2].isEmpty()) {
+                byte[] wrapped = InventoryNatives.parseSnbt(flat[i + 2]);
+                java.util.Map<String, Object> root = wrapped == null ? null : org.basaltmc.bukkit.item.Nbt.read(wrapped);
+                java.util.Map<String, Object> value = root == null ? null
+                    : org.basaltmc.bukkit.item.Nbt.map(root.get("value"));
+                if (value != null) {
+                    components = value;
+                }
+            }
+            out.add(new BasaltItemStack(material, Integer.parseInt(flat[i + 1]), components));
+        }
+        return out;
     }
 
     @Override
     public Collection<ItemStack> getDrops() {
-        return List.of();
+        return drops(null, false);
     }
 
     @Override
     public Collection<ItemStack> getDrops(ItemStack tool) {
-        return List.of();
+        return drops(tool, false);
     }
 
     @Override
     public Collection<ItemStack> getDrops(ItemStack tool, Entity entity) {
-        return List.of();
+        return drops(tool, entity != null);
     }
 
     @Override
     public boolean isPreferredTool(ItemStack tool) {
-        return false;
+        return BlockDataSpecials.preferredTool(state(), tool);
     }
 
     @Override
     public boolean isValidTool(ItemStack tool) {
-        return true;
+        return BlockDataSpecials.preferredTool(state(), tool);
     }
 
     @Override
     public boolean canPlace(BlockData data) {
-        return true;
+        Blocks.flushAll();
+        return WorldEnvNatives.survives(world.getName(), x, y, z, BasaltBlockData.stateOf(data));
     }
 
     @Override

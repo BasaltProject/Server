@@ -10,6 +10,8 @@ public final class WorldNatives {
     public static native String[] blockProperties(String block);
     public static native double[] blockHardness(String block);
     public static native double[] blockInfo(int state);
+
+    public static native String[] blockSounds(int state);
     public static native String[] biomeIds();
     public static native String[] itemIds();
     public static native String[] registryIds(String registry);

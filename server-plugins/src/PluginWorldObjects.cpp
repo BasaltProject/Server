@@ -470,6 +470,7 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
         return 1;
     });
     addBulkWorldMethods(object, world, shared);
+    addEnvWorldMethods(object, world);
     std::move(object).push(lua);
 }
 } // namespace basalt::server::plugins

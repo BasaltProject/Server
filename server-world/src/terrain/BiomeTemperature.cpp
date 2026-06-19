@@ -60,6 +60,10 @@ const Noises& noises() {
 
 } // namespace
 
+float temperatureOf(std::string_view biomeId, std::int32_t x, std::int32_t y, std::int32_t z) {
+    return temperatureAt(biomeId, x, y, z);
+}
+
 bool coldEnoughToSnow(std::string_view biomeId, std::int32_t x, std::int32_t y, std::int32_t z) {
     return temperatureAt(biomeId, x, y, z) < 0.15F;
 }
