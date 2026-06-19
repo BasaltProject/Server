@@ -586,6 +586,10 @@ jint JNICALL nativeGameEventFrequency(JNIEnv* env, jclass, jstring event) {
     return BukkitBridge::current().services().worlds().gameEventFrequency(toStd(env, event));
 }
 
+void JNICALL nativeCommandReply(JNIEnv* env, jclass, jstring message) {
+    BukkitBridge::replyToCommand(toStd(env, message));
+}
+
 jint JNICALL nativeTransformState(JNIEnv*, jclass, jint state, jint rotation, jint mirror) {
     return BukkitBridge::current().services().worlds().transformState(state, rotation, mirror);
 }
@@ -653,6 +657,7 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
         method("inhabitedTime", "(Ljava/lang/String;IIJ)J", reinterpret_cast<void*>(&nativeInhabitedTime)),
         method("gameRuleSpecs", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeGameRuleSpecs)),
         method("gameEventFrequency", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeGameEventFrequency)),
+        method("commandReply", "(Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeCommandReply)),
         method("transformState", "(III)I", reinterpret_cast<void*>(&nativeTransformState)),
         method("toolFacts", "(Ljava/lang/String;I)[D", reinterpret_cast<void*>(&nativeToolFacts)),
     };

@@ -15,6 +15,7 @@
 #include <basalt/server/plugins/PluginServerControl.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -57,6 +58,17 @@ public:
     [[nodiscard]] virtual std::string source() const = 0;
 
     [[nodiscard]] virtual bool isConsole() const = 0;
+
+    /// What ran the command: `console`, `player`, `command_block`, `proxied` (an entity run as) or `other`.
+    [[nodiscard]] virtual std::string kind() const { return isConsole() ? "console" : "player"; }
+
+    /// The world and position the command runs at, which a command block's is the block.
+    [[nodiscard]] virtual std::string world() const { return {}; }
+
+    [[nodiscard]] virtual std::array<double, 3> position() const { return {0.0, 0.0, 0.0}; }
+
+    /// For a `proxied` call, the sender that asked: its kind, a colon and its name.
+    [[nodiscard]] virtual std::string caller() const { return {}; }
 
     virtual void reply(std::string_view message) = 0;
 
@@ -266,6 +278,7 @@ public:
         static PluginInventories kNone;
         return kNone;
     }
+
     [[nodiscard]] virtual PluginAccess& access() { return PluginAccess::unavailable(); }
 
     [[nodiscard]] virtual PluginScoreboards& scoreboards() { return PluginScoreboards::unavailable(); }

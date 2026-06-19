@@ -186,8 +186,9 @@ public final class BukkitRuntime {
         }
     }
 
-    public static boolean command(String label, String senderName, boolean console, String args) {
-        CommandSender sender = console ? server.consoleImpl() : server.playerByName(senderName);
+    public static boolean command(String label, String senderName, String kind, String world, double x, double y,
+        double z, String caller, String args) {
+        CommandSender sender = Senders.of(server, kind, senderName, world, x, y, z, caller);
         if (sender == null) {
             return false;
         }
