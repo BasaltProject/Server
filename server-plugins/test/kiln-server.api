@@ -241,6 +241,7 @@ worlds.default function
 worlds.entity_types function
 worlds.fix_name function
 worlds.fix_nbt function
+worlds.game_rules function
 worlds.items function
 worlds.registry function
 worlds.state_flags function
