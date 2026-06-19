@@ -201,6 +201,18 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                     }
                     return 0;
                 })
+        .method("block_event",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    if (PluginWorldEnv* env = world->env(); env != nullptr) {
+                        env->blockEvent(static_cast<std::int32_t>(args.checkInteger(base)),
+                                        static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                        static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                        static_cast<std::int32_t>(args.checkInteger(base + 3)),
+                                        static_cast<std::int32_t>(args.integerOr(base + 4, 0)));
+                    }
+                    return 0;
+                })
         .method("drops",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);

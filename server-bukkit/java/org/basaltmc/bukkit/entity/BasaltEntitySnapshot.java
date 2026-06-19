@@ -33,6 +33,17 @@ public final class BasaltEntitySnapshot implements EntitySnapshot {
         return new BasaltEntitySnapshot(kind, parsed);
     }
 
+    /** A snapshot of the named entity compound; null when it names no known entity. */
+    public static EntitySnapshot ofNbt(byte[] named) {
+        CompoundTag tag = named == null ? null : NbtCodec.fromBytes(named);
+        EntityType kind = tag == null ? EntityType.UNKNOWN : EntityCore.typeOf(tag.getStringOr("id", ""));
+        return kind == EntityType.UNKNOWN ? null : new BasaltEntitySnapshot(kind, named);
+    }
+
+    public byte[] nbt() {
+        return nbt;
+    }
+
     public static EntitySnapshot of(EntityCore core) {
         byte[] saved = core.nbt("");
         return saved == null ? null : new BasaltEntitySnapshot(core.type, saved);
