@@ -56,6 +56,7 @@ public:
     void setWeatherTimes(std::int32_t rain, std::int32_t thunder, std::int32_t clear) override;
     [[nodiscard]] std::int64_t inhabitedTime(std::int32_t chunkX, std::int32_t chunkZ) override;
     void setInhabitedTime(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t ticks) override;
+    bool useChunkFill(ChunkFill fill) override;
     [[nodiscard]] bool survives(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) override;
 
 private:

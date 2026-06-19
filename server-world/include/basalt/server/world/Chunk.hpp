@@ -178,6 +178,15 @@ public:
 
     void setNeedsRetrogen(bool needed) noexcept { needsRetrogen_ = needed; }
 
+    /// Whether this run made the chunk rather than read it; reading it tells the answer once, and then it is false.
+    [[nodiscard]] bool takeFresh() noexcept {
+        const bool was = fresh_;
+        fresh_ = false;
+        return was;
+    }
+
+    void markFresh() noexcept { fresh_ = true; }
+
     /// parity: `ChunkAccess.getBlendingData`, set on a chunk upgraded from before the 1.18 terrain.
     [[nodiscard]] const std::shared_ptr<blending::BlendingData>& blendingData() const noexcept { return blending_; }
 
@@ -332,6 +341,7 @@ private:
     wire::nbt::NbtCompound pluginData_;
     bool loadedComplete_ = false;
     bool needsRetrogen_ = false;
+    bool fresh_ = false;
     std::shared_ptr<blending::BlendingData> blending_;
     std::vector<ChunkScheduledTick> blockTicks_;
     std::vector<ChunkScheduledTick> fluidTicks_;

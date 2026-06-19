@@ -13,6 +13,21 @@ using plugins::PluginWorldEnv;
 using plugins::PluginWorldRef;
 using Enchantments = std::vector<std::pair<std::string, std::int32_t>>;
 
+struct JavaRef {
+    explicit JavaRef(JNIEnv* env, jobject object) : ref(env->NewGlobalRef(object)) {}
+
+    JavaRef(const JavaRef&) = delete;
+    JavaRef& operator=(const JavaRef&) = delete;
+
+    ~JavaRef() {
+        if (JNIEnv* env = BukkitBridge::liveEnv(); env != nullptr && ref != nullptr) {
+            env->DeleteGlobalRef(ref);
+        }
+    }
+
+    jobject ref;
+};
+
 [[nodiscard]] std::shared_ptr<PluginWorldRef> worldOf(JNIEnv* env, jstring name) {
     return BukkitBridge::current().services().worlds().byName(toStd(env, name));
 }
@@ -590,6 +605,64 @@ void JNICALL nativeCommandReply(JNIEnv* env, jclass, jstring message) {
     BukkitBridge::replyToCommand(toStd(env, message));
 }
 
+jboolean JNICALL nativeUseGenerator(JNIEnv* env, jclass, jstring world) {
+    const auto found = worldOf(env, world);
+    const std::string name = toStd(env, world);
+    jclass local = env->FindClass("org/basaltmc/bukkit/worldgen/CustomGenerators");
+    if (found == nullptr || local == nullptr) {
+        env->ExceptionClear();
+        return JNI_FALSE;
+    }
+    const auto holder = std::make_shared<JavaRef>(env, local);
+    const jmethodID fill = env->GetStaticMethodID(local, "fill", "(Ljava/lang/String;II)[I");
+    if (fill == nullptr) {
+        env->ExceptionClear();
+        return JNI_FALSE;
+    }
+    return jni::onServer<bool>(
+               false,
+               [&] {
+                   PluginWorldEnv* target = found->env();
+                   return target != nullptr &&
+                          target->useChunkFill([holder, fill, name](std::int32_t chunkX, std::int32_t chunkZ,
+                                                                    std::vector<std::int32_t>& blocks,
+                                                                    std::vector<std::int32_t>& biomes) {
+                              JNIEnv* callEnv = BukkitBridge::liveEnv();
+                              if (callEnv == nullptr) {
+                                  return;
+                              }
+                              jstring who = toJava(callEnv, name);
+                              auto* packed = static_cast<jintArray>(callEnv->CallStaticObjectMethod(
+                                  static_cast<jclass>(holder->ref), fill, who, chunkX, chunkZ));
+                              callEnv->DeleteLocalRef(who);
+                              if (callEnv->ExceptionCheck() == JNI_TRUE) {
+                                  callEnv->ExceptionDescribe();
+                                  callEnv->ExceptionClear();
+                                  return;
+                              }
+                              if (packed == nullptr) {
+                                  return;
+                              }
+                              std::vector<jint> all(static_cast<std::size_t>(callEnv->GetArrayLength(packed)));
+                              callEnv->GetIntArrayRegion(packed, 0, static_cast<jsize>(all.size()), all.data());
+                              callEnv->DeleteLocalRef(packed);
+                              if (all.size() < 2) {
+                                  return;
+                              }
+                              const auto blockCount = static_cast<std::size_t>(all[0]);
+                              const auto biomeCount = static_cast<std::size_t>(all[1]);
+                              if (all.size() < 2 + blockCount + biomeCount) {
+                                  return;
+                              }
+                              blocks.assign(all.begin() + 2, all.begin() + 2 + static_cast<std::ptrdiff_t>(blockCount));
+                              biomes.assign(all.begin() + 2 + static_cast<std::ptrdiff_t>(blockCount),
+                                            all.begin() + 2 + static_cast<std::ptrdiff_t>(blockCount + biomeCount));
+                          });
+               })
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
 jint JNICALL nativeTransformState(JNIEnv*, jclass, jint state, jint rotation, jint mirror) {
     return BukkitBridge::current().services().worlds().transformState(state, rotation, mirror);
 }
@@ -658,6 +731,7 @@ void registerWorldEnvNatives(JNIEnv* env, jclass natives) {
         method("gameRuleSpecs", "()[Ljava/lang/String;", reinterpret_cast<void*>(&nativeGameRuleSpecs)),
         method("gameEventFrequency", "(Ljava/lang/String;)I", reinterpret_cast<void*>(&nativeGameEventFrequency)),
         method("commandReply", "(Ljava/lang/String;)V", reinterpret_cast<void*>(&nativeCommandReply)),
+        method("useGenerator", "(Ljava/lang/String;)Z", reinterpret_cast<void*>(&nativeUseGenerator)),
         method("transformState", "(III)I", reinterpret_cast<void*>(&nativeTransformState)),
         method("toolFacts", "(Ljava/lang/String;I)[D", reinterpret_cast<void*>(&nativeToolFacts)),
     };

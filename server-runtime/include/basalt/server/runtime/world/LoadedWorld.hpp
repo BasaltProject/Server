@@ -201,6 +201,14 @@ public:
         return strongholdGenerator_;
     }
 
+    /// Fills each chunk a void world generates, from a thread that generates; set before any chunk is asked for.
+    using ChunkFiller = std::function<void(std::int32_t chunkX, std::int32_t chunkZ, server::world::Chunk& chunk)>;
+
+    void setChunkFiller(ChunkFiller filler) {
+        const std::lock_guard<std::mutex> lock{fillerMutex_};
+        chunkFiller_ = std::move(filler);
+    }
+
     /// What a plugin changed about natural spawning here; a value under zero is vanilla's.
     struct SpawnTunables {
         std::array<std::int32_t, 8> limits{-1, -1, -1, -1, -1, -1, -1, -1};
@@ -359,6 +367,8 @@ private:
     server::world::terrain::BiomeZoomer biomeZoomer_;
     WorldBorder border_;
     SpawnTunables spawnTunables_;
+    mutable std::mutex fillerMutex_;
+    ChunkFiller chunkFiller_;
     std::set<std::int64_t> forcedChunks_;
     std::mutex pluginDataMutex_;
     std::optional<wire::nbt::NbtCompound> pluginData_;

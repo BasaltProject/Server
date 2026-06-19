@@ -267,7 +267,11 @@ Chunk& WorldState::getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) 
     }
     std::optional<Chunk> generated = generateDetached(chunkX, chunkZ);
     if (generated.has_value()) {
-        return install(std::move(*generated));
+        Chunk& placed = install(std::move(*generated));
+        if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
+            handler(placed);
+        }
+        return placed;
     }
     Chunk* arrived = chunkIfLoaded(chunkX, chunkZ);
     while (arrived == nullptr) {

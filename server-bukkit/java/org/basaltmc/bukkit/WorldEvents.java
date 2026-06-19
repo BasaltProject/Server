@@ -39,7 +39,7 @@ final class WorldEvents {
                 return null;
             }
             org.bukkit.Location at = new org.bukkit.Location(f.world(), f.real("x"), f.real("y"), f.real("z"));
-            return new org.bukkit.event.raid.RaidFinishEvent(new BasaltRaid(at, org.bukkit.Raid.RaidStatus.VICTORY,
+            return new org.bukkit.event.raid.RaidFinishEvent(new BasaltEndedRaid(at, org.bukkit.Raid.RaidStatus.VICTORY,
                 (int) f.whole("waves")), f.world(), new java.util.ArrayList<>());
         });
         EventBridge.map("raid.finish", org.bukkit.event.raid.RaidStopEvent.class, f -> {
@@ -47,7 +47,7 @@ final class WorldEvents {
                 return null;
             }
             org.bukkit.Location at = new org.bukkit.Location(f.world(), f.real("x"), f.real("y"), f.real("z"));
-            return new org.bukkit.event.raid.RaidStopEvent(new BasaltRaid(at, org.bukkit.Raid.RaidStatus.LOSS,
+            return new org.bukkit.event.raid.RaidStopEvent(new BasaltEndedRaid(at, org.bukkit.Raid.RaidStatus.LOSS,
                 (int) f.whole("waves")), f.world(), org.bukkit.event.raid.RaidStopEvent.Reason.FINISHED);
         });
         EventBridge.map("world.chunk_load", org.bukkit.event.world.ChunkPopulateEvent.class, f -> !f.flag("generated")
