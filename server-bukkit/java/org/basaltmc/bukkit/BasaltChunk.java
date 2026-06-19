@@ -76,12 +76,21 @@ public final class BasaltChunk extends ChunkBase {
 
     @Override
     public BlockState[] getTileEntities(boolean useSnapshot) {
-        return new BlockState[0];
+        return getTileEntities(block -> true, useSnapshot).toArray(new BlockState[0]);
     }
 
     @Override
     public Collection<BlockState> getTileEntities(Predicate<? super Block> blockPredicate, boolean useSnapshot) {
-        return List.of();
+        Blocks.flushAll();
+        List<BlockState> out = new java.util.ArrayList<>();
+        int[] at = WorldNatives.blockEntityPositions(world.getName(), x, z);
+        for (int i = 0; at != null && i + 2 < at.length; i += 3) {
+            Block block = world.getBlockAt(at[i], at[i + 1], at[i + 2]);
+            if (blockPredicate.test(block)) {
+                out.add(block.getState());
+            }
+        }
+        return out;
     }
 
     @Override
@@ -117,39 +126,56 @@ public final class BasaltChunk extends ChunkBase {
 
     @Override
     public boolean isSlimeChunk() {
-        return false;
+        long seed = world.getSeed() + (long) (x * x * 0x4c1906) + (long) (x * 0x5ac0db) + (long) (z * z) * 0x4307a7L
+            + (long) (z * 0x5f24f) ^ 0x3ad8025fL;
+        return new java.util.Random(seed).nextInt(10) == 0;
     }
 
     @Override
     public boolean isForceLoaded() {
-        return false;
+        return world.isChunkForceLoaded(x, z);
     }
 
     @Override
-    public void setForceLoaded(boolean forced) {}
+    public void setForceLoaded(boolean forced) {
+        world.setChunkForceLoaded(x, z, forced);
+    }
 
     @Override
     public boolean addPluginChunkTicket(Plugin plugin) {
-        return true;
+        return world.addPluginChunkTicket(x, z, plugin);
     }
 
     @Override
     public boolean removePluginChunkTicket(Plugin plugin) {
-        return true;
+        return world.removePluginChunkTicket(x, z, plugin);
     }
 
     @Override
     public Collection<Plugin> getPluginChunkTickets() {
-        return List.of();
+        return world.getPluginChunkTickets(x, z);
     }
 
     @Override
     public long getInhabitedTime() {
-        return 0L;
+        return WorldEnvNatives.inhabitedTime(world.getName(), x, z, -1L);
     }
 
     @Override
-    public void setInhabitedTime(long ticks) {}
+    public void setInhabitedTime(long ticks) {
+        WorldEnvNatives.inhabitedTime(world.getName(), x, z, Math.max(ticks, 0L));
+    }
+
+    @Override
+    public Collection<org.bukkit.generator.structure.GeneratedStructure> getStructures() {
+        return world.getStructures(x, z);
+    }
+
+    @Override
+    public Collection<org.bukkit.generator.structure.GeneratedStructure> getStructures(
+        org.bukkit.generator.structure.Structure structure) {
+        return world.getStructures(x, z, structure);
+    }
 
     @Override
     public boolean contains(BlockData data) {
@@ -170,6 +196,15 @@ public final class BasaltChunk extends ChunkBase {
 
     @Override
     public boolean contains(Biome biome) {
+        String[] known = Registries.biomeIds();
+        int wanted = java.util.Arrays.asList(known).indexOf(biome.getKey().toString());
+        int[] cells = org.basaltmc.bukkit.facade.Chunks.readBiomes(world.getName(), x, z,
+            ((world.getMaxHeight() - world.getMinHeight()) >> 4) * 64);
+        for (int cell : cells == null ? new int[0] : cells) {
+            if (cell == wanted) {
+                return true;
+            }
+        }
         return false;
     }
 
@@ -180,7 +215,7 @@ public final class BasaltChunk extends ChunkBase {
 
     @Override
     public Collection<Player> getPlayersSeeingChunk() {
-        return List.of();
+        return world.getPlayersSeeingChunk(x, z);
     }
 
     @Override

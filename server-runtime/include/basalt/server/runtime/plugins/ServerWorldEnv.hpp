@@ -34,6 +34,28 @@ public:
                                           bool direct) override;
     [[nodiscard]] double temperature(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] double breakSpeed(std::string_view player, std::int32_t x, std::int32_t y, std::int32_t z) override;
+    [[nodiscard]] std::vector<server::plugins::PluginStructureStart> structureStarts(std::int32_t chunkX,
+                                                                                      std::int32_t chunkZ) override;
+    [[nodiscard]] std::vector<server::plugins::PluginRaid> raids() override;
+    bool setRaid(std::int32_t id, std::int32_t omenLevel, std::int32_t totalGroups) override;
+    [[nodiscard]] server::plugins::PluginFluid fluidAt(std::int32_t x, std::int32_t y, std::int32_t z) override;
+    [[nodiscard]] std::optional<std::array<std::int32_t, 3>> lightningTarget(std::int32_t x, std::int32_t z) override;
+    void gameEvent(std::string_view event, double x, double y, double z, std::string_view source) override;
+    bool growTree(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view sapling) override;
+    [[nodiscard]] std::vector<server::plugins::PluginPoi>
+    pointsOfInterest(const std::vector<std::string>& types, std::int32_t x, std::int32_t y, std::int32_t z,
+                     std::int32_t radius, std::int32_t occupancy) override;
+    [[nodiscard]] server::plugins::PluginSpawnTunables spawnTunables() override;
+    void setSpawnTunables(const server::plugins::PluginSpawnTunables& tunables) override;
+    [[nodiscard]] std::int32_t viewDistance() override;
+    void setViewDistance(std::int32_t chunks) override;
+    [[nodiscard]] std::int32_t seaLevel() override;
+    [[nodiscard]] std::vector<std::int32_t> forcedChunks() override;
+    void setChunkForced(std::int32_t chunkX, std::int32_t chunkZ, bool forced) override;
+    [[nodiscard]] std::array<std::int32_t, 3> weatherTimes() override;
+    void setWeatherTimes(std::int32_t rain, std::int32_t thunder, std::int32_t clear) override;
+    [[nodiscard]] std::int64_t inhabitedTime(std::int32_t chunkX, std::int32_t chunkZ) override;
+    void setInhabitedTime(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t ticks) override;
     [[nodiscard]] bool survives(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) override;
 
 private:

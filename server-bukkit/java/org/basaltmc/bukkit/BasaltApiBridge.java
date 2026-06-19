@@ -17,6 +17,23 @@ public final class BasaltApiBridge extends InternalAPIBridgeBase {
     }
 
     @Override
+    public <MODERN, LEGACY> org.bukkit.GameRule<LEGACY> legacyGameRuleBridge(org.bukkit.GameRule<MODERN> modern,
+        java.util.function.Function<LEGACY, MODERN> toModern, java.util.function.Function<MODERN, LEGACY> fromModern,
+        Class<LEGACY> type) {
+        return new BasaltGameRule.Legacy<>(modern, toModern, fromModern, type);
+    }
+
+    @Override
+    public io.papermc.paper.entity.poi.PoiType.Occupancy createOccupancy(String name) {
+        return new io.papermc.paper.entity.poi.PoiType.Occupancy() {
+            @Override
+            public String toString() {
+                return name;
+            }
+        };
+    }
+
+    @Override
     public org.bukkit.block.Biome constructLegacyCustomBiome() {
         return new BasaltBiome("minecraft:custom", -1);
     }

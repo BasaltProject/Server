@@ -231,14 +231,28 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
             alive.push_back(entity);
         }
     }
-    const std::vector<MobCategory> categories =
-        world::naturalSpawner::categoriesFor(world.difficulty(), world.gameTime());
+    std::vector<MobCategory> categories = world::naturalSpawner::categoriesFor(world.difficulty(), world.gameTime());
+    const world::LoadedWorld::SpawnTunables& tunables = world.spawnTunables();
     std::map<MobCategory, std::int32_t> caps;
     std::map<MobCategory, std::int32_t> counts;
     for (const MobCategory category : kCappedCategories) {
-        caps[category] = world::naturalSpawner::capFor(category, static_cast<std::int32_t>(chunks.size()));
+        const auto slot = static_cast<std::size_t>(category);
+        caps[category] =
+            tunables.limits[slot] >= 0
+                ? tunables.limits[slot] * static_cast<std::int32_t>(chunks.size()) / world::naturalSpawner::kCapChunks
+                : world::naturalSpawner::capFor(category, static_cast<std::int32_t>(chunks.size()));
         counts[category] = 0;
+        if (const std::int32_t every = tunables.ticksPer[slot]; every >= 0) {
+            std::erase(categories, category);
+            const bool peaceful = world.difficulty() == "peaceful" && !entity::mobCategoryFacts(category).friendly;
+            if (every > 0 && world.gameTime() % every == 0 && !peaceful) {
+                categories.push_back(category);
+            }
+        }
     }
+    std::erase_if(categories, [&tunables](const MobCategory category) {
+        return entity::mobCategoryFacts(category).friendly ? !tunables.allowAnimals : !tunables.allowMonsters;
+    });
     world::SpawnPotential spawnPotential;
     for (const ServerEntity* entity : alive) {
         const auto blockX = static_cast<std::int32_t>(std::floor(entity->x));

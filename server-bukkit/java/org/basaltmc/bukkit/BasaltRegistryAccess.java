@@ -34,6 +34,16 @@ public final class BasaltRegistryAccess implements RegistryAccess {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T extends Keyed> Registry<T> genericRegistry(String name, Class<?> type) {
         Supplier<List<T>> source = () -> (List<T>) (List) entriesOf(name, type);
+        switch (name) {
+            case "game_event":
+                return new BasaltRegistry<T>(source, key -> (T) new BasaltGameEvent(key));
+            case "worldgen/structure":
+                return new BasaltRegistry<T>(source, key -> (T) new BasaltStructure(key));
+            case "worldgen/structure_type":
+                return new BasaltRegistry<T>(source, key -> (T) new BasaltStructureType(key));
+            default:
+                break;
+        }
         if (type != null && type.isInterface() && !BUILT_IN.contains(name)) {
             Class<T> keyed = (Class<T>) type;
             return new BasaltRegistry<T>(source, key -> KeyedProxy.of(keyed, key, -1));
@@ -65,6 +75,9 @@ public final class BasaltRegistryAccess implements RegistryAccess {
             case "data_component_type":
                 out.addAll(org.basaltmc.bukkit.datacomponent.ComponentType.list().stream()
                     .map(entry -> (Keyed) entry).toList());
+                break;
+            case "game_rule":
+                out.addAll(BasaltGameRule.all());
                 break;
             case "menu":
                 out.addAll(org.basaltmc.bukkit.inv.MenuTypes.list());
