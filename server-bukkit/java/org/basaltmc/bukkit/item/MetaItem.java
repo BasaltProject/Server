@@ -3,9 +3,7 @@ package org.basaltmc.bukkit.item;
 import com.google.common.collect.Multimap;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,7 +15,6 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemRarity;
 import org.bukkit.inventory.meta.Damageable;
@@ -328,6 +325,164 @@ public class MetaItem extends ItemMetaBase implements Damageable, Repairable {
     @Override
     public void setCustomModelDataComponent(CustomModelDataComponent component) {
         put(kModelData, component == null ? null : ((MetaModelData.ModelData) component).data);
+    }
+
+    @Override
+    public boolean hasFood() {
+        return has("minecraft:food");
+    }
+
+    @Override
+    public org.bukkit.inventory.meta.components.FoodComponent getFood() {
+        return new MetaComponents.Food(has("minecraft:food") ? Nbt.deepCopy(compoundOf("minecraft:food"))
+            : Nbt.compound());
+    }
+
+    @Override
+    public void setFood(org.bukkit.inventory.meta.components.FoodComponent food) {
+        put("minecraft:food", food == null ? null : Nbt.deepCopy(((MetaComponents.Food) food).data));
+    }
+
+    @Override
+    public boolean hasTool() {
+        return has("minecraft:tool");
+    }
+
+    @Override
+    public org.bukkit.inventory.meta.components.ToolComponent getTool() {
+        return new MetaComponents.Tool(has("minecraft:tool") ? Nbt.deepCopy(compoundOf("minecraft:tool"))
+            : Nbt.compound());
+    }
+
+    @Override
+    public void setTool(org.bukkit.inventory.meta.components.ToolComponent tool) {
+        put("minecraft:tool", tool == null ? null : Nbt.deepCopy(((MetaComponents.Tool) tool).data));
+    }
+
+    @Override
+    public boolean hasEquippable() {
+        return has("minecraft:equippable");
+    }
+
+    @Override
+    public org.bukkit.inventory.meta.components.EquippableComponent getEquippable() {
+        return has("minecraft:equippable") ? new MetaComponents.Equippable(Nbt.deepCopy(compoundOf("minecraft:equippable")))
+            : MetaComponents.Equippable.empty();
+    }
+
+    @Override
+    public void setEquippable(org.bukkit.inventory.meta.components.EquippableComponent equippable) {
+        put("minecraft:equippable", equippable == null ? null
+            : Nbt.deepCopy(((MetaComponents.Equippable) equippable).data));
+    }
+
+    @Override
+    public boolean hasUseCooldown() {
+        return has("minecraft:use_cooldown");
+    }
+
+    @Override
+    public org.bukkit.inventory.meta.components.UseCooldownComponent getUseCooldown() {
+        return has("minecraft:use_cooldown") ? new MetaComponents.Cooldown(Nbt.deepCopy(compoundOf("minecraft:use_cooldown")))
+            : MetaComponents.Cooldown.empty();
+    }
+
+    @Override
+    public void setUseCooldown(org.bukkit.inventory.meta.components.UseCooldownComponent cooldown) {
+        put("minecraft:use_cooldown", cooldown == null ? null
+            : Nbt.deepCopy(((MetaComponents.Cooldown) cooldown).data));
+    }
+
+    @Override
+    public boolean hasJukeboxPlayable() {
+        return has("minecraft:jukebox_playable");
+    }
+
+    @Override
+    public org.bukkit.inventory.meta.components.JukeboxPlayableComponent getJukeboxPlayable() {
+        return has("minecraft:jukebox_playable") ? MetaComponents.Jukebox.of(c.get("minecraft:jukebox_playable"))
+            : MetaComponents.Jukebox.empty();
+    }
+
+    @Override
+    public void setJukeboxPlayable(org.bukkit.inventory.meta.components.JukeboxPlayableComponent jukebox) {
+        put("minecraft:jukebox_playable", jukebox == null ? null : ((MetaComponents.Jukebox) jukebox).stored());
+    }
+
+    @Override
+    public boolean hasUseRemainder() {
+        return has("minecraft:use_remainder");
+    }
+
+    @Override
+    public org.bukkit.inventory.ItemStack getUseRemainder() {
+        Map<String, Object> stored = compoundOf("minecraft:use_remainder");
+        return stored == null ? null : Convert.stack(stored);
+    }
+
+    @Override
+    public void setUseRemainder(org.bukkit.inventory.ItemStack remainder) {
+        put("minecraft:use_remainder", remainder == null || remainder.isEmpty() ? null : Convert.stack(remainder));
+    }
+
+    @Override
+    public io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.damage.DamageType> getDamageResistantTypes() {
+        return has("minecraft:damage_resistant")
+            ? org.basaltmc.bukkit.datacomponent.Builders.damageResistantOf(c.get("minecraft:damage_resistant")).types()
+            : null;
+    }
+
+    @Override
+    public void setDamageResistantTypes(io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.damage.DamageType> types) {
+        put("minecraft:damage_resistant", types == null ? null
+            : org.basaltmc.bukkit.datacomponent.Builders.damageResistantNbt(types));
+    }
+
+    @Override
+    public void setDamageResistant(org.bukkit.Tag<org.bukkit.damage.DamageType> tag) {
+        if (tag == null) {
+            c.remove("minecraft:damage_resistant");
+            return;
+        }
+        Map<String, Object> resistant = Nbt.compound();
+        resistant.put("types", "#" + tag.getKey());
+        c.put("minecraft:damage_resistant", resistant);
+    }
+
+    @Override
+    public boolean hasDestroyableKeys() {
+        return has("minecraft:can_break");
+    }
+
+    @Override
+    public java.util.Set<com.destroystokyo.paper.Namespaced> getDestroyableKeys() {
+        return MetaFlags.keys(c, "minecraft:can_break");
+    }
+
+    @Override
+    public void setDestroyableKeys(Collection<com.destroystokyo.paper.Namespaced> keys) {
+        MetaFlags.setKeys(c, "minecraft:can_break", keys);
+    }
+
+    @Override
+    public boolean hasPlaceableKeys() {
+        return has("minecraft:can_place_on");
+    }
+
+    @Override
+    public java.util.Set<com.destroystokyo.paper.Namespaced> getPlaceableKeys() {
+        return MetaFlags.keys(c, "minecraft:can_place_on");
+    }
+
+    @Override
+    public void setPlaceableKeys(Collection<com.destroystokyo.paper.Namespaced> keys) {
+        MetaFlags.setKeys(c, "minecraft:can_place_on", keys);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public org.bukkit.inventory.meta.tags.CustomItemTagContainer getCustomTagContainer() {
+        return new LegacyTags(getPersistentDataContainer());
     }
 
     @Override

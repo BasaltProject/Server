@@ -138,4 +138,51 @@ final class MetaFlags {
         value.put("predicates", predicates);
         c.put(component, value);
     }
+
+    private record Key(String namespace, String key) implements com.destroystokyo.paper.Namespaced {
+        @Override
+        public String getNamespace() {
+            return namespace;
+        }
+
+        @Override
+        public String getKey() {
+            return key;
+        }
+    }
+
+    static Set<com.destroystokyo.paper.Namespaced> keys(Map<String, Object> c, String component) {
+        Set<com.destroystokyo.paper.Namespaced> out = new LinkedHashSet<>();
+        Map<String, Object> predicates = Nbt.map(c.get(component));
+        List<Object> list = predicates == null ? null : Nbt.list(predicates.get("predicates"));
+        if (list != null) {
+            for (Object item : list) {
+                Map<String, Object> entry = Nbt.map(item);
+                Object blocks = entry == null ? null : entry.get("blocks");
+                if (blocks instanceof String id) {
+                    String text = id.startsWith("#") ? id.substring(1) : id;
+                    int colon = text.indexOf(':');
+                    out.add(new Key(colon < 0 ? "minecraft" : text.substring(0, colon), text.substring(colon + 1)));
+                }
+            }
+        }
+        return out;
+    }
+
+    static void setKeys(Map<String, Object> c, String component, java.util.Collection<com.destroystokyo.paper.Namespaced> keys) {
+        if (keys == null || keys.isEmpty()) {
+            c.remove(component);
+            return;
+        }
+        List<Object> predicates = new ArrayList<>();
+        for (com.destroystokyo.paper.Namespaced key : keys) {
+            Map<String, Object> entry = Nbt.compound();
+            boolean tag = key instanceof org.bukkit.Tag<?>;
+            entry.put("blocks", (tag ? "#" : "") + key.getNamespace() + ":" + key.getKey());
+            predicates.add(entry);
+        }
+        Map<String, Object> value = Nbt.compound();
+        value.put("predicates", predicates);
+        c.put(component, value);
+    }
 }

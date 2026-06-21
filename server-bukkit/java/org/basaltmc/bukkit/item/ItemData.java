@@ -46,6 +46,14 @@ public final class ItemData {
         return Nbt.map(data.get("food"));
     }
 
+    public Map<String, Object> tool() {
+        return Nbt.map(data.get("tool"));
+    }
+
+    public int composterChance() {
+        return Nbt.integer(data, "composter_chance", 0);
+    }
+
     public Map<String, Object> armor() {
         return Nbt.map(data.get("armor"));
     }

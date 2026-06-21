@@ -14,7 +14,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.EquipmentSlotGroup;
 
 /** The `minecraft:attribute_modifiers` list of an item, read and written as Bukkit's attribute modifiers. */
-final class MetaAttributes {
+public final class MetaAttributes {
     private static final String kAttributes = "minecraft:attribute_modifiers";
 
     private MetaAttributes() {}
@@ -24,12 +24,12 @@ final class MetaAttributes {
         return list != null && !list.isEmpty();
     }
 
-    private static Attribute attribute(String id) {
+    public static Attribute attribute(String id) {
         NamespacedKey key = NamespacedKey.fromString(id);
         return key == null ? null : org.bukkit.Registry.ATTRIBUTE.get(key);
     }
 
-    private static AttributeModifier modifier(Map<String, Object> entry) {
+    public static AttributeModifier modifier(Map<String, Object> entry) {
         NamespacedKey id = NamespacedKey.fromString(Nbt.string(entry, "id", "minecraft:unnamed"));
         AttributeModifier.Operation operation;
         switch (Nbt.string(entry, "operation", "add_value")) {
@@ -48,7 +48,7 @@ final class MetaAttributes {
             slot == null ? EquipmentSlotGroup.ANY : slot);
     }
 
-    private static Map<String, Object> entry(Attribute attribute, AttributeModifier modifier) {
+    public static Map<String, Object> entry(Attribute attribute, AttributeModifier modifier) {
         Map<String, Object> entry = Nbt.compound();
         entry.put("type", attribute.getKey().toString());
         entry.put("id", modifier.getKey().toString());
@@ -68,7 +68,7 @@ final class MetaAttributes {
         return entry;
     }
 
-    static Multimap<Attribute, AttributeModifier> all(Map<String, Object> c, Predicate<Map<String, Object>> keep) {
+    public static Multimap<Attribute, AttributeModifier> all(Map<String, Object> c, Predicate<Map<String, Object>> keep) {
         Multimap<Attribute, AttributeModifier> out = LinkedHashMultimap.create();
         List<Object> list = Nbt.list(c.get(kAttributes));
         if (list != null) {
@@ -85,7 +85,7 @@ final class MetaAttributes {
         return out;
     }
 
-    static Multimap<Attribute, AttributeModifier> forSlot(Map<String, Object> c, EquipmentSlot slot) {
+    public static Multimap<Attribute, AttributeModifier> forSlot(Map<String, Object> c, EquipmentSlot slot) {
         if (slot == null) {
             throw new IllegalArgumentException("EquipmentSlot cannot be null");
         }

@@ -1,7 +1,10 @@
 package io.papermc.paper.datacomponent.item;
 
-import org.basaltmc.bukkit.Unsupported;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.basaltmc.bukkit.datacomponent.Builders;
+import org.basaltmc.bukkit.datacomponent.ContentSpecs;
+import org.basaltmc.bukkit.datacomponent.ItemSpecs;
 
 /** The factories the item component interfaces reach the server through; the kinds not held yet say so on use. */
 public final class BasaltComponentBridge implements ItemComponentTypesBridge {
@@ -72,201 +75,227 @@ public final class BasaltComponentBridge implements ItemComponentTypesBridge {
 
     @Override
     public ChargedProjectiles.Builder chargedProjectiles() {
-        throw Unsupported.hit("ChargedProjectiles");
+        return (ChargedProjectiles.Builder) ContentSpecs.CHARGED.builder();
     }
 
     @Override
     public PotDecorations.Builder potDecorations() {
-        throw Unsupported.hit("PotDecorations");
+        return (PotDecorations.Builder) ContentSpecs.DECORATIONS.builder();
     }
 
     @Override
     public ItemAttributeModifiers.Builder modifiers() {
-        throw Unsupported.hit("ItemAttributeModifiers");
+        return (ItemAttributeModifiers.Builder) ItemSpecs.MODIFIERS.builder();
     }
 
     @Override
     public PotionContents.Builder potionContents() {
-        throw Unsupported.hit("PotionContents");
+        return (PotionContents.Builder) ContentSpecs.POTION.builder();
     }
 
     @Override
     public BundleContents.Builder bundleContents() {
-        throw Unsupported.hit("BundleContents");
+        return (BundleContents.Builder) ContentSpecs.BUNDLE.builder();
     }
 
     @Override
     public SuspiciousStewEffects.Builder suspiciousStewEffects() {
-        throw Unsupported.hit("SuspiciousStewEffects");
+        return (SuspiciousStewEffects.Builder) ContentSpecs.STEW.builder();
     }
 
     @Override
     public MapDecorations.Builder mapDecorations() {
-        throw Unsupported.hit("MapDecorations");
+        return (MapDecorations.Builder) ContentSpecs.MAP_DECORATIONS.builder();
     }
 
     @Override
     public MapDecorations.DecorationEntry mapDecorationEntry(org.bukkit.map.MapCursor.Type type, double x, double z, float rotation) {
-        throw Unsupported.hit("MapDecorations");
+        return (MapDecorations.DecorationEntry) ContentSpecs.decoration(type, x, z, rotation);
     }
 
     @Override
     public SeededContainerLoot.Builder seededContainerLoot(net.kyori.adventure.key.Key lootTableKey) {
-        throw Unsupported.hit("SeededContainerLoot");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("lootTable", lootTableKey);
+        return (SeededContainerLoot.Builder) org.basaltmc.bukkit.datacomponent.Dyn.builder(ContentSpecs.LOOT, fields);
     }
 
     @Override
     public WrittenBookContent.Builder writtenBookContent(io.papermc.paper.text.Filtered<String> title, String author) {
-        throw Unsupported.hit("WrittenBookContent");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("title", title);
+        fields.put("author", author);
+        return (WrittenBookContent.Builder) org.basaltmc.bukkit.datacomponent.Dyn.builder(ContentSpecs.WRITTEN, fields);
     }
 
     @Override
     public WritableBookContent.Builder writeableBookContent() {
-        throw Unsupported.hit("WritableBookContent");
+        return (WritableBookContent.Builder) ContentSpecs.WRITABLE.builder();
     }
 
     @Override
     public ItemArmorTrim.Builder itemArmorTrim(org.bukkit.inventory.meta.trim.ArmorTrim armorTrim) {
-        throw Unsupported.hit("ItemArmorTrim");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("armorTrim", armorTrim);
+        return (ItemArmorTrim.Builder) org.basaltmc.bukkit.datacomponent.Dyn.builder(ContentSpecs.TRIM, fields);
     }
 
     @Override
     public LodestoneTracker.Builder lodestoneTracker() {
-        throw Unsupported.hit("LodestoneTracker");
+        return (LodestoneTracker.Builder) ContentSpecs.LODESTONE.builder();
     }
 
     @Override
     public Fireworks.Builder fireworks() {
-        throw Unsupported.hit("Fireworks");
+        return (Fireworks.Builder) ContentSpecs.FIREWORKS.builder();
     }
 
     @Override
     public ResolvableProfile resolvableProfile(com.destroystokyo.paper.profile.PlayerProfile profile) {
-        throw Unsupported.hit("ResolvableProfile");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("name", profile.getName());
+        fields.put("uuid", profile.getId());
+        fields.put("properties", new java.util.ArrayList<Object>(profile.getProperties()));
+        return (ResolvableProfile) ContentSpecs.PROFILE.value(fields);
     }
 
     @Override
     public ResolvableProfile.Builder resolvableProfile() {
-        throw Unsupported.hit("ResolvableProfile");
+        return (ResolvableProfile.Builder) ContentSpecs.PROFILE.builder();
     }
 
     @Override
     public ResolvableProfile.SkinPatchBuilder skinPatch() {
-        throw Unsupported.hit("ResolvableProfile");
+        return (ResolvableProfile.SkinPatchBuilder) ContentSpecs.PATCH.builder();
     }
 
     @Override
     public ResolvableProfile.SkinPatch emptySkinPatch() {
-        throw Unsupported.hit("ResolvableProfile");
+        return (ResolvableProfile.SkinPatch) ContentSpecs.PATCH.value(new LinkedHashMap<>());
     }
 
     @Override
     public BannerPatternLayers.Builder bannerPatternLayers() {
-        throw Unsupported.hit("BannerPatternLayers");
+        return (BannerPatternLayers.Builder) ContentSpecs.LAYERS.builder();
     }
 
     @Override
     public BlockItemDataProperties.Builder blockItemStateProperties() {
-        throw Unsupported.hit("BlockItemDataProperties");
+        return (BlockItemDataProperties.Builder) ContentSpecs.BLOCK_DATA.builder();
     }
 
     @Override
     public ItemContainerContents.Builder itemContainerContents() {
-        throw Unsupported.hit("ItemContainerContents");
+        return (ItemContainerContents.Builder) ContentSpecs.CONTAINER.builder();
     }
 
     @Override
     public JukeboxPlayable.Builder jukeboxPlayable(org.bukkit.JukeboxSong song) {
-        throw Unsupported.hit("JukeboxPlayable");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("jukeboxSong", song);
+        return (JukeboxPlayable.Builder) org.basaltmc.bukkit.datacomponent.Dyn.builder(ContentSpecs.JUKEBOX, fields);
     }
 
     @Override
     public Tool.Builder tool() {
-        throw Unsupported.hit("Tool");
+        return (Tool.Builder) ItemSpecs.TOOL.builder();
     }
 
     @Override
     public Tool.Rule toolRule(io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.block.BlockType> blocks, Float speed, net.kyori.adventure.util.TriState correctForDrops) {
-        throw Unsupported.hit("Tool");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("blocks", blocks);
+        if (speed != null) {
+            fields.put("speed", speed);
+        }
+        fields.put("correctForDrops", correctForDrops == null ? net.kyori.adventure.util.TriState.NOT_SET : correctForDrops);
+        return (Tool.Rule) ItemSpecs.RULE.value(fields);
     }
 
     @Override
     public ItemAdventurePredicate.Builder itemAdventurePredicate() {
-        throw Unsupported.hit("ItemAdventurePredicate");
+        return (ItemAdventurePredicate.Builder) ContentSpecs.PREDICATE.builder();
     }
 
     @Override
     public Consumable.Builder consumable() {
-        throw Unsupported.hit("Consumable");
+        return (Consumable.Builder) ItemSpecs.CONSUMABLE.builder();
     }
 
     @Override
     public Equippable.Builder equippable(org.bukkit.inventory.EquipmentSlot slot) {
-        throw Unsupported.hit("Equippable");
+        return (Equippable.Builder) ItemSpecs.equippable(slot);
     }
 
     @Override
     public DeathProtection.Builder deathProtection() {
-        throw Unsupported.hit("DeathProtection");
+        return (DeathProtection.Builder) ItemSpecs.DEATH_PROTECTION.builder();
     }
 
     @Override
     public BlocksAttacks.Builder blocksAttacks() {
-        throw Unsupported.hit("BlocksAttacks");
+        return (BlocksAttacks.Builder) ItemSpecs.BLOCKS_ATTACKS.builder();
     }
 
     @Override
     public Weapon.Builder weapon() {
-        throw Unsupported.hit("Weapon");
+        return (Weapon.Builder) ItemSpecs.WEAPON.builder();
     }
 
     @Override
     public KineticWeapon.Builder kineticWeapon() {
-        throw Unsupported.hit("KineticWeapon");
+        return (KineticWeapon.Builder) ItemSpecs.KINETIC.builder();
     }
 
     @Override
     public KineticWeapon.Condition kineticWeaponCondition(int maxDurationTicks, float minSpeed, float minRelativeSpeed) {
-        throw Unsupported.hit("KineticWeapon");
+        return (KineticWeapon.Condition) ItemSpecs.condition(maxDurationTicks, minSpeed, minRelativeSpeed);
     }
 
     @Override
     public UseEffects.Builder useEffects() {
-        throw Unsupported.hit("UseEffects");
+        return (UseEffects.Builder) ItemSpecs.USE_EFFECTS.builder();
     }
 
     @Override
     public PiercingWeapon.Builder piercingWeapon() {
-        throw Unsupported.hit("PiercingWeapon");
+        return (PiercingWeapon.Builder) ItemSpecs.PIERCING.builder();
     }
 
     @Override
     public AttackRange.Builder attackRange() {
-        throw Unsupported.hit("AttackRange");
+        return (AttackRange.Builder) ItemSpecs.ATTACK_RANGE.builder();
     }
 
     @Override
     public SwingAnimation.Builder swingAnimation() {
-        throw Unsupported.hit("SwingAnimation");
+        return (SwingAnimation.Builder) ItemSpecs.SWING.builder();
     }
 
     @Override
     public SulfurCubeContent sulfurCubeContent(org.bukkit.inventory.ItemStack stack) {
-        throw Unsupported.hit("SulfurCubeContent");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("absorbedItem", stack.clone());
+        return (SulfurCubeContent) ContentSpecs.SULFUR.value(fields);
     }
 
     @Override
     public MobVisibility mobVisibility(io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.entity.EntityType> types, float multiplier) {
-        throw Unsupported.hit("MobVisibility");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("targetingEntityTypes", types);
+        fields.put("visibility", multiplier);
+        return (MobVisibility) ContentSpecs.VISIBILITY.value(fields);
     }
 
     @Override
     public VillagerFood villagerFood(int value) {
-        throw Unsupported.hit("VillagerFood");
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("nutrition", value);
+        return (VillagerFood) ContentSpecs.FOOD.value(fields);
     }
 
     @Override
     public SignText.Builder signText() {
-        throw Unsupported.hit("SignText");
+        return (SignText.Builder) ContentSpecs.SIGN.builder();
     }
 }
