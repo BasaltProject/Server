@@ -1,5 +1,6 @@
 package org.basaltmc.bukkit;
 
+import io.papermc.paper.registry.RegistryKey;
 import io.papermc.paper.registry.tag.Tag;
 import io.papermc.paper.registry.tag.TagKey;
 import java.util.Collection;
@@ -19,6 +20,8 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
     private final Supplier<List<T>> source;
     private final Function<NamespacedKey, T> open;
     private Map<NamespacedKey, T> entries;
+    private String name;
+    private Map<NamespacedKey, Tag<T>> tags;
 
     BasaltRegistry(Supplier<List<T>> source) {
         this(source, null);
@@ -28,6 +31,55 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
     BasaltRegistry(Supplier<List<T>> source, Function<NamespacedKey, T> open) {
         this.source = source;
         this.open = open;
+    }
+
+    BasaltRegistry<T> named(String registryName) {
+        this.name = registryName;
+        return this;
+    }
+
+    private static String tagSource(String registry) {
+        if (registry == null) {
+            return null;
+        }
+        return switch (registry) {
+            case "block" -> "blocks";
+            case "item" -> "items";
+            case "entity_type" -> "entity_types";
+            case "fluid" -> "fluids";
+            default -> null;
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private synchronized Map<NamespacedKey, Tag<T>> tags(RegistryKey<T> registry) {
+        if (tags == null) {
+            tags = new LinkedHashMap<>();
+            String source = tagSource(name);
+            if (source != null) {
+                String[] flat = WorldNatives.tags(source);
+                for (int i = 0; i + 1 < flat.length; i += 2) {
+                    NamespacedKey id = NamespacedKey.fromString(flat[i]);
+                    List<String> members = flat[i + 1].isEmpty() ? List.of() : List.of(flat[i + 1].split("\\|"));
+                    tags.put(id, new BasaltRegistryTag<>(registry, registry.tagKey(id), members));
+                }
+            }
+        }
+        return tags;
+    }
+
+    @SuppressWarnings("unchecked")
+    private RegistryKey<T> registryKey() {
+        try {
+            for (java.lang.reflect.Field field : RegistryKey.class.getFields()) {
+                if (field.get(null) instanceof RegistryKey<?> candidate && candidate.key().value().equals(name)) {
+                    return (RegistryKey<T>) candidate;
+                }
+            }
+        } catch (IllegalAccessException failure) {
+            throw new IllegalStateException(failure);
+        }
+        throw new IllegalStateException("No registry key for " + name);
     }
 
     private synchronized Map<NamespacedKey, T> entries() {
@@ -65,17 +117,21 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
 
     @Override
     public boolean hasTag(TagKey<T> key) {
-        return false;
+        return tags(key.registryKey()).containsKey(new NamespacedKey(key.key().namespace(), key.key().value()));
     }
 
     @Override
     public Tag<T> getTag(TagKey<T> key) {
-        throw new NoSuchElementException("No tag " + key);
+        Tag<T> found = tags(key.registryKey()).get(new NamespacedKey(key.key().namespace(), key.key().value()));
+        if (found == null) {
+            throw new NoSuchElementException("No tag " + key);
+        }
+        return found;
     }
 
     @Override
     public Collection<Tag<T>> getTags() {
-        return List.of();
+        return List.copyOf(tags(registryKey()).values());
     }
 
     @Override

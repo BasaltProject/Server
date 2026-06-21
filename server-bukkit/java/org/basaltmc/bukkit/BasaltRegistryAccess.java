@@ -33,6 +33,11 @@ public final class BasaltRegistryAccess implements RegistryAccess {
     /** Entries come from the server's own registry when it has one; an interface type also answers for any key named. */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T extends Keyed> Registry<T> genericRegistry(String name, Class<?> type) {
+        return ((BasaltRegistry<T>) (BasaltRegistry) plainRegistry(name, type)).named(name);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T extends Keyed> Registry<T> plainRegistry(String name, Class<?> type) {
         Supplier<List<T>> source = () -> (List<T>) (List) entriesOf(name, type);
         switch (name) {
             case "game_event":
@@ -95,6 +100,12 @@ public final class BasaltRegistryAccess implements RegistryAccess {
                     if (entity != EntityType.UNKNOWN) {
                         out.add(entity);
                     }
+                }
+                break;
+            case "sound_event":
+                int ordinal = 0;
+                for (String id : Registries.soundIds()) {
+                    out.add(KeyedProxy.of((Class<? extends Keyed>) type, NamespacedKey.minecraft(id), ordinal++));
                 }
                 break;
             default:
