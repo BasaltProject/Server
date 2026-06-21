@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
@@ -9,6 +10,7 @@
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -349,7 +351,8 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         if (PlayerSession* taker = owner_->playerSession(); taker != nullptr && hadItem.has_value()) {
             taker->stats.increment(storage::stats::crafted(*hadItem), hadCount - (put.has_value() ? put->count : 0));
         }
-        payFurnace(*world, *entity);
+        payFurnace(*world, *entity, half->first, hadItem.value_or(std::string{}),
+                   hadCount - (put.has_value() ? put->count : 0));
     }
     // parity: `BrewingStandMenu.PotionSlot.onTake`.
     if (cooking != nullptr && *cooking == world::brewingStands::block() &&
@@ -384,7 +387,9 @@ void ContainerMenuController::awardBrewed(const server::world::loot::ItemStack& 
                    world::TriggerEvent{.ids = {{"potion", *id}}});
 }
 
-void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity) {
+void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity,
+                                         const wire::protocol::play::BlockPos& at, const std::string& takenItem,
+                                         const std::int32_t takenAmount) {
     PlayerSession* session = owner_->playerSession();
     world::RealRecipes* recipes = owner_->options().recipes;
     world::furnaces::State state = world::furnaces::read(entity.data());
@@ -393,6 +398,7 @@ void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::worl
     }
     random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
     std::vector<Identifier> used;
+    std::vector<std::int32_t> points;
     for (const auto& [name, count] : state.recipesUsed) {
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
         const server::world::crafting::Recipe* recipe = id.has_value() ? recipes->recipeFor(*id) : nullptr;
@@ -400,9 +406,37 @@ void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::worl
             continue;
         }
         used.push_back(*id);
-        if (owner_->options().awardExperience) {
-            owner_->options().awardExperience(world, session->x, session->y, session->z,
-                                              world::furnaces::experienceFor(count, recipe->experience, random));
+        points.push_back(world::furnaces::experienceFor(count, recipe->experience, random));
+    }
+    std::int32_t total = 0;
+    for (const std::int32_t each : points) {
+        total += each;
+    }
+    std::optional<std::int32_t> replaced;
+    if (const server::plugins::PluginEvent* asked =
+            world.events().ask(&server::plugins::pluginEventTypes::inventoryFurnaceExtract,
+                               [&](server::plugins::PluginEvent& event) {
+                                   plugins::EventSink::player(event, *session);
+                                   event.set("x", static_cast<std::int64_t>(at.x));
+                                   event.set("y", static_cast<std::int64_t>(at.y));
+                                   event.set("z", static_cast<std::int64_t>(at.z));
+                                   event.set("item", takenItem);
+                                   event.set("amount", static_cast<std::int64_t>(takenAmount));
+                                   event.set("experience", static_cast<std::int64_t>(total));
+                               });
+        asked != nullptr) {
+        if (const auto* edited = std::get_if<std::int64_t>(&asked->get("experience"));
+            edited != nullptr && *edited != total) {
+            replaced = static_cast<std::int32_t>(std::max<std::int64_t>(0, *edited));
+        }
+    }
+    if (owner_->options().awardExperience) {
+        if (replaced.has_value()) {
+            owner_->options().awardExperience(world, session->x, session->y, session->z, *replaced);
+        } else {
+            for (const std::int32_t each : points) {
+                owner_->options().awardExperience(world, session->x, session->y, session->z, each);
+            }
         }
     }
     // parity: `awardUsedRecipesAndPopExperience`.

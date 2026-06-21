@@ -113,6 +113,12 @@ public:
     /// parity: `EnderMan.teleport`.
     virtual void teleported(ServerEntity& mob) = 0;
 
+    /// Asked before a mob is moved somewhere by its own doing; false keeps it where it is.
+    virtual bool mayTeleport(ServerEntity& /*mob*/, double /*x*/, double /*y*/, double /*z*/,
+                             std::string_view /*cause*/) {
+        return true;
+    }
+
     /// parity: `AbstractSkeleton.performRangedAttack`.
     virtual void shootArrow(ServerEntity& mob, double targetX, double targetY, double targetZ, float power) = 0;
 

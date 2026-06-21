@@ -1,3 +1,5 @@
+#include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Items.hpp>
@@ -37,6 +39,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
@@ -403,6 +406,30 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     ServerEntity* entity = world->state().entity(interact.entityId);
     if (entity == nullptr || entity->removed) {
         return;
+    }
+    if (session->events != nullptr) {
+        const std::string_view hand =
+            interact.hand == wire::protocol::play::InteractPacket::kMainHand ? "main_hand" : "off_hand";
+        const auto describe = [&](server::plugins::PluginEvent& event) {
+            plugins::EventSink::player(event, *session);
+            event.set("entity_id", static_cast<std::int64_t>(entity->entityId()));
+            event.set("entity_type", entity->type().toString());
+            event.set("hand", std::string{hand});
+        };
+        if (!session->events->allowed(&server::plugins::pluginEventTypes::playerInteractEntityAt,
+                                      [&](server::plugins::PluginEvent& event) {
+                                          describe(event);
+                                          event.set("x", interact.x);
+                                          event.set("y", interact.y);
+                                          event.set("z", interact.z);
+                                      }) ||
+            !session->events->allowed(&server::plugins::pluginEventTypes::playerInteractEntity,
+                                      [&](server::plugins::PluginEvent& event) {
+                                          describe(event);
+                                          event.set("action", std::string{"interact"});
+                                      })) {
+            return;
+        }
     }
     // parity: `ItemFrame.interact`.
     if (world::itemFrames::isFrame(entity->type()) && useItemFrame(*session, *entity)) {

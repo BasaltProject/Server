@@ -1,4 +1,6 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
 
@@ -198,6 +200,19 @@ portal::BlockStateView view(LoadedWorld& world) {
 std::optional<PortalShape> light(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<PortalShape> shape = PortalShape::findEmpty(view(world), x, y, z, minY(world));
     if (!shape.has_value()) {
+        return std::nullopt;
+    }
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::worldPortalCreate,
+                                [&](server::plugins::PluginEvent& event) {
+                                    std::string blocks;
+                                    for (const portal::PortalBlock& block : shape->interior()) {
+                                        blocks += (blocks.empty() ? "" : "\n") + std::to_string(block.x) + "," +
+                                                  std::to_string(block.y) + "," + std::to_string(block.z);
+                                    }
+                                    event.set("world", world.name());
+                                    event.set("reason", std::string{"fire"});
+                                    event.set("blocks", std::move(blocks));
+                                })) {
         return std::nullopt;
     }
     const std::int32_t state = PortalShape::portalState(shape->axis());

@@ -3,6 +3,7 @@
 #include <basalt/server/storage/StoredPlayer.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <string>
@@ -12,6 +13,11 @@ namespace basalt::server::runtime::player {
 
 class PlayerStats {
 public:
+    /// Asked before a counter moves; false leaves it where it is.
+    using Gate = std::function<bool(std::string_view key, std::int64_t amount)>;
+
+    void setGate(Gate gate) { gate_ = std::move(gate); }
+
     void increment(std::string_view key, std::int64_t amount = 1);
 
     [[nodiscard]] std::int64_t get(std::string_view key) const;
@@ -42,6 +48,7 @@ private:
 
     std::map<std::string, Change, std::less<>> changes_;
 
+    Gate gate_;
     mutable std::mutex lock_;
     std::map<std::string, std::int64_t, std::less<>> counters_;
 

@@ -29,6 +29,10 @@
 #include <utility>
 #include <vector>
 
+namespace basalt::server::runtime::plugins {
+class EventSink;
+}
+
 namespace basalt::server::runtime::world {
 
 /// parity: `RedstoneTorchBlock.RECENT_TOGGLES`.
@@ -93,6 +97,13 @@ public:
     void setOwner(sched::Owner* owner) { owner_ = owner; }
 
     [[nodiscard]] sched::Owner* owner() const noexcept { return owner_; }
+
+    void setEvents(const plugins::EventSink* events, std::string worldName);
+
+    /// Where this world tells the plugins what happens in it; never null.
+    [[nodiscard]] const plugins::EventSink& events() const noexcept;
+
+    [[nodiscard]] const std::string& eventWorld() const noexcept { return eventWorld_; }
 
     void setRegionCount(std::function<std::int32_t()> regionCount) { regionCount_ = std::move(regionCount); }
 
@@ -360,6 +371,10 @@ public:
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
     void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event);
 
+    /// Asks the plugins whether the TNT block here may be lit, by `reason` and, if any, `who`.
+    [[nodiscard]] bool tntMayPrime(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view reason,
+                                   std::string_view who = {}) const;
+
     [[nodiscard]] std::vector<PrimedTntQueue::Primed> takePrimedTnt();
 
     /// Queued because the block write already holds this world's lock.
@@ -454,6 +469,8 @@ private:
     std::mutex graveyardMutex_;
     std::vector<std::unique_ptr<server::world::Chunk>> graveyard_;
 
+    const plugins::EventSink* events_ = nullptr;
+    std::string eventWorld_;
     PrimedTntQueue primedTntQueue_;
     std::vector<Spilled> spilled_;
     std::vector<std::array<std::int32_t, 3>> structureTriggers_;

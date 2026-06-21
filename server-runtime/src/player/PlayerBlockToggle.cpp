@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
@@ -7,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
 #include <basalt/server/runtime/player/PlayerFaces.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -92,6 +94,19 @@ bool ringBellFor(const BreakContext& context, world::LoadedWorld& world, const s
     }
     if (context.blocks == nullptr) {
         return false;
+    }
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::blockBellRing,
+                                [&](server::plugins::PluginEvent& event) {
+                                    if (player != nullptr) {
+                                        plugins::EventSink::player(event, *player);
+                                    }
+                                    event.set("world", world.name());
+                                    event.set("x", static_cast<std::int64_t>(x));
+                                    event.set("y", static_cast<std::int64_t>(y));
+                                    event.set("z", static_cast<std::int64_t>(z));
+                                    event.set("direction", std::string{faceName(face)});
+                                })) {
+        return true;
     }
     const std::vector<world::BlockEffect> effects{
         world::blockEffect::Event{.b0 = 1, .b1 = frameDirectionData(faceName(face))},

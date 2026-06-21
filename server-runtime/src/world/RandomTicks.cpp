@@ -1,9 +1,11 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/BambooGrowth.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/ChorusFlowerGrowth.hpp>
@@ -385,6 +387,18 @@ void spreadGrass(const randomTicks::Context& context, std::int32_t x, std::int32
     return false;
 }
 
+[[nodiscard]] bool moistureAllowed(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
+                                   std::int32_t moisture) {
+    return context.world.events().allowed(&server::plugins::pluginEventTypes::blockMoistureChange,
+                                          [&](server::plugins::PluginEvent& event) {
+                                              event.set("world", std::string{context.worldName});
+                                              event.set("x", static_cast<std::int64_t>(x));
+                                              event.set("y", static_cast<std::int64_t>(y));
+                                              event.set("z", static_cast<std::int64_t>(z));
+                                              event.set("moisture", static_cast<std::int64_t>(moisture));
+                                          });
+}
+
 /// parity: `FarmlandBlock.randomTick`.
 void dryFarmland(const randomTicks::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::int32_t stateId, std::vector<BlockChange>& changes) {
@@ -399,7 +413,7 @@ void dryFarmland(const randomTicks::Context& context, std::int32_t x, std::int32
         }
         const std::optional<std::int32_t> wet =
             registry::blockStateDefinitions::stateIdOf(*block, {{"moisture", std::to_string(kMaxMoisture)}}, stateId);
-        if (wet.has_value()) {
+        if (wet.has_value() && moistureAllowed(context, x, y, z, kMaxMoisture)) {
             set(context, x, y, z, *wet, changes);
         }
         return;
@@ -407,7 +421,7 @@ void dryFarmland(const randomTicks::Context& context, std::int32_t x, std::int32
     if (*moisture > 0) {
         const std::optional<std::int32_t> drier =
             registry::blockStateDefinitions::stateIdOf(*block, {{"moisture", std::to_string(*moisture - 1)}}, stateId);
-        if (drier.has_value()) {
+        if (drier.has_value() && moistureAllowed(context, x, y, z, *moisture - 1)) {
             set(context, x, y, z, *drier, changes);
         }
         return;

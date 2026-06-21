@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/player/PlayerEntityData.hpp>
 #include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 
 #include <algorithm>
@@ -237,6 +238,7 @@ void tickBody(PlayerSession& session, const entity::entityCollision::BlockAt& bl
     }
     // parity: `Player.updateSwimming`.
     const bool riding = session.vehicleId.has_value();
+    const bool wasSwimming = session.swimming;
     if (session.flying) {
         session.swimming = false;
     } else {
@@ -251,6 +253,15 @@ void tickBody(PlayerSession& session, const entity::entityCollision::BlockAt& bl
             session.swimming =
                 session.sprinting && !riding && waterAt(blockAt, session.x, eyeY, session.z) && feetInWater;
         }
+    }
+    if (session.swimming != wasSwimming && session.events != nullptr &&
+        !session.events->allowed(&server::plugins::pluginEventTypes::entityToggleSwim,
+                                 [&](server::plugins::PluginEvent& event) {
+                                     plugins::hookEvents::entity(event, session.worldName, session.entityId(),
+                                                                 "minecraft:player", session.x, session.y, session.z);
+                                     event.set("swimming", session.swimming);
+                                 })) {
+        session.swimming = wasSwimming;
     }
     // parity: `Player.updatePlayerPose`.
     if (!fits(session, Pose::Swimming, blockAt)) {

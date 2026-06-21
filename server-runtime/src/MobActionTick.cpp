@@ -27,6 +27,7 @@
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
@@ -418,7 +419,9 @@ void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntit
     const std::optional<std::int32_t> here = world.state().blockState(x, y, z);
     const server::registry::BlockState* shortGrass = server::registry::blocks::named("short_grass");
     if (here.has_value() && shortGrass != nullptr && *here == shortGrass->stateId) {
-        if (world.state().setBlockState(x, y, z, server::registry::blocks::air().stateId)) {
+        if (plugins::hookEvents::changeBlockAllowed(world.events(), world.name(), mob, x, y, z, *here,
+                                                    server::registry::blocks::air().stateId, "eat") &&
+            world.state().setBlockState(x, y, z, server::registry::blocks::air().stateId)) {
             broadcaster_->announceBlock(
                 watchers,
                 world::BlockChange{.x = x, .y = y, .z = z, .stateId = server::registry::blocks::air().stateId});
@@ -431,7 +434,9 @@ void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntit
     if (!below.has_value() || grassBlock == nullptr || dirt == nullptr || *below != grassBlock->stateId) {
         return;
     }
-    if (world.state().setBlockState(x, y - 1, z, dirt->stateId)) {
+    if (plugins::hookEvents::changeBlockAllowed(world.events(), world.name(), mob, x, y - 1, z, *below, dirt->stateId,
+                                                "eat") &&
+        world.state().setBlockState(x, y - 1, z, dirt->stateId)) {
         broadcaster_->announceBlock(watchers, world::BlockChange{.x = x, .y = y - 1, .z = z, .stateId = dirt->stateId});
     }
 }
@@ -455,7 +460,9 @@ void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& g
             !world::blockSurvival::isSupported(world.state(), x, y, z, snow->stateId)) {
             continue;
         }
-        if (!world.state().setBlockState(x, y, z, snow->stateId)) {
+        if (!plugins::hookEvents::changeBlockAllowed(world.events(), world.name(), golem, x, y, z, *here, snow->stateId,
+                                                     "trail") ||
+            !world.state().setBlockState(x, y, z, snow->stateId)) {
             continue;
         }
         // parity: `setBlockAndUpdate`.

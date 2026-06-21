@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -99,10 +100,16 @@ void MobActionSystem::setLeashedTo(world::LoadedWorld& world, ServerEntity& leas
     }
 }
 
-void MobActionSystem::dropLeash(world::LoadedWorld& world, ServerEntity& leashed, bool dropLead) {
+void MobActionSystem::dropLeash(world::LoadedWorld& world, ServerEntity& leashed, bool dropLead,
+                                std::string_view reason) {
     if (!leashed.leashHolderId.has_value()) {
         return;
     }
+    world.events().notify(&server::plugins::pluginEventTypes::entityUnleash, [&](server::plugins::PluginEvent& event) {
+        plugins::hookEvents::entity(event, world.name(), leashed);
+        event.set("reason", std::string{reason});
+        event.set("drop", dropLead);
+    });
     const std::int32_t holderId = *std::exchange(leashed.leashHolderId, std::nullopt);
     leashed.leashHolderUuid.reset();
     leashed.leashKnotAt.reset();
@@ -219,7 +226,7 @@ void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed
             leashed.leashHolderUuid.reset();
             leashed.leashKnotAt.reset();
             leashed.leashHolderId = -1;
-            dropLeash(world, leashed, true);
+            dropLeash(world, leashed, true, "holder_gone");
         }
     }
     if (!leashed.leashHolderId.has_value()) {
@@ -233,7 +240,7 @@ void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed
         (player != nullptr && !player->dead && player->gamemode != wire::protocol::play::Gamemode::Spectator) ||
         (holder != nullptr && !holder->removed && !holder->dying);
     if (!holderThere || leashed.dying || leashed.removed) {
-        dropLeash(world, leashed, world.gameRules().get(world::gameRules::kEntityDrops));
+        dropLeash(world, leashed, world.gameRules().get(world::gameRules::kEntityDrops), "holder_gone");
         return;
     }
     const leashes::Body holderBody = player != nullptr ? bodyOf(*player) : bodyOf(*holder);
@@ -245,7 +252,7 @@ void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed
     }
     if (distance > leashes::snapDistance(leashed)) {
         leashSound(world, "minecraft:entity.lead.break", holderBody.x, holderBody.y, holderBody.z);
-        dropLeash(world, leashed, true);
+        dropLeash(world, leashed, true, "distance");
         return;
     }
     const std::optional<leashes::Pull> pull =
@@ -309,7 +316,10 @@ MobActionSystem::LeashUse MobActionSystem::useOnLeashable(world::LoadedWorld& wo
         return LeashUse::DamageShears;
     }
     if (entity.leashHolderId == player.entityId()) {
-        dropLeash(world, entity, player.gamemode != wire::protocol::play::Gamemode::Creative);
+        if (!playerMayUnleash(world, player, entity)) {
+            return LeashUse::Done;
+        }
+        dropLeash(world, entity, player.gamemode != wire::protocol::play::Gamemode::Creative, "player");
         world::vibrations::emit(world.state(), "entity_interact", entity.x, entity.y, entity.z, world.gameTime(),
                                 {.entity = player.uuid()});
         leashSound(world, "minecraft:entity.lead.untied", entity.x, entity.y, entity.z);
@@ -319,6 +329,14 @@ MobActionSystem::LeashUse MobActionSystem::useOnLeashable(world::LoadedWorld& wo
     if (!holdingLead || heldByPlayer || !canHaveLeashAttachedTo(entity, bodyOf(player), player.entityId())) {
         return LeashUse::Pass;
     }
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::playerLeash,
+                                [&](server::plugins::PluginEvent& event) {
+                                    plugins::hookEvents::entity(event, world.name(), entity);
+                                    plugins::EventSink::player(event, player);
+                                    event.set("holder_id", static_cast<std::int64_t>(player.entityId()));
+                                })) {
+        return LeashUse::Done;
+    }
     if (entity.leashHolderId.has_value()) {
         dropLeash(world, entity, true);
     }
@@ -327,14 +345,26 @@ MobActionSystem::LeashUse MobActionSystem::useOnLeashable(world::LoadedWorld& wo
     return LeashUse::ConsumeOne;
 }
 
+bool MobActionSystem::playerMayUnleash(world::LoadedWorld& world, const PlayerSession& player,
+                                       const ServerEntity& leashed) {
+    return world.events().allowed(&server::plugins::pluginEventTypes::playerUnleash,
+                                  [&](server::plugins::PluginEvent& event) {
+                                      plugins::hookEvents::entity(event, world.name(), leashed);
+                                      plugins::EventSink::player(event, player);
+                                  });
+}
+
 bool MobActionSystem::cutLeashes(world::LoadedWorld& world, ServerEntity& entity, const PlayerSession* player) {
     bool dropped = false;
     for (ServerEntity* mob : leashedTo(world, entity, entity.x, entity.y + (entity.height() / 2.0), entity.z)) {
-        dropLeash(world, *mob, true);
+        if (player != nullptr && !playerMayUnleash(world, *player, *mob)) {
+            continue;
+        }
+        dropLeash(world, *mob, true, player != nullptr ? "player" : "unknown");
         dropped = true;
     }
-    if (entity.leashHolderId.has_value()) {
-        dropLeash(world, entity, true);
+    if (entity.leashHolderId.has_value() && (player == nullptr || playerMayUnleash(world, *player, entity))) {
+        dropLeash(world, entity, true, player != nullptr ? "player" : "unknown");
         dropped = true;
     }
     if (!dropped) {

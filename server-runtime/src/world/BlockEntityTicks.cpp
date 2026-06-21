@@ -1,5 +1,8 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/BlockEntityTicks.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
@@ -85,6 +88,42 @@ namespace crafting = server::world::crafting;
         return std::nullopt;
     }
     return *turned;
+}
+
+void announceBrewing(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                     const brewingStands::State& before, brewingStands::State& stand) {
+    const auto ingredientSlot = static_cast<std::size_t>(brewingStands::kIngredientSlot);
+    if (before.brewTime == 0 && stand.brewTime > 0 && stand.items[ingredientSlot].has_value()) {
+        world.events().notify(&server::plugins::pluginEventTypes::blockBrewStart,
+                              [&](server::plugins::PluginEvent& event) {
+                                  plugins::hookEvents::position(event, world.eventWorld(), x, y, z);
+                                  event.set("source", stand.items[ingredientSlot]->item.toString());
+                                  event.set("total_time", static_cast<std::int64_t>(stand.brewTime));
+                              });
+        return;
+    }
+    const auto& wasIngredient = before.items[ingredientSlot];
+    const auto& nowIngredient = stand.items[ingredientSlot];
+    const bool spent =
+        wasIngredient.has_value() && (!nowIngredient.has_value() || nowIngredient->count < wasIngredient->count);
+    if (before.brewTime != 1 || stand.brewTime != 0 || !spent) {
+        return;
+    }
+    // A brew that a plugin cancels leaves the bottles and the ingredient where they were, with the heat spent.
+    if (!world.events().allowed(
+            &server::plugins::pluginEventTypes::blockBrew, [&](server::plugins::PluginEvent& event) {
+                std::string results;
+                for (std::int32_t slot = 0; slot < brewingStands::kBottles; ++slot) {
+                    const auto& bottle = stand.items[static_cast<std::size_t>(slot)];
+                    results += (slot == 0 ? "" : "\n") + (bottle.has_value() ? bottle->item.toString() : "");
+                }
+                plugins::hookEvents::position(event, world.eventWorld(), x, y, z);
+                event.set("fuel", static_cast<std::int64_t>(stand.fuel));
+                event.set("results", std::move(results));
+            })) {
+        stand.items = before.items;
+        stand.potions = before.potions;
+    }
 }
 
 } // namespace
@@ -327,11 +366,20 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             // parity: `BrewingStandBlockEntity.serverTick`, which also shows what it holds on the.
             if (path == "brewing_stand") {
                 brewingStands::State stand = brewingStands::read(entity->data());
+                const bool watching = world.events().listening(&server::plugins::pluginEventTypes::blockBrewStart) ||
+                                      world.events().listening(&server::plugins::pluginEventTypes::blockBrew);
+                std::optional<brewingStands::State> before;
+                if (watching) {
+                    before = stand;
+                }
                 if (brewingStands::tick(stand, [&hooks, x, y, z](const server::world::loot::ItemStack& remainder) {
                         if (hooks.onDropped) {
                             hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = remainder});
                         }
                     })) {
+                    if (before.has_value()) {
+                        announceBrewing(world, x, y, z, *before, stand);
+                    }
                     brewingStands::write(stand, entity->data());
                     chunk->markDirty();
                     redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z,

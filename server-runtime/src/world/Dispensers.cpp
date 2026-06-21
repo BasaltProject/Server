@@ -670,7 +670,8 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
             }
         } else if (target.has_value() && isTntBlock(*target)) {
             // parity: `TntBlock.prime` then `removeBlock`, and with `tnt_explodes` off the block.
-            if (!context.gameRules.get(gameRules::kTntExplodes)) {
+            if (!context.gameRules.get(gameRules::kTntExplodes) ||
+                !context.world.tntMayPrime(tx, ty, tz, "dispenser")) {
                 return Special{.refused = true};
             }
             context.world.primeTnt(tx, ty, tz, "prime_fuse");

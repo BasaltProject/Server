@@ -114,7 +114,10 @@ public:
     /// Who owns this world's state: its chunks, its blocks and everything living in them.
     [[nodiscard]] sched::Owner& owner() const noexcept { return region_->owner(); }
 
-    void setEvents(plugins::EventSink* events) noexcept { events_ = events; }
+    void setEvents(plugins::EventSink* events) {
+        events_ = events;
+        state_.setEvents(events, name());
+    }
 
     /// Where the world tells the plugins what happens in it; never null.
     [[nodiscard]] const plugins::EventSink& events() const noexcept;

@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -11,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
@@ -263,6 +265,37 @@ void UiStateSync::sendAbilities() {
         });
 }
 
+void UiStateSync::filterCommandTree(wire::protocol::play::CommandsPacket& tree, const PlayerSession& session) {
+    const plugins::EventSink* events = owner_->options().events;
+    if (events == nullptr || !events->listening(&server::plugins::pluginEventTypes::playerCommandSend) ||
+        tree.nodes.empty()) {
+        return;
+    }
+    std::vector<std::int32_t>& roots = tree.nodes[0].children;
+    const server::plugins::PluginEvent* answered =
+        events->ask(&server::plugins::pluginEventTypes::playerCommandSend, [&](server::plugins::PluginEvent& event) {
+            std::string names;
+            for (const std::int32_t child : roots) {
+                names += (names.empty() ? "" : "\n") + tree.nodes[static_cast<std::size_t>(child)].name.value_or("");
+            }
+            plugins::EventSink::player(event, session);
+            event.set("commands", std::move(names));
+        });
+    const auto* kept = answered == nullptr ? nullptr : std::get_if<std::string>(&answered->get("commands"));
+    if (kept == nullptr) {
+        return;
+    }
+    std::set<std::string, std::less<>> names;
+    for (std::size_t from = 0; from <= kept->size();) {
+        const std::size_t end = std::min(kept->find('\n', from), kept->size());
+        names.insert(kept->substr(from, end - from));
+        from = end + 1;
+    }
+    std::erase_if(roots, [&](const std::int32_t child) {
+        return !names.contains(tree.nodes[static_cast<std::size_t>(child)].name.value_or(""));
+    });
+}
+
 void UiStateSync::sendCommandTree() {
     PlayerSession* session = owner_->playerSession();
     command::CommandDispatcher* dispatcher = owner_->options().commands;
@@ -270,8 +303,9 @@ void UiStateSync::sendCommandTree() {
         return;
     }
     sendPermissionLevel();
-    const wire::protocol::play::CommandsPacket tree =
+    wire::protocol::play::CommandsPacket tree =
         dispatcher->treeFor(command::PlayerCommandSource{*session, dispatcher->environment().groups()});
+    filterCommandTree(tree, *session);
     owner_->sendCompressed(wire::protocol::play::CommandsPacket::kId,
                            [&tree](wire::io::ByteBuffer& buffer) { tree.write(buffer); });
 }

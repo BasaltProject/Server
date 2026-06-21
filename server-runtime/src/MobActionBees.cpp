@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -261,6 +262,15 @@ void MobActionSystem::enterHive(ServerEntity& bee, const Pos& hive) {
     world::LoadedWorld* world = worldOf(bee);
     server::world::ChunkBlockEntity* entity = world == nullptr ? nullptr : hiveEntity(*world, hive);
     if (entity == nullptr || beehives::occupantCount(entity->data()) >= beehives::kMaxOccupants || bee.removed) {
+        return;
+    }
+    if (!world->events().allowed(&server::plugins::pluginEventTypes::entityEnterBlock,
+                                 [&](server::plugins::PluginEvent& event) {
+                                     plugins::hookEvents::entity(event, world->name(), bee);
+                                     event.set("block_x", static_cast<std::int64_t>(hive[0]));
+                                     event.set("block_y", static_cast<std::int64_t>(hive[1]));
+                                     event.set("block_z", static_cast<std::int64_t>(hive[2]));
+                                 })) {
         return;
     }
     random::RandomSource random = freshRandom();

@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/FallLanding.hpp>
 #include <basalt/server/runtime/world/FluidCurrents.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -234,6 +235,14 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
     const auto passenger = [](const EntityPushSystem::Body& body) {
         return body.mob != nullptr ? body.mob->vehicleId.has_value() : body.player->vehicleId.has_value();
     };
+    const auto collides = [&world, &cart](const EntityPushSystem::Body& body) {
+        return world.events().allowed(
+            &server::plugins::pluginEventTypes::vehicleEntityCollision, [&](server::plugins::PluginEvent& event) {
+                plugins::hookEvents::entity(event, world.name(), cart);
+                event.set("other_id", static_cast<std::int64_t>(body.mob != nullptr ? body.mob->entityId()
+                                                                                    : body.player->entityId()));
+            });
+    };
     // parity: whoever a moving empty cart takes aboard: no player, golem or cart, nobody riding.
     const auto takes = [&cart, &passenger](const EntityPushSystem::Body& body) {
         return body.mob != nullptr && body.mob->type().path() != "iron_golem" && !carts::isMinecart(body.mob->type()) &&
@@ -243,6 +252,9 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
         // parity: `OldMinecartBehavior.pushAndPickupEntities`.
         if (rideable && (cart.velocityX * cart.velocityX) + (cart.velocityZ * cart.velocityZ) >= 0.01) {
             for (const EntityPushSystem::Body& other : pushes_->pushablesIn(world, self, reach)) {
+                if (!collides(other)) {
+                    continue;
+                }
                 if (takes(other) && registry::entityAttributes::isLiving(other.mob->type())) {
                     static_cast<void>(board(world, cart, *other.mob));
                 } else {
@@ -264,7 +276,7 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
     bool pickedUp = false;
     if (rideable && cart.passengerIds.empty()) {
         for (const EntityPushSystem::Body& other : pushes_->pushablesIn(world, self, reach)) {
-            if (takes(other) && registry::entityAttributes::isLiving(other.mob->type()) &&
+            if (takes(other) && registry::entityAttributes::isLiving(other.mob->type()) && collides(other) &&
                 board(world, cart, *other.mob)) {
                 pickedUp = true;
                 break;
@@ -281,7 +293,8 @@ bool VehicleSystem::pushAndPickup(world::LoadedWorld& world, ServerEntity& cart,
         for (const EntityPushSystem::Body& other : pushes_->pushablesIn(world, self, touching)) {
             const bool golemOrCart = other.mob != nullptr &&
                                      (other.mob->type().path() == "iron_golem" || carts::isMinecart(other.mob->type()));
-            if (other.player != nullptr || golemOrCart || !cart.passengerIds.empty() || passenger(other)) {
+            if ((other.player != nullptr || golemOrCart || !cart.passengerIds.empty() || passenger(other)) &&
+                collides(other)) {
                 pushes_->push(world, other, self);
                 pushed = true;
             }

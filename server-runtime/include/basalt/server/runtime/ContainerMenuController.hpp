@@ -348,7 +348,8 @@ private:
     /// parity: `Slot.getMaxStackSize(ItemStack)`.
     [[nodiscard]] std::int32_t slotCapacity(const player::MenuSlot& slot, const storage::StoredItemStack& stack) const;
 
-    void payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity);
+    void payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity,
+                    const wire::protocol::play::BlockPos& at, const std::string& takenItem, std::int32_t takenAmount);
 
     /// parity: `BrewingStandMenu.PotionSlot.onTake`'s trigger, for a bottle just taken out.
     void awardBrewed(const server::world::loot::ItemStack& bottle);

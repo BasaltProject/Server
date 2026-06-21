@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -547,6 +548,21 @@ std::optional<bool> MobActionSystem::blockTagged(std::string_view tag, const wir
         return std::nullopt;
     }
     return world::realBlockTags::contains(*options_.blockTags, tag, block);
+}
+
+bool MobActionSystem::mayTeleport(ServerEntity& mob, double x, double y, double z, std::string_view cause) {
+    const world::LoadedWorld* world = worldOf(mob);
+    if (world == nullptr) {
+        return true;
+    }
+    return world->events().allowed(&server::plugins::pluginEventTypes::entityTeleport,
+                                   [&](server::plugins::PluginEvent& event) {
+                                       plugins::hookEvents::entity(event, world->name(), mob);
+                                       event.set("to_x", x);
+                                       event.set("to_y", y);
+                                       event.set("to_z", z);
+                                       event.set("cause", std::string{cause});
+                                   });
 }
 
 void MobActionSystem::teleported(ServerEntity& mob) {

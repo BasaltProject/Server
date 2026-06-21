@@ -523,6 +523,11 @@ void LoadedWorld::warmSpawnArea() {
                                                  static_cast<std::int32_t>(std::floor(spawn_[2]))};
 }
 
+const plugins::EventSink& WorldState::events() const noexcept {
+    static const plugins::EventSink kSilent{[]() -> server::plugins::PluginEventBus* { return nullptr; }};
+    return events_ != nullptr ? *events_ : kSilent;
+}
+
 const plugins::EventSink& LoadedWorld::events() const noexcept {
     static const plugins::EventSink kSilent{[]() -> server::plugins::PluginEventBus* { return nullptr; }};
     return events_ != nullptr ? *events_ : kSilent;

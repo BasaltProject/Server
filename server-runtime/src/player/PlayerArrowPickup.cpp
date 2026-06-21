@@ -1,7 +1,9 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerArrowPickup.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cmath>
@@ -49,6 +51,15 @@ std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::World
         const double dy = candidate->y - session.y;
         const double dz = candidate->z - session.z;
         if ((dx * dx) + (dy * dy) + (dz * dz) > kPickupRadius * kPickupRadius) {
+            continue;
+        }
+        if (session.events != nullptr &&
+            !session.events->allowed(&server::plugins::pluginEventTypes::playerPickupArrow,
+                                     [&](server::plugins::PluginEvent& event) {
+                                         plugins::EventSink::player(event, session);
+                                         event.set("entity_id", static_cast<std::int64_t>(candidate->entityId()));
+                                         event.set("entity_type", candidate->type().toString());
+                                     })) {
             continue;
         }
         // parity: `tryPickup`.

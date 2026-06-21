@@ -1,5 +1,7 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 
 #include <charconv>
@@ -85,6 +87,17 @@ std::vector<BlockEffect> playNote(const WorldState& world, std::int32_t x, std::
         return {};
     }
     if (!instrument.worksAbove() && *above != registry::blocks::air().stateId) {
+        return {};
+    }
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::blockNotePlay,
+                                [&](server::plugins::PluginEvent& event) {
+                                    event.set("world", world.eventWorld());
+                                    event.set("x", static_cast<std::int64_t>(x));
+                                    event.set("y", static_cast<std::int64_t>(y));
+                                    event.set("z", static_cast<std::int64_t>(z));
+                                    event.set("instrument", std::string{instrument.serializedName()});
+                                    event.set("note", static_cast<std::int64_t>(numberOf(properties, "note")));
+                                })) {
         return {};
     }
     std::vector<BlockEffect> effects{blockEffect::Event{.b0 = 0, .b1 = 0}};

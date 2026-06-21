@@ -121,6 +121,9 @@ bool teleportEnderman(MobContext& mob, double x, double y, double z) {
     if (!landing.has_value()) {
         return false;
     }
+    if (!mob.actions.mayTeleport(mob.mob, x, *landing, z, "enderman")) {
+        return false;
+    }
     mob.mob.x = x;
     mob.mob.y = *landing;
     mob.mob.z = z;

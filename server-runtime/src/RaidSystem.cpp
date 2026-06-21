@@ -1,7 +1,9 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -333,6 +335,15 @@ Raid* RaidSystem::createOrExtendRaid(world::LoadedWorld& world, PlayerSession& p
     entity::RaidManager& manager = world.raids();
     Raid* raid = manager.nearby(center);
     if (raid == nullptr) {
+        if (!world.events().allowed(&server::plugins::pluginEventTypes::raidTrigger,
+                                    [&](server::plugins::PluginEvent& event) {
+                                        plugins::EventSink::player(event, player);
+                                        event.set("x", static_cast<std::int64_t>(center[0]));
+                                        event.set("y", static_cast<std::int64_t>(center[1]));
+                                        event.set("z", static_cast<std::int64_t>(center[2]));
+                                    })) {
+            return nullptr;
+        }
         const std::int32_t id = manager.add(std::make_unique<Raid>(
             center, entity::raidWaves::groupsFor(world.difficulty()), options_.nextSeed ? options_.nextSeed() : 0));
         raid = manager.get(id);

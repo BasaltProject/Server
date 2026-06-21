@@ -1,5 +1,7 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
@@ -183,9 +185,28 @@ constexpr std::array<std::string_view, 19> kSignalSources{
     }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const std::int32_t was = numberOf(properties, "power").value_or(0);
-    const std::int32_t wanted = wireStrength(world, worldName, x, y, z);
+    std::int32_t wanted = wireStrength(world, worldName, x, y, z);
     if (was == wanted) {
         return std::nullopt;
+    }
+    if (const server::plugins::PluginEvent* answered =
+            world.events().ask(&server::plugins::pluginEventTypes::blockRedstone,
+                               [&](server::plugins::PluginEvent& event) {
+                                   event.set("world", std::string{worldName});
+                                   event.set("x", static_cast<std::int64_t>(x));
+                                   event.set("y", static_cast<std::int64_t>(y));
+                                   event.set("z", static_cast<std::int64_t>(z));
+                                   event.set("block", std::string{"minecraft:redstone_wire"});
+                                   event.set("old_current", static_cast<std::int64_t>(was));
+                                   event.set("new_current", static_cast<std::int64_t>(wanted));
+                               });
+        answered != nullptr) {
+        if (const auto* edited = std::get_if<std::int64_t>(&answered->get("new_current")); edited != nullptr) {
+            wanted = static_cast<std::int32_t>(std::clamp<std::int64_t>(*edited, 0, kMaxSignal));
+        }
+        if (was == wanted) {
+            return std::nullopt;
+        }
     }
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     if (block == nullptr) {

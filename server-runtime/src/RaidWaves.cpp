@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
@@ -114,6 +115,8 @@ std::optional<RaidPos> RaidSystem::findRandomSpawnPos(world::LoadedWorld& world,
 
 void RaidSystem::spawnGroup(world::LoadedWorld& world, Raid& raid, const RaidPos& pos) {
     bool leaderSet = false;
+    std::string spawned;
+    std::int32_t leaderId = -1;
     const std::int32_t wave = raid.groupsSpawned + 1;
     raid.totalHealth = 0.0F;
     const bool bonusWave = raid.shouldSpawnBonusGroup();
@@ -128,10 +131,12 @@ void RaidSystem::spawnGroup(world::LoadedWorld& world, Raid& raid, const RaidPos
             if (raider == nullptr) {
                 break;
             }
+            spawned += (spawned.empty() ? "" : ",") + std::to_string(raider->entityId());
             if (leads) {
                 raider->patrolLeader = true;
                 setLeader(world, raid, wave, *raider);
                 leaderSet = true;
+                leaderId = raider->entityId();
             }
             if (type != RaiderType::Ravager) {
                 continue;
@@ -147,6 +152,7 @@ void RaidSystem::spawnGroup(world::LoadedWorld& world, Raid& raid, const RaidPos
                 continue;
             }
             if (entity::ServerEntity* rider = spawnRaider(world, raid, riderType, wave, pos); rider != nullptr) {
+                spawned += "," + std::to_string(rider->entityId());
                 rider->vehicleId = raider->entityId();
                 raider->passengerIds.push_back(rider->entityId());
             }
@@ -156,6 +162,12 @@ void RaidSystem::spawnGroup(world::LoadedWorld& world, Raid& raid, const RaidPos
     ++raid.groupsSpawned;
     updateBossbar(world, raid);
     world.raids().dirty = true;
+    world.events().notify(&server::plugins::pluginEventTypes::raidWave, [&](server::plugins::PluginEvent& event) {
+        plugins::hookEvents::position(event, world.name(), raid.center[0], raid.center[1], raid.center[2]);
+        event.set("wave", static_cast<std::int64_t>(wave));
+        event.set("raiders", spawned);
+        event.set("leader_id", static_cast<std::int64_t>(leaderId));
+    });
 }
 
 entity::ServerEntity* RaidSystem::spawnRaider(world::LoadedWorld& world, Raid& raid, std::string_view type,

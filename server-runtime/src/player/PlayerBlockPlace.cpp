@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -7,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -153,22 +155,36 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
                                         random);
     const std::int32_t blockStateId = world::doubleBlocks::firstHalf(placedStateId);
     // parity: `BlockItem.canPlace`: a block never goes down inside somebody.
-    if (world::blockPlacement::isObstructed(blockStateId, placeAt.x, placeAt.y, placeAt.z,
-                                            buildersInTheWay(context.blocks, *session, world))) {
-        return false;
-    }
+    bool buildable = !world::blockPlacement::isObstructed(blockStateId, placeAt.x, placeAt.y, placeAt.z,
+                                                          buildersInTheWay(context.blocks, *session, world));
     // parity: `canSurvive` refuses a torch hung on nothing instead of placing it and dropping it later.
-    if (!world::blockSurvival::isSupported(world.state(), placeAt.x, placeAt.y, placeAt.z, blockStateId)) {
-        return false;
-    }
+    buildable =
+        buildable && world::blockSurvival::isSupported(world.state(), placeAt.x, placeAt.y, placeAt.z, blockStateId);
     // parity: `setPlacedBy` on a door, bed or tall flower: one block asked for, two put down.
     const std::optional<world::SecondHalf> second =
         world::doubleBlocks::secondHalf(blockStateId, placeAt.x, placeAt.y, placeAt.z);
     if (second.has_value()) {
         const std::optional<std::int32_t> room = world.state().blockState(second->x, second->y, second->z);
-        if (!room.has_value() || !reg::blockShapes::isReplaceable(*room)) {
-            return false;
+        buildable = buildable && room.has_value() && reg::blockShapes::isReplaceable(*room);
+    }
+    if (const server::plugins::PluginEvent* asked =
+            world.events().ask(&server::plugins::pluginEventTypes::blockCanBuild,
+                               [&](server::plugins::PluginEvent& event) {
+                                   plugins::EventSink::player(event, *session);
+                                   event.set("x", static_cast<std::int64_t>(placeAt.x));
+                                   event.set("y", static_cast<std::int64_t>(placeAt.y));
+                                   event.set("z", static_cast<std::int64_t>(placeAt.z));
+                                   const Identifier* named = reg::blockStateDefinitions::blockOf(blockStateId);
+                                   event.set("block", named == nullptr ? std::string{} : named->toString());
+                                   event.set("buildable", buildable);
+                               });
+        asked != nullptr) {
+        if (const auto* edited = std::get_if<bool>(&asked->get("buildable")); edited != nullptr) {
+            buildable = *edited;
         }
+    }
+    if (!buildable) {
+        return false;
     }
     // Asked once the block is decided to go down; a plugin veto makes the client put its prediction back.
     const Identifier* placedName = reg::blockStateDefinitions::blockOf(blockStateId);

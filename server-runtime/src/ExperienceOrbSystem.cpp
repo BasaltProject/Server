@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
@@ -205,7 +206,12 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
         // parity: `scanForMerges`, the orbs within half a block of this one's box.
         for (ServerEntity* other : living) {
             if (other != &orb && canMerge(*other, orb.entityId(), value) && std::abs(other->x - orb.x) < 1.0 &&
-                std::abs(other->y - orb.y) < 1.0 && std::abs(other->z - orb.z) < 1.0) {
+                std::abs(other->y - orb.y) < 1.0 && std::abs(other->z - orb.z) < 1.0 &&
+                world.events().allowed(&server::plugins::pluginEventTypes::entityOrbMerge,
+                                       [&](server::plugins::PluginEvent& event) {
+                                           plugins::hookEvents::entity(event, world.name(), orb);
+                                           event.set("source_id", static_cast<std::int64_t>(other->entityId()));
+                                       })) {
                 tagOf(orb).putInt("Count", countOf(orb) + countOf(*other));
                 tagOf(orb).putShort("Age", static_cast<std::int16_t>(std::min(ageOf(orb), ageOf(*other))));
                 other->removed = true;
@@ -274,6 +280,17 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
             if (takeDelays_.contains(player->entityId())) {
                 continue;
             }
+        }
+        if (!world.events().allowed(&server::plugins::pluginEventTypes::playerPickupExperience,
+                                    [&](server::plugins::PluginEvent& event) {
+                                        plugins::EventSink::player(event, *player);
+                                        event.set("orb_id", static_cast<std::int64_t>(orb.entityId()));
+                                        event.set("experience", static_cast<std::int64_t>(value));
+                                    })) {
+            continue;
+        }
+        {
+            const std::scoped_lock guard{lock_};
             takeDelays_[player->entityId()] = kPickupDelay;
         }
         for (PlayerSession* watcher : watchers) {

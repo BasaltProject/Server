@@ -1,5 +1,7 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -221,8 +223,31 @@ std::optional<BlockChange> craft(WorldState& world, std::int32_t x, std::int32_t
         return std::nullopt;
     }
     blockInventory::Slots slots = blockInventory::read(entity->data(), kSize);
-    const std::optional<server::world::loot::ItemStack> result =
+    std::optional<server::world::loot::ItemStack> result =
         hooks.resultFor(server::world::crafting::CraftingInput::of(kGrid, kGrid, slots));
+    if (result.has_value() && result->count > 0) {
+        const server::plugins::PluginEvent* answered = world.events().ask(
+            &server::plugins::pluginEventTypes::blockCrafterCraft, [&](server::plugins::PluginEvent& event) {
+                event.set("world", world.eventWorld());
+                event.set("x", static_cast<std::int64_t>(x));
+                event.set("y", static_cast<std::int64_t>(y));
+                event.set("z", static_cast<std::int64_t>(z));
+                event.set("result", result->item.toString());
+                event.set("count", static_cast<std::int64_t>(result->count));
+            });
+        if (answered != nullptr && answered->cancelled()) {
+            result.reset();
+        } else if (answered != nullptr) {
+            if (const auto* item = std::get_if<std::string>(&answered->get("result")); item != nullptr) {
+                if (const auto parsed = wire::common::Identifier::parse(*item); parsed.has_value()) {
+                    result->item = *parsed;
+                }
+            }
+            if (const auto* count = std::get_if<std::int64_t>(&answered->get("count")); count != nullptr) {
+                result->count = static_cast<std::int32_t>(*count);
+            }
+        }
+    }
     if (!result.has_value() || result->count <= 0) {
         // parity: `CrafterBlock.dispenseFrom` raises `levelEvent(1050.
         return BlockChange{.x = x,

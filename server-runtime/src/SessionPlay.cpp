@@ -1,4 +1,5 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
@@ -19,6 +20,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
+#include <basalt/server/runtime/plugins/PlayerHookEvents.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -266,6 +268,28 @@ void ClientSession::runCommand(const std::string& command, const chat::SignedArg
     // No vanilla counterpart: an operator should see what players run, and console output is not protocol parity.
     logger_.info([session, &line] { return session->name() + " issued server command: /" + line; });
     command::PlayerCommandSource source{*session, dispatcher->environment().groups(), signedArguments};
+    if (options_.events != nullptr && options_.events->listening(&server::plugins::pluginEventTypes::commandUnknown)) {
+        const std::string word = line.substr(0, line.find(' '));
+        const std::vector<command::CommandNode*> usable = dispatcher->usableCommands(source);
+        if (std::ranges::none_of(usable, [&word](const command::CommandNode* node) { return node->name() == word; })) {
+            const server::plugins::PluginEvent* asked = options_.events->ask(
+                &server::plugins::pluginEventTypes::commandUnknown, [&](server::plugins::PluginEvent& event) {
+                    plugins::EventSink::player(event, *session);
+                    event.set("command", line);
+                    event.set("message", std::string{});
+                    event.set("silent", false);
+                });
+            const auto* message = asked == nullptr ? nullptr : std::get_if<std::string>(&asked->get("message"));
+            const auto* silent = asked == nullptr ? nullptr : std::get_if<bool>(&asked->get("silent"));
+            if (silent != nullptr && *silent) {
+                return;
+            }
+            if (message != nullptr && !message->empty()) {
+                source.sendSystemMessage(wire::text::miniMessage::parse(*message));
+                return;
+            }
+        }
+    }
     dispatcher->execute(source, line);
 }
 
@@ -663,6 +687,9 @@ void ClientSession::enterPlay() {
     session->chatVisibility.store(static_cast<PlayerSession::ChatVisibility>(std::clamp(pendingChatVisibility_, 0, 2)));
     playerSession_ = std::move(session);
     PlayerSession& player = *playerSession_;
+    if (options_.events != nullptr) {
+        plugins::playerHooks::install(player, *options_.events);
+    }
     secureChat_ = std::make_unique<chat::SecureChat>(
         player.uuid(), options_.enforceSecureProfile && !translatedClient(), options_.servicesKeys);
 

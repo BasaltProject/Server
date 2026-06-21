@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerTrident.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Precipitation.hpp>
@@ -119,6 +121,12 @@ void release(const BreakContext& context, PlayerSession& player, world::LoadedWo
         player.autoSpinDamage = kBaseDamage;
         player.autoSpinItem = worn;
         player.shoulderDropPending = true;
+        world.events().notify(&server::plugins::pluginEventTypes::playerRiptide,
+                              [&](server::plugins::PluginEvent& event) {
+                                  plugins::EventSink::player(event, player);
+                                  event.set("item", worn.id);
+                                  event.set("strength", static_cast<double>(riptide));
+                              });
         playAround(context, world, sound, player.x, player.y, player.z);
         return;
     }

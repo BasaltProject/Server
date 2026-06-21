@@ -1,3 +1,4 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
@@ -608,6 +610,15 @@ void ContainerMenuController::clickContainerButton(std::int32_t button) {
     } else if (button == ContainerButtonClickPacket::kLecternNextPage) {
         wanted = lecternPage_ + 1;
     } else if (button == ContainerButtonClickPacket::kLecternTakeBook) {
+        if (!world->events().allowed(&server::plugins::pluginEventTypes::playerTakeLecternBook,
+                                     [&](server::plugins::PluginEvent& event) {
+                                         plugins::EventSink::player(event, *session);
+                                         event.set("x", static_cast<std::int64_t>(pos.x));
+                                         event.set("y", static_cast<std::int64_t>(pos.y));
+                                         event.set("z", static_cast<std::int64_t>(pos.z));
+                                     })) {
+            return;
+        }
         const std::optional<std::pair<world::BlockChange, server::world::loot::ItemStack>> taken =
             world::lecterns::takeBook(world->state(), pos.x, pos.y, pos.z);
         if (!taken.has_value()) {
@@ -627,7 +638,16 @@ void ContainerMenuController::clickContainerButton(std::int32_t button) {
     } else {
         return;
     }
-    if (wanted < 0) {
+    if (wanted < 0 || !world->events().allowed(
+                          &server::plugins::pluginEventTypes::playerLecternPage,
+                          [&](server::plugins::PluginEvent& event) {
+                              plugins::EventSink::player(event, *session);
+                              event.set("x", static_cast<std::int64_t>(pos.x));
+                              event.set("y", static_cast<std::int64_t>(pos.y));
+                              event.set("z", static_cast<std::int64_t>(pos.z));
+                              event.set("old_page", static_cast<std::int64_t>(lecternPage_));
+                              event.set("new_page", static_cast<std::int64_t>(wanted));
+                          })) {
         return;
     }
     lecternPage_ = wanted;

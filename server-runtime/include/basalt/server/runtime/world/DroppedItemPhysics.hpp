@@ -6,6 +6,9 @@
 #include <basalt/server/runtime/world/WorldMutex.hpp>
 
 #include <cstdint>
+#include <functional>
+#include <mutex>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -44,6 +47,19 @@ public:
     /// parity: `(tickCount + getId()) % 4 == 0`.
     static constexpr std::int32_t kRestingMoveEvery = 4;
 
+    /// Asked with the lock released, so a handler may use the world.
+    using MergeGate = std::function<bool(const DroppedItem& into, const DroppedItem& from)>;
+
+    void setMergeGate(MergeGate gate, std::function<bool()> listened) {
+        mergeGate_ = std::move(gate);
+        mergeListened_ = std::move(listened);
+    }
+
+    /// The items that reach their lifetime on the next tick.
+    [[nodiscard]] std::vector<DroppedItem> expiring(const sched::Region* region) const;
+
+    void restartAge(std::int32_t entityId);
+
     DroppedItemPhysics(WorldMutex& mutex, entity::entityCollision::BlockAt blockAt)
         : mutex_(&mutex), blockAt_(std::move(blockAt)) {}
 
@@ -75,11 +91,13 @@ private:
 
     void moveItem(DroppedItem& item);
     void mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
-                             std::vector<std::int32_t>& absorbed);
+                             std::vector<std::int32_t>& absorbed, std::unique_lock<WorldMutex>& lock);
 
     WorldMutex* mutex_;
     entity::entityCollision::BlockAt blockAt_;
     std::vector<DroppedItem> droppedItems_;
+    MergeGate mergeGate_;
+    std::function<bool()> mergeListened_;
 };
 
 } // namespace basalt::server::runtime::world

@@ -177,8 +177,29 @@ bool DroppedItemPhysics::shiftItem(std::int32_t entityId, double dx, double dy, 
     return true;
 }
 
-std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* region) {
+std::vector<DroppedItem> DroppedItemPhysics::expiring(const sched::Region* region) const {
+    const WorldReadLock lock{*mutex_};
+    std::vector<DroppedItem> found;
+    for (const DroppedItem& item : droppedItems_) {
+        if (item.age != kUnlimitedLifetimeAge && item.age + 1 >= kItemLifetimeTicks &&
+            (region == nullptr || region->ownsPosition(item.x, item.z))) {
+            found.push_back(item);
+        }
+    }
+    return found;
+}
+
+void DroppedItemPhysics::restartAge(std::int32_t entityId) {
     const WorldWriteLock lock{*mutex_};
+    const auto at =
+        std::ranges::find_if(droppedItems_, [entityId](const DroppedItem& item) { return item.entityId == entityId; });
+    if (at != droppedItems_.end()) {
+        at->age = 0;
+    }
+}
+
+std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* region) {
+    std::unique_lock<WorldMutex> lock{*mutex_};
     std::vector<std::int32_t> despawned;
     for (std::size_t index = 0; index < droppedItems_.size();) {
         DroppedItem& item = droppedItems_[index];
@@ -225,13 +246,13 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         if (item.age % interval != 0) {
             continue;
         }
-        mergeWithNeighbours(index, despawned, absorbed);
+        mergeWithNeighbours(index, despawned, absorbed, lock);
     }
     return despawned;
 }
 
 void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
-                                             std::vector<std::int32_t>& absorbed) {
+                                             std::vector<std::int32_t>& absorbed, std::unique_lock<WorldMutex>& lock) {
     const auto maxOf = [](const DroppedItem& item) {
         return registry::itemStacking::maxStackSize(item.item, item.components);
     };
@@ -239,6 +260,7 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
     if (droppedItems_[index].count >= maxOf(droppedItems_[index])) {
         return;
     }
+    std::pair<std::int32_t, std::int32_t> approved{-1, -1};
     for (std::size_t other = 0; other < droppedItems_.size();) {
         if (other == index) {
             ++other;
@@ -252,6 +274,29 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
             std::abs(candidate.x - item.x) > kMergeRange || std::abs(candidate.z - item.z) > kMergeRange ||
             std::abs(candidate.y - item.y) > kMergeHeight) {
             ++other;
+            continue;
+        }
+        if (mergeGate_ && approved != std::pair{item.entityId, candidate.entityId} && mergeListened_ &&
+            mergeListened_()) {
+            const DroppedItem into = item;
+            const DroppedItem from = candidate;
+            lock.unlock();
+            const bool allowed = mergeGate_(into, from);
+            lock.lock();
+            const auto intoAt = std::ranges::find_if(
+                droppedItems_, [&into](const DroppedItem& each) { return each.entityId == into.entityId; });
+            const auto fromAt = std::ranges::find_if(
+                droppedItems_, [&from](const DroppedItem& each) { return each.entityId == from.entityId; });
+            if (intoAt == droppedItems_.end() || fromAt == droppedItems_.end()) {
+                return;
+            }
+            index = static_cast<std::size_t>(intoAt - droppedItems_.begin());
+            other = static_cast<std::size_t>(fromAt - droppedItems_.begin());
+            if (!allowed) {
+                ++other;
+                continue;
+            }
+            approved = {into.entityId, from.entityId};
             continue;
         }
         const std::int32_t moved = std::min(std::min(maxOf(item), kMergeCap) - item.count, candidate.count);

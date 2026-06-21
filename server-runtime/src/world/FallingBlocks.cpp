@@ -5,6 +5,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -205,6 +206,11 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
     const bool wouldContinueFalling = below.has_value() && isFree(*below);
     const bool wouldSurvive =
         (!canSurvive || canSurvive(entity.objectData, blockX, blockY, blockZ)) && !wouldContinueFalling;
+    if (mayReplace && wouldSurvive &&
+        !plugins::hookEvents::changeBlockAllowed(world.events(), world.eventWorld(), entity, blockX, blockY, blockZ,
+                                                 at.value_or(0), entity.objectData, "fall")) {
+        return Landing{};
+    }
     if (mayReplace && wouldSurvive && world.setBlockState(blockX, blockY, blockZ, entity.objectData)) {
         std::int32_t landed = entity.objectData;
         if (const std::optional<std::int32_t> set =

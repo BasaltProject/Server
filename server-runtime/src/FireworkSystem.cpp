@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -279,6 +280,12 @@ void FireworkSystem::tick(world::LoadedWorld& world, const std::vector<PlayerSes
 
 void FireworkSystem::explode(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                              const std::vector<ServerEntity*>& living, ServerEntity& rocket) {
+    if (!world.events().allowed(
+            &server::plugins::pluginEventTypes::entityFireworkExplode,
+            [&](server::plugins::PluginEvent& event) { plugins::hookEvents::entity(event, world.name(), rocket); })) {
+        rocket.removed = true;
+        return;
+    }
     broadcastEvent(watchers, rocket.entityId(), kExplodeEvent);
     std::optional<wire::common::Uuid> owner;
     if (rocket.ownerId.has_value()) {

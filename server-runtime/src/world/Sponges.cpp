@@ -1,5 +1,7 @@
+#include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/Sponges.hpp>
 
 #include <array>
@@ -41,8 +43,10 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kFaces{{
            (static_cast<std::int64_t>(y) & 0xFFF);
 }
 
-[[nodiscard]] bool drink(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                         const OnChanged& onChanged) {
+using Drunk = std::array<std::int32_t, 4>;
+
+[[nodiscard]] bool drink(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const OnChanged& onChanged,
+                         std::vector<Drunk>& drunk) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return false;
@@ -57,6 +61,7 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kFaces{{
         if (!world.setBlockState(x, y, z, empty)) {
             return false;
         }
+        drunk.push_back({x, y, z, *stateId});
         onChanged(empty, x, y, z);
         return true;
     }
@@ -71,6 +76,7 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kFaces{{
     if (!drained.has_value() || !world.setBlockState(x, y, z, *drained)) {
         return false;
     }
+    drunk.push_back({x, y, z, *stateId});
     onChanged(*drained, x, y, z);
     return true;
 }
@@ -97,6 +103,7 @@ void absorb(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, c
     std::unordered_set<std::int64_t> visited{packed(x, y, z)};
     std::vector<std::array<std::int32_t, 3>> frontier{{x, y, z}};
     std::int32_t absorbed = 0;
+    std::vector<Drunk> drunk;
     for (std::int32_t step = 1; step <= kReach; ++step) {
         std::vector<std::array<std::int32_t, 3>> next;
         for (const std::array<std::int32_t, 3>& position : frontier) {
@@ -107,7 +114,7 @@ void absorb(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, c
                 const std::int32_t nx = position[0] + face[0];
                 const std::int32_t ny = position[1] + face[1];
                 const std::int32_t nz = position[2] + face[2];
-                if (!visited.insert(packed(nx, ny, nz)).second || !drink(world, nx, ny, nz, onChanged)) {
+                if (!visited.insert(packed(nx, ny, nz)).second || !drink(world, nx, ny, nz, onChanged, drunk)) {
                     continue;
                 }
                 ++absorbed;
@@ -120,6 +127,27 @@ void absorb(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, c
         frontier = std::move(next);
     }
     if (absorbed == 0) {
+        return;
+    }
+    // A cancelled absorption puts every block back, since the search needs each drained block gone to go on.
+    if (!world.events().allowed(&server::plugins::pluginEventTypes::blockSpongeAbsorb,
+                                [&](server::plugins::PluginEvent& event) {
+                                    std::string lines;
+                                    for (const Drunk& at : drunk) {
+                                        lines += (lines.empty() ? "" : "\n") + std::to_string(at[0]) + "," +
+                                                 std::to_string(at[1]) + "," + std::to_string(at[2]);
+                                    }
+                                    event.set("world", world.eventWorld());
+                                    event.set("x", static_cast<std::int64_t>(x));
+                                    event.set("y", static_cast<std::int64_t>(y));
+                                    event.set("z", static_cast<std::int64_t>(z));
+                                    event.set("blocks", std::move(lines));
+                                })) {
+        for (const Drunk& at : drunk) {
+            if (world.setBlockState(at[0], at[1], at[2], at[3])) {
+                onChanged(at[3], at[0], at[1], at[2]);
+            }
+        }
         return;
     }
     const std::optional<std::int32_t> wet =
