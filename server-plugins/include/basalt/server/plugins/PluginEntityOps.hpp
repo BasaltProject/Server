@@ -106,6 +106,7 @@ inline constexpr std::array kEntityOperations{
     EntityOperationSpec{"nbt", ""},
     EntityOperationSpec{"nbt_value", ""},
     EntityOperationSpec{"nbt_set", ""},
+    EntityOperationSpec{"nbt_remove", ""},
     EntityOperationSpec{"push", ""},
     EntityOperationSpec{"knockback", ""},
 };

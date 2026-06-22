@@ -160,6 +160,7 @@ void EntityVisibilityTracker::forgetEverythingDrawn() {
     trackedEquipment_.clear();
     lastEntityPositions_.clear();
     lastRuntimeEntityMetadata_.clear();
+    sentSourceVersion_.clear();
     lastPassengers_.clear();
     lastMobEquipment_.clear();
     lastDisplayText_.clear();
@@ -182,6 +183,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());
+                sentSourceVersion_.erase(entity->entityId());
                 lastPassengers_.erase(entity->entityId());
                 lastLeashHolders_.erase(entity->entityId());
                 lastMobEquipment_.erase(entity->entityId());
@@ -232,6 +234,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             });
             const entity::RuntimeEntityMetadata live = entity::runtimeEntityMetadata(*entity);
             lastRuntimeEntityMetadata_.insert_or_assign(entity->entityId(), live);
+            sentSourceVersion_.insert_or_assign(entity->entityId(), entity->sourceNbtVersion);
             std::vector<SetEntityDataPacket::Entry> metadata;
             if (entity->sourceNbt.has_value()) {
                 metadata = entity::generatedEntityMetadata(entity->type().path(), *entity->sourceNbt);
@@ -272,6 +275,20 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 SetEntityDataPacket{.entityId = entity->entityId(), .entries = changes}.write(buffer);
             });
+        }
+        if (entity->sourceNbt.has_value() && sentSourceVersion_[entity->entityId()] != entity->sourceNbtVersion) {
+            sentSourceVersion_[entity->entityId()] = entity->sourceNbtVersion;
+            std::vector<SetEntityDataPacket::Entry> saved =
+                entity::generatedEntityMetadata(entity->type().path(), *entity->sourceNbt);
+            const std::vector<SetEntityDataPacket::Entry> runtime = live.changesFrom(nullptr);
+            std::erase_if(saved, [&runtime](const SetEntityDataPacket::Entry& held) {
+                return std::ranges::any_of(runtime, [&held](const auto& own) { return own.index == held.index; });
+            });
+            if (!saved.empty()) {
+                owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                    SetEntityDataPacket{.entityId = entity->entityId(), .entries = saved}.write(buffer);
+                });
+            }
         }
         syncMobEquipment(*entity);
         if (entity->displayText.has_value()) {
@@ -349,6 +366,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             gone.push_back(entityId);
             lastEntityPositions_.erase(entityId);
             lastRuntimeEntityMetadata_.erase(entityId);
+            sentSourceVersion_.erase(entityId);
             lastPassengers_.erase(entityId);
             lastLeashHolders_.erase(entityId);
         }

@@ -75,6 +75,9 @@ struct BeeState {
 /// parity: `addAdditionalSaveData` and `addPersistentAngerSaveData`.
 void write(const ServerEntity& bee, wire::nbt::NbtCompound& tag);
 
+/// Takes the saved fields of the bee's source data back into its live state, after a plugin changed them.
+void reload(ServerEntity& bee);
+
 [[nodiscard]] std::int8_t flagsOf(const BeeState& state);
 
 /// parity: `NeutralMob.isAngry`.

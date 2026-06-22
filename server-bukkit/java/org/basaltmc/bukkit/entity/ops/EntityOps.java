@@ -136,6 +136,86 @@ public interface EntityOps extends Entity, Cored {
         return !core().alive();
     }
 
+    default boolean wouldCollideUsing(BoundingBox box) {
+        return getWorld().hasCollisionsIn(box);
+    }
+
+    default boolean collidesAt(Location location) {
+        BoundingBox box = getBoundingBox();
+        return wouldCollideUsing(box.clone().shift(location.getX() - box.getCenterX(), location.getY() - box.getMinY(),
+            location.getZ() - box.getCenterZ()));
+    }
+
+    default boolean isAlliedTo(Entity other) {
+        org.bukkit.scoreboard.Scoreboard board = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
+        org.bukkit.scoreboard.Team mine = board.getEntityTeam(this);
+        return mine != null && mine.equals(board.getEntityTeam(other));
+    }
+
+    default boolean isInRain() {
+        World world = getWorld();
+        if (!world.hasStorm()) {
+            return false;
+        }
+        BoundingBox box = getBoundingBox();
+        return rainsAt(world, getLocation().getBlockX(), getLocation().getBlockY(), getLocation().getBlockZ())
+            || rainsAt(world, getLocation().getBlockX(), (int) Math.floor(box.getMaxY()), getLocation().getBlockZ());
+    }
+
+    private static boolean rainsAt(World world, int x, int y, int z) {
+        return y > world.getHighestBlockYAt(x, z, org.bukkit.HeightMap.MOTION_BLOCKING)
+            && world.getTemperature(x, y, z) >= 0.15;
+    }
+
+    default org.bukkit.block.PistonMoveReaction getPistonMoveReaction() {
+        return switch (getType()) {
+            case AREA_EFFECT_CLOUD, INTERACTION, MARKER, BLOCK_DISPLAY, ITEM_DISPLAY, TEXT_DISPLAY ->
+                org.bukkit.block.PistonMoveReaction.IGNORE;
+            default -> org.bukkit.block.PistonMoveReaction.MOVE;
+        };
+    }
+
+    default org.bukkit.inventory.ItemStack getPickItemStack() {
+        String type = getType().getKey().getKey();
+        org.bukkit.Material found = switch (type) {
+            case "item", "player" -> null;
+            case "end_crystal" -> org.bukkit.Material.END_CRYSTAL;
+            case "leash_knot" -> org.bukkit.Material.LEAD;
+            default -> {
+                org.bukkit.Material direct = org.bukkit.Material.matchMaterial(type);
+                yield direct != null && direct.isItem() ? direct
+                    : org.bukkit.Material.matchMaterial(type + "_spawn_egg");
+            }
+        };
+        if (this instanceof org.bukkit.entity.Item item) {
+            return item.getItemStack().clone();
+        }
+        return found == null ? null : new org.bukkit.inventory.ItemStack(found);
+    }
+
+    default org.bukkit.inventory.ItemStack getWeapon() {
+        return this instanceof org.bukkit.entity.AbstractArrow ? EntityNbt.item(core(), "weapon", null) : null;
+    }
+
+    default boolean hasData(io.papermc.paper.datacomponent.DataComponentType type) {
+        return EntityComponents.read(core(), type.getKey().getKey()) != null;
+    }
+
+    default <T> T getData(io.papermc.paper.datacomponent.DataComponentType.Valued<T> type) {
+        Object stored = EntityComponents.read(core(), type.getKey().getKey());
+        return stored == null ? null : org.basaltmc.bukkit.datacomponent.ComponentOps.decodeDefault(type, stored);
+    }
+
+    default <T> T getDataOrDefault(io.papermc.paper.datacomponent.DataComponentType.Valued<? extends T> type,
+            T fallback) {
+        T found = getData(type);
+        return found != null ? found : fallback;
+    }
+
+    default io.papermc.paper.threadedregions.scheduler.EntityScheduler getScheduler() {
+        return new org.basaltmc.bukkit.player.PlayerEntityScheduler(this);
+    }
+
     default boolean isValid() {
         return core().alive();
     }

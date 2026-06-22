@@ -75,18 +75,8 @@ void putPos(NbtCompound& tag, std::string_view key, const std::optional<Pos>& po
 
 bool isBee(const wire::common::Identifier& type) { return type == wire::common::Identifier::vanilla("bee"); }
 
-BeeState& stateOf(ServerEntity& bee, random::RandomSource& random) {
-    if (bee.bee != nullptr) {
-        return *bee.bee;
-    }
-    bee.bee = std::make_shared<BeeState>();
-    BeeState& state = *bee.bee;
-    // parity: the constructor's `Mth.nextInt(random, 20, 60)`.
-    state.flowerCooldown = kFlowerRetryMin + random.nextInt(kFlowerRetryMax - kFlowerRetryMin + 1);
-    if (!bee.sourceNbt.has_value()) {
-        return state;
-    }
-    const NbtCompound& tag = *bee.sourceNbt;
+namespace {
+void readSaved(BeeState& state, const NbtCompound& tag) {
     state.hasNectar = tag.getBoolean("HasNectar");
     state.hasStung = tag.getBoolean("HasStung");
     state.ticksWithoutNectar = tag.getInt("TicksSincePollination");
@@ -101,7 +91,27 @@ BeeState& stateOf(ServerEntity& bee, random::RandomSource& random) {
         state.legacyAngerTime = tag.getInt("AngerTime");
     }
     state.angryAt = uuidIn(tag, "angry_at");
+}
+} // namespace
+
+BeeState& stateOf(ServerEntity& bee, random::RandomSource& random) {
+    if (bee.bee != nullptr) {
+        return *bee.bee;
+    }
+    bee.bee = std::make_shared<BeeState>();
+    BeeState& state = *bee.bee;
+    // parity: the constructor's `Mth.nextInt(random, 20, 60)`.
+    state.flowerCooldown = kFlowerRetryMin + random.nextInt(kFlowerRetryMax - kFlowerRetryMin + 1);
+    if (bee.sourceNbt.has_value()) {
+        readSaved(state, *bee.sourceNbt);
+    }
     return state;
+}
+
+void reload(ServerEntity& bee) {
+    if (bee.bee != nullptr && bee.sourceNbt.has_value()) {
+        readSaved(*bee.bee, *bee.sourceNbt);
+    }
 }
 
 void write(const ServerEntity& bee, NbtCompound& tag) {

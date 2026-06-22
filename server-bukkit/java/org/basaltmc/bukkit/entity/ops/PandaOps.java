@@ -29,4 +29,13 @@ public interface PandaOps extends Panda, Cored {
     default void setHiddenGene(Panda.Gene gene) {
         core().nbtSet("HiddenGene", "string", gene.name().toLowerCase(Locale.ROOT));
     }
+
+    default Panda.Gene getCombinedGene() {
+        Panda.Gene main = getMainGene();
+        Panda.Gene hidden = getHiddenGene();
+        if (!main.isRecessive()) {
+            return main;
+        }
+        return main == hidden ? main : Panda.Gene.NORMAL;
+    }
 }

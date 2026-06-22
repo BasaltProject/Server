@@ -23,4 +23,25 @@ public interface ZombieOps extends Zombie, Cored {
     default void setCanBreakDoors(boolean breakDoors) {
         core().nbtSet("CanBreakDoors", "bool", breakDoors);
     }
+
+    default boolean isVillager() {
+        return getType() == org.bukkit.entity.EntityType.ZOMBIE_VILLAGER;
+    }
+
+    default org.bukkit.entity.Villager.Profession getVillagerProfession() {
+        if (!isVillager()) {
+            return null;
+        }
+        java.util.Map<String, Object> data = org.basaltmc.bukkit.item.Nbt.map(EntityNbt.compound(core(), "")
+            .get("VillagerData"));
+        String id = data == null ? null : org.basaltmc.bukkit.item.Nbt.string(data, "profession", null);
+        org.bukkit.entity.Villager.Profession found = id == null ? null : io.papermc.paper.registry.RegistryAccess
+            .registryAccess().getRegistry(io.papermc.paper.registry.RegistryKey.VILLAGER_PROFESSION)
+            .get(org.bukkit.NamespacedKey.fromString(id));
+        return found == null ? org.bukkit.entity.Villager.Profession.NONE : found;
+    }
+
+    default boolean isConverting() {
+        return core().nbtValue("ConversionTime") instanceof Number time && time.intValue() > -1;
+    }
 }

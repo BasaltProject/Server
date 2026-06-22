@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
@@ -470,6 +471,24 @@ void putAt(NbtCompound& root, std::string_view path, NbtTag tag) {
     }
 }
 
+bool removeAt(NbtCompound& root, std::string_view path) {
+    NbtCompound* current = &root;
+    while (true) {
+        const std::size_t dot = path.find('.');
+        if (dot == std::string_view::npos) {
+            const bool held = current->contains(path);
+            current->remove(path);
+            return held;
+        }
+        NbtTag* inner = current->find(path.substr(0, dot));
+        if (inner == nullptr || inner->get<NbtCompound>() == nullptr) {
+            return false;
+        }
+        current = inner->get<NbtCompound>();
+        path = path.substr(dot + 1);
+    }
+}
+
 [[nodiscard]] NbtTag typedTag(std::string_view type, const Value& value) {
     if (type == "bool" || type == "byte") {
         return NbtTag::ofByte(static_cast<std::int8_t>(asInt(value)));
@@ -488,6 +507,28 @@ void putAt(NbtCompound& root, std::string_view path, NbtTag tag) {
     }
     if (type == "double") {
         return NbtTag::ofDouble(asReal(value));
+    }
+    if (type == "uuid") {
+        const std::optional<wire::common::Uuid> parsed =
+            wire::common::Uuid::parse(asText(value).value_or(std::string{}));
+        if (parsed.has_value()) {
+            const auto word = [](std::uint64_t part) {
+                return static_cast<std::int32_t>(static_cast<std::uint32_t>(part));
+            };
+            return NbtTag::ofIntArray(
+                {word(parsed->high() >> 32), word(parsed->high()), word(parsed->low() >> 32), word(parsed->low())});
+        }
+    }
+    if (type == "pos") {
+        std::vector<std::int32_t> parts;
+        const std::string text = asText(value).value_or(std::string{});
+        for (std::size_t from = 0; from <= text.size();) {
+            const std::size_t comma = text.find(',', from);
+            const std::size_t end = comma == std::string::npos ? text.size() : comma;
+            parts.push_back(static_cast<std::int32_t>(std::strtol(text.substr(from, end - from).c_str(), nullptr, 10)));
+            from = end + 1;
+        }
+        return NbtTag::ofIntArray(std::move(parts));
     }
     return NbtTag::ofString(asText(value).value_or(std::string{}));
 }
@@ -521,6 +562,13 @@ void merge(NbtCompound& into, const NbtCompound& patch) {
     }
 }
 
+void sourceChanged(ServerEntity& entity) {
+    ++entity.sourceNbtVersion;
+    if (entity::bees::isBee(entity.type())) {
+        entity::bees::reload(entity);
+    }
+}
+
 bool mergeNbt(ServerEntity& entity, const NbtCompound& patch) {
     NbtCompound remainder = patch;
     for (const auto& [key, property] : kLiveKeys) {
@@ -543,6 +591,7 @@ bool mergeNbt(ServerEntity& entity, const NbtCompound& patch) {
         remainder.remove("Offers");
     }
     merge(source(entity), remainder);
+    sourceChanged(entity);
     if (const NbtTag* health = patch.find("Health"); health != nullptr) {
         entity.health = asReal(scalarOf(*health), entity.health);
     }
@@ -824,7 +873,16 @@ std::optional<Value> invoke(const Environment& environment, ServerEntity& entity
             return false;
         }
         putAt(source(entity), path, typedTag(asText(at(arguments, 1)).value_or("string"), at(arguments, 2)));
+        sourceChanged(entity);
         return true;
+    }
+    if (operation == "nbt_remove") {
+        const std::string path = asText(at(arguments, 0)).value_or("");
+        const bool removed = !path.empty() && removeAt(source(entity), path);
+        if (removed) {
+            sourceChanged(entity);
+        }
+        return removed;
     }
     if (operation == "is_breed_item") {
         return entity::breeding::isFood(entity.type(), idOf(asText(at(arguments, 0)).value_or("")));
