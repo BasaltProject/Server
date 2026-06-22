@@ -19,7 +19,7 @@ final class BasaltStructure extends Structure {
 
     @Override
     public StructureType getStructureType() {
-        throw Unsupported.hit("Structure#getStructureType");
+        return StructureKinds.typeOf(key);
     }
 
     @Override

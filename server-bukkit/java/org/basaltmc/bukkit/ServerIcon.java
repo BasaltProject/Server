@@ -27,6 +27,10 @@ final class ServerIcon implements CachedServerIcon {
         return new ServerIcon("data:image/png;base64," + Base64.getEncoder().encodeToString(bytes));
     }
 
+    static CachedServerIcon of(byte[] png) {
+        return new ServerIcon("data:image/png;base64," + Base64.getEncoder().encodeToString(png));
+    }
+
     @Override
     public String getData() {
         return data;

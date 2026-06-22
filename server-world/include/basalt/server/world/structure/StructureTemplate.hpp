@@ -74,6 +74,8 @@ struct TemplatePlacement {
     /// the same stream. parity: `processBlockInfos` with no bounding box.
     bool wholePiece = false;
     std::optional<std::int32_t> gravityOffset;
+    /// The palette to use in place of drawing one.
+    std::optional<std::size_t> paletteIndex;
 };
 
 /// parity: `StructureTemplate`.

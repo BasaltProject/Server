@@ -13,6 +13,7 @@
 #include <basalt/server/plugins/PluginScoreboards.hpp>
 #include <basalt/server/plugins/PluginSelectors.hpp>
 #include <basalt/server/plugins/PluginServerControl.hpp>
+#include <basalt/server/plugins/PluginStructures.hpp>
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 
 #include <array>
@@ -296,5 +297,7 @@ public:
     [[nodiscard]] virtual PluginLoot& loot() { return PluginLoot::unavailable(); }
 
     [[nodiscard]] virtual PluginSelectors& selectors() { return PluginSelectors::unavailable(); }
+
+    [[nodiscard]] virtual PluginStructures& structures() { return PluginStructures::unavailable(); }
 };
 } // namespace basalt::server::plugins

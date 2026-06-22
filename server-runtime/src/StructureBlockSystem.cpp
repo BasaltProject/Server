@@ -206,17 +206,27 @@ bool StructureBlockSystem::place(world::LoadedWorld& world, const Pos& at, bool 
     if (sameSizeOnly && !sameSize) {
         return false;
     }
-    const float integrity = std::clamp(settings.integrity, 0.0F, 1.0F);
+    placeTemplate(world, *found, {at[0] + settings.offset[0], at[1] + settings.offset[1], at[2] + settings.offset[2]},
+                  Placement{.rotation = settings.rotation,
+                            .mirror = settings.mirror,
+                            .integrity = settings.integrity,
+                            .seed = settings.seed,
+                            .ignoreEntities = settings.ignoreEntities});
+    return true;
+}
+
+void StructureBlockSystem::placeTemplate(world::LoadedWorld& world, const structure::StructureTemplate& found,
+                                         const Pos& at, const Placement& how) {
+    const float integrity = std::clamp(how.integrity, 0.0F, 1.0F);
     const std::optional<structure::StructureProcessorList> rot =
-        settings.integrity < 1.0F
+        how.integrity < 1.0F
             ? std::optional{structure::StructureProcessorList{{}, structure::BlockRot{.integrity = integrity}}}
             : std::nullopt;
-    const structure::StructurePos origin{at[0] + settings.offset[0], at[1] + settings.offset[1],
-                                         at[2] + settings.offset[2]};
-    const auto rotation = static_cast<structure::StructureRotation>(settings.rotation);
-    const auto mirror = static_cast<structure::StructureMirror>(settings.mirror);
+    const structure::StructurePos origin{at[0], at[1], at[2]};
+    const auto rotation = static_cast<structure::StructureRotation>(how.rotation);
+    const auto mirror = static_cast<structure::StructureMirror>(how.mirror);
     const structure::StructurePos pivot{0, 0, 0};
-    const structure::StructureBoundingBox box = found->getBoundingBox(origin, rotation, pivot, mirror);
+    const structure::StructureBoundingBox box = found.getBoundingBox(origin, rotation, pivot, mirror);
     for (std::int32_t chunkX = box.minX >> 4; chunkX <= (box.maxX >> 4); ++chunkX) {
         for (std::int32_t chunkZ = box.minZ >> 4; chunkZ <= (box.maxZ >> 4); ++chunkZ) {
             server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
@@ -224,9 +234,9 @@ bool StructureBlockSystem::place(world::LoadedWorld& world, const Pos& at, bool 
                 continue;
             }
             // Every pass replays the same streams, so the chunks agree on the palette and the rot.
-            random::RandomSource random = createRandom(settings.seed);
-            random::RandomSource settingsRandom = createRandom(settings.seed);
-            found->placeInto(
+            random::RandomSource random = createRandom(how.seed);
+            random::RandomSource settingsRandom = createRandom(how.seed);
+            found.placeInto(
                 *chunk, structure::TemplatePlacement{
                             .position = origin,
                             .rotation = rotation,
@@ -237,8 +247,9 @@ bool StructureBlockSystem::place(world::LoadedWorld& world, const Pos& at, bool 
                             .processors = rot.has_value() ? &*rot : nullptr,
                             .random = &random,
                             .settingsRandom = rot.has_value() ? &settingsRandom : nullptr,
-                            .ignoreEntities = settings.ignoreEntities,
-                            .wholePiece = rot.has_value()});
+                            .ignoreEntities = how.ignoreEntities,
+                            .wholePiece = rot.has_value(),
+                            .paletteIndex = how.palette});
             chunk->markDirty();
             for (PlayerSession* watcher : players_->snapshot()) {
                 if (watcher->worldName == world.name() && watcher->connection().resendChunk) {
@@ -247,7 +258,6 @@ bool StructureBlockSystem::place(world::LoadedWorld& world, const Pos& at, bool 
             }
         }
     }
-    return true;
 }
 
 void StructureBlockSystem::sendBlockEntity(world::LoadedWorld& world, const Pos& at) {

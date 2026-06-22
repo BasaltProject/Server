@@ -507,6 +507,10 @@ server::plugins::PluginLoot& ServerPluginServices::loot() {
     return parts_.loot == nullptr ? server::plugins::PluginLoot::unavailable() : *parts_.loot;
 }
 
+server::plugins::PluginStructures& ServerPluginServices::structures() {
+    return parts_.structures == nullptr ? server::plugins::PluginStructures::unavailable() : *parts_.structures;
+}
+
 server::plugins::PluginSelectors& ServerPluginServices::selectors() {
     return parts_.selectors == nullptr ? server::plugins::PluginSelectors::unavailable() : *parts_.selectors;
 }

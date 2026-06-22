@@ -3,6 +3,7 @@
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <fstream>
 #include <iterator>
@@ -84,6 +85,7 @@ bool StructureTemplates::store(const Identifier& id, const wire::nbt::NbtCompoun
     {
         const std::scoped_lock lock{mutex_};
         cache_.insert_or_assign(id, std::move(built));
+        kept_.insert_or_assign(id, structure);
     }
     if (!toDisk) {
         return true;
@@ -108,6 +110,80 @@ bool StructureTemplates::store(const Identifier& id, const wire::nbt::NbtCompoun
 void StructureTemplates::forget(const Identifier& id) {
     const std::scoped_lock lock{mutex_};
     cache_.erase(id);
+    kept_.erase(id);
+}
+
+std::filesystem::path StructureTemplates::generatedFile(const Identifier& id) const {
+    return generatedRoot_.has_value() ? *generatedRoot_ / id.namespaceName() / "structure" / (id.path() + ".nbt")
+                                      : std::filesystem::path{};
+}
+
+std::optional<wire::nbt::NbtCompound> StructureTemplates::read(const Identifier& id) {
+    {
+        const std::scoped_lock lock{mutex_};
+        if (const auto held = kept_.find(id); held != kept_.end()) {
+            return held->second;
+        }
+    }
+    std::optional<std::vector<std::uint8_t>> bytes;
+    if (const std::filesystem::path generated = generatedFile(id); !generated.empty()) {
+        std::ifstream file{generated, std::ios::binary};
+        if (file) {
+            bytes = std::vector<std::uint8_t>{std::istreambuf_iterator<char>{file}, {}};
+        }
+    }
+    if (!bytes.has_value() && jar_.readEntry) {
+        bytes = jar_.readEntry(entryFor(id));
+    }
+    if (!bytes.has_value()) {
+        return std::nullopt;
+    }
+    const std::expected<std::vector<std::uint8_t>, wire::io::CompressionError> plain =
+        wire::io::gzip::decompress(*bytes);
+    if (!plain.has_value()) {
+        return std::nullopt;
+    }
+    const std::expected<wire::nbt::NamedTag, wire::nbt::NbtError> parsed = wire::nbt::nbtIO::read(*plain);
+    const wire::nbt::NbtCompound* root = parsed.has_value() ? parsed->tag.get<wire::nbt::NbtCompound>() : nullptr;
+    return root == nullptr ? std::nullopt : std::optional{*root};
+}
+
+bool StructureTemplates::erase(const Identifier& id, bool fromDisk) {
+    forget(id);
+    if (!fromDisk) {
+        return true;
+    }
+    const std::filesystem::path file = generatedFile(id);
+    std::error_code failed;
+    return !file.empty() && std::filesystem::remove(file, failed) && !failed;
+}
+
+std::vector<Identifier> StructureTemplates::allIds() {
+    std::vector<Identifier> ids = templateIds();
+    if (generatedRoot_.has_value()) {
+        std::error_code failed;
+        for (const auto& space : std::filesystem::directory_iterator(*generatedRoot_, failed)) {
+            const std::filesystem::path folder = space.path() / "structure";
+            for (std::filesystem::recursive_directory_iterator walk{folder, failed};
+                 !failed && walk != std::filesystem::recursive_directory_iterator{}; walk.increment(failed)) {
+                if (walk->path().extension() != ".nbt") {
+                    continue;
+                }
+                std::string name = std::filesystem::relative(walk->path(), folder).replace_extension().generic_string();
+                if (const auto parsed = Identifier::parse(space.path().filename().string() + ":" + name);
+                    parsed.has_value()) {
+                    ids.push_back(*parsed);
+                }
+            }
+        }
+    }
+    const std::scoped_lock lock{mutex_};
+    for (const auto& [id, structure] : kept_) {
+        ids.push_back(id);
+    }
+    std::ranges::sort(ids);
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    return ids;
 }
 
 const std::vector<Identifier>& StructureTemplates::templateIds() { return idsUnder("structure", ".nbt"); }

@@ -52,6 +52,18 @@ public:
     /// parity: `StructureTemplateManager.remove`, which a corner block's signal asks for.
     void forget(const wire::common::Identifier& id);
 
+    /// The structure file as its compound: kept in memory, then the generated folder, then the game data.
+    [[nodiscard]] std::optional<wire::nbt::NbtCompound> read(const wire::common::Identifier& id);
+
+    /// Forgets the template and, when asked, deletes its generated file.
+    bool erase(const wire::common::Identifier& id, bool fromDisk);
+
+    /// The generated file a template is saved to; empty before the world's folder is known.
+    [[nodiscard]] std::filesystem::path generatedFile(const wire::common::Identifier& id) const;
+
+    /// Every template the game data ships, the generated folder holds or a plugin kept.
+    [[nodiscard]] std::vector<wire::common::Identifier> allIds();
+
 private:
     [[nodiscard]] const std::vector<wire::common::Identifier>& idsUnder(const std::string& directory,
                                                                         std::string_view extension);
@@ -63,6 +75,7 @@ private:
     /// A map rather than a vector: a pointer handed out has to survive the next read.
     std::map<wire::common::Identifier, std::optional<server::world::structure::StructureTemplate>> cache_;
     std::map<std::string, std::vector<wire::common::Identifier>> listings_;
+    std::map<wire::common::Identifier, wire::nbt::NbtCompound> kept_;
     std::map<wire::common::Identifier, std::optional<server::world::structure::StructureTemplate>> retired_;
 };
 

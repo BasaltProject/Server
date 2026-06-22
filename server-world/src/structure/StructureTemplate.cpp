@@ -550,6 +550,8 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         if (placement.settingsRandom != nullptr) {
             static_cast<void>(placement.settingsRandom->nextInt(1));
         }
+    } else if (placement.paletteIndex.has_value()) {
+        paletteIndex = *placement.paletteIndex;
     } else if (placement.settingsRandom != nullptr) {
         paletteIndex =
             static_cast<std::size_t>(placement.settingsRandom->nextInt(static_cast<std::int32_t>(paletteCount())));
