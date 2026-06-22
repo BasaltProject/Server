@@ -43,6 +43,11 @@ public final class PlayerCalls {
         return call(id, operation, arguments) instanceof Number value ? value.longValue() : 0L;
     }
 
+    public static String statisticCriteria(org.bukkit.Statistic statistic) {
+        String[] parts = PlayerStatistics.untyped(statistic).split("/");
+        return parts[0].replace(':', '.') + ":" + parts[1].replace(':', '.');
+    }
+
     public static UnsupportedOperationException unsupported(String what) {
         return Unsupported.hit(what);
     }
