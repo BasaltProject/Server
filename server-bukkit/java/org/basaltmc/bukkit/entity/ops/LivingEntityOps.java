@@ -407,4 +407,26 @@ public interface LivingEntityOps extends LivingEntity, EntityOps {
         org.bukkit.util.RayTraceResult result = rayTraceBlocks(maxDistance, mode);
         return result == null ? null : result.getHitBlockFace();
     }
+
+    default boolean canUseEquipmentSlot(org.bukkit.inventory.EquipmentSlot slot) {
+        return getType() != org.bukkit.entity.EntityType.PLAYER
+            || slot != org.bukkit.inventory.EquipmentSlot.BODY && slot != org.bukkit.inventory.EquipmentSlot.SADDLE;
+    }
+
+    default float getSoundPitch() {
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        float pitch = (random.nextFloat() - random.nextFloat()) * 0.2F + 1.0F;
+        return this instanceof org.bukkit.entity.Ageable ageable && !ageable.isAdult() ? pitch + 0.5F : pitch;
+    }
+
+    default org.bukkit.inventory.ItemStack damageItemStack(org.bukkit.inventory.ItemStack stack, int amount) {
+        return stack == null || stack.getType().isAir() ? stack : stack.damage(amount, this);
+    }
+
+    default void damageItemStack(org.bukkit.inventory.EquipmentSlot slot, int amount) {
+        org.bukkit.inventory.ItemStack held = getEquipment().getItem(slot);
+        if (held != null && !held.getType().isAir()) {
+            getEquipment().setItem(slot, held.damage(amount, this));
+        }
+    }
 }

@@ -24,7 +24,8 @@ import org.bukkit.persistence.PersistentDataContainer;
 
 /** Item meta over the vanilla data components of one stack; every getter and setter reads or writes the map. */
 @org.bukkit.configuration.serialization.DelegateDeserialization(ItemMetas.Serial.class)
-public class MetaItem extends ItemMetaBase implements Damageable, Repairable {
+public class MetaItem extends ItemMetaBase implements Damageable, Repairable,
+        org.bukkit.inventory.meta.BlockDataMeta {
     static final String kCustomName = "minecraft:custom_name";
     static final String kItemName = "minecraft:item_name";
     static final String kLore = "minecraft:lore";
@@ -325,6 +326,47 @@ public class MetaItem extends ItemMetaBase implements Damageable, Repairable {
     @Override
     public void setCustomModelDataComponent(CustomModelDataComponent component) {
         put(kModelData, component == null ? null : ((MetaModelData.ModelData) component).data);
+    }
+
+    @Override
+    public boolean hasBlockData() {
+        return has("minecraft:block_state");
+    }
+
+    @Override
+    public org.bukkit.block.data.BlockData getBlockData(Material material) {
+        if (!material.isBlock()) {
+            throw new IllegalArgumentException("Material " + material + " is not a block");
+        }
+        org.bukkit.block.data.BlockData base = material.createBlockData();
+        Map<String, Object> stored = compoundOf("minecraft:block_state");
+        if (stored == null || stored.isEmpty()) {
+            return base;
+        }
+        StringBuilder properties = new StringBuilder("[");
+        for (Map.Entry<String, Object> entry : stored.entrySet()) {
+            properties.append(properties.length() > 1 ? "," : "").append(entry.getKey()).append('=')
+                .append(entry.getValue());
+        }
+        return base.merge(org.bukkit.Bukkit.createBlockData(material, properties.append(']').toString()));
+    }
+
+    @Override
+    public void setBlockData(org.bukkit.block.data.BlockData data) {
+        if (data == null) {
+            c.remove("minecraft:block_state");
+            return;
+        }
+        String text = data.getAsString();
+        int open = text.indexOf('[');
+        Map<String, Object> stored = Nbt.compound();
+        if (open >= 0) {
+            for (String pair : text.substring(open + 1, text.length() - 1).split(",")) {
+                String[] parts = pair.split("=", 2);
+                stored.put(parts[0], parts[1]);
+            }
+        }
+        put("minecraft:block_state", stored);
     }
 
     @Override

@@ -209,7 +209,11 @@ public final class BasaltWorld extends WorldGeo {
     }
 
     @Override
-    public void setHardcore(boolean hardcore) {}
+    public void setHardcore(boolean hardcore) {
+        if (hardcore) {
+            throw Unsupported.hit("World#setHardcore");
+        }
+    }
 
     @Override
     public boolean isNatural() {
@@ -401,7 +405,11 @@ public final class BasaltWorld extends WorldGeo {
     }
 
     @Override
-    public void setKeepSpawnInMemory(boolean keep) {}
+    public void setKeepSpawnInMemory(boolean keep) {
+        if (keep) {
+            throw Unsupported.hit("World#setKeepSpawnInMemory");
+        }
+    }
 
     @Override
     public void save() {
@@ -421,7 +429,11 @@ public final class BasaltWorld extends WorldGeo {
     }
 
     @Override
-    public void setAutoSave(boolean value) {}
+    public void setAutoSave(boolean value) {
+        if (!value) {
+            throw Unsupported.hit("World#setAutoSave");
+        }
+    }
 
     @Override
     public List<Entity> getEntities() {
