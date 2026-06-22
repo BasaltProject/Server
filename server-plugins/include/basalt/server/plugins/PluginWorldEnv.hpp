@@ -202,6 +202,14 @@ public:
         return 0;
     }
 
+    /// The climate humidity (downfall) of the biome at a point.
+    [[nodiscard]] virtual double humidity(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return 0.4;
+    }
+
     /// The climate temperature at a point, as the biome there gives it at that height.
     [[nodiscard]] virtual double temperature(std::int32_t x, std::int32_t y, std::int32_t z) {
         static_cast<void>(x);

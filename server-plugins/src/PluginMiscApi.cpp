@@ -674,6 +674,34 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("roll");
+    wire::lua::pushHostFunction(lua, "loot.enchant", [server](LuaArgs& args) {
+        if (!args.isTable(1)) {
+            args.raise("loot.enchant({ item = ..., levels = ..., world = ... }) takes a table");
+        }
+        PluginLootItem given;
+        given.item = stringField(args, 1, "item").value_or(std::string{});
+        given.count = static_cast<std::int32_t>(numberField(args, 1, "count").value_or(1.0));
+        given.components = stringField(args, 1, "components").value_or(std::string{});
+        PluginLootEnchant how;
+        how.world = stringField(args, 1, "world").value_or(std::string{});
+        how.options = stringField(args, 1, "options").value_or(how.options);
+        how.levels = static_cast<std::int32_t>(numberField(args, 1, "levels").value_or(1.0));
+        how.seed = static_cast<std::int64_t>(numberField(args, 1, "seed").value_or(0.0));
+        const std::optional<PluginLootItem> made = server->services().loot().enchant(given, how);
+        if (!made.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushString(made->item);
+        args.setField("item");
+        args.pushInteger(made->count);
+        args.setField("count");
+        args.pushString(made->components);
+        args.setField("components");
+        return 1;
+    });
+    lua.setField("enchant");
     lua.setGlobal("loot");
 
     lua.pushTable();

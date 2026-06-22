@@ -72,6 +72,7 @@ struct ModelHooks {
     world::RealLootTables* lootTables = nullptr;
     const world::realBlockTags::TagMembers* blockTags = nullptr;
     const world::realBlockTags::TagMembers* itemTags = nullptr;
+    std::function<bool(world::LoadedWorld& world, std::string_view action, std::int32_t value)> endFight;
     std::function<std::int32_t()> nextEntityId;
     std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                        double z, std::string_view cause)>
@@ -156,6 +157,9 @@ public:
     [[nodiscard]] std::vector<std::string> tags(std::string_view registry) const override;
     [[nodiscard]] std::vector<std::string> entityTypeIds() const override;
     [[nodiscard]] std::vector<std::string> registryIds(std::string_view registry) const override;
+    [[nodiscard]] std::optional<std::vector<std::uint8_t>> registryData(std::string_view registry,
+                                                                        std::string_view id) const override;
+    [[nodiscard]] std::vector<std::string> entityDefaultAttributes(std::string_view type) const override;
 
 private:
     std::shared_ptr<const ModelHooks> hooks_;

@@ -793,6 +793,27 @@ public abstract class PlayerMisc extends PlayerView {
     }
 
     @Override
+    public boolean hasData(io.papermc.paper.datacomponent.DataComponentType type) {
+        return false;
+    }
+
+    @Override
+    public <T> T getData(io.papermc.paper.datacomponent.DataComponentType.Valued<T> type) {
+        return null;
+    }
+
+    @Override
+    public <T> T getDataOrDefault(io.papermc.paper.datacomponent.DataComponentType.Valued<? extends T> type,
+            T fallback) {
+        return fallback;
+    }
+
+    @Override
+    public io.papermc.paper.connection.PlayerGameConnection getConnection() {
+        return new BasaltConnection(this);
+    }
+
+    @Override
     public io.papermc.paper.threadedregions.scheduler.EntityScheduler getScheduler() {
         return new PlayerEntityScheduler(this);
     }

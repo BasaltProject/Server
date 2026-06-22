@@ -54,5 +54,12 @@ public:
     virtual void setCursorItem(const std::optional<PluginItem>& item) = 0;
 
     virtual void resyncWindow() = 0;
+
+    /// Sends the open window one of its data values (furnace progress, enchantment costs, anvil cost...).
+    virtual bool setWindowProperty(std::int32_t id, std::int32_t value) {
+        static_cast<void>(id);
+        static_cast<void>(value);
+        return false;
+    }
 };
 } // namespace basalt::server::plugins

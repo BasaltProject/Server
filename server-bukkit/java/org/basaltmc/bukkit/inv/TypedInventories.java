@@ -172,7 +172,11 @@ public final class TypedInventories {
                 Object holder = base.getHolder();
                 return method.getReturnType().isInstance(holder) ? holder : null;
             }
-            throw Unsupported.hit(declaring.getSimpleName() + "#" + name);
+            try {
+                return call(Inventory.class.getMethod(name, method.getParameterTypes()), args);
+            } catch (NoSuchMethodException notInventory) {
+                throw Unsupported.hit(declaring.getSimpleName() + "#" + name);
+            }
         }
 
         private Object call(Method method, Object[] args) throws Throwable {

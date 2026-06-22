@@ -753,6 +753,14 @@ public:
         return false;
     }
 
+    /// Drives the fight: "respawn" (as placing the fourth crystal does), "stage" (value is the respawn stage index),
+    /// "portal" (value non-zero lights it), "gateway" and "crystals" (rebuild the pillar crystals).
+    virtual bool dragonFightAction(std::string_view action, std::int32_t value) {
+        static_cast<void>(action);
+        static_cast<void>(value);
+        return false;
+    }
+
     /// The block x and z of the start of the nearest structure of this kind, searching `cells` placement cells out.
     [[nodiscard]] virtual std::optional<std::array<std::int32_t, 2>>
     locateStructure(std::string_view structure, std::int32_t x, std::int32_t z, std::int32_t cells, bool skipExisting) {
@@ -1125,6 +1133,21 @@ public:
     /// none.
     [[nodiscard]] virtual std::vector<std::string> registryIds(std::string_view registry) const {
         static_cast<void>(registry);
+        return {};
+    }
+
+    /// The data of one entry of a registry the client is sent (`damage_type`, `jukebox_song`, `instrument`...) as an
+    /// unnamed NBT compound.
+    [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> registryData(std::string_view registry,
+                                                                                std::string_view id) const {
+        static_cast<void>(registry);
+        static_cast<void>(id);
+        return std::nullopt;
+    }
+
+    /// The attributes a new entity of the type starts with, as `attribute=value`.
+    [[nodiscard]] virtual std::vector<std::string> entityDefaultAttributes(std::string_view type) const {
+        static_cast<void>(type);
         return {};
     }
 

@@ -402,6 +402,11 @@ double ServerWorldEnv::temperature(const std::int32_t x, const std::int32_t y, c
                              : 0.8;
 }
 
+double ServerWorldEnv::humidity(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    const std::optional<Identifier> biome = world::naturalSpawner::biomeAt(*world_, x, y, z);
+    return biome.has_value() ? static_cast<double>(biomeDownfall(biome->path())) : 0.4;
+}
+
 double ServerWorldEnv::breakSpeed(const std::string_view uuid, const std::int32_t x, const std::int32_t y,
                                   const std::int32_t z) {
     const std::optional<std::int32_t> state = world_->state().blockState(x, y, z);

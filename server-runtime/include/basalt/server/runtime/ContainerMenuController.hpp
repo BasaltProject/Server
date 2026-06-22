@@ -159,6 +159,8 @@ public:
 
     void resyncWindow() override { sendInventory(); }
 
+    bool setWindowProperty(std::int32_t id, std::int32_t value) override;
+
     void openPluginMenu(const std::string& title, std::int32_t rows,
                         const std::map<std::int32_t, PluginMenuItem>& items, std::function<void(std::int32_t)> onClick);
 

@@ -8,6 +8,9 @@
 
 namespace basalt::server::runtime::plugins {
 
+/// The downfall (climate humidity) of a biome by its path, 0.4 when the biome is unknown.
+[[nodiscard]] float biomeDownfall(std::string_view path);
+
 class ServerWorldEnv final : public server::plugins::PluginWorldEnv {
 public:
     ServerWorldEnv(world::LoadedWorld& world, std::shared_ptr<const ModelHooks> hooks,
@@ -33,18 +36,20 @@ public:
     [[nodiscard]] std::int32_t signalFrom(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face,
                                           bool direct) override;
     [[nodiscard]] double temperature(std::int32_t x, std::int32_t y, std::int32_t z) override;
+    [[nodiscard]] double humidity(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] double breakSpeed(std::string_view player, std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::vector<server::plugins::PluginStructureStart> structureStarts(std::int32_t chunkX,
-                                                                                      std::int32_t chunkZ) override;
+                                                                                     std::int32_t chunkZ) override;
     [[nodiscard]] std::vector<server::plugins::PluginRaid> raids() override;
     bool setRaid(std::int32_t id, std::int32_t omenLevel, std::int32_t totalGroups) override;
     [[nodiscard]] server::plugins::PluginFluid fluidAt(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::optional<std::array<std::int32_t, 3>> lightningTarget(std::int32_t x, std::int32_t z) override;
     void gameEvent(std::string_view event, double x, double y, double z, std::string_view source) override;
     bool growTree(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view sapling) override;
-    [[nodiscard]] std::vector<server::plugins::PluginPoi>
-    pointsOfInterest(const std::vector<std::string>& types, std::int32_t x, std::int32_t y, std::int32_t z,
-                     std::int32_t radius, std::int32_t occupancy) override;
+    [[nodiscard]] std::vector<server::plugins::PluginPoi> pointsOfInterest(const std::vector<std::string>& types,
+                                                                           std::int32_t x, std::int32_t y,
+                                                                           std::int32_t z, std::int32_t radius,
+                                                                           std::int32_t occupancy) override;
     [[nodiscard]] server::plugins::PluginSpawnTunables spawnTunables() override;
     void setSpawnTunables(const server::plugins::PluginSpawnTunables& tunables) override;
     [[nodiscard]] std::int32_t viewDistance() override;
