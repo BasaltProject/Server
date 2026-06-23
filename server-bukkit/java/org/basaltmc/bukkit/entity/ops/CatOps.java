@@ -15,4 +15,13 @@ public interface CatOps extends Cat, Cored {
     default void setCatType(Cat.Type type) {
         core().nbtSet("variant", "string", type.getKey().toString());
     }
+
+    default Cat.SoundVariant getSoundVariant() {
+        return EntityNbt.variant(core(), "sound_variant", io.papermc.paper.registry.RegistryKey.CAT_SOUND_VARIANT,
+            "classic");
+    }
+
+    default void setSoundVariant(Cat.SoundVariant variant) {
+        EntityNbt.variant(core(), "sound_variant", variant);
+    }
 }

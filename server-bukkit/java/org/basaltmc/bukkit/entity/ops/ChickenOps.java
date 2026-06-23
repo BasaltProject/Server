@@ -38,4 +38,12 @@ public interface ChickenOps extends Chicken, Cored {
         Chicken.SoundVariant found = id == null ? null : registry.get(NamespacedKey.fromString(id));
         return found != null ? found : Chicken.SoundVariant.CLASSIC;
     }
+
+    default void setVariant(Chicken.Variant variant) {
+        EntityNbt.variant(core(), "variant", variant);
+    }
+
+    default void setSoundVariant(Chicken.SoundVariant variant) {
+        EntityNbt.variant(core(), "sound_variant", variant);
+    }
 }

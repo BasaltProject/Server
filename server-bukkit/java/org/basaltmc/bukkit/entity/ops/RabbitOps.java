@@ -29,4 +29,12 @@ public interface RabbitOps extends Rabbit, Cored {
         };
         core().nbtSet("RabbitType", "int", id);
     }
+
+    default int getMoreCarrotTicks() {
+        return core().nbtInt("MoreCarrotTicks");
+    }
+
+    default void setMoreCarrotTicks(int ticks) {
+        core().nbtSet("MoreCarrotTicks", "int", ticks);
+    }
 }
