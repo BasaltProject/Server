@@ -395,6 +395,17 @@ void EndFightSystem::spawnNewGateway(world::LoadedWorld& world, DragonFight& fig
     syncArea(world, x - 1, z - 1, x + 1, z + 1);
 }
 
+bool EndFightSystem::spawnGatewayAt(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    for (PlayerSession* player : players_->snapshot()) {
+        if (player->worldName == world.name() && player->connection().sendLevelEvent) {
+            player->connection().sendLevelEvent(kGatewaySpawnEvent, x, y, z, 0);
+        }
+    }
+    world::endGateways::place(world.state(), x, y, z, std::nullopt, false);
+    syncArea(world, x - 1, z - 1, x + 1, z + 1);
+    return true;
+}
+
 void EndFightSystem::syncArea(world::LoadedWorld& world, std::int32_t minX, std::int32_t minZ, std::int32_t maxX,
                               std::int32_t maxZ) {
     for (PlayerSession* player : players_->snapshot()) {

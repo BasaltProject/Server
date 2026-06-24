@@ -52,12 +52,12 @@ public:
     [[nodiscard]] wire::protocol::status::ServerStatusPayload
     statusFor(std::int32_t protocolVersion, const std::string& host, const std::optional<std::string>& address);
 
+    [[nodiscard]] std::vector<std::uint8_t> iconFor(const config::ServerListProfile& profile) const;
+
 private:
     [[nodiscard]] std::vector<wire::protocol::status::ServerStatusPayload::SamplePlayer>
     sampleFor(const config::ServerListProfile& profile, const std::vector<ListedPlayer>& players,
               const wire::common::placeholder::PlaceholderContext& context) const;
-
-    [[nodiscard]] std::vector<std::uint8_t> iconFor(const config::ServerListProfile& profile) const;
 
     [[nodiscard]] wire::text::Component render(const std::vector<std::string>& lines,
                                                const wire::common::placeholder::PlaceholderContext& context) const;

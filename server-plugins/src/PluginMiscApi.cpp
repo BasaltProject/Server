@@ -456,6 +456,33 @@ void installAccess(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("known");
+    wire::lua::pushHostFunction(lua, "access.statistic", [server, uuidOf](LuaArgs& args) {
+        args.pushInteger(server->services().access().statistic(uuidOf(args), args.checkString(2)));
+        return 1;
+    });
+    lua.setField("statistic");
+    wire::lua::pushHostFunction(lua, "access.set_statistic", [server, uuidOf](LuaArgs& args) {
+        args.pushBoolean(
+            server->services().access().setStatistic(uuidOf(args), args.checkString(2), args.checkInteger(3)));
+        return 1;
+    });
+    lua.setField("set_statistic");
+    wire::lua::pushHostFunction(lua, "access.last_death", [server, uuidOf](LuaArgs& args) {
+        const auto spot = server->services().access().lastDeath(uuidOf(args));
+        if (!spot.has_value()) {
+            args.pushNil();
+            return 1;
+        }
+        args.pushTable();
+        args.pushString((*spot)[0]);
+        args.setField("dimension");
+        for (std::size_t at = 1; at < 4; ++at) {
+            args.pushInteger(std::stoll((*spot)[at]));
+            args.setField(std::array<const char*, 3>{"x", "y", "z"}[at - 1]);
+        }
+        return 1;
+    });
+    lua.setField("last_death");
     lua.setGlobal("access");
 }
 
@@ -508,6 +535,21 @@ void installServerTables(LuaArgs& lua, PluginHost& host) {
         return 1;
     });
     lua.setField("pace");
+    wire::lua::pushHostFunction(lua, "tick.times", [control](LuaArgs& args) {
+        const std::vector<std::int64_t> times = control().tickTimes();
+        args.pushTable();
+        for (std::size_t index = 0; index < times.size(); ++index) {
+            args.pushInteger(times[index]);
+            args.setIndex(static_cast<std::int64_t>(index) + 1);
+        }
+        return 1;
+    });
+    lua.setField("times");
+    wire::lua::pushHostFunction(lua, "tick.paused", [control](LuaArgs& args) {
+        args.pushBoolean(control().paused());
+        return 1;
+    });
+    lua.setField("paused");
     lua.setGlobal("tick");
 
     lua.pushTable();

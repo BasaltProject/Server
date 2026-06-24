@@ -427,6 +427,17 @@ void installWorld(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plugin, 
         return 1;
     });
     lua.setField("block_info");
+    wire::lua::pushHostFunction(lua, "worlds.block_instrument", [server](LuaArgs& args) {
+        const std::string name =
+            server->services().worlds().blockInstrument(static_cast<std::int32_t>(args.checkInteger(1)));
+        if (name.empty()) {
+            args.pushNil();
+        } else {
+            args.pushString(name);
+        }
+        return 1;
+    });
+    lua.setField("block_instrument");
     wire::lua::pushHostFunction(lua, "worlds.block_sounds", [server](LuaArgs& args) {
         const std::vector<std::string> facts =
             server->services().worlds().blockSounds(static_cast<std::int32_t>(args.checkInteger(1)));

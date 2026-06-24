@@ -27,6 +27,16 @@ std::array<double, 4> ServerControl::pace() {
     return {rates.oneMinute, rates.fiveMinutes, rates.fifteenMinutes, loop->durations().summary(now, 60).meanMillis};
 }
 
+std::vector<std::int64_t> ServerControl::tickTimes() {
+    TickLoop* loop = hooks_.tickLoop ? hooks_.tickLoop() : nullptr;
+    return loop == nullptr ? std::vector<std::int64_t>{} : loop->recentTickNanos();
+}
+
+bool ServerControl::paused() {
+    TickLoop* loop = hooks_.tickLoop ? hooks_.tickLoop() : nullptr;
+    return loop != nullptr && loop->isPaused();
+}
+
 void ServerControl::setTickRate(float rate) {
     if (TickLoop* loop = hooks_.tickLoop ? hooks_.tickLoop() : nullptr; loop != nullptr) {
         loop->setTickRate(rate);
@@ -91,6 +101,12 @@ void ServerControl::setLinks(std::vector<server::plugins::PluginServerLink> link
 std::optional<server::plugins::PluginResourcePack> ServerControl::resourcePack() {
     return hooks_.resourcePack ? hooks_.resourcePack() : std::nullopt;
 }
+
+std::vector<std::uint8_t> ServerControl::serverIcon() {
+    return hooks_.serverIcon ? hooks_.serverIcon() : std::vector<std::uint8_t>{};
+}
+
+bool ServerControl::reloadCommands() { return hooks_.reloadCommands && hooks_.reloadCommands(); }
 
 std::vector<std::string> ServerControl::settingKeys() {
     return hooks_.settings == nullptr ? std::vector<std::string>{} : hooks_.settings->keys();

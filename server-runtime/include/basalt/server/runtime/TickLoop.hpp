@@ -2,11 +2,13 @@
 
 #include <basalt/wire/common/timings/TickDurations.hpp>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <deque>
 #include <functional>
 #include <thread>
+#include <vector>
 
 namespace basalt::server::runtime {
 
@@ -24,6 +26,9 @@ struct TickLoopOptions {
     std::int32_t unloadIntervalSeconds = 30;
     std::function<void()> onSaveInterval;
     std::function<void()> onUnloadInterval;
+    /// parity: `pause-when-empty-seconds`; 0 or unset never pauses.
+    std::function<std::int32_t()> pauseWhenEmptySeconds;
+    std::function<bool()> hasPlayers;
     /// parity: `worldRuns` is false while `/tick freeze` holds and no step is owed.
     std::function<void(bool worldRuns)> onTick;
 };
@@ -60,6 +65,11 @@ public:
     [[nodiscard]] float tickRate() const noexcept { return targetRate_.load(std::memory_order_relaxed); }
 
     [[nodiscard]] bool isFrozen() const noexcept { return frozen_.load(std::memory_order_relaxed); }
+
+    [[nodiscard]] bool isPaused() const noexcept { return paused_.load(std::memory_order_relaxed); }
+
+    /// parity: `MinecraftServer.tickTimesNanos`, the last hundred tick durations in a ring.
+    [[nodiscard]] std::vector<std::int64_t> recentTickNanos() const;
 
     [[nodiscard]] bool isSprinting() const noexcept { return sprintTicksLeft_.load(std::memory_order_relaxed) > 0; }
 
@@ -111,6 +121,8 @@ private:
     std::atomic<std::int32_t> stepsOwed_{0};
     std::atomic<std::int64_t> ticksCounted_{0};
     std::atomic<std::int32_t> sprintTicksLeft_{0};
+    std::atomic<bool> paused_{false};
+    std::array<std::atomic<std::int64_t>, 100> recentNanos_{};
 
     std::thread ticker_;
     std::thread sweeper_;

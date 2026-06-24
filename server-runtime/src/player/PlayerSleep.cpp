@@ -58,7 +58,8 @@ void showSleeping(const BreakContext& context, const PlayerSession& player, worl
 
 std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, PlayerSession& player,
                                                world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
-                                               const std::int32_t z, const std::int32_t clickedState) {
+                                               const std::int32_t z, const std::int32_t clickedState,
+                                               const bool force) {
     const std::array<std::int32_t, 3> step = world::beds::headOffset(clickedState);
     const std::array<std::int32_t, 3> head = world::beds::isHead(clickedState)
                                                  ? std::array<std::int32_t, 3>{x, y, z}
@@ -94,13 +95,13 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
 
     // parity: `ServerPlayer.startSleepInBed`.
     const std::array<std::int32_t, 3> foot{head[0] - step[0], head[1] - step[1], head[2] - step[2]};
-    if (!world::beds::reachable(player.x, player.y, player.z, head[0], head[1], head[2]) &&
+    if (!force && !world::beds::reachable(player.x, player.y, player.z, head[0], head[1], head[2]) &&
         !world::beds::reachable(player.x, player.y, player.z, foot[0], foot[1], foot[2])) {
         refuse(player, world::translationKeyOf(world::BedProblem::TooFarAway));
         return world::BedProblem::TooFarAway;
     }
-    if (suffocatesAt(context.blocks, world, head[0], head[1] + 1, head[2]) ||
-        suffocatesAt(context.blocks, world, foot[0], foot[1] + 1, foot[2])) {
+    if (!force && (suffocatesAt(context.blocks, world, head[0], head[1] + 1, head[2]) ||
+                   suffocatesAt(context.blocks, world, foot[0], foot[1] + 1, foot[2]))) {
         refuse(player, world::translationKeyOf(world::BedProblem::Obstructed));
         return world::BedProblem::Obstructed;
     }
@@ -109,7 +110,7 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     if (setsSpawn && context.setSpawn) {
         context.setSpawn(player, head[0], head[1], head[2]);
     }
-    if (!world::beds::holds(rule.canSleep, dark)) {
+    if (!force && !world::beds::holds(rule.canSleep, dark)) {
         if (!rule.errorKey.empty()) {
             refuse(player, rule.errorKey);
         }

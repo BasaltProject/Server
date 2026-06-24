@@ -163,6 +163,7 @@ basalt_module(server-runtime-core
         src/plugins/PlayerOps.cpp
         src/plugins/PlayerOpsHud.cpp
         src/plugins/PlayerOpsMisc.cpp
+        src/plugins/PlayerOpsTail.cpp
         src/plugins/PlayerOpsState.cpp
         src/plugins/PlayerOpsView.cpp
         src/plugins/ServerObjectModel.cpp

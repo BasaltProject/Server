@@ -90,6 +90,14 @@ struct PluginPoi {
     std::int32_t freeTickets = 0;
 };
 
+struct PluginPlacedBlock {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::int32_t before = 0;
+    std::int32_t after = 0;
+};
+
 /// What a plugin changed about natural spawning; a value under zero is vanilla's. Categories in `MobCategory` order:
 /// monster, creature, ambient, axolotls, underground water creature, water creature, water ambient, misc.
 struct PluginSpawnTunables {
@@ -278,6 +286,29 @@ public:
 
     /// Points of interest of the named types (empty: all) within `radius` of the point; `occupancy` 0 free, 1 taken, 2
     /// any.
+    /// Plants a named tree (`oak`, `fancy_oak`, `birch`, `mega_jungle`...) as the world generator would, without a
+    /// sapling; with `apply` false nothing changes and the blocks it would set come back. Empty when it does not fit.
+    [[nodiscard]] virtual std::optional<std::vector<PluginPlacedBlock>>
+    placeTree(std::string_view tree, std::int32_t x, std::int32_t y, std::int32_t z, bool apply) {
+        static_cast<void>(tree);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(apply);
+        return std::nullopt;
+    }
+
+    /// One random tick on the block, as the random tick speed gives; true when something changed.
+    virtual bool randomTick(std::int32_t x, std::int32_t y, std::int32_t z) {
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return false;
+    }
+
+    /// Loaded block entities that run code every tick (furnaces, hoppers, spawners, beacons...).
+    [[nodiscard]] virtual std::int32_t tickableBlockEntityCount() { return 0; }
+
     [[nodiscard]] virtual std::vector<PluginPoi> pointsOfInterest(const std::vector<std::string>& types, std::int32_t x,
                                                                   std::int32_t y, std::int32_t z, std::int32_t radius,
                                                                   std::int32_t occupancy) {
@@ -293,6 +324,18 @@ public:
     [[nodiscard]] virtual PluginSpawnTunables spawnTunables() { return {}; }
 
     virtual void setSpawnTunables(const PluginSpawnTunables& tunables) { static_cast<void>(tunables); }
+
+    /// Void damage (`void_damage` 0 or 1, `void_damage_amount`, `void_damage_offset`) and `simulation_distance`.
+    [[nodiscard]] virtual std::optional<double> tunable(std::string_view key) {
+        static_cast<void>(key);
+        return std::nullopt;
+    }
+
+    virtual bool setTunable(std::string_view key, double value) {
+        static_cast<void>(key);
+        static_cast<void>(value);
+        return false;
+    }
 
     [[nodiscard]] virtual std::int32_t viewDistance() { return 10; }
 
@@ -339,6 +382,20 @@ public:
     virtual bool useChunkFill(ChunkFill fill) {
         static_cast<void>(fill);
         return false;
+    }
+
+    /// What of the world's own generation stays when a plugin fills the chunks.
+    struct ChunkFillTraits {
+        /// `blocks` and `biomes` arrive holding the vanilla chunk and the plugin builds on it.
+        bool vanillaTerrain = false;
+        bool decorations = false;
+        bool structures = false;
+        bool mobs = false;
+    };
+
+    virtual bool useChunkFill(ChunkFill fill, const ChunkFillTraits& traits) {
+        static_cast<void>(traits);
+        return useChunkFill(std::move(fill));
     }
 
     /// Whether the state would survive standing at the position (`BlockState.canSurvive`).

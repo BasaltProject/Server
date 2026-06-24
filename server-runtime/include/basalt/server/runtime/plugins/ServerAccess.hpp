@@ -27,6 +27,9 @@ public:
     [[nodiscard]] std::optional<server::plugins::PluginKnownPlayer> playerByName(std::string_view name) override;
     [[nodiscard]] std::vector<server::plugins::PluginKnownPlayer> knownPlayers() override;
     [[nodiscard]] std::optional<server::plugins::PluginKnownPlayer> spawnPoint(std::string_view uuid) override;
+    [[nodiscard]] std::int64_t statistic(std::string_view uuid, std::string_view key) override;
+    bool setStatistic(std::string_view uuid, std::string_view key, std::int64_t value) override;
+    [[nodiscard]] std::optional<std::array<std::string, 4>> lastDeath(std::string_view uuid) override;
     [[nodiscard]] bool isOperator(std::string_view uuid) override;
     bool setOperator(std::string_view uuid, bool value) override;
     [[nodiscard]] std::vector<server::plugins::PluginKnownPlayer> operators() override;

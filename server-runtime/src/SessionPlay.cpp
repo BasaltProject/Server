@@ -7,21 +7,27 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
+#include <basalt/server/runtime/FireworkSystem.hpp>
+#include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/PlayerLifecycle.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBooks.hpp>
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/plugins/PlayerHookEvents.hpp>
+#include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerAdvancements.hpp>
@@ -548,6 +554,89 @@ player::PlayerConnection ClientSession::playerConnection() {
         }
     };
     connection.wakeUp = [this] { wakeUp(); };
+    connection.openMerchant = [this](const wire::text::Component& title, std::vector<world::trades::Offer> offers) {
+        return trades_->openCustom(title, std::move(offers));
+    };
+    connection.openTrades = [this](std::int32_t villagerId) {
+        entity::ServerEntity* villager = currentWorld_ == nullptr ? nullptr : currentWorld_->state().entity(villagerId);
+        if (villager == nullptr || villager->removed) {
+            return false;
+        }
+        trades_->openTrades(*villager);
+        return trades_->open();
+    };
+    connection.resendRecipes = [this] {
+        PlayerSession* session = playerSession();
+        if (session == nullptr) {
+            return;
+        }
+        sendStonecutterRecipes();
+        if (options_.progress != nullptr && options_.recipes != nullptr) {
+            const std::string uuid = session->uuid().toString();
+            const std::set<wire::common::Identifier> known = options_.progress->knownRecipes(uuid);
+            world::recipeBook::resend(*session, *options_.recipes, {known.begin(), known.end()},
+                                      options_.progress->highlightedRecipes(uuid));
+        }
+    };
+    connection.attachFirework = [this](const std::string& text) -> std::int32_t {
+        PlayerSession* session = playerSession();
+        const std::optional<storage::StoredItemStack> stack = plugins::stackFromSnbt(text);
+        if (session == nullptr || currentWorld_ == nullptr || options_.fireworks == nullptr || !stack.has_value() ||
+            stack->id != "minecraft:firework_rocket") {
+            return -1;
+        }
+        wire::nbt::NbtCompound item;
+        item.putString("id", stack->id);
+        item.putInt("count", 1);
+        if (stack->components.size() > 0) {
+            item.set("components", wire::nbt::NbtTag::ofCompound(stack->components));
+        }
+        const entity::ServerEntity* rocket = options_.fireworks->attach(
+            *currentWorld_, std::move(item), session->entityId(), session->x, session->y, session->z);
+        return rocket == nullptr ? -1 : rocket->entityId();
+    };
+    connection.retitleScreen = [this](const wire::text::Component& title) { return retitleScreen(title); };
+    connection.refreshProfile = [this] { lifecycle_->refreshProfile(); };
+    connection.sleepAt = [this](std::int32_t x, std::int32_t y, std::int32_t z, bool force) {
+        PlayerSession* session = playerSession();
+        if (session == nullptr || currentWorld_ == nullptr || session->sleepingBed.has_value() || session->dead) {
+            return false;
+        }
+        const std::optional<std::int32_t> state = currentWorld_->state().blockState(x, y, z);
+        if (!state.has_value() || !world::beds::isBed(*state)) {
+            return false;
+        }
+        return !player::sleepInBedFor(blockInteraction_->sleepContext(), *session, *currentWorld_, x, y, z, *state,
+                                      force)
+                    .has_value();
+    };
+    connection.itemUse = [this](std::string_view operation, std::int64_t value) -> std::int64_t {
+        PlayerSession* session = playerSession();
+        const std::optional<ItemUseTimers::UseState> state = itemUseTimers_->useState();
+        if (operation == "used") {
+            return state.has_value() ? state->used : -1;
+        }
+        if (operation == "remaining") {
+            return state.has_value() ? state->duration - state->used : -1;
+        }
+        if (session == nullptr) {
+            return 0;
+        }
+        if (operation == "set_remaining") {
+            return itemUseTimers_->setRemaining(static_cast<std::int32_t>(value)) ? 1 : 0;
+        }
+        if (operation == "complete") {
+            itemUseTimers_->completeUse(*session);
+            return state.has_value() ? 1 : 0;
+        }
+        if (operation == "clear") {
+            itemUseTimers_->clearUse();
+            return state.has_value() ? 1 : 0;
+        }
+        const std::int32_t slot = value != 0 ? player::PlayerInventory::kOffhandSlot
+                                             : player::PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+        return operation == "start" && itemUseTimers_->startUse(*session, slot) ? 1 : 0;
+    };
     connection.sendTime = [this](const world::LoadedWorld& world) { uiState_->sendTime(world); };
     connection.sendActionBar = [this](const wire::text::Component& message) { sendPluginText(message, true); };
     connection.sendTitle = [this](const wire::text::Component& title, const wire::text::Component& subtitle,

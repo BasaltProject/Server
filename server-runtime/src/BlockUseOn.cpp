@@ -224,6 +224,23 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     }
 
     const play::BlockHitResult& hit = useItemOn.blockHit;
+    if (const auto& protectedAt = owner_->options().spawnProtected;
+        protectedAt && owner_->currentWorld() != nullptr &&
+        protectedAt(*session, *owner_->currentWorld(), hit.pos.x, hit.pos.z)) {
+        constexpr std::array<std::array<std::int32_t, 3>, 6> kStep{
+            {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}};
+        const std::array<std::int32_t, 3>& step = kStep[static_cast<std::size_t>(hit.direction)];
+        for (const play::BlockPos& pos :
+             {hit.pos, play::BlockPos{hit.pos.x + step[0], hit.pos.y + step[1], hit.pos.z + step[2]}}) {
+            const std::optional<std::int32_t> actual = owner_->world().blockState(pos.x, pos.y, pos.z);
+            owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                play::ClientboundBlockUpdatePacket{.pos = pos, .blockStateId = actual.value_or(0)}.write(buffer);
+            });
+        }
+        owner_->sendInventory();
+        ack();
+        return;
+    }
     const bool mainHand = useItemOn.hand == play::Hand::MainHand;
     const std::int32_t heldSlot =
         mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;

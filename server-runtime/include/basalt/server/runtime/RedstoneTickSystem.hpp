@@ -148,11 +148,16 @@ public:
 
     void tickRandomBlocks(world::LoadedWorld& world, const sched::Region& region);
 
+    /// One random tick on one block, as a plugin asks; true when the block changed.
+    bool randomTickAt(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
     void tickBlockEntities(world::LoadedWorld& world, const sched::Region& region);
 
     void tickInhabitedTime(world::LoadedWorld& world, const sched::Region& region);
 
 private:
+    [[nodiscard]] world::randomTicks::Context randomContext(world::LoadedWorld& world);
+
     bool tickSpawner(world::LoadedWorld& world, wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y,
                      std::int32_t z);
 

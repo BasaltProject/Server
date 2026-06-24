@@ -55,6 +55,9 @@ public:
     /// parity: `EnderDragonFight.tryRespawn`.
     void tryRespawn(world::LoadedWorld& world);
 
+    /// parity: `EnderDragonFight.spawnNewGateway(BlockPos)`.
+    bool spawnGatewayAt(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
     /// What a plugin asks of the fight: respawn, stage, portal, gateway or crystals.
     bool control(world::LoadedWorld& world, std::string_view action, std::int32_t value);
 

@@ -10,7 +10,7 @@
 namespace basalt::server::runtime::plugins {
 namespace {
 
-constexpr std::array<std::string_view, 18> kKeys{"motd",
+constexpr std::array<std::string_view, 23> kKeys{"motd",
                                                  "max_players",
                                                  "port",
                                                  "bind",
@@ -27,7 +27,12 @@ constexpr std::array<std::string_view, 18> kKeys{"motd",
                                                  "initial_enabled_packs",
                                                  "initial_disabled_packs",
                                                  "allow_nether",
-                                                 "allow_end"};
+                                                 "allow_end",
+                                                 "pause_when_empty_seconds",
+                                                 "spawn_protection",
+                                                 "pause_allowed",
+                                                 "respawn_world",
+                                                 "autosave"};
 
 [[nodiscard]] std::string joined(const std::vector<std::string>& values) {
     std::string out;
@@ -59,6 +64,21 @@ std::optional<std::int32_t> ServerSettings::maxPlayersOverride() const {
     return maxPlayers_;
 }
 
+std::optional<std::string> ServerSettings::respawnWorldOverride() const {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    return respawnWorld_;
+}
+
+std::int32_t ServerSettings::pauseWhenEmptySeconds() const {
+    const std::int32_t held = pauseWhenEmpty_.load(std::memory_order_relaxed);
+    return held >= 0 ? held : hooks_.config ? hooks_.config().pauseWhenEmptySeconds : 0;
+}
+
+std::int32_t ServerSettings::spawnProtection() const {
+    const std::int32_t held = spawnProtection_.load(std::memory_order_relaxed);
+    return held >= 0 ? held : hooks_.config ? hooks_.config().spawnProtection : 0;
+}
+
 std::optional<std::string> ServerSettings::get(const std::string_view key) const {
     if (!hooks_.config) {
         return std::nullopt;
@@ -79,6 +99,26 @@ std::optional<std::string> ServerSettings::get(const std::string_view key) const
     }
     if (key == "max_players") {
         return std::to_string(maxPlayersOverride().value_or(config.maxPlayers));
+    }
+    if (key == "pause_when_empty_seconds") {
+        return std::to_string(pauseWhenEmptySeconds());
+    }
+    if (key == "spawn_protection") {
+        return std::to_string(spawnProtection());
+    }
+    if (key == "pause_allowed") {
+        return boolText(pauseAllowed());
+    }
+    if (key == "autosave") {
+        return boolText(!hooks_.autoSave || hooks_.autoSave());
+    }
+    if (key == "respawn_world") {
+        if (const auto held = respawnWorldOverride(); held.has_value()) {
+            return held;
+        }
+        const std::vector<world::LoadedWorld*> worlds =
+            hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{};
+        return worlds.empty() ? std::string{} : worlds.front()->name();
     }
     if (key == "port") {
         return std::to_string(config.port);
@@ -155,6 +195,38 @@ bool ServerSettings::set(const std::string_view key, const std::string_view valu
         }
         const std::lock_guard<std::mutex> lock{mutex_};
         maxPlayers_ = *number;
+        return true;
+    }
+    if (key == "autosave") {
+        if ((value != "true" && value != "false") || !hooks_.setAutoSave) {
+            return false;
+        }
+        hooks_.setAutoSave(value == "true");
+        return true;
+    }
+    if (key == "pause_allowed") {
+        if (value != "true" && value != "false") {
+            return false;
+        }
+        pauseAllowed_.store(value == "true", std::memory_order_relaxed);
+        return true;
+    }
+    if (key == "respawn_world") {
+        for (world::LoadedWorld* world : hooks_.worlds ? hooks_.worlds() : std::vector<world::LoadedWorld*>{}) {
+            if (world->name() == value) {
+                const std::lock_guard<std::mutex> lock{mutex_};
+                respawnWorld_ = std::string{value};
+                return true;
+            }
+        }
+        return false;
+    }
+    if (key == "pause_when_empty_seconds" || key == "spawn_protection") {
+        const std::optional<std::int32_t> number = numberOf(value);
+        if (!number.has_value() || *number < 0) {
+            return false;
+        }
+        (key == "spawn_protection" ? spawnProtection_ : pauseWhenEmpty_).store(*number, std::memory_order_relaxed);
         return true;
     }
     if (key == "idle_timeout") {

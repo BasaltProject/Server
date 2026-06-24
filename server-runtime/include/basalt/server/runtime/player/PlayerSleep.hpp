@@ -27,7 +27,7 @@ struct SleepContext {
 
 std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, PlayerSession& player,
                                                world::LoadedWorld& world, std::int32_t x, std::int32_t y,
-                                               std::int32_t z, std::int32_t clickedState);
+                                               std::int32_t z, std::int32_t clickedState, bool force = false);
 
 void freeBedAt(const BreakContext& context, world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 

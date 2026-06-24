@@ -513,7 +513,10 @@ void EntityVisibilityTracker::syncPlayers() {
         const bool hidden =
             session->extras.hiddenEntities.contains(other->entityId()) ||
             (other->extras.hiddenByDefault && !session->extras.shownEntities.contains(other->entityId()));
-        if (other->uuid() != session->uuid() && other->worldName == session->worldName && !hidden) {
+        // A new skin shows by taking the player off the screen for a tick and drawing them again.
+        const auto seen = profileSeen_.find(other->entityId());
+        const bool restyled = seen != profileSeen_.end() && seen->second != other->extras.profileVersion;
+        if (other->uuid() != session->uuid() && other->worldName == session->worldName && !hidden && !restyled) {
             visible.push_back(other);
         }
     }
@@ -521,6 +524,7 @@ void EntityVisibilityTracker::syncPlayers() {
         if (!trackedPlayers_.insert(other->entityId()).second) {
             continue;
         }
+        profileSeen_[other->entityId()] = other->extras.profileVersion;
         owner_->sendPlayPacket(wire::protocol::play::PlayerInfoUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::PlayerInfoUpdatePacket::initializing(
                 {wire::protocol::play::PlayerInfoEntry{.uuid = other->uuid(),
@@ -595,6 +599,7 @@ void EntityVisibilityTracker::syncPlayers() {
     }
     for (const std::int32_t entityId : gone) {
         trackedPlayers_.erase(entityId);
+        profileSeen_.erase(entityId);
         trackedEquipment_.erase(entityId);
         lastPlayerData_.erase(entityId);
     }

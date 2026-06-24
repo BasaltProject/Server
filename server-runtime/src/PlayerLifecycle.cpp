@@ -245,6 +245,11 @@ void PlayerLifecycle::respawn() {
             respawnWorld = found->second;
         }
     }
+    if (!stored.has_value() && owner_->options().respawnWorld) {
+        if (world::LoadedWorld* configured = owner_->options().respawnWorld(); configured != nullptr) {
+            respawnWorld = configured;
+        }
+    }
     if (respawnWorld == nullptr) {
         return;
     }
@@ -296,6 +301,11 @@ void PlayerLifecycle::respawn() {
 
     owner_->chunkStreamer().resetForRespawn(spawnX, spawnZ);
 
+    if (respawnWorld != owner_->currentWorld() && session->connection().switchWorld) {
+        static_cast<void>(session->connection().switchWorld(*respawnWorld, spawnX, spawnY, spawnZ));
+        return;
+    }
+
     for (PlayerSession* other : owner_->playersInSameWorld()) {
         if (other->uuid() == session->uuid() || !other->connection().sendPlayPacket) {
             continue;
@@ -312,6 +322,44 @@ void PlayerLifecycle::respawn() {
                     .write(buffer);
             });
     }
+}
+
+void PlayerLifecycle::refreshProfile() {
+    PlayerSession* session = owner_->playerSession();
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (session == nullptr || world == nullptr || session->dead) {
+        return;
+    }
+    const wire::protocol::play::PlayerInfoEntry entry{.uuid = session->uuid(),
+                                                      .name = session->name(),
+                                                      .listed = true,
+                                                      .gamemode = session->gamemode,
+                                                      .properties = session->profileProperties,
+                                                      .chatSession = session->chatSession()};
+    owner_->sendCompressed(wire::protocol::play::PlayerInfoRemovePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::PlayerInfoRemovePacket{.players = {session->uuid()}}.write(buffer);
+    });
+    owner_->sendCompressed(wire::protocol::play::PlayerInfoUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::PlayerInfoUpdatePacket::initializing({entry}).write(buffer);
+    });
+    // parity: `ServerPlayer.refreshPlayer`'s respawn in place keeps the data of the player and loses the world.
+    owner_->entityTracker().forgetEverythingDrawn();
+    owner_->sendCompressed(wire::protocol::play::RespawnPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::RespawnPacket{.spawnInfo = owner_->spawnInfo(session->gamemode), .dataToKeep = 3}.write(
+            buffer);
+    });
+    owner_->uiState().forgetSentAttributes();
+    owner_->sendPlayerPosition(session->x, session->y, session->z, session->yaw, session->pitch);
+    owner_->uiState().sendTime(*world);
+    if (world->weather().raining) {
+        owner_->uiState().sendWeather(world->weather());
+    }
+    owner_->uiState().sendAbilities();
+    owner_->uiState().syncHealth();
+    owner_->uiState().syncExperience();
+    owner_->sendPostEffects();
+    owner_->chunkStreamer().resetForRespawn(session->x, session->z);
+    owner_->sendInventoryAll();
 }
 
 void PlayerLifecycle::setGamemode(Gamemode mode) {

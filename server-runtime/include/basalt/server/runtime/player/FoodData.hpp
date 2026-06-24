@@ -24,6 +24,14 @@ public:
 
     [[nodiscard]] float exhaustionLevel() const noexcept { return exhaustionLevel_; }
 
+    static constexpr std::int32_t kDefaultSaturatedRegenTicks = 10;
+    static constexpr std::int32_t kDefaultUnsaturatedRegenTicks = 80;
+    static constexpr std::int32_t kDefaultStarveTicks = 80;
+
+    std::int32_t saturatedRegenTicks = kDefaultSaturatedRegenTicks;
+    std::int32_t unsaturatedRegenTicks = kDefaultUnsaturatedRegenTicks;
+    std::int32_t starveTicks = kDefaultStarveTicks;
+
     void addExhaustion(float amount);
 
     void eat(std::int32_t food, float saturation);

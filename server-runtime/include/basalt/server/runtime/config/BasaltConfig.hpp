@@ -45,6 +45,10 @@ struct BasaltConfig {
     std::string resourcePackPrompt;
     std::string gamemode = "survival";
     bool whitelist = false;
+    /// parity: `pause-when-empty-seconds`.
+    std::int32_t pauseWhenEmptySeconds = 60;
+    /// parity: `spawn-protection`.
+    std::int32_t spawnProtection = 16;
     wire::auth::forwarding::ProxyForwarding forwarding;
     wire::common::LogLevel logLevel = wire::common::LogLevel::Info;
     bool logToFile = true;

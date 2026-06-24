@@ -217,6 +217,12 @@ public:
         world::RealBlockTransformers* blockTransformers = nullptr;
         world::jukeboxes::SongOutputs* jukeboxes = nullptr;
         std::function<bool()> whitelistEnforced;
+        /// parity: `MinecraftServer.findRespawnDimension`, where a player without a spawn point comes back.
+        std::function<world::LoadedWorld*()> respawnWorld;
+        /// parity: `DedicatedServer.isUnderSpawnProtection`.
+        std::function<bool(const player::PlayerSession& player, const world::LoadedWorld& world, std::int32_t x,
+                           std::int32_t z)>
+            spawnProtected;
         world::RealEnchantments* enchantments = nullptr;
         world::PlayerProgress* progress = nullptr;
         world::PlayerAdvancements* advancements = nullptr;
@@ -304,6 +310,9 @@ public:
     void sendPlayPacket(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
 
     void sendCompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);
+
+    /// parity: `CraftInventoryView.sendInventoryTitleChange`, the open screen again under a new title.
+    bool retitleScreen(const wire::text::Component& title);
 
     /// Sends a clientbound packet (id and body) past the plugin listeners unless `intercept`; any thread.
     bool sendRaw(std::int32_t id, std::span<const std::uint8_t> body, bool intercept);
@@ -444,6 +453,9 @@ public:
     void handOverToRegionOf(world::LoadedWorld& world);
 
 private:
+    std::int32_t lastScreenId_ = 0;
+    std::int32_t lastScreenType_ = -1;
+
     void writeToSocket(const wire::io::ByteBuffer& frame);
 
     void sendUncompressed(std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& writeBody);

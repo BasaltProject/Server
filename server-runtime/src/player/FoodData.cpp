@@ -10,11 +10,8 @@ namespace {
 constexpr float kMaxExhaustion = 40.0F;
 constexpr float kExhaustionPerPoint = 4.0F;
 constexpr std::int32_t kRegenFoodThreshold = 18;
-constexpr std::int32_t kRegenTicks = 80;
 constexpr float kRegenExhaustion = 6.0F;
-constexpr std::int32_t kSaturatedRegenTicks = 10;
 constexpr float kSaturatedRegenCost = 6.0F;
-constexpr std::int32_t kStarveTicks = 80;
 constexpr float kStarveFloorEasy = 10.0F;
 constexpr float kStarveFloorHard = 1.0F;
 
@@ -68,7 +65,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth, const 
     const bool hurtAlready = health < maxHealth;
     if (naturalRegeneration && saturationLevel_ > 0.0F && hurtAlready && foodLevel_ >= kMaxFood) {
         tickTimer_++;
-        if (tickTimer_ >= kSaturatedRegenTicks) {
+        if (tickTimer_ >= saturatedRegenTicks) {
             const float spent = std::min(saturationLevel_, kSaturatedRegenCost);
             heal(spent / kSaturatedRegenCost);
             addExhaustion(spent);
@@ -78,7 +75,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth, const 
     }
     if (naturalRegeneration && foodLevel_ >= kRegenFoodThreshold && hurtAlready) {
         tickTimer_++;
-        if (tickTimer_ >= kRegenTicks) {
+        if (tickTimer_ >= unsaturatedRegenTicks) {
             heal(1.0F);
             addExhaustion(kRegenExhaustion);
             tickTimer_ = 0;
@@ -87,7 +84,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth, const 
     }
     if (foodLevel_ <= 0) {
         tickTimer_++;
-        if (tickTimer_ >= kStarveTicks) {
+        if (tickTimer_ >= starveTicks) {
             const bool mayStarve = health > kStarveFloorEasy || difficulty == Difficulty::Hard ||
                                    (health > kStarveFloorHard && difficulty == Difficulty::Normal);
             if (mayStarve) {

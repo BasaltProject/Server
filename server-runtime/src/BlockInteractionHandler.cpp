@@ -449,6 +449,20 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
         break;
     }
 
+    if (action.action == Action::StartDestroyBlock) {
+        const PlayerSession* breaker = owner_->playerSession();
+        if (const auto& protectedAt = owner_->options().spawnProtected;
+            protectedAt && breaker != nullptr && owner_->currentWorld() != nullptr &&
+            protectedAt(*breaker, *owner_->currentWorld(), action.pos.x, action.pos.z)) {
+            const std::optional<std::int32_t> actual =
+                owner_->world().blockState(action.pos.x, action.pos.y, action.pos.z);
+            owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                play::ClientboundBlockUpdatePacket{.pos = action.pos, .blockStateId = actual.value_or(0)}.write(buffer);
+            });
+            ack();
+            return;
+        }
+    }
     // The cracks everyone else sees.
     if (action.action == Action::StartDestroyBlock) {
         // parity: `NoteBlock.attack`, which plays the note without moving it on.

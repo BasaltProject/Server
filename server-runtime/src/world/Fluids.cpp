@@ -29,8 +29,8 @@ Submersion of(std::int32_t stateId) {
     return Submersion::None;
 }
 
-std::int32_t airAfterTick(std::int32_t air, bool eyesInWater) {
-    return eyesInWater ? air - 1 : std::min(air + 4, kMaxAir);
+std::int32_t airAfterTick(std::int32_t air, bool eyesInWater, std::int32_t maxAir) {
+    return eyesInWater ? air - 1 : std::min(air + 4, maxAir);
 }
 
 namespace {

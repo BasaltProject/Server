@@ -40,6 +40,7 @@ struct Context {
 [[nodiscard]] std::optional<Value> hud(Context& context, Verb verb, std::string_view name, const Args& args);
 [[nodiscard]] std::optional<Value> view(Context& context, Verb verb, std::string_view name, const Args& args);
 [[nodiscard]] std::optional<Value> misc(Context& context, Verb verb, std::string_view name, const Args& args);
+[[nodiscard]] std::optional<Value> tail(Context& context, Verb verb, std::string_view name, const Args& args);
 
 [[nodiscard]] std::optional<Value> dispatch(Context& context, Verb verb, std::string_view name, const Args& args);
 

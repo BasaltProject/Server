@@ -587,17 +587,9 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
     }
 }
 
-void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched::Region& region) {
-    const std::int32_t speed = world.gameRules().number(world::gameRules::kRandomTickSpeed);
-    if (speed <= 0) {
-        return;
-    }
-    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region, 1);
-    if (chunks.empty()) {
-        return;
-    }
+world::randomTicks::Context RedstoneTickSystem::randomContext(world::LoadedWorld& world) {
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    const world::randomTicks::Context context{
+    return world::randomTicks::Context{
         .world = world.state(),
         .worldName = world.name(),
         .seed = world.metadata().seed,
@@ -639,6 +631,31 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
                     }
                 }
             }};
+}
+
+bool RedstoneTickSystem::randomTickAt(world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
+                                      const std::int32_t z) {
+    const world::randomTicks::Context context = randomContext(world);
+    random::RandomSource random = freshRandom();
+    const std::vector<world::BlockChange> changes = randomTicks_.tickBlock(context, x, y, z, random);
+    const std::vector<PlayerSession*> watchers = watchersOf(world);
+    for (const world::BlockChange& change : changes) {
+        broadcaster_->announceRedstone(world, watchers, change);
+        broadcaster_->notifyAround(world, watchers, change.x, change.y, change.z, std::nullopt);
+    }
+    return !changes.empty();
+}
+
+void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched::Region& region) {
+    const std::int32_t speed = world.gameRules().number(world::gameRules::kRandomTickSpeed);
+    if (speed <= 0) {
+        return;
+    }
+    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region, 1);
+    if (chunks.empty()) {
+        return;
+    }
+    const world::randomTicks::Context context = randomContext(world);
     random::RandomSource random = freshRandom();
     const std::vector<world::BlockChange> changes = randomTicks_.tick(context, chunks, speed, random);
     if (changes.empty()) {

@@ -159,6 +159,21 @@ public:
 
     bool lastHurtLanded = false;
 
+    /// parity: `CombatEntry`, kept raw; the tracker's own status rules are read on top of them.
+    struct CombatRecord {
+        std::string damageType;
+        std::string messageId;
+        std::int32_t directId = -1;
+        std::int32_t causeId = -1;
+        float damage = 0.0F;
+        float fallDistance = 0.0F;
+        std::string fallLocation;
+        std::int64_t tick = 0;
+    };
+
+    static constexpr std::size_t kMaxCombatRecords = 256;
+    std::vector<CombatRecord> combatRecords;
+
     /// parity: `LivingEntity.lastHurt`.
     float lastHurt = 0.0F;
 

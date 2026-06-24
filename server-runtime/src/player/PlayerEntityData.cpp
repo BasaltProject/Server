@@ -101,7 +101,7 @@ std::optional<std::int32_t> parrotVariantOf(const std::optional<wire::nbt::NbtCo
 PlayerEntityData PlayerEntityData::of(const PlayerSession& session) {
     PlayerEntityData data;
     const bool spectator = session.gamemode == wire::protocol::play::Gamemode::Spectator;
-    if (session.fireTicks > 0) {
+    if (session.extras.visualFire == 1 || (session.extras.visualFire < 0 && session.fireTicks > 0)) {
         data.sharedFlags |= SetEntityDataPacket::kFlagOnFire;
     }
     if (session.sneaking) {
@@ -262,6 +262,10 @@ void tickBody(PlayerSession& session, const entity::entityCollision::BlockAt& bl
                                      event.set("swimming", session.swimming);
                                  })) {
         session.swimming = wasSwimming;
+    }
+    if (session.extras.fixedPose >= 0) {
+        session.pose = static_cast<Pose>(session.extras.fixedPose);
+        return;
     }
     // parity: `Player.updatePlayerPose`.
     if (!fits(session, Pose::Swimming, blockAt)) {
