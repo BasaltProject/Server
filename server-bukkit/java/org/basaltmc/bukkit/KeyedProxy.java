@@ -59,7 +59,7 @@ final class KeyedProxy implements InvocationHandler {
             default:
                 break;
         }
-        Object fact = KeyedFacts.answer(type, key, method);
+        Object fact = KeyedFacts.answer(type, key, method, args);
         if (fact != KeyedFacts.kNone) {
             return fact;
         }

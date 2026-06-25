@@ -46,13 +46,24 @@ public final class CustomGenerators {
             new CellBiomes(world.getMinHeight(), world.getMaxHeight(), 0));
     }
 
-    /** Puts the generator in charge of the chunks of a void world; false when the server cannot hand them over. */
+    /** Whether a generator needs the game's own generation for any of its flags. */
+    public static boolean needsVanilla(ChunkGenerator generator) {
+        return generator.shouldGenerateNoise() || generator.shouldGenerateSurface() || generator.shouldGenerateBedrock()
+            || generator.shouldGenerateCaves() || generator.shouldGenerateDecorations()
+            || generator.shouldGenerateStructures();
+    }
+
+    /** Puts the generator in charge of the chunks of a world; false when the server cannot hand them over. */
     public static synchronized boolean install(BasaltWorld world, ChunkGenerator generator, BiomeProvider biomes) {
         BiomeProvider provider = biomes != null ? biomes : generator.getDefaultBiomeProvider(world);
         Entry entry = entryOf(world);
         entry.generator = generator;
         entry.biomes = provider;
-        if (!org.basaltmc.bukkit.WorldEnvNatives.useGenerator(world.getName())) {
+        boolean vanilla = generator.shouldGenerateNoise() || generator.shouldGenerateSurface()
+            || generator.shouldGenerateBedrock() || generator.shouldGenerateCaves();
+        int flags = (vanilla ? 1 : 0) | (generator.shouldGenerateDecorations() ? 2 : 0)
+            | (generator.shouldGenerateStructures() ? 4 : 0) | (generator.shouldGenerateMobs() ? 8 : 0);
+        if (!org.basaltmc.bukkit.RestNatives.useGeneratorWith(world.getName(), flags)) {
             entry.generator = null;
             return false;
         }
@@ -92,6 +103,11 @@ public final class CustomGenerators {
 
     /** The block state ids of every section from the lowest, then the biome cells; called off the tick thread. */
     public static int[] fill(String name, int chunkX, int chunkZ) {
+        return fillOver(name, chunkX, chunkZ, null);
+    }
+
+    /** As `fill`, over the blocks and biome cells the server made first when `base` holds them. */
+    public static int[] fillOver(String name, int chunkX, int chunkZ, int[] base) {
         Entry entry = kEntries.get(name);
         if (entry == null || entry.generator == null) {
             return null;
@@ -103,6 +119,10 @@ public final class CustomGenerators {
         int plains = Math.max(0, java.util.Arrays.asList(known).indexOf("minecraft:plains"));
         CellBiomes grid = new CellBiomes(minY, maxY, plains);
         BasaltChunkData data = new BasaltChunkData(minY, maxY, grid);
+        if (base != null && base.length >= 2) {
+            data.load(java.util.Arrays.copyOfRange(base, 2, 2 + base[0]));
+            grid.load(java.util.Arrays.copyOfRange(base, 2 + base[0], 2 + base[0] + base[1]));
+        }
         Object guard = entry.generator.isParallelCapable() ? new Object() : entry.lock;
         synchronized (guard) {
             Random random = new Random(chunkSeed(0L, chunkX, chunkZ));

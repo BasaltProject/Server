@@ -23,6 +23,21 @@ public final class BasaltChunkData implements ChunkGenerator.ChunkData {
         this.biomes = biomes;
     }
 
+    /** Starts from the blocks of a chunk the server already made, section by section from the lowest. */
+    void load(int[] blocks) {
+        for (int i = 0; i < sections.length && (i + 1) * 4096 <= blocks.length; i++) {
+            int[] one = java.util.Arrays.copyOfRange(blocks, i * 4096, (i + 1) * 4096);
+            boolean empty = true;
+            for (int state : one) {
+                if (state != 0) {
+                    empty = false;
+                    break;
+                }
+            }
+            sections[i] = empty ? null : one;
+        }
+    }
+
     int[] flat() {
         int[] out = new int[sections.length * 4096];
         for (int i = 0; i < sections.length; i++) {

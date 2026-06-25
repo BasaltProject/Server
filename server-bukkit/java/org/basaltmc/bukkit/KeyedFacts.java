@@ -84,8 +84,19 @@ final class KeyedFacts {
         return stored == null ? null : Registry.SOUNDS.get(NamespacedKey.fromString(String.valueOf(stored)));
     }
 
-    static Object answer(Class<?> type, NamespacedKey key, Method method) {
+    static Object answer(Class<?> type, NamespacedKey key, Method method, Object[] args) {
         String name = method.getName();
+        if (type == io.papermc.paper.entity.poi.PoiType.class) {
+            switch (name) {
+                case "is":
+                    return key.getKey().equals(RestNatives.poiOfState(
+                        BasaltBlockData.stateOf((org.bukkit.block.data.BlockData) args[0])));
+                case "hasOccupants":
+                    return RestNatives.poiTickets(key.getKey()) > 0;
+                default:
+                    return kNone;
+            }
+        }
         if (type == Attribute.class) {
             switch (name) {
                 case "getDefaultValue":

@@ -44,7 +44,11 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
     }
 
     @Override
-    public void setMaxStackSize(int size) {}
+    public void setMaxStackSize(int size) {
+        if (size != 99) {
+            throw Unsupported.hit("PlayerInventory#setMaxStackSize other than 99");
+        }
+    }
 
     @Override
     public ItemStack getItem(int slot) {

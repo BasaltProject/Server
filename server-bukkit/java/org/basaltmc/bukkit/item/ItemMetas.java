@@ -14,7 +14,8 @@ import org.bukkit.configuration.serialization.SerializableAs;
 public final class ItemMetas {
     public enum Kind {
         PLAIN, SKULL, LEATHER, ARMOR, BOOK, WRITABLE_BOOK, ENCHANTED_BOOK, FIREWORK, FIREWORK_EFFECT, POTION, BANNER,
-        SHIELD, MAP, COMPASS, AXOLOTL, BUNDLE, STEW, TROPICAL, KNOWLEDGE, CROSSBOW, INSTRUMENT, OMINOUS, SPAWN_EGG
+        SHIELD, MAP, COMPASS, AXOLOTL, BUNDLE, STEW, TROPICAL, KNOWLEDGE, CROSSBOW, INSTRUMENT, OMINOUS, SPAWN_EGG,
+        BLOCK_STATE
     }
 
     private static boolean registered;
@@ -81,11 +82,29 @@ public final class ItemMetas {
         if (name.endsWith("_spawn_egg")) {
             return Kind.SPAWN_EGG;
         }
+        if (hasBlockEntity(name)) {
+            return Kind.BLOCK_STATE;
+        }
         if (name.endsWith("_helmet") || name.endsWith("_chestplate") || name.endsWith("_leggings")
             || name.endsWith("_boots")) {
             return Kind.ARMOR;
         }
         return Kind.PLAIN;
+    }
+
+    private static boolean hasBlockEntity(String name) {
+        switch (name) {
+            case "chest", "trapped_chest", "barrel", "furnace", "blast_furnace", "smoker", "hopper", "dropper",
+                "dispenser", "brewing_stand", "crafter", "beehive", "bee_nest", "spawner", "jukebox", "lectern",
+                "enchanting_table", "command_block", "chain_command_block", "repeating_command_block", "beacon",
+                "conduit", "campfire", "soul_campfire", "comparator", "daylight_detector", "decorated_pot",
+                "chiseled_bookshelf", "bell", "sculk_sensor", "calibrated_sculk_sensor", "sculk_shrieker",
+                "sculk_catalyst", "end_gateway", "structure_block", "jigsaw", "trial_spawner", "vault",
+                "ender_chest":
+                return true;
+            default:
+                return name.endsWith("shulker_box") || name.endsWith("_sign") || name.endsWith("_hanging_sign");
+        }
     }
 
     public static Class<? extends org.bukkit.inventory.meta.ItemMeta> metaClass(Material material) {
@@ -134,6 +153,8 @@ public final class ItemMetas {
                 return org.bukkit.inventory.meta.OminousBottleMeta.class;
             case SPAWN_EGG:
                 return org.bukkit.inventory.meta.SpawnEggMeta.class;
+            case BLOCK_STATE:
+                return org.bukkit.inventory.meta.BlockStateMeta.class;
             default:
                 return org.bukkit.inventory.meta.ItemMeta.class;
         }
@@ -185,6 +206,8 @@ public final class ItemMetas {
                 return new MetaVariants.Ominous(material, components);
             case SPAWN_EGG:
                 return new MetaSpawnEgg(material, components);
+            case BLOCK_STATE:
+                return new MetaBlockState(material, components);
             default:
                 return new MetaItem(material, components);
         }

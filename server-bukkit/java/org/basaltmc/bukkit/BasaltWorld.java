@@ -40,7 +40,6 @@ public final class BasaltWorld extends WorldGeo {
     private final String name;
     private final UUID id;
     private World.Environment environment;
-    private boolean pvp = true;
     private int minHeight = Integer.MIN_VALUE;
     private int maxHeight = Integer.MIN_VALUE;
 
@@ -425,14 +424,12 @@ public final class BasaltWorld extends WorldGeo {
 
     @Override
     public boolean isAutoSave() {
-        return true;
+        return Boolean.parseBoolean(WorldEnvNatives.setting("autosave"));
     }
 
     @Override
     public void setAutoSave(boolean value) {
-        if (!value) {
-            throw Unsupported.hit("World#setAutoSave");
-        }
+        WorldEnvNatives.setSetting("autosave", Boolean.toString(value));
     }
 
     @Override
@@ -738,12 +735,12 @@ public final class BasaltWorld extends WorldGeo {
 
     @Override
     public boolean getPVP() {
-        return pvp;
+        return Boolean.TRUE.equals(getGameRuleValue(org.bukkit.GameRules.PVP));
     }
 
     @Override
     public void setPVP(boolean value) {
-        pvp = value;
+        setGameRule(org.bukkit.GameRules.PVP, value);
     }
 
     @Override
@@ -761,8 +758,13 @@ public final class BasaltWorld extends WorldGeo {
     }
 
     @Override
+    public int getTickableTileEntityCount() {
+        return RestNatives.tickableBlockEntities(name);
+    }
+
+    @Override
     public int getSimulationDistance() {
-        return BasaltServer.instance().getSimulationDistance();
+        return (int) RestNatives.worldTunable(name, "simulation_distance");
     }
 
     @Override

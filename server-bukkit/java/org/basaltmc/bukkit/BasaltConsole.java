@@ -112,9 +112,33 @@ public final class BasaltConsole extends ConsoleCommandSenderBase {
         return Set.of();
     }
 
+    private final org.basaltmc.bukkit.player.PlayerConversations conversations =
+        new org.basaltmc.bukkit.player.PlayerConversations();
+
     @Override
     public boolean isConversing() {
-        return false;
+        return conversations.isConversing();
+    }
+
+    @Override
+    public boolean beginConversation(org.bukkit.conversations.Conversation conversation) {
+        return conversations.begin(conversation);
+    }
+
+    @Override
+    public void abandonConversation(org.bukkit.conversations.Conversation conversation) {
+        conversations.abandon(conversation, new org.bukkit.conversations.ConversationAbandonedEvent(conversation));
+    }
+
+    @Override
+    public void abandonConversation(org.bukkit.conversations.Conversation conversation,
+            org.bukkit.conversations.ConversationAbandonedEvent details) {
+        conversations.abandon(conversation, details);
+    }
+
+    @Override
+    public void acceptConversationInput(String input) {
+        conversations.accept(input);
     }
 
     @Override

@@ -39,6 +39,36 @@ public final class BasaltBlockType extends BlockTypeTypedBase {
     }
 
     @Override
+    public org.bukkit.Instrument getInstrument() {
+        String name = RestNatives.blockInstrument(Registries.defaultState(block));
+        return name == null ? org.bukkit.Instrument.PIANO : switch (name) {
+            case "basedrum" -> org.bukkit.Instrument.BASS_DRUM;
+            case "snare" -> org.bukkit.Instrument.SNARE_DRUM;
+            case "hat" -> org.bukkit.Instrument.STICKS;
+            case "bass" -> org.bukkit.Instrument.BASS_GUITAR;
+            case "flute" -> org.bukkit.Instrument.FLUTE;
+            case "bell" -> org.bukkit.Instrument.BELL;
+            case "guitar" -> org.bukkit.Instrument.GUITAR;
+            case "chime" -> org.bukkit.Instrument.CHIME;
+            case "xylophone" -> org.bukkit.Instrument.XYLOPHONE;
+            case "iron_xylophone" -> org.bukkit.Instrument.IRON_XYLOPHONE;
+            case "cow_bell" -> org.bukkit.Instrument.COW_BELL;
+            case "didgeridoo" -> org.bukkit.Instrument.DIDGERIDOO;
+            case "bit" -> org.bukkit.Instrument.BIT;
+            case "banjo" -> org.bukkit.Instrument.BANJO;
+            case "pling" -> org.bukkit.Instrument.PLING;
+            case "zombie" -> org.bukkit.Instrument.ZOMBIE;
+            case "skeleton" -> org.bukkit.Instrument.SKELETON;
+            case "creeper" -> org.bukkit.Instrument.CREEPER;
+            case "dragon" -> org.bukkit.Instrument.DRAGON;
+            case "wither_skeleton" -> org.bukkit.Instrument.WITHER_SKELETON;
+            case "piglin" -> org.bukkit.Instrument.PIGLIN;
+            case "custom_head" -> org.bukkit.Instrument.CUSTOM_HEAD;
+            default -> org.bukkit.Instrument.PIANO;
+        };
+    }
+
+    @Override
     public boolean hasItemType() {
         return Registries.materialOfBlock(block).isItem();
     }

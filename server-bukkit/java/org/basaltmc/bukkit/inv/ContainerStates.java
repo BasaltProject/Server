@@ -85,7 +85,63 @@ public final class ContainerStates {
         return proxy;
     }
 
+    /** The state of a container block that is not in the world, holding the stacks of the item it came from. */
+    public static BlockState detached(BlockState base, Map<String, Object> data, java.util.List<Object> items) {
+        String block = base.getType().getKey().getKey();
+        Class<? extends BlockState> iface = interfaceOf(block);
+        if (iface == null) {
+            return base;
+        }
+        Handler handler = new Handler(null, 0, 0, 0, base, typeOf(block), block);
+        handler.detachedData = data;
+        InventoryType type = typeOf(block);
+        org.bukkit.inventory.ItemStack[] slots = new org.bukkit.inventory.ItemStack[BlockInventory.sizeOf(block)];
+        for (Object entry : items == null ? java.util.List.of() : items) {
+            Map<String, Object> one = Nbt.map(entry);
+            org.bukkit.inventory.ItemStack stack = one == null ? null : org.basaltmc.bukkit.item.Convert.stack(
+                Nbt.map(one.get("item")));
+            int slot = one == null ? -1 : Nbt.integer(one, "slot", -1);
+            if (stack != null && slot >= 0 && slot < slots.length) {
+                slots[slot] = stack;
+            }
+        }
+        BlockState proxy = (BlockState) Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[] {iface}, handler);
+        handler.holder = (org.bukkit.inventory.InventoryHolder) proxy;
+        handler.fixed = TypedInventories.wrap(new SnapshotInventory(type, slots));
+        return proxy;
+    }
+
+    /** The stacks of a detached container state in the item's own `container` format. */
+    public static java.util.List<Object> detachedItems(BlockState state) {
+        java.util.List<Object> out = new java.util.ArrayList<>();
+        if (state != null && Proxy.isProxyClass(state.getClass())
+            && Proxy.getInvocationHandler(state) instanceof Handler handler && handler.fixed != null) {
+            Inventory inventory = TypedInventories.unwrap(handler.fixed);
+            for (int slot = 0; slot < inventory.getSize(); slot++) {
+                org.bukkit.inventory.ItemStack stack = inventory.getItem(slot);
+                if (stack != null && !stack.getType().isAir()) {
+                    Map<String, Object> entry = Nbt.compound();
+                    entry.put("slot", slot);
+                    entry.put("item", org.basaltmc.bukkit.item.Convert.stack(stack));
+                    out.add(entry);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** The block entity data a detached container state holds apart from its stacks, or null for another state. */
+    public static Map<String, Object> detachedData(BlockState state) {
+        if (state != null && Proxy.isProxyClass(state.getClass())
+            && Proxy.getInvocationHandler(state) instanceof Handler handler && handler.fixed != null) {
+            return handler.detachedData;
+        }
+        return null;
+    }
+
     private static final class Handler implements InvocationHandler {
+        private Inventory fixed;
+        private Map<String, Object> detachedData;
         private final String world;
         private final int x;
         private final int y;
@@ -107,6 +163,9 @@ public final class ContainerStates {
         }
 
         private Inventory inventory() {
+            if (fixed != null) {
+                return fixed;
+            }
             if (inventory == null) {
                 Inventory single = new BlockInventory(world, x, y, z, type, BlockInventory.sizeOf(block), holder);
                 inventory = TypedInventories.wrap(single);
@@ -115,11 +174,13 @@ public final class ContainerStates {
         }
 
         private Map<String, Object> entity() {
-            return Nbt.readNamed(WorldNatives.blockEntityNbt(world, x, y, z));
+            return detachedData != null ? detachedData : Nbt.readNamed(WorldNatives.blockEntityNbt(world, x, y, z));
         }
 
         private void store(Map<String, Object> data) {
-            WorldNatives.setBlockEntityNbt(world, x, y, z, Nbt.writeNamed(data));
+            if (detachedData == null) {
+                WorldNatives.setBlockEntityNbt(world, x, y, z, Nbt.writeNamed(data));
+            }
         }
 
         @Override

@@ -330,7 +330,8 @@ public final class BasaltBlock extends BlockBase {
 
     @Override
     public void randomTick() {
-        throw Unsupported.hit("Block#randomTick");
+        Blocks.flushAll();
+        RestNatives.randomTick(world.getName(), x, y, z);
     }
 
     @Override

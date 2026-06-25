@@ -35,7 +35,7 @@ public final class PlayerStatistics {
 
     private PlayerStatistics() {}
 
-    static String untyped(Statistic statistic) {
+    public static String untyped(Statistic statistic) {
         if (statistic.getType() != Statistic.Type.UNTYPED) {
             throw new IllegalArgumentException("Must supply additional paramater for this statistic");
         }
@@ -57,7 +57,7 @@ public final class PlayerStatistics {
         };
     }
 
-    static String of(Statistic statistic, Material material) {
+    public static String of(Statistic statistic, Material material) {
         if (statistic.getType() != Statistic.Type.BLOCK && statistic.getType() != Statistic.Type.ITEM) {
             throw new IllegalArgumentException("This statistic does not take a Material parameter");
         }
@@ -68,7 +68,7 @@ public final class PlayerStatistics {
         return typed(statistic) + material.getKey();
     }
 
-    static String of(Statistic statistic, EntityType entity) {
+    public static String of(Statistic statistic, EntityType entity) {
         if (statistic.getType() != Statistic.Type.ENTITY) {
             throw new IllegalArgumentException("This statistic does not take an EntityType parameter");
         }
