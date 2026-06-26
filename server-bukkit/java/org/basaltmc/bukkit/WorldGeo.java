@@ -23,6 +23,7 @@ import org.bukkit.Raid;
 import org.bukkit.Registry;
 import org.bukkit.TreeType;
 import org.bukkit.block.Biome;
+import org.bukkit.block.BlockState;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.SpawnCategory;
@@ -424,6 +425,38 @@ public abstract class WorldGeo extends WorldExtras {
             delegate.setBlockData(placed[at], placed[at + 1], placed[at + 2], BasaltBlockData.of(placed[at + 4]));
         }
         return true;
+    }
+
+    private boolean growInto(Location location, TreeType type, java.util.function.Predicate<BlockState> allow) {
+        Blocks.flushAll();
+        int[] placed = RestNatives.placeTree(getName(), treeName(type), location.getBlockX(), location.getBlockY(),
+            location.getBlockZ(), false);
+        if (placed == null) {
+            return false;
+        }
+        for (int at = 0; at + 4 < placed.length; at += 5) {
+            BlockState state = getBlockAt(placed[at], placed[at + 1], placed[at + 2]).getState();
+            state.setBlockData(BasaltBlockData.of(placed[at + 4]));
+            if (allow.test(state)) {
+                state.update(true, false);
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public boolean generateTree(Location location, java.util.Random random, TreeType type,
+            java.util.function.Consumer<? super BlockState> consumer) {
+        return growInto(location, type, state -> {
+            consumer.accept(state);
+            return true;
+        });
+    }
+
+    @Override
+    public boolean generateTree(Location location, java.util.Random random, TreeType type,
+            java.util.function.Predicate<? super BlockState> predicate) {
+        return growInto(location, type, predicate::test);
     }
 
     @Override
