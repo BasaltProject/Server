@@ -93,6 +93,16 @@ public final class AdventureBars {
         };
     }
 
+    public static synchronized java.util.List<BossBar> shownTo(UUID player) {
+        java.util.List<BossBar> out = new java.util.ArrayList<>();
+        for (Map.Entry<BossBar, Mirror> entry : kMirrors.entrySet()) {
+            if (entry.getValue().viewers.contains(player)) {
+                out.add(entry.getKey());
+            }
+        }
+        return out;
+    }
+
     public static synchronized void show(UUID player, BossBar bar) {
         Mirror mirror = kMirrors.computeIfAbsent(bar, Mirror::new);
         if (mirror.id != null && mirror.viewers.add(player)) {

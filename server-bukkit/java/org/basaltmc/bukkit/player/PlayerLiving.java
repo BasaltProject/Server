@@ -24,7 +24,7 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.RayTraceResult;
 
-public abstract class PlayerLiving extends PlayerActions {
+public abstract class PlayerLiving extends PlayerTail {
     private static final double kGravity = 0.08;
     private static final float kAirDrag = 0.98F;
     private static final int kWardenWarningCooldown = 200;
@@ -231,11 +231,6 @@ public abstract class PlayerLiving extends PlayerActions {
                 return (flags & 0x40) != 0;
             }
         };
-    }
-
-    @Override
-    public boolean isJumping() {
-        return getCurrentInput().isJump();
     }
 
     @Override

@@ -34,7 +34,18 @@ public final class BasaltConnection implements PlayerGameConnection {
 
     @Override
     public void sendReportDetails(Map<String, String> details) {
-        throw Unsupported.hit("PlayerCommonConnection#sendReportDetails");
+        if (details.size() > 32) {
+            throw new IllegalArgumentException("A report holds at most 32 details");
+        }
+        java.util.List<Object> flat = new java.util.ArrayList<>();
+        for (Map.Entry<String, String> entry : details.entrySet()) {
+            if (entry.getKey().length() > 128 || entry.getValue().length() > 4096) {
+                throw new IllegalArgumentException("A report detail is too long");
+            }
+            flat.add(entry.getKey());
+            flat.add(entry.getValue());
+        }
+        PlayerCalls.call(player.getUniqueId(), "report_details", flat.toArray());
     }
 
     @Override

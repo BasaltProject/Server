@@ -8,9 +8,6 @@ import org.bukkit.attribute.AttributeInstance;
 
 public abstract class PlayerState extends PlayerHud {
     private static final double kDefaultHealthScale = 20.0;
-    private static final int kVanillaSaturatedRegenRate = 10;
-    private static final int kVanillaUnsaturatedRegenRate = 80;
-    private static final int kVanillaStarvationRate = 80;
 
     private volatile double healthScaleValue = kDefaultHealthScale;
 
@@ -320,21 +317,6 @@ public abstract class PlayerState extends PlayerHud {
     @Override
     public void resetCooldown() {
         PlayerCalls.call(key(), "reset_attack_cooldown");
-    }
-
-    @Override
-    public int getSaturatedRegenRate() {
-        return kVanillaSaturatedRegenRate;
-    }
-
-    @Override
-    public int getUnsaturatedRegenRate() {
-        return kVanillaUnsaturatedRegenRate;
-    }
-
-    @Override
-    public int getStarvationRate() {
-        return kVanillaStarvationRate;
     }
 
     @Override
