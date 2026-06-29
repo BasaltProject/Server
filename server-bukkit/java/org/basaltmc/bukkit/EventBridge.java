@@ -143,11 +143,16 @@ final class EventBridge {
     }
 
     static void mapAlways(String basalt, java.util.function.Consumer<Fields> effect) {
+        mapLazily(basalt, effect);
+        Natives.subscribe(basalt, EventPriority.MONITOR.ordinal());
+    }
+
+    /** Runs the effect on every firing once somebody calls `Natives.subscribe` for the event. */
+    static void mapLazily(String basalt, java.util.function.Consumer<Fields> effect) {
         map(basalt, org.bukkit.event.server.ServerEvent.class, f -> {
             effect.accept(f);
             return null;
         });
-        Natives.subscribe(basalt, EventPriority.MONITOR.ordinal());
     }
 
     static {

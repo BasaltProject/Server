@@ -98,12 +98,12 @@ public final class BasaltPathfinder implements Pathfinder {
 
     @Override
     public boolean canOpenDoors() {
-        throw Unsupported.hit("Pathfinder#canOpenDoors");
+        return core.flag("nav_open_doors");
     }
 
     @Override
     public void setCanOpenDoors(boolean canOpenDoors) {
-        throw Unsupported.hit("Pathfinder#setCanOpenDoors");
+        core.set("nav_open_doors", canOpenDoors);
     }
 
     @Override
