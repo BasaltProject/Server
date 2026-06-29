@@ -56,13 +56,19 @@ void cast(ServerEntity& hook, HookState& state, double ownerX, double ownerEyeY,
                                     static_cast<double>(kPi));
 }
 
+void resetTimeUntilLured(HookState& state) {
+    state.timeUntilLured = nextIntBetween(state.random, state.minWaitTime, state.maxWaitTime);
+    state.timeUntilLured -=
+        state.applyLure ? (state.lureSpeed >= state.maxWaitTime ? state.timeUntilLured - 1 : state.lureSpeed) : 0;
+}
+
 void catchingFish(ServerEntity& hook, HookState& state, const Surroundings& around) {
     random::RandomSource& random = state.random;
     std::int32_t fishingSpeed = 1;
-    if (random.nextFloat() < 0.25F && around.rainingAbove) {
+    if (state.rainInfluenced && random.nextFloat() < 0.25F && around.rainingAbove) {
         ++fishingSpeed;
     }
-    if (random.nextFloat() < 0.5F && !around.skyAbove) {
+    if (state.skyInfluenced && random.nextFloat() < 0.5F && !around.skyAbove) {
         --fishingSpeed;
     }
     const auto particles = [&around](std::string_view name, double x, double y, double z, std::int32_t count, double dx,
@@ -141,11 +147,11 @@ void catchingFish(ServerEntity& hook, HookState& state, const Surroundings& arou
             }
         }
         if (state.timeUntilLured <= 0) {
-            state.fishAngle = nextFloatBetween(random, 0.0F, 360.0F);
-            state.timeUntilHooked = nextIntBetween(random, 20, 80);
+            state.fishAngle = nextFloatBetween(random, state.minLureAngle, state.maxLureAngle);
+            state.timeUntilHooked = nextIntBetween(random, state.minLureTime, state.maxLureTime);
         }
     } else {
-        state.timeUntilLured = nextIntBetween(random, 100, 600) - state.lureSpeed;
+        resetTimeUntilLured(state);
     }
 }
 

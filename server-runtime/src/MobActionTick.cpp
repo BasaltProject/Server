@@ -67,13 +67,14 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
     const auto blockX = static_cast<std::int32_t>(std::floor(mob.x));
     const auto blockY = static_cast<std::int32_t>(std::floor(mob.y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(mob.z));
-    if (entity::sunBurn::burns(mob.type())) {
+    const bool sensitive = mob.burnsInDay >= 0 ? mob.burnsInDay != 0 : entity::sunBurn::burns(mob.type());
+    if (sensitive) {
         const bool day = !world::beds::isNight(world.clock().totalTicks());
         const std::int32_t light = world::worldLight::skyLight(world.state(), blockX, blockY, blockZ);
         const bool openSky = world::worldLight::skyLight(world.state(), blockX, blockY + 1, blockZ) >= kSkyLightMax;
         const std::optional<std::int32_t> here = world.state().blockState(blockX, blockY, blockZ);
         const bool inWater = world::fluids::of(here.value_or(0)) == world::Submersion::Water;
-        if (entity::sunBurn::shouldBurn(mob.type(), day, light, openSky, inWater, random) &&
+        if (entity::sunBurn::shouldBurn(sensitive, day, light, openSky, inWater, random) &&
             (!hooks_.combustAllowed || hooks_.combustAllowed(world, mob, entity::sunBurn::kFireTicks, "sunlight"))) {
             mob.fireTicks = entity::sunBurn::kFireTicks;
         }
@@ -328,7 +329,8 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     // parity: `Allay.customServerAiStep`.
     // parity: `customServerAiStep`.
     // parity: `AbstractFish`.
-    const bool goalsToo = mob.goals != nullptr && mob.type().path() == "tadpole";
+    const bool goalsToo =
+        mob.goals != nullptr && (mob.type().path() == "tadpole" || (brain != nullptr && mob.goals->hasPluginGoals()));
     if (brain != nullptr && !goalsToo) {
         (this->*brain)(world, context);
         travelMob(world, mob, context.speed, &random);

@@ -32,6 +32,13 @@ struct Offers {
 [[nodiscard]] std::vector<world::trades::Offer>& offersOf(world::RealVillagerTrades& trades, ServerEntity& villager,
                                                           world::LoadedWorld& world);
 
+/// Rolls more trades for the level it has reached; how many it gave.
+std::int32_t addTrades(world::RealVillagerTrades& trades, ServerEntity& villager, world::LoadedWorld& world,
+                       std::int32_t amount);
+
+/// Forgets every offer, so the next ask rolls them again.
+void resetOffers(ServerEntity& villager);
+
 void writeOffers(const ServerEntity& villager, wire::nbt::NbtCompound& tag);
 
 void readOffers(const wire::nbt::NbtCompound& tag, ServerEntity& villager);

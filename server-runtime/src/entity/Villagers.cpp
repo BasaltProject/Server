@@ -118,6 +118,55 @@ world::trades::Offer asOffer(const world::VillagerTrade& trade) {
     return offer;
 }
 
+namespace {
+
+void rollTrades(world::RealVillagerTrades& trades, ServerEntity& villager, world::LoadedWorld& world,
+                std::int32_t level, std::optional<std::int32_t> fixedAmount) {
+    Offers& offers = *villager.offers;
+    const world::TradeSet& set = trades.tradeSet(villager.profession, level);
+    // parity: the roll's `THIS_ENTITY` and `ORIGIN`.
+    server::world::loot::LootContext context;
+    if (world::RealLootTables* tables = trades.lootTables(); tables != nullptr) {
+        tables->prepareAt(context, world, villager.x, villager.y, villager.z);
+    }
+    context.hasEntity = true;
+    context.additionalCostAllowed = true;
+    server::world::loot::EntityFacts facts{.type = villager.type()};
+    const wire::nbt::NbtCompound* data =
+        villager.sourceNbt.has_value() ? villager.sourceNbt->getCompound("VillagerData") : nullptr;
+    const std::string_view variant = data == nullptr ? std::string_view{} : data->getString("type");
+    facts.components.emplace("minecraft:villager/variant", variant.empty() ? "minecraft:plains" : variant);
+    context.thisEntity = std::move(facts);
+    random::RandomSource fallback = random::RandomSource::legacy(0);
+    random::RandomSource& random =
+        set.randomSequence.has_value() ? world.randomSequences().of(*set.randomSequence) : fallback;
+    const std::int32_t wanted = fixedAmount.has_value() ? *fixedAmount : set.amount.get(random, context);
+    std::vector<const world::VillagerTrade*> pool;
+    for (const world::VillagerTrade& trade : set.trades) {
+        pool.push_back(&trade);
+    }
+    std::int32_t found = 0;
+    while (found < wanted && !pool.empty()) {
+        const auto roll = static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(pool.size())));
+        const world::VillagerTrade* trade = pool[roll];
+        // parity: without duplicates the pick leaves the pool first; with them, only a pick that gave nothing does.
+        if (!set.allowDuplicates) {
+            pool.erase(pool.begin() + static_cast<std::ptrdiff_t>(roll));
+        }
+        std::optional<world::trades::Offer> offer = world::RealVillagerTrades::offerOf(*trade, context, random);
+        if (!offer.has_value()) {
+            if (set.allowDuplicates) {
+                pool.erase(pool.begin() + static_cast<std::ptrdiff_t>(roll));
+            }
+            continue;
+        }
+        offers.list.push_back(std::move(*offer));
+        ++found;
+    }
+}
+
+} // namespace
+
 std::vector<world::trades::Offer>& offersOf(world::RealVillagerTrades& trades, ServerEntity& villager,
                                             world::LoadedWorld& world) {
     if (villager.offers == nullptr) {
@@ -127,48 +176,18 @@ std::vector<world::trades::Offer>& offersOf(world::RealVillagerTrades& trades, S
     const std::int32_t reached = std::clamp(villager.villagerLevel, kFirstLevel, kMaxLevel);
     while (offers.level < reached) {
         ++offers.level;
-        const world::TradeSet& set = trades.tradeSet(villager.profession, offers.level);
-        // parity: the roll's `THIS_ENTITY` and `ORIGIN`.
-        server::world::loot::LootContext context;
-        if (world::RealLootTables* tables = trades.lootTables(); tables != nullptr) {
-            tables->prepareAt(context, world, villager.x, villager.y, villager.z);
-        }
-        context.hasEntity = true;
-        context.additionalCostAllowed = true;
-        server::world::loot::EntityFacts facts{.type = villager.type()};
-        const wire::nbt::NbtCompound* data =
-            villager.sourceNbt.has_value() ? villager.sourceNbt->getCompound("VillagerData") : nullptr;
-        const std::string_view variant = data == nullptr ? std::string_view{} : data->getString("type");
-        facts.components.emplace("minecraft:villager/variant", variant.empty() ? "minecraft:plains" : variant);
-        context.thisEntity = std::move(facts);
-        random::RandomSource fallback = random::RandomSource::legacy(0);
-        random::RandomSource& random =
-            set.randomSequence.has_value() ? world.randomSequences().of(*set.randomSequence) : fallback;
-        const std::int32_t wanted = set.amount.get(random, context);
-        std::vector<const world::VillagerTrade*> pool;
-        for (const world::VillagerTrade& trade : set.trades) {
-            pool.push_back(&trade);
-        }
-        std::int32_t found = 0;
-        while (found < wanted && !pool.empty()) {
-            const auto roll = static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(pool.size())));
-            const world::VillagerTrade* trade = pool[roll];
-            // parity: without duplicates the pick leaves the pool first; with them, only a pick that gave nothing does.
-            if (!set.allowDuplicates) {
-                pool.erase(pool.begin() + static_cast<std::ptrdiff_t>(roll));
-            }
-            std::optional<world::trades::Offer> offer = world::RealVillagerTrades::offerOf(*trade, context, random);
-            if (!offer.has_value()) {
-                if (set.allowDuplicates) {
-                    pool.erase(pool.begin() + static_cast<std::ptrdiff_t>(roll));
-                }
-                continue;
-            }
-            offers.list.push_back(std::move(*offer));
-            ++found;
-        }
+        rollTrades(trades, villager, world, offers.level, std::nullopt);
     }
     return offers.list;
 }
+
+std::int32_t addTrades(world::RealVillagerTrades& trades, ServerEntity& villager, world::LoadedWorld& world,
+                       std::int32_t amount) {
+    const std::size_t before = offersOf(trades, villager, world).size();
+    rollTrades(trades, villager, world, villager.offers->level, amount);
+    return static_cast<std::int32_t>(villager.offers->list.size() - before);
+}
+
+void resetOffers(ServerEntity& villager) { villager.offers.reset(); }
 
 } // namespace basalt::server::runtime::entity::villagers

@@ -46,6 +46,7 @@ constexpr std::uint8_t kEffectAmbienceDataIndex = 11;
 /// parity: `LivingEntity.DATA_STINGER_COUNT_ID`, after the arrows stuck in it.
 constexpr std::uint8_t kArrowCountDataIndex = 12;
 /// parity: `Wolf`'s anger after the tamable's two and its own interest and collar.
+constexpr std::uint8_t kWolfInterestedDataIndex = 20;
 constexpr std::uint8_t kWolfAngerEndDataIndex = 22;
 /// parity: `Enderman`'s creepy and stared-at flags after its carried block at 16.
 constexpr std::uint8_t kEndermanCreepyDataIndex = 17;
@@ -71,6 +72,12 @@ constexpr std::uint8_t kAbstractHorseFlagsDataIndex = 18;
 constexpr std::uint8_t kTridentLoyaltyDataIndex = 11;
 constexpr std::uint8_t kTridentFoilDataIndex = 12;
 constexpr std::uint8_t kMobFlagsDataIndex = 15;
+/// parity: `Fox.DATA_FLAGS_ID` after the type, and `Panda`'s counters and flags after the genes.
+constexpr std::uint8_t kFoxFlagsDataIndex = 20;
+constexpr std::uint8_t kPandaUnhappyDataIndex = 18;
+constexpr std::uint8_t kPandaSneezeDataIndex = 19;
+constexpr std::uint8_t kPandaEatDataIndex = 20;
+constexpr std::uint8_t kPandaFlagsDataIndex = 23;
 constexpr std::uint8_t kAirSupplyDataIndex = 1;
 constexpr std::int32_t kDefaultAirSupply = 300;
 
@@ -560,6 +567,30 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     };
     horn(goatLeftHorn, &RuntimeEntityMetadata::goatLeftHorn, goats::kLeftHornDataIndex);
     horn(goatRightHorn, &RuntimeEntityMetadata::goatRightHorn, goats::kRightHornDataIndex);
+    if (mobFlags.has_value() && (previous == nullptr || previous->mobFlags != mobFlags) &&
+        (previous != nullptr || *mobFlags != 0)) {
+        entries.push_back(
+            Entry{.index = kMobFlagsDataIndex, .value = SetEntityDataPacket::ByteValue{.value = *mobFlags}});
+    }
+    if (foxFlags.has_value() && (previous == nullptr || previous->foxFlags != foxFlags) &&
+        (previous != nullptr || *foxFlags != 0)) {
+        entries.push_back(
+            Entry{.index = kFoxFlagsDataIndex, .value = SetEntityDataPacket::ByteValue{.value = *foxFlags}});
+    }
+    if (pandaFlags.has_value() && (previous == nullptr || previous->pandaFlags != pandaFlags) &&
+        (previous != nullptr || *pandaFlags != 0)) {
+        entries.push_back(
+            Entry{.index = kPandaFlagsDataIndex, .value = SetEntityDataPacket::ByteValue{.value = *pandaFlags}});
+    }
+    const auto counter = [&](const std::optional<std::int32_t>& now, const std::optional<std::int32_t>& before,
+                             std::uint8_t index) {
+        if (now.has_value() && (previous == nullptr || before != now) && (previous != nullptr || *now != 0)) {
+            entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::IntValue{.value = *now}});
+        }
+    };
+    counter(pandaUnhappy, previous == nullptr ? std::nullopt : previous->pandaUnhappy, kPandaUnhappyDataIndex);
+    counter(pandaSneeze, previous == nullptr ? std::nullopt : previous->pandaSneeze, kPandaSneezeDataIndex);
+    counter(pandaEat, previous == nullptr ? std::nullopt : previous->pandaEat, kPandaEatDataIndex);
     if (allayDancing.has_value() && (previous == nullptr || previous->allayDancing != allayDancing) &&
         (previous != nullptr || *allayDancing)) {
         entries.push_back(
@@ -583,6 +614,11 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || *wolfAngerEnd != -1)) {
         entries.push_back(
             Entry{.index = kWolfAngerEndDataIndex, .value = SetEntityDataPacket::LongValue{*wolfAngerEnd}});
+    }
+    if (wolfInterested.has_value() && (previous == nullptr || previous->wolfInterested != wolfInterested) &&
+        (previous != nullptr || *wolfInterested)) {
+        entries.push_back(
+            Entry{.index = kWolfInterestedDataIndex, .value = SetEntityDataPacket::BoolValue{*wolfInterested}});
     }
     if (endermanCreepy.has_value() && (previous == nullptr || previous->endermanCreepy != endermanCreepy) &&
         (previous != nullptr || *endermanCreepy)) {
@@ -801,6 +837,23 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     live.nameVisible = entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("CustomNameVisible");
     live.silent = entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("Silent");
     live.noGravity = entity.noGravity;
+    if (entity.type().path() == "fox") {
+        constexpr std::int32_t kSitting = 1;
+        constexpr std::int32_t kSleeping = 32;
+        live.foxFlags = static_cast<std::int8_t>(entity.foxFlags | (entity.sitting ? kSitting : 0) |
+                                                 (entity.sleeping ? kSleeping : 0));
+    } else if (entity.type().path() == "panda") {
+        live.pandaFlags = static_cast<std::int8_t>(entity.pandaFlags);
+        live.pandaUnhappy = entity.pandaUnhappy;
+        live.pandaSneeze = entity.pandaSneeze;
+        live.pandaEat = entity.pandaEat;
+    }
+    if (mobs::isMob(entity.type())) {
+        live.mobFlags = static_cast<std::int8_t>(
+            (entity.noAi ? 1 : 0) |
+            (entity.sourceNbt.has_value() && entity.sourceNbt->getBoolean("LeftHanded") ? 2 : 0) |
+            (entity.aggressive ? 4 : 0));
+    }
     live.vehicle = vehicleDataOf(entity);
     if (ageableMobs::hasBabyMetadata(entity.type().path())) {
         live.baby = entity.age < 0;
@@ -929,6 +982,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.type().path() == "wolf") {
         live.wolfAngerEnd = entity.neutral != nullptr ? entity.neutral->endTime : -1;
+        live.wolfInterested = entity.begging;
     }
     if (entity.type().path() == "enderman") {
         // parity: `setTarget` raises `DATA_CREEPY` with a target and lowers both without one.

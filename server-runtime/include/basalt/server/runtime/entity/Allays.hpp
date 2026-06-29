@@ -52,6 +52,8 @@ struct AllayState {
     std::optional<server::world::loot::ItemStack> inventory;
     std::int64_t duplicationCooldown = 0;
     bool dancing = false;
+    /// Set by a plugin: it dances without a jukebox until told to stop.
+    bool forceDancing = false;
     std::optional<Pos> jukebox;
     std::optional<WalkTarget> walk;
     std::optional<std::array<double, 3>> lastPathTarget;

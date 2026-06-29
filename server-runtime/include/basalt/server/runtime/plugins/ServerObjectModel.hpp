@@ -49,7 +49,8 @@ class RealLootTables;
 
 namespace basalt::server::runtime {
 class BlockChangeBroadcaster;
-}
+class MobActionSystem;
+} // namespace basalt::server::runtime
 
 namespace basalt::server::runtime::plugins {
 
@@ -91,6 +92,7 @@ struct ModelHooks {
     std::function<void(world::LoadedWorld& world, double x, double y, double z, float power, bool breakBlocks,
                        std::int32_t sourceEntityId)>
         explode;
+    std::function<MobActionSystem*()> mobSystem;
     std::function<world::PlayerProgress*()> progress;
     std::function<world::RealRecipes*()> recipes;
     std::function<storage::PlayerStore*()> store;

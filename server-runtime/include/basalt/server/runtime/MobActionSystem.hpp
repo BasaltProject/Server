@@ -117,6 +117,9 @@ public:
             openersChanged;
         std::function<void(const std::string& from, const std::string& to)> teamCarried;
         std::function<void(const wire::common::Uuid& player)> curedZombieVillager;
+        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::string_view key,
+                           entity::ai::PluginGoalPhase phase)>
+            pluginGoal;
         std::function<void(world::LoadedWorld& world, wire::nbt::NbtCompound item, double x, double y, double z,
                            std::int32_t ownerId)>
             launchFirework;
@@ -168,6 +171,8 @@ public:
     void setCasting(entity::ServerEntity& mob, bool casting) override;
 
     void poseChanged(entity::ServerEntity& mob) override;
+
+    bool pluginGoal(entity::ServerEntity& mob, std::string_view key, entity::ai::PluginGoalPhase phase) override;
 
     void throwPotion(entity::ServerEntity& mob, double targetX, double targetY, double targetZ,
                      std::string_view potion) override;
@@ -533,6 +538,50 @@ public:
     void angerBeesAround(world::LoadedWorld& world, const std::array<std::int32_t, 3>& hive);
 
     [[nodiscard]] static bool touchesCart(const entity::ServerEntity& cart, const player::PlayerSession& player);
+
+    /// What the plugin API asks of the mob systems; each says whether the mob could do it.
+    [[nodiscard]] std::optional<std::string> pluginAmbientSound(entity::ServerEntity& mob);
+
+    [[nodiscard]] std::int32_t pluginExperienceReward(entity::ServerEntity& mob);
+
+    bool pluginRangedAttack(entity::ServerEntity& mob, double x, double y, double z, float charge);
+
+    /// The entity id of the copy, or -1.
+    [[nodiscard]] std::int32_t pluginDuplicateAllay(entity::ServerEntity& allay);
+
+    bool pluginRoll(entity::ServerEntity& armadillo, bool up);
+
+    /// parity: `AbstractPiglin.isConverting` and `Hoglin.isConverting`.
+    [[nodiscard]] bool pluginConverting(entity::ServerEntity& mob);
+
+    bool pluginSpell(entity::ServerEntity& caster, std::int32_t spell);
+
+    bool pluginCatLying(entity::ServerEntity& cat, bool lying);
+
+    bool pluginCatRelaxed(entity::ServerEntity& cat, bool relaxed);
+
+    bool pluginCelebrate(entity::ServerEntity& raider, bool celebrating);
+
+    bool pluginGuardianLaser(entity::ServerEntity& guardian, bool active);
+
+    bool pluginEnderTeleport(entity::ServerEntity& enderman, bool towards, double x, double y, double z);
+
+    bool pluginRestock(entity::ServerEntity& villager);
+
+    bool pluginUpdateDemand(entity::ServerEntity& villager);
+
+    [[nodiscard]] std::int32_t pluginAddTrades(entity::ServerEntity& villager, std::int32_t amount);
+
+    bool pluginResetOffers(entity::ServerEntity& villager);
+
+    bool pluginShakeHead(entity::ServerEntity& villager);
+
+    bool pluginSleep(entity::ServerEntity& villager, std::int32_t x, std::int32_t y, std::int32_t z);
+
+    bool pluginWake(entity::ServerEntity& villager);
+
+    /// The entity id of the zombie villager it turned into, or -1 when it did not.
+    [[nodiscard]] std::int32_t pluginZombify(entity::ServerEntity& villager);
 
 private:
     [[nodiscard]] std::optional<bool> heartClaims(world::LoadedWorld& world, const std::array<std::int32_t, 3>& home,

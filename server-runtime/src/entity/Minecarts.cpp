@@ -373,8 +373,8 @@ std::array<double, 3> naturalSlowdown(ServerEntity& cart, const Env& env, const 
         }
     }
     const bool vehicle = !cart.passengerIds.empty();
-    const double factor =
-        env.experimental ? (vehicle ? kVehicleSlowdown : 0.975) : (vehicle ? kVehicleSlowdown : kSlowdown);
+    const double empty = state.slowWhenEmpty ? (env.experimental ? 0.975 : kSlowdown) : kVehicleSlowdown;
+    const double factor = state.frictionState == 0 ? 1.0 : (vehicle ? kVehicleSlowdown : empty);
     std::array<double, 3> slowed{base[0] * factor, 0.0, base[2] * factor};
     if (state.inWater) {
         slowed = {slowed[0] * kWaterSlowdown, slowed[1] * kWaterSlowdown, slowed[2] * kWaterSlowdown};
@@ -482,6 +482,9 @@ std::optional<std::array<double, 3>> railPosition(const world::WorldState& world
 }
 
 double maxSpeed(const ServerEntity& cart, const Env& env) {
+    if (cart.cart != nullptr && cart.cart->maxSpeedOverride.has_value()) {
+        return *cart.cart->maxSpeedOverride;
+    }
     const bool inWater = cart.cart != nullptr && cart.cart->inWater;
     double speed = env.experimental ? static_cast<double>(env.maxMinecartSpeed) * (inWater ? 0.5 : 1.0) / 20.0
                                     : (inWater ? kMaxSpeedInWater : kMaxSpeed);

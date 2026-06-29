@@ -50,6 +50,10 @@ struct BoatState {
     bool aboveBubbleColumn = false;
     bool bubbleColumnDown = false;
     std::int32_t bubbleTime = 0;
+    double maxSpeed = 0.4;
+    double occupiedDeceleration = 0.2;
+    double unoccupiedDeceleration = -1.0;
+    bool workOnLand = false;
 };
 
 /// parity: `rideHeight`: a third of the boat, or eight ninths of a raft.

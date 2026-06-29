@@ -352,13 +352,13 @@ constexpr double kSwimSpeed = 0.03;
 bool BeamAttackGoal::canUse(MobContext& mob) { return targetOf(mob).has_value(); }
 
 void BeamAttackGoal::start(MobContext& mob) {
-    attackTime_ = -kChargeTicks;
+    mob.mob.beamTicks = -kChargeTicks;
     mob.actions.setBeamTarget(mob.mob, mob.mob.targetId);
 }
 
 void BeamAttackGoal::stop(MobContext& mob) {
     mob.actions.setBeamTarget(mob.mob, std::nullopt);
-    attackTime_ = 0;
+    mob.mob.beamTicks = 0;
 }
 
 void BeamAttackGoal::tick(MobContext& mob) {
@@ -367,14 +367,15 @@ void BeamAttackGoal::tick(MobContext& mob) {
         return;
     }
     lookControl::lookAt(mob.mob, target->x, target->y, target->z, kAttackLookSpeed);
-    attackTime_++;
-    if (attackTime_ == 0) {
+    std::int32_t& attackTime = mob.mob.beamTicks;
+    attackTime++;
+    if (attackTime == 0) {
         mob.actions.setBeamTarget(
             mob.mob,
             target->playerId.has_value()
                 ? target->playerId
                 : (target->entity != nullptr ? std::optional<std::int32_t>{target->entity->entityId()} : std::nullopt));
-    } else if (attackTime_ >= kChargeTicks) {
+    } else if (attackTime >= kChargeTicks) {
         const float damage = entityCombat::attackDamageOf(mob.mob) + kBeamBonus;
         if (target->playerId.has_value()) {
             mob.actions.hurtPlayer(mob.mob, *target->playerId, damage);
@@ -382,7 +383,7 @@ void BeamAttackGoal::tick(MobContext& mob) {
             mob.actions.hurtMob(mob.mob, *target->entity, damage);
         }
         mob.mob.targetId.reset();
-        attackTime_ = -kChargeTicks;
+        attackTime = -kChargeTicks;
     }
     // parity: it keeps its distance while the beam charges.
     if (std::sqrt(mob.distanceSquaredTo(target->x, target->y, target->z)) > kKeepRange) {

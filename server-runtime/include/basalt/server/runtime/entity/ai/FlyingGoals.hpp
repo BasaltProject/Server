@@ -142,9 +142,6 @@ public:
     void stop(MobContext& mob) override;
 
     void tick(MobContext& mob) override;
-
-private:
-    std::int32_t attackTime_ = 0;
 };
 
 } // namespace basalt::server::runtime::entity::ai

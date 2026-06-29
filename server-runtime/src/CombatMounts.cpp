@@ -143,8 +143,7 @@ bool CombatHandler::feedMount(PlayerSession& session, ServerEntity& horse, const
         ageUp(feeding.ageUp);
         used = true;
     }
-    if (feeding.temper > 0 && (used || !horses::tamed(horse)) &&
-        horses::temper(horse) < horses::maxTemper(horse.type())) {
+    if (feeding.temper > 0 && (used || !horses::tamed(horse)) && horses::temper(horse) < horses::maxTemper(horse)) {
         static_cast<void>(horses::modifyTemper(horse, feeding.temper));
         used = true;
     }

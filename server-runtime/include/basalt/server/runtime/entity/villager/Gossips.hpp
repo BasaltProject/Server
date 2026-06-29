@@ -40,6 +40,15 @@ public:
 
     [[nodiscard]] bool empty() const noexcept { return entries_.empty(); }
 
+    using Values = std::array<std::int32_t, static_cast<std::size_t>(GossipType::kCount)>;
+
+    [[nodiscard]] const std::map<std::string, Values, std::less<>>& entries() const noexcept { return entries_; }
+
+    /// Writes one value as it stands, with no merging and no limits.
+    void set(const std::string& target, GossipType type, std::int32_t value);
+
+    void clear() noexcept { entries_.clear(); }
+
     [[nodiscard]] wire::nbt::NbtList encode() const;
 
     void decode(const wire::nbt::NbtList& list);
@@ -49,8 +58,6 @@ public:
     [[nodiscard]] static std::optional<GossipType> byName(std::string_view name);
 
 private:
-    using Values = std::array<std::int32_t, static_cast<std::size_t>(GossipType::kCount)>;
-
     std::map<std::string, Values, std::less<>> entries_;
 };
 

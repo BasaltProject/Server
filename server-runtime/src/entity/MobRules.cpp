@@ -219,9 +219,9 @@ bool sunBurn::burns(const Identifier& type) {
     return holds(kBurns, type.path());
 }
 
-bool sunBurn::shouldBurn(const Identifier& type, bool day, std::int32_t light, bool openSky, bool inWater,
+bool sunBurn::shouldBurn(bool sensitive, bool day, std::int32_t light, bool openSky, bool inWater,
                          random::RandomSource& random) {
-    if (!day || !openSky || inWater || !burns(type)) {
+    if (!day || !openSky || inWater || !sensitive) {
         return false;
     }
     // parity: `getLightLevelDependentMagicValue` (light over fifteen) and the roll against thirty for dim light.

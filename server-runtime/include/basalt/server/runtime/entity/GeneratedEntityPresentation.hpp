@@ -113,6 +113,7 @@ struct RuntimeEntityMetadata {
     std::optional<std::int64_t> beeAngerEnd;
     /// parity: `Wolf.DATA_ANGER_END_TIME`, and `Enderman.DATA_CREEPY` and `DATA_STARED_AT`.
     std::optional<std::int64_t> wolfAngerEnd;
+    std::optional<bool> wolfInterested;
     std::optional<bool> endermanCreepy;
     std::optional<bool> endermanStaredAt;
     /// parity: `Allay.DATA_DANCING` and `DATA_CAN_DUPLICATE`.
@@ -127,6 +128,14 @@ struct RuntimeEntityMetadata {
     /// parity: `Goat`'s horns, which a ram into stone can knock off.
     std::optional<bool> goatLeftHorn;
     std::optional<bool> goatRightHorn;
+    /// parity: `Mob.DATA_MOB_FLAGS_ID`, no AI, left handed and aggressive.
+    std::optional<std::int8_t> mobFlags;
+    /// parity: `Fox.DATA_FLAGS_ID` and `Panda.DATA_ID_FLAGS` with the panda's three counters.
+    std::optional<std::int8_t> foxFlags;
+    std::optional<std::int8_t> pandaFlags;
+    std::optional<std::int32_t> pandaUnhappy;
+    std::optional<std::int32_t> pandaSneeze;
+    std::optional<std::int32_t> pandaEat;
     std::optional<VehicleData> vehicle;
     /// parity: `Entity`'s shared flags, custom name, name visibility, silence and gravity.
     std::int8_t sharedFlags = 0;

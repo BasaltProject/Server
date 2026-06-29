@@ -4,6 +4,7 @@
 #include <basalt/wire/common/Uuid.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace basalt::server::random {
@@ -52,6 +53,7 @@ struct HorseState {
     bool hurt = false;
     /// parity: `AbstractHorse.gallopSoundCounter`, the steps taken while ridden forward.
     std::int32_t gallopSoundCounter = 0;
+    std::optional<std::int32_t> maxTemperOverride;
 };
 
 [[nodiscard]] bool isHorse(const wire::common::Identifier& type);
@@ -76,6 +78,9 @@ void tame(ServerEntity& horse, const wire::common::Uuid& owner);
 
 /// parity: `getMaxTemper`, thirty for a llama.
 [[nodiscard]] std::int32_t maxTemper(const wire::common::Identifier& type);
+
+/// The cap this horse has: a plugin may have moved it from the type's.
+[[nodiscard]] std::int32_t maxTemper(const ServerEntity& horse);
 
 [[nodiscard]] std::int32_t temper(const ServerEntity& horse);
 
