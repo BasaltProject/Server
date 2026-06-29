@@ -163,7 +163,10 @@ jboolean JNICALL nativeUseGeneratorWith(JNIEnv* env, jclass, jstring world, jint
     const plugins::PluginWorldEnv::ChunkFillTraits traits{.vanillaTerrain = (flags & 1) != 0,
                                                           .decorations = (flags & 2) != 0,
                                                           .structures = (flags & 4) != 0,
-                                                          .mobs = (flags & 8) != 0};
+                                                          .mobs = (flags & 8) != 0,
+                                                          .noise = (flags & 16) != 0,
+                                                          .surface = (flags & 32) != 0,
+                                                          .caves = (flags & 64) != 0};
     return flag(jni::onServer<bool>(false, [&] {
         plugins::PluginWorldEnv* target = found->env();
         return target != nullptr &&

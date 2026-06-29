@@ -26,6 +26,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.BoundingBox;
 
 public final class BasaltWorld extends WorldGeo {
+    private static final int kKeepRadius = 2;
+    private volatile boolean keepSpawn;
     private static final int kSeed = 0;
     private static final int kMinY = 1;
     private static final int kHeight = 2;
@@ -204,14 +206,12 @@ public final class BasaltWorld extends WorldGeo {
 
     @Override
     public boolean isHardcore() {
-        return false;
+        return RestNatives.worldTunable(name, "hardcore") != 0.0;
     }
 
     @Override
     public void setHardcore(boolean hardcore) {
-        if (hardcore) {
-            throw Unsupported.hit("World#setHardcore");
-        }
+        RestNatives.setWorldTunable(name, "hardcore", hardcore ? 1.0 : 0.0);
     }
 
     @Override
@@ -400,14 +400,33 @@ public final class BasaltWorld extends WorldGeo {
 
     @Override
     public boolean getKeepSpawnInMemory() {
-        return false;
+        return keepSpawn;
     }
 
     @Override
     public void setKeepSpawnInMemory(boolean keep) {
-        if (keep) {
-            throw Unsupported.hit("World#setKeepSpawnInMemory");
+        keepSpawn = keep;
+        holdSpawn();
+    }
+
+    private synchronized void holdSpawn() {
+        String token = "bukkit:keep-spawn";
+        if (!keepSpawn) {
+            WorldNatives.releaseChunks(name, token);
+            return;
         }
+        int centerX = (int) Math.floor(number(kSpawnX)) >> 4;
+        int centerZ = (int) Math.floor(number(kSpawnZ)) >> 4;
+        int[] flat = new int[(2 * kKeepRadius + 1) * (2 * kKeepRadius + 1) * 2];
+        int at = 0;
+        for (int dx = -kKeepRadius; dx <= kKeepRadius; dx++) {
+            for (int dz = -kKeepRadius; dz <= kKeepRadius; dz++) {
+                flat[at++] = centerX + dx;
+                flat[at++] = centerZ + dz;
+                WorldNatives.loadChunk(name, centerX + dx, centerZ + dz, true);
+            }
+        }
+        WorldNatives.holdChunks(name, token, flat);
     }
 
     @Override
@@ -673,6 +692,9 @@ public final class BasaltWorld extends WorldGeo {
     @Override
     public boolean setSpawnLocation(Location location) {
         WorldNatives.setSpawn(name, location.getBlockX(), location.getBlockY(), location.getBlockZ());
+        if (keepSpawn) {
+            holdSpawn();
+        }
         return true;
     }
 

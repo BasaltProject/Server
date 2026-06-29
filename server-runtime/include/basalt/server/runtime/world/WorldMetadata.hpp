@@ -37,6 +37,7 @@ struct WorldMetadata {
     /// parity: `level.dat`.
     std::optional<std::string> difficulty;
     bool difficultyLocked = false;
+    std::optional<bool> hardcore;
     std::optional<std::string> defaultGamemode;
 
     /// parity: `TicketType.FORCED`.

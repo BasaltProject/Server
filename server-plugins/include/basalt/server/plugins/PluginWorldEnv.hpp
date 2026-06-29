@@ -387,6 +387,10 @@ public:
         bool decorations = false;
         bool structures = false;
         bool mobs = false;
+        /// With `vanillaTerrain`, which of its three steps still run.
+        bool noise = true;
+        bool surface = true;
+        bool caves = true;
     };
 
     virtual bool useChunkFill(ChunkFill fill, const ChunkFillTraits& traits) {

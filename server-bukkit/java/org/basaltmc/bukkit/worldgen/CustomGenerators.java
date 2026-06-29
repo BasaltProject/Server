@@ -48,7 +48,7 @@ public final class CustomGenerators {
 
     /** Whether a generator needs the game's own generation for any of its flags. */
     public static boolean needsVanilla(ChunkGenerator generator) {
-        return generator.shouldGenerateNoise() || generator.shouldGenerateSurface() || generator.shouldGenerateBedrock()
+        return generator.shouldGenerateNoise() || generator.shouldGenerateSurface()
             || generator.shouldGenerateCaves() || generator.shouldGenerateDecorations()
             || generator.shouldGenerateStructures();
     }
@@ -60,9 +60,11 @@ public final class CustomGenerators {
         entry.generator = generator;
         entry.biomes = provider;
         boolean vanilla = generator.shouldGenerateNoise() || generator.shouldGenerateSurface()
-            || generator.shouldGenerateBedrock() || generator.shouldGenerateCaves();
+            || generator.shouldGenerateCaves();
         int flags = (vanilla ? 1 : 0) | (generator.shouldGenerateDecorations() ? 2 : 0)
-            | (generator.shouldGenerateStructures() ? 4 : 0) | (generator.shouldGenerateMobs() ? 8 : 0);
+            | (generator.shouldGenerateStructures() ? 4 : 0) | (generator.shouldGenerateMobs() ? 8 : 0)
+            | (generator.shouldGenerateNoise() ? 16 : 0) | (generator.shouldGenerateSurface() ? 32 : 0)
+            | (generator.shouldGenerateCaves() ? 64 : 0);
         if (!org.basaltmc.bukkit.RestNatives.useGeneratorWith(world.getName(), flags)) {
             entry.generator = null;
             return false;

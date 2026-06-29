@@ -89,7 +89,11 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       clock_(metadata_.timeOfDay, metadata_.clockRate, metadata_.clockPaused), gameRules_(metadata_.gameRules),
       biomeZoomSeed_(obfuscateBiomeSeed(metadata_.seed)), biomeZoomer_(biomeZoomSeed_), gameTime_(metadata_.gameTime),
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
+      hardcore_(metadata_.hardcore.value_or(settings_.hardcore)),
       defaultGamemode_(metadata_.defaultGamemode) {
+    if (hardcore_) {
+        difficulty_ = "hard";
+    }
     if (options.pipeline.terrain) {
         terrainOf_ = options.pipeline.terrain;
         server::world::terrain::ProtoChunks::Hooks hooks = std::move(options.pipeline);
@@ -127,6 +131,8 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
             }
             const config::DimensionFacts& facts = config::dimensionFacts(declaration_.dimension);
             if (traits.vanillaTerrain || traits.structures) {
+                const server::world::terrain::realTerrainGenerator::TerrainStepsScope steps{
+                    {.noise = traits.noise, .surface = traits.surface, .caves = traits.caves}};
                 server::world::terrain::realTerrainGenerator::GeneratedTerrain terrain =
                     baseTerrain(chunkX, chunkZ, blender);
                 if (!traits.vanillaTerrain) {
@@ -426,6 +432,7 @@ void LoadedWorld::saveMetadata() {
     saved.gameRules = gameRules_;
     saved.difficulty = difficulty_;
     saved.difficultyLocked = difficultyLocked_;
+    saved.hardcore = hardcore_;
     saved.defaultGamemode = defaultGamemode_;
     saved.worldBorder = border_.encode();
     if (dragonFight_ != nullptr) {

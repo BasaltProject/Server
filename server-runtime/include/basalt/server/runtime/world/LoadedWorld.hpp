@@ -215,6 +215,9 @@ public:
         bool decorations = false;
         bool structures = false;
         bool mobs = false;
+        bool noise = true;
+        bool surface = true;
+        bool caves = true;
 
         [[nodiscard]] bool needsPipeline() const noexcept { return vanillaTerrain || decorations || structures; }
     };
@@ -281,7 +284,17 @@ public:
 
     [[nodiscard]] const std::string& difficulty() const noexcept { return difficulty_; }
 
-    void setDifficulty(std::string value) { difficulty_ = std::move(value); }
+    // parity: `MinecraftServer.setDifficulty` pins a hardcore world to hard.
+    void setDifficulty(std::string value) { difficulty_ = hardcore_ ? "hard" : std::move(value); }
+
+    [[nodiscard]] bool hardcore() const noexcept { return hardcore_; }
+
+    void setHardcore(bool value) {
+        hardcore_ = value;
+        if (value) {
+            difficulty_ = "hard";
+        }
+    }
 
     [[nodiscard]] bool difficultyLocked() const noexcept { return difficultyLocked_; }
 
@@ -423,6 +436,7 @@ private:
     std::int32_t skyDarken_ = 0;
     std::string difficulty_;
     bool difficultyLocked_ = false;
+    bool hardcore_ = false;
     std::optional<std::string> defaultGamemode_;
     std::jthread lightWorker_;
 };

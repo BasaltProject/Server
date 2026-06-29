@@ -265,6 +265,9 @@ std::optional<double> ServerWorldEnv::tunable(const std::string_view key) {
     if (key == "simulation_distance") {
         return static_cast<double>(held.simulationDistance.value_or(world_->settings().viewDistance));
     }
+    if (key == "hardcore") {
+        return world_->hardcore() ? 1.0 : 0.0;
+    }
     return std::nullopt;
 }
 
@@ -276,6 +279,15 @@ bool ServerWorldEnv::setTunable(const std::string_view key, const double value) 
         held.voidDamageAmount = static_cast<float>(std::max(value, 0.0));
     } else if (key == "void_damage_offset") {
         held.voidDamageOffset = value;
+    } else if (key == "hardcore") {
+        world_->setHardcore(value != 0.0);
+        if (world_->hardcore()) {
+            for (player::PlayerSession* player : watchers()) {
+                if (player->connection().setDifficulty) {
+                    player->connection().setDifficulty(3, world_->difficultyLocked());
+                }
+            }
+        }
     } else if (key == "simulation_distance") {
         held.simulationDistance = std::clamp(static_cast<std::int32_t>(value), 2, 32);
         for (player::PlayerSession* player : watchers()) {
@@ -404,7 +416,10 @@ bool ServerWorldEnv::useChunkFill(ChunkFill fill, const ChunkFillTraits& traits)
         world::LoadedWorld::FillerTraits{.vanillaTerrain = traits.vanillaTerrain,
                                          .decorations = traits.decorations,
                                          .structures = traits.structures,
-                                         .mobs = traits.mobs});
+                                         .mobs = traits.mobs,
+                                         .noise = traits.noise,
+                                         .surface = traits.surface,
+                                         .caves = traits.caves});
     return true;
 }
 

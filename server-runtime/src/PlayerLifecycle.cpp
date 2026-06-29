@@ -301,8 +301,13 @@ void PlayerLifecycle::respawn() {
 
     owner_->chunkStreamer().resetForRespawn(spawnX, spawnZ);
 
+    // parity: `ServerGamePacketListenerImpl.handleClientCommand` puts a hardcore player in spectator after the respawn.
+    const bool hardcore = respawnWorld->hardcore();
     if (respawnWorld != owner_->currentWorld() && session->connection().switchWorld) {
         static_cast<void>(session->connection().switchWorld(*respawnWorld, spawnX, spawnY, spawnZ));
+        if (hardcore) {
+            owner_->setGamemode(wire::protocol::play::Gamemode::Spectator);
+        }
         return;
     }
 
@@ -321,6 +326,9 @@ void PlayerLifecycle::respawn() {
                                                            .onGround = true}
                     .write(buffer);
             });
+    }
+    if (hardcore) {
+        owner_->setGamemode(wire::protocol::play::Gamemode::Spectator);
     }
 }
 
