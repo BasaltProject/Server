@@ -23,7 +23,7 @@ import org.bukkit.inventory.LoomInventory;
 import org.bukkit.inventory.SmithingInventory;
 import org.bukkit.inventory.StonecutterInventory;
 
-/** Gives an inventory the typed accessors its kind has (fuel, result, matrix...) as named slots of the same inventory. */
+/** Gives an inventory the typed accessors of its kind (fuel, result, matrix...) as named slots. */
 public final class TypedInventories {
     private static final Map<String, Integer> kFurnace = Map.of("Result", 2, "Fuel", 1, "Smelting", 0);
     private static final Map<String, Integer> kBrewer = Map.of("Ingredient", 3, "Fuel", 4);
@@ -112,7 +112,7 @@ public final class TypedInventories {
         return wrap(base, null, Map.of());
     }
 
-    /** As {@link #wrap(Inventory)}, with the recipe a crafting or smithing inventory answers with and the anvil's state. */
+    /** As {@link #wrap(Inventory)}, with the recipe of a crafting or smithing inventory and the anvil's state. */
     public static Inventory wrap(Inventory base, org.bukkit.inventory.Recipe recipe, Map<String, Object> state) {
         Class<? extends Inventory> iface = interfaceOf(base.getType());
         if (iface == null) {

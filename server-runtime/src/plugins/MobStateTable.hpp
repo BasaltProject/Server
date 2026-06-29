@@ -53,8 +53,7 @@ void fromValue(T& stored, const Value& value) {
 
 using Ensure = void (*)(entity::ServerEntity&);
 
-/// A plain member of a state struct hanging off the entity; `ensure` gives the entity its state when it has none yet,
-/// which is the case until the mob has had a turn.
+/// A plain member of a state struct hanging off the entity; `ensure` creates the state on first use.
 template <typename State, typename T>
 [[nodiscard]] Accessor viaState(std::shared_ptr<State> entity::ServerEntity::* holder, T State::* member,
                                 bool writable = true, Ensure ensure = nullptr) {

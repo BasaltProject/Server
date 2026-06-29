@@ -120,8 +120,7 @@ void BukkitBridge::seal() { gCurrent.store(nullptr); }
 
 BukkitBridge& BukkitBridge::current() {
     BukkitBridge* bridge = gCurrent.load();
-    // A Java thread that outlives the server must not run against the freed model: it waits here until the process
-    // ends.
+    // A Java thread outliving the server must not run against the freed model: it waits here until exit.
     while (bridge == nullptr) {
         std::this_thread::sleep_for(std::chrono::hours{1});
         bridge = gCurrent.load();

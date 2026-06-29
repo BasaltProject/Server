@@ -69,7 +69,8 @@ constexpr std::int32_t kCustomCompletionsId = 0x17;
     root.putString("id", stack.id);
     root.putInt("count", stack.count);
     root.set("components", wire::nbt::NbtTag::ofCompound(stack.components));
-    const std::vector<std::uint8_t> bytes = wire::nbt::nbtIO::writeAnonymous(wire::nbt::NbtTag::ofCompound(std::move(root)));
+    const std::vector<std::uint8_t> bytes =
+        wire::nbt::nbtIO::writeAnonymous(wire::nbt::NbtTag::ofCompound(std::move(root)));
     return std::string{bytes.begin(), bytes.end()};
 }
 
@@ -475,10 +476,9 @@ std::optional<Value> misc(Context& context, const Verb verb, const std::string_v
         if (!connection.sendPlayPacket) {
             return false;
         }
-        static constexpr std::array<std::string_view, 10> kKinds{"bug_report", "community_guidelines", "support",
-                                                                 "status",     "feedback",             "community",
-                                                                 "website",    "forums",               "news",
-                                                                 "announcements"};
+        static constexpr std::array<std::string_view, 10> kKinds{
+            "bug_report", "community_guidelines", "support", "status", "feedback", "community", "website", "forums",
+            "news",       "announcements"};
         const auto* flat = std::get_if<std::vector<std::string>>(&first);
         const std::vector<std::string> rows = flat == nullptr ? std::vector<std::string>{} : *flat;
         connection.sendPlayPacket(kServerLinksId, [&rows](wire::io::ByteBuffer& buffer) {

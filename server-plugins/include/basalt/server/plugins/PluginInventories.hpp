@@ -17,8 +17,7 @@ public:
     PluginInventories& operator=(PluginInventories&&) = delete;
     virtual ~PluginInventories() = default;
 
-    /// What the registries know about an item (stack size, durability, food, fuel, armour...) as an unnamed NBT
-    /// compound.
+    /// What the registries know about an item (stack size, durability, food, fuel...) as an unnamed NBT compound.
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> itemData(std::string_view id) const {
         static_cast<void>(id);
         return std::nullopt;
@@ -27,8 +26,7 @@ public:
     /// The ids of every enchantment the datapack defines.
     [[nodiscard]] virtual std::vector<std::string> enchantmentIds() const { return {}; }
 
-    /// What a crafting grid makes: `{items:[...]}` in, `{recipe, result, remaining:[...]}` out; nothing when no recipe
-    /// fits.
+    /// What a crafting grid makes: `{items:[...]}` in, `{recipe, result, remaining:[...]}` out; empty if none fits.
     [[nodiscard]] virtual std::optional<std::vector<std::uint8_t>> craft(std::int32_t width, std::int32_t height,
                                                                          std::span<const std::uint8_t> items) const {
         static_cast<void>(width);

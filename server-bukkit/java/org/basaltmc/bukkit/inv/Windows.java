@@ -143,7 +143,7 @@ public final class Windows {
         InventoryNatives.windowClose(uuid(player));
     }
 
-    /** After the window changed behind the plugin's back, brings the inventory it shows and every other viewer along. */
+    /** After the window changed behind the plugin's back, refreshes its inventory and every other viewer. */
     public static void synchronize(HumanEntity player) {
         BasaltInventoryView view = cached(player);
         if (view == null || !(TypedInventories.unwrap(view.getTopInventory()) instanceof CustomInventory custom)) {

@@ -23,7 +23,7 @@ public final class RestNatives {
 
     public static native byte[] serverIcon();
 
-    /** Hands the chunks of the world to the plugin generator; flags: 1 builds on vanilla terrain, 2 decorations, 4 structures, 8 mobs. */
+    /** Hands the world chunks to the plugin generator; flags: 1 vanilla terrain, 2 decorations, 4 structures, 8 mobs. */
     public static native boolean useGeneratorWith(String world, int flags);
 
     public static native String poiOfState(int state);
