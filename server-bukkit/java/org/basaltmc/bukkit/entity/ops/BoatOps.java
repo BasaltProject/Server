@@ -28,4 +28,44 @@ public interface BoatOps extends Boat, Cored {
             default -> org.bukkit.TreeSpecies.GENERIC;
         };
     }
+
+    default double getMaxSpeed() {
+        return core().real("boat_max_speed");
+    }
+
+    default void setMaxSpeed(double speed) {
+        if (speed >= 0.0) {
+            core().set("boat_max_speed", speed);
+        }
+    }
+
+    default double getOccupiedDeceleration() {
+        return core().real("boat_occupied_deceleration");
+    }
+
+    default void setOccupiedDeceleration(double rate) {
+        if (rate >= 0.0) {
+            core().set("boat_occupied_deceleration", rate);
+        }
+    }
+
+    default double getUnoccupiedDeceleration() {
+        return core().real("boat_unoccupied_deceleration");
+    }
+
+    default void setUnoccupiedDeceleration(double rate) {
+        core().set("boat_unoccupied_deceleration", rate);
+    }
+
+    default boolean getWorkOnLand() {
+        return core().flag("boat_work_on_land");
+    }
+
+    default void setWorkOnLand(boolean workOnLand) {
+        core().set("boat_work_on_land", workOnLand);
+    }
+
+    default Boat.Status getStatus() {
+        return Boat.Status.values()[Math.max(0, Math.min(4, core().integer("boat_status")))];
+    }
 }

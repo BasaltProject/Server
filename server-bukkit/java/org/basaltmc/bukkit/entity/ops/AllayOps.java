@@ -5,7 +5,7 @@ import org.bukkit.entity.Allay;
 
 public interface AllayOps extends Allay, Cored {
     default boolean canDuplicate() {
-        return core().nbtValue("DuplicationCooldown") instanceof Number cooldown ? cooldown.longValue() <= 0 : true;
+        return core().property("allay_duplication_cooldown") instanceof Number cooldown ? cooldown.longValue() <= 0 : true;
     }
 
     default void setCanDuplicate(boolean duplicate) {
@@ -13,14 +13,39 @@ public interface AllayOps extends Allay, Cored {
     }
 
     default long getDuplicationCooldown() {
-        return core().nbtValue("DuplicationCooldown") instanceof Number cooldown ? cooldown.longValue() : 0L;
+        return core().property("allay_duplication_cooldown") instanceof Number cooldown ? cooldown.longValue() : 0L;
     }
 
     default void setDuplicationCooldown(long cooldown) {
-        core().nbtSet("DuplicationCooldown", "long", cooldown);
+        core().set("allay_duplication_cooldown", cooldown);
     }
 
     default void resetDuplicationCooldown() {
         setDuplicationCooldown(6000L);
+    }
+
+    default boolean isDancing() {
+        return core().flag("allay_dancing");
+    }
+
+    default void startDancing() {
+        core().set("allay_dancing", true);
+    }
+
+    default void stopDancing() {
+        core().set("allay_dancing", false);
+    }
+
+    default org.bukkit.Location getJukebox() {
+        return MobPositions.parse(core(), core().text("allay_jukebox"));
+    }
+
+    default org.bukkit.entity.Allay duplicateAllay() {
+        return core().call("allay_duplicate") instanceof Number id && id.intValue() >= 0
+            && core().entity(id.intValue()) instanceof org.bukkit.entity.Allay copy ? copy : null;
+    }
+
+    default void startDancing(org.bukkit.Location location) {
+        startDancing();
     }
 }

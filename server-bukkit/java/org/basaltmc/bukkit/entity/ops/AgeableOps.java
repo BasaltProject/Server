@@ -32,4 +32,12 @@ public interface AgeableOps extends Ageable, org.basaltmc.bukkit.entity.Cored {
     default void setBreed(boolean breed) {
         setAge(breed ? 0 : 6000);
     }
+
+    default boolean getAgeLock() {
+        return core().flag("age_locked");
+    }
+
+    default void setAgeLock(boolean lock) {
+        core().set("age_locked", lock);
+    }
 }

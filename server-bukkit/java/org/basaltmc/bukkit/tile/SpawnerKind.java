@@ -20,17 +20,17 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 /** Mob spawners: the timer, the ranges and the weighted entities they pick from. */
-final class SpawnerKind implements TileKind {
+public final class SpawnerKind implements TileKind {
     @Override
     public Class<? extends BlockState> face() {
         return CreatureSpawner.class;
     }
 
-    private static void number(Tile tile, String key, Object value) {
+    private static void number(SpawnerView tile, String key, Object value) {
         tile.put(key, ((Number) value).shortValue());
     }
 
-    private static Map<String, Object> entity(Tile tile) {
+    private static Map<String, Object> entity(SpawnerView tile) {
         Map<String, Object> spawn = tile.map("SpawnData");
         return spawn == null ? null : Nbt.map(spawn, "entity");
     }
@@ -86,7 +86,7 @@ final class SpawnerKind implements TileKind {
         return new SpawnerEntry(snapshot, Nbt.integer(entry, "weight", 1), rule);
     }
 
-    private static void setSingle(Tile tile, Map<String, Object> entity) {
+    private static void setSingle(SpawnerView tile, Map<String, Object> entity) {
         Map<String, Object> spawn = Nbt.compound();
         spawn.put("entity", entity);
         tile.put("SpawnData", spawn);
@@ -102,6 +102,11 @@ final class SpawnerKind implements TileKind {
 
     @Override
     public Object call(Tile tile, Method method, String name, Object[] args) {
+        return callOn(new SpawnerView(tile.world, tile.data, tile.location()), name, args);
+    }
+
+    /** Runs a spawner call on plain data, for the block and for the minecart that spawns just the same. */
+    public static Object callOn(SpawnerView tile, String name, Object[] args) {
         int count = args == null ? 0 : args.length;
         switch (name) {
             case "getSpawnedType": {

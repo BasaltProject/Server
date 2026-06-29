@@ -38,4 +38,73 @@ public interface PandaOps extends Panda, Cored {
         }
         return main == hidden ? main : Panda.Gene.NORMAL;
     }
+
+    private boolean flag(int bit) {
+        return (core().integer("panda_flags") & bit) != 0;
+    }
+
+    private void flag(int bit, boolean on) {
+        int flags = core().integer("panda_flags");
+        core().set("panda_flags", on ? flags | bit : flags & ~bit);
+    }
+
+    default boolean isRolling() {
+        return flag(4);
+    }
+
+    default void setRolling(boolean rolling) {
+        flag(4, rolling);
+    }
+
+    default boolean isSneezing() {
+        return flag(2);
+    }
+
+    default void setSneezing(boolean sneezing) {
+        flag(2, sneezing);
+    }
+
+    default boolean isOnBack() {
+        return flag(16);
+    }
+
+    default void setOnBack(boolean onBack) {
+        flag(16, onBack);
+    }
+
+    default boolean isEating() {
+        return core().integer("panda_eat") > 0;
+    }
+
+    default void setEating(boolean eating) {
+        core().set("panda_eat", eating ? 1 : 0);
+    }
+
+    default boolean isScared() {
+        return getMainGene() == Panda.Gene.WORRIED && getWorld().isThundering();
+    }
+
+    default int getUnhappyTicks() {
+        return core().integer("panda_unhappy");
+    }
+
+    default void setUnhappyTicks(int ticks) {
+        core().set("panda_unhappy", ticks);
+    }
+
+    default int getSneezeTicks() {
+        return core().integer("panda_sneeze");
+    }
+
+    default void setSneezeTicks(int ticks) {
+        core().set("panda_sneeze", ticks);
+    }
+
+    default int getEatingTicks() {
+        return core().integer("panda_eat");
+    }
+
+    default void setEatingTicks(int ticks) {
+        core().set("panda_eat", ticks);
+    }
 }

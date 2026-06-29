@@ -25,4 +25,12 @@ public interface PhantomOps extends Phantom, Cored {
                 location.getBlockX() + "," + location.getBlockY() + "," + location.getBlockZ());
         }
     }
+
+    default boolean shouldBurnInDay() {
+        return core().flag("burns_in_day");
+    }
+
+    default void setShouldBurnInDay(boolean burn) {
+        core().set("burns_in_day", burn);
+    }
 }

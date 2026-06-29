@@ -6,23 +6,22 @@ import org.bukkit.entity.WanderingTrader;
 
 public interface WanderingTraderOps extends WanderingTrader, Cored {
     default int getDespawnDelay() {
-        return core().nbtInt("DespawnDelay");
+        return core().integer("despawn_delay");
     }
 
     default void setDespawnDelay(int delay) {
-        core().nbtSet("DespawnDelay", "int", delay);
+        core().set("despawn_delay", delay);
+    }
+
+    default void resetOffers() {
+        core().call("villager_reset_offers");
     }
 
     default Location getWanderingTowards() {
-        return EntityNbt.position(core().worldRef(), EntityNbt.compound(core(), "").get("wander_target"));
+        return MobPositions.parse(core(), core().text("wander_target"));
     }
 
     default void setWanderingTowards(Location location) {
-        if (location == null) {
-            core().nbtRemove("wander_target");
-        } else {
-            core().nbtSet("wander_target", "pos",
-                location.getBlockX() + "," + location.getBlockY() + "," + location.getBlockZ());
-        }
+        core().set("wander_target", location == null ? "" : MobPositions.format(location));
     }
 }

@@ -11,4 +11,12 @@ public interface GhastOps extends Ghast, Cored {
     default void setExplosionPower(int power) {
         core().nbtSet("ExplosionPower", "byte", power);
     }
+
+    default boolean isCharging() {
+        return core().flag("charging");
+    }
+
+    default void setCharging(boolean charging) {
+        core().call("set_charging", charging);
+    }
 }

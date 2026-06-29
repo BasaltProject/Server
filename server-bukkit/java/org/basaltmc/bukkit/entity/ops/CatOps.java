@@ -24,4 +24,20 @@ public interface CatOps extends Cat, Cored {
     default void setSoundVariant(Cat.SoundVariant variant) {
         EntityNbt.variant(core(), "sound_variant", variant);
     }
+
+    default boolean isLyingDown() {
+        return core().flag("cat_lying");
+    }
+
+    default void setLyingDown(boolean lyingDown) {
+        core().call("cat_lying", lyingDown);
+    }
+
+    default boolean isHeadUp() {
+        return core().flag("cat_head_up");
+    }
+
+    default void setHeadUp(boolean headUp) {
+        core().call("cat_head_up", headUp);
+    }
 }

@@ -75,4 +75,36 @@ public interface MobOps extends Mob, org.basaltmc.bukkit.entity.Cored {
     default void setAware(boolean aware) {
         core().set("no_ai", !aware);
     }
+
+    default boolean isAggressive() {
+        return core().flag("aggressive");
+    }
+
+    default void setAggressive(boolean aggressive) {
+        core().set("aggressive", aggressive);
+    }
+
+    default org.bukkit.Sound getAmbientSound() {
+        if (!(core().call("ambient_sound") instanceof String id)) {
+            return null;
+        }
+        return org.bukkit.Registry.SOUNDS.get(org.bukkit.NamespacedKey.fromString(id));
+    }
+
+    default int getPossibleExperienceReward() {
+        return core().call("xp_reward") instanceof Number reward ? reward.intValue() : 0;
+    }
+
+    default net.kyori.adventure.util.TriState getDespawnInPeacefulOverride() {
+        return switch (core().integer("despawn_in_peaceful")) {
+            case 0 -> net.kyori.adventure.util.TriState.FALSE;
+            case 1 -> net.kyori.adventure.util.TriState.TRUE;
+            default -> net.kyori.adventure.util.TriState.NOT_SET;
+        };
+    }
+
+    default void setDespawnInPeacefulOverride(net.kyori.adventure.util.TriState state) {
+        core().set("despawn_in_peaceful", state == net.kyori.adventure.util.TriState.TRUE ? 1
+            : state == net.kyori.adventure.util.TriState.FALSE ? 0 : -1);
+    }
 }
