@@ -17,13 +17,13 @@ public class ResourceKey<T> implements Comparable<ResourceKey<?>> {
 
     @SuppressWarnings("unchecked")
     public static <T> ResourceKey<T> create(ResourceKey<? extends Registry<T>> registryName, Identifier location) {
-        return (ResourceKey<T>) kValues.computeIfAbsent(registryName.identifier + ":" + location,
+        return (ResourceKey<T>) org.basaltmc.bukkit.facade.Memo.get(kValues, registryName.identifier + ":" + location,
             ignored -> new ResourceKey<>(registryName.identifier, location));
     }
 
     @SuppressWarnings("unchecked")
     public static <T> ResourceKey<Registry<T>> createRegistryKey(Identifier registryName) {
-        return (ResourceKey<Registry<T>>) kValues.computeIfAbsent("minecraft:root:" + registryName,
+        return (ResourceKey<Registry<T>>) org.basaltmc.bukkit.facade.Memo.get(kValues, "minecraft:root:" + registryName,
             ignored -> new ResourceKey<>(Identifier.withDefaultNamespace("root"), registryName));
     }
 

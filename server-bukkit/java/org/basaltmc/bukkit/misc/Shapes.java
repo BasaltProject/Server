@@ -17,7 +17,7 @@ public final class Shapes {
 
     /** Six numbers per box (min corner, then max corner) in blocks, relative to the block. */
     public static double[] boxes(int state) {
-        return kBoxes.computeIfAbsent(state, id -> {
+        return org.basaltmc.bukkit.facade.Memo.get(kBoxes, state, id -> {
             int[] raw = MiscNatives.shapeBoxes(id);
             double[] out = new double[raw == null ? 0 : raw.length];
             for (int i = 0; i < out.length; i++) {

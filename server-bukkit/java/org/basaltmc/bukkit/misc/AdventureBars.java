@@ -104,7 +104,7 @@ public final class AdventureBars {
     }
 
     public static synchronized void show(UUID player, BossBar bar) {
-        Mirror mirror = kMirrors.computeIfAbsent(bar, Mirror::new);
+        Mirror mirror = org.basaltmc.bukkit.facade.Memo.get(kMirrors, bar, Mirror::new);
         if (mirror.id != null && mirror.viewers.add(player)) {
             MiscNatives.bbAddPlayer(mirror.id, player.toString());
         }

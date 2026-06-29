@@ -311,7 +311,7 @@ final class EventBridge {
         if (found == null) {
             return cancelled;
         }
-        Map<String, Integer> index = indexes.computeIfAbsent(name, key -> {
+        Map<String, Integer> index = org.basaltmc.bukkit.facade.Memo.get(indexes, name, key -> {
             String[] fieldNames = Natives.eventFields(key);
             Map<String, Integer> built = new HashMap<>();
             for (int at = 0; at < fieldNames.length; at++) {

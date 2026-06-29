@@ -33,7 +33,7 @@ public final class CustomGenerators {
     }
 
     private static synchronized Entry entryOf(BasaltWorld world) {
-        Entry entry = kEntries.computeIfAbsent(world.getName(), key -> new Entry(world));
+        Entry entry = org.basaltmc.bukkit.facade.Memo.get(kEntries, world.getName(), key -> new Entry(world));
         if (!subscribed) {
             subscribed = Natives.subscribe("world.chunk_load", 0);
         }

@@ -82,7 +82,7 @@ public class BasaltServer extends ServerTail {
     }
 
     synchronized BasaltPlayer player(UUID id, String name) {
-        return players.computeIfAbsent(id, key -> new org.bukkit.craftbukkit.entity.CraftPlayer(key, name));
+        return org.basaltmc.bukkit.facade.Memo.get(players, id, key -> new org.bukkit.craftbukkit.entity.CraftPlayer(key, name));
     }
 
     synchronized void forget(UUID id) {
@@ -109,7 +109,7 @@ public class BasaltServer extends ServerTail {
     }
 
     synchronized BasaltWorld world(String name) {
-        return worlds.computeIfAbsent(name, BasaltWorld::new);
+        return org.basaltmc.bukkit.facade.Memo.get(worlds, name, BasaltWorld::new);
     }
 
     @Override
