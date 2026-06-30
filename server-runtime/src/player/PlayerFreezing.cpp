@@ -20,10 +20,9 @@ constexpr double kHeight = 1.8;
 constexpr double kSneakingHeight = 1.5;
 constexpr double kSlack = 1.0e-5;
 
-constexpr std::array<std::string_view, 5> kFreezeImmuneWearables{"minecraft:leather_boots", "minecraft:leather_leggings",
-                                                                 "minecraft:leather_chestplate",
-                                                                 "minecraft:leather_helmet",
-                                                                 "minecraft:leather_horse_armor"};
+constexpr std::array<std::string_view, 5> kFreezeImmuneWearables{
+    "minecraft:leather_boots", "minecraft:leather_leggings", "minecraft:leather_chestplate", "minecraft:leather_helmet",
+    "minecraft:leather_horse_armor"};
 
 [[nodiscard]] bool wearsFreezeImmune(const PlayerSession& session) {
     for (std::int32_t slot = 0; slot < PlayerInventory::kArmourSlots; ++slot) {

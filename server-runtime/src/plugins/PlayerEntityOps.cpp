@@ -297,7 +297,9 @@ public:
                     source = entity::DamageSource{.entityId = by->entityId(), .x = by->x, .z = by->z};
                 }
             }
-            player->connection().hurt(static_cast<float>(asReal(at(arguments, 0))), cause, idOf(cause), source);
+            // parity: `DamageTypes.MOB_ATTACK` and `PLAYER_ATTACK` name their death messages `mob` and `player`.
+            const std::string messageId = cause == "mob_attack" ? "mob" : cause == "player_attack" ? "player" : cause;
+            player->connection().hurt(static_cast<float>(asReal(at(arguments, 0))), messageId, idOf(cause), source);
             return true;
         }
         if (operation == "kill") {

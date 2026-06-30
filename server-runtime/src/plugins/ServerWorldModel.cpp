@@ -320,7 +320,7 @@ public:
 
     [[nodiscard]] bool thundering() const override { return world_->weather().thundering; }
 
-    [[nodiscard]] std::string difficulty() const override { return world_->settings().difficulty; }
+    [[nodiscard]] std::string difficulty() const override { return world_->difficulty(); }
 
     [[nodiscard]] std::optional<std::string> gameRule(std::string_view name) const override {
         const world::GameRule* rule = world::gameRules::byId(name);

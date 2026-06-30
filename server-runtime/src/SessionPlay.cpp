@@ -29,10 +29,10 @@
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
-#include <basalt/server/runtime/world/RealDialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
+#include <basalt/server/runtime/world/RealDialogs.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
@@ -523,9 +523,8 @@ player::PlayerConnection ClientSession::playerConnection() {
     };
     connection.showDialogNamed = [this](const std::string& id) {
         const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
-        const std::optional<std::int32_t> dialogId = options_.dialogs == nullptr || !parsed.has_value()
-                                                         ? std::nullopt
-                                                         : options_.dialogs->protocolIdOf(*parsed);
+        const std::optional<std::int32_t> dialogId =
+            options_.dialogs == nullptr || !parsed.has_value() ? std::nullopt : options_.dialogs->protocolIdOf(*parsed);
         if (!dialogId.has_value()) {
             return false;
         }
