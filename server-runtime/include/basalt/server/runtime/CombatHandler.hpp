@@ -105,6 +105,8 @@ public:
     void trackFall(player::PlayerSession& session, double y, bool onGround,
                    const std::optional<std::int32_t>& feetState);
 
+    [[nodiscard]] std::function<std::optional<player::DeathLabel>(std::int32_t)> deathLabels() const;
+
     void hurt(float amount, std::string_view deathMessageId,
               const std::optional<wire::common::Identifier>& damageType = std::nullopt,
               const std::optional<entity::DamageSource>& source = std::nullopt);

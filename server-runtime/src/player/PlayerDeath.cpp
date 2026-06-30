@@ -12,7 +12,7 @@ namespace basalt::server::runtime::player {
 using wire::text::Component;
 
 void killPlayer(PlayerSession& session, const std::string_view deathMessageId, const std::optional<Component>& killer,
-                const DeathContext& context) {
+                const DeathContext& context, const std::optional<Component>& tracked) {
     if (session.dead) {
         return;
     }
@@ -42,7 +42,9 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     if (killer.has_value()) {
         arguments.push_back(*killer);
     }
-    const Component message = Component::translatable("death.attack." + std::string{deathMessageId}, arguments);
+    const Component message =
+        tracked.has_value() ? *tracked
+                            : Component::translatable("death.attack." + std::string{deathMessageId}, arguments);
     Announcement said;
     if (context.died) {
         said = context.died(session, wire::text::resolvePlainText(message, context.lang));

@@ -7,6 +7,8 @@
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
@@ -14,6 +16,7 @@
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
@@ -29,6 +32,7 @@
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/text/ComponentNbt.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
@@ -261,7 +265,36 @@ player::DamageContext CombatHandler::damageContext() const {
     context.death.logger = owner_->logger();
     context.death.lang = owner_->consoleLang();
     context.death.died = hooks_.died;
+    context.death.labelOf = deathLabels();
     return context;
+}
+
+std::function<std::optional<player::DeathLabel>(std::int32_t)> CombatHandler::deathLabels() const {
+    return [this](std::int32_t id) -> std::optional<player::DeathLabel> {
+        const auto customName = [](const wire::nbt::NbtCompound& components) -> std::optional<Component> {
+            const wire::nbt::NbtTag* name = components.find("minecraft:custom_name");
+            return name == nullptr ? std::nullopt : std::optional{wire::text::componentNbt::deserialize(*name)};
+        };
+        if (player::PlayerRegistry* registry = owner_->options().playerRegistry; registry != nullptr) {
+            for (const PlayerSession* other : registry->snapshot()) {
+                if (other->entityId() != id) {
+                    continue;
+                }
+                const std::optional<storage::StoredItemStack>& held = other->inventory.heldItem();
+                return player::DeathLabel{.name = Component::text(other->name()),
+                                          .heldItem = held.has_value() ? customName(held->components) : std::nullopt};
+            }
+        }
+        const world::LoadedWorld* world = owner_->currentWorld();
+        const entity::ServerEntity* mob = world == nullptr ? nullptr : world->state().entity(id);
+        if (mob == nullptr) {
+            return std::nullopt;
+        }
+        const std::optional<server::world::loot::ItemStack> held =
+            entity::mobEquipment::get(*mob, entity::mobEquipment::Slot::MainHand);
+        return player::DeathLabel{.name = entity::entityCombat::displayName(*mob),
+                                  .heldItem = held.has_value() ? customName(held->components) : std::nullopt};
+    };
 }
 
 float CombatHandler::reduced(const PlayerSession& session, const float amount,
@@ -307,6 +340,7 @@ void CombatHandler::die(std::string_view deathMessageId, const std::optional<Com
     context.logger = owner_->logger();
     context.lang = owner_->consoleLang();
     context.died = hooks_.died;
+    context.labelOf = deathLabels();
     player::killPlayer(*session, deathMessageId, killer, context);
 }
 
