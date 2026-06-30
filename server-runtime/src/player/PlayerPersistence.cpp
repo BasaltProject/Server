@@ -24,6 +24,7 @@ namespace {
     // parity: `Entity.saveWithoutId` and `LivingEntity.addAdditionalSaveData`.
     data.putShort("Air", static_cast<std::int16_t>(session.airSupply));
     data.putShort("Fire", static_cast<std::int16_t>(session.fireTicks));
+    data.putInt("TicksFrozen", session.ticksFrozen);
     data.putDouble("fall_distance", session.fallDistance);
     data.putFloat("AbsorptionAmount", session.absorption);
     if (session.lastDeath.has_value()) {
@@ -128,6 +129,7 @@ void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
         session.airSupply = stored.entityData.getShort("Air");
     }
     session.fireTicks = std::max<std::int32_t>(0, stored.entityData.getShort("Fire"));
+    session.ticksFrozen = std::max<std::int32_t>(0, stored.entityData.getInt("TicksFrozen"));
     session.fallDistance = stored.entityData.getDouble("fall_distance");
     session.absorption = stored.entityData.getFloat("AbsorptionAmount");
     session.lastDeath.reset();

@@ -92,6 +92,8 @@ inline constexpr GameRule kPlayersSleepingPercentage = GameRule::integer("player
 
 inline constexpr GameRule kFallDamage = GameRule::boolean("fall_damage", true);
 
+inline constexpr GameRule kFreezeDamage = GameRule::boolean("freeze_damage", true);
+
 /// parity: `TntBlock.prime` answers false with this off, leaving the block where it is.
 inline constexpr GameRule kTntExplodes = GameRule::boolean("tnt_explodes", true);
 

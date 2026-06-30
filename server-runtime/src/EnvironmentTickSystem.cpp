@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/player/PlayerEntityData.hpp>
+#include <basalt/server/runtime/player/PlayerFreezing.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -316,6 +317,14 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
         player::tickBody(*player, [&world](std::int32_t x, std::int32_t y, std::int32_t z) {
             return world.state().blockState(x, y, z);
         });
+        player::tickFreezing(
+            *player,
+            [&world](std::int32_t x, std::int32_t y, std::int32_t z) { return world.state().blockState(x, y, z); },
+            world.gameRules().get(world::gameRules::kFreezeDamage), [&player](float amount) {
+                if (player->connection().hurt) {
+                    player->connection().hurt(amount, "freeze", world::damageTypes::kFreeze, std::nullopt);
+                }
+            });
         const double eyeY = player->y + world::fluids::eyeHeight(player->sneaking);
         const auto blockX = static_cast<std::int32_t>(std::floor(player->x));
         const auto blockZ = static_cast<std::int32_t>(std::floor(player->z));

@@ -188,6 +188,9 @@ public:
         if (name == "air") {
             return static_cast<std::int64_t>(player->airSupply);
         }
+        if (name == "frozen_ticks") {
+            return static_cast<std::int64_t>(player->ticksFrozen);
+        }
         if (name == "max_air") {
             return static_cast<std::int64_t>(world::fluids::kMaxAir);
         }
@@ -264,6 +267,10 @@ public:
         }
         if (name == "air") {
             player->airSupply = static_cast<std::int32_t>(asInt(value));
+            return true;
+        }
+        if (name == "frozen_ticks") {
+            player->ticksFrozen = static_cast<std::int32_t>(std::max<std::int64_t>(0, asInt(value)));
             return true;
         }
         if (name == "no_damage_ticks") {

@@ -275,6 +275,12 @@ Modifiers modifiersOf(const PlayerSession& player, const DefinitionOf& definitio
             }
         }
     }
+    if (player.frostSlowdown > 0.0F) {
+        put(modifiers, "minecraft:movement_speed",
+            Modifier{.id = Identifier::vanilla("powder_snow"),
+                     .amount = -static_cast<double>(player.frostSlowdown),
+                     .operation = Operation::AddValue});
+    }
     return modifiers;
 }
 
