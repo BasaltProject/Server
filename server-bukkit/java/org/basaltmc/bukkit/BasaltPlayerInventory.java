@@ -12,6 +12,7 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.basaltmc.bukkit.gen.PlayerInventoryBase;
 import org.basaltmc.bukkit.inv.InventoryOps;
+import org.basaltmc.bukkit.player.PlayerCalls;
 
 /** Slots: 0-8 hotbar, 9-35 rest, 36-39 armor boots up, 40 off hand. */
 public final class BasaltPlayerInventory extends PlayerInventoryBase {
@@ -40,14 +41,12 @@ public final class BasaltPlayerInventory extends PlayerInventoryBase {
 
     @Override
     public int getMaxStackSize() {
-        return 99;
+        return (int) PlayerCalls.integer(java.util.UUID.fromString(uuid), "slot_limit");
     }
 
     @Override
     public void setMaxStackSize(int size) {
-        if (size != 99) {
-            throw Unsupported.hit("PlayerInventory#setMaxStackSize other than 99");
-        }
+        PlayerCalls.set(java.util.UUID.fromString(uuid), "slot_limit", (long) Math.max(1, size));
     }
 
     @Override

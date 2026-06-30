@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <map>
@@ -41,7 +42,13 @@ public:
     /// What any one slot holds at most, before the stack's own limit. parity: `Container.getMaxStackSize`.
     static constexpr std::int32_t kSlotLimit = 99;
 
-    [[nodiscard]] static std::int32_t maxStackIn(const storage::StoredItemStack& stack);
+    [[nodiscard]] static std::int32_t maxStackIn(const storage::StoredItemStack& stack,
+                                                 std::int32_t slotLimit = kSlotLimit);
+
+    /// A plugin's own cap on what one slot of this inventory holds; never above the 99 of `kSlotLimit`.
+    [[nodiscard]] std::int32_t slotLimit() const noexcept { return slotLimit_; }
+
+    void setSlotLimit(std::int32_t value) noexcept { slotLimit_ = std::clamp(value, 1, kSlotLimit); }
 
     explicit PlayerInventory(item::itemComponentCodecs::EnchantmentId enchantmentIds = {});
 
@@ -102,6 +109,7 @@ private:
     std::array<std::optional<storage::StoredItemStack>, storage::StoredInventory::kPlayerSlots> slots_;
     bool changed_ = true;
     std::int32_t heldSlot_ = 0;
+    std::int32_t slotLimit_ = kSlotLimit;
 };
 
 } // namespace basalt::server::runtime::player
