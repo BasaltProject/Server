@@ -55,7 +55,11 @@ ServerEntity* NaturalSpawningSystem::materializeSpawnForest(world::LoadedWorld& 
     const world::MobSpawnForest forest =
         world::writeGeneratedForest(data, request.type, request.groupIndex, context, group, blockX, blockY, blockZ,
                                     request.x, request.y, request.z, request.yaw, spawnEnvironment(world));
-    return materializeForest(world, forest);
+    ServerEntity* spawned = materializeForest(world, forest);
+    if (spawned != nullptr) {
+        spawned->spawnReason = std::string{eventReason};
+    }
+    return spawned;
 }
 
 ServerEntity* NaturalSpawningSystem::materializePatrolMember(world::LoadedWorld& world,

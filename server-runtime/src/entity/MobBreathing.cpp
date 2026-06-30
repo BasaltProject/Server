@@ -195,7 +195,7 @@ double eyeHeightOf(const ServerEntity& mob) {
 
 std::vector<Hurt> tick(ServerEntity& mob, const Surroundings& at) {
     const std::string_view path = mob.type().path();
-    const std::int32_t maxAir = maxAirOf(path);
+    const std::int32_t maxAir = mob.maxAirOverride.value_or(maxAirOf(path));
     const std::int32_t before = mob.airSupply;
     std::vector<Hurt> hurts;
     // parity: `increaseAirSupply`, four a tick, and all of it at once for a dolphin.

@@ -644,6 +644,11 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         entries.push_back(
             Entry{.index = kCubeSizeDataIndex, .value = SetEntityDataPacket::IntValue{.value = *cubeSize}});
     }
+    if (livingFlags.has_value() && (previous == nullptr || previous->livingFlags != livingFlags) &&
+        (previous != nullptr || *livingFlags != 0)) {
+        entries.push_back(Entry{.index = SetEntityDataPacket::kLivingFlagsIndex,
+                                .value = SetEntityDataPacket::ByteValue{.value = *livingFlags}});
+    }
     if (horseFlags.has_value() && (previous == nullptr || previous->horseFlags != horseFlags) &&
         (previous != nullptr || *horseFlags != 0)) {
         entries.push_back(Entry{.index = kAbstractHorseFlagsDataIndex,
@@ -818,9 +823,10 @@ std::int8_t sharedFlagsOf(const ServerEntity& entity) {
     const bool glowing = (hasData && entity.sourceNbt->getBoolean("Glowing")) ||
                          entity.effects.contains(wire::common::Identifier::vanilla("glowing"));
     std::int8_t flags = 0;
-    if (entity.fireTicks > 0) {
+    if (entity.visualFire < 0 ? entity.fireTicks > 0 : entity.visualFire > 0) {
         flags |= SetEntityDataPacket::kFlagOnFire;
     }
+    flags |= static_cast<std::int8_t>(entity.forcedFlags);
     if (invisible) {
         flags |= 0x20;
     }
@@ -1050,6 +1056,23 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
                 ? std::optional{wire::protocol::play::BlockPos{.x = (*beam)[0], .y = (*beam)[1], .z = (*beam)[2]}}
                 : std::nullopt;
         live.crystalBottom = world::endCrystals::showsBottom(entity);
+    }
+    if (entity.activeSlot >= 0 || entity.riptiding) {
+        live.livingFlags = static_cast<std::int8_t>((entity.activeSlot >= 0 ? 1 : 0) | (entity.activeSlot == 1 ? 2 : 0) |
+                                                    (entity.riptiding ? 4 : 0));
+    } else if (server::registry::entityAttributes::isLiving(entity.type())) {
+        live.livingFlags = 0;
+    }
+    if (entity.forcedPose >= 0) {
+        live.pose = static_cast<wire::protocol::play::Pose>(entity.forcedPose);
+    } else if ((entity.forcedFlags & 0x80) != 0) {
+        live.pose = wire::protocol::play::Pose::FallFlying;
+    } else if ((entity.forcedFlags & 0x10) != 0) {
+        live.pose = wire::protocol::play::Pose::Swimming;
+    } else if ((entity.forcedFlags & 0x02) != 0) {
+        live.pose = wire::protocol::play::Pose::Crouching;
+    } else if (entity.forcedPose == -2 && !live.pose.has_value()) {
+        live.pose = wire::protocol::play::Pose::Standing;
     }
     return live;
 }

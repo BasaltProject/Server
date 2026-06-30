@@ -151,6 +151,14 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
             --entity.arrowCount;
         }
     }
+    if (entity.activeSlot >= 0) {
+        ++entity.activeUsed;
+        if (--entity.activeTicks <= 0) {
+            entity.activeSlot = -1;
+            entity.activeTicks = 0;
+            entity.activeUsed = 0;
+        }
+    }
     if (entity.stingerCount > 0) {
         if (entity.removeStingerTime <= 0) {
             entity.removeStingerTime = 20 * (30 - entity.stingerCount);

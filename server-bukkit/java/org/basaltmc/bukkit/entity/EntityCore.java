@@ -43,6 +43,12 @@ public final class EntityCore {
     public final EntityType type;
     public final MetadataHolder metadata = new MetadataHolder();
     public final java.util.Set<String> tags = new java.util.HashSet<>();
+    public final java.util.Map<net.kyori.adventure.key.Key, java.util.function.Predicate<Entity>> alliedRules =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    public final java.util.Map<org.bukkit.entity.memory.MemoryKey<?>, Object> memories =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    public volatile org.bukkit.permissions.PermissibleBase permissions;
+    public volatile org.bukkit.event.entity.EntityRemoveEvent.Cause removeCause;
 
     private volatile double[] staged;
     private Map<String, byte[]> stagedBlobs;
@@ -219,6 +225,9 @@ public final class EntityCore {
     public void remove() {
         if (staged != null) {
             return;
+        }
+        if (removeCause == null) {
+            removeCause = org.bukkit.event.entity.EntityRemoveEvent.Cause.PLUGIN;
         }
         WorldNatives.entityRemove(world.getName(), id);
     }
