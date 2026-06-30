@@ -25,6 +25,8 @@ public:
 
     void resetForRespawn(double spawnX, double spawnZ);
 
+    void forgetAll();
+
     void resetForWorldSwitch(double x, double z, std::int32_t radius);
 
     void resendChunk(std::int32_t chunkX, std::int32_t chunkZ);

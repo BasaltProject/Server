@@ -40,6 +40,8 @@ namespace {
 
 namespace play = wire::protocol::play;
 
+constexpr std::int32_t kConfigurationAcknowledgedId = 16;
+
 constexpr std::chrono::milliseconds kOutboundInterval{50};
 
 // An idle client cannot then be handed an enormous burst at once.
@@ -184,7 +186,8 @@ void ClientSession::startOutboundLoop() {
     outbound_ = std::jthread([this] {
         while (streaming_.load()) {
             bool idle = false;
-            if (tickTaskPending_.compare_exchange_strong(idle, true)) {
+            const bool switching = switchingToConfiguration_.load();
+            if (!switching && tickTaskPending_.compare_exchange_strong(idle, true)) {
                 // The player's turn goes to the world's owner; it only queues packets, so it never waits on a socket.
                 onOwner([this] {
                     chunkStreamer_->sendBudget =
@@ -214,7 +217,9 @@ void ClientSession::startOutboundLoop() {
                     tickTaskPending_.store(false);
                 });
             }
-            sendKeepAliveIfDue();
+            if (!switching) {
+                sendKeepAliveIfDue();
+            }
             flushOutbox();
             std::this_thread::sleep_for(kOutboundInterval);
         }
@@ -452,6 +457,13 @@ void ClientSession::handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer&
             replaced.writeBytes(*replacement);
             body = std::move(replaced);
         }
+    }
+    if (state_ == wire::protocol::ProtocolState::Play && switchingToConfiguration_.load()) {
+        // parity: `waitingForSwitchToConfig` drops every packet but the acknowledgement.
+        if (packetId == kConfigurationAcknowledgedId) {
+            enterConfiguration();
+        }
+        return;
     }
     switch (state_) {
     case wire::protocol::ProtocolState::Handshake:

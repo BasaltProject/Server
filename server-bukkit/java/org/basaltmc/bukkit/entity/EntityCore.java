@@ -405,6 +405,24 @@ public final class EntityCore {
         return call("nbt", path) instanceof byte[] value ? value : null;
     }
 
+    /** Gives a template the saved data of an entity so its reads answer from it. */
+    public void seedNbt(byte[] named) {
+        net.minecraft.nbt.CompoundTag tag = org.basaltmc.bukkit.facade.NbtCodec.fromBytes(named);
+        if (staged == null || tag == null) {
+            return;
+        }
+        for (String key : tag.keySet()) {
+            net.minecraft.nbt.Tag value = tag.get(key);
+            if (value instanceof net.minecraft.nbt.CompoundTag inner) {
+                stagedBlobs.put(key, org.basaltmc.bukkit.facade.NbtCodec.toBytes(inner));
+            } else if (value instanceof net.minecraft.nbt.NumericTag number) {
+                stagedProperties.put("nbt:" + key, number.box());
+            } else if (value instanceof net.minecraft.nbt.StringTag text) {
+                stagedProperties.put("nbt:" + key, text.value());
+            }
+        }
+    }
+
     public void stageNbt(String path, byte[] compound) {
         if (staged != null) {
             stagedBlobs.put(path, compound);

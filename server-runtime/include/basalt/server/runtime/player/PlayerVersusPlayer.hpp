@@ -33,6 +33,9 @@ struct BreakContext;
 
 namespace pvp {
 
+/// parity: `Entity.isAlliedTo` once plugins have added their own rules; false while nobody answers.
+[[nodiscard]] bool alliedByRules(const PlayerSession& attacker, std::int32_t otherId);
+
 [[nodiscard]] bool canHarm(const PlayerSession& victim, const PlayerSession& attacker, bool pvpAllowed,
                            const scoreboard::Teams* teams);
 

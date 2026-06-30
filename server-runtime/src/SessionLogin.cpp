@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/PlayerLifecycle.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/registry/PackRegistries.hpp>
 #include <basalt/server/runtime/registry/SyncedTags.hpp>
@@ -41,6 +42,7 @@ namespace login = wire::protocol::login;
 namespace mv = wire::multiversion;
 
 constexpr std::int32_t kConfigurationCustomPayloadId = 0x02;
+constexpr std::int32_t kStartConfigurationId = 120;
 namespace reg = server::registry;
 
 using wire::common::Identifier;
@@ -468,6 +470,22 @@ void ClientSession::enterConfiguration() {
                     .namespaceName = "minecraft", .id = "core", .version = std::string{buildInfo::kMinecraftVersion}}}}
                 .write(buffer);
         });
+}
+
+bool ClientSession::reenterConfiguration() {
+    if (state_ != wire::protocol::ProtocolState::Play || !handshake_.has_value() || translation_ != nullptr ||
+        handshake_->protocolVersion != buildInfo::kProtocolVersion || playerSession_ == nullptr) {
+        return false;
+    }
+    onOwner([this] {
+        bool expected = false;
+        if (playerSession_ == nullptr || !switchingToConfiguration_.compare_exchange_strong(expected, true)) {
+            return;
+        }
+        lifecycle_->leavePlayIfPresent();
+        sendCompressed(kStartConfigurationId, [](wire::io::ByteBuffer&) {});
+    });
+    return true;
 }
 
 void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuffer& body) {

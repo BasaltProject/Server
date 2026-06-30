@@ -1,7 +1,9 @@
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/plugins/PlayerOps.hpp>
 #include <basalt/server/runtime/plugins/PluginItemConversion.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -29,6 +31,72 @@ std::optional<wire::nbt::NbtCompound> compoundOf(const std::string& snbt) {
     const std::expected<wire::nbt::NbtTag, wire::nbt::NbtError> parsed = wire::nbt::snbt::parse(snbt);
     const wire::nbt::NbtCompound* root = parsed.has_value() ? parsed->get<wire::nbt::NbtCompound>() : nullptr;
     return root == nullptr ? std::nullopt : std::optional{*root};
+}
+
+wire::nbt::NbtCompound itemNbt(const storage::StoredItemStack& stack) {
+    wire::nbt::NbtCompound item;
+    item.putString("id", stack.id);
+    item.putInt("count", stack.count);
+    if (!stack.components.empty()) {
+        item.set("components", wire::nbt::NbtTag::ofCompound(stack.components));
+    }
+    return item;
+}
+
+wire::nbt::NbtTag itemsNbt(const storage::StoredInventory& inventory) {
+    wire::nbt::NbtList list{wire::nbt::NbtType::Compound};
+    for (std::size_t slot = 0; slot < inventory.slots.size(); ++slot) {
+        if (!inventory.slots[slot].has_value()) {
+            continue;
+        }
+        wire::nbt::NbtCompound entry = itemNbt(*inventory.slots[slot]);
+        entry.putByte("Slot", static_cast<std::int8_t>(slot));
+        list.push(wire::nbt::NbtTag::ofCompound(std::move(entry)));
+    }
+    return wire::nbt::NbtTag::ofList(std::move(list));
+}
+
+wire::nbt::NbtTag vector3(double x, double y, double z) {
+    wire::nbt::NbtList list{wire::nbt::NbtType::Double};
+    for (const double value : {x, y, z}) {
+        list.push(wire::nbt::NbtTag::ofDouble(value));
+    }
+    return wire::nbt::NbtTag::ofList(std::move(list));
+}
+
+/// parity: `Entity.saveAsPassenger` of a player, the part of it that Basalt keeps.
+wire::nbt::NbtCompound playerNbt(const player::PlayerSession& session) {
+    const storage::StoredPlayer stored = player::playerPersistence::toStored(session, session.worldName, 0, 0, 0);
+    wire::nbt::NbtCompound root;
+    root.putString("id", "minecraft:player");
+    root.set("Pos", vector3(stored.x, stored.y, stored.z));
+    root.set("Motion", vector3(0.0, 0.0, 0.0));
+    wire::nbt::NbtList rotation{wire::nbt::NbtType::Float};
+    rotation.push(wire::nbt::NbtTag::ofFloat(stored.yaw));
+    rotation.push(wire::nbt::NbtTag::ofFloat(stored.pitch));
+    root.set("Rotation", wire::nbt::NbtTag::ofList(std::move(rotation)));
+    root.putString("Dimension", stored.world);
+    root.putFloat("Health", stored.health);
+    root.putInt("foodLevel", stored.food);
+    root.putFloat("foodSaturationLevel", stored.saturation);
+    root.putFloat("foodExhaustionLevel", stored.exhaustion);
+    root.putInt("XpLevel", stored.xpLevel);
+    root.putFloat("XpP", stored.xpProgress);
+    root.putInt("XpTotal", stored.xpTotal);
+    root.putInt("playerGameType", static_cast<std::int32_t>(stored.gamemode));
+    root.set("Inventory", itemsNbt(stored.inventory));
+    root.set("EnderItems", itemsNbt(stored.enderChest));
+    const wire::common::Uuid uuid = session.uuid();
+    root.putIntArray("UUID", {static_cast<std::int32_t>(uuid.high() >> 32), static_cast<std::int32_t>(uuid.high()),
+                              static_cast<std::int32_t>(uuid.low() >> 32), static_cast<std::int32_t>(uuid.low())});
+    if (!stored.tags.empty()) {
+        wire::nbt::NbtList tags{wire::nbt::NbtType::String};
+        for (const std::string& tag : stored.tags) {
+            tags.push(wire::nbt::NbtTag::ofString(tag));
+        }
+        root.set("Tags", wire::nbt::NbtTag::ofList(std::move(tags)));
+    }
+    return root;
 }
 
 void broadcastWaypoint(Context& context) {
@@ -139,6 +207,14 @@ std::optional<Value> tail(Context& context, const Verb verb, const std::string_v
         extras.noPhysicsTick = asBool(first) ? now : -1;
         return true;
     }
+    if (name == "slot_limit") {
+        if (verb == Verb::Get) {
+            return static_cast<std::int64_t>(session.inventory.slotLimit());
+        }
+        session.inventory.setSlotLimit(static_cast<std::int32_t>(
+            std::clamp<std::int64_t>(asInt(first), 1, player::PlayerInventory::kSlotLimit)));
+        return true;
+    }
     if (name == "freeze_locked") {
         if (verb == Verb::Get) {
             return extras.freezeLocked;
@@ -232,6 +308,9 @@ std::optional<Value> tail(Context& context, const Verb verb, const std::string_v
             }
         }
         return true;
+    }
+    if (name == "as_string") {
+        return wire::nbt::snbt::stringify(wire::nbt::NbtTag::ofCompound(playerNbt(session)));
     }
     if (name == "shoulder") {
         const std::optional<wire::nbt::NbtCompound>& held = shoulderSide(session, asInt(first));
@@ -329,6 +408,31 @@ std::optional<Value> tail(Context& context, const Verb verb, const std::string_v
         return connection.retitleScreen &&
                connection.retitleScreen(title.has_value() ? wire::text::componentJson::deserialize(*title)
                                                           : wire::text::Component::empty());
+    }
+    if (name == "show_dialog") {
+        const std::string written = asText(first);
+        if (!written.starts_with('{')) {
+            return connection.showDialogNamed && connection.showDialogNamed(written);
+        }
+        const std::optional<wire::nbt::NbtCompound> dialog = compoundOf(written);
+        if (!dialog.has_value()) {
+            return false;
+        }
+        if (connection.showDialogData) {
+            return connection.showDialogData(*dialog);
+        }
+        const std::optional<world::dialogs::Dialog> form =
+            world::dialogs::read(*dialog, [](const wire::common::Identifier&) -> const wire::nbt::NbtCompound* {
+                return nullptr;
+            });
+        if (!form.has_value() || !connection.showForm) {
+            return false;
+        }
+        connection.showForm(*form);
+        return true;
+    }
+    if (name == "reenter_configuration") {
+        return connection.reenterConfiguration && connection.reenterConfiguration();
     }
     if (name == "clear_dialog") {
         constexpr std::int32_t kClearDialogId = 142;

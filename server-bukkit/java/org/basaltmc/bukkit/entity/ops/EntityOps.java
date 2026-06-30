@@ -149,7 +149,25 @@ public interface EntityOps extends Entity, Cored {
     default boolean isAlliedTo(Entity other) {
         org.bukkit.scoreboard.Scoreboard board = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
         org.bukkit.scoreboard.Team mine = board.getEntityTeam(this);
-        return mine != null && mine.equals(board.getEntityTeam(other));
+        return mine != null && mine.equals(board.getEntityTeam(other))
+            || org.basaltmc.bukkit.AlliedRules.matches(this, other);
+    }
+
+    default java.util.Map<net.kyori.adventure.key.Key, java.util.function.Predicate<Entity>> getAdditionalAlliedRules() {
+        return org.basaltmc.bukkit.AlliedRules.of(this);
+    }
+
+    default void addAdditionalAlliedRule(net.kyori.adventure.key.Key key,
+            java.util.function.Predicate<Entity> rule) {
+        org.basaltmc.bukkit.AlliedRules.add(this, key, rule);
+    }
+
+    default void removeAdditionalAlliedRule(net.kyori.adventure.key.Key key) {
+        org.basaltmc.bukkit.AlliedRules.remove(this, key);
+    }
+
+    default void removeAdditionalAlliedRule(net.kyori.adventure.key.Namespaced key) {
+        org.basaltmc.bukkit.AlliedRules.removeNamespace(this, key.namespace());
     }
 
     default boolean isInRain() {
