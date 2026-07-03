@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
+#include <basalt/server/runtime/world/FluidCurrents.hpp>
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -126,6 +127,18 @@ PluginFluid ServerWorldEnv::fluidAt(const std::int32_t x, const std::int32_t y, 
         out = PluginFluid{.fluid = "water", .source = true, .level = 8, .falling = false};
     }
     return out;
+}
+
+std::array<double, 3> ServerWorldEnv::fluidFlow(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    world::WorldState& state = world_->state();
+    const std::optional<std::int32_t> here = state.blockState(x, y, z);
+    if (!here.has_value()) {
+        return {};
+    }
+    const world::fluidCurrents::BlockAt blockAt = [&state](std::int32_t bx, std::int32_t by, std::int32_t bz) {
+        return state.blockState(bx, by, bz);
+    };
+    return world::fluidCurrents::flowAt(blockAt, x, y, z, *here, hooks_ != nullptr ? hooks_->blockTags : nullptr);
 }
 
 std::optional<std::array<std::int32_t, 3>> ServerWorldEnv::lightningTarget(const std::int32_t x, const std::int32_t z) {

@@ -43,6 +43,7 @@ public:
     [[nodiscard]] std::vector<server::plugins::PluginRaid> raids() override;
     bool setRaid(std::int32_t id, std::int32_t omenLevel, std::int32_t totalGroups) override;
     [[nodiscard]] server::plugins::PluginFluid fluidAt(std::int32_t x, std::int32_t y, std::int32_t z) override;
+    [[nodiscard]] std::array<double, 3> fluidFlow(std::int32_t x, std::int32_t y, std::int32_t z) override;
     [[nodiscard]] std::optional<std::array<std::int32_t, 3>> lightningTarget(std::int32_t x, std::int32_t z) override;
     void gameEvent(std::string_view event, double x, double y, double z, std::string_view source) override;
     bool growTree(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view sapling) override;
