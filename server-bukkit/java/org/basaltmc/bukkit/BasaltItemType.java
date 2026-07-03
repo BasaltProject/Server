@@ -163,7 +163,12 @@ public final class BasaltItemType extends ItemTypeTypedBase {
 
     @Override
     public boolean isCompostable() {
-        return false;
+        return ItemData.of(key.toString()).composterChance() > 0;
+    }
+
+    @Override
+    public org.bukkit.inventory.CreativeCategory getCreativeCategory() {
+        return org.bukkit.inventory.CreativeCategory.BUILDING_BLOCKS;
     }
 
     @Override
