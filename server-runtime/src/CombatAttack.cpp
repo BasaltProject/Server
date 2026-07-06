@@ -101,6 +101,20 @@ std::optional<Identifier> parsedOrNothing(const std::string& id) {
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
+/// parity: `Interaction.attack` and `Interaction.interaction`, the last player and when.
+void recordInteraction(ServerEntity& target, std::string_view key, const PlayerSession& player, std::int64_t time) {
+    const std::uint64_t high = player.uuid().high();
+    const std::uint64_t low = player.uuid().low();
+    wire::nbt::NbtCompound action;
+    action.putIntArray("player", {static_cast<std::int32_t>(high >> 32U), static_cast<std::int32_t>(high),
+                                  static_cast<std::int32_t>(low >> 32U), static_cast<std::int32_t>(low)});
+    action.putLong("timestamp", time);
+    if (!target.sourceNbt.has_value()) {
+        target.sourceNbt.emplace();
+    }
+    target.sourceNbt->set(key, wire::nbt::NbtTag::ofCompound(std::move(action)));
+}
+
 } // namespace
 
 void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attack) {
@@ -200,6 +214,10 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         session->ticksSinceSwing = 0;
         CombatSystem::deflectByPunch(owner_->playersInSameWorld(), *target, *session);
         owner_->broadcastSound(kSoundAttackNoDamage, session->x, session->y, session->z, SoundSource::Players);
+        return;
+    }
+    if (target->type().path() == "interaction") {
+        recordInteraction(*target, "attack", *session, world->gameTime());
         return;
     }
     if (!server::registry::entityAttributes::isLiving(target->type())) {
@@ -430,6 +448,10 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
                                       })) {
             return;
         }
+    }
+    if (entity->type().path() == "interaction") {
+        recordInteraction(*entity, "interaction", *session, world->gameTime());
+        return;
     }
     // parity: `ItemFrame.interact`.
     if (world::itemFrames::isFrame(entity->type()) && useItemFrame(*session, *entity)) {

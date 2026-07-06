@@ -196,7 +196,7 @@ void MobActionSystem::piglinPicksUp(world::LoadedWorld& world, ServerEntity& pig
     for (const world::DroppedItem& item :
          world.state().nearbyItems(piglin.x, piglin.y, piglin.z, 2.0 + piglin.width() + piglin.height())) {
         constexpr double kItemHalf = 0.125;
-        if (!item.canBePickedUp() || item.count <= 0 || item.x + kItemHalf < piglin.x - half - 1.0 ||
+        if (!item.canBePickedUpByMob() || item.count <= 0 || item.x + kItemHalf < piglin.x - half - 1.0 ||
             item.x - kItemHalf > piglin.x + half + 1.0 || item.z + kItemHalf < piglin.z - half - 1.0 ||
             item.z - kItemHalf > piglin.z + half + 1.0 || item.y + 0.25 < piglin.y ||
             item.y > piglin.y + piglin.height()) {

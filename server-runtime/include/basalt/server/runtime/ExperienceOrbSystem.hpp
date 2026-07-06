@@ -1,10 +1,12 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 
 #include <cstdint>
 #include <functional>
 #include <mutex>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -27,6 +29,37 @@ namespace basalt::server::runtime {
 class ExperienceOrbSystem {
 public:
     static constexpr std::uint8_t kValueDataIndex = 8;
+
+    enum class Reason : std::uint8_t {
+        Unknown,
+        PlayerDeath,
+        EntityDeath,
+        Furnace,
+        Breed,
+        VillagerTrade,
+        Fishing,
+        BlockBreak,
+        Custom,
+        ExpBottle,
+        Grindstone
+    };
+
+    /// What the orbs spawned while it lives are marked with; the server thread owns it.
+    class ReasonScope {
+    public:
+        explicit ReasonScope(Reason reason, std::optional<wire::common::Uuid> source = std::nullopt,
+                             std::optional<wire::common::Uuid> trigger = std::nullopt);
+        ~ReasonScope();
+        ReasonScope(const ReasonScope&) = delete;
+        ReasonScope& operator=(const ReasonScope&) = delete;
+
+    private:
+        Reason reason_;
+        std::optional<wire::common::Uuid> source_;
+        std::optional<wire::common::Uuid> trigger_;
+        const ReasonScope* previous_;
+        friend class ExperienceOrbSystem;
+    };
 
     struct Options {
         std::function<std::int64_t()> nextSeed;

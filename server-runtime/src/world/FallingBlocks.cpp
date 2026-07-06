@@ -23,6 +23,7 @@ namespace {
 /// parity: `Entity.getGravity` for a falling block, and `Entity.getAirDrag`.
 constexpr double kGravity = 0.04;
 constexpr double kAirDrag = 0.98;
+constexpr std::int32_t kExpireTicks = 600;
 
 /// parity: `FluidTags.WATER` at a square.
 [[nodiscard]] bool waterAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -191,6 +192,16 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
         const server::world::Chunk* chunk = world.chunkIfLoaded(blockX >> 4, blockZ >> 4);
         if (chunk != nullptr && blockY < chunk->verticalBounds().minY()) {
             entity.removed = true;
+        }
+        // parity: `FallingBlockEntity.tick` gives up on a block that has been falling for thirty seconds.
+        if (!entity.sourceNbt.has_value()) {
+            entity.sourceNbt.emplace();
+        }
+        const std::int32_t time = entity.sourceNbt->getInt("Time") + 1;
+        entity.sourceNbt->putInt("Time", time);
+        if (!entity.removed && time > kExpireTicks && !entity.sourceNbt->getBoolean("BasaltNoExpire")) {
+            entity.removed = true;
+            return Landing{.shattered = entity.objectData};
         }
         return Landing{};
     }

@@ -55,6 +55,15 @@ NbtCompound encode(const DroppedItem& item) {
         tag.putIntArray("Thrower", {static_cast<std::int32_t>(high >> 32U), static_cast<std::int32_t>(high),
                                     static_cast<std::int32_t>(low >> 32U), static_cast<std::int32_t>(low)});
     }
+    if (!item.mobsMayPickUp) {
+        tag.putBoolean("BasaltMobsMayPickUp", false);
+    }
+    if (!item.playersMayPickUp) {
+        tag.putBoolean("BasaltPlayersMayPickUp", false);
+    }
+    if (item.frictionState != 0) {
+        tag.putByte("BasaltFriction", item.frictionState);
+    }
     return tag;
 }
 
@@ -98,6 +107,9 @@ std::optional<DroppedItem> decode(const NbtCompound& tag, const std::function<st
         };
         dropped.thrower = wire::common::Uuid{half(thrower[0], thrower[1]), half(thrower[2], thrower[3])};
     }
+    dropped.mobsMayPickUp = !tag.contains("BasaltMobsMayPickUp") || tag.getBoolean("BasaltMobsMayPickUp");
+    dropped.playersMayPickUp = !tag.contains("BasaltPlayersMayPickUp") || tag.getBoolean("BasaltPlayersMayPickUp");
+    dropped.frictionState = tag.getByte("BasaltFriction");
     return dropped;
 }
 

@@ -148,6 +148,15 @@ CombatSystem::ArrowHit CombatSystem::tridentHitEntity(world::LoadedWorld& world,
     if (!target.has_value()) {
         return ArrowHit::Missed;
     }
+    if (!hitAllowed(world, trident, target->mob != nullptr ? target->mob->entityId() : target->player->entityId(),
+                    static_cast<std::int32_t>(std::floor(trident.x)), static_cast<std::int32_t>(std::floor(trident.y)),
+                    static_cast<std::int32_t>(std::floor(trident.z)))) {
+        return ArrowHit::Missed;
+    }
+    if (trident.bounces) {
+        bounceOff(trident, std::nullopt);
+        return ArrowHit::Stopped;
+    }
     // parity: `EnchantmentHelper.modifyDamage` on the eight, impaling's bonus among it.
     const Identifier victimType = target->mob != nullptr ? target->mob->type() : Identifier::vanilla("player");
     const world::realEntityTypeTags::TagMembers* entityTags = options_.entityTags;

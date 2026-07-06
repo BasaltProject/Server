@@ -214,6 +214,14 @@ void CombatSystem::tickLlamaSpit(world::LoadedWorld& world, const std::vector<Pl
     if (target.has_value()) {
         spitHits(world, watchers, living, spit, *target, fromX, fromZ);
     } else if (!turned && hit.has_value()) {
+        if (!hitAllowed(world, spit, -1, static_cast<std::int32_t>(std::floor(hit->x)),
+                        static_cast<std::int32_t>(std::floor(hit->y)), static_cast<std::int32_t>(std::floor(hit->z)))) {
+            return;
+        }
+        if (spit.bounces) {
+            bounceOff(spit, hit);
+            return;
+        }
         hitBlock(world, watchers, spit, *hit, false);
         spit.removed = true;
         return;

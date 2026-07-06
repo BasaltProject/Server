@@ -536,7 +536,7 @@ void MobActionSystem::allayPicksUp(world::LoadedWorld& world, ServerEntity& alla
     for (const world::DroppedItem& item :
          world.state().nearbyItems(allay.x, allay.y, allay.z, 3.0 + allay.width() + allay.height())) {
         constexpr double kItemHalf = 0.125;
-        if (!item.canBePickedUp() || item.count <= 0 || item.x + kItemHalf < allay.x - half - 1.0 ||
+        if (!item.canBePickedUpByMob() || item.count <= 0 || item.x + kItemHalf < allay.x - half - 1.0 ||
             item.x - kItemHalf > allay.x + half + 1.0 || item.z + kItemHalf < allay.z - half - 1.0 ||
             item.z - kItemHalf > allay.z + half + 1.0 || item.y + 0.25 < allay.y - 1.0 ||
             item.y > allay.y + allay.height() + 1.0) {

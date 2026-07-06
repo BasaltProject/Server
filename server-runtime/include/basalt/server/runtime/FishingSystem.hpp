@@ -39,10 +39,17 @@ public:
     bool useRod(const player::BreakContext& context, player::PlayerSession& player, world::LoadedWorld& world,
                 std::int32_t slot);
 
+    /// The rod wear of reeling in with the rod in this slot, or -1 when nothing was reeled in.
+    std::int32_t reelIn(const player::BreakContext& context, player::PlayerSession& player, world::LoadedWorld& world,
+                        std::int32_t slot);
+
     void tick(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& hook);
 
 private:
+    std::int32_t reelIn(const player::BreakContext& context, player::PlayerSession& player, world::LoadedWorld& world,
+                        std::int32_t slot, random::RandomSource& random);
+
     [[nodiscard]] player::PlayerSession* ownerOf(const entity::ServerEntity& hook) const;
 
     bool stopsFishing(world::LoadedWorld& world, entity::ServerEntity& hook, const player::PlayerSession* owner);

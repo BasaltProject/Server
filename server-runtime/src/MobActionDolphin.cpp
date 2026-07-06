@@ -50,7 +50,7 @@ std::vector<entity::ai::MobActions::ItemView> MobActionSystem::itemsInWater(cons
          world->state().nearbyItems(mob.x, mob.y, mob.z, std::sqrt(3.0) * (reach + mob.height()))) {
         // parity: `ALLOWED_ITEMS`: no pickup delay, alive, and in water, in the grown box.
         constexpr double kItemHalf = 0.125;
-        if (!item.canBePickedUp() || item.count <= 0 || !inWater(world->state(), item.x, item.y, item.z) ||
+        if (!item.canBePickedUpByMob() || item.count <= 0 || !inWater(world->state(), item.x, item.y, item.z) ||
             item.x + kItemHalf < mob.x - half - grow || item.x - kItemHalf > mob.x + half + grow ||
             item.z + kItemHalf < mob.z - half - grow || item.z - kItemHalf > mob.z + half + grow ||
             item.y + 0.25 < mob.y - grow || item.y > mob.y + mob.height() + grow) {
@@ -151,7 +151,7 @@ void MobActionSystem::dolphinPicksUp(world::LoadedWorld& world, ServerEntity& do
     for (const world::DroppedItem& item :
          world.state().nearbyItems(dolphin.x, dolphin.y, dolphin.z, 2.0 + dolphin.width() + dolphin.height())) {
         constexpr double kItemHalf = 0.125;
-        if (!item.canBePickedUp() || item.count <= 0 || item.x + kItemHalf < dolphin.x - half - 1.0 ||
+        if (!item.canBePickedUpByMob() || item.count <= 0 || item.x + kItemHalf < dolphin.x - half - 1.0 ||
             item.x - kItemHalf > dolphin.x + half + 1.0 || item.z + kItemHalf < dolphin.z - half - 1.0 ||
             item.z - kItemHalf > dolphin.z + half + 1.0 || item.y + 0.25 < dolphin.y ||
             item.y > dolphin.y + dolphin.height()) {

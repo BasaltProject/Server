@@ -148,14 +148,7 @@ bool FishingSystem::useRod(const player::BreakContext& context, PlayerSession& p
     player::statAwards::used(player, "minecraft:fishing_rod");
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     const std::vector<PlayerSession*> heard = playersIn(*players_, world);
-    ServerEntity* hook = player.fishingHook.has_value() ? world.state().entity(*player.fishingHook) : nullptr;
-    if (hook != nullptr && !hook->removed && isHook(*hook)) {
-        const std::int32_t wear = retrieve(context, player, world, *hook, slot);
-        wearRod(context, player, slot, wear, random.nextLong());
-        playSound(heard, "entity.fishing_bobber.retrieve", player.x, player.y, player.z, 1.0F, soundPitch(random),
-                  random.nextLong());
-        world::vibrations::emit(world.state(), "item_interact_finish", player.x, player.y, player.z, world.gameTime(),
-                                world::triggerFacts::vibrationSourceOf(player, context.triggers));
+    if (reelIn(context, player, world, slot, random) >= 0) {
         return true;
     }
     playSound(heard, "entity.fishing_bobber.throw", player.x, player.y, player.z, 0.5F, soundPitch(random),
@@ -193,6 +186,30 @@ void FishingSystem::cast(const player::BreakContext& context, PlayerSession& pla
     hook->ownerId = player.entityId();
     hook->hook = std::move(state);
     player.fishingHook = world.state().spawnEntity(std::move(hook)).entityId();
+}
+
+std::int32_t FishingSystem::reelIn(const player::BreakContext& context, PlayerSession& player,
+                                   world::LoadedWorld& world, std::int32_t slot, random::RandomSource& random) {
+    ServerEntity* hook = player.fishingHook.has_value() ? world.state().entity(*player.fishingHook) : nullptr;
+    if (hook == nullptr || hook->removed || !isHook(*hook)) {
+        return -1;
+    }
+    const std::int32_t wear = retrieve(context, player, world, *hook, slot);
+    wearRod(context, player, slot, wear, random.nextLong());
+    playSound(playersIn(*players_, world), "entity.fishing_bobber.retrieve", player.x, player.y, player.z, 1.0F,
+              soundPitch(random), random.nextLong());
+    world::vibrations::emit(world.state(), "item_interact_finish", player.x, player.y, player.z, world.gameTime(),
+                            world::triggerFacts::vibrationSourceOf(player, context.triggers));
+    return wear;
+}
+
+std::int32_t FishingSystem::reelIn(const player::BreakContext& context, PlayerSession& player,
+                                   world::LoadedWorld& world, std::int32_t slot) {
+    if (!isRodAt(player, slot)) {
+        return -1;
+    }
+    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    return reelIn(context, player, world, slot, random);
 }
 
 PlayerSession* FishingSystem::ownerOf(const ServerEntity& hook) const {
@@ -325,6 +342,8 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
                 dropped.components = stack.components;
                 dropped.pickupDelay = 0;
                 static_cast<void>(world.state().spawnItem(std::move(dropped)));
+                const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::Fishing, hook.uuid(),
+                                                              player.uuid()};
                 orbs_->spawn(world, player.x, player.y + 0.5, player.z + 0.5, experience);
                 if (context.triggers != nullptr) {
                     world::TriggerEvent caught{.entities = {{"entity", world::triggerFacts::ofEntity(world, hook)}},

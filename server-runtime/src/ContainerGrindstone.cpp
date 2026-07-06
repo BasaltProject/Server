@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
+#include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/EnchantmentBooks.hpp>
 #include <basalt/server/runtime/world/Grindstones.hpp>
@@ -73,6 +74,7 @@ void ContainerMenuController::takeGrindstoneResult(PlayerSession& session) {
         grindstoneWorth_, static_cast<std::int32_t>(roll * static_cast<double>(half)));
     world::LoadedWorld* world = owner_->currentWorld();
     if (points > 0 && openBlock.has_value() && world != nullptr && owner_->options().awardExperience) {
+        const ExperienceOrbSystem::ReasonScope reason{ExperienceOrbSystem::Reason::Grindstone};
         owner_->options().awardExperience(*world, openBlock->x + 0.5, openBlock->y + 0.5, openBlock->z + 0.5, points);
     }
     grindstoneSlots_[Menu::kGrindstoneInput].reset();

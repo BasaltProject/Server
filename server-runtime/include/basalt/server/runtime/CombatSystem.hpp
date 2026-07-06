@@ -70,8 +70,8 @@ public:
         std::function<void(world::LoadedWorld& world, double x, double y, double z,
                            const server::world::loot::ItemStack& stack)>
             dropItem;
-        /// Said when a projectile strikes a block (hitId < 0) or an entity.
-        std::function<void(world::LoadedWorld& world, const entity::ServerEntity& projectile, std::int32_t hitId,
+        /// Asked when a projectile strikes a block (hitId < 0) or an entity; false lets it fly on.
+        std::function<bool(world::LoadedWorld& world, const entity::ServerEntity& projectile, std::int32_t hitId,
                            std::int32_t x, std::int32_t y, std::int32_t z)>
             projectileHit;
     };
@@ -172,6 +172,11 @@ private:
     void spitHits(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& spit,
                   const Target& target, double fromX, double fromZ);
+
+    static void bounceOff(entity::ServerEntity& projectile, const std::optional<entity::BlockHit>& block);
+
+    [[nodiscard]] bool hitAllowed(world::LoadedWorld& world, const entity::ServerEntity& projectile, std::int32_t hitId,
+                                  std::int32_t x, std::int32_t y, std::int32_t z) const;
 
     /// parity: `Projectile.onHitBlock`.
     void hitBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,

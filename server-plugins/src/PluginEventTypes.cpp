@@ -661,7 +661,7 @@ const PluginEventType& serverTickEnd() {
 
 const PluginEventType& projectileHit() {
     static const PluginEventType type{
-        "projectile.hit", false, {"entity_id", "entity_type", "world", "hit_id", "x", "y", "z"}};
+        "projectile.hit", true, {"entity_id", "entity_type", "world", "hit_id", "x", "y", "z"}};
     return type;
 }
 
