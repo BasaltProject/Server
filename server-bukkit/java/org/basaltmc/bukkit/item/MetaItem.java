@@ -798,6 +798,17 @@ public class MetaItem extends ItemMetaBase implements Damageable, Repairable,
     }
 
     @Override
+    public org.bukkit.Tag<org.bukkit.damage.DamageType> getDamageResistant() {
+        Map<String, Object> resistant = compoundOf("minecraft:damage_resistant");
+        Object types = resistant == null ? null : resistant.get("types");
+        if (!(types instanceof String text) || !text.startsWith("#")) {
+            return null;
+        }
+        return org.bukkit.Bukkit.getTag("damage_type", org.bukkit.NamespacedKey.fromString(text.substring(1)),
+            org.bukkit.damage.DamageType.class);
+    }
+
+    @Override
     public boolean hasDamageResistant() {
         return has("minecraft:damage_resistant");
     }

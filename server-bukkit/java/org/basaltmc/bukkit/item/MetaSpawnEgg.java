@@ -1,7 +1,6 @@
 package org.basaltmc.bukkit.item;
 
 import java.util.Map;
-import org.basaltmc.bukkit.Unsupported;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
@@ -57,11 +56,19 @@ public final class MetaSpawnEgg extends MetaItem implements SpawnEggMeta {
 
     @Override
     public EntitySnapshot getSpawnedEntity() {
-        throw Unsupported.hit("SpawnEggMeta#getSpawnedEntity");
+        Map<String, Object> data = compoundOf(kData);
+        return data == null ? null : org.basaltmc.bukkit.entity.BasaltEntitySnapshot.ofNbt(Nbt.writeNamed(data));
     }
 
     @Override
     public void setSpawnedEntity(EntitySnapshot snapshot) {
-        throw Unsupported.hit("SpawnEggMeta#setSpawnedEntity");
+        if (snapshot == null) {
+            c.remove(kData);
+            return;
+        }
+        if (!(snapshot instanceof org.basaltmc.bukkit.entity.BasaltEntitySnapshot own)) {
+            throw new IllegalArgumentException("Only snapshots taken from this server can be stored in a spawn egg");
+        }
+        c.put(kData, Nbt.readNamed(own.nbt()));
     }
 }
