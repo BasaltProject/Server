@@ -263,7 +263,7 @@ MobActionSystem::HiveView MobActionSystem::hiveAt(const ServerEntity& bee, const
 void MobActionSystem::enterHive(ServerEntity& bee, const Pos& hive) {
     world::LoadedWorld* world = worldOf(bee);
     server::world::ChunkBlockEntity* entity = world == nullptr ? nullptr : hiveEntity(*world, hive);
-    if (entity == nullptr || beehives::occupantCount(entity->data()) >= beehives::kMaxOccupants || bee.removed) {
+    if (entity == nullptr || beehives::isFull(entity->data()) || bee.removed) {
         return;
     }
     if (!world->events().allowed(&server::plugins::pluginEventTypes::entityEnterBlock,
