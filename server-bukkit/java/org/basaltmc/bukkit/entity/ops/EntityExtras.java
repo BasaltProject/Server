@@ -61,15 +61,6 @@ final class EntityExtras {
         return holder.core().entity(id);
     }
 
-    static boolean allied(Entity self, EntityCore core, Entity other) {
-        for (java.util.function.Predicate<Entity> rule : core.alliedRules.values()) {
-            if (rule.test(other)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     static float airDrag(Entity entity) {
         return switch (entity.getType()) {
             case EXPERIENCE_ORB -> 0.98F;

@@ -61,24 +61,6 @@ public interface EntityExtraOps extends Entity, Cored {
 
     default void sendMessage(java.util.UUID sender, String... messages) {}
 
-    default void addAdditionalAlliedRule(net.kyori.adventure.key.Key key,
-            java.util.function.Predicate<Entity> rule) {
-        core().alliedRules.put(key, rule);
-    }
-
-    default java.util.Map<net.kyori.adventure.key.Key, java.util.function.Predicate<Entity>>
-            getAdditionalAlliedRules() {
-        return java.util.Map.copyOf(core().alliedRules);
-    }
-
-    default void removeAdditionalAlliedRule(net.kyori.adventure.key.Key key) {
-        core().alliedRules.remove(key);
-    }
-
-    default void removeAdditionalAlliedRule(net.kyori.adventure.key.Namespaced key) {
-        core().alliedRules.keySet().removeIf(rule -> rule.namespace().equals(key.namespace()));
-    }
-
     default void broadcastHurtAnimation(java.util.Collection<org.bukkit.entity.Player> players) {
         EntityExtras.hurtAnimation(core(), 0.0F, players);
     }
@@ -93,11 +75,6 @@ public interface EntityExtraOps extends Entity, Cored {
 
     default double getGravity() {
         return hasGravity() ? getDefaultGravity() : 0.0;
-    }
-
-    default String getAsString() {
-        byte[] bytes = core().nbt("");
-        return bytes == null ? null : org.basaltmc.bukkit.EntityNatives.nbtToSnbt(bytes);
     }
 
     default org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason getEntitySpawnReason() {
@@ -222,12 +199,6 @@ public interface EntityExtraOps extends Entity, Cored {
 
     default Entity.Spigot spigot() {
         return EntityExtras.spigot();
-    }
-
-    default boolean isAlliedTo(Entity other) {
-        org.bukkit.scoreboard.Scoreboard board = org.bukkit.Bukkit.getScoreboardManager().getMainScoreboard();
-        org.bukkit.scoreboard.Team mine = board.getEntityTeam(this);
-        return mine != null && mine.equals(board.getEntityTeam(other)) || EntityExtras.allied(this, core(), other);
     }
 
     default boolean isVisibleByDefault() {
