@@ -90,4 +90,31 @@ public interface AbstractArrowOps extends AbstractArrow, Cored {
     default void setShooter(org.bukkit.projectiles.ProjectileSource source, boolean resetLeft) {
         setShooter(source);
     }
+
+    default int getKnockbackStrength() {
+        return core().integer("arrow_knockback");
+    }
+
+    default void setKnockbackStrength(int strength) {
+        if (strength < 0) {
+            throw new IllegalArgumentException("Knockback strength cannot be negative");
+        }
+        core().set("arrow_knockback", strength);
+    }
+
+    default int getLifetimeTicks() {
+        return core().integer("arrow_life");
+    }
+
+    default void setLifetimeTicks(int ticks) {
+        core().set("arrow_life", ticks);
+    }
+
+    default void setShotFromCrossbow(boolean crossbow) {
+        if (crossbow) {
+            core().set("fired_from", "minecraft:crossbow");
+        } else if ("minecraft:crossbow".equals(core().text("fired_from"))) {
+            core().set("fired_from", "minecraft:bow");
+        }
+    }
 }

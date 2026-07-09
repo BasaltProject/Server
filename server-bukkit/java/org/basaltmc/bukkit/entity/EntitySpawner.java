@@ -87,6 +87,9 @@ public final class EntitySpawner {
         String[] strings = org.basaltmc.bukkit.WorldNatives.entityStrings(world.getName(), id);
         core.bind(id, UUID.fromString(strings[0]));
         world.adopt(id, entity);
+        if (entity instanceof org.bukkit.entity.ExperienceOrb && core.nbtText("SpawnReason") == null) {
+            core.nbtSet("SpawnReason", "string", "CUSTOM");
+        }
         return entity;
     }
 }

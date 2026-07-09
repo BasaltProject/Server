@@ -19,4 +19,26 @@ public interface ExperienceOrbOps extends ExperienceOrb, Cored {
     default void setCount(int count) {
         core().nbtSet("Count", "int", Math.max(1, count));
     }
+
+    default SpawnReason getSpawnReason() {
+        String stored = core().nbtText("SpawnReason");
+        try {
+            return stored == null ? SpawnReason.UNKNOWN : SpawnReason.valueOf(stored);
+        } catch (IllegalArgumentException unknown) {
+            return SpawnReason.UNKNOWN;
+        }
+    }
+
+    default java.util.UUID getSourceEntityId() {
+        return uuidAt("SourceEntity");
+    }
+
+    default java.util.UUID getTriggerEntityId() {
+        return uuidAt("TriggerEntity");
+    }
+
+    private java.util.UUID uuidAt(String key) {
+        String stored = core().nbtText(key);
+        return stored == null || stored.isEmpty() ? null : java.util.UUID.fromString(stored);
+    }
 }

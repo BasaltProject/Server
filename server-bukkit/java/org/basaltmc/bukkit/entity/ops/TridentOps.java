@@ -25,4 +25,12 @@ public interface TridentOps extends Trident, Cored {
         }
         setItemStack(stack);
     }
+
+    default boolean hasGlint() {
+        return core().flag("trident_glint");
+    }
+
+    default void setGlint(boolean glint) {
+        core().set("trident_glint", glint);
+    }
 }

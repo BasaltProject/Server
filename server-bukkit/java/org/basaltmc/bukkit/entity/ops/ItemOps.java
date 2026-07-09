@@ -80,4 +80,36 @@ public interface ItemOps extends Item, Cored {
     default void setWillAge(boolean ages) {
         setUnlimitedLifetime(!ages);
     }
+
+    default boolean canMobPickup() {
+        return core().nbtInt("CanMobPickup", 1) != 0;
+    }
+
+    default void setCanMobPickup(boolean pickup) {
+        core().nbtSet("CanMobPickup", "short", pickup ? 1 : 0);
+    }
+
+    default boolean canPlayerPickup() {
+        return core().nbtInt("CanPlayerPickup", 1) != 0;
+    }
+
+    default void setCanPlayerPickup(boolean pickup) {
+        core().nbtSet("CanPlayerPickup", "short", pickup ? 1 : 0);
+    }
+
+    default net.kyori.adventure.util.TriState getFrictionState() {
+        return switch (core().nbtInt("FrictionState")) {
+            case 1 -> net.kyori.adventure.util.TriState.FALSE;
+            case 2 -> net.kyori.adventure.util.TriState.TRUE;
+            default -> net.kyori.adventure.util.TriState.NOT_SET;
+        };
+    }
+
+    default void setFrictionState(net.kyori.adventure.util.TriState state) {
+        core().nbtSet("FrictionState", "short", switch (state) {
+            case FALSE -> 1;
+            case TRUE -> 2;
+            case NOT_SET -> 0;
+        });
+    }
 }

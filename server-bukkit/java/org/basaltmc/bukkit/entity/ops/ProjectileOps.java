@@ -45,4 +45,23 @@ public interface ProjectileOps extends Projectile, Cored {
         }
         return !(entity.equals(getShooter()) && !hasLeftShooter());
     }
+
+    default boolean doesBounce() {
+        return core().flag("bounce");
+    }
+
+    default void setBounce(boolean bounces) {
+        core().set("bounce", bounces);
+    }
+
+    default void hitEntity(Entity entity) {
+        hitEntity(entity, null);
+    }
+
+    default void hitEntity(Entity entity, org.bukkit.util.Vector at) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Entity cannot be null");
+        }
+        core().call("hit_entity", entity.getEntityId());
+    }
 }

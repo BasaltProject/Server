@@ -65,4 +65,24 @@ public interface FireworkOps extends Firework, Cored {
     default void setShotAtAngle(boolean angled) {
         core().nbtSet("ShotAtAngle", "bool", angled);
     }
+
+    default org.bukkit.entity.LivingEntity getAttachedTo() {
+        return core().entity(core().integer("attached_to")) instanceof org.bukkit.entity.LivingEntity living ? living
+            : null;
+    }
+
+    default boolean setAttachedTo(org.bukkit.entity.LivingEntity entity) {
+        if (isDetonated()) {
+            return false;
+        }
+        return core().set("attached_to", entity == null ? -1 : entity.getEntityId());
+    }
+
+    default boolean isDetonated() {
+        return getTicksFlown() > getTicksToDetonate();
+    }
+
+    default java.util.UUID getSpawningEntity() {
+        return getOwnerUniqueId();
+    }
 }

@@ -23,4 +23,8 @@ public interface ThrownPotionOps extends ThrownPotion, Cored {
         effects.addAll(meta.getCustomEffects());
         return effects;
     }
+
+    default void splash() {
+        core().call("land");
+    }
 }

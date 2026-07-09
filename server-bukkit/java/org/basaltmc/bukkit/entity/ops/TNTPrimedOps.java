@@ -21,4 +21,13 @@ public interface TNTPrimedOps extends TNTPrimed, Cored {
     default void setBlockData(org.bukkit.block.data.BlockData data) {
         EntityNbt.put(core(), "block_state", EntityNbt.blockState(data));
     }
+
+    default org.bukkit.entity.Entity getSource() {
+        return core().entity(core().integer("owner_id")) instanceof org.bukkit.entity.LivingEntity source ? source
+            : null;
+    }
+
+    default void setSource(org.bukkit.entity.Entity source) {
+        core().set("owner_id", source instanceof org.bukkit.entity.LivingEntity living ? living.getEntityId() : -1);
+    }
 }
