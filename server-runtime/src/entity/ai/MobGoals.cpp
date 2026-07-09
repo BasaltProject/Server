@@ -6,11 +6,11 @@
 #include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinItemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/EndermanGoals.hpp>
+#include <basalt/server/runtime/entity/ai/FishGoals.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 #include <basalt/server/runtime/entity/ai/HorseGoals.hpp>
-#include <basalt/server/runtime/entity/ai/FishGoals.hpp>
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LlamaGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
@@ -635,7 +635,7 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
     if (kFish.contains(path)) {
         add<SwimAboutGoal>(selector, 4, kFishPush);
         if (path == "cod" || path == "salmon" || path == "tropical_fish") {
-            add<FollowFlockLeaderGoal>(selector, 5);
+            add<FollowFlockLeaderGoal>(selector, 3);
         }
         return true;
     }

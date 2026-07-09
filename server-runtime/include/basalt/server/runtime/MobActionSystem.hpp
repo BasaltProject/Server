@@ -741,7 +741,8 @@ private:
     [[nodiscard]] bool piglinCurrency(const entity::piglins::PiglinState& state,
                                       const wire::common::Identifier& item) const;
 
-    [[nodiscard]] bool piglinLoves(const entity::piglins::PiglinState& state, const wire::common::Identifier& item) const;
+    [[nodiscard]] bool piglinLoves(const entity::piglins::PiglinState& state,
+                                   const wire::common::Identifier& item) const;
 
     [[nodiscard]] bool piglinWantsToPickUp(const entity::ServerEntity& piglin,
                                            const entity::piglins::PiglinState& state,

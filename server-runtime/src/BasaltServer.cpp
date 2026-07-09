@@ -573,7 +573,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         return fishing_ == nullptr ? -1 : fishing_->reelIn(breakContext(), player, world, slot);
     };
     model.mobSystem = [this] { return mobActions_.get(); };
-    model.entityBar = [this](std::int32_t entityId, const std::function<void(BossBarView&, player::PlayerRegistry&)>& use) {
+    model.entityBar = [this](std::int32_t entityId,
+                             const std::function<void(BossBarView&, player::PlayerRegistry&)>& use) {
         return withers_ != nullptr && withers_->withBar(entityId, use);
     };
     model.progress = [this] { return playerProgress_.get(); };

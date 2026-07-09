@@ -15,9 +15,9 @@
 #include <basalt/server/runtime/entity/FishingHooks.hpp>
 #include <basalt/server/runtime/entity/Frogs.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
-#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/Goats.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/NeutralAnger.hpp>
@@ -185,11 +185,10 @@ void addItemFrameMetadata(Entries& into, const NbtCompound& data) {
         if (const wire::nbt::NbtList* held = profile->getList("properties"); held != nullptr) {
             for (const wire::nbt::NbtTag& tag : held->elements()) {
                 if (const NbtCompound* property = tag.get<NbtCompound>(); property != nullptr) {
-                    properties.emplace_back(std::string{property->getString("name")},
-                                            std::string{property->getString("value")},
-                                            property->contains("signature")
-                                                ? std::optional{std::string{property->getString("signature")}}
-                                                : std::nullopt);
+                    properties.emplace_back(
+                        std::string{property->getString("name")}, std::string{property->getString("value")},
+                        property->contains("signature") ? std::optional{std::string{property->getString("signature")}}
+                                                        : std::nullopt);
                 }
             }
         }
@@ -250,22 +249,23 @@ void addMannequinMetadata(Entries& into, const NbtCompound& data) {
     constexpr std::uint8_t kImmovableIndex = 18;
     constexpr std::uint8_t kDescriptionIndex = 19;
     constexpr std::int32_t kProfileSerializer = 41;
-    static constexpr std::array<std::string_view, 7> kLayers{"cape",           "jacket",         "left_sleeve", "right_sleeve",
-                                                             "left_pants_leg", "right_pants_leg", "hat"};
+    static constexpr std::array<std::string_view, 7> kLayers{
+        "cape", "jacket", "left_sleeve", "right_sleeve", "left_pants_leg", "right_pants_leg", "hat"};
     using wire::protocol::play::Pose;
     const std::string_view pose = data.getString("pose");
-    const std::optional<Pose> saved = pose == "crouching"      ? std::optional{Pose::Crouching}
-                                      : pose == "swimming"     ? std::optional{Pose::Swimming}
-                                      : pose == "fall_flying"  ? std::optional{Pose::FallFlying}
-                                      : pose == "sleeping"     ? std::optional{Pose::Sleeping}
-                                                               : std::nullopt;
+    const std::optional<Pose> saved = pose == "crouching"     ? std::optional{Pose::Crouching}
+                                      : pose == "swimming"    ? std::optional{Pose::Swimming}
+                                      : pose == "fall_flying" ? std::optional{Pose::FallFlying}
+                                      : pose == "sleeping"    ? std::optional{Pose::Sleeping}
+                                                              : std::nullopt;
     if (saved.has_value()) {
-        into.push_back(Entry{.index = SetEntityDataPacket::kPoseIndex, .value = SetEntityDataPacket::PoseValue{*saved}});
+        into.push_back(
+            Entry{.index = SetEntityDataPacket::kPoseIndex, .value = SetEntityDataPacket::PoseValue{*saved}});
     }
     if (data.getString("main_hand") == "left") {
-        into.push_back(Entry{.index = kMainHandIndex,
-                             .value = SetEntityDataPacket::RegistryIdValue{.value = 0,
-                                                                           .registry = RegistryHolder::HumanoidArm}});
+        into.push_back(
+            Entry{.index = kMainHandIndex,
+                  .value = SetEntityDataPacket::RegistryIdValue{.value = 0, .registry = RegistryHolder::HumanoidArm}});
     }
     std::int32_t mask = 0x7F;
     if (const wire::nbt::NbtList* hidden = data.getList("hidden_layers"); hidden != nullptr) {
@@ -278,11 +278,12 @@ void addMannequinMetadata(Entries& into, const NbtCompound& data) {
             }
         }
     }
-    into.push_back(Entry{.index = kLayersIndex, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(mask)}});
+    into.push_back(
+        Entry{.index = kLayersIndex, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(mask)}});
     if (const wire::nbt::NbtTag* profile = data.find("profile"); profile != nullptr) {
-        into.push_back(Entry{.index = kProfileIndex,
-                             .value = SetEntityDataPacket::RawValue{.serializer = kProfileSerializer,
-                                                                   .bytes = profileBytes(*profile)}});
+        into.push_back(Entry{
+            .index = kProfileIndex,
+            .value = SetEntityDataPacket::RawValue{.serializer = kProfileSerializer, .bytes = profileBytes(*profile)}});
     }
     if (data.getBoolean("immovable")) {
         into.push_back(Entry{.index = kImmovableIndex, .value = SetEntityDataPacket::BoolValue{.value = true}});

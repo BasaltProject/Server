@@ -42,14 +42,23 @@ using Gate = bool (*)(const ServerEntity&);
 [[nodiscard]] bool is(const ServerEntity& entity, std::string_view path) { return entity.type().path() == path; }
 
 [[nodiscard]] bool isCreeper(const ServerEntity& entity) { return is(entity, "creeper"); }
+
 [[nodiscard]] bool isEvoker(const ServerEntity& entity) { return is(entity, "evoker"); }
+
 [[nodiscard]] bool isPolarBear(const ServerEntity& entity) { return is(entity, "polar_bear"); }
+
 [[nodiscard]] bool isStrider(const ServerEntity& entity) { return is(entity, "strider"); }
+
 [[nodiscard]] bool isTurtle(const ServerEntity& entity) { return is(entity, "turtle"); }
+
 [[nodiscard]] bool isParrot(const ServerEntity& entity) { return is(entity, "parrot"); }
+
 [[nodiscard]] bool isWither(const ServerEntity& entity) { return is(entity, "wither"); }
+
 [[nodiscard]] bool isWitch(const ServerEntity& entity) { return is(entity, "witch"); }
+
 [[nodiscard]] bool isSteerable(const ServerEntity& entity) { return is(entity, "pig") || is(entity, "strider"); }
+
 [[nodiscard]] bool isCube(const ServerEntity& entity) {
     return is(entity, "slime") || is(entity, "magma_cube") || is(entity, "sulfur_cube");
 }
@@ -145,8 +154,8 @@ void addFlags(Table& table) {
     table["cube_wander"] = miscField(&misc::State::cubeWanders, isCube);
     table["guardian_moving"] =
         Accessor{[](const ServerEntity& entity) -> Value {
-                     const double speed = (entity.velocityX * entity.velocityX) + (entity.velocityY * entity.velocityY) +
-                                          (entity.velocityZ * entity.velocityZ);
+                     const double speed = (entity.velocityX * entity.velocityX) +
+                                          (entity.velocityY * entity.velocityY) + (entity.velocityZ * entity.velocityZ);
                      return (is(entity, "guardian") || is(entity, "elder_guardian")) && speed > 1.0E-4;
                  },
                  nullptr};
@@ -163,29 +172,29 @@ void addFlags(Table& table) {
                                        },
                                        nullptr};
     table["witch_use_ticks"] = miscField(&misc::State::witchDrinkTicks, isWitch);
-    table["bat_target"] = Accessor{[](const ServerEntity& entity) -> Value {
-                                       return entity.flight.batTarget.has_value() ? positionText(*entity.flight.batTarget)
-                                                                                  : Value{};
-                                   },
-                                   [](ServerEntity& entity, const Value& value) {
-                                       if (!is(entity, "bat")) {
-                                           return false;
-                                       }
-                                       const std::optional<std::string> text = asText(value);
-                                       if (!text.has_value() || text->empty()) {
-                                           entity.flight.batTarget.reset();
-                                           return true;
-                                       }
-                                       std::array<std::int32_t, 3> at{};
-                                       std::size_t from = 0;
-                                       for (std::int32_t& axis : at) {
-                                           const std::size_t end = text->find(',', from);
-                                           axis = std::atoi(text->substr(from, end == std::string::npos ? end : end - from).c_str());
-                                           from = end == std::string::npos ? text->size() : end + 1;
-                                       }
-                                       entity.flight.batTarget = at;
-                                       return true;
-                                   }};
+    table["bat_target"] =
+        Accessor{[](const ServerEntity& entity) -> Value {
+                     return entity.flight.batTarget.has_value() ? positionText(*entity.flight.batTarget) : Value{};
+                 },
+                 [](ServerEntity& entity, const Value& value) {
+                     if (!is(entity, "bat")) {
+                         return false;
+                     }
+                     const std::optional<std::string> text = asText(value);
+                     if (!text.has_value() || text->empty()) {
+                         entity.flight.batTarget.reset();
+                         return true;
+                     }
+                     std::array<std::int32_t, 3> at{};
+                     std::size_t from = 0;
+                     for (std::int32_t& axis : at) {
+                         const std::size_t end = text->find(',', from);
+                         axis = std::atoi(text->substr(from, end == std::string::npos ? end : end - from).c_str());
+                         from = end == std::string::npos ? text->size() : end + 1;
+                     }
+                     entity.flight.batTarget = at;
+                     return true;
+                 }};
 }
 
 void addPiglin(Operations& operations) {
@@ -194,7 +203,8 @@ void addPiglin(Operations& operations) {
         std::vector<std::string> names;
         if (entity::piglins::isPiglin(entity.type())) {
             const entity::piglins::PiglinState& state = entity::piglins::stateOf(entity);
-            const auto& from = asText(at(arguments, 0)).value_or("") == "barter" ? state.barterItems : state.interestItems;
+            const auto& from =
+                asText(at(arguments, 0)).value_or("") == "barter" ? state.barterItems : state.interestItems;
             names.assign(from.begin(), from.end());
         }
         return names;
@@ -241,12 +251,14 @@ void addPiglin(Operations& operations) {
 void addHeld(Operations& operations) {
     operations["held_get"] = [](const Environment&, ServerEntity& entity,
                                 const Arguments& arguments) -> std::optional<Value> {
-        const std::optional<ItemStack>* slot = heldSlot(entity, asText(at(arguments, 0)).value_or(""), asInt(at(arguments, 1), -1));
+        const std::optional<ItemStack>* slot =
+            heldSlot(entity, asText(at(arguments, 0)).value_or(""), asInt(at(arguments, 1), -1));
         return slot == nullptr ? Value{} : stackValue(*slot);
     };
     operations["held_set"] = [](const Environment&, ServerEntity& entity,
                                 const Arguments& arguments) -> std::optional<Value> {
-        std::optional<ItemStack>* slot = heldSlot(entity, asText(at(arguments, 0)).value_or(""), asInt(at(arguments, 1), -1));
+        std::optional<ItemStack>* slot =
+            heldSlot(entity, asText(at(arguments, 0)).value_or(""), asInt(at(arguments, 1), -1));
         if (slot == nullptr) {
             return false;
         }
@@ -260,7 +272,8 @@ void addActions(Operations& operations) {
                               const Arguments& arguments) -> std::optional<Value> {
         MobActionSystem* system = mobSystem(environment);
         const std::string name = asText(at(arguments, 0)).value_or("");
-        const auto id = wire::common::Identifier::parse(name.find(':') == std::string::npos ? "minecraft:" + name : name);
+        const auto id =
+            wire::common::Identifier::parse(name.find(':') == std::string::npos ? "minecraft:" + name : name);
         if (system == nullptr || !id.has_value()) {
             return static_cast<std::int64_t>(-1);
         }
@@ -280,16 +293,14 @@ void addActions(Operations& operations) {
     };
     operations["school_follow"] = [](const Environment& environment, ServerEntity& entity,
                                      const Arguments& arguments) -> std::optional<Value> {
-        ServerEntity* leader = environment.world == nullptr
-                                   ? nullptr
-                                   : environment.world->state().entity(
-                                         static_cast<std::int32_t>(asInt(at(arguments, 0), -1)));
+        ServerEntity* leader =
+            environment.world == nullptr
+                ? nullptr
+                : environment.world->state().entity(static_cast<std::int32_t>(asInt(at(arguments, 0), -1)));
         if (leader == nullptr || leader == &entity || !misc::isSchooling(entity) || !misc::isSchooling(*leader)) {
             return false;
         }
-        const misc::Lookup lookup = [&environment](std::int32_t id) {
-            return environment.world->state().entity(id);
-        };
+        const misc::Lookup lookup = [&environment](std::int32_t id) { return environment.world->state().entity(id); };
         misc::stopFollowing(entity, lookup);
         misc::startFollowing(entity, *leader);
         return true;
@@ -309,9 +320,9 @@ void addActions(Operations& operations) {
             return facts;
         }
         const misc::State* held = misc::peek(entity);
-        const bool follower =
-            environment.world != nullptr &&
-            misc::isFollower(entity, [&environment](std::int32_t id) { return environment.world->state().entity(id); });
+        const bool follower = environment.world != nullptr && misc::isFollower(entity, [&environment](std::int32_t id) {
+                                  return environment.world->state().entity(id);
+                              });
         facts.push_back(follower ? std::to_string(*held->schoolLeader) : "-1");
         facts.push_back(std::to_string(held == nullptr ? 1 : held->schoolSize));
         facts.push_back(std::to_string(misc::maxSchoolSize(entity)));
@@ -338,14 +349,15 @@ void addActions(Operations& operations) {
     operations["shear"] = [](const Environment& environment, ServerEntity& entity,
                              const Arguments& arguments) -> std::optional<Value> {
         MobActionSystem* system = mobSystem(environment);
-        const auto source = static_cast<wire::protocol::play::SoundSource>(
-            std::clamp<std::int64_t>(asInt(at(arguments, 0), 7), 0, 10));
+        const auto source =
+            static_cast<wire::protocol::play::SoundSource>(std::clamp<std::int64_t>(asInt(at(arguments, 0), 7), 0, 10));
         return system != nullptr && system->shearMob(entity, source);
     };
     operations["goat_ram"] = [](const Environment& environment, ServerEntity& entity,
                                 const Arguments& arguments) -> std::optional<Value> {
         MobActionSystem* system = mobSystem(environment);
-        return system != nullptr && system->pluginGoatRam(entity, static_cast<std::int32_t>(asInt(at(arguments, 0), -1)));
+        return system != nullptr &&
+               system->pluginGoatRam(entity, static_cast<std::int32_t>(asInt(at(arguments, 0), -1)));
     };
     operations["sniffer_set_state"] = [](const Environment& environment, ServerEntity& entity,
                                          const Arguments& arguments) -> std::optional<Value> {
@@ -380,7 +392,7 @@ void addActions(Operations& operations) {
 
 constexpr std::array<std::string_view, 7> kBarColors{"pink", "blue", "red", "green", "yellow", "purple", "white"};
 constexpr std::array<std::string_view, 5> kBarOverlays{"progress", "notched_6", "notched_10", "notched_12",
-                                                        "notched_20"};
+                                                       "notched_20"};
 
 [[nodiscard]] std::string titleJson(const wire::text::Component& title) {
     return wire::common::writeJson(wire::text::componentJson::serialize(title));
@@ -463,15 +475,18 @@ void addBars(Operations& operations) {
                                const Arguments& arguments) -> std::optional<Value> {
         const auto player = static_cast<std::int32_t>(asInt(at(arguments, 0), -1));
         const bool shown = asBool(at(arguments, 1));
-        return withBar(environment, entity, [&](BossBarView& view, player::PlayerRegistry& registry) {
-            view.pin(registry, player, shown);
-        });
+        return withBar(environment, entity,
+                       [&](BossBarView& view, player::PlayerRegistry& registry) { view.pin(registry, player, shown); });
     };
 }
 
 void addBosses(Operations& operations) {
-    operations["dragon_parts"] = [](const Environment&, ServerEntity& entity, const Arguments&) -> std::optional<Value> {
+    operations["dragon_parts"] = [](const Environment&, ServerEntity& entity,
+                                    const Arguments&) -> std::optional<Value> {
         std::vector<std::string> boxes;
+        if (entity.dragon == nullptr && entity::enderDragon::isDragon(entity.type())) {
+            entity.dragon = std::make_shared<entity::enderDragon::DragonState>(entity::enderDragon::freshState(entity));
+        }
         if (entity.dragon != nullptr) {
             for (std::size_t part = 0; part < static_cast<std::size_t>(entity::enderDragon::kPartCount); ++part) {
                 const std::array<double, 6> box =

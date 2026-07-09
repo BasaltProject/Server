@@ -22,4 +22,5 @@ org.bukkit.OfflinePlayer
 
 # inventory
 org.bukkit.inventory.meta.ItemMeta
+io.papermc.paper.registry.data.InlinedRegistryBuilderProvider
 org.bukkit.entity.ComplexEntityPart

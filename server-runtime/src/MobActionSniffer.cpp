@@ -475,7 +475,8 @@ void MobActionSystem::snifferDropsSeed(world::LoadedWorld& world, const ServerEn
 
 bool MobActionSystem::pluginSnifferState(ServerEntity& sniffer, std::int32_t pose) {
     world::LoadedWorld* world = worldOf(sniffer);
-    if (world == nullptr || sniffer.type().path() != "sniffer" || pose < 0 || pose > static_cast<std::int32_t>(Pose::Rising)) {
+    if (world == nullptr || sniffer.type().path() != "sniffer" || pose < 0 ||
+        pose > static_cast<std::int32_t>(Pose::Rising)) {
         return false;
     }
     SnifferState& state = sniffers::stateOf(sniffer);

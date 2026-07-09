@@ -1,7 +1,7 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
-#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/Parrots.hpp>
@@ -11,7 +11,6 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
-
 #include <basalt/wire/common/Mth.hpp>
 
 #include <cmath>
@@ -124,7 +123,8 @@ void MobActionSystem::parrotListens(world::LoadedWorld& world, ServerEntity& par
         if (record.gameTime < now - 1 || (record.event != "jukebox_play" && record.event != "jukebox_stop_play")) {
             continue;
         }
-        const std::array<std::int32_t, 3> pos{wire::common::mth::floor(record.x), wire::common::mth::floor(record.y), wire::common::mth::floor(record.z)};
+        const std::array<std::int32_t, 3> pos{wire::common::mth::floor(record.x), wire::common::mth::floor(record.y),
+                                              wire::common::mth::floor(record.z)};
         const double dx = pos[0] + 0.5 - parrot.x;
         const double dy = pos[1] + 0.5 - parrot.y;
         const double dz = pos[2] + 0.5 - parrot.z;
