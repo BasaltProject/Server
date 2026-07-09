@@ -11,4 +11,12 @@ public interface TadpoleOps extends Tadpole, Cored {
     default void setAge(int age) {
         core().nbtSet("Age", "int", age);
     }
+
+    default void setAgeLock(boolean lock) {
+        core().set("age_locked", lock);
+    }
+
+    default boolean getAgeLock() {
+        return core().flag("age_locked");
+    }
 }

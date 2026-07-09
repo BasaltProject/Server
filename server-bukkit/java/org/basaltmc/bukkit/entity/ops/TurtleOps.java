@@ -25,4 +25,12 @@ public interface TurtleOps extends Turtle, Cored {
     default void setHasEgg(boolean egg) {
         core().nbtSet("has_egg", "bool", egg);
     }
+
+    default boolean isLayingEgg() {
+        return core().flag("turtle_laying_egg");
+    }
+
+    default boolean isGoingHome() {
+        return core().flag("turtle_going_home");
+    }
 }

@@ -68,4 +68,23 @@ public interface BoatOps extends Boat, Cored {
     default Boat.Status getStatus() {
         return Boat.Status.values()[Math.max(0, Math.min(4, core().integer("boat_status")))];
     }
+
+    default void setBoatType(Boat.Type type) {
+        String current = core().type.getKey().getKey();
+        boolean chest = current.contains("chest");
+        boolean raft = type == Boat.Type.BAMBOO;
+        String wood = type.name().toLowerCase(java.util.Locale.ROOT);
+        core().retype(wood + (chest ? (raft ? "_chest_raft" : "_chest_boat") : (raft ? "_raft" : "_boat")));
+    }
+
+    default void setWoodType(org.bukkit.TreeSpecies species) {
+        setBoatType(switch (species) {
+            case REDWOOD -> Boat.Type.SPRUCE;
+            case BIRCH -> Boat.Type.BIRCH;
+            case JUNGLE -> Boat.Type.JUNGLE;
+            case ACACIA -> Boat.Type.ACACIA;
+            case DARK_OAK -> Boat.Type.DARK_OAK;
+            default -> Boat.Type.OAK;
+        });
+    }
 }

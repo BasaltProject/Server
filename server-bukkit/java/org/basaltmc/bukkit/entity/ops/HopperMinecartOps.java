@@ -14,4 +14,12 @@ public interface HopperMinecartOps extends org.bukkit.entity.minecart.HopperMine
     default void setEnabled(boolean enabled) {
         core().nbtSet("Enabled", "bool", enabled);
     }
+
+    default int getPickupCooldown() {
+        return 0;
+    }
+
+    default void setPickupCooldown(int cooldown) {
+        throw org.basaltmc.bukkit.Unsupported.hit("HopperMinecart#setPickupCooldown: hopper minecarts have no pickup cooldown in this game version");
+    }
 }

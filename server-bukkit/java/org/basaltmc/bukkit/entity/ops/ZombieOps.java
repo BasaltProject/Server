@@ -76,4 +76,22 @@ public interface ZombieOps extends Zombie, Cored {
     default void setConversionTime(int time) {
         core().set("conversion_countdown", time);
     }
+
+    default void setVillager(boolean villager) {
+        if (villager != isVillager()) {
+            core().retype(villager ? "zombie_villager" : "zombie");
+        }
+    }
+
+    default void setVillagerProfession(org.bukkit.entity.Villager.Profession profession) {
+        String key = profession.getKey().toString();
+        if (!isVillager()) {
+            core().nbtSet("VillagerData.type", "string", "minecraft:plains");
+            core().nbtSet("VillagerData.level", "int", 1);
+            core().nbtSet("VillagerData.profession", "string", key);
+            core().retype("zombie_villager");
+            return;
+        }
+        core().nbtSet("VillagerData.profession", "string", key);
+    }
 }

@@ -19,4 +19,14 @@ public interface HorseOps extends Horse, Cored {
     default void setStyle(Horse.Style style) {
         core().nbtSet("Variant", "int", getColor().ordinal() | (style.ordinal() << 8));
     }
+
+    default boolean isCarryingChest() {
+        return false;
+    }
+
+    default void setCarryingChest(boolean chest) {
+        if (chest) {
+            throw org.basaltmc.bukkit.Unsupported.hit("Horse#setCarryingChest: a horse cannot carry a chest, a donkey or mule can");
+        }
+    }
 }

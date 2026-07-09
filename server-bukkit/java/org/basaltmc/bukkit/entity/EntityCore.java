@@ -40,7 +40,7 @@ public final class EntityCore {
     public final BasaltWorld world;
     public volatile int id;
     public volatile UUID uuid;
-    public final EntityType type;
+    public volatile EntityType type;
     public final MetadataHolder metadata = new MetadataHolder();
     public final java.util.Set<String> tags = new java.util.HashSet<>();
     public final java.util.Map<org.bukkit.entity.memory.MemoryKey<?>, Object> memories =
@@ -334,6 +334,25 @@ public final class EntityCore {
             return true;
         }
         return EntityNatives.set(world.getName(), id, name, value);
+    }
+
+    /** Turns the entity into another type, keeping what it was; the object follows the entity that takes its place. */
+    public boolean retype(String key) {
+        if (staged != null) {
+            stagedCalls.add(new Object[] {"retype", new Object[] {key}});
+            return true;
+        }
+        if (!(EntityNatives.call(world.getName(), id, "retype", new Object[] {key}) instanceof Number made)
+            || made.intValue() < 0) {
+            return false;
+        }
+        String[] strings = WorldNatives.entityStrings(world.getName(), made.intValue());
+        id = made.intValue();
+        if (strings != null) {
+            uuid = UUID.fromString(strings[0]);
+            type = typeOf(strings[1]);
+        }
+        return true;
     }
 
     public Object call(String operation, Object... arguments) {

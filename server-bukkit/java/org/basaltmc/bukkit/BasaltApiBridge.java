@@ -157,4 +157,21 @@ public final class BasaltApiBridge extends InternalAPIBridgeBase {
             float damage, io.papermc.paper.world.damagesource.FallLocationType location, float fallDistance) {
         return new BasaltCombatEntry(source, damage, location, fallDistance);
     }
+
+    @Override
+    public io.papermc.paper.datacomponent.item.ResolvableProfile defaultMannequinProfile() {
+        return (io.papermc.paper.datacomponent.item.ResolvableProfile) org.basaltmc.bukkit.datacomponent.ContentSpecs
+            .PROFILE.value(new java.util.LinkedHashMap<>());
+    }
+
+    @Override
+    public net.kyori.adventure.text.Component defaultMannequinDescription() {
+        return net.kyori.adventure.text.Component.translatable("entity.minecraft.mannequin.label");
+    }
+
+    @Override
+    public java.util.Set<org.bukkit.entity.Pose> validMannequinPoses() {
+        return java.util.EnumSet.of(org.bukkit.entity.Pose.STANDING, org.bukkit.entity.Pose.SNEAKING,
+            org.bukkit.entity.Pose.SWIMMING, org.bukkit.entity.Pose.FALL_FLYING, org.bukkit.entity.Pose.SLEEPING);
+    }
 }

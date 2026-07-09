@@ -11,4 +11,12 @@ public interface BatOps extends Bat, Cored {
     default void setAwake(boolean awake) {
         core().call("bat_awake", awake);
     }
+
+    default org.bukkit.Location getTargetLocation() {
+        return MobPositions.parse(core(), core().text("bat_target"));
+    }
+
+    default void setTargetLocation(org.bukkit.Location location) {
+        core().set("bat_target", location == null ? "" : MobPositions.format(location));
+    }
 }

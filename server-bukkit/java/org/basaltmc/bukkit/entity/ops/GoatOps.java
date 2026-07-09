@@ -27,4 +27,8 @@ public interface GoatOps extends Goat, Cored {
     default void setScreaming(boolean screaming) {
         core().nbtSet("IsScreamingGoat", "bool", screaming);
     }
+
+    default void ram(org.bukkit.entity.LivingEntity target) {
+        core().call("goat_ram", (long) target.getEntityId());
+    }
 }

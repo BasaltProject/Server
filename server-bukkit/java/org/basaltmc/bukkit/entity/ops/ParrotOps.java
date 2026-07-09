@@ -11,4 +11,8 @@ public interface ParrotOps extends Parrot, Cored {
     default void setVariant(Parrot.Variant variant) {
         core().nbtSet("Variant", "int", variant.ordinal());
     }
+
+    default boolean isDancing() {
+        return core().flag("parrot_dancing");
+    }
 }
