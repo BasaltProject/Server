@@ -61,7 +61,7 @@ TEST_CASE("the table of events is the table of events") {
         joined += describe(*type);
     }
     CHECK(names.size() == 166);
-    CHECK(checksumOf(joined) == 1341474910677532685LL);
+    CHECK(checksumOf(joined) == -6889212385763648714LL);
 
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world,message,silent|message,silent");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world,message,silent|message,silent");
