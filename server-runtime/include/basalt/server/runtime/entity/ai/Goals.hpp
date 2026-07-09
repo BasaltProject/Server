@@ -322,7 +322,7 @@ public:
 
     [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
 
-    [[nodiscard]] bool canUse(MobContext& /*mob*/) override { return true; }
+    [[nodiscard]] bool canUse(MobContext& mob) override;
 
     void tick(MobContext& mob) override;
 
@@ -340,7 +340,7 @@ public:
 
     [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
 
-    [[nodiscard]] bool canUse(MobContext& /*mob*/) override { return true; }
+    [[nodiscard]] bool canUse(MobContext& mob) override;
 
     void tick(MobContext& mob) override;
 

@@ -475,6 +475,12 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             if (shears && shearEquipment(*session, *entity, slot)) {
                 return;
             }
+            // parity: `Shearable.shear` from `mobInteract`, the shears worn down once it took.
+            if (shears && mobs->readyForShearing(*entity) &&
+                mobs->shearMob(*entity, wire::protocol::play::SoundSource::Players)) {
+                owner_->blockInteraction().wearHeldItem(1);
+                return;
+            }
             break;
         case MobActionSystem::LeashUse::Done:
             return;

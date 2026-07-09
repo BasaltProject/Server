@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
 #include <basalt/server/runtime/world/RealBiomeSpawns.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -27,6 +28,8 @@ struct SpawnRequest {
     float yaw = 0.0F;
     std::int32_t groupIndex = 0;
     std::optional<wire::common::Identifier> biome;
+    /// The player a phantom was sent for. parity: `Phantom.spawningEntity`.
+    std::optional<wire::common::Uuid> spawnedFor;
 };
 
 /// parity: `NaturalSpawner`.

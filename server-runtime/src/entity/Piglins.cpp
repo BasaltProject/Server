@@ -83,6 +83,16 @@ PiglinState& stateOf(ServerEntity& piglin) {
     }
     const NbtCompound& tag = *piglin.sourceNbt;
     state.cannotHunt = tag.getBoolean("CannotHunt");
+    for (const auto& [key, into] : {std::pair{"Bukkit.BarterList", &state.barterItems},
+                                    std::pair{"Bukkit.InterestList", &state.interestItems}}) {
+        if (const NbtList* listed = tag.getList(key); listed != nullptr) {
+            for (const NbtTag& entry : listed->elements()) {
+                if (const std::string* name = entry.get<std::string>(); name != nullptr) {
+                    into->insert(*name);
+                }
+            }
+        }
+    }
     if (const NbtList* inventory = tag.getList("Inventory"); inventory != nullptr) {
         std::size_t slot = 0;
         for (const NbtTag& entry : inventory->elements()) {
@@ -129,6 +139,18 @@ void write(const ServerEntity& piglin, NbtCompound& tag) {
     }
     const PiglinState& state = *piglin.piglin;
     const std::int64_t gameTime = state.lastTick;
+    for (const auto& [key, from] : {std::pair{"Bukkit.BarterList", &state.barterItems},
+                                    std::pair{"Bukkit.InterestList", &state.interestItems}}) {
+        std::vector<NbtTag> names;
+        for (const std::string& name : *from) {
+            names.push_back(NbtTag::ofString(name));
+        }
+        if (names.empty()) {
+            tag.remove(key);
+        } else {
+            tag.set(key, NbtTag::ofList(NbtList{NbtType::String, std::move(names)}));
+        }
+    }
     if (!state.brute) {
         tag.putBoolean("CannotHunt", state.cannotHunt);
         std::vector<NbtTag> items;

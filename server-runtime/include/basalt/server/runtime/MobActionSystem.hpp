@@ -293,6 +293,9 @@ public:
     void camelRidden(world::LoadedWorld& world, entity::ServerEntity& camel, const player::PlayerSession& rider);
 
     void tickParrot(world::LoadedWorld& world, entity::ServerEntity& parrot);
+
+    /// parity: `Parrot.setRecordPlayingNearby`, which makes a parrot dance to a jukebox.
+    void parrotListens(world::LoadedWorld& world, entity::ServerEntity& parrot);
     void flapParrot(world::LoadedWorld& world, entity::ServerEntity& parrot);
 
     /// parity: `Parrot.flapSpeed`, `Entity.flyDist` and `Parrot.nextFlap`, with where the parrot was a tick ago.
@@ -583,6 +586,38 @@ public:
     /// The entity id of the zombie villager it turned into, or -1 when it did not.
     [[nodiscard]] std::int32_t pluginZombify(entity::ServerEntity& villager);
 
+    /// parity: `Shearable.readyForShearing`, for the mobs that have one.
+    [[nodiscard]] bool readyForShearing(const entity::ServerEntity& mob) const;
+
+    /// parity: `Shearable.shear`: its sound, its drops and what it becomes. False when the mob cannot be sheared.
+    bool shearMob(entity::ServerEntity& mob, wire::protocol::play::SoundSource source);
+
+    /// The entity id of the copy made as `into`, or -1.
+    [[nodiscard]] std::int32_t pluginRetype(entity::ServerEntity& mob, const wire::common::Identifier& into);
+
+    bool pluginGoatRam(entity::ServerEntity& goat, std::int32_t targetId);
+
+    bool pluginSnifferState(entity::ServerEntity& sniffer, std::int32_t pose);
+
+    [[nodiscard]] bool pluginSnifferCanDig(entity::ServerEntity& sniffer);
+
+    [[nodiscard]] std::optional<std::array<std::int32_t, 3>> pluginSnifferDigSpot(entity::ServerEntity& sniffer);
+
+    bool pluginSulfurSwallow(entity::ServerEntity& cube, const server::world::loot::ItemStack& item);
+
+    /// Starts the witch drinking this potion, or stops it drinking with none.
+    bool pluginWitchDrink(entity::ServerEntity& witch, const std::optional<server::world::loot::ItemStack>& potion);
+
+    /// parity: `Witch.aiStep`, the potions it drinks by itself.
+    void tickWitchDrinking(world::LoadedWorld& world, entity::ServerEntity& witch, random::RandomSource& random);
+
+    /// parity: `Strider.tick`, which decides whether it shivers.
+    void tickStriderWarmth(world::LoadedWorld& world, entity::ServerEntity& strider);
+
+    [[nodiscard]] bool wololo(entity::ServerEntity& evoker, std::int32_t sheepId) override;
+
+    [[nodiscard]] bool mobGriefing(const entity::ServerEntity& mob) override;
+
 private:
     [[nodiscard]] std::optional<bool> heartClaims(world::LoadedWorld& world, const std::array<std::int32_t, 3>& home,
                                                   const entity::ServerEntity& creaking);
@@ -703,6 +738,11 @@ private:
     [[nodiscard]] std::optional<std::int32_t> piglinAttackTarget(world::LoadedWorld& world,
                                                                  const entity::ai::MobContext& context,
                                                                  entity::piglins::PiglinState& state);
+    [[nodiscard]] bool piglinCurrency(const entity::piglins::PiglinState& state,
+                                      const wire::common::Identifier& item) const;
+
+    [[nodiscard]] bool piglinLoves(const entity::piglins::PiglinState& state, const wire::common::Identifier& item) const;
+
     [[nodiscard]] bool piglinWantsToPickUp(const entity::ServerEntity& piglin,
                                            const entity::piglins::PiglinState& state,
                                            const server::world::loot::ItemStack& stack, std::int64_t now) const;

@@ -67,6 +67,16 @@ bool MobActionSystem::itemTagged(std::string_view tag, const wire::common::Ident
     return options_.itemTags != nullptr && world::realItemTags::contains(*options_.itemTags, tag, item);
 }
 
+bool MobActionSystem::piglinCurrency(const PiglinState& state, const wire::common::Identifier& item) const {
+    return item.path() == "gold_ingot" || state.barterItems.contains(item.toString());
+}
+
+bool MobActionSystem::piglinLoves(const PiglinState& state, const wire::common::Identifier& item) const {
+    const std::string name = item.toString();
+    return itemTagged("minecraft:piglin_loved", item) || state.interestItems.contains(name) ||
+           state.barterItems.contains(name);
+}
+
 void MobActionSystem::equipmentChanged(ServerEntity& mob, std::uint8_t slot) {
     world::LoadedWorld* world = worldOf(mob);
     if (world == nullptr) {
@@ -141,8 +151,8 @@ bool MobActionSystem::piglinWantsToPickUp(const ServerEntity& piglin, const Pigl
         return false;
     }
     const std::optional<ItemStack> offhand = equipment::get(piglin, equipment::Slot::OffHand);
-    const bool lovesOffhand = offhand.has_value() && itemTagged("minecraft:piglin_loved", offhand->item);
-    if (stack.item.path() == "gold_ingot") {
+    const bool lovesOffhand = offhand.has_value() && piglinLoves(state, offhand->item);
+    if (piglinCurrency(state, stack.item)) {
         return !lovesOffhand;
     }
     const bool space = piglins::canAddToInventory(state, stack);
@@ -152,14 +162,14 @@ bool MobActionSystem::piglinWantsToPickUp(const ServerEntity& piglin, const Pigl
     if (itemTagged("minecraft:piglin_food", stack.item)) {
         return !state.ateRecently.has(now) && space;
     }
-    if (!itemTagged("minecraft:piglin_loved", stack.item)) {
+    if (!piglinLoves(state, stack.item)) {
         // parity: `canReplaceCurrentItem`.
         const equipment::Slot slot = slotFor(stack);
         const std::optional<ItemStack> current = equipment::get(piglin, slot);
         const bool newWanted = !isBaby(piglin) && itemTagged("minecraft:piglin_preferred_weapons", stack.item);
         const bool currentWanted =
             current.has_value() &&
-            (itemTagged("minecraft:piglin_loved", current->item) ||
+            (piglinLoves(state, current->item) ||
              (!isBaby(piglin) && itemTagged("minecraft:piglin_preferred_weapons", current->item)));
         if (newWanted && !currentWanted) {
             return true;
@@ -174,7 +184,7 @@ bool MobActionSystem::piglinEquip(world::LoadedWorld& world, ServerEntity& pigli
     const std::optional<ItemStack> current = equipment::get(piglin, slot);
     const bool newWanted = !isBaby(piglin) && itemTagged("minecraft:piglin_preferred_weapons", stack.item);
     const bool currentWanted =
-        current.has_value() && (itemTagged("minecraft:piglin_loved", current->item) ||
+        current.has_value() && (piglinLoves(piglins::stateOf(piglin), current->item) ||
                                 (!isBaby(piglin) && itemTagged("minecraft:piglin_preferred_weapons", current->item)));
     if (current.has_value() && !(newWanted && !currentWanted)) {
         return false;
@@ -231,14 +241,14 @@ void MobActionSystem::piglinPicksUp(world::LoadedWorld& world, ServerEntity& pig
                                                     [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
             }
         }
-        if (itemTagged("minecraft:piglin_loved", taken.item)) {
+        if (piglinLoves(state, taken.item)) {
             state.timeTryingToReachItem.reset();
             if (const std::optional<ItemStack> offhand = equipment::get(piglin, equipment::Slot::OffHand);
                 offhand.has_value()) {
                 throwFromMob(world, piglin, *offhand, {piglin.x, piglin.y, piglin.z});
             }
             equipment::set(piglin, equipment::Slot::OffHand, taken, true);
-            if (taken.item.path() != "gold_ingot") {
+            if (!piglinCurrency(state, taken.item)) {
                 piglin.persistent = true;
             }
             equipmentChanged(piglin, static_cast<std::uint8_t>(equipment::Slot::OffHand));
@@ -294,7 +304,7 @@ void MobActionSystem::piglinStopHoldingOffhand(world::LoadedWorld& world, Server
         }
     };
     if (!isBaby(piglin)) {
-        const bool currency = held->item.path() == "gold_ingot";
+        const bool currency = piglinCurrency(state, held->item);
         if (barter && currency) {
             // parity: `getBarterResponseItems`, the `piglin_bartering` table.
             std::vector<ItemStack> result;
@@ -345,7 +355,7 @@ void MobActionSystem::piglinStopHoldingOffhand(world::LoadedWorld& world, Server
     if (!piglinEquip(world, piglin, *held)) {
         const std::optional<ItemStack> main = equipment::get(piglin, equipment::Slot::MainHand);
         if (main.has_value()) {
-            if (itemTagged("minecraft:piglin_loved", main->item)) {
+            if (piglinLoves(state, main->item)) {
                 static_cast<void>(piglins::addToInventory(state, *main));
             } else {
                 throwAll({*main});
@@ -533,7 +543,7 @@ bool MobActionSystem::useOnPiglin(world::LoadedWorld& world, PlayerSession& play
     PiglinState& state = piglins::stateOf(piglin);
     const std::int64_t now = world.gameTime();
     // parity: `canAdmire`: an adult, not already admiring, not put off, and a gold ingot.
-    if (!held.has_value() || held->item.path() != "gold_ingot" || state.admiringDisabled.has(now) ||
+    if (!held.has_value() || !piglinCurrency(state, held->item) || state.admiringDisabled.has(now) ||
         state.admiring.has(now) || isBaby(piglin)) {
         return false;
     }

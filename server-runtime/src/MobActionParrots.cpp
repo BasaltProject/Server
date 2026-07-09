@@ -1,7 +1,9 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/Parrots.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -9,6 +11,8 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+
+#include <basalt/wire/common/Mth.hpp>
 
 #include <cmath>
 #include <string>
@@ -112,8 +116,47 @@ void MobActionSystem::flapParrot(world::LoadedWorld& world, ServerEntity& parrot
     }
 }
 
+void MobActionSystem::parrotListens(world::LoadedWorld& world, ServerEntity& parrot) {
+    constexpr double kReach = 3.46;
+    entity::mobMisc::State& state = entity::mobMisc::of(parrot);
+    const std::int64_t now = world.gameTime();
+    for (const world::GameEventRecord& record : world.state().recentGameEvents()) {
+        if (record.gameTime < now - 1 || (record.event != "jukebox_play" && record.event != "jukebox_stop_play")) {
+            continue;
+        }
+        const std::array<std::int32_t, 3> pos{wire::common::mth::floor(record.x), wire::common::mth::floor(record.y), wire::common::mth::floor(record.z)};
+        const double dx = pos[0] + 0.5 - parrot.x;
+        const double dy = pos[1] + 0.5 - parrot.y;
+        const double dz = pos[2] + 0.5 - parrot.z;
+        if (record.event == "jukebox_play") {
+            // parity: `Parrot.setRecordPlayingNearby`, a jukebox within 3.46 blocks of it.
+            if ((dx * dx) + (dy * dy) + (dz * dz) < kReach * kReach) {
+                state.parrotJukebox = pos;
+                state.partyParrot = true;
+            }
+        } else if (state.parrotJukebox == pos) {
+            state.parrotJukebox.reset();
+            state.partyParrot = false;
+        }
+    }
+    if (state.partyParrot) {
+        const std::array<std::int32_t, 3>& at = *state.parrotJukebox;
+        const double dx = at[0] + 0.5 - parrot.x;
+        const double dy = at[1] + 0.5 - parrot.y;
+        const double dz = at[2] + 0.5 - parrot.z;
+        const std::optional<std::int32_t> block = world.state().blockState(at[0], at[1], at[2]);
+        const wire::common::Identifier* name =
+            block.has_value() ? server::registry::blockStateDefinitions::blockOf(*block) : nullptr;
+        if ((dx * dx) + (dy * dy) + (dz * dz) >= kReach * kReach || name == nullptr || name->path() != "jukebox") {
+            state.partyParrot = false;
+            state.parrotJukebox.reset();
+        }
+    }
+}
+
 void MobActionSystem::tickParrot(world::LoadedWorld& world, ServerEntity& parrot) {
     flapParrot(world, parrot);
+    parrotListens(world, parrot);
     // parity: `Parrot.aiStep` rolls the level's own random.
     // and not silenced.
     random::RandomSource random = freshRandom();

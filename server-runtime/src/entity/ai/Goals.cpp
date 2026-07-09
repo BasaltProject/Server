@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
@@ -442,9 +443,19 @@ void LeapAtTargetGoal::start(MobContext& mob) {
     mob.mob.onGround = false;
 }
 
+namespace {
+
+/// parity: `Creeper.isIgnited`, which swells it whatever it targets.
+[[nodiscard]] bool ignited(const ServerEntity& creeper) {
+    const mobMisc::State* misc = mobMisc::peek(creeper);
+    return misc != nullptr && misc->creeperIgnited;
+}
+
+} // namespace
+
 bool SwellGoal::canUse(MobContext& mob) {
     constexpr double kSwellRange = 9.0;
-    if (mob.mob.swell > 0) {
+    if (mob.mob.swell > 0 || ignited(mob.mob)) {
         return true;
     }
     const std::optional<TargetView> target = targetOf(mob);
@@ -459,7 +470,9 @@ void SwellGoal::tick(MobContext& mob) {
     constexpr std::int32_t kMaxSwell = 30;
     const std::optional<TargetView> target = targetOf(mob);
     const std::int32_t direction =
-        !target.has_value() || mob.distanceSquaredTo(target->x, target->y, target->z) > kStopRange ? -1 : 1;
+        !ignited(mob.mob) && (!target.has_value() || mob.distanceSquaredTo(target->x, target->y, target->z) > kStopRange)
+            ? -1
+            : 1;
     if (direction > 0 && mob.mob.swell == 0) {
         mob.actions.primeCreeper(mob.mob);
     }
@@ -516,6 +529,12 @@ void RangedAttackGoal::tick(MobContext& mob) {
 
 SwimAboutGoal::SwimAboutGoal(double push) : push_(push) {}
 
+bool SwimAboutGoal::canUse(MobContext& mob) {
+    // parity: `AbstractSchoolingFish.canRandomSwim`, which a follower does not.
+    return !mobMisc::isSchooling(mob.mob) ||
+           !mobMisc::isFollower(mob.mob, [&mob](std::int32_t id) { return mob.entityById(id); });
+}
+
 void SwimAboutGoal::tick(MobContext& mob) {
     // parity: the tenth of a block up or down a squid picks, and the ten blocks ahead it looks.
     constexpr double kRise = 0.1;
@@ -538,6 +557,11 @@ void SwimAboutGoal::tick(MobContext& mob) {
     // parity: `Squid.aiStep`'s own turn towards where it is going.
     lookControl::lookAt(mob.mob, mob.mob.x + vectorX_ * kLookAhead, mob.mob.y + vectorY_,
                         mob.mob.z + vectorZ_ * kLookAhead);
+}
+
+bool HopAboutGoal::canUse(MobContext& mob) {
+    const mobMisc::State* misc = mobMisc::peek(mob.mob);
+    return misc == nullptr || misc->cubeWanders;
 }
 
 void HopAboutGoal::tick(MobContext& mob) {

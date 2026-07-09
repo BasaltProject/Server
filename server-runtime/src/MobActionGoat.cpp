@@ -483,4 +483,34 @@ bool MobActionSystem::milkGoat(world::LoadedWorld& world, PlayerSession& player,
     return true;
 }
 
+bool MobActionSystem::pluginGoatRam(ServerEntity& goat, std::int32_t targetId) {
+    world::LoadedWorld* world = worldOf(goat);
+    if (world == nullptr || goat.type().path() != "goat") {
+        return false;
+    }
+    std::optional<Vec> at;
+    if (const ServerEntity* target = world->state().entity(targetId); target != nullptr && !target->removed) {
+        at = Vec{target->x, target->y, target->z};
+    } else {
+        for (PlayerSession* session : watchersOf(*world)) {
+            if (session->entityId() == targetId) {
+                at = Vec{session->x, session->y, session->z};
+            }
+        }
+    }
+    if (!at.has_value()) {
+        return false;
+    }
+    // parity: `Goat.ram`.
+    GoatState& state = goats::stateOf(goat);
+    state.ramTarget = at;
+    state.ramming = false;
+    state.preparing = false;
+    state.ramCooldown.reset();
+    state.breedTarget.reset();
+    state.temptation.following = false;
+    state.activity = Activity::Ram;
+    return true;
+}
+
 } // namespace basalt::server::runtime

@@ -124,7 +124,8 @@ void PhantomSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vect
                                .z = spawnZ + 0.5,
                                .yaw = 0.0F,
                                .groupIndex = groupIndex,
-                               .biome = naturalSpawner::biomeAt(world, spawnX, spawnY, spawnZ)});
+                               .biome = naturalSpawner::biomeAt(world, spawnX, spawnY, spawnZ),
+                               .spawnedFor = player->uuid()});
         }
     }
 }

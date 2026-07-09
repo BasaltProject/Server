@@ -41,6 +41,8 @@ struct Step {
 };
 
 struct CartState {
+    /// Set by a plugin: the speed squared a tnt cart blows up with on its next turn.
+    std::optional<double> detonateSpeedSqr;
     bool flipped = false;
     bool onRails = false;
     bool firstTick = true;

@@ -82,6 +82,14 @@ void addVehicles(Table& table, Operations& /*operations*/) {
     cartMember(table, "cart_push_z", &entity::minecarts::CartState::pushZ, 0.0);
     cartMember(table, "cart_explosion_speed", &entity::minecarts::CartState::explosionSpeedFactor,
                entity::minecarts::kTntCartSpeedFactor);
+    table["cart_detonate"] = Accessor{[](const ServerEntity&) -> Value { return Value{}; },
+                                      [](ServerEntity& entity, const Value& value) {
+                                          if (entity.type().path() != "tnt_minecart") {
+                                              return false;
+                                          }
+                                          entity::minecarts::stateOf(entity).detonateSpeedSqr = asReal(value);
+                                          return true;
+                                      }};
     table["vehicle_damage"] =
         Accessor{[](const ServerEntity& entity) -> Value { return static_cast<double>(entity.vehicleDamage); },
                  [](ServerEntity& entity, const Value& value) {
