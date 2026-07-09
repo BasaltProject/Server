@@ -31,6 +31,10 @@ public final class EntitySpawner {
         int spawned = EntityNatives.spawnAs(world.getName(), type.getKey().toString(), at.getX(), at.getY(), at.getZ(),
             at.getYaw(), reason == null ? "custom" : reason.name().toLowerCase(java.util.Locale.ROOT));
         Entity made = spawned < 0 ? null : world.entity(spawned);
+        if (made instanceof org.bukkit.entity.ExperienceOrb orb && orb instanceof Cored cored
+            && cored.core().nbtText("SpawnReason") == null) {
+            cored.core().nbtSet("SpawnReason", "string", "CUSTOM");
+        }
         if (made != null && before != null) {
             before.accept(made);
         }

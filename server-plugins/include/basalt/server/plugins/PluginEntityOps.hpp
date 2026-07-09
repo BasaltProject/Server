@@ -126,6 +126,7 @@ inline constexpr std::array kEntityOperations{
     EntityOperationSpec{"push", ""},
     EntityOperationSpec{"knockback", ""},
     EntityOperationSpec{"hit_entity", ""},
+    EntityOperationSpec{"hook_own", ""},
     EntityOperationSpec{"hook_retrieve", ""},
     EntityOperationSpec{"land", ""},
     EntityOperationSpec{"eye_target", ""},

@@ -383,6 +383,10 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         }
     }
     if (!hit.has_value()) {
+        // parity: `Projectile.onHit` discards a thrown projectile that struck anything.
+        if (!kind.sticks && targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
+            entity.removed = true;
+        }
         return;
     }
     if (!hitAllowed(world, entity, -1, static_cast<std::int32_t>(std::floor(hit->x)),

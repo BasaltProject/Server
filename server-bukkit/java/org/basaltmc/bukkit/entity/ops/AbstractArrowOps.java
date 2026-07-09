@@ -74,6 +74,9 @@ public interface AbstractArrowOps extends AbstractArrow, Cored {
     }
 
     default boolean isShotFromCrossbow() {
+        if ("minecraft:crossbow".equals(core().text("fired_from"))) {
+            return true;
+        }
         org.bukkit.inventory.ItemStack weapon = getWeapon();
         return weapon != null && weapon.getType() == org.bukkit.Material.CROSSBOW;
     }
