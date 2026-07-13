@@ -177,8 +177,8 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     entity.lastBlame = blamed;
     if (sourceX.has_value() && sourceZ.has_value()) {
         constexpr double kRadiansToDegrees = 180.0 / 3.14159265358979323846;
-        entity.hurtDirection = static_cast<float>(std::atan2(*sourceZ - entity.z, *sourceX - entity.x) *
-                                                  kRadiansToDegrees - static_cast<double>(entity.yaw));
+        entity.hurtDirection = static_cast<float>(
+            std::atan2(*sourceZ - entity.z, *sourceX - entity.x) * kRadiansToDegrees - static_cast<double>(entity.yaw));
     }
     // parity: `CopperGolem.actuallyHurt`, which drops whatever pose it was working in.
     if (entity.copperGolem != nullptr) {

@@ -1244,8 +1244,8 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         live.crystalBottom = world::endCrystals::showsBottom(entity);
     }
     if (entity.activeSlot >= 0 || entity.riptiding) {
-        live.livingFlags = static_cast<std::int8_t>((entity.activeSlot >= 0 ? 1 : 0) | (entity.activeSlot == 1 ? 2 : 0) |
-                                                    (entity.riptiding ? 4 : 0));
+        live.livingFlags = static_cast<std::int8_t>((entity.activeSlot >= 0 ? 1 : 0) |
+                                                    (entity.activeSlot == 1 ? 2 : 0) | (entity.riptiding ? 4 : 0));
     } else if (server::registry::entityAttributes::isLiving(entity.type())) {
         live.livingFlags = 0;
     }
