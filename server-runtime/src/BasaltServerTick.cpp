@@ -169,7 +169,10 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Time tick", [this, &world] { environment_->tickTime(world); });
                 step("Border damage", [this, &world] { environment_->tickBorderDamage(world); });
                 step("Border wall", [this, &world] { environment_->tickBorderWall(world); });
-                step("Portal tick", [this, &world] { environment_->tickPortals(world); });
+                step("Portal tick", [this, &world] {
+                    environment_->tickPortals(world);
+                    environment_->tickEntityPortals(world);
+                });
                 step("Inside blocks", [this, &world] { environment_->tickInsideBlocks(world); });
                 step("Location tick", [this, &world] { environment_->tickLocation(world); });
                 step("Drowning tick", [this, &world] { environment_->tickSubmersion(world); });
