@@ -22,12 +22,25 @@ public final class LogTags {
             .orElse(fallback);
     }
 
-    public static void write(int level, String tag, String message, Throwable thrown) {
-        Natives.log(level, tag, message);
-        if (thrown != null) {
-            java.io.StringWriter trace = new java.io.StringWriter();
-            thrown.printStackTrace(new java.io.PrintWriter(trace));
-            Natives.log(level, tag, trace.toString());
+    public static String ofThrowable(Throwable thrown, String fallback) {
+        for (Throwable at = thrown; at != null; at = at.getCause() == at ? null : at.getCause()) {
+            for (StackTraceElement frame : at.getStackTrace()) {
+                String plugin = BasaltPluginClassLoader.pluginOfClass(frame.getClassName());
+                if (plugin != null) {
+                    return plugin;
+                }
+            }
         }
+        return fallback;
+    }
+
+    public static void write(int level, String tag, String message, Throwable thrown) {
+        if (thrown == null) {
+            Natives.log(level, tag, message);
+            return;
+        }
+        java.io.StringWriter trace = new java.io.StringWriter();
+        thrown.printStackTrace(new java.io.PrintWriter(trace));
+        Natives.log(level, tag, message == null || message.isEmpty() ? trace.toString() : message + "\n" + trace);
     }
 }

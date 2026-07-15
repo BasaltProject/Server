@@ -140,8 +140,9 @@ public final class BasaltScheduler extends BukkitSchedulerBase {
         try {
             task.body.accept(task);
         } catch (Throwable t) {
-            Natives.log(3, "Bukkit", "Task #" + id + " for " + (task.owner == null ? "Basalt" : task.owner.getName()) + " generated an exception");
-            t.printStackTrace();
+            org.basaltmc.bukkit.log.LogTags.write(3, task.owner == null ? "Bukkit" : task.owner.getName(),
+                "Task #" + id + " for " + (task.owner == null ? "Basalt" : task.owner.getName())
+                    + " generated an exception", t);
         } finally {
             Blocks.end();
             task.running = false;
