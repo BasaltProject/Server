@@ -383,6 +383,16 @@ void addActions(Operations& operations) {
         const std::optional<ItemStack> item = stackOf(at(arguments, 0));
         return system != nullptr && item.has_value() && system->pluginSulfurSwallow(entity, *item);
     };
+    operations["sulfur_can_explode"] = [](const Environment& environment, ServerEntity& entity,
+                                          const Arguments&) -> std::optional<Value> {
+        MobActionSystem* system = mobSystem(environment);
+        return system != nullptr && system->pluginSulfurCanExplode(entity);
+    };
+    operations["sulfur_prime"] = [](const Environment& environment, ServerEntity& entity,
+                                    const Arguments& arguments) -> std::optional<Value> {
+        MobActionSystem* system = mobSystem(environment);
+        return system != nullptr && system->pluginSulfurPrime(entity, asBool(at(arguments, 0)));
+    };
     operations["witch_drink"] = [](const Environment& environment, ServerEntity& entity,
                                    const Arguments& arguments) -> std::optional<Value> {
         MobActionSystem* system = mobSystem(environment);

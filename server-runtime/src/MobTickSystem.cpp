@@ -268,6 +268,12 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity.type().path() == "parrot") {
         actions_->tickParrot(world, entity);
     }
+    if (entity.type().path() == "sulfur_cube") {
+        actions_->tickSulfurCube(world, entity);
+        if (entity.removed) {
+            return;
+        }
+    }
     // parity: `Pufferfish.tick` and `aiStep`.
     // the travel they belong to.
     if (entity.type().path() == "pufferfish") {

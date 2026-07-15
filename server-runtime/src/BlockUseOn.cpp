@@ -249,6 +249,15 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         owner_->broadcastSound("minecraft:entity.lead.break", session->x, session->y, session->z,
                                play::SoundSource::Neutral);
     }
+    // parity: `FoodOnAStickItem.use`, the boost its mount takes and the wear it costs.
+    if (session->vehicleId.has_value() && owner_->options().mobs != nullptr &&
+        (item->path() == "carrot_on_a_stick" || item->path() == "warped_fungus_on_a_stick")) {
+        entity::ServerEntity* vehicle = world->state().entity(*session->vehicleId);
+        if (vehicle != nullptr && owner_->options().mobs->boostSteerable(*vehicle, item->path())) {
+            wearHeldItem(item->path() == "carrot_on_a_stick" ? 7 : 1);
+            return;
+        }
+    }
     // parity: `ItemCooldowns.isOnCooldown`.
     if (owner_->itemUseTimers().onCooldown(*item) || owner_->itemUseTimers().startEating(*session, *item, heldSlot) ||
         owner_->itemUseTimers().startDrawing(*session, *item, heldSlot) ||

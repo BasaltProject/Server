@@ -250,6 +250,35 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             return;
         }
     }
+    // parity: `SulfurCube.mobInteract`.
+    if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr && entity->type().path() == "sulfur_cube") {
+        const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
+        const std::int32_t slot =
+            mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;
+        const std::optional<storage::StoredItemStack> inHand = session->inventory.at(slot);
+        const std::optional<Identifier> id = inHand.has_value() ? parsedOrNothing(inHand->id) : std::nullopt;
+        if (id.has_value() && inHand->count > 0) {
+            const server::world::loot::ItemStack held{
+                .item = *id, .count = inHand->count, .components = inHand->components};
+            switch (mobs->useOnSulfurCube(*entity, held)) {
+            case MobActionSystem::SulfurUse::Pass:
+                break;
+            case MobActionSystem::SulfurUse::Wear:
+                if (mainHand) {
+                    owner_->blockInteraction().wearHeldItem(1);
+                }
+                return;
+            case MobActionSystem::SulfurUse::Consume:
+                if (session->gamemode != Gamemode::Creative) {
+                    storage::StoredItemStack left = *inHand;
+                    left.count -= 1;
+                    session->inventory.set(slot, left.count <= 0 ? std::nullopt : std::optional{left});
+                    owner_->sendInventorySlot(slot);
+                }
+                return;
+            }
+        }
+    }
     // parity: `Goat.mobInteract`'s bucket of milk.
     if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr && entity->type().path() == "goat") {
         const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
