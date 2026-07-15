@@ -684,6 +684,9 @@ basalt_module(server-runtime-core
         src/entity/MobMisc.cpp
         src/entity/ai/FishGoals.cpp
         src/MobActionPluginMore.cpp
+        src/MobActionSulfurCube.cpp
+        src/entity/ai/TurtleGoals.cpp
+        src/entity/SulfurCubes.cpp
         src/MobActionShearing.cpp
         src/plugins/MobMoreOps.cpp
         src/entity/CopperGolem.cpp

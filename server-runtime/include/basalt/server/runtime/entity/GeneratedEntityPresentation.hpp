@@ -129,6 +129,8 @@ struct RuntimeEntityMetadata {
     std::optional<bool> polarStanding;
     std::optional<bool> striderCold;
     std::optional<bool> turtleLaying;
+    std::optional<bool> turtleHasEgg;
+    std::optional<std::int32_t> sulfurMaxFuse;
     std::optional<bool> witchUsing;
     /// parity: `Pig.DATA_BOOST_TIME` and `Strider.DATA_BOOST_TIME`.
     std::optional<std::int32_t> boostTotal;

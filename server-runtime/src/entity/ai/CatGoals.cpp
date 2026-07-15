@@ -117,7 +117,7 @@ void MoveToBlockGoal::tick(MobContext& mob) {
     if (mob.distanceSquaredTo(x, y, z) >= kAcceptedDistance * kAcceptedDistance) {
         reachedTarget_ = false;
         ++tryTicks_;
-        if (tryTicks_ % kRepathInterval == 0) {
+        if (shouldRecalculatePath()) {
             static_cast<void>(
                 navigation::moveTo(mob.world, mob.mob, x, static_cast<double>(blockPos_[1] + 1), z, speedModifier_));
         }
@@ -126,6 +126,8 @@ void MoveToBlockGoal::tick(MobContext& mob) {
         --tryTicks_;
     }
 }
+
+bool MoveToBlockGoal::shouldRecalculatePath() const { return tryTicks_ % kRepathInterval == 0; }
 
 bool MoveToBlockGoal::findNearestBlock(MobContext& mob) {
     const auto originX = static_cast<std::int32_t>(std::floor(mob.mob.x));

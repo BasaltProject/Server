@@ -32,6 +32,15 @@ protected:
 
     [[nodiscard]] bool reachedTarget() const { return reachedTarget_; }
 
+    /// parity: `MoveToBlockGoal.shouldRecalculatePath`.
+    [[nodiscard]] virtual bool shouldRecalculatePath() const;
+
+    [[nodiscard]] std::int32_t tryTicks() const { return tryTicks_; }
+
+    [[nodiscard]] const std::array<std::int32_t, 3>& targetBlock() const { return blockPos_; }
+
+    void setSpeedModifier(double speedModifier) { speedModifier_ = speedModifier; }
+
     std::int32_t verticalSearchStart_ = 0;
 
 private:

@@ -560,6 +560,9 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
     const bool sniffer = animal.type().path() == "sniffer";
     if (frog) {
         entity::frogs::stateOf(animal).pregnant = true;
+    } else if (animal.type().path() == "turtle") {
+        // parity: `TurtleBreedGoal.breed`, an egg to lay instead of a calf.
+        entity::mobMisc::of(animal).turtleHasEgg = true;
     } else if (sniffer) {
         // parity: `Sniffer.spawnChildFromBreeding`: an egg dropped where it stands, with a plop.
         random::RandomSource random = freshRandom();

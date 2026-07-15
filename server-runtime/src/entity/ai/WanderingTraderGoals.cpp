@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/entity/MobBrain.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/WanderingTraderGoals.hpp>
@@ -102,6 +103,50 @@ void MoveTowardsTraderHomeGoal::start(MobContext& mob) {
 void MoveTowardsTraderHomeGoal::stop(MobContext& mob) {
     wanted_.reset();
     navigation::stop(mob.mob);
+}
+
+namespace {
+
+/// parity: `ItemUtils` use duration of a potion and of a bucket of milk.
+constexpr std::int32_t kDrinkTicks = 32;
+/// parity: `Level.isBrightOutside`, the sky darkness under which it counts as day.
+constexpr std::int32_t kBrightSkyDarken = 4;
+
+[[nodiscard]] bool invisible(const MobContext& mob) {
+    return mob.mob.effects.contains(wire::common::Identifier::vanilla("invisibility")) ||
+           (mob.mob.sourceNbt.has_value() && mob.mob.sourceNbt->getBoolean("Invisible"));
+}
+
+} // namespace
+
+bool TraderUseItemGoal::canUse(MobContext& mob) {
+    const mobMisc::State* held = mobMisc::peek(mob.mob);
+    if (held != nullptr && (potion_ ? held->traderNoPotion : held->traderNoMilk)) {
+        return false;
+    }
+    if (!mob.hasSkylight) {
+        return false;
+    }
+    const bool bright = mob.skyDarken < kBrightSkyDarken;
+    return potion_ ? !bright && !invisible(mob) : bright && invisible(mob);
+}
+
+bool TraderUseItemGoal::canContinueToUse(MobContext& /*mob*/) { return remaining_ > 0; }
+
+void TraderUseItemGoal::start(MobContext& mob) {
+    remaining_ = kDrinkTicks;
+    mob.actions.traderUsesItem(mob.mob, potion_, UsePhase::Start);
+}
+
+void TraderUseItemGoal::tick(MobContext& mob) {
+    if (remaining_ > 0 && --remaining_ == 0) {
+        mob.actions.traderUsesItem(mob.mob, potion_, UsePhase::Finish);
+    }
+}
+
+void TraderUseItemGoal::stop(MobContext& mob) {
+    remaining_ = 0;
+    mob.actions.traderUsesItem(mob.mob, potion_, UsePhase::Stop);
 }
 
 } // namespace basalt::server::runtime::entity::ai

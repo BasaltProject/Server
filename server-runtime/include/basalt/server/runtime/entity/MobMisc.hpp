@@ -32,6 +32,15 @@ struct State {
     std::int32_t witchDrinkTicks = 0;
     std::optional<std::int32_t> schoolLeader;
     std::int32_t schoolSize = 1;
+    bool sulfurExplosive = false;
+    bool sulfurBody = false;
+    bool sulfurFuseSounded = false;
+    bool turtleHasEgg = false;
+    std::optional<std::array<std::int32_t, 3>> turtleHome;
+    std::optional<std::array<std::int32_t, 3>> turtleTravel;
+    std::int32_t turtleLayCounter = 0;
+    bool traderNoPotion = false;
+    bool traderNoMilk = false;
 };
 
 using Lookup = std::function<ServerEntity*(std::int32_t entityId)>;

@@ -50,4 +50,24 @@ private:
     std::optional<std::array<double, 3>> wanted_;
 };
 
+/// parity: `UseItemGoal` as the wandering trader sets it up: an invisibility potion at night, milk by day.
+class TraderUseItemGoal final : public Goal {
+public:
+    explicit TraderUseItemGoal(bool potion) : potion_(potion) {}
+
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+
+    void start(MobContext& mob) override;
+
+    void stop(MobContext& mob) override;
+
+    void tick(MobContext& mob) override;
+
+private:
+    bool potion_;
+    std::int32_t remaining_ = 0;
+};
+
 } // namespace basalt::server::runtime::entity::ai

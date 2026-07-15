@@ -56,6 +56,8 @@ struct PlayerView {
 
 enum class PluginGoalPhase : std::uint8_t { CanUse, CanContinue, Start, Stop, Tick };
 
+enum class UsePhase : std::uint8_t { Start, Finish, Stop };
+
 class MobActions {
 public:
     MobActions() = default;
@@ -215,6 +217,13 @@ public:
 
     /// parity: `EvokerWololoSpellGoal.performSpellCasting`.
     [[nodiscard]] virtual bool wololo(ServerEntity& /*evoker*/, std::int32_t /*sheepId*/) { return false; }
+
+    /// parity: `TurtleLayEggGoal`, the egg block set above the sand with its sound.
+    virtual void layTurtleEgg(ServerEntity& /*turtle*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/,
+                              std::int32_t /*eggs*/) {}
+
+    /// parity: `UseItemGoal`, the item put in the hand, drunk once the use time is up and taken out again.
+    virtual void traderUsesItem(ServerEntity& /*trader*/, bool /*potion*/, UsePhase /*phase*/) {}
 
     /// parity: `GameRules.MOB_GRIEFING`.
     [[nodiscard]] virtual bool mobGriefing(const ServerEntity& /*mob*/) { return true; }
