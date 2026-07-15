@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/MobActionHooks.hpp>
 #include <basalt/server/runtime/VillagerWorldSystem.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -89,54 +90,8 @@ class RaidSystem;
 
 class MobActionSystem final : public entity::ai::MobActions {
 public:
-    struct Hooks {
-        entity::entityCombat::Hooks combat;
-        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::int32_t fireTicks,
-                           std::string_view cause)>
-            combustAllowed;
-        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob,
-                           const std::optional<std::int32_t>& previous, std::optional<std::int32_t>& next)>
-            targetChanged;
-        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob,
-                           const world::ActiveEffect& effect, std::string_view action)>
-            effectAllowed;
-        std::function<void(const world::LoadedWorld& world, const entity::ServerEntity& mob,
-                           std::vector<server::world::loot::ItemStack>& drops, std::int32_t& experience)>
-            deathDrops;
-        std::function<bool(const player::PlayerSession& player, const entity::ServerEntity& animal)> tameAllowed;
-        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& animal,
-                           const entity::ServerEntity& partner)>
-            breedAllowed;
-        std::function<void(std::string_view cause, const wire::common::Identifier& parent,
-                           const wire::common::Identifier& partner, const wire::common::Identifier& child)>
-            bredAnimals;
-        std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
-        std::function<void(world::LoadedWorld& world, entity::ServerEntity& wither)> witherShoots;
-        std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                           std::int32_t openers)>
-            openersChanged;
-        std::function<void(const std::string& from, const std::string& to)> teamCarried;
-        std::function<void(const wire::common::Uuid& player)> curedZombieVillager;
-        std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& mob, std::string_view key,
-                           entity::ai::PluginGoalPhase phase)>
-            pluginGoal;
-        std::function<void(world::LoadedWorld& world, wire::nbt::NbtCompound item, double x, double y, double z,
-                           std::int32_t ownerId)>
-            launchFirework;
-    };
-
-    struct Options {
-        std::function<std::int64_t()> nextSeed;
-        const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
-        const scoreboard::Teams* teams = nullptr;
-        std::function<double()> nextDouble;
-        const world::RealRecipes* recipes = nullptr;
-        const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
-        const world::realBlockTags::TagMembers* blockTags = nullptr;
-        const world::realItemTags::TagMembers* itemTags = nullptr;
-        world::RealVillagerTrades* villagerTrades = nullptr;
-        world::AdvancementTriggers* advancementTriggers = nullptr;
-    };
+    using Hooks = MobActionHooks;
+    using Options = MobActionOptions;
 
     /// Which worlds a mob might be in, since a goal only ever hands over the mob itself.
     using Worlds = std::function<std::vector<world::LoadedWorld*>()>;
