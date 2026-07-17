@@ -152,6 +152,8 @@ public final class BukkitRuntime {
                 Blocks.end();
             }
             Natives.log(1, "Bukkit", manager.getPlugins().length + " Bukkit plugin(s) loaded");
+            manager.callEvent(new org.bukkit.event.server.ServerLoadEvent(
+                org.bukkit.event.server.ServerLoadEvent.LoadType.STARTUP));
             return true;
         } catch (Throwable t) {
             t.printStackTrace();

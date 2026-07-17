@@ -361,6 +361,12 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 event.set(2, static_cast<std::int64_t>(chunkZ));
             }));
     };
+    persistenceHooks.worldSaved = [this](const std::string& worldName) {
+        server::plugins::PluginEventBus* bus = plugins_ == nullptr ? nullptr : &plugins_->events();
+        static_cast<void>(server::plugins::emit(
+            bus, bus == nullptr ? nullptr : &server::plugins::pluginEventTypes::worldSave(),
+            [&worldName](server::plugins::PluginEvent& event) { event.set(0, worldName); }));
+    };
     persistenceHooks.saveShared = [this] {
         if (maps_ != nullptr) {
             maps_->save();
