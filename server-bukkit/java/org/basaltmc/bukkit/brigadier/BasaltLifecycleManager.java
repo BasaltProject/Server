@@ -22,15 +22,27 @@ public final class BasaltLifecycleManager implements LifecycleEventManager<Plugi
 
     @Override
     public void registerEventHandler(LifecycleEventHandlerConfiguration<? super Plugin> configuration) {
+        if ((Object) configuration instanceof io.papermc.paper.registry.event.BasaltRegistryEventTypeProvider.Unused<?> unused) {
+            reportUnused(unused.event());
+            return;
+        }
         if (!(configuration instanceof BasaltLifecycleEventTypeProvider.Handler<?> handler)) {
             throw new IllegalArgumentException("Not a handler this server made: " + configuration);
         }
         if (!handler.event().equals("commands")) {
-            if (kReported.add(handler.event())) {
-                Natives.log(2, "Bukkit", "The lifecycle event '" + handler.event() + "' is not run by Basalt");
-            }
+            reportUnused(handler.event());
             return;
         }
+        runCommands(plugin, handler);
+    }
+
+    public static void reportUnused(String event) {
+        if (kReported.add(event)) {
+            Natives.log(2, "Bukkit", "The lifecycle event '" + event + "' is not run by Basalt");
+        }
+    }
+
+    public static void runCommands(Plugin plugin, BasaltLifecycleEventTypeProvider.Handler<?> handler) {
         Commands registrar = new BasaltCommands(plugin);
         handler.<ReloadableRegistrarEvent<Commands>>handler().run(new ReloadableRegistrarEvent<>() {
             @Override

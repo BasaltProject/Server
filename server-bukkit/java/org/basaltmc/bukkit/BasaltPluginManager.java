@@ -190,11 +190,23 @@ public final class BasaltPluginManager extends PluginManagerBase {
                 loader.addLibraries(org.basaltmc.bukkit.plugin.PluginLibraries.runLoader(paperLoader, loader,
                     description, dataFolder.toPath(), file.toPath()));
             }
-            Class<?> main = Class.forName(description.getMainClass(), true, loader);
-            if (!JavaPlugin.class.isAssignableFrom(main)) {
-                throw new InvalidPluginException("main class '" + description.getMainClass() + "' does not extend JavaPlugin");
+            String bootstrapper = org.basaltmc.bukkit.plugin.Bootstraps.bootstrapperClass(file);
+            org.basaltmc.bukkit.plugin.Bootstraps.Started started = bootstrapper == null ? null
+                : org.basaltmc.bukkit.plugin.Bootstraps.start(bootstrapper, loader, description, dataFolder.toPath(),
+                    file.toPath());
+            JavaPlugin made = started == null ? null : started.createPlugin();
+            if (made != null) {
+                plugin = made;
+            } else {
+                Class<?> main = Class.forName(description.getMainClass(), true, loader);
+                if (!JavaPlugin.class.isAssignableFrom(main)) {
+                    throw new InvalidPluginException("main class '" + description.getMainClass() + "' does not extend JavaPlugin");
+                }
+                plugin = (JavaPlugin) main.getDeclaredConstructor().newInstance();
             }
-            plugin = (JavaPlugin) main.getDeclaredConstructor().newInstance();
+            if (started != null) {
+                started.registerCommands(plugin);
+            }
         } catch (InvocationTargetException e) {
             throw new InvalidPluginException(e.getCause());
         } catch (ReflectiveOperationException | IOException | LinkageError e) {
