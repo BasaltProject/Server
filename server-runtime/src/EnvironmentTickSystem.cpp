@@ -7,6 +7,9 @@
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
+#include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/MobMisc.hpp>
 #include <basalt/server/runtime/player/PlayerBlockContact.hpp>
 #include <basalt/server/runtime/player/PlayerEntityData.hpp>
 #include <basalt/server/runtime/player/PlayerFreezing.hpp>
@@ -34,6 +37,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <memory>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -307,6 +312,81 @@ void EnvironmentTickSystem::tickPortals(world::LoadedWorld& world) {
         if (player->portalTicks >= delay) {
             travelThroughPortal(world, *player, *axis);
         }
+    }
+}
+
+namespace {
+
+/// parity: `Entity.getDimensionChangingDelay`.
+constexpr std::int32_t kEntityPortalCooldown = 300;
+
+/// parity: `Entity.canUsePortal` and the overrides of the wither, the dragon, bobbers and heart-bound creakings.
+[[nodiscard]] bool mayUsePortal(const entity::ServerEntity& mob) {
+    if (mob.removed || mob.dying || mob.health <= 0.0 || mob.vehicleId.has_value() || !mob.passengerIds.empty() ||
+        mob.sleeping) {
+        return false;
+    }
+    const std::string_view path = mob.type().path();
+    if (path == "ender_dragon" || path == "fishing_bobber") {
+        return false;
+    }
+    if (path == "wither") {
+        const entity::mobMisc::State* held = entity::mobMisc::peek(mob);
+        return held != nullptr && held->canUsePortals;
+    }
+    return !(entity::creakings::isCreaking(mob.type()) && entity::creakings::heartBound(mob));
+}
+
+} // namespace
+
+void EnvironmentTickSystem::tickEntityPortals(world::LoadedWorld& world) {
+    world::LoadedWorld* target = nullptr;
+    for (entity::ServerEntity* mob : world.state().entities()) {
+        std::optional<PortalAxis> axis;
+        const auto column = static_cast<std::int32_t>(std::floor(mob->x));
+        const auto row = static_cast<std::int32_t>(std::floor(mob->z));
+        for (const double lift : {0.0, mob->height() / 2.0}) {
+            const std::optional<std::int32_t> state =
+                world.state().blockState(column, static_cast<std::int32_t>(std::floor(mob->y + lift)), row);
+            axis = state.has_value() ? server::world::portal::PortalShape::axisOf(*state) : std::nullopt;
+            if (axis.has_value()) {
+                break;
+            }
+        }
+        if (mob->portalCooldown > 0) {
+            // parity: `Entity.setAsInsidePortal` rests a cooling entity longer while it stands in the frame.
+            mob->portalCooldown = axis.has_value() ? kEntityPortalCooldown : mob->portalCooldown - 1;
+            continue;
+        }
+        if (!axis.has_value() || !mayUsePortal(*mob)) {
+            continue;
+        }
+        if (target == nullptr) {
+            target = netherCounterpart(world);
+        }
+        // parity: `Level.isAllowedToEnterPortal`.
+        if (target == nullptr || (target->declaration().dimension == config::WorldDimension::Nether &&
+                                  !world.gameRules().get(world::gameRules::kAllowEnteringNetherUsingPortals))) {
+            continue;
+        }
+        const std::optional<world::PortalExit> exit =
+            world::netherPortals::exitFor(world, *target, mob->x, mob->y, mob->z, *axis);
+        if (!exit.has_value()) {
+            continue;
+        }
+        wire::nbt::NbtCompound saved = entity::entityNbt::encode(*mob);
+        std::unique_ptr<entity::ServerEntity> moved =
+            entity::entityNbt::decode(saved, players_->allocateEntityId(), mob->protocolType());
+        if (moved == nullptr) {
+            continue;
+        }
+        moved->x = exit->x;
+        moved->y = exit->y;
+        moved->z = exit->z;
+        moved->portalCooldown = kEntityPortalCooldown;
+        moved->sourceNbt = std::move(saved);
+        mob->removed = true;
+        target->state().spawnEntity(std::move(moved));
     }
 }
 
@@ -621,8 +701,12 @@ void EnvironmentTickSystem::strikeLightning(world::LoadedWorld& world) {
             static_cast<void>(spawning_->spawnSkeletonTrap(world, (*target)[0], (*target)[1], (*target)[2]));
         }
         // parity: `ServerLevel.tickThunder`.
-        static_cast<void>(LightningBoltSystem::spawn(world, (*target)[0] + 0.5, (*target)[1], (*target)[2] + 0.5,
-                                                     players_->allocateEntityId(), std::nullopt, isTrap));
+        if (entity::ServerEntity* bolt =
+                LightningBoltSystem::spawn(world, (*target)[0] + 0.5, (*target)[1], (*target)[2] + 0.5,
+                                           players_->allocateEntityId(), std::nullopt, isTrap);
+            bolt != nullptr) {
+            bolt->boltAnnounced = true;
+        }
     }
 }
 

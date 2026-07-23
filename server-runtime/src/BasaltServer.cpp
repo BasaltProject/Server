@@ -1240,6 +1240,15 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         playerRegistry_, *broadcaster_,
         ConduitSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
     lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_, advancementTriggers_.get());
+    lightning_->setStruckCheck([this](world::LoadedWorld& world, const entity::ServerEntity& bolt) {
+        return eventSink_.allowed(&server::plugins::pluginEventTypes::worldLightning,
+                                  [&](server::plugins::PluginEvent& event) {
+                                      event.set("world", world.name());
+                                      event.set("x", static_cast<std::int64_t>(std::floor(bolt.x)));
+                                      event.set("y", static_cast<std::int64_t>(std::floor(bolt.y)));
+                                      event.set("z", static_cast<std::int64_t>(std::floor(bolt.z)));
+                                  });
+    });
     pushes_ = std::make_unique<EntityPushSystem>(
         playerRegistry_, *combat_,
         EntityPushSystem::Hooks{
