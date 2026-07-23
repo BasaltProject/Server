@@ -32,8 +32,8 @@ class MobTickSystem {
 public:
     MobTickSystem(MobActionSystem& actions, EntityPushSystem& pushes) : actions_(&actions), pushes_(&pushes) {}
 
-    using MoveCheck = std::function<bool(world::LoadedWorld&, const entity::ServerEntity&,
-                                         const std::array<double, 5>& from)>;
+    using MoveCheck =
+        std::function<bool(world::LoadedWorld&, const entity::ServerEntity&, const std::array<double, 5>& from)>;
 
     void setMoveCheck(MoveCheck check) { moveCheck_ = std::move(check); }
 
