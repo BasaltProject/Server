@@ -29,6 +29,7 @@ struct RouteOptions {
     std::int32_t maxVisited = 256;
     bool openDoors = false;
     bool amphibious = false;
+    bool floats = false;
 };
 
 struct Route {

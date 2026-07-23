@@ -76,6 +76,8 @@ inline constexpr std::array kEntityProperties{
     EntityPropertySpec{"burns_in_day", EntityValueKind::Bool, true},
     EntityPropertySpec{"despawn_in_peaceful", EntityValueKind::Int, true},
     EntityPropertySpec{"nav_open_doors", EntityValueKind::Bool, true},
+    EntityPropertySpec{"nav_pass_doors", EntityValueKind::Bool, true},
+    EntityPropertySpec{"nav_can_float", EntityValueKind::Bool, true},
     EntityPropertySpec{"bounce", EntityValueKind::Bool, true},
     EntityPropertySpec{"incendiary", EntityValueKind::Bool, true},
     EntityPropertySpec{"arrow_knockback", EntityValueKind::Int, true},

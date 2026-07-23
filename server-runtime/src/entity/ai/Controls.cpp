@@ -78,7 +78,9 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
         }
         return route->nodes;
     }
-    if (mob.navigationOpensDoors.value_or(false)) {
+    const bool opensDoors = mob.navigationOpensDoors.value_or(false) && mob.navigationPassesDoors.value_or(true);
+    const bool floats = mob.navigationFloats.value_or(false);
+    if (opensDoors || floats) {
         const double range = mob.attributeWithModifiers("minecraft:follow_range");
         const std::array<std::int32_t, 3> start = pathFinder::startOf(world, mob.x, mob.y, mob.z, mob.onGround);
         const std::array<std::array<std::int32_t, 3>, 1> targets{{{blockOf(x), blockOf(y), blockOf(z)}}};
@@ -87,7 +89,8 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
                                   pathFinder::RouteOptions{.accuracy = 1,
                                                            .maxPathLength = static_cast<float>(range),
                                                            .maxVisited = static_cast<std::int32_t>(range * 16.0),
-                                                           .openDoors = true});
+                                                           .openDoors = opensDoors,
+                                                           .floats = floats});
         if (!route.has_value()) {
             return std::nullopt;
         }

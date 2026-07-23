@@ -48,6 +48,18 @@ void addMobCommon(Table& table, Operations& operations) {
                      entity.navigationOpensDoors = asBool(value);
                      return true;
                  }};
+    table["nav_pass_doors"] =
+        Accessor{[](const ServerEntity& entity) -> Value { return entity.navigationPassesDoors.value_or(true); },
+                 [](ServerEntity& entity, const Value& value) {
+                     entity.navigationPassesDoors = asBool(value);
+                     return true;
+                 }};
+    table["nav_can_float"] =
+        Accessor{[](const ServerEntity& entity) -> Value { return entity.navigationFloats.value_or(false); },
+                 [](ServerEntity& entity, const Value& value) {
+                     entity.navigationFloats = asBool(value);
+                     return true;
+                 }};
     operations["ambient_sound"] = [](const Environment& environment, ServerEntity& entity,
                                      const Arguments&) -> std::optional<Value> {
         MobActionSystem* system = mobSystem(environment);

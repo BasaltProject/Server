@@ -2,7 +2,6 @@ package org.basaltmc.bukkit.entity;
 
 import com.destroystokyo.paper.entity.Pathfinder;
 import java.util.List;
-import org.basaltmc.bukkit.Unsupported;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
@@ -108,21 +107,21 @@ public final class BasaltPathfinder implements Pathfinder {
 
     @Override
     public boolean canPassDoors() {
-        throw Unsupported.hit("Pathfinder#canPassDoors");
+        return core.flag("nav_pass_doors");
     }
 
     @Override
     public void setCanPassDoors(boolean canPassDoors) {
-        throw Unsupported.hit("Pathfinder#setCanPassDoors");
+        core.set("nav_pass_doors", canPassDoors);
     }
 
     @Override
     public boolean canFloat() {
-        throw Unsupported.hit("Pathfinder#canFloat");
+        return core.flag("nav_can_float");
     }
 
     @Override
     public void setCanFloat(boolean canFloat) {
-        throw Unsupported.hit("Pathfinder#setCanFloat");
+        core.set("nav_can_float", canFloat);
     }
 }
