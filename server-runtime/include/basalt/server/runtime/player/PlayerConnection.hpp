@@ -140,6 +140,9 @@ struct PlayerConnection {
     std::function<void(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier)>
         addEffect;
 
+    std::function<bool(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier)>
+        effectAllowed;
+
     std::function<void(double minX, double maxX, double minZ, double maxZ, std::int32_t warningBlocks, bool withWall)>
         showBorder;
 

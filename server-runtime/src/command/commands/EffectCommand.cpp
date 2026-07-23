@@ -112,6 +112,10 @@ struct Targets {
             }
             continue;
         }
+        if (session->connection().effectAllowed &&
+            !session->connection().effectAllowed(*effect, durationTicks, amplifier)) {
+            continue;
+        }
         const world::ActiveEffect active{.effect = *effect,
                                          .amplifier = amplifier,
                                          .remainingTicks = durationTicks,

@@ -43,6 +43,9 @@ public:
 
     void addEffect(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier);
 
+    [[nodiscard]] bool effectAllowed(const wire::common::Identifier& effect, std::int32_t durationTicks,
+                                     std::int32_t amplifier);
+
     void sendEffect(const world::ActiveEffect& effect);
 
     void sendEffectRemoved(const wire::common::Identifier& effect);

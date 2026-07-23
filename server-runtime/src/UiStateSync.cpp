@@ -58,6 +58,12 @@ void UiStateSync::syncHealth() {
     });
 }
 
+bool UiStateSync::effectAllowed(const Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier) {
+    PlayerSession* session = owner_->playerSession();
+    return session == nullptr || !hooks_.effectAllowed ||
+           hooks_.effectAllowed(*session, effect, amplifier, durationTicks);
+}
+
 void UiStateSync::addEffect(const Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier) {
     PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
