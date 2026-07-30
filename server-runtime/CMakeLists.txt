@@ -270,6 +270,7 @@ basalt_module(server-runtime-core
         src/MobActionAllay.cpp
         src/MobActionHorses.cpp
         src/MobActionCreaking.cpp
+        src/MobActionBell.cpp
         src/MobActionCreakingHeart.cpp
         src/MobActionAmbient.cpp
         src/MobActionArmadillo.cpp
@@ -507,6 +508,7 @@ basalt_module(server-runtime-core
         src/world/RuinedPortalVariants.cpp
         src/world/RealSurfaceEnvironment.cpp
         src/world/NetherSurfaceEnvironment.cpp
+        src/world/Bells.cpp
         src/world/Campfires.cpp
         src/world/BlockEntityTicks.cpp
         src/world/PotionEffects.cpp

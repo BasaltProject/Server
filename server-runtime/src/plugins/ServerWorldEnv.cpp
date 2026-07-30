@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/plugins/ServerWorldEnv.hpp>
+#include <basalt/server/runtime/world/Bells.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -216,6 +217,9 @@ void ServerWorldEnv::blockEvent(const std::int32_t x, const std::int32_t y, cons
     const std::optional<std::int32_t> state = world_->state().blockState(x, y, z);
     if (!state.has_value()) {
         return;
+    }
+    if (first == 1) {
+        world::bells::ringAt(world_->state(), x, y, z);
     }
     for (const player::PlayerSession* player : watchers()) {
         if (player->connection().sendBlockEvent &&

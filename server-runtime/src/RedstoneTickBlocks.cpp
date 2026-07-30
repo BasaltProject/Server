@@ -335,6 +335,9 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 return options_.tickSculkCatalyst && options_.tickSculkCatalyst(world, x, y, z);
             },
+        .bell = [this,
+                 &world](wire::nbt::NbtCompound& data, const std::int32_t x, const std::int32_t y,
+                         const std::int32_t z) { return options_.tickBell && options_.tickBell(world, x, y, z, data); },
         .conduit =
             [this, &world](wire::nbt::NbtCompound& data, const std::int32_t x, const std::int32_t y,
                            const std::int32_t z) {

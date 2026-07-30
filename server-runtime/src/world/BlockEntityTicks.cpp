@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
+#include <basalt/server/runtime/world/Bells.hpp>
 #include <basalt/server/runtime/world/BlockEntityTicks.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
@@ -215,6 +216,14 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             }
             if (path == "sculk_catalyst") {
                 catalysts.push_back({x, y, z});
+                continue;
+            }
+            if (path == "bell") {
+                server::world::ChunkBlockEntity* bellEntity = chunk->blockEntityAt(stored.localX(), y, stored.localZ());
+                if (bellEntity != nullptr && bells::ringing(bellEntity->data()) && hooks.bell &&
+                    hooks.bell(bellEntity->data(), x, y, z)) {
+                    chunk->markDirty();
+                }
                 continue;
             }
             if (path == "creaking_heart") {

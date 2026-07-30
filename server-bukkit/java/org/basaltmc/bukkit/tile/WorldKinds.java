@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import net.kyori.adventure.text.Component;
-import org.basaltmc.bukkit.Unsupported;
 import org.basaltmc.bukkit.WorldEnvNatives;
 import org.basaltmc.bukkit.item.Convert;
 import org.basaltmc.bukkit.item.Nbt;
@@ -362,8 +361,17 @@ final class WorldKinds {
                     tile.put("CookingTotalTimes", values);
                     return null;
                 }
-                case "startCooking", "stopCooking", "isCookingDisabled":
-                    throw Unsupported.hit("Campfire#" + name);
+                case "isCookingDisabled": {
+                    check((Integer) args[0]);
+                    return array(tile, "Paper.StopCooking")[(Integer) args[0]] != 0;
+                }
+                case "startCooking", "stopCooking": {
+                    check((Integer) args[0]);
+                    int[] values = array(tile, "Paper.StopCooking");
+                    values[(Integer) args[0]] = name.equals("stopCooking") ? 1 : 0;
+                    tile.put("Paper.StopCooking", values);
+                    return null;
+                }
                 default:
                     return Tile.kNone;
             }
@@ -398,8 +406,17 @@ final class WorldKinds {
                         tile.y + 0.5, tile.z + 0.5, 2.0F, 1.0F, 0L);
                     return true;
                 }
-                case "isShaking", "getShakingTicks", "isResonating", "getResonatingTicks":
-                    throw Unsupported.hit("Bell#" + name);
+                case "isShaking", "getShakingTicks", "isResonating", "getResonatingTicks": {
+                    Map<String, Object> live = tile.data;
+                    return switch (name) {
+                        case "isShaking" -> Nbt.flag(live, "Basalt.BellShaking", false);
+                        case "getShakingTicks" -> Nbt.flag(live, "Basalt.BellShaking", false)
+                            ? Nbt.integer(live, "Basalt.BellTicks", 0) : 0;
+                        case "isResonating" -> Nbt.flag(live, "Basalt.BellResonating", false);
+                        default -> Nbt.flag(live, "Basalt.BellResonating", false)
+                            ? Nbt.integer(live, "Basalt.BellResonationTicks", 0) : 0;
+                    };
+                }
                 default:
                     return Tile.kNone;
             }
