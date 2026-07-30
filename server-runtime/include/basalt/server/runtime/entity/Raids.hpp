@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/entity/IntHashOrder.hpp>
 #include <basalt/wire/common/Uuid.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 #include <basalt/wire/text/Component.hpp>
 
 #include <array>
@@ -16,10 +17,6 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-
-namespace basalt::wire::nbt {
-class NbtCompound;
-}
 
 namespace basalt::server::runtime::entity {
 
