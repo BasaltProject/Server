@@ -220,12 +220,9 @@ public abstract class WorldEntities extends WorldGeo {
     }
 
     private boolean blast(Entity source, double x, double y, double z, float power, boolean fire, boolean breakBlocks) {
-        if (fire) {
-            throw Unsupported.hit("World#createExplosion that sets fires");
-        }
         Blocks.flushAll();
         return EntityNatives.explode(getName(), x, y, z, power, breakBlocks,
-            source == null ? -1 : source.getEntityId());
+            source == null ? -1 : source.getEntityId(), fire);
     }
 
     @Override

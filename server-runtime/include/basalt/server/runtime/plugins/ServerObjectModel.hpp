@@ -101,7 +101,7 @@ struct ModelHooks {
                                         double y, double z, float yaw, std::string_view reason)>
         spawnAs;
     std::function<void(world::LoadedWorld& world, double x, double y, double z, float power, bool breakBlocks,
-                       std::int32_t sourceEntityId)>
+                       std::int32_t sourceEntityId, bool fire)>
         explode;
     std::function<std::int32_t(world::LoadedWorld& world, player::PlayerSession& player, bool offHand)> reelIn;
     std::function<MobActionSystem*()> mobSystem;

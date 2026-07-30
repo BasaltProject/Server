@@ -94,10 +94,10 @@ jint JNICALL nativeDropItem(JNIEnv* env, jclass, jstring world, jbyteArray stack
 }
 
 jboolean JNICALL nativeExplode(JNIEnv* env, jclass, jstring world, jdouble x, jdouble y, jdouble z, jfloat power,
-                               jboolean breakBlocks, jint source) {
+                               jboolean breakBlocks, jint source, jboolean fire) {
     const auto found = BukkitBridge::current().services().worlds().byName(toStd(env, world));
     return found != nullptr &&
-                   guarded<bool>(false, [&] { return found->explode(x, y, z, power, breakBlocks == JNI_TRUE, source); })
+                   guarded<bool>(false, [&] { return found->explode(x, y, z, power, breakBlocks == JNI_TRUE, source, fire == JNI_TRUE); })
                ? JNI_TRUE
                : JNI_FALSE;
 }
@@ -136,7 +136,7 @@ void registerEntityNatives(JNIEnv* env, jclass natives) {
         method("spawnAs", "(Ljava/lang/String;Ljava/lang/String;DDDFLjava/lang/String;)I",
                reinterpret_cast<void*>(&nativeSpawnAs)),
         method("dropItem", "(Ljava/lang/String;[BDDDDDD)I", reinterpret_cast<void*>(&nativeDropItem)),
-        method("explode", "(Ljava/lang/String;DDDFZI)Z", reinterpret_cast<void*>(&nativeExplode)),
+        method("explode", "(Ljava/lang/String;DDDFZIZ)Z", reinterpret_cast<void*>(&nativeExplode)),
         method("snbtToNbt", "(Ljava/lang/String;)[B", reinterpret_cast<void*>(&nativeSnbtToNbt)),
         method("nbtToSnbt", "([B)Ljava/lang/String;", reinterpret_cast<void*>(&nativeNbtToSnbt)),
     };

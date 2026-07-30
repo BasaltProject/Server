@@ -443,7 +443,8 @@ void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks h
         const std::int32_t base = firstArgument(args);
         args.pushBoolean(world->explode(args.checkNumber(base), args.checkNumber(base + 1), args.checkNumber(base + 2),
                                         static_cast<float>(args.checkNumber(base + 3)), args.booleanOr(base + 4, true),
-                                        static_cast<std::int32_t>(args.integerOr(base + 5, -1))));
+                                        static_cast<std::int32_t>(args.integerOr(base + 5, -1)),
+                                        args.booleanOr(base + 6, false)));
         return 1;
     });
     object.method("drop_item", [world](LuaArgs& args) {
