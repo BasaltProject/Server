@@ -145,6 +145,10 @@ public:
 
     std::int32_t openWindow(const server::plugins::PluginWindowSpec& spec) override;
 
+    std::int32_t openBlockWindow(std::int32_t x, std::int32_t y, std::int32_t z) override;
+
+    std::int32_t openEntityWindow(std::int32_t entityId) override;
+
     void closeWindow() override;
 
     [[nodiscard]] server::plugins::PluginWindowInfo windowInfo() const override;

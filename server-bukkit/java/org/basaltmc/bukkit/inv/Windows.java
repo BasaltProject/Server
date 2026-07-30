@@ -99,8 +99,20 @@ public final class Windows {
     }
 
     public static InventoryView open(HumanEntity player, Inventory inventory) {
-        if (!(TypedInventories.unwrap(inventory) instanceof CustomInventory custom)) {
-            throw org.basaltmc.bukkit.Unsupported.hit("HumanEntity#openInventory of an inventory the server owns");
+        Inventory real = TypedInventories.unwrap(inventory);
+        if (real instanceof BlockInventory block) {
+            if (!block.worldName().equals(player.getWorld().getName())) {
+                return null;
+            }
+            int container = InventoryNatives.windowOpenBlock(uuid(player), block.blockX(), block.blockY(), block.blockZ());
+            return container == 0 ? null : current(player);
+        }
+        if (real instanceof EntityContainerInventory entity) {
+            int container = InventoryNatives.windowOpenEntity(uuid(player), entity.entityId());
+            return container == 0 ? null : current(player);
+        }
+        if (!(real instanceof CustomInventory custom)) {
+            throw org.basaltmc.bukkit.Unsupported.hit("HumanEntity#openInventory of " + real.getClass().getSimpleName());
         }
         String kind = InventoryTypes.kindOf(custom.getType());
         if (kind == null) {
@@ -111,8 +123,12 @@ public final class Windows {
     }
 
     public static InventoryView open(HumanEntity player, BasaltInventoryView view) {
-        if (!(TypedInventories.unwrap(view.getTopInventory()) instanceof CustomInventory custom)) {
-            throw org.basaltmc.bukkit.Unsupported.hit("HumanEntity#openInventory of a view the server owns");
+        Inventory top = TypedInventories.unwrap(view.getTopInventory());
+        if (top instanceof BlockInventory || top instanceof EntityContainerInventory) {
+            return open(player, top);
+        }
+        if (!(top instanceof CustomInventory custom)) {
+            throw org.basaltmc.bukkit.Unsupported.hit("HumanEntity#openInventory of " + top.getClass().getSimpleName());
         }
         InventoryOpenEvent event = new InventoryOpenEvent(view);
         Bukkit.getPluginManager().callEvent(event);
