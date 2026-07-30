@@ -68,6 +68,7 @@ inline constexpr std::array kEntityProperties{
     EntityPropertySpec{"powered", EntityValueKind::Bool, true},
     EntityPropertySpec{"swell", EntityValueKind::Int, true},
     EntityPropertySpec{"profession", EntityValueKind::Text, true},
+    EntityPropertySpec{"trading_player", EntityValueKind::Int, false},
     EntityPropertySpec{"villager_level", EntityValueKind::Int, true},
     EntityPropertySpec{"villager_experience", EntityValueKind::Int, true},
     EntityPropertySpec{"tamed_horse", EntityValueKind::Bool, true},

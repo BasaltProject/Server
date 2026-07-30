@@ -99,6 +99,15 @@ public interface AbstractVillagerOps extends AbstractVillager, Cored {
     }
 
     default HumanEntity getTrader() {
+        int trader = core().integer("trading_player");
+        if (trader < 0) {
+            return null;
+        }
+        for (org.bukkit.entity.Player player : org.bukkit.Bukkit.getOnlinePlayers()) {
+            if (player.getEntityId() == trader) {
+                return player;
+            }
+        }
         return null;
     }
 }
