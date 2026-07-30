@@ -252,6 +252,8 @@ public:
         float voidDamageAmount = 4.0F;
         double voidDamageOffset = -64.0;
         std::optional<std::int32_t> simulationDistance;
+        bool lootRefill = false;
+        std::int32_t lootRelootSeconds = -1;
     };
 
     [[nodiscard]] Tunables& tunables() noexcept { return tunables_; }

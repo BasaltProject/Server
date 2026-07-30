@@ -1,7 +1,9 @@
 #pragma once
 
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/common/Uuid.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <array>
 #include <cstdint>
@@ -26,6 +28,23 @@ struct Opener {
     std::string name;
     float luck = 0.0F;
     std::optional<wire::common::Identifier> mainhand;
+};
+
+struct Lootable {
+    std::int64_t lastFill = -1;
+    std::int64_t nextRefill = -1;
+    std::int32_t numRefills = 0;
+    std::vector<std::pair<wire::common::Uuid, std::int64_t>> looted;
+
+    [[nodiscard]] static Lootable read(const wire::nbt::NbtCompound& data);
+
+    void write(wire::nbt::NbtCompound& data) const;
+
+    [[nodiscard]] bool canLoot(const wire::common::Uuid& player, std::int64_t now, std::int32_t relootSeconds) const;
+
+    /// parity: Paper's `PaperLootableInventoryData.shouldReplenish`, with the event left out.
+    [[nodiscard]] bool shouldRefill(const std::optional<wire::common::Uuid>& player, std::int64_t now, bool refill,
+                                    std::int32_t relootSeconds, std::int32_t maxRefills) const;
 };
 
 /// A zero seed rolls on the table's own stream, as the jar does.

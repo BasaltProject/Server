@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import net.kyori.adventure.text.Component;
 import org.basaltmc.bukkit.Items;
-import org.basaltmc.bukkit.Unsupported;
 import org.basaltmc.bukkit.item.Nbt;
 import org.basaltmc.bukkit.item.Texts;
 import org.bukkit.Bukkit;
@@ -102,16 +101,34 @@ final class Common {
                     return null;
                 }
                 return Tile.kNone;
-            case "isRefillEnabled", "hasBeenFilled", "hasPendingRefill", "hasPlayerLooted":
-                return false;
-            case "canPlayerLoot":
-                return true;
-            case "getLastFilled", "getNextRefill":
-                return -1L;
+            case "isRefillEnabled":
+                return LootableData.refillEnabled(tile.world.getName());
+            case "hasBeenFilled":
+                return LootableData.of(tile.data).lastFill() != -1L;
+            case "hasPendingRefill":
+                return LootableData.of(tile.data).hasPendingRefill();
+            case "getLastFilled":
+                return LootableData.of(tile.data).lastFill();
+            case "getNextRefill":
+                return LootableData.of(tile.data).nextRefill();
+            case "setNextRefill": {
+                LootableData data = LootableData.of(tile.data);
+                long previous = data.setNextRefill((Long) args[0]);
+                tile.put(LootableData.key(), data.toNbt());
+                return previous;
+            }
+            case "hasPlayerLooted":
+                return LootableData.of(tile.data).hasPlayerLooted(playerId(args[0]));
             case "getLastLooted":
-                return null;
-            case "setNextRefill", "setHasPlayerLooted":
-                throw Unsupported.hit("LootableInventory#" + name);
+                return LootableData.of(tile.data).lastLooted(playerId(args[0]));
+            case "canPlayerLoot":
+                return LootableData.of(tile.data).canPlayerLoot(tile.world.getName(), playerId(args[0]));
+            case "setHasPlayerLooted": {
+                LootableData data = LootableData.of(tile.data);
+                boolean was = data.setHasPlayerLooted(playerId(args[0]), (Boolean) args[1]);
+                tile.put(LootableData.key(), data.toNbt());
+                return was;
+            }
             case "getCraftingTicks":
                 return tile.integer("crafting_ticks_remaining", 0);
             case "setCraftingTicks":
@@ -196,6 +213,10 @@ final class Common {
             default:
                 return Tile.kNone;
         }
+    }
+
+    private static java.util.UUID playerId(Object who) {
+        return who instanceof org.bukkit.entity.Player player ? player.getUniqueId() : (java.util.UUID) who;
     }
 
     private static boolean contains(int[] slots, int slot) {

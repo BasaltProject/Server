@@ -91,3 +91,12 @@ open-end-exit-portal = false
 # Vanilla hardcore: the difficulty stays hard, hearts are drawn hardcore, and a player who dies
 # comes back as a spectator.
 hardcore = false
+# NOT VANILLA. With this on, a loot container keeps its table after the first opening and fills again once a random
+# time between the two limits below has passed since it was filled, for a player who opens it after that.
+loot-refill = false
+loot-refill-min-seconds = 43200
+loot-refill-max-seconds = 172800
+# How many times a container may fill in all, the first fill included. -1 is without limit.
+loot-max-refills = -1
+# How long a player must wait to loot a refilled container they already looted. -1 is never.
+loot-reloot-seconds = -1

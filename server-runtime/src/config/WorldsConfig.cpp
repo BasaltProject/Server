@@ -54,6 +54,15 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
         std::max<std::int64_t>(table->integer("save-interval-seconds").value_or(inherited.saveIntervalSeconds), 0));
     settings.openEndExitPortal = table->boolean("open-end-exit-portal").value_or(inherited.openEndExitPortal);
     settings.hardcore = table->boolean("hardcore").value_or(inherited.hardcore);
+    settings.lootRefill = table->boolean("loot-refill").value_or(inherited.lootRefill);
+    const auto whole = [table](std::string_view key, std::int32_t fallback, std::int64_t least) {
+        return static_cast<std::int32_t>(std::max<std::int64_t>(table->integer(key).value_or(fallback), least));
+    };
+    settings.lootRefillMinSeconds = whole("loot-refill-min-seconds", inherited.lootRefillMinSeconds, 0);
+    settings.lootRefillMaxSeconds =
+        std::max(whole("loot-refill-max-seconds", inherited.lootRefillMaxSeconds, 0), settings.lootRefillMinSeconds);
+    settings.lootMaxRefills = whole("loot-max-refills", inherited.lootMaxRefills, -1);
+    settings.lootRelootSeconds = whole("loot-reloot-seconds", inherited.lootRelootSeconds, -1);
     return settings;
 }
 
