@@ -26,6 +26,7 @@ public final class InventoryNatives {
     public static native boolean removeRecipe(String id);
     public static native void clearRecipes();
     public static native void resetRecipes();
+    public static native void resetBrewing();
     public static native byte[] mobEffects();
     public static native byte[] potions();
 }

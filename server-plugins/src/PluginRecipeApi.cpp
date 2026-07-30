@@ -44,6 +44,12 @@ void installRecipes(LuaArgs& lua, PluginHost& host) {
         return 0;
     });
     lua.setField("reset");
+    wire::lua::pushHostFunction(lua, "recipes.reset_brewing", [server](LuaArgs& args) {
+        static_cast<void>(args);
+        server->services().inventories().resetBrewingRecipes();
+        return 0;
+    });
+    lua.setField("reset_brewing");
     lua.setGlobal("recipes");
 }
 } // namespace basalt::server::plugins::pluginApi

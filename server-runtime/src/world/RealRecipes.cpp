@@ -98,6 +98,7 @@ void RealRecipes::load(const Jar& jar) {
         parsedIds_.push_back(id);
         live_.push_back(true);
     }
+    loaded_ = recipes_.size();
     logger_.info([&] {
         return "Loaded " + std::to_string(recipes_.size()) + " crafting recipe(s) (" + std::to_string(skipped) +
                " other recipe type(s) skipped).";
@@ -164,6 +165,21 @@ void RealRecipes::restore() {
     ids_.clear();
     if (jar_.readText && jar_.entriesUnder) {
         load(jar_);
+    }
+    index();
+}
+
+void RealRecipes::restoreBrewing() {
+    for (std::size_t at = 0; at < recipes_.size(); ++at) {
+        if (recipes_[at].kind != crafting::RecipeKind::Brewing) {
+            continue;
+        }
+        live_[at] = at < loaded_;
+        if (live_[at]) {
+            ids_.insert(parsedIds_[at]);
+        } else {
+            ids_.erase(parsedIds_[at]);
+        }
     }
     index();
 }

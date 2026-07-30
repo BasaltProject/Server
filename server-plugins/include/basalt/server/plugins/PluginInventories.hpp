@@ -80,6 +80,9 @@ public:
 
     virtual void resetRecipes() {}
 
+    /// Drops the brewing recipes a plugin added and brings back the ones the game ships.
+    virtual void resetBrewingRecipes() {}
+
     /// Tags of a datapack registry as tag, members joined by `|`, tag, members...
     [[nodiscard]] virtual std::vector<std::string> registryTags(std::string_view registry) const {
         static_cast<void>(registry);

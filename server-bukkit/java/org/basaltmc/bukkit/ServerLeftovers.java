@@ -84,7 +84,7 @@ public abstract class ServerLeftovers extends ServerExtras {
 
             @Override
             public void resetPotionMixes() {
-                throw Unsupported.hit("PotionBrewer#resetPotionMixes");
+                InventoryNatives.resetBrewing();
             }
         };
     }

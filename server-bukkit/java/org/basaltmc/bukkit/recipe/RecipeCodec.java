@@ -33,6 +33,7 @@ public final class RecipeCodec {
     private static final int kStonecutting = 3;
     private static final int kSmithing = 4;
     private static final int kSpecial = 5;
+    private static final int kBrewing = 6;
 
     private RecipeCodec() {}
 
@@ -136,6 +137,10 @@ public final class RecipeCodec {
             if (trim.getTrimPattern() != null) {
                 out.put("trim_pattern", trim.getTrimPattern().getKey().toString());
             }
+        } else if (recipe instanceof org.bukkit.inventory.BrewingRecipe brewing) {
+            out.put("kind", kBrewing);
+            out.put("base", ingredient(brewing.getInput()));
+            out.put("ingredient", ingredient(brewing.getIngredient()));
         } else {
             throw new IllegalArgumentException("Cannot register a recipe of " + recipe.getClass().getName());
         }
@@ -278,6 +283,9 @@ public final class RecipeCodec {
             }
             case kSpecial:
                 return new SpecialRecipe(key, result);
+            case kBrewing:
+                return new org.bukkit.inventory.BrewingRecipe(key, result, choice(data.get("base")),
+                    choice(data.get("ingredient")));
             default:
                 return null;
         }

@@ -229,7 +229,11 @@ bool ServerInventories::addRecipe(std::string_view id, std::span<const std::uint
     const std::expected<wire::nbt::AnonymousTag, wire::nbt::NbtError> read = wire::nbt::nbtIO::readAnonymous(data);
     const NbtCompound* root = read.has_value() ? read->tag.get<NbtCompound>() : nullptr;
     std::optional<server::world::crafting::Recipe> recipe = root == nullptr ? std::nullopt : recipeFromNbt(*root);
-    return recipe.has_value() && data_().recipes.add(*parsedId, std::move(*recipe));
+    const bool added = recipe.has_value() && data_().recipes.add(*parsedId, std::move(*recipe));
+    if (added) {
+        data_().useBrewingRecipes();
+    }
+    return added;
 }
 
 bool ServerInventories::addRecipeJson(std::string_view id, std::string_view json) {
@@ -247,23 +251,40 @@ bool ServerInventories::addRecipeJson(std::string_view id, std::string_view json
     };
     std::expected<server::world::crafting::Recipe, server::world::crafting::RecipeParseError> recipe =
         server::world::crafting::recipeJson::parse(json, resolve);
-    return recipe.has_value() && data_().recipes.add(*parsedId, std::move(*recipe));
+    const bool added = recipe.has_value() && data_().recipes.add(*parsedId, std::move(*recipe));
+    if (added) {
+        data_().useBrewingRecipes();
+    }
+    return added;
 }
 
 bool ServerInventories::removeRecipe(std::string_view id) {
     const std::optional<Identifier> parsedId = parsed(id);
-    return parsedId.has_value() && data_ && data_().recipes.remove(*parsedId);
+    const bool removed = parsedId.has_value() && data_ && data_().recipes.remove(*parsedId);
+    if (removed) {
+        data_().useBrewingRecipes();
+    }
+    return removed;
 }
 
 void ServerInventories::clearRecipes() {
     if (data_) {
         data_().recipes.clear();
+        data_().useBrewingRecipes();
+    }
+}
+
+void ServerInventories::resetBrewingRecipes() {
+    if (data_) {
+        data_().recipes.restoreBrewing();
+        data_().useBrewingRecipes();
     }
 }
 
 void ServerInventories::resetRecipes() {
     if (data_) {
         data_().recipes.restore();
+        data_().useBrewingRecipes();
     }
 }
 

@@ -307,6 +307,13 @@ void JNICALL nativeResetRecipes(JNIEnv*, jclass) {
     });
 }
 
+void JNICALL nativeResetBrewing(JNIEnv*, jclass) {
+    onServerThread<bool>(false, [] {
+        inventories().resetBrewingRecipes();
+        return true;
+    });
+}
+
 jbyteArray JNICALL nativeMobEffects(JNIEnv* env, jclass) {
     const std::optional<std::vector<std::uint8_t>> data = inventories().mobEffects();
     return data.has_value() ? javaBytes(env, *data) : nullptr;
@@ -386,6 +393,8 @@ void registerInventoryNatives(JNIEnv* env, jclass natives) {
                         reinterpret_cast<void*>(&nativeClearRecipes)},
         JNINativeMethod{const_cast<char*>("resetRecipes"), const_cast<char*>("()V"),
                         reinterpret_cast<void*>(&nativeResetRecipes)},
+        JNINativeMethod{const_cast<char*>("resetBrewing"), const_cast<char*>("()V"),
+                        reinterpret_cast<void*>(&nativeResetBrewing)},
         JNINativeMethod{const_cast<char*>("mobEffects"), const_cast<char*>("()[B"),
                         reinterpret_cast<void*>(&nativeMobEffects)},
         JNINativeMethod{const_cast<char*>("potions"), const_cast<char*>("()[B"),
