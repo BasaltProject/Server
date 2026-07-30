@@ -145,6 +145,9 @@ void Raid::encode(NbtCompound& tag) const {
         heroTags.push_back(NbtTag::ofIntArray(intsOf(hero)));
     }
     tag.set("heroes_of_the_village", NbtTag::ofList(NbtList{NbtType::IntArray, std::move(heroTags)}));
+    if (!values.empty()) {
+        tag.set("BukkitValues", NbtTag::ofCompound(values));
+    }
 }
 
 std::unique_ptr<Raid> Raid::decode(const NbtCompound& tag, std::int64_t seed) {
@@ -170,6 +173,9 @@ std::unique_ptr<Raid> Raid::decode(const NbtCompound& tag, std::int64_t seed) {
                 raid->heroes.emplace_back(halfOf((*ints)[0], (*ints)[1]), halfOf((*ints)[2], (*ints)[3]));
             }
         }
+    }
+    if (const NbtCompound* held = tag.getCompound("BukkitValues"); held != nullptr) {
+        raid->values = *held;
     }
     return raid;
 }

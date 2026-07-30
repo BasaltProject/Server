@@ -18,6 +18,7 @@ import org.bukkit.block.structure.Mirror;
 import org.bukkit.block.structure.StructureRotation;
 import org.bukkit.craftbukkit.persistence.CraftPersistentDataContainer;
 import org.bukkit.entity.Entity;
+import org.bukkit.generator.LimitedRegion;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.structure.Palette;
 import org.bukkit.structure.Structure;
@@ -177,7 +178,32 @@ final class BasaltTemplate implements Structure {
 
     @Override
     public List<Entity> getEntities() {
-        throw Unsupported.hit("Structure#getEntities");
+        List<Entity> out = new ArrayList<>();
+        List<Object> saved = Nbt.list(data.get("entities"));
+        if (saved == null || !(Bukkit.getWorlds().get(0) instanceof BasaltWorld world)) {
+            return out;
+        }
+        for (Object value : saved) {
+            Map<String, Object> entry = Nbt.map(value);
+            Map<String, Object> nbt = entry == null ? null : Nbt.map(entry.get("nbt"));
+            List<Object> pos = entry == null ? null : Nbt.list(entry.get("pos"));
+            if (nbt == null || pos == null || pos.size() < 3) {
+                continue;
+            }
+            org.bukkit.entity.EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(
+                Nbt.string(nbt, "id", ""));
+            if (type == org.bukkit.entity.EntityType.UNKNOWN) {
+                continue;
+            }
+            List<Object> rotation = Nbt.list(nbt.get("Rotation"));
+            Entity made = org.basaltmc.bukkit.entity.EntityCore.template(world, type, ((Number) pos.get(0)).doubleValue(),
+                ((Number) pos.get(1)).doubleValue(), ((Number) pos.get(2)).doubleValue(),
+                rotation == null || rotation.size() < 2 ? 0.0F : ((Number) rotation.get(0)).floatValue(),
+                rotation == null || rotation.size() < 2 ? 0.0F : ((Number) rotation.get(1)).floatValue());
+            ((org.basaltmc.bukkit.entity.Cored) made).core().seedNbt(Nbt.writeNamed(nbt));
+            out.add(made);
+        }
+        return out;
     }
 
     @Override
@@ -229,8 +255,31 @@ final class BasaltTemplate implements Structure {
     @Override
     public void place(RegionAccessor regionAccessor, BlockVector location, boolean includeEntities,
             StructureRotation rotation, Mirror mirror, int palette, float integrity, Random random) {
-        if (!(regionAccessor instanceof World world)) {
-            throw Unsupported.hit("Structure#place into a limited region");
+        World world;
+        if (regionAccessor instanceof LimitedRegion limited) {
+            world = limited.getWorld();
+            BlockVector size = getSize();
+            int[][] corners = {{0, 0}, {size.getBlockX() - 1, 0}, {0, size.getBlockZ() - 1},
+                {size.getBlockX() - 1, size.getBlockZ() - 1}};
+            for (int[] corner : corners) {
+                int x = mirror == Mirror.FRONT_BACK ? -corner[0] : corner[0];
+                int z = mirror == Mirror.LEFT_RIGHT ? -corner[1] : corner[1];
+                int[] turned = switch (rotation) {
+                    case CLOCKWISE_90 -> new int[] {-z, x};
+                    case CLOCKWISE_180 -> new int[] {-x, -z};
+                    case COUNTERCLOCKWISE_90 -> new int[] {z, -x};
+                    default -> new int[] {x, z};
+                };
+                if (!limited.isInRegion(location.getBlockX() + turned[0], location.getBlockY(),
+                    location.getBlockZ() + turned[1])) {
+                    throw new IllegalArgumentException("The structure does not fit in the region of chunk "
+                        + limited.getCenterChunkX() + ", " + limited.getCenterChunkZ());
+                }
+            }
+        } else if (regionAccessor instanceof World whole) {
+            world = whole;
+        } else {
+            throw new IllegalArgumentException("A structure is placed in a world or a limited region");
         }
         placeAt(world, location.getBlockX(), location.getBlockY(), location.getBlockZ(), includeEntities, rotation,
             mirror, palette, integrity, random);
