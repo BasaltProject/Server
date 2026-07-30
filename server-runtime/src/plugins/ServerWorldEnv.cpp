@@ -229,6 +229,17 @@ void ServerWorldEnv::blockEvent(const std::int32_t x, const std::int32_t y, cons
     }
 }
 
+bool ServerWorldEnv::sculk(const std::string_view action, const std::int32_t x, const std::int32_t y,
+                           const std::int32_t z, const std::int32_t sourceX, const std::int32_t sourceY,
+                           const std::int32_t sourceZ, const std::int32_t value, const std::string_view player) {
+    return hooks_->sculk && hooks_->sculk(*world_, action, {x, y, z}, {sourceX, sourceY, sourceZ}, value, player);
+}
+
+std::string ServerWorldEnv::creakingHeart(const std::string_view action, const std::int32_t x, const std::int32_t y,
+                                          const std::int32_t z) {
+    return hooks_->creakingHeart ? hooks_->creakingHeart(*world_, action, {x, y, z}) : std::string{};
+}
+
 PluginBorder ServerWorldEnv::border() {
     const world::WorldBorder& border = world_->border();
     return PluginBorder{.centerX = border.centerX(),

@@ -23,6 +23,10 @@ public:
     void levelEvent(std::int32_t type, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t data,
                     bool global) override;
     void blockEvent(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t first, std::int32_t second) override;
+    bool sculk(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t sourceX,
+               std::int32_t sourceY, std::int32_t sourceZ, std::int32_t value, std::string_view player) override;
+    [[nodiscard]] std::string creakingHeart(std::string_view action, std::int32_t x, std::int32_t y,
+                                            std::int32_t z) override;
     [[nodiscard]] server::plugins::PluginBorder border() override;
     void setBorder(const server::plugins::PluginBorder& border, double seconds) override;
     [[nodiscard]] std::int32_t playerCount() override;

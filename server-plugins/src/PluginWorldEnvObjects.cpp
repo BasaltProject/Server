@@ -657,6 +657,48 @@ void addEnvWorldMethods(PluginObject& object, const std::shared_ptr<PluginWorldR
                     }
                     return 0;
                 })
+        .method("creaking_heart",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    const std::string answer =
+                        env == nullptr ? std::string{}
+                                       : env->creakingHeart(args.checkString(base),
+                                                            static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                            static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                            static_cast<std::int32_t>(args.checkInteger(base + 3)));
+                    if (answer.empty()) {
+                        args.pushNil();
+                    } else {
+                        args.pushString(answer);
+                    }
+                    return 1;
+                })
+        .method("sculk_shriek",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    args.pushBoolean(env != nullptr &&
+                                     env->sculk("shriek", static_cast<std::int32_t>(args.checkInteger(base)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 2)), 0, 0, 0, 0,
+                                                args.checkString(base + 3)));
+                    return 1;
+                })
+        .method("sculk_bloom",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    PluginWorldEnv* env = world->env();
+                    args.pushBoolean(env != nullptr &&
+                                     env->sculk("bloom", static_cast<std::int32_t>(args.checkInteger(base)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 3)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 4)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 5)),
+                                                static_cast<std::int32_t>(args.checkInteger(base + 6)), {}));
+                    return 1;
+                })
         .method("drops",
                 [world](LuaArgs& args) {
                     const std::int32_t base = firstArgument(args);

@@ -402,6 +402,30 @@ bool MobActionSystem::tickCreakingHeart(world::LoadedWorld& world, std::int32_t 
     return changed;
 }
 
+std::string MobActionSystem::heartCommand(world::LoadedWorld& world, const Pos& at, const std::string_view action) {
+    if (heartEntity(world, at) == nullptr) {
+        return {};
+    }
+    random::RandomSource random = freshRandom();
+    if (action == "spawn") {
+        ServerEntity* spawned = spawnProtector(world, at, random);
+        if (spawned == nullptr) {
+            return {};
+        }
+        if (server::world::ChunkBlockEntity* stored = heartEntity(world, at); stored != nullptr) {
+            creakings::setHeartCreaking(stored->data(), spawned->uuid());
+        }
+        return spawned->uuid().toString();
+    }
+    if (action == "resin") {
+        const std::optional<Pos> placed = spreadResin(world, at, random);
+        return placed.has_value() ? std::to_string((*placed)[0]) + "," + std::to_string((*placed)[1]) + "," +
+                                        std::to_string((*placed)[2])
+                                  : std::string{};
+    }
+    return {};
+}
+
 ServerEntity* MobActionSystem::spawnProtector(world::LoadedWorld& world, const Pos& at, random::RandomSource& random) {
     if (spawning_ == nullptr) {
         return nullptr;

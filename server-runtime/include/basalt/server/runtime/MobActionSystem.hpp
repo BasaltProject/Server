@@ -205,6 +205,10 @@ public:
     bool tickCreakingHeart(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::vector<world::BlockChange>& pending);
 
+    /// "spawn" puts a protector at the heart and answers its uuid; "resin" spreads a clump and answers "x,y,z".
+    [[nodiscard]] std::string heartCommand(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
+                                           std::string_view action);
+
     bool tickBell(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                   wire::nbt::NbtCompound& data);
 

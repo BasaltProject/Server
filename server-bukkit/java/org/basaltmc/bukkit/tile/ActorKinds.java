@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.basaltmc.bukkit.Unsupported;
+import org.basaltmc.bukkit.WorldEnvNatives;
 import org.basaltmc.bukkit.item.Convert;
 import org.basaltmc.bukkit.item.Nbt;
 import org.bukkit.Bukkit;
@@ -81,16 +82,38 @@ final class ActorKinds {
                     tile.put("last_vibration_frequency", (Integer) args[0]);
                     return null;
                 case "getListenerRange":
-                    return range;
+                    return tile.integer("Paper.ListenerRange", range);
                 case "setListenerRange":
-                    throw Unsupported.hit("SculkSensor#setListenerRange");
+                    if ((Integer) args[0] <= 0) {
+                        throw new IllegalArgumentException("Vibration listener range must be greater than 0");
+                    }
+                    tile.put("Paper.ListenerRange", args[0]);
+                    return null;
                 case "getWarningLevel":
                     return tile.integer("warning_level", 0);
                 case "setWarningLevel":
                     tile.put("warning_level", (Integer) args[0]);
                     return null;
-                case "tryShriek", "bloom":
-                    throw Unsupported.hit(face.getSimpleName() + "#" + name);
+                case "tryShriek":
+                    if (args[0] != null) {
+                        WorldEnvNatives.sculk(tile.world.getName(), "shriek", tile.x, tile.y, tile.z, 0, 0, 0, 0,
+                            ((Player) args[0]).getUniqueId().toString());
+                    }
+                    return null;
+                case "bloom": {
+                    int charge = (Integer) args[1];
+                    if (charge <= 0) {
+                        throw new IllegalArgumentException("charge must be positive");
+                    }
+                    int[] at = args[0] instanceof org.bukkit.block.Block block
+                        ? new int[] {block.getX(), block.getY(), block.getZ()}
+                        : new int[] {((io.papermc.paper.math.Position) args[0]).blockX(),
+                            ((io.papermc.paper.math.Position) args[0]).blockY(),
+                            ((io.papermc.paper.math.Position) args[0]).blockZ()};
+                    WorldEnvNatives.sculk(tile.world.getName(), "bloom", tile.x, tile.y, tile.z, at[0], at[1], at[2],
+                        charge, null);
+                    return null;
+                }
                 default:
                     return Tile.kNone;
             }
@@ -329,8 +352,24 @@ final class ActorKinds {
                     tile.put("creaking", args[0] == null ? null
                         : Convert.uuidToInts(((org.bukkit.entity.Creaking) args[0]).getUniqueId()));
                     return null;
-                case "spawnCreaking", "spreadResin":
-                    throw Unsupported.hit("CreakingHeart#" + name);
+                case "spawnCreaking": {
+                    String id = WorldEnvNatives.creakingHeart(tile.world.getName(), "spawn", tile.x, tile.y, tile.z);
+                    Entity entity = id == null ? null : Bukkit.getEntity(UUID.fromString(id));
+                    if (entity instanceof org.bukkit.entity.Creaking creaking) {
+                        tile.put("creaking", Convert.uuidToInts(creaking.getUniqueId()));
+                        return creaking;
+                    }
+                    return null;
+                }
+                case "spreadResin": {
+                    String at = WorldEnvNatives.creakingHeart(tile.world.getName(), "resin", tile.x, tile.y, tile.z);
+                    if (at == null) {
+                        return null;
+                    }
+                    String[] parts = at.split(",");
+                    return new Location(tile.world, Integer.parseInt(parts[0]), Integer.parseInt(parts[1]),
+                        Integer.parseInt(parts[2]));
+                }
                 default:
                     return Tile.kNone;
             }
@@ -343,11 +382,54 @@ final class ActorKinds {
             return TrialSpawner.class;
         }
 
+        private static LootTable table(Object id) {
+            NamespacedKey key = id instanceof String text ? NamespacedKey.fromString(text) : null;
+            return key == null ? null : Bukkit.getLootTable(key);
+        }
+
+        private static void checkReward(LootTable table, int weight) {
+            if (table == null) {
+                throw new IllegalArgumentException("Table cannot be null");
+            }
+            if (weight < 1) {
+                throw new IllegalArgumentException("Weight must be at least 1");
+            }
+        }
+
+        private static Map<String, Object> reward(LootTable table, int weight) {
+            Map<String, Object> entry = Nbt.compound();
+            entry.put("data", table.getKey().toString());
+            entry.put("weight", weight);
+            return entry;
+        }
+
+        private static List<Object> rewards(Map<String, Object> config) {
+            List<Object> list = Nbt.list(config, "loot_tables_to_eject");
+            if (list == null) {
+                list = new ArrayList<>(List.of(reward(Bukkit.getLootTable(NamespacedKey.minecraft(
+                    "spawners/trial_chamber/consumables")), 1), reward(Bukkit.getLootTable(NamespacedKey.minecraft(
+                    "spawners/trial_chamber/key")), 1)));
+            }
+            return list;
+        }
+
+        private static Object potentials(Map<String, Object> config, String name, Object[] args) {
+            Map<String, Object> scratch = Nbt.compound();
+            List<Object> held = Nbt.list(config, "spawn_potentials");
+            scratch.put("SpawnPotentials", held == null ? new ArrayList<Object>() : held);
+            Object result = SpawnerKind.callOn(new SpawnerView(null, scratch, new Location(null, 0, 0, 0)), name, args);
+            if (!name.startsWith("get")) {
+                config.put("spawn_potentials", scratch.get("SpawnPotentials"));
+            }
+            return result;
+        }
+
         private static TrialSpawnerConfiguration configuration(Tile tile, String key) {
             return (TrialSpawnerConfiguration) Proxy.newProxyInstance(TrialSpawnerConfiguration.class.getClassLoader(),
                 new Class<?>[] {TrialSpawnerConfiguration.class}, (proxy, method, args) -> {
-                    Map<String, Object> config = tile.mapOrCreate(key);
                     String name = method.getName();
+                    Map<String, Object> config = Nbt.map(tile.data.get(key)) != null ? Nbt.map(tile.data.get(key))
+                        : name.startsWith("get") ? Nbt.compound() : tile.mapOrCreate(key);
                     switch (name) {
                         case "getBaseSpawnsBeforeCooldown":
                             return (float) Nbt.real(config, "total_mobs", 6.0);
@@ -374,6 +456,63 @@ final class ActorKinds {
                         case "setSpawnRange":
                             config.put("spawn_range", (Integer) args[0]);
                             return null;
+                        case "getDelay":
+                            return Nbt.integer(config, "ticks_between_spawn", 40);
+                        case "setDelay":
+                            if ((Integer) args[0] < 0) {
+                                throw new IllegalArgumentException("Delay cannot be less than 0");
+                            }
+                            config.put("ticks_between_spawn", (Integer) args[0]);
+                            return null;
+                        case "getRequiredPlayerRange":
+                            return tile.integer("required_player_range", 14);
+                        case "setRequiredPlayerRange":
+                            tile.put("required_player_range", (Integer) args[0]);
+                            return null;
+                        case "getSpawnedType":
+                        case "getSpawnedEntity":
+                        case "setSpawnedType":
+                        case "setSpawnedEntity":
+                        case "addPotentialSpawn":
+                        case "setPotentialSpawns":
+                        case "getPotentialSpawns":
+                            return potentials(config, name, args);
+                        case "getPossibleRewards": {
+                            Map<LootTable, Integer> out = new java.util.LinkedHashMap<>();
+                            for (Object value : rewards(config)) {
+                                Map<String, Object> entry = Nbt.map(value);
+                                LootTable table = entry == null ? null : table(entry.get("data"));
+                                if (table != null) {
+                                    out.put(table, Nbt.integer(entry, "weight", 1));
+                                }
+                            }
+                            return out;
+                        }
+                        case "addPossibleReward": {
+                            checkReward((LootTable) args[0], (Integer) args[1]);
+                            List<Object> list = rewards(config);
+                            list.add(reward((LootTable) args[0], (Integer) args[1]));
+                            config.put("loot_tables_to_eject", list);
+                            return null;
+                        }
+                        case "removePossibleReward": {
+                            String key = ((LootTable) args[0]).getKey().toString();
+                            List<Object> list = rewards(config);
+                            list.removeIf(value -> key.equals(Nbt.map(value).get("data")));
+                            config.put("loot_tables_to_eject", list);
+                            return null;
+                        }
+                        case "setPossibleRewards": {
+                            List<Object> list = new ArrayList<>();
+                            Map<LootTable, Integer> given = (Map<LootTable, Integer>) args[0];
+                            for (Map.Entry<LootTable, Integer> entry : given == null
+                                ? Map.<LootTable, Integer>of().entrySet() : given.entrySet()) {
+                                checkReward(entry.getKey(), entry.getValue());
+                                list.add(reward(entry.getKey(), entry.getValue()));
+                            }
+                            config.put("loot_tables_to_eject", list);
+                            return null;
+                        }
                         case "hashCode":
                             return System.identityHashCode(proxy);
                         case "equals":

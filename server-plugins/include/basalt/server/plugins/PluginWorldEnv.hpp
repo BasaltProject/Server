@@ -151,6 +151,33 @@ public:
         static_cast<void>(second);
     }
 
+    /// "shriek" makes the sculk shrieker at the position shriek for the player (a uuid); "bloom" makes the sculk
+    /// catalyst at the position bloom and spread from the source block with a charge of `value`.
+    virtual bool sculk(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t sourceX,
+                       std::int32_t sourceY, std::int32_t sourceZ, std::int32_t value, std::string_view player) {
+        static_cast<void>(action);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        static_cast<void>(sourceX);
+        static_cast<void>(sourceY);
+        static_cast<void>(sourceZ);
+        static_cast<void>(value);
+        static_cast<void>(player);
+        return false;
+    }
+
+    /// "spawn" makes the creaking heart at the position spawn its creaking and answers the uuid; "resin" spreads a
+    /// resin clump from it and answers "x,y,z". Empty when nothing happened.
+    [[nodiscard]] virtual std::string creakingHeart(std::string_view action, std::int32_t x, std::int32_t y,
+                                                    std::int32_t z) {
+        static_cast<void>(action);
+        static_cast<void>(x);
+        static_cast<void>(y);
+        static_cast<void>(z);
+        return {};
+    }
+
     [[nodiscard]] virtual PluginBorder border() { return {}; }
 
     /// Applies the border settings that differ from the current ones; the size moves over `seconds` when positive.
