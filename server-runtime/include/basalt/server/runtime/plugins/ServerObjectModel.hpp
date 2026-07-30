@@ -75,6 +75,8 @@ struct ModelHooks {
     const world::realBlockTags::TagMembers* blockTags = nullptr;
     const world::realBlockTags::TagMembers* itemTags = nullptr;
     std::function<bool(world::LoadedWorld& world, std::string_view action, std::int32_t value)> endFight;
+    std::function<bool(world::LoadedWorld& world, std::string_view action, std::string_view text, std::int32_t value)>
+        endFightBar;
     std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> endGatewayAt;
     std::function<std::int32_t()> nextEntityId;
     std::function<bool(const world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,

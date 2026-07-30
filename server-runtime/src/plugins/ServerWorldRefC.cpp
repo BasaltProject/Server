@@ -77,6 +77,10 @@ bool LoadedWorldRef::dragonFightAction(std::string_view action, std::int32_t val
     return hooks_.endFight && hooks_.endFight(*world_, action, value);
 }
 
+bool LoadedWorldRef::dragonFightBar(std::string_view action, std::string_view text, std::int32_t value) {
+    return hooks_.endFightBar && hooks_.endFightBar(*world_, action, text, value);
+}
+
 std::optional<std::array<std::int32_t, 2>> LoadedWorldRef::locateStructure(std::string_view structure, std::int32_t x,
                                                                            std::int32_t z, std::int32_t cells,
                                                                            bool skipExisting) {

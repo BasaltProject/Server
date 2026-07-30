@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/EndFightBar.hpp>
 #include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -162,13 +163,7 @@ void EndFightSystem::updatePlayers(world::LoadedWorld& world, DragonFight& fight
             }
         }
     };
-    const play::BossEventPacket::Add add{.name = wire::text::Component::translatable("entity.minecraft.ender_dragon"),
-                                         .progress = fight.barProgress,
-                                         .color = play::BossBarColor::Pink,
-                                         .overlay = play::BossBarOverlay::Progress,
-                                         .darkenScreen = false,
-                                         .playMusic = true,
-                                         .createWorldFog = true};
+    const play::BossEventPacket::Add add = endFightBar::addOf(fight);
     for (const std::int32_t joined : near) {
         if (!fight.barPlayers.contains(joined) && fight.barVisible) {
             send(joined, add);
@@ -192,23 +187,14 @@ void EndFightSystem::showBar(DragonFight& fight, bool visible) {
             continue;
         }
         if (player->connection().showBossBar) {
-            player->connection().showBossBar(fight.barId,
-                                             wire::text::Component::translatable("entity.minecraft.ender_dragon"),
-                                             fight.barProgress, visible);
+            player->connection().showBossBar(fight.barId, endFightBar::nameOf(fight), fight.barProgress, visible);
             continue;
         }
         if (!player->connection().sendPlayPacket) {
             continue;
         }
         const play::BossEventPacket::Operation operation =
-            visible ? play::BossEventPacket::Operation{play::BossEventPacket::Add{
-                          .name = wire::text::Component::translatable("entity.minecraft.ender_dragon"),
-                          .progress = fight.barProgress,
-                          .color = play::BossBarColor::Pink,
-                          .overlay = play::BossBarOverlay::Progress,
-                          .darkenScreen = false,
-                          .playMusic = true,
-                          .createWorldFog = true}}
+            visible ? play::BossEventPacket::Operation{endFightBar::addOf(fight)}
                     : play::BossEventPacket::Operation{play::BossEventPacket::Remove{}};
         player->connection().sendPlayPacket(play::BossEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             play::BossEventPacket{.id = fight.barId, .operation = operation}.write(buffer);
@@ -229,7 +215,7 @@ void EndFightSystem::updateBar(DragonFight& fight, float progress) {
             continue;
         }
         if (player->connection().showBossBar) {
-            player->connection().showBossBar(fight.barId, wire::text::Component::empty(), progress, true);
+            player->connection().showBossBar(fight.barId, endFightBar::nameOf(fight), progress, true);
         } else if (player->connection().sendPlayPacket) {
             player->connection().sendPlayPacket(play::BossEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
                 play::BossEventPacket{.id = fight.barId, .operation = play::BossEventPacket::UpdateProgress{progress}}

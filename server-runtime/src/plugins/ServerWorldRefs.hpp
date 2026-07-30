@@ -173,6 +173,8 @@ public:
     bool setDragonPreviouslyKilled(bool value) override;
     bool placeEndGateway(std::int32_t x, std::int32_t y, std::int32_t z) override;
     bool dragonFightAction(std::string_view action, std::int32_t value) override;
+
+    bool dragonFightBar(std::string_view action, std::string_view text, std::int32_t value) override;
     [[nodiscard]] std::optional<std::array<std::int32_t, 2>> locateStructure(std::string_view structure, std::int32_t x,
                                                                              std::int32_t z, std::int32_t cells,
                                                                              bool skipExisting) override;

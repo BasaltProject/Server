@@ -419,6 +419,10 @@ public:
         std::string dragonUuid;
         float barProgress = 1.0F;
         bool barVisible = true;
+        std::string barTitle;
+        std::int32_t barColor = 0;
+        std::int32_t barStyle = 0;
+        std::int32_t barFlags = 6;
         /// Entity ids of the players who see the fight's boss bar.
         std::vector<std::int32_t> barPlayers;
         /// Uuids of the crystals the respawn uses, and of those that stand on the pillars.
@@ -436,6 +440,15 @@ public:
     /// Drives the fight: "respawn", "stage" (value is the stage index), "portal", "gateway" or "crystals".
     virtual bool dragonFightAction(std::string_view action, std::int32_t value) {
         static_cast<void>(action);
+        static_cast<void>(value);
+        return false;
+    }
+
+    /// Edits the fight's boss bar: "bar_title" (component JSON), "bar_color", "bar_style", "bar_flags" (bits one to
+    /// four), "bar_add" and "bar_remove" (value is a player's entity id), or "bar_clear".
+    virtual bool dragonFightBar(std::string_view action, std::string_view text, std::int32_t value) {
+        static_cast<void>(action);
+        static_cast<void>(text);
         static_cast<void>(value);
         return false;
     }
