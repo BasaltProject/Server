@@ -123,6 +123,9 @@ public final class Windows {
     }
 
     public static InventoryView open(HumanEntity player, BasaltInventoryView view) {
+        if (view instanceof MerchantView merchantView && player instanceof org.bukkit.entity.Player human) {
+            return human.openMerchant(merchantView.merchant(), true);
+        }
         Inventory top = TypedInventories.unwrap(view.getTopInventory());
         if (top instanceof BlockInventory || top instanceof EntityContainerInventory) {
             return open(player, top);
