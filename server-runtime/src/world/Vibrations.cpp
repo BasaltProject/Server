@@ -108,6 +108,15 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
     return block == calibrated() ? kCalibratedRange : kRange;
 }
 
+[[nodiscard]] std::int32_t radiusAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    const wire::common::Identifier& block) {
+    const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+    const server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+    const std::int32_t given = entity == nullptr ? 0 : entity->data().getInt("Paper.ListenerRange");
+    return given > 0 ? given : radiusOf(block);
+}
+
 /// parity: `getActiveTicks`, overridden by the calibrated sensor and by nothing else.
 [[nodiscard]] std::int32_t activeTicksOf(const wire::common::Identifier& block) {
     return block == calibrated() ? kCalibratedActiveTicks : kActiveTicks;
@@ -222,7 +231,9 @@ void putUuid(wire::nbt::NbtCompound& tag, std::string_view key, const std::optio
         return std::nullopt;
     }
     const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(
-        block, {{"sculk_sensor_phase", "active"}, {"power", std::to_string(strengthFor(distance, radiusOf(block)))}},
+        block,
+        {{"sculk_sensor_phase", "active"},
+         {"power", std::to_string(strengthFor(distance, radiusAt(world, x, y, z, block)))}},
         stateId);
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
@@ -587,32 +598,26 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
         return;
     }
     // parity: the calibrated sensor hears twice as far, so the walk is the wider of the two and each.
-    for (std::int32_t offsetY = -kCalibratedRange; offsetY <= kCalibratedRange; ++offsetY) {
-        for (std::int32_t offsetZ = -kCalibratedRange; offsetZ <= kCalibratedRange; ++offsetZ) {
-            for (std::int32_t offsetX = -kCalibratedRange; offsetX <= kCalibratedRange; ++offsetX) {
-                // parity: `EuclideanGameEventListenerRegistry.getPostableListenerPosition`, which.
-                const std::int32_t reach = (offsetX * offsetX) + (offsetY * offsetY) + (offsetZ * offsetZ);
-                if (reach > kCalibratedRange * kCalibratedRange) {
-                    continue;
-                }
-                const std::int32_t sensorX = blockX + offsetX;
-                const std::int32_t sensorY = blockY + offsetY;
-                const std::int32_t sensorZ = blockZ + offsetZ;
-                const std::optional<std::int32_t> stateId = world.blockState(sensorX, sensorY, sensorZ);
-                if (!stateId.has_value()) {
-                    continue;
-                }
-                const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
-                if (block == nullptr || !isSensor(*block)) {
-                    continue;
-                }
-                const std::int32_t radius = radiusOf(*block);
-                if (reach > radius * radius) {
-                    continue;
-                }
-                hear(world, sensorX, sensorY, sensorZ, *stateId, *block, event, x, y, z, gameTime, source);
-            }
+    for (const std::array<std::int32_t, 3>& sensor :
+         world.sculkSensorsWithin(blockX, blockY, blockZ, std::max(kCalibratedRange, world.widestSculkRange()))) {
+        // parity: `EuclideanGameEventListenerRegistry.getPostableListenerPosition`, which.
+        const std::int32_t offsetX = sensor[0] - blockX;
+        const std::int32_t offsetY = sensor[1] - blockY;
+        const std::int32_t offsetZ = sensor[2] - blockZ;
+        const std::int32_t reach = (offsetX * offsetX) + (offsetY * offsetY) + (offsetZ * offsetZ);
+        const std::optional<std::int32_t> stateId = world.blockState(sensor[0], sensor[1], sensor[2]);
+        if (!stateId.has_value()) {
+            continue;
         }
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+        if (block == nullptr || !isSensor(*block)) {
+            continue;
+        }
+        const std::int32_t radius = radiusAt(world, sensor[0], sensor[1], sensor[2], *block);
+        if (reach > radius * radius) {
+            continue;
+        }
+        hear(world, sensor[0], sensor[1], sensor[2], *stateId, *block, event, x, y, z, gameTime, source);
     }
 }
 

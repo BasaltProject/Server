@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <string_view>
+#include <tuple>
 
 namespace basalt::server::runtime::world {
 namespace {
@@ -56,6 +57,7 @@ void SculkSensorTracker::rememberChunk(const server::world::Chunk& chunk) {
         const std::string_view path = entity.type().path();
         if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
             keep(baseX + entity.localX(), entity.y(), baseZ + entity.localZ());
+            noteRange(entity.data().getInt("Paper.ListenerRange"));
         }
     }
     const std::int32_t minY = chunk.verticalBounds().minY();
@@ -88,12 +90,31 @@ bool SculkSensorTracker::hasNear(double x, double y, double z, std::int32_t rang
     if (sculkSensors_.empty()) {
         return false;
     }
+    range = std::max(range, widest_);
     const WorldReadLock lock{*mutex_};
     return std::ranges::any_of(sculkSensors_, [x, y, z, range](std::int64_t position) {
         return std::abs(unpackBlockX(position) - x) <= range && std::abs(unpackBlockY(position) - y) <= range &&
                std::abs(unpackBlockZ(position) - z) <= range;
     });
 }
+
+std::vector<std::array<std::int32_t, 3>> SculkSensorTracker::within(std::int32_t x, std::int32_t y, std::int32_t z,
+                                                                    std::int32_t range) const {
+    std::vector<std::array<std::int32_t, 3>> found;
+    const WorldReadLock lock{*mutex_};
+    for (const std::int64_t position : sculkSensors_) {
+        const std::array<std::int32_t, 3> at{unpackBlockX(position), unpackBlockY(position), unpackBlockZ(position)};
+        if (std::abs(at[0] - x) <= range && std::abs(at[1] - y) <= range && std::abs(at[2] - z) <= range) {
+            found.push_back(at);
+        }
+    }
+    std::ranges::sort(found, [](const auto& one, const auto& other) {
+        return std::tie(one[1], one[2], one[0]) < std::tie(other[1], other[2], other[0]);
+    });
+    return found;
+}
+
+void SculkSensorTracker::noteRange(std::int32_t range) noexcept { widest_ = std::max(widest_, range); }
 
 std::size_t SculkSensorTracker::size() const {
     const WorldWriteLock lock{*mutex_};

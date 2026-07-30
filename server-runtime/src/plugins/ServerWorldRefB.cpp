@@ -284,6 +284,7 @@ bool LoadedWorldRef::setBlockEntityNbt(std::int32_t x, std::int32_t y, std::int3
     for (const char* key : {"id", "x", "y", "z"}) {
         data.remove(key);
     }
+    world_->state().noteSculkRange(data.getInt("Paper.ListenerRange"));
     server::world::ChunkBlockEntity next = held->withData(std::move(data));
     chunk->setBlockEntity(next);
     tellBlockEntity(x, y, z, next);
@@ -310,6 +311,7 @@ bool LoadedWorldRef::createBlockEntity(std::int32_t x, std::int32_t y, std::int3
             data.remove(key);
         }
     }
+    world_->state().noteSculkRange(data.getInt("Paper.ListenerRange"));
     const server::world::ChunkBlockEntity made{x & 15, y, z & 15, *block, std::move(data)};
     chunk->setBlockEntity(made);
     tellBlockEntity(x, y, z, made);
@@ -384,6 +386,10 @@ std::optional<LoadedWorldRef::DragonFightFacts> LoadedWorldRef::dragonFight() {
     }
     facts.barProgress = fight->barProgress;
     facts.barVisible = fight->barVisible;
+    facts.barTitle = fight->barTitle;
+    facts.barColor = fight->barColor;
+    facts.barStyle = fight->barStyle;
+    facts.barFlags = fight->barFlags;
     facts.barPlayers.assign(fight->barPlayers.begin(), fight->barPlayers.end());
     for (const wire::common::Uuid& crystal : fight->respawnCrystals) {
         facts.respawnCrystals.push_back(crystal.toString());
