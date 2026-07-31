@@ -24,7 +24,6 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/PersistenceCoordinator.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
-#include <basalt/server/runtime/TrialSpawnerSystem.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/SculkCatalystSystem.hpp>
 #include <basalt/server/runtime/ServerListStatus.hpp>
@@ -34,6 +33,7 @@
 #include <basalt/server/runtime/StructureBlockSystem.hpp>
 #include <basalt/server/runtime/SubstituteLabels.hpp>
 #include <basalt/server/runtime/TickLoop.hpp>
+#include <basalt/server/runtime/TrialSpawnerSystem.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>

@@ -96,8 +96,11 @@ jint JNICALL nativeDropItem(JNIEnv* env, jclass, jstring world, jbyteArray stack
 jboolean JNICALL nativeExplode(JNIEnv* env, jclass, jstring world, jdouble x, jdouble y, jdouble z, jfloat power,
                                jboolean breakBlocks, jint source, jboolean fire) {
     const auto found = BukkitBridge::current().services().worlds().byName(toStd(env, world));
-    return found != nullptr &&
-                   guarded<bool>(false, [&] { return found->explode(x, y, z, power, breakBlocks == JNI_TRUE, source, fire == JNI_TRUE); })
+    return found != nullptr && guarded<bool>(false,
+                                             [&] {
+                                                 return found->explode(x, y, z, power, breakBlocks == JNI_TRUE, source,
+                                                                       fire == JNI_TRUE);
+                                             })
                ? JNI_TRUE
                : JNI_FALSE;
 }

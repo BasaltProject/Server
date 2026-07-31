@@ -70,7 +70,8 @@ public:
         return -1;
     }
 
-    /// An explosion of the given power; the source is an entity id or -1. Blocks are spared when `breakBlocks` is off, and `fire` sets fires.
+    /// An explosion of the given power; the source is an entity id or -1. Blocks are spared when `breakBlocks` is off,
+    /// and `fire` sets fires.
     virtual bool explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId,
                          bool fire) {
         static_cast<void>(fire);

@@ -80,7 +80,8 @@ struct ModelHooks {
     std::function<bool(world::LoadedWorld& world, std::string_view action, const std::array<std::int32_t, 3>& at,
                        const std::array<std::int32_t, 3>& source, std::int32_t value, std::string_view player)>
         sculk;
-    std::function<std::string(world::LoadedWorld& world, std::string_view action, const std::array<std::int32_t, 3>& at)>
+    std::function<std::string(world::LoadedWorld& world, std::string_view action,
+                              const std::array<std::int32_t, 3>& at)>
         creakingHeart;
     std::function<bool(world::LoadedWorld& world, std::int32_t id, std::string_view action, std::string_view text,
                        std::int32_t value)>

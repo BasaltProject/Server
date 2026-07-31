@@ -104,7 +104,8 @@ std::int32_t ContainerMenuController::openWindow(const PluginWindowSpec& spec) {
     return openMenu.containerId();
 }
 
-std::int32_t ContainerMenuController::openBlockWindow(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+std::int32_t ContainerMenuController::openBlockWindow(const std::int32_t x, const std::int32_t y,
+                                                      const std::int32_t z) {
     PlayerSession* session = owner_->playerSession();
     world::LoadedWorld* world = owner_->currentWorld();
     if (session == nullptr || world == nullptr) {
