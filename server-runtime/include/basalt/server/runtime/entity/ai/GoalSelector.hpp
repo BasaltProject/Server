@@ -32,6 +32,11 @@ public:
 
     void retire() noexcept { retired_ = true; }
 
+    /// What the selector last found out about the goal: whether it could start, or keep going while it runs.
+    [[nodiscard]] bool lastUsable() const noexcept { return lastUsable_; }
+
+    void noteUsable(bool usable) noexcept { lastUsable_ = usable; }
+
     [[nodiscard]] bool canBeReplacedBy(const WrappedGoal& other) const;
 
     void start(MobContext& mob);
@@ -45,6 +50,7 @@ private:
     bool plugin_ = false;
     bool retired_ = false;
     bool running_ = false;
+    bool lastUsable_ = false;
 };
 
 /// parity: `GoalSelector.tick`.
@@ -57,6 +63,7 @@ public:
         std::int32_t priority = 0;
         bool running = false;
         bool plugin = false;
+        bool usable = false;
         std::set<GoalFlag> flags;
     };
 

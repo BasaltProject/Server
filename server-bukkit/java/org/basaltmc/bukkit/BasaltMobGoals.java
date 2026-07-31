@@ -63,14 +63,15 @@ public final class BasaltMobGoals implements MobGoals {
         return types;
     }
 
-    private record Row(String key, int priority, boolean running, boolean plugin, EnumSet<GoalType> types) {}
+    private record Row(String key, int priority, boolean running, boolean plugin, boolean usable,
+            EnumSet<GoalType> types) {}
 
     private static List<Row> rows(EntityCore core) {
         List<Row> out = new ArrayList<>();
         if (core.call("goals") instanceof String[] flat) {
-            for (int at = 0; at + 5 <= flat.length; at += 5) {
+            for (int at = 0; at + 6 <= flat.length; at += 6) {
                 out.add(new Row(flat[at], Integer.parseInt(flat[at + 1]), flat[at + 2].equals("1"),
-                    flat[at + 3].equals("1"), typesOf(flat[at + 4])));
+                    flat[at + 3].equals("1"), flat[at + 4].equals("1"), typesOf(flat[at + 5])));
             }
         }
         return out;
@@ -94,16 +95,18 @@ public final class BasaltMobGoals implements MobGoals {
     private static final class VanillaGoalView implements Goal<Mob> {
         private final GoalKey<Mob> key;
         private final EnumSet<GoalType> types;
+        private final boolean usable;
 
         @SuppressWarnings("unchecked")
         VanillaGoalView(Mob mob, Row row) {
             this.key = GoalKey.of((Class<Mob>) (Class<?>) Mob.class, namespaced(row.key));
             this.types = row.types;
+            this.usable = row.usable;
         }
 
         @Override
         public boolean shouldActivate() {
-            throw Unsupported.hit("Goal#shouldActivate on a vanilla goal");
+            return usable;
         }
 
         @Override

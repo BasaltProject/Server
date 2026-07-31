@@ -138,7 +138,7 @@ inline constexpr std::array kEntityOperations{
     EntityOperationSpec{"remove_goal", ""},
     EntityOperationSpec{"remove_goals", ""},
     EntityOperationSpec{"has_goal", ""},
-    EntityOperationSpec{"goals", "key,priority,running,plugin,flags"},
+    EntityOperationSpec{"goals", "key,priority,running,plugin,usable,flags"},
 };
 
 } // namespace basalt::server::plugins

@@ -102,6 +102,7 @@ std::optional<Value> invoke(ServerEntity& entity, std::string_view operation, co
                 rows.push_back(std::to_string(row.priority));
                 rows.push_back(row.running ? "1" : "0");
                 rows.push_back(row.plugin ? "1" : "0");
+                rows.push_back(row.usable ? "1" : "0");
                 rows.push_back(flagsText(row.flags));
             }
         }
