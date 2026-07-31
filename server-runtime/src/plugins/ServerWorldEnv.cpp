@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
+#include <basalt/server/runtime/VillagerWorldSystem.hpp>
 #include <basalt/server/runtime/command/BlockEditor.hpp>
 #include <basalt/server/runtime/player/PlayerDigSpeed.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
@@ -218,8 +219,8 @@ void ServerWorldEnv::blockEvent(const std::int32_t x, const std::int32_t y, cons
     if (!state.has_value()) {
         return;
     }
-    if (first == 1) {
-        world::bells::ringAt(world_->state(), x, y, z);
+    if (first == 1 && world::bells::ringAt(world_->state(), x, y, z)) {
+        VillagerWorldSystem::alertVillagers(*world_, x, y, z);
     }
     for (const player::PlayerSession* player : watchers()) {
         if (player->connection().sendBlockEvent &&

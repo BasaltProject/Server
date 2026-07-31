@@ -43,13 +43,15 @@ void ring(wire::nbt::NbtCompound& data) {
     write(state, data);
 }
 
-void ringAt(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+bool ringAt(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
     server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
-    if (entity != nullptr && entity->type().path() == "bell") {
-        ring(entity->data());
-        chunk->markDirty();
+    if (entity == nullptr || entity->type().path() != "bell") {
+        return false;
     }
+    ring(entity->data());
+    chunk->markDirty();
+    return true;
 }
 
 Step advance(State& state, const bool raidersNearby) {

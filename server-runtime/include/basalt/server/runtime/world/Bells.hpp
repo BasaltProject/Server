@@ -38,7 +38,7 @@ void write(const State& state, wire::nbt::NbtCompound& data);
 /// parity: `BellBlockEntity.triggerEvent` for event one.
 void ring(wire::nbt::NbtCompound& data);
 
-void ringAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+[[nodiscard]] bool ringAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: `BellBlockEntity.tick`.
 [[nodiscard]] Step advance(State& state, bool raidersNearby);
