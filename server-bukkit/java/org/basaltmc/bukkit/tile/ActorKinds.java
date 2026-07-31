@@ -496,9 +496,9 @@ final class ActorKinds {
                             return null;
                         }
                         case "removePossibleReward": {
-                            String key = ((LootTable) args[0]).getKey().toString();
+                            String rewardKey = ((LootTable) args[0]).getKey().toString();
                             List<Object> list = rewards(config);
-                            list.removeIf(value -> key.equals(Nbt.map(value).get("data")));
+                            list.removeIf(value -> rewardKey.equals(Nbt.map(value).get("data")));
                             config.put("loot_tables_to_eject", list);
                             return null;
                         }

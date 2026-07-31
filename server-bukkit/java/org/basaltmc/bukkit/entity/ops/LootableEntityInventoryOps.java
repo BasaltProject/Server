@@ -29,7 +29,7 @@ public interface LootableEntityInventoryOps extends LootableEntityInventory, Cor
     }
 
     default boolean isRefillEnabled() {
-        return LootableData.refillEnabled(getWorld().getName());
+        return LootableData.refillEnabled(core().world.getName());
     }
 
     default boolean hasBeenFilled() {
@@ -37,7 +37,7 @@ public interface LootableEntityInventoryOps extends LootableEntityInventory, Cor
     }
 
     default boolean canPlayerLoot(UUID player) {
-        return data().canPlayerLoot(getWorld().getName(), player);
+        return data().canPlayerLoot(core().world.getName(), player);
     }
 
     default boolean hasPlayerLooted(UUID player) {
