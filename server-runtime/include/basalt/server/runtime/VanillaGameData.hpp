@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/RealPotionTags.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RealTestEnvironments.hpp>
+#include <basalt/server/runtime/world/RealTrialSpawnerConfigs.hpp>
 #include <basalt/server/runtime/world/RealTestInstances.hpp>
 #include <basalt/server/runtime/world/RealTimelineTags.hpp>
 #include <basalt/server/runtime/world/RealTimelines.hpp>
@@ -86,6 +87,7 @@ public:
     world::RealTimelines timelines;
     world::RealTestInstances testInstances;
     world::RealTestEnvironments testEnvironments;
+    world::RealTrialSpawnerConfigs trialSpawnerConfigs;
     world::StructureTemplates structureTemplates;
 
     /// Hands the brewing stand the brewing recipes the recipe list holds now.

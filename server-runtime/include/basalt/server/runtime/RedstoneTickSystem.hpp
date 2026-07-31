@@ -41,6 +41,7 @@ namespace basalt::server::runtime {
 class BlockChangeBroadcaster;
 class ChunkSimulationView;
 class MobSpawnerSystem;
+class TrialSpawnerSystem;
 
 class RedstoneTickSystem {
 public:
@@ -115,6 +116,7 @@ public:
         /// parity: `Armadillo.brushOffScute` from the dispenser's brush behaviour.
         std::function<bool(world::LoadedWorld& world, entity::ServerEntity& armadillo)> brushArmadillo;
         MobSpawnerSystem* mobSpawners = nullptr;
+        TrialSpawnerSystem* trialSpawners = nullptr;
     };
 
     RedstoneTickSystem(player::PlayerRegistry& players, world::RealRecipes& recipes,

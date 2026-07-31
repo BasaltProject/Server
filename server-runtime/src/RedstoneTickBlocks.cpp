@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
+#include <basalt/server/runtime/TrialSpawnerSystem.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
@@ -338,6 +339,10 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         .bell = [this,
                  &world](wire::nbt::NbtCompound& data, const std::int32_t x, const std::int32_t y,
                          const std::int32_t z) { return options_.tickBell && options_.tickBell(world, x, y, z, data); },
+        .trialSpawner =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+                return options_.trialSpawners != nullptr && options_.trialSpawners->tick(world, {x, y, z});
+            },
         .conduit =
             [this, &world](wire::nbt::NbtCompound& data, const std::int32_t x, const std::int32_t y,
                            const std::int32_t z) {

@@ -105,6 +105,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       timelines({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       testInstances({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       testEnvironments({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
+      trialSpawnerConfigs({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       structureTemplates({.readEntry = jar.readEntry, .dataIds = jar.dataIds}) {
     useHeightmapTags(blockTags);
     lootTables.useRegistries(&lootRegistries);
@@ -155,6 +156,7 @@ void VanillaGameData::reload(const Jar& jar, const wire::common::Logger& logger)
     useBrewingRecipes();
     advancements = world::RealAdvancements(
         world::RealAdvancements::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText});
+    trialSpawnerConfigs = world::RealTrialSpawnerConfigs({.readText = jar.readText, .entriesUnder = jar.entriesUnder});
     structureTemplates.reload({.readEntry = jar.readEntry, .dataIds = jar.dataIds});
 }
 

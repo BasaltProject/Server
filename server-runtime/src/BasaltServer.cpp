@@ -606,8 +606,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         if (!breakBlocks) {
             spare = [](world::WorldState&, std::int32_t, std::int32_t, std::int32_t, std::int32_t) { return true; };
         }
-        explosions_->blowUp(world, watchersIn(world), x, y, z, power, "explosion", std::max(sourceEntityId, 0), spare, {},
-                            fire);
+        explosions_->blowUp(world, watchersIn(world), x, y, z, power, "explosion", std::max(sourceEntityId, 0), spare,
+                            {}, fire);
     };
     model.spawnAs = [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y,
                            double z, float yaw, std::string_view reason) {
@@ -906,6 +906,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                               return false;
                           }},
             .lootTables = &vanillaData_.lootTables});
+    trialSpawners_ =
+        std::make_unique<TrialSpawnerSystem>(playerRegistry_, *broadcaster_, *mobSpawners_,
+                                             TrialSpawnerSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                                                         .configs = &vanillaData_.trialSpawnerConfigs,
+                                                                         .lootTables = &vanillaData_.lootTables});
     combat_ = std::make_unique<CombatSystem>(
         *broadcaster_, *explosions_, CombatSystem::Hooks{},
         CombatSystem::Options{
@@ -1130,7 +1135,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 [this](world::LoadedWorld& world, entity::ServerEntity& armadillo) {
                     return mobActions_ != nullptr && mobActions_->brushArmadillo(world, armadillo);
                 },
-            .mobSpawners = mobSpawners_.get()});
+            .mobSpawners = mobSpawners_.get(),
+            .trialSpawners = trialSpawners_.get()});
     // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory.
     RaidSystem::Hooks raidHooks;
     raidHooks.raidFinished = [this](const world::LoadedWorld& world, const entity::Raid& raid, bool won) {

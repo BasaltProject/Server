@@ -62,7 +62,8 @@ public:
 
     [[nodiscard]] world::MobSpawnForest finalizeForSpawner(world::LoadedWorld& world,
                                                            const wire::common::Identifier& type, double x, double y,
-                                                           double z, float yaw, random::RandomSource& random);
+                                                           double z, float yaw, random::RandomSource& random,
+                                                           world::MobSpawnReason reason = world::MobSpawnReason::Spawner);
 
     entity::ServerEntity* spawnSkeletonTrap(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 

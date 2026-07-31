@@ -41,6 +41,11 @@ public:
               const std::function<void(std::int32_t eventId)>& broadcastEvent,
               const std::function<void()>& spawnDataChanged = {});
 
+    /// parity: `TrialSpawner.spawnMob`: one try at the spawn data, answering the new mob's uuid.
+    [[nodiscard]] std::optional<wire::common::Uuid>
+    spawnForTrial(world::LoadedWorld& world, const world::SpawnData& spawn, const std::array<std::int32_t, 3>& pos,
+                  std::int32_t spawnRange, bool ominous, random::RandomSource& random);
+
 private:
     enum class Attempt : std::uint8_t { Skipped, Spawned, Abort };
 
@@ -52,6 +57,9 @@ private:
         const std::function<void(std::int32_t)>& broadcastEvent;
         const std::function<void()>& spawnDataChanged;
         bool dataChanged = false;
+        bool trial = false;
+        bool ominous = false;
+        std::optional<wire::common::Uuid> spawned;
     };
 
     [[nodiscard]] bool isNearPlayer(const world::LoadedWorld& world, const std::array<std::int32_t, 3>& pos,
@@ -62,6 +70,10 @@ private:
     [[nodiscard]] const world::SpawnData& nextSpawnData(Turn& turn) const;
 
     [[nodiscard]] Attempt attempt(Turn& turn, const world::SpawnData& spawn);
+
+    void broadcastTrialSpawned(world::LoadedWorld& world, const std::array<std::int32_t, 3>& pos, std::int32_t blockX,
+                               std::int32_t blockY, std::int32_t blockZ, const wire::common::Uuid& source,
+                               bool ominous) const;
 
     void broadcastSpawned(world::LoadedWorld& world, const std::array<std::int32_t, 3>& pos, std::int32_t blockX,
                           std::int32_t blockY, std::int32_t blockZ, const wire::common::Uuid& source,

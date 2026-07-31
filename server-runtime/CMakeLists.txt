@@ -307,6 +307,7 @@ basalt_module(server-runtime-core
         src/NaturalSpawningSystem.cpp
         src/MobSpawnerSystem.cpp
         src/MobSpawnerSpawn.cpp
+        src/TrialSpawnerSystem.cpp
         src/SpawnerBlockTick.cpp
         src/world/BaseSpawnerData.cpp
         src/world/EquipmentTables.cpp
@@ -510,6 +511,8 @@ basalt_module(server-runtime-core
         src/world/RealSurfaceEnvironment.cpp
         src/world/NetherSurfaceEnvironment.cpp
         src/world/Bells.cpp
+        src/world/RealTrialSpawnerConfigs.cpp
+        src/world/TrialSpawners.cpp
         src/world/Campfires.cpp
         src/world/BlockEntityTicks.cpp
         src/world/PotionEffects.cpp

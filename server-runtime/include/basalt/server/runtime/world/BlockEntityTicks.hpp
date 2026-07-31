@@ -61,6 +61,7 @@ struct Hooks {
         creakingHeart;
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> sculkCatalyst;
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> bell;
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> trialSpawner;
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> conduit;
     WorldState::Ticking ticking;
     std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> spawnerTick;
