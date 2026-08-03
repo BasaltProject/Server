@@ -53,9 +53,6 @@ struct BreakContext {
     std::function<void(const PlayerSession* player, const std::string& world, std::int32_t x, std::int32_t y,
                        std::int32_t z, std::int32_t stateId, std::vector<server::world::loot::ItemStack>& drops)>
         blockDrops;
-    std::function<bool(std::string_view worldName, double x, double y, double z, const std::string& item,
-                       std::int32_t count, std::string_view cause)>
-        itemSpawnAllowed;
     std::function<bool(const PlayerSession& player, const std::string& item, std::int32_t amount, bool broken)>
         itemDamageAllowed;
 

@@ -163,9 +163,6 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
     if (count <= 0 || reg::items::registry().byName(item) == nullptr) {
         return;
     }
-    if (context.itemSpawnAllowed && !context.itemSpawnAllowed(world.name(), x, y, z, item.toString(), count, "drop")) {
-        return;
-    }
     if (context.registry == nullptr) {
         return;
     }

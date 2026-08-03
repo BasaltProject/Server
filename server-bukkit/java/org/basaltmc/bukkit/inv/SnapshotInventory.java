@@ -10,6 +10,7 @@ import org.bukkit.inventory.ItemStack;
 public final class SnapshotInventory extends AbstractInventory {
     private final InventoryType type;
     private final ItemStack[] slots;
+    private List<HumanEntity> viewers = List.of();
 
     public SnapshotInventory(InventoryType type, ItemStack[] slots) {
         this.type = type;
@@ -32,9 +33,14 @@ public final class SnapshotInventory extends AbstractInventory {
         slots[slot] = item;
     }
 
+    public SnapshotInventory withViewers(List<HumanEntity> watching) {
+        viewers = List.copyOf(watching);
+        return this;
+    }
+
     @Override
     public List<HumanEntity> getViewers() {
-        return List.of();
+        return viewers;
     }
 
     @Override

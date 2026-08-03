@@ -49,6 +49,10 @@ public:
         std::function<bool(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId)>
             mobEffect;
+        /// parity: `ThrownLingeringPotion.onHitAsPotion`, the cloud a lingering potion leaves.
+        std::function<void(world::LoadedWorld& world, const entity::ServerEntity& bottle,
+                           const std::vector<world::ActiveEffect>& effects)>
+            lingeringLanded;
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            entity::ServerEntity& skull, entity::ServerEntity* mob, player::PlayerSession* player)>
             witherSkullLanded;

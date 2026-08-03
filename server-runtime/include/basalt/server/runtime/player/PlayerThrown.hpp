@@ -14,6 +14,8 @@ namespace basalt::server::runtime::player {
 struct BreakContext;
 class PlayerSession;
 
+[[nodiscard]] bool isThrowable(const wire::common::Identifier& item);
+
 bool throwItemFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                   const wire::common::Identifier& item, std::int32_t slot);
 

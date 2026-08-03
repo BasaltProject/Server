@@ -2,6 +2,7 @@ package org.basaltmc.bukkit;
 
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -107,15 +108,41 @@ final class PlayerEvents {
     static void install() {
         EventBridge.map("player.death", org.bukkit.event.entity.PlayerDeathEvent.class, f -> {
             Player who = f.player();
-            return who == null ? null : new org.bukkit.event.entity.PlayerDeathEvent(who, generic(), new ArrayList<>(),
-                0, Component.text(f.text("cause")), false);
+            if (who == null) {
+                return null;
+            }
+            List<ItemStack> drops = new ArrayList<>();
+            if (!f.text("drops").isEmpty()) {
+                for (String one : f.text("drops").split("\n")) {
+                    ItemStack stack = Items.fromSnbt(one);
+                    if (stack != null) {
+                        drops.add(stack);
+                    }
+                }
+            }
+            org.bukkit.event.entity.PlayerDeathEvent event = new org.bukkit.event.entity.PlayerDeathEvent(who, generic(),
+                drops, (int) f.whole("exp"), Component.text(f.text("cause")), f.flag("show_messages"));
+            event.setKeepInventory(f.flag("keep_inventory"));
+            event.setKeepLevel(f.flag("keep_level"));
+            return event;
         }, (e, f) -> {
-            Component chosen = ((org.bukkit.event.entity.PlayerDeathEvent) e).deathMessage();
+            org.bukkit.event.entity.PlayerDeathEvent death = (org.bukkit.event.entity.PlayerDeathEvent) e;
+            Component chosen = death.deathMessage();
             if (chosen == null) {
                 f.put("silent", true);
             } else if (!chosen.equals(Component.text(f.text("cause")))) {
                 f.put("message", net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().serialize(chosen));
             }
+            StringBuilder drops = new StringBuilder();
+            for (ItemStack stack : death.getDrops()) {
+                if (stack != null && !stack.getType().isAir()) {
+                    drops.append(drops.length() == 0 ? "" : "\n").append(Items.toSnbt(stack));
+                }
+            }
+            f.put("drops", drops.toString());
+            f.put("exp", (long) (death.shouldDropExperience() ? death.getDroppedExp() : 0));
+            f.put("keep_inventory", death.getKeepInventory());
+            f.put("keep_level", death.getKeepLevel());
         });
         EventBridge.map("player.item_drop", org.bukkit.event.player.PlayerDropItemEvent.class, f -> {
             Entity item = droppedItem(f, stackOf(f.text("item"), f.whole("count")));

@@ -473,7 +473,7 @@ void MobActionSystem::throwPotion(ServerEntity& mob, double targetX, double targ
     if (world == nullptr) {
         return;
     }
-    const entity::projectiles::Kind* kind = entity::projectiles::kindOf(Identifier::vanilla("potion"));
+    const entity::projectiles::Kind* kind = entity::projectiles::kindOf(Identifier::vanilla("splash_potion"));
     const server::registry::EntityTypeEntry* entry =
         kind == nullptr ? nullptr : server::registry::entityTypes::of(kind->type);
     if (entry == nullptr) {

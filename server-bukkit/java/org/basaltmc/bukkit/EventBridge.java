@@ -241,7 +241,8 @@ final class EventBridge {
                 org.bukkit.inventory.EquipmentSlot.HAND);
         });
         map("player.respawn", org.bukkit.event.player.PlayerRespawnEvent.class,
-            f -> new org.bukkit.event.player.PlayerRespawnEvent(f.player(), f.location(), false),
+            f -> new org.bukkit.event.player.PlayerRespawnEvent(f.player(), f.location(), false, false, false,
+                org.bukkit.event.player.PlayerRespawnEvent.RespawnReason.DEATH),
             (e, f) -> {
                 Location at = ((org.bukkit.event.player.PlayerRespawnEvent) e).getRespawnLocation();
                 f.put("x", at.getX());

@@ -27,11 +27,11 @@ const PluginEventType& playerCommand() {
 }
 
 const PluginEventType& playerDeath() {
-    static const PluginEventType type{
-        "player.death",
-        false,
-        {"player_name", "player_uuid", "world", "x", "y", "z", "cause", "message", "silent"},
-        {"message", "silent"}};
+    static const PluginEventType type{"player.death",
+                                      false,
+                                      {"player_name", "player_uuid", "world", "x", "y", "z", "cause", "message",
+                                       "silent", "drops", "exp", "keep_inventory", "keep_level", "show_messages"},
+                                      {"message", "silent", "drops", "exp", "keep_inventory", "keep_level"}};
     return type;
 }
 
@@ -200,7 +200,7 @@ const PluginEventType& blockGrow() {
 }
 
 const PluginEventType& blockDispense() {
-    static const PluginEventType type{"block.dispense", true, {"world", "x", "y", "z", "item"}};
+    static const PluginEventType type{"block.dispense", true, {"world", "x", "y", "z", "item", "face"}};
     return type;
 }
 
@@ -296,7 +296,10 @@ const PluginEventType& entityTame() {
 }
 
 const PluginEventType& entityBreed() {
-    static const PluginEventType type{"entity.breed", true, {"entity_id", "entity_type", "world", "partner_id"}};
+    static const PluginEventType type{"entity.breed",
+                                      true,
+                                      {"entity_id", "entity_type", "world", "partner_id", "breeder", "experience"},
+                                      {"experience"}};
     return type;
 }
 
@@ -319,7 +322,8 @@ const PluginEventType& entityShoot() {
 }
 
 const PluginEventType& itemSpawn() {
-    static const PluginEventType type{"item.spawn", true, {"world", "x", "y", "z", "item", "count", "cause"}};
+    static const PluginEventType type{
+        "item.spawn", true, {"world", "x", "y", "z", "entity_id", "item", "count", "cause"}};
     return type;
 }
 

@@ -86,10 +86,12 @@ void redstone(RedstoneTickSystem::Hooks& hooks, const EventSink& sink) {
             event.set("player_name", std::string{});
         });
     };
-    hooks.dispenseAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    hooks.dispenseAllowed = [&sink](const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    const std::string& item, std::string_view face) {
         return sink.allowed(&blockDispense, [&](PluginEvent& event) {
             here(event, world, x, y, z);
-            event.set("item", std::string{});
+            event.set("item", item);
+            event.set("face", std::string{face});
         });
     };
     hooks.allowHopperMove = [&sink](std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -471,13 +473,26 @@ void mobs(MobActionSystem::Hooks& hooks, const EventSink& sink, WorldOf worldOf)
         });
     };
     hooks.breedAllowed = [&sink](const world::LoadedWorld& world, const entity::ServerEntity& animal,
-                                 const entity::ServerEntity& partner) {
-        return sink.allowed(&entityBreed, [&](PluginEvent& event) {
-            event.set("entity_id", static_cast<std::int64_t>(animal.entityId()));
-            event.set("entity_type", animal.type().toString());
-            event.set("world", world.name());
-            event.set("partner_id", static_cast<std::int64_t>(partner.entityId()));
+                                 const entity::ServerEntity& partner, const std::string& breeder,
+                                 std::int32_t& experience) {
+        const server::plugins::PluginEvent* event = sink.ask(&entityBreed, [&](PluginEvent& filled) {
+            filled.set("entity_id", static_cast<std::int64_t>(animal.entityId()));
+            filled.set("entity_type", animal.type().toString());
+            filled.set("world", world.name());
+            filled.set("partner_id", static_cast<std::int64_t>(partner.entityId()));
+            filled.set("breeder", breeder);
+            filled.set("experience", static_cast<std::int64_t>(experience));
         });
+        if (event == nullptr) {
+            return true;
+        }
+        if (event->cancelled()) {
+            return false;
+        }
+        if (const auto* edited = std::get_if<std::int64_t>(&event->get("experience")); edited != nullptr) {
+            experience = static_cast<std::int32_t>(*edited);
+        }
+        return true;
     };
     hooks.combat.damaged = [&sink, worldOf](const entity::ServerEntity& mob, float amount, std::string_view cause,
                                             const std::optional<std::string>& attackerName,

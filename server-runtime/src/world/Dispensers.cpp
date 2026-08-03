@@ -894,6 +894,9 @@ void shoot(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, st
     // parity: `ProjectileItem.asProjectile` hands the stack to the projectile.
     if (config.carries) {
         shot.heldItem = stack.item.path();
+        if (stack.item.path().ends_with("_potion")) {
+            shot.heldItemComponents = stack.components;
+        }
     }
     // parity: `ArrowItem.asProjectile`.
     if (config.kind->sticks) {
@@ -974,6 +977,12 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         return result;
     }
     const ItemStack stack = *slots[*slot];
+    if (hooks.dispensing && !hooks.dispensing(stack, *out)) {
+        result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserDispense, .data = 0});
+        result.effects.emplace_back(
+            blockEffect::Effect{.type = blockEffect::Effect::kDispenserSmoke, .data = static_cast<std::int32_t>(*out)});
+        return result;
+    }
 
     // parity: `DropperBlock.getDispenseMethod`.
     const bool dropper = block->path() == "dropper";

@@ -101,7 +101,10 @@ std::optional<bool> PlayerSession::permissionGrant(const std::string_view node) 
 void PlayerSession::resetForRespawn() {
     health_ = maxHealth_;
     food.reset();
-    experience.reset();
+    if (!keepLevelOnRespawn) {
+        experience.reset();
+    }
+    keepLevelOnRespawn = false;
     dead = false;
     flying = gamemode == wire::protocol::play::Gamemode::Spectator;
     sprinting = false;

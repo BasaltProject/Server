@@ -157,8 +157,10 @@ final class BlockEvents {
         EventBridge.map("block.dispense", org.bukkit.event.block.BlockDispenseEvent.class, f -> {
             Block block = f.block();
             ItemStack stack = PlayerEvents.stackOf(f.text("item"), 1);
+            org.bukkit.block.BlockFace face = PlayerEvents.face(f.text("face"));
             return block == null ? null : new org.bukkit.event.block.BlockDispenseEvent(block,
-                stack == null ? new ItemStack(Material.AIR) : stack, new Vector(0, 0, 0));
+                stack == null ? new ItemStack(Material.AIR) : stack,
+                new Vector(face.getModX(), face.getModY() + 0.1, face.getModZ()));
         });
         EventBridge.map("block.piston", org.bukkit.event.block.BlockPistonExtendEvent.class, f -> {
             Block block = f.block();
