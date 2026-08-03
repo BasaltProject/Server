@@ -198,6 +198,7 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.bedLeft = hooks_.bedLeft;
     context.fishing = hooks_.fishing;
     context.fertilizeAllowed = hooks_.fertilizeAllowed;
+    context.foodEaten = hooks_.foodEaten;
     context.hangingAllowed = hooks_.hangingAllowed;
     context.putBack = [this](const PlayerSession&, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                              const std::int32_t stateId) {
@@ -337,12 +338,27 @@ void BlockInteractionHandler::handlePunch() {
     }
 }
 
-void BlockInteractionHandler::startDigging(const BlockPos& pos) {
+bool BlockInteractionHandler::digPermitted(const BlockPos& pos, const std::int32_t direction) {
+    const PlayerSession* session = owner_->playerSession();
+    if (session == nullptr || !hooks_.digAllowed) {
+        return true;
+    }
+    constexpr std::array<std::string_view, 6> kFaceNames{"down", "up", "north", "south", "west", "east"};
+    const std::optional<std::int32_t> state = owner_->world().blockState(pos.x, pos.y, pos.z);
+    const Identifier* block = state.has_value() ? reg::blockStateDefinitions::blockOf(*state) : nullptr;
+    const bool instaBreak = session->gamemode == Gamemode::Creative ||
+                            breaksInOneTick(block, block == nullptr ? nullptr : reg::blocks::hardnessOf(*block));
+    const auto face = static_cast<std::size_t>(direction);
+    return hooks_.digAllowed(*session, pos.x, pos.y, pos.z, face < kFaceNames.size() ? kFaceNames[face] : "up",
+                             instaBreak);
+}
+
+void BlockInteractionHandler::startDigging(const BlockPos& pos, const std::int32_t direction) {
     const PlayerSession* session = owner_->playerSession();
     if (session == nullptr || (session->gamemode != Gamemode::Survival && session->gamemode != Gamemode::Adventure)) {
         return;
     }
-    if (hooks_.digAllowed && !hooks_.digAllowed(*session, pos.x, pos.y, pos.z)) {
+    if (!digPermitted(pos, direction)) {
         return;
     }
     diggingAt_ = pos;
@@ -463,6 +479,16 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
             return;
         }
     }
+    if (action.action == Action::StartDestroyBlock && owner_->playerSession() != nullptr &&
+        owner_->playerSession()->gamemode == Gamemode::Creative &&
+        !digPermitted(action.pos, static_cast<std::int32_t>(action.direction))) {
+        const std::optional<std::int32_t> actual = owner_->world().blockState(action.pos.x, action.pos.y, action.pos.z);
+        owner_->sendPlayPacket(play::ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::ClientboundBlockUpdatePacket{.pos = action.pos, .blockStateId = actual.value_or(0)}.write(buffer);
+        });
+        ack();
+        return;
+    }
     // The cracks everyone else sees.
     if (action.action == Action::StartDestroyBlock) {
         // parity: `NoteBlock.attack`, which plays the note without moving it on.
@@ -490,7 +516,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
                 broadcastBlockUpdate(action.pos, glow->stateId);
             }
         }
-        startDigging(action.pos);
+        startDigging(action.pos, static_cast<std::int32_t>(action.direction));
         diggingDirection_ = static_cast<std::int32_t>(action.direction);
     } else if (action.action == Action::ChangeDestroyDirection) {
         // parity: 26.3 `handleBlockBreakAction`, which only turns the face the dust flies off.

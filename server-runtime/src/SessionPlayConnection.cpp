@@ -120,7 +120,7 @@ player::PlayerConnection ClientSession::playerConnection() {
         sendCompressed(play::SetHeldSlotPacket::kId,
                        [slot](wire::io::ByteBuffer& buffer) { play::SetHeldSlotPacket{.slot = slot}.write(buffer); });
     };
-    connection.heal = [this](float amount) { heal(amount); };
+    connection.heal = [this](float amount, std::string_view cause) { heal(amount, cause); };
     connection.hurt = [this](float amount, std::string_view deathMessageId, const Identifier& damageType,
                              const std::optional<entity::DamageSource>& source) {
         hurt(amount, deathMessageId, damageType, source);

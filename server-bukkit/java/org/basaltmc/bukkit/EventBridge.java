@@ -230,9 +230,10 @@ final class EventBridge {
         map("block.damage", org.bukkit.event.player.PlayerInteractEvent.class,
             f -> new org.bukkit.event.player.PlayerInteractEvent(f.player(),
                 org.bukkit.event.block.Action.LEFT_CLICK_BLOCK, f.stack("item"), f.block(),
-                org.bukkit.block.BlockFace.SELF, org.bukkit.inventory.EquipmentSlot.HAND));
+                PlayerEvents.face(f.text("face")), org.bukkit.inventory.EquipmentSlot.HAND));
         map("block.damage", org.bukkit.event.block.BlockDamageEvent.class, f -> new org.bukkit.event.block.BlockDamageEvent(
-            f.player(), f.block(), f.player().getInventory().getItemInMainHand(), false));
+            f.player(), f.block(), PlayerEvents.face(f.text("face")), f.player().getInventory().getItemInMainHand(),
+            f.flag("insta_break")));
         map("block.place", org.bukkit.event.block.BlockPlaceEvent.class, f -> {
             org.bukkit.block.Block placed = f.block();
             return new org.bukkit.event.block.BlockPlaceEvent(placed, placed.getState(), placed.getRelative(
@@ -256,7 +257,7 @@ final class EventBridge {
             f -> new org.bukkit.event.player.PlayerSwapHandItemsEvent(f.player(), f.stack("main_item"),
                 f.stack("off_item")));
         map("player.food_change", org.bukkit.event.entity.FoodLevelChangeEvent.class,
-            f -> new org.bukkit.event.entity.FoodLevelChangeEvent(f.player(), (int) f.whole("food")),
+            f -> new org.bukkit.event.entity.FoodLevelChangeEvent(f.player(), (int) f.whole("food"), f.stack("item")),
             (e, f) -> f.put("food", (long) ((org.bukkit.event.entity.FoodLevelChangeEvent) e).getFoodLevel()));
         map("player.level_change", org.bukkit.event.player.PlayerLevelChangeEvent.class,
             f -> new org.bukkit.event.player.PlayerLevelChangeEvent(f.player(), (int) f.whole("from_level"),

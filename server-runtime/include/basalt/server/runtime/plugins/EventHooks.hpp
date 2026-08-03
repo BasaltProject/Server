@@ -16,6 +16,8 @@ class ClientSession;
 /// The callbacks each system of one player's session calls, turned into the events plugins listen to.
 namespace basalt::server::runtime::plugins::eventHooks {
 
+[[nodiscard]] std::optional<float> raiseHeal(const EventSink& sink, const player::PlayerSession& who, float amount,
+                                             std::string_view cause, bool fast);
 [[nodiscard]] BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const EventSink& sink);
 [[nodiscard]] PlayerLifecycle::Hooks lifecycle(ClientSession& owner, const EventSink& sink);
 [[nodiscard]] CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink);

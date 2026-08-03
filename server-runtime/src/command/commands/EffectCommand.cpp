@@ -101,7 +101,7 @@ struct Targets {
         // parity: the two instantaneous effects act once and are never carried.
         if (*effect == world::mobEffects::instantHealth()) {
             if (session->connection().heal) {
-                session->connection().heal(kInstantAmount * static_cast<float>(1 << amplifier));
+                session->connection().heal(kInstantAmount * static_cast<float>(1 << amplifier), "magic");
             }
             continue;
         }

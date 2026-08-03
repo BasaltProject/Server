@@ -732,14 +732,15 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     }
 }
 
-void healPlayer(PlayerSession& player, const float amount, const DamageContext& context) {
+void healPlayer(PlayerSession& player, const float amount, const DamageContext& context, const std::string_view cause,
+                const bool fast) {
     PlayerSession* session = &player;
     if (session->dead) {
         return;
     }
     float healed = amount;
     if (context.healed) {
-        const std::optional<float> allowed = context.healed(*session, amount);
+        const std::optional<float> allowed = context.healed(*session, amount, cause, fast);
         if (!allowed.has_value()) {
             return;
         }

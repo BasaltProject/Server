@@ -56,8 +56,12 @@ public:
         std::function<bool(const player::PlayerSession& player, const std::string& item, bool mainHand)> airUseAllowed;
         std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t count)>
             dropAllowed;
-        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::string_view face, bool instaBreak)>
             digAllowed;
+        std::function<std::optional<std::int32_t>(const player::PlayerSession& player, const std::string& item,
+                                                  std::int32_t now, std::int32_t before)>
+            foodEaten;
         std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t amount,
                            bool broken)>
             itemDamageAllowed;
@@ -65,7 +69,7 @@ public:
                            std::vector<std::string>& lines)>
             signChange;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                           const std::string& item, bool filling)>
+                           const std::string& item, bool filling, std::string_view face)>
             bucketAllowed;
         std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
             bedAllowed;
@@ -245,7 +249,8 @@ private:
 
     void refreshSnowAt(const wire::protocol::play::BlockPos& pos);
 
-    void startDigging(const wire::protocol::play::BlockPos& pos);
+    void startDigging(const wire::protocol::play::BlockPos& pos, std::int32_t direction);
+    [[nodiscard]] bool digPermitted(const wire::protocol::play::BlockPos& pos, std::int32_t direction);
 
     void stopDigging();
 

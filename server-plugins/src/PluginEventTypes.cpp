@@ -119,7 +119,7 @@ const PluginEventType& playerGamemodeChange() {
 
 const PluginEventType& playerFoodChange() {
     static const PluginEventType type{
-        "player.food_change", true, {"player_name", "player_uuid", "world", "food", "from_food"}, {"food"}};
+        "player.food_change", true, {"player_name", "player_uuid", "world", "food", "from_food", "item"}, {"food"}};
     return type;
 }
 
@@ -146,7 +146,7 @@ const PluginEventType& playerSignChange() {
 
 const PluginEventType& playerBucket() {
     static const PluginEventType type{
-        "player.bucket", true, {"player_name", "player_uuid", "world", "x", "y", "z", "item", "filling"}};
+        "player.bucket", true, {"player_name", "player_uuid", "world", "x", "y", "z", "item", "filling", "face"}};
     return type;
 }
 
@@ -308,7 +308,7 @@ const PluginEventType& entityMount() {
 
 const PluginEventType& entityHeal() {
     static const PluginEventType type{
-        "entity.heal", true, {"entity_id", "entity_type", "world", "amount", "cause"}, {"amount"}};
+        "entity.heal", true, {"entity_id", "entity_type", "world", "amount", "cause", "fast_regen"}, {"amount"}};
     return type;
 }
 
@@ -374,18 +374,20 @@ const PluginEventType& inventoryTake() {
 }
 
 const PluginEventType& inventoryEnchantPrepare() {
-    static const PluginEventType type{"inventory.enchant_prepare",
-                                      true,
-                                      {"player_name", "player_uuid", "world", "item", "bookshelves", "offers"},
-                                      {"offers"}};
+    static const PluginEventType type{
+        "inventory.enchant_prepare",
+        true,
+        {"player_name", "player_uuid", "world", "x", "y", "z", "item", "bookshelves", "offers"},
+        {"offers"}};
     return type;
 }
 
 const PluginEventType& inventoryEnchant() {
-    static const PluginEventType type{"inventory.enchant",
-                                      true,
-                                      {"player_name", "player_uuid", "world", "item", "button", "cost", "enchants"},
-                                      {"cost", "enchants"}};
+    static const PluginEventType type{
+        "inventory.enchant",
+        true,
+        {"player_name", "player_uuid", "world", "x", "y", "z", "item", "button", "cost", "enchants"},
+        {"cost", "enchants"}};
     return type;
 }
 
@@ -434,7 +436,7 @@ const PluginEventType& inventoryTrade() {
 
 const PluginEventType& blockDamage() {
     static const PluginEventType type{
-        "block.damage", true, {"player_name", "player_uuid", "world", "x", "y", "z", "block"}};
+        "block.damage", true, {"player_name", "player_uuid", "world", "x", "y", "z", "block", "face", "insta_break"}};
     return type;
 }
 

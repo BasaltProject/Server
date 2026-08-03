@@ -85,6 +85,9 @@ struct BreakContext {
     std::function<bool(const PlayerSession& player, std::string_view type, std::int32_t x, std::int32_t y,
                        std::int32_t z, std::string_view face)>
         hangingAllowed;
+    std::function<std::optional<std::int32_t>(const PlayerSession& player, const std::string& item, std::int32_t now,
+                                              std::int32_t before)>
+        foodEaten;
 };
 
 [[nodiscard]] std::vector<PlayerSession*> playersIn(const BreakContext& context, std::string_view worldName);

@@ -321,7 +321,7 @@ public:
                 return false;
             }
             if (effect.effect == world::mobEffects::instantHealth() && player->connection().heal) {
-                player->connection().heal(6.0F * static_cast<float>(1 << std::min(effect.amplifier, 30)));
+                player->connection().heal(6.0F * static_cast<float>(1 << std::min(effect.amplifier, 30)), "magic");
                 return true;
             }
             if (effect.effect == world::mobEffects::instantDamage() && player->connection().hurt) {

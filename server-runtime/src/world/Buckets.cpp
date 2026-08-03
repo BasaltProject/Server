@@ -94,14 +94,21 @@ struct Hit {
 }
 
 /// parity: `BucketItem.emptyContents`.
+[[nodiscard]] bool permitted(const Gate& gate, const Hit& at) {
+    return !gate || gate(at.x, at.y, at.z, at.faceX, at.faceY, at.faceZ);
+}
+
 [[nodiscard]] std::optional<Result> pour(const fluidFlow::Context& context, const Hit& hit, FluidKind content,
-                                         bool creative) {
+                                         bool creative, const Gate& gate) {
     const std::optional<std::int32_t> clicked = context.world.blockState(hit.x, hit.y, hit.z);
     if (!clicked.has_value()) {
         return std::nullopt;
     }
     // parity: the `WATER_EVAPORATES` branch of `BucketItem.emptyContents`.
     if (content == FluidKind::Water && context.ultrawarm) {
+        if (!permitted(gate, hit)) {
+            return std::nullopt;
+        }
         Result hissed;
         if (!creative) {
             hissed.replacement = emptyBucket();
@@ -110,6 +117,9 @@ struct Hit {
     }
     // parity: `BucketItem.emptyContents`' `LiquidBlockContainer` branch.
     if (content == FluidKind::Water && holdsWaterInside(*clicked)) {
+        if (!permitted(gate, hit)) {
+            return std::nullopt;
+        }
         Result soakedResult;
         // parity: `canPlaceLiquid` only asks whether the fluid is water, not whether the block is.
         if (const std::optional<std::int32_t> soaked = waterloggedTo(*clicked, true); soaked.has_value()) {
@@ -136,6 +146,9 @@ struct Hit {
         return std::nullopt;
     }
 
+    if (!permitted(gate, target)) {
+        return std::nullopt;
+    }
     const std::int32_t source = baseStateId(content);
     if (!context.world.setBlockState(target.x, target.y, target.z, source)) {
         return std::nullopt;
@@ -153,14 +166,14 @@ struct Hit {
 }
 
 /// parity: `BucketPickup.pickupBlock` on `LiquidBlock`.
-[[nodiscard]] std::optional<Result> fill(const fluidFlow::Context& context, const Hit& hit) {
+[[nodiscard]] std::optional<Result> fill(const fluidFlow::Context& context, const Hit& hit, const Gate& gate) {
     const std::optional<std::int32_t> state = context.world.blockState(hit.x, hit.y, hit.z);
     if (!state.has_value()) {
         return std::nullopt;
     }
     // parity: `SimpleWaterloggedBlock.pickupBlock`.
     if (const std::optional<std::int32_t> dried = waterloggedTo(*state, false); dried.has_value()) {
-        if (!context.world.setBlockState(hit.x, hit.y, hit.z, *dried)) {
+        if (!permitted(gate, hit) || !context.world.setBlockState(hit.x, hit.y, hit.z, *dried)) {
             return std::nullopt;
         }
         Result driedResult;
@@ -177,7 +190,7 @@ struct Hit {
         return std::nullopt;
     }
     const std::int32_t empty = registry::blocks::air().stateId;
-    if (!context.world.setBlockState(hit.x, hit.y, hit.z, empty)) {
+    if (!permitted(gate, hit) || !context.world.setBlockState(hit.x, hit.y, hit.z, empty)) {
         return std::nullopt;
     }
     Result result;
@@ -218,18 +231,19 @@ bool isBucket(const wire::common::Identifier& item) {
 }
 
 std::optional<Result> use(const fluidFlow::Context& context, const wire::common::Identifier& item, double eyeX,
-                          double eyeY, double eyeZ, float yaw, float pitch, bool creative) {
+                          double eyeY, double eyeZ, float yaw, float pitch, bool creative, const Gate& gate) {
     const std::optional<FluidKind> content = contentOf(item);
     const double reach = creative ? kCreativeReach : kReach;
     const std::optional<Hit> hit = trace(context.world, eyeX, eyeY, eyeZ, yaw, pitch, reach, !content.has_value());
     if (!hit.has_value()) {
         return std::nullopt;
     }
-    return content.has_value() ? pour(context, *hit, *content, creative) : fill(context, *hit);
+    return content.has_value() ? pour(context, *hit, *content, creative, gate) : fill(context, *hit, gate);
 }
 
 std::optional<Result> useOn(const fluidFlow::Context& context, const wire::common::Identifier& item, std::int32_t x,
-                            std::int32_t y, std::int32_t z, wire::protocol::play::Direction face, bool creative) {
+                            std::int32_t y, std::int32_t z, wire::protocol::play::Direction face, bool creative,
+                            const Gate& gate) {
     const Hit hit{.x = x,
                   .y = y,
                   .z = z,
@@ -237,7 +251,7 @@ std::optional<Result> useOn(const fluidFlow::Context& context, const wire::commo
                   .faceY = wire::protocol::play::normalY(face),
                   .faceZ = wire::protocol::play::normalZ(face)};
     const std::optional<FluidKind> content = contentOf(item);
-    return content.has_value() ? pour(context, hit, *content, creative) : fill(context, hit);
+    return content.has_value() ? pour(context, hit, *content, creative, gate) : fill(context, hit, gate);
 }
 
 } // namespace basalt::server::runtime::world::buckets

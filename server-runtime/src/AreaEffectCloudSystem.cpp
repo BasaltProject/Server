@@ -197,7 +197,7 @@ void AreaEffectCloudSystem::affect(world::LoadedWorld& world, const ServerEntity
             }
         } else {
             if (player != nullptr && player->connection().heal) {
-                player->connection().heal(static_cast<float>(healed));
+                player->connection().heal(static_cast<float>(healed), "magic");
             }
             if (mob != nullptr) {
                 mob->health = std::min(mob->attributeWithModifiers("minecraft:max_health"),

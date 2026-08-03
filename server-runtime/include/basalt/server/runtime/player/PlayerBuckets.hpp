@@ -19,7 +19,7 @@ struct BreakContext;
 class PlayerSession;
 
 using BucketGate = std::function<bool(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
-                                      const std::string& item, bool filling)>;
+                                      const std::string& item, bool filling, std::string_view face)>;
 
 bool useBucketFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                   const wire::common::Identifier& item, std::int32_t heldSlot, const storage::StoredItemStack& held,

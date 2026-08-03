@@ -42,6 +42,7 @@ using server::plugins::pluginEventTypes::playerBucket;
 using server::plugins::pluginEventTypes::playerDeath;
 using server::plugins::pluginEventTypes::playerEffect;
 using server::plugins::pluginEventTypes::playerFish;
+using server::plugins::pluginEventTypes::playerFoodChange;
 using server::plugins::pluginEventTypes::playerGamemodeChange;
 using server::plugins::pluginEventTypes::playerInteract;
 using server::plugins::pluginEventTypes::playerInteractAir;
@@ -91,6 +92,24 @@ void playerAsEntity(PluginEvent& event, const player::PlayerSession& who) {
 }
 
 } // namespace
+
+std::optional<float> raiseHeal(const EventSink& sink, const player::PlayerSession& who, float amount,
+                               std::string_view cause, bool fast) {
+    const PluginEvent* event = sink.ask(&entityHeal, [&](PluginEvent& filled) {
+        playerAsEntity(filled, who);
+        filled.set("amount", static_cast<double>(amount));
+        filled.set("cause", std::string{cause});
+        filled.set("fast_regen", fast);
+    });
+    if (event == nullptr) {
+        return amount;
+    }
+    if (event->cancelled()) {
+        return std::nullopt;
+    }
+    const auto* edited = std::get_if<double>(&event->get("amount"));
+    return edited == nullptr ? amount : static_cast<float>(*edited);
+}
 
 BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const EventSink& sink) {
     BlockInteractionHandler::Hooks hooks;
@@ -191,12 +210,14 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             event.set("count", static_cast<std::int64_t>(count));
         });
     };
-    hooks.digAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y,
-                                       std::int32_t z) {
+    hooks.digAllowed = [&owner, &sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
+                                       std::string_view face, bool instaBreak) {
         return sink.allowed(&blockDamage, [&](PluginEvent& event) {
             EventSink::player(event, who);
             position(event, x, y, z);
             event.set("block", blockNameAt(owner, x, y, z));
+            event.set("face", std::string{face});
+            event.set("insta_break", instaBreak);
         });
     };
     hooks.itemDamageAllowed = [&sink](const player::PlayerSession& who, const std::string& item, std::int32_t amount,
@@ -232,12 +253,13 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
         return true;
     };
     hooks.bucketAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z,
-                                  const std::string& item, bool filling) {
+                                  const std::string& item, bool filling, std::string_view face) {
         return sink.allowed(&playerBucket, [&](PluginEvent& event) {
             EventSink::player(event, who);
             position(event, x, y, z);
             event.set("item", item);
             event.set("filling", filling);
+            event.set("face", std::string{face});
         });
     };
     hooks.bedAllowed = [&sink](const player::PlayerSession& who, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -263,6 +285,23 @@ BlockInteractionHandler::Hooks blockInteraction(ClientSession& owner, const Even
             exp = static_cast<std::int32_t>(std::max<std::int64_t>(0, *paid));
         }
         return !event->cancelled();
+    };
+    hooks.foodEaten = [&sink](const player::PlayerSession& who, const std::string& item, std::int32_t now,
+                              std::int32_t before) -> std::optional<std::int32_t> {
+        const PluginEvent* event = sink.ask(&playerFoodChange, [&](PluginEvent& filled) {
+            EventSink::player(filled, who);
+            filled.set("food", static_cast<std::int64_t>(now));
+            filled.set("from_food", static_cast<std::int64_t>(before));
+            filled.set("item", item);
+        });
+        if (event == nullptr) {
+            return now;
+        }
+        if (event->cancelled()) {
+            return std::nullopt;
+        }
+        const auto* edited = std::get_if<std::int64_t>(&event->get("food"));
+        return edited == nullptr ? now : static_cast<std::int32_t>(*edited);
     };
     hooks.hangingAllowed = [&sink](const player::PlayerSession& who, std::string_view type, std::int32_t x,
                                    std::int32_t y, std::int32_t z, std::string_view face) {
@@ -417,20 +456,8 @@ CombatHandler::Hooks combat(ClientSession& owner, const EventSink& sink) {
             event.set("hand", std::string{offhand ? "off_hand" : "hand"});
         });
     };
-    hooks.healed = [&sink](const player::PlayerSession& who, float amount) -> std::optional<float> {
-        const server::plugins::PluginEvent* event = sink.ask(&entityHeal, [&](PluginEvent& filled) {
-            playerAsEntity(filled, who);
-            filled.set("amount", static_cast<double>(amount));
-            filled.set("cause", std::string{"regeneration"});
-        });
-        if (event == nullptr) {
-            return amount;
-        }
-        if (event->cancelled()) {
-            return std::nullopt;
-        }
-        const auto* edited = std::get_if<double>(&event->get("amount"));
-        return edited == nullptr ? amount : static_cast<float>(*edited);
+    hooks.healed = [&sink](const player::PlayerSession& who, float amount, std::string_view cause, bool fast) {
+        return raiseHeal(sink, who, amount, cause, fast);
     };
     hooks.died = [&sink](const player::PlayerSession& who, const std::string& deathMessage) {
         Announcement said;
@@ -661,6 +688,9 @@ ContainerMenuController::Hooks containerMenu(ClientSession& owner, const EventSi
         };
         const server::plugins::PluginEvent* answered = sink.ask(&inventoryEnchantPrepare, [&](PluginEvent& event) {
             EventSink::player(event, *who);
+            if (const auto& at = owner.menus().openBlock; at.has_value()) {
+                position(event, at->x, at->y, at->z);
+            }
             event.set("item", snbtOf(item));
             event.set("bookshelves", static_cast<std::int64_t>(shelves));
             event.set("offers", describe());
@@ -712,6 +742,9 @@ ContainerMenuController::Hooks containerMenu(ClientSession& owner, const EventSi
         }
         const server::plugins::PluginEvent* answered = sink.ask(&inventoryEnchant, [&](PluginEvent& event) {
             EventSink::player(event, *who);
+            if (const auto& at = owner.menus().openBlock; at.has_value()) {
+                position(event, at->x, at->y, at->z);
+            }
             event.set("item", snbtOf(item));
             event.set("button", static_cast<std::int64_t>(button));
             event.set("cost", static_cast<std::int64_t>(cost));

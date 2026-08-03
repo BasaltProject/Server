@@ -98,7 +98,7 @@ void CombatSystem::arrowEffects(world::LoadedWorld& world, const std::vector<Pla
         if (harm || effect.effect == world::mobEffects::instantHealth()) {
             const auto amount = static_cast<float>(1 << std::clamp(effect.amplifier, 0, 30));
             if (!harm && player->connection().heal) {
-                player->connection().heal(kHeal * amount);
+                player->connection().heal(kHeal * amount, "magic");
             } else if (harm && player->connection().hurt) {
                 player->connection().hurt(kHarm * amount, "indirectMagic",
                                           wire::common::Identifier::vanilla("indirect_magic"),
