@@ -366,11 +366,22 @@ final class WorldKinds {
                     return array(tile, "Paper.StopCooking")[(Integer) args[0]] != 0;
                 }
                 case "startCooking", "stopCooking": {
-                    check((Integer) args[0]);
                     int[] values = array(tile, "Paper.StopCooking");
-                    values[(Integer) args[0]] = name.equals("stopCooking") ? 1 : 0;
+                    int wanted = name.equals("stopCooking") ? 1 : 0;
+                    boolean changed = false;
+                    if (args == null || args.length == 0) {
+                        for (int slot = 0; slot < values.length; slot++) {
+                            changed |= values[slot] != wanted;
+                            values[slot] = wanted;
+                        }
+                        tile.put("Paper.StopCooking", values);
+                        return null;
+                    }
+                    check((Integer) args[0]);
+                    changed = values[(Integer) args[0]] != wanted;
+                    values[(Integer) args[0]] = wanted;
                     tile.put("Paper.StopCooking", values);
-                    return null;
+                    return changed;
                 }
                 default:
                     return Tile.kNone;

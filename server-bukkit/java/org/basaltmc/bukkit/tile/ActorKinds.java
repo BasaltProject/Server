@@ -417,6 +417,14 @@ final class ActorKinds {
             Map<String, Object> scratch = Nbt.compound();
             List<Object> held = Nbt.list(config, "spawn_potentials");
             scratch.put("SpawnPotentials", held == null ? new ArrayList<Object>() : held);
+            if (held != null && !held.isEmpty() && Nbt.map(held.get(0)) != null) {
+                Map<String, Object> first = Nbt.map(Nbt.map(held.get(0)).get("data"));
+                Map<String, Object> spawn = Nbt.compound();
+                if (first != null && Nbt.map(first.get("entity")) != null) {
+                    spawn.put("entity", Nbt.map(first.get("entity")));
+                    scratch.put("SpawnData", spawn);
+                }
+            }
             Object result = SpawnerKind.callOn(new SpawnerView(null, scratch, new Location(null, 0, 0, 0)), name, args);
             if (!name.startsWith("get")) {
                 config.put("spawn_potentials", scratch.get("SpawnPotentials"));

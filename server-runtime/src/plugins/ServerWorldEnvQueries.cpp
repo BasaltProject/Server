@@ -185,7 +185,10 @@ void ServerWorldEnv::gameEvent(const std::string_view event, const double x, con
     if (!source.empty()) {
         who.entity = wire::common::Uuid::parse(std::string{source});
     }
-    world::vibrations::emit(world_->state(), event, x, y, z, world_->gameTime(), who);
+    constexpr std::string_view kVanillaPrefix = "minecraft:";
+    world::vibrations::emit(world_->state(),
+                            event.starts_with(kVanillaPrefix) ? event.substr(kVanillaPrefix.size()) : event, x, y, z,
+                            world_->gameTime(), who);
 }
 
 bool ServerWorldEnv::growTree(const std::int32_t x, const std::int32_t y, const std::int32_t z,
