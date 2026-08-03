@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -318,7 +319,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         }
         return;
     }
-    if (path == "potion") {
+    if (path == "splash_potion" || path == "lingering_potion") {
         if (!entity.forcedLand && !hit.has_value() &&
             !targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
             return;
@@ -345,7 +346,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         }
         return;
     }
-    if (!hitAllowed(world, entity, -1, static_cast<std::int32_t>(std::floor(hit->x)),
+    if (kind.sticks &&
+        !hitAllowed(world, entity, -1, static_cast<std::int32_t>(std::floor(hit->x)),
                     static_cast<std::int32_t>(std::floor(hit->y)), static_cast<std::int32_t>(std::floor(hit->z)))) {
         return;
     }
@@ -445,7 +447,17 @@ bool CombatSystem::giveMobEffect(world::LoadedWorld& world, const std::vector<Pl
 
 void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                 const std::vector<ServerEntity*>& living, const ServerEntity& bottle) {
-    if (!bottle.potionEffect.has_value()) {
+    // parity: `ThrownSplashPotion.onHitAsPotion` runs the effects of the stack's `potion_contents`.
+    std::vector<world::ActiveEffect> effects;
+    if (bottle.potionEffect.has_value()) {
+        effects.push_back(world::ActiveEffect{.effect = Identifier::vanilla(*bottle.potionEffect),
+                                              .remainingTicks = static_cast<std::int32_t>(kSplashDuration)});
+    } else if (const wire::nbt::NbtCompound* contents =
+                   bottle.heldItemComponents.getCompound("minecraft:potion_contents");
+               contents != nullptr) {
+        effects = world::potionEffects::of(*contents, 1.0F);
+    }
+    if (effects.empty()) {
         return;
     }
 
@@ -490,7 +502,7 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
                 lines += (lines.empty() ? "" : "\n") + std::to_string(idOf(hit)) + "|" + std::to_string(hit.share);
             }
             plugins::hookEvents::entity(event, world.name(), bottle);
-            event.set("effect", *bottle.potionEffect);
+            event.set("effect", effects.front().effect.toString());
             event.set("affected", std::move(lines));
         });
     if (answered != nullptr && answered->cancelled()) {
@@ -517,20 +529,75 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
         splashed = std::move(kept);
     }
     for (const Splashed& hit : splashed) {
-        const auto ticks = static_cast<std::int32_t>(kSplashDuration * hit.share);
-        if (ticks <= 0) {
-            continue;
+        for (const world::ActiveEffect& effect : effects) {
+            const bool harm = effect.effect == world::mobEffects::instantDamage();
+            const bool heal = effect.effect == world::mobEffects::instantHealth();
+            if (harm || heal) {
+                // parity: `HealOrHarmMobEffect.applyInstantenousEffect` scales by how close the splash came.
+                const auto healed = static_cast<float>(static_cast<std::int32_t>(
+                    (hit.share * static_cast<double>(4 << std::clamp(effect.amplifier, 0, 30))) + 0.5));
+                const auto hurt = static_cast<float>(static_cast<std::int32_t>(
+                    (hit.share * static_cast<double>(6 << std::clamp(effect.amplifier, 0, 30))) + 0.5));
+                const bool undead =
+                    hit.mob != nullptr && options_.entityTags != nullptr &&
+                    world::realEntityTypeTags::membersOf(*options_.entityTags, Identifier::vanilla("undead"))
+                        .contains(hit.mob->type());
+                if (harm != undead) {
+                    const entity::DamageSource source{.entityId = bottle.entityId(),
+                                                      .x = bottle.x,
+                                                      .z = bottle.z,
+                                                      .name = shooterName(watchers, living, bottle)};
+                    if (hit.player != nullptr && hit.player->connection().hurt) {
+                        hit.player->connection().hurt(hurt, "indirectMagic",
+                                                      wire::common::Identifier::vanilla("indirect_magic"), source);
+                    }
+                    if (hit.mob != nullptr) {
+                        entity::entityCombat::blame(*hit.mob, bottle.ownerId, bottle.entityId(), bottle.type());
+                        const entity::entityCombat::Result result =
+                            entity::entityCombat::hurt(*hit.mob, hurt, bottle.x, bottle.z, {}, "indirect_magic");
+                        if (result.landed) {
+                            announceEntityHit(watchers, *hit.mob, Identifier::vanilla("indirect_magic"),
+                                              bottle.entityId(), result.died);
+                        }
+                    }
+                } else {
+                    if (hit.player != nullptr && hit.player->connection().heal) {
+                        hit.player->connection().heal(healed, "magic");
+                    }
+                    if (hit.mob != nullptr) {
+                        hit.mob->health = std::min(hit.mob->attributeWithModifiers("minecraft:max_health"),
+                                                   hit.mob->health + static_cast<double>(healed));
+                    }
+                }
+                continue;
+            }
+            // parity: `applySplash` drops anything that would last a second or less.
+            const auto ticks =
+                static_cast<std::int32_t>((hit.share * static_cast<double>(effect.remainingTicks)) + 0.5);
+            if (ticks <= 20 && !bottle.potionEffect.has_value()) {
+                continue;
+            }
+            if (ticks <= 0) {
+                continue;
+            }
+            if (hit.mob != nullptr) {
+                static_cast<void>(giveMobEffect(world, watchers, *hit.mob,
+                                                world::ActiveEffect{.effect = effect.effect,
+                                                                    .amplifier = effect.amplifier,
+                                                                    .remainingTicks = ticks,
+                                                                    .ambient = effect.ambient,
+                                                                    .visible = effect.visible,
+                                                                    .showIcon = effect.showIcon},
+                                                bottle.entityId()));
+            } else if (hit.player->connection().addEffect) {
+                // parity: `getEffectSource`, the thrower or else the bottle.
+                hit.player->noteEffectSource(bottle.ownerId.value_or(bottle.entityId()));
+                hit.player->connection().addEffect(effect.effect, ticks, effect.amplifier);
+            }
         }
-        if (hit.mob != nullptr) {
-            static_cast<void>(giveMobEffect(
-                world, watchers, *hit.mob,
-                world::ActiveEffect{.effect = Identifier::vanilla(*bottle.potionEffect), .remainingTicks = ticks},
-                bottle.entityId()));
-        } else if (hit.player->connection().addEffect) {
-            // parity: `getEffectSource`, the thrower or else the bottle.
-            hit.player->noteEffectSource(bottle.ownerId.value_or(bottle.entityId()));
-            hit.player->connection().addEffect(Identifier::vanilla(*bottle.potionEffect), ticks, 0);
-        }
+    }
+    if (bottle.type().path() == "lingering_potion" && options_.lingeringLanded) {
+        options_.lingeringLanded(world, bottle, effects);
     }
     broadcaster_.sendEffects(watchers, static_cast<std::int32_t>(std::floor(bottle.x)),
                              static_cast<std::int32_t>(std::floor(bottle.y)),
