@@ -64,7 +64,7 @@ struct Slots {
             return PlayerInventory::kOffhandSlot;
         }
         if (id >= kFeet && id <= kHead) {
-            return 36 + (id - kFeet);
+            return player::PlayerInventory::kArmourStart + (kHead - id);
         }
         return std::nullopt;
     };
