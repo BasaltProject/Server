@@ -61,12 +61,13 @@ TEST_CASE("the table of events is the table of events") {
         joined += describe(*type);
     }
     CHECK(names.size() == 167);
-    CHECK(checksumOf(joined) == 4431500233604771919LL);
+    CHECK(checksumOf(joined) == 1505735962850003388LL);
 
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world,message,silent|message,silent");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world,message,silent|message,silent");
     CHECK(describe(*all[2]) == "player.chat|true|player_name,player_uuid,world,message|message");
-    CHECK(describe(*all[17]) == "player.gamemode_change|true|player_name,player_uuid,world,gamemode,from_gamemode|");
+    CHECK(describe(*all[17]) ==
+          "player.gamemode_change|true|player_name,player_uuid,world,gamemode,from_gamemode,cause|");
     CHECK(describe(*all[34]) == "world.chunk_load|false|world,chunk_x,chunk_z,generated|");
     CHECK(describe(*all[51]) == "entity.shoot|true|entity_id,entity_type,world,projectile,power|");
     CHECK(describe(*all[68]) == "entity.combust|true|entity_id,entity_type,world,ticks,cause|");
