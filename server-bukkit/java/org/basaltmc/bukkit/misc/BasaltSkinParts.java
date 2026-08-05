@@ -2,7 +2,6 @@ package org.basaltmc.bukkit.misc;
 
 import com.destroystokyo.paper.SkinParts;
 
-/** The skin layers a figure shows, as the seven bits the game sends. */
 public final class BasaltSkinParts implements SkinParts.Mutable {
     private int raw;
 

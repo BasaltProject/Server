@@ -13,7 +13,6 @@ import org.bukkit.ServerLinks;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
-/** The connection of a player in the game, answered by the player it belongs to. */
 public final class BasaltConnection implements PlayerGameConnection {
     private final Player player;
 

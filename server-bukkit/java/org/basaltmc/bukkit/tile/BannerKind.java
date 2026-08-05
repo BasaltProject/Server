@@ -10,7 +10,6 @@ import org.bukkit.block.Banner;
 import org.bukkit.block.Bed;
 import org.bukkit.block.BlockState;
 
-/** Banners keep their patterns in the data and their colour in the block; beds keep only the block's colour. */
 final class BannerKind implements TileKind {
     private final boolean bed;
 

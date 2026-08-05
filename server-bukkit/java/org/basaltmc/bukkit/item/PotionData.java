@@ -10,7 +10,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 
-/** What one potion type does, taken from the server's potion registry. */
 public final class PotionData implements PotionType.InternalPotionData {
     private static Map<String, List<Map<String, Object>>> potions;
 

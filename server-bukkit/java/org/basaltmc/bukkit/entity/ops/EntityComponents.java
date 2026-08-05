@@ -6,7 +6,6 @@ import java.util.Set;
 import org.basaltmc.bukkit.entity.EntityCore;
 import org.bukkit.DyeColor;
 
-/** The data components an entity answers for: the variants and colours it saves, in the form the item codecs read. */
 final class EntityComponents {
     private static final String[] kRabbits = {"brown", "white", "black", "black_and_white", "gold", "salt_and_pepper"};
     private static final String[] kParrots = {"red_blue", "blue", "green", "yellow_blue", "gray"};

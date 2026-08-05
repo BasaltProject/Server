@@ -14,7 +14,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** The few stacks a mob carries in its own state (a piglin, villager or allay), read and written there. */
 public class HeldInventory extends AbstractInventory {
     private final EntityCore core;
     private final Entity holder;

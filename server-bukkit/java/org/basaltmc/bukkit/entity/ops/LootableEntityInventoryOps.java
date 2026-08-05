@@ -7,7 +7,6 @@ import org.basaltmc.bukkit.item.Nbt;
 import org.basaltmc.bukkit.tile.LootableData;
 import org.bukkit.entity.Entity;
 
-/** Loot bookkeeping of a container entity, kept in the data the server writes under Paper.LootableData. */
 public interface LootableEntityInventoryOps extends LootableEntityInventory, Cored {
     private LootableData data() {
         return LootableData.of(EntityNbt.compound(core(), ""));

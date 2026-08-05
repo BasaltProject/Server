@@ -7,7 +7,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.Sound;
 
-/** A goat horn call by the name the game gives it. */
 final class BasaltMusicInstrument extends MusicInstrument {
     static final List<String> kNames = List.of("ponder_goat_horn", "sing_goat_horn", "seek_goat_horn",
         "feel_goat_horn", "admire_goat_horn", "call_goat_horn", "yearn_goat_horn", "dream_goat_horn");

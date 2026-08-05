@@ -11,7 +11,6 @@ import org.basaltmc.bukkit.item.Texts;
 import org.bukkit.Color;
 import org.bukkit.DyeColor;
 
-/** Reads and writes the values of the components the Paper API can hold, between their stored form and objects. */
 final class Codecs {
     private Codecs() {}
 

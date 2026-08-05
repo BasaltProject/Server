@@ -14,7 +14,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 
-/** The potion contents an entity keeps (an area effect cloud, an arrow), read and written as one compound. */
 final class EntityPotions {
     private final EntityCore core;
     private final String path;

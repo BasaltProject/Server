@@ -58,7 +58,6 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 import org.bukkit.profile.PlayerTextures;
 
-/** The specs of the components that hold things: potions, containers, books, banners, maps and profiles. */
 public final class ContentSpecs {
     private ContentSpecs() {}
 

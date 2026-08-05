@@ -16,7 +16,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-/** The lines a stack lists under its name, in the order the game's own tooltip gives them. */
 public final class Tooltips {
     private static final String[] kSlotGroups = {"any", "mainhand", "offhand", "hand", "feet", "legs", "chest", "head",
         "armor", "body", "saddle"};

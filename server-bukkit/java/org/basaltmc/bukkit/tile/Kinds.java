@@ -20,7 +20,6 @@ import org.bukkit.block.SuspiciousSand;
 import org.bukkit.block.TestBlock;
 import org.bukkit.block.TestInstanceBlock;
 
-/** Which kind of tile state each block id has. */
 final class Kinds {
     private Kinds() {}
 
@@ -85,7 +84,6 @@ final class Kinds {
     private static final TileKind kShelf = new StorageKinds.ShelfKind();
     private static final TileKind kStatue = new Plain(CopperGolemStatue.class);
 
-    /** The kind of a container block, whose own accessors the container state already holds. */
     static TileKind container(BlockState held) {
         for (Class<?> face : held.getClass().getInterfaces()) {
             if (BlockState.class.isAssignableFrom(face)) {

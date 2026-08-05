@@ -166,7 +166,6 @@ public:
         static_cast<void>(display);
     }
 
-    /// Whether a /trigger of this objective is allowed for the entry.
     [[nodiscard]] virtual bool triggerable(std::int32_t board, std::string_view entry, std::string_view objective) {
         static_cast<void>(board);
         static_cast<void>(entry);

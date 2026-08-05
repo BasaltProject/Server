@@ -9,7 +9,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.view.AnvilView;
 
-/** Views over a window's contents at the moment its result was worked out, for the events that may change it. */
 public final class PrepareViews {
     private PrepareViews() {}
 
@@ -106,7 +105,6 @@ public final class PrepareViews {
         }
     }
 
-    /** An enchanting table view carrying the three rows the table is about to show. */
     public static final class Enchanting extends BasaltInventoryView implements org.bukkit.inventory.view.EnchantmentView {
         private org.bukkit.enchantments.EnchantmentOffer[] offers;
         private int seed;

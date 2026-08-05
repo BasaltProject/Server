@@ -18,7 +18,6 @@ import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.material.MaterialData;
 
-/** The environment half of the World API: what the dimension is, what it sounds and looks like, and its border. */
 public abstract class WorldExtras extends org.bukkit.craftbukkit.CraftWorld {
     private BasaltWorldBorder border;
 

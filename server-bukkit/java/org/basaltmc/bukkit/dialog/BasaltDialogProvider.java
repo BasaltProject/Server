@@ -27,7 +27,6 @@ import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.inventory.ItemStack;
 import org.jspecify.annotations.Nullable;
 
-/** Makes the parts of a dialog for the API, which builds them through this one place. */
 public final class BasaltDialogProvider implements DialogInstancesProvider {
     @Override
     public DialogBase.Builder dialogBaseBuilder(Component title) {

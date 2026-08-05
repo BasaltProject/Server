@@ -23,7 +23,6 @@ import org.bukkit.inventory.LoomInventory;
 import org.bukkit.inventory.SmithingInventory;
 import org.bukkit.inventory.StonecutterInventory;
 
-/** Gives an inventory the typed accessors of its kind (fuel, result, matrix...) as named slots. */
 public final class TypedInventories {
     private static final Map<String, Integer> kFurnace = Map.of("Result", 2, "Fuel", 1, "Smelting", 0);
     private static final Map<String, Integer> kBrewer = Map.of("Ingredient", 3, "Fuel", 4);

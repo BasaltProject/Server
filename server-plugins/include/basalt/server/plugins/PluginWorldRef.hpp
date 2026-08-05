@@ -104,7 +104,6 @@ public:
 
     [[nodiscard]] virtual std::int32_t minHeight() const { return 0; }
 
-    /// The number of blocks from the lowest to the highest.
     [[nodiscard]] virtual std::int32_t height() const { return 0; }
 
     [[nodiscard]] virtual std::array<std::int32_t, 3> spawn() const { return {0, 64, 0}; }
@@ -157,7 +156,6 @@ public:
         return 0;
     }
 
-    /// Writes many positions at once, returns how many changed.
     virtual std::int32_t writeStates(std::span<const std::int32_t> positions, std::span<const std::int32_t> states,
                                      bool notify) {
         static_cast<void>(positions);
@@ -257,15 +255,11 @@ public:
         static constexpr std::uint32_t kNeighbors = 1;
         /// The blocks around reshape to fit the new one (a fence joining, stairs turning).
         static constexpr std::uint32_t kShapes = 2;
-        /// The light there is worked out again.
         static constexpr std::uint32_t kLight = 4;
-        /// What a container that is replaced holds spills out as items.
         static constexpr std::uint32_t kEntities = 8;
-        /// Points of interest follow the change.
         static constexpr std::uint32_t kPoi = 16;
         /// The new block books its scheduled ticks and fluid updates (`onPlace`).
         static constexpr std::uint32_t kTicks = 32;
-        /// The players who see the blocks are shown their new state.
         static constexpr std::uint32_t kClients = 64;
         /// The rest of `onPlace`: golems, dust, signals, pistons and the like arriving.
         static constexpr std::uint32_t kPlace = 128;
@@ -648,7 +642,6 @@ public:
         return false;
     }
 
-    /// Loads or generates the chunk, and returns whether it is there afterwards.
     virtual bool loadChunk(std::int32_t chunkX, std::int32_t chunkZ, bool generate) {
         static_cast<void>(chunkX);
         static_cast<void>(chunkZ);
@@ -676,7 +669,6 @@ public:
         return nullptr;
     }
 
-    /// Entities in the chunk, which are the ones it will save.
     [[nodiscard]] virtual std::vector<std::shared_ptr<PluginEntityRef>> entitiesIn(std::int32_t chunkX,
                                                                                    std::int32_t chunkZ) const {
         static_cast<void>(chunkX);

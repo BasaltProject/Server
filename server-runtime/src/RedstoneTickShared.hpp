@@ -72,7 +72,6 @@ inline void sendBlockUpdate(const std::vector<PlayerSession*>& watchers, const B
     }
 }
 
-/// Every tripwire block an entity of this size is crossing.
 inline void crossingsOf(world::LoadedWorld& world, double x, double y, double z, double halfWidth, double height,
                         std::set<std::int64_t>& into) {
     for (std::int32_t blockX = wire::common::mth::floor(x - halfWidth);

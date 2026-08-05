@@ -11,7 +11,6 @@ import org.basaltmc.bukkit.item.ItemDefaults;
 import org.basaltmc.bukkit.item.Nbt;
 import org.bukkit.inventory.ItemStack;
 
-/** The Paper data component calls on an item, over the component map the stack keeps. */
 public final class ComponentOps {
     private ComponentOps() {}
 

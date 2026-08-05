@@ -13,7 +13,6 @@ import org.bukkit.generator.BiomeProvider;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 
-/** The worlds whose chunks a plugin's generator makes, and the populators that decorate them. */
 public final class CustomGenerators {
     private static final Map<String, Entry> kEntries = new ConcurrentHashMap<>();
     private static boolean subscribed;
@@ -165,7 +164,6 @@ public final class CustomGenerators {
         return packed;
     }
 
-    /** Runs the populators of a world on a chunk it has just made. */
     public static void chunkLoaded(Object[] values) {
         if (values.length < 4 || !(values[3] instanceof Boolean generated) || !generated) {
             return;

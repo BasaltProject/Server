@@ -5,7 +5,6 @@ import io.papermc.paper.scoreboard.numbers.NumberFormat;
 import io.papermc.paper.scoreboard.numbers.StyledFormat;
 import net.kyori.adventure.text.Component;
 
-/** The number formats of a score, as the kind and component text the server stores them as. */
 public final class BoardNumbers {
     private BoardNumbers() {}
 

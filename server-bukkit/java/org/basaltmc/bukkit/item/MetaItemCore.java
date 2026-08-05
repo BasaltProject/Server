@@ -22,7 +22,6 @@ import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataContainer;
 
-/** Identity, name and lore of an item meta. */
 public abstract class MetaItemCore extends ItemMetaBase implements Damageable, Repairable,
         org.bukkit.inventory.meta.BlockDataMeta {
     static final String kCustomName = "minecraft:custom_name";

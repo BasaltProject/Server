@@ -16,7 +16,6 @@ import org.basaltmc.bukkit.entity.EntityCore;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Mob;
 
-/** Mob goals over the plugin goal hook of the mob AI: one goal per key and mob, vanilla ones seen by name. */
 public final class BasaltMobGoals implements MobGoals {
     public static final BasaltMobGoals INSTANCE = new BasaltMobGoals();
 

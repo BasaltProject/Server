@@ -7,7 +7,6 @@ import java.util.function.Function;
 import org.bukkit.GameRule;
 import org.bukkit.NamespacedKey;
 
-/** A game rule of the server, keyed by the name it has in the game. */
 public final class BasaltGameRule<T> extends GameRule<T> {
     private static final Map<String, String> kLegacy = Map.ofEntries(
         Map.entry("doDaylightCycle", "advance_time"), Map.entry("doWeatherCycle", "advance_weather"),

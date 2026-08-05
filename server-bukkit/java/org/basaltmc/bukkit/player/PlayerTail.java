@@ -25,7 +25,6 @@ import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
-/** The players' state the server keeps for them alone: item use, fixed pose, shoulders, waypoint and the like. */
 public abstract class PlayerTail extends PlayerActions {
     private static final long kUnset = -1;
 

@@ -14,7 +14,6 @@ import org.bukkit.inventory.meta.SuspiciousStewMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-/** The metas that hold other stacks or a list of effects. */
 public final class MetaContainers {
     private MetaContainers() {}
 

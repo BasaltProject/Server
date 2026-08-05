@@ -18,7 +18,6 @@ import org.bukkit.map.MapCursorCollection;
 import org.bukkit.map.MapRenderer;
 import org.bukkit.map.MapView;
 
-/** A map of the world, seen through the renderers a plugin gave it; without any, the world's own picture shows. */
 public final class BasaltMapView implements MapView {
     private static final Map<Integer, BasaltMapView> kViews = new HashMap<>();
     private static final int kRenderPeriod = 10;

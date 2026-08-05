@@ -10,7 +10,6 @@ import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
 import org.basaltmc.bukkit.MiscNatives;
 
-/** Adventure's boss bars shown to players: each is mirrored by a bar of the server, and follows the original. */
 public final class AdventureBars {
     private AdventureBars() {}
 

@@ -36,7 +36,6 @@ struct PluginLootEnchant {
     std::int64_t seed = 0;
 };
 
-/// The loot tables the server loaded.
 class PluginLoot {
 public:
     PluginLoot() = default;

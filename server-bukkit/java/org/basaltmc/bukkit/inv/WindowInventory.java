@@ -12,7 +12,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** The top half of a window the server opened, read and written through that window's own slots. */
 public class WindowInventory extends AbstractInventory {
     protected final String uuid;
     protected final InventoryType type;

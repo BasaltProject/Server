@@ -12,7 +12,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 
-/** The server's recipe list, as the Bukkit calls on the server see it. */
 public final class Recipes {
     private Recipes() {}
 
@@ -124,7 +123,6 @@ public final class Recipes {
         return out;
     }
 
-    /** What a crafting grid makes: the recipe, its result and what each cell is left holding. */
     public record Crafted(NamespacedKey recipe, ItemStack result, ItemStack[] remaining) {}
 
     public static Crafted craft(ItemStack[] matrix) {

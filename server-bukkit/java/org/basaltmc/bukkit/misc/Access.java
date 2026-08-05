@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.UUID;
 import org.basaltmc.bukkit.MiscNatives;
 
-/** Who the server knows, who is operator, whitelisted or banned: the player database as Bukkit asks for it. */
 public final class Access {
     private Access() {}
 

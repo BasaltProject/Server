@@ -4,7 +4,6 @@ import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Vehicle;
 
-/** The vehicle events raised from deep in the game systems, as the Bukkit events plugins listen for. */
 final class HookVehicleEvents {
     private HookVehicleEvents() {}
 

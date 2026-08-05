@@ -34,7 +34,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.loot.LootTable;
 import org.bukkit.spawner.TrialSpawnerConfiguration;
 
-/** Blocks tied to creatures and players: sculk, vaults, hives, trial spawners, brushable blocks. */
 final class ActorKinds {
     private ActorKinds() {}
 

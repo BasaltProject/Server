@@ -12,7 +12,6 @@ import org.bukkit.util.BoundingBox;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-/** Rays through the collision shapes of blocks and the boxes of entities. */
 public final class RayTracing {
     private RayTracing() {}
 

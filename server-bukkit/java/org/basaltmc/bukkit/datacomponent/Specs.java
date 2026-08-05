@@ -14,7 +14,6 @@ import org.bukkit.FireworkEffect;
 import org.bukkit.Keyed;
 import org.bukkit.NamespacedKey;
 
-/** Which spec or plain codec reads and writes each component the specs cover. */
 final class Specs {
     private static final Map<String, Spec> kSpecs = Map.ofEntries(Map.entry("tool", ItemSpecs.TOOL),
         Map.entry("equippable", ItemSpecs.EQUIPPABLE), Map.entry("consumable", ItemSpecs.CONSUMABLE),

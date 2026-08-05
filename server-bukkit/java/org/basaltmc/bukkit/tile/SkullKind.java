@@ -13,7 +13,6 @@ import org.bukkit.block.Skull;
 import org.bukkit.block.data.Directional;
 import org.bukkit.block.data.Rotatable;
 
-/** Heads: the owner profile and sound are edited through the head item's own meta over the same data. */
 final class SkullKind implements TileKind {
     @Override
     public Class<? extends BlockState> face() {

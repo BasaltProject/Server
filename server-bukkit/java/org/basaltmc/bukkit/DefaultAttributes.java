@@ -11,7 +11,6 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.attribute.AttributeModifier;
 
-/** The attributes a new entity type starts with, held apart from any entity. */
 final class DefaultAttributes implements Attributable {
     private final Map<NamespacedKey, Double> base = new HashMap<>();
     private final Map<Attribute, AttributeInstance> made = new HashMap<>();

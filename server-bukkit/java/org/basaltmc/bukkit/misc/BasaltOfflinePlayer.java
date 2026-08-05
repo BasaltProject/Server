@@ -17,7 +17,6 @@ import org.bukkit.configuration.serialization.ConfigurationSerializable;
 import org.bukkit.configuration.serialization.SerializableAs;
 import org.bukkit.entity.Player;
 
-/** A player who is not online, known by the database or only by a name. */
 @SerializableAs("Player")
 public final class BasaltOfflinePlayer extends OfflinePlayerBase implements ConfigurationSerializable {
     private final UUID id;

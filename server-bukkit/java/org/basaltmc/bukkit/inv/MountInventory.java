@@ -16,7 +16,6 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-/** The saddle, the body armour and the chest of a horse, donkey, mule or llama, kept in the animal's own data. */
 public class MountInventory extends AbstractInventory
         implements org.bukkit.inventory.HorseInventory, org.bukkit.inventory.LlamaInventory {
     private static final int kEquipment = 2;

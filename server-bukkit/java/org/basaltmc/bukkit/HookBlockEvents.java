@@ -9,7 +9,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.inventory.ItemStack;
 
-/** The block events raised from deep in the game systems, as the Bukkit and Paper events plugins listen for. */
 final class HookBlockEvents {
     private HookBlockEvents() {}
 

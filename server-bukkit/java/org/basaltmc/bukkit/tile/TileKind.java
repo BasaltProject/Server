@@ -3,7 +3,6 @@ package org.basaltmc.bukkit.tile;
 import java.lang.reflect.Method;
 import org.bukkit.block.BlockState;
 
-/** One family of tile states: the interfaces its proxy implements and how their methods read and write the data. */
 interface TileKind {
     Class<? extends BlockState> face();
 

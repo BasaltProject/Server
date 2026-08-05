@@ -17,7 +17,6 @@ import org.bukkit.damage.DamageType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ItemType;
 
-/** The public door to the component values, for the bridge that lives in the API's own package. */
 public final class Builders {
     private Builders() {}
 

@@ -21,7 +21,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.material.MaterialData;
 import org.bukkit.persistence.PersistentDataContainer;
 
-/** The server's stack: a material, a count and the vanilla data components, which every other view reads and writes. */
 @DelegateDeserialization(ItemStack.class)
 public final class BasaltItemStack extends ItemStack {
     private Material type;
@@ -29,7 +28,6 @@ public final class BasaltItemStack extends ItemStack {
     private Map<String, Object> components;
     private Binding binding;
 
-    /** Where a stack taken out of an inventory writes itself back, so changing it changes the slot it came from. */
     @FunctionalInterface
     public interface Binding {
         void store(ItemStack stack);

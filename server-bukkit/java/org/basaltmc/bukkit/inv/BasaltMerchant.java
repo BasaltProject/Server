@@ -7,7 +7,6 @@ import org.bukkit.entity.HumanEntity;
 import org.bukkit.inventory.Merchant;
 import org.bukkit.inventory.MerchantRecipe;
 
-/** A trader that is not an entity: a title and a list of trades a plugin made. */
 public final class BasaltMerchant implements Merchant {
     private final Component title;
     private final List<MerchantRecipe> recipes = new ArrayList<>();

@@ -10,7 +10,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.basaltmc.bukkit.Natives;
 import org.bukkit.plugin.Plugin;
 
-/** Runs the handlers a plugin registers for the events this server has: commands are registered as soon as asked. */
 public final class BasaltLifecycleManager implements LifecycleEventManager<Plugin> {
     private static final Set<String> kReported = ConcurrentHashMap.newKeySet();
 

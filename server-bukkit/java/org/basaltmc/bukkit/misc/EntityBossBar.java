@@ -11,7 +11,6 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 
-/** The bar a boss mob carries; who sees it follows the mob, and what it looks like is the plugin's to change. */
 public final class EntityBossBar implements BossBar {
     private static final int kTitle = 0;
     private static final int kColor = 1;

@@ -21,7 +21,6 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.EquipmentSlotGroup;
 import org.bukkit.inventory.ItemStack;
 
-/** An enchantment as the datapack defines it: levels, costs, exclusivity and the items it fits. */
 public final class BasaltEnchantment extends Enchantment {
     private final NamespacedKey key;
     private Map<String, Object> definition;

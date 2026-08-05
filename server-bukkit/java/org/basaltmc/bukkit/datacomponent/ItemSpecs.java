@@ -38,7 +38,6 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.EquipmentSlotGroup;
 
-/** The specs of the components that change how an item is used: tools, wearables, food, weapons and shields. */
 public final class ItemSpecs {
     private ItemSpecs() {}
 

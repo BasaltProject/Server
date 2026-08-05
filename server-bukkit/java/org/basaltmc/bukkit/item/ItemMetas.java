@@ -10,7 +10,6 @@ import org.bukkit.configuration.serialization.ConfigurationSerializable;
 import org.bukkit.configuration.serialization.ConfigurationSerialization;
 import org.bukkit.configuration.serialization.SerializableAs;
 
-/** Which meta class a material gets, and the text and serialized forms of a component map. */
 public final class ItemMetas {
     public enum Kind {
         PLAIN, SKULL, LEATHER, ARMOR, BOOK, WRITABLE_BOOK, ENCHANTED_BOOK, FIREWORK, FIREWORK_EFFECT, POTION, BANNER,

@@ -19,7 +19,6 @@ struct PluginStructurePlacement {
     /// 0 none, 1 left-right, 2 front-back.
     std::int32_t mirror = 0;
     float integrity = 1.0F;
-    /// Zero draws the seed from the clock.
     std::int64_t seed = 0;
     bool entities = true;
     /// -1 picks one at random.
@@ -61,7 +60,6 @@ public:
         return false;
     }
 
-    /// The generated file an id is saved to.
     [[nodiscard]] virtual std::string file(std::string_view id) {
         static_cast<void>(id);
         return {};

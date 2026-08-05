@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import org.basaltmc.bukkit.gen.InlinedRegistryBuilderProviderBase;
 
-/** The entries a plugin makes on the spot instead of reading them from the registry. */
 public final class BasaltInlineRegistries extends InlinedRegistryBuilderProviderBase {
     @Override
     public Dialog createDialog(Consumer<RegistryBuilderFactory<Dialog, ? extends DialogRegistryEntry.Builder>> value) {

@@ -25,7 +25,6 @@ import org.bukkit.inventory.SmokingRecipe;
 import org.bukkit.inventory.StonecuttingRecipe;
 import org.bukkit.inventory.TransmuteRecipe;
 
-/** Recipes as the server keeps them: a compound that mirrors the recipe struct, with ingredients as item id sets. */
 public final class RecipeCodec {
     private static final int kShaped = 0;
     private static final int kShapeless = 1;

@@ -10,7 +10,6 @@ import org.bukkit.block.BlockState;
 import org.bukkit.configuration.serialization.DelegateDeserialization;
 import org.bukkit.inventory.meta.BlockStateMeta;
 
-/** The meta of an item that places a block with a block entity: the state it will have once placed. */
 @DelegateDeserialization(ItemMetas.Serial.class)
 public final class MetaBlockState extends MetaItem implements BlockStateMeta {
     private static final String kEntityData = "minecraft:block_entity_data";

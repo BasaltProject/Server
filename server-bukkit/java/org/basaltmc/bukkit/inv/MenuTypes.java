@@ -23,7 +23,6 @@ import org.bukkit.inventory.Merchant;
 import org.bukkit.inventory.view.builder.LocationInventoryViewBuilder;
 import org.bukkit.inventory.view.builder.MerchantInventoryViewBuilder;
 
-/** The window kinds a plugin can ask for by menu type, and the views and builders that make them. */
 public final class MenuTypes {
     private static final Map<String, BasaltMenuType> all = new LinkedHashMap<>();
 

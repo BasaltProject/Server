@@ -11,7 +11,6 @@ import org.bukkit.persistence.PersistentDataAdapterContext;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
-/** Plugin data on an item: the `PublicBukkitValues` compound inside `custom_data`, so other servers read it too. */
 public final class ItemPdc implements PersistentDataContainer, PersistentDataAdapterContext {
     private final Map<String, Object> components;
     private final Map<String, Object> nested;

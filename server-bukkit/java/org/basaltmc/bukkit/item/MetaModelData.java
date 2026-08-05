@@ -9,7 +9,6 @@ import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 public final class MetaModelData {
     private MetaModelData() {}
 
-    /** Custom model data over its stored compound: floats, flags, strings and colours. */
     public static final class ModelData implements CustomModelDataComponent {
         final Map<String, Object> data;
 

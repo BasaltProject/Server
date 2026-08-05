@@ -8,7 +8,6 @@ import org.basaltmc.bukkit.item.Texts;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
-/** The `id[component=value,...]` text form of an item, with values in SNBT. */
 final class ItemParser {
     private ItemParser() {}
 

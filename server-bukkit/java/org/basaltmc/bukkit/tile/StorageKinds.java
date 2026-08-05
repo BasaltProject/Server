@@ -23,7 +23,6 @@ import org.bukkit.inventory.LecternInventory;
 import org.bukkit.inventory.ShelfInventory;
 import org.bukkit.util.Vector;
 
-/** The blocks that hold a few items in a fixed place: a record, a book, a bookshelf, a pot, a shelf. */
 final class StorageKinds {
     private StorageKinds() {}
 

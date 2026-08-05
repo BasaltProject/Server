@@ -34,7 +34,6 @@ struct PluginAdvancement {
     std::vector<std::string> loot;
 };
 
-/// The advancements the server loaded and what each player has done towards them.
 class PluginAdvancements {
 public:
     PluginAdvancements() = default;
@@ -60,7 +59,6 @@ public:
         return {};
     }
 
-    /// Gives one criterion, with the toast, announcement and rewards that completing the advancement brings.
     virtual bool grant(std::string_view uuid, std::string_view id, std::string_view criterion) {
         static_cast<void>(uuid);
         static_cast<void>(id);

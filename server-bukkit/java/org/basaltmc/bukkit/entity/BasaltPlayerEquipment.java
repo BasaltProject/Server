@@ -7,7 +7,6 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
-/** A player's worn and held items, which live in the inventory and drop when it does. */
 public final class BasaltPlayerEquipment implements EntityEquipment {
     private final PlayerInventory inventory;
     private final Entity holder;

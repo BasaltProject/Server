@@ -11,7 +11,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 
-/** What a tile state holds: the block it was taken from and a private copy of the block entity's data. */
 public final class Tile {
     public static final Object kNone = new Object();
 
@@ -22,7 +21,6 @@ public final class Tile {
     public final String block;
     public final BlockState base;
     public final Map<String, Object> data;
-    /** The proxy that holds this data, set once it exists. */
     public BlockState self;
 
     Tile(BlockState base, Map<String, Object> data) {

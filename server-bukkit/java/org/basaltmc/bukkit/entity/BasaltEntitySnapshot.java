@@ -13,7 +13,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntitySnapshot;
 import org.bukkit.entity.EntityType;
 
-/** A frozen copy of an entity: its type and the NBT the server saves for it. */
 public final class BasaltEntitySnapshot implements EntitySnapshot {
     private final EntityType type;
     private final byte[] nbt;

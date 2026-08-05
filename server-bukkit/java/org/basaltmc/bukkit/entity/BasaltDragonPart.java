@@ -10,7 +10,6 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.Vector;
 
-/** One of the eight hit boxes of an ender dragon, seen from the dragon it belongs to. */
 public final class BasaltDragonPart extends org.basaltmc.bukkit.gen.ComplexEntityPartBase {
     private final ComplexLivingEntity parent;
     private final EntityCore core;

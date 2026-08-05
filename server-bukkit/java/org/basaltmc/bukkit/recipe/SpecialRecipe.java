@@ -4,7 +4,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ComplexRecipe;
 import org.bukkit.inventory.ItemStack;
 
-/** One of the recipes the game computes (dyeing, firework crafting, banner copying...), which can be read, not made. */
 public final class SpecialRecipe implements ComplexRecipe {
     private final NamespacedKey key;
     private final ItemStack result;

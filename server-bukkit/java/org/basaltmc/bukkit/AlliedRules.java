@@ -12,7 +12,6 @@ import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 
-/** The extra rules plugins add to who counts as an ally, asked by the game through `entity.allied_check`. */
 public final class AlliedRules {
     private static final String kEvent = "entity.allied_check";
     private static final Map<UUID, Map<Key, Predicate<Entity>>> rules = new ConcurrentHashMap<>();

@@ -17,7 +17,6 @@ import java.util.Set;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
-/** Where a plugin registers the commands it builds with Brigadier: they land in the Bukkit command map. */
 public final class BasaltCommands implements Commands {
     private static final CommandDispatcher<CommandSourceStack> kDispatcher = new CommandDispatcher<>();
 

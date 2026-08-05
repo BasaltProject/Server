@@ -4,7 +4,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.generator.structure.Structure;
 import org.bukkit.generator.structure.StructureType;
 
-/** A structure by the name the game gives it. */
 final class BasaltStructure extends Structure {
     private final NamespacedKey key;
 

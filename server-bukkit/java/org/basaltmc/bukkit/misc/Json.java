@@ -4,7 +4,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 
-/** Text as it crosses to the server: a JSON component, which keeps everything a component can carry. */
 public final class Json {
     private static final GsonComponentSerializer kGson = GsonComponentSerializer.gson();
     private static final LegacyComponentSerializer kLegacy = LegacyComponentSerializer.legacySection();

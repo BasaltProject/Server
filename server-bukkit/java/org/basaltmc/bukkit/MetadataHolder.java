@@ -44,7 +44,6 @@ public final class MetadataHolder {
         }
     }
 
-    /** Asks every lazy value of the plugin to compute again, as MetadataStore#invalidateAll does. */
     public synchronized void invalidateAll(Plugin plugin) {
         for (Map<Plugin, MetadataValue> found : values.values()) {
             MetadataValue value = found.get(plugin);

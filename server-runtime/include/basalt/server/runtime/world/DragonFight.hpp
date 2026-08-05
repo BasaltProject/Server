@@ -48,7 +48,6 @@ struct DragonFight {
     std::string barTitle;
     std::int32_t barColor = 0;
     std::int32_t barStyle = 0;
-    /// Bits one, two and four: darken the sky, play the boss music, create fog.
     std::int32_t barFlags = 6;
 
     [[nodiscard]] wire::nbt::NbtCompound encode() const;

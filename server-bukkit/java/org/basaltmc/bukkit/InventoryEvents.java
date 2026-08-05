@@ -19,7 +19,6 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 
-/** Turns the server's window events into the Bukkit inventory events. */
 final class InventoryEvents {
     private static final int kOutside = -999;
 

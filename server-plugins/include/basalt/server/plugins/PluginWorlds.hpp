@@ -93,7 +93,6 @@ public:
         return {};
     }
 
-    /// How many occupants a point of interest type holds.
     [[nodiscard]] virtual std::int32_t poiTickets(std::string_view type) const {
         static_cast<void>(type);
         return 0;
@@ -141,7 +140,6 @@ public:
     /// Which blocks own a block entity, as pairs: the block id, then the id of its block entity type.
     [[nodiscard]] virtual std::vector<std::string> blockEntityTypes() const { return {}; }
 
-    /// The data version this server writes, the number saved data is upgraded to.
     [[nodiscard]] virtual std::int32_t dataVersion() const { return 0; }
 
     /// Upgrades a named NBT document of `kind` (chunk, block_entity, entity, item) from `fromVersion`; else nothing.
@@ -194,7 +192,6 @@ public:
         return {};
     }
 
-    /// The entity type ids.
     [[nodiscard]] virtual std::vector<std::string> entityTypeIds() const { return {}; }
 };
 

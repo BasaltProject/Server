@@ -11,7 +11,6 @@ import org.bukkit.generator.structure.StructurePiece;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.util.BoundingBox;
 
-/** The structures that start in a chunk, with the boxes the server generated them in. */
 final class BasaltStructures {
     private BasaltStructures() {}
 

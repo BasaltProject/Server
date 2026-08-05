@@ -7,9 +7,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
-/** The worn and held items of a living entity, over whatever the entity keeps its equipment in. */
 public final class BasaltEntityEquipment implements EntityEquipment {
-    /** How one kind of entity stores equipment; a player stores it in an inventory, a mob in its entity data. */
     public interface Access {
         ItemStack get(EquipmentSlot slot);
 

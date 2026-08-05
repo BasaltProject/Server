@@ -185,7 +185,6 @@ struct PlayerConnection {
     /// Shows a dialog written out in full (Java) or its closest form (Bedrock).
     std::function<bool(const wire::nbt::NbtCompound& dialog)> showDialogData;
 
-    /// Shows a dialog of the registry by its id.
     std::function<bool(const std::string& id)> showDialogNamed;
 
     std::function<void(const wire::common::Uuid& waypoint, std::int32_t entityId, const std::string& style,

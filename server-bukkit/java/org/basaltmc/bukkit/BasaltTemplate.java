@@ -26,7 +26,6 @@ import org.bukkit.util.BlockTransformer;
 import org.bukkit.util.BlockVector;
 import org.bukkit.util.EntityTransformer;
 
-/** A structure template held as the compound of a structure file; placing and capturing go through the server. */
 final class BasaltTemplate implements Structure {
     private static final String kValues = "BukkitValues";
 
@@ -269,7 +268,6 @@ final class BasaltTemplate implements Structure {
         }
     }
 
-    /** A template position as it lands once mirrored and turned about the origin. */
     private static int[] turn(int x, int z, StructureRotation rotation, Mirror mirror) {
         int flippedX = mirror == Mirror.FRONT_BACK ? -x : x;
         int flippedZ = mirror == Mirror.LEFT_RIGHT ? -z : z;

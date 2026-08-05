@@ -5,7 +5,6 @@ import org.basaltmc.bukkit.MiscNatives;
 import org.basaltmc.bukkit.WorldNatives;
 import org.bukkit.craftbukkit.persistence.CraftPersistentDataContainer;
 
-/** The containers of the holders the server stores itself; each reads and writes the server's own copy. */
 public final class PdcStores {
     private PdcStores() {}
 

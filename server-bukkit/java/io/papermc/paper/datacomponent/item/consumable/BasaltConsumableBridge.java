@@ -10,7 +10,6 @@ import org.basaltmc.bukkit.datacomponent.ItemSpecs;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
-/** Builds the consume effects the item component API hands out. */
 public final class BasaltConsumableBridge implements ConsumableTypesBridge {
     @Override
     public ConsumeEffect.ApplyStatusEffects applyStatusEffects(List<PotionEffect> effects, float probability) {

@@ -9,7 +9,6 @@ import java.util.Set;
 import org.basaltmc.bukkit.WorldNatives;
 import org.bukkit.NamespacedKey;
 
-/** One data component type; a unit component carries no value, every other carries one. */
 public class ComponentType implements DataComponentType {
     private static final Set<String> kUnits = Set.of("unbreakable", "creative_slot_lock", "intangible_projectile",
         "glider", "waxed");

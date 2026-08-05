@@ -20,13 +20,11 @@ import org.bukkit.block.structure.StructureRotation;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 
-/** The BlockData methods whose property is not just the method name, and the ones that need the server. */
 final class BlockDataSpecials {
     static final Object kNone = new Object();
 
     private BlockDataSpecials() {}
 
-    /** The sound type of a block, answering both the Bukkit and the Paper interface. */
     static final class Sounds implements SoundGroup, com.destroystokyo.paper.block.BlockSoundGroup {
         private final String[] facts;
 

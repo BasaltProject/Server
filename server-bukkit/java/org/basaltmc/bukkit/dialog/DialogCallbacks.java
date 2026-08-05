@@ -17,7 +17,6 @@ import org.basaltmc.bukkit.facade.NbtCodec;
 import org.bukkit.entity.Player;
 import org.jspecify.annotations.Nullable;
 
-/** The buttons a plugin gave a function instead of an id, and the clicks that reach them. */
 public final class DialogCallbacks {
     private static final String kEvent = "player.custom_click";
     private static final String kPrefix = "click_callback/";
@@ -66,7 +65,6 @@ public final class DialogCallbacks {
         return true;
     }
 
-    /** What the client answered, read from the payload of the click. */
     public static final class Response implements DialogResponseView {
         private final String payload;
         private CompoundTag tag;

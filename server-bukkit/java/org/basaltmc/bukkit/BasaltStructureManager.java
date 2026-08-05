@@ -13,7 +13,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.structure.Structure;
 import org.bukkit.structure.StructureManager;
 
-/** The structure templates of the server: the ones plugins registered, the generated folder and the game data. */
 final class BasaltStructureManager implements StructureManager {
     private final Map<NamespacedKey, Structure> registered = new LinkedHashMap<>();
 

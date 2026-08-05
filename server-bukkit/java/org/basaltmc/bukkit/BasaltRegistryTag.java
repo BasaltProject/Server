@@ -12,7 +12,6 @@ import org.bukkit.Keyed;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 
-/** A tag of a registry, held as the ids of its members. */
 public final class BasaltRegistryTag<T extends Keyed> implements Tag<T> {
     private final RegistryKey<T> registry;
     private final TagKey<T> key;

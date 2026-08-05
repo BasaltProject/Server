@@ -119,7 +119,6 @@ public:
     bool barVisible = true;
     std::int32_t barColor = 2;
     std::int32_t barStyle = 2;
-    /// Bits one, two and four: darken the sky, play the boss music, create fog.
     std::int32_t barFlags = 0;
     /// What a plugin keeps on the raid, saved as `BukkitValues`.
     wire::nbt::NbtCompound values;

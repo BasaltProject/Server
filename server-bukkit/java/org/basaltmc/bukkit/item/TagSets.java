@@ -7,7 +7,6 @@ import java.util.Set;
 import org.basaltmc.bukkit.InventoryNatives;
 import org.basaltmc.bukkit.WorldNatives;
 
-/** Datapack tags by registry and tag id, as sets of member ids. */
 public final class TagSets {
     private static final Map<String, Map<String, Set<String>>> cache = new HashMap<>();
 

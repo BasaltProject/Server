@@ -1,6 +1,5 @@
 package org.basaltmc.bukkit;
 
-/** The inventory events raised from deep in the game systems, as the Bukkit events plugins listen for. */
 final class HookInventoryEvents {
     private HookInventoryEvents() {}
 

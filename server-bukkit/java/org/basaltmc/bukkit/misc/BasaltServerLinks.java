@@ -8,7 +8,6 @@ import net.kyori.adventure.text.Component;
 import org.basaltmc.bukkit.MiscNatives;
 import org.bukkit.ServerLinks;
 
-/** The links of the pause menu, kept by the server and read back whenever a plugin asks. */
 public final class BasaltServerLinks implements ServerLinks {
     private final List<ServerLink> links;
     private final boolean live;

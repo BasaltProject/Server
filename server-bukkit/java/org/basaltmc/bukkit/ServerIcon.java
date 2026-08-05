@@ -5,7 +5,6 @@ import java.nio.file.Files;
 import java.util.Base64;
 import org.bukkit.util.CachedServerIcon;
 
-/** A 64 by 64 PNG kept as the base64 text a server list shows. */
 final class ServerIcon implements CachedServerIcon {
     private final String data;
 

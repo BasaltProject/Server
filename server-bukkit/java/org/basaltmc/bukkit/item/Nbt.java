@@ -10,7 +10,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Item data as plain Java values: Map for a compound, List for a list, boxed numbers, String, and primitive arrays. */
 public final class Nbt {
     private static final int kEnd = 0;
     private static final int kByte = 1;
@@ -161,7 +160,6 @@ public final class Nbt {
         }
     }
 
-    /** A compound with its root name, as the block and entity services exchange them. */
     public static byte[] writeNamed(Map<String, Object> root) {
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();

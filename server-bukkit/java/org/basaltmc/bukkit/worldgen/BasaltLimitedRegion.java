@@ -11,7 +11,6 @@ import org.bukkit.World;
 import org.bukkit.block.BlockState;
 import org.bukkit.generator.LimitedRegion;
 
-/** The world seen through a few chunks around one: reaching outside it is refused, as it is for any populator. */
 public final class BasaltLimitedRegion {
     private BasaltLimitedRegion() {}
 

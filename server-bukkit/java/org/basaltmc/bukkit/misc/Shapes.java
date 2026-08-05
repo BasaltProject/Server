@@ -8,7 +8,6 @@ import org.basaltmc.bukkit.MiscNatives;
 import org.bukkit.util.BoundingBox;
 import org.bukkit.util.VoxelShape;
 
-/** The collision shapes of block states, read once from the server's tables. */
 public final class Shapes {
     private static final Map<Integer, double[]> kBoxes = new ConcurrentHashMap<>();
     private static final double kUnits = 32.0;

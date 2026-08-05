@@ -19,7 +19,6 @@ struct PluginDatapack {
     std::vector<std::string> features;
 };
 
-/// The data packs the server has found and which of them are on.
 class PluginDatapacks {
 public:
     PluginDatapacks() = default;

@@ -5,7 +5,6 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
 
-/** A border that belongs to no world, for the plugins that show one to a player. */
 final class StandaloneBorder implements WorldBorder {
     private static final double kMaxSize = 5.999997E7;
     private static final double kMaxCenter = 2.9999984E7;

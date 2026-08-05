@@ -8,7 +8,6 @@ import org.bukkit.command.BlockCommandSender;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ProxiedCommandSender;
 
-/** The command sender a plugin command sees for the kind of source that ran it. */
 final class Senders {
     private Senders() {}
 

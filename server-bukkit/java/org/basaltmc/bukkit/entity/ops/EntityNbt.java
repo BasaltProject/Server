@@ -10,7 +10,6 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.data.BlockData;
 
-/** Reads and writes the saved data of an entity as plain values, for the kinds of data one plugin call touches. */
 final class EntityNbt {
     private EntityNbt() {}
 

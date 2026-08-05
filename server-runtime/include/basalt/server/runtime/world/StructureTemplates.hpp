@@ -61,7 +61,6 @@ public:
     /// The generated file a template is saved to; empty before the world's folder is known.
     [[nodiscard]] std::filesystem::path generatedFile(const wire::common::Identifier& id) const;
 
-    /// Every template the game data ships, the generated folder holds or a plugin kept.
     [[nodiscard]] std::vector<wire::common::Identifier> allIds();
 
 private:

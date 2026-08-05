@@ -26,16 +26,13 @@ struct PluginMapCursor {
     std::int8_t y = 0;
     /// 0 to 15, a sixteenth of a turn each.
     std::int8_t direction = 0;
-    /// A map decoration type id.
     std::int32_t type = 0;
     /// A JSON text component.
     std::optional<std::string> caption;
 };
 
 struct PluginExploration {
-    /// Structure ids, or tag ids with a leading #.
     std::vector<std::string> destination;
-    /// A map decoration type id.
     std::string decoration = "minecraft:mansion";
     std::int32_t zoom = 2;
     std::int32_t radius = 50;
@@ -82,7 +79,6 @@ public:
         return {};
     }
 
-    /// The uuids of the online players carrying a filled map with this id.
     [[nodiscard]] virtual std::vector<std::string> carriers(std::int32_t id) {
         static_cast<void>(id);
         return {};

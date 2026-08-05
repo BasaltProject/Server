@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.basaltmc.bukkit.InventoryNatives;
 
-/** What the server's registries know about one item kind; read once per id. */
 public final class ItemData {
     private static final Map<String, ItemData> cache = new HashMap<>();
     private static final ItemData kUnknown = new ItemData(Nbt.compound());

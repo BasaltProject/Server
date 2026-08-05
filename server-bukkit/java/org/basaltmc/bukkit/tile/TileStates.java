@@ -12,7 +12,6 @@ import org.bukkit.Location;
 import org.bukkit.block.BlockState;
 import org.bukkit.craftbukkit.persistence.CraftPersistentDataContainer;
 
-/** Block states of the blocks that own a block entity, each with the accessors of its kind over a copy of its data. */
 public final class TileStates {
     private TileStates() {}
 
@@ -41,7 +40,6 @@ public final class TileStates {
         return proxy(new Tile(held, data), kind);
     }
 
-    /** The state a tile state wraps, which holds the stacks of a container. */
     public static BlockState innerOf(BlockState state) {
         if (state != null && Proxy.isProxyClass(state.getClass())
             && Proxy.getInvocationHandler(state) instanceof Handler handler) {

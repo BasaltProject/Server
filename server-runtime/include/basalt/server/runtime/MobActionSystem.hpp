@@ -374,7 +374,6 @@ public:
     [[nodiscard]] std::vector<server::world::loot::ItemStack> deathLootOf(world::LoadedWorld& world,
                                                                           const entity::ServerEntity& entity);
 
-    /// Spawns the stacks where the mob stood.
     void spawnLoot(world::LoadedWorld& world, const entity::ServerEntity& entity,
                    const std::vector<server::world::loot::ItemStack>& stacks);
 
@@ -589,7 +588,6 @@ public:
     /// parity: `SulfurCube.mobInteract`, lighting the cube or swallowing what the player holds.
     [[nodiscard]] SulfurUse useOnSulfurCube(entity::ServerEntity& cube, const server::world::loot::ItemStack& held);
 
-    /// Starts the witch drinking this potion, or stops it drinking with none.
     bool pluginWitchDrink(entity::ServerEntity& witch, const std::optional<server::world::loot::ItemStack>& potion);
 
     /// parity: `Witch.aiStep`, the potions it drinks by itself.

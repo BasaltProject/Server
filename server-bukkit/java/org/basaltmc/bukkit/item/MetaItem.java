@@ -22,7 +22,6 @@ import org.bukkit.inventory.meta.Repairable;
 import org.bukkit.inventory.meta.components.CustomModelDataComponent;
 import org.bukkit.persistence.PersistentDataContainer;
 
-/** Item meta over the vanilla data components of one stack; every getter and setter reads or writes the map. */
 @org.bukkit.configuration.serialization.DelegateDeserialization(ItemMetas.Serial.class)
 public class MetaItem extends MetaItemEnchants {
     public MetaItem(Material type, Map<String, Object> components) {

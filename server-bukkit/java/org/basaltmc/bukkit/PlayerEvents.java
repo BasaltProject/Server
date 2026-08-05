@@ -22,7 +22,6 @@ import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 
-/** The player events Basalt raises, as the Bukkit and Paper events plugins listen for. */
 final class PlayerEvents {
     private static final java.util.Map<java.util.UUID, org.bukkit.inventory.MainHand> mainHands =
         new java.util.concurrent.ConcurrentHashMap<>();

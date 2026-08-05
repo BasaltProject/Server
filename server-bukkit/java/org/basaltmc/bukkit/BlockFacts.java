@@ -2,7 +2,6 @@ package org.basaltmc.bukkit;
 
 import java.util.Set;
 
-/** Per-block facts the registries do not carry: which blocks react to a use and which catch fire from lava. */
 final class BlockFacts {
     private static final Set<String> kInteractable = Set.of((
         "dispenser note_block straw_bed tnt chiseled_bookshelf acacia_shelf bamboo_shelf birch_shelf " +

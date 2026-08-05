@@ -13,7 +13,6 @@ import org.bukkit.block.BlockState;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.Inventory;
 
-/** Block states of the blocks that hold items, whose inventory is the block entity's own item list. */
 public final class ContainerStates {
     private ContainerStates() {}
 

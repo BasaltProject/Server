@@ -7,7 +7,6 @@ namespace basalt::server::runtime::player {
 class PlayerRegistry;
 class PlayerSession;
 
-/// Whether a plugin changed how this player is listed.
 [[nodiscard]] bool hasCustomListEntry(const PlayerSession& subject);
 
 void sendListEntry(const PlayerSession& viewer, const PlayerSession& subject, bool listedForViewer = true);

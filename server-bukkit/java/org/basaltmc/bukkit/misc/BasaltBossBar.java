@@ -13,7 +13,6 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.KeyedBossBar;
 import org.bukkit.entity.Player;
 
-/** A boss bar held by the server: one a plugin keeps for a moment, or one kept by name that /bossbar also edits. */
 public final class BasaltBossBar implements KeyedBossBar {
     private static final int kId = 0;
     private static final int kKeyed = 1;

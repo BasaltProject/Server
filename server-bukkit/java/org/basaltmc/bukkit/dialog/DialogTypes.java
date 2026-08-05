@@ -11,7 +11,6 @@ import io.papermc.paper.registry.set.RegistrySet;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
-/** The five shapes a dialog can take. */
 final class DialogTypes {
     private DialogTypes() {}
 

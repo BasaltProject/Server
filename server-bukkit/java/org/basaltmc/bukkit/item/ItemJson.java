@@ -10,7 +10,6 @@ import org.basaltmc.bukkit.BasaltItemStack;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
-/** A stack as the JSON of the game's own item format: id, count and components, with the data version. */
 public final class ItemJson {
     private ItemJson() {}
 
