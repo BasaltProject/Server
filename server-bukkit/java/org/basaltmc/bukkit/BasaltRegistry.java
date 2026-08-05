@@ -19,7 +19,9 @@ import org.bukkit.Registry;
 public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
     private final Supplier<List<T>> source;
     private final Function<NamespacedKey, T> open;
+    private final List<String> known;
     private Map<NamespacedKey, T> entries;
+    private boolean listed;
     private String name;
     private Map<NamespacedKey, Tag<T>> tags;
 
@@ -29,8 +31,14 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
 
     /** A registry the server cannot list at all still answers for a key a plugin names, through {@code open}. */
     BasaltRegistry(Supplier<List<T>> source, Function<NamespacedKey, T> open) {
+        this(source, open, null);
+    }
+
+    /** A registry whose entries the server cannot list is told the vanilla ones, which {@code open} then makes. */
+    BasaltRegistry(Supplier<List<T>> source, Function<NamespacedKey, T> open, List<String> known) {
         this.source = source;
         this.open = open;
+        this.known = known;
     }
 
     BasaltRegistry<T> named(String registryName) {
@@ -88,15 +96,30 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
             for (T entry : source.get()) {
                 built.put(entry.getKey(), entry);
             }
+            listed = !built.isEmpty();
             entries = built;
+            if (!listed && open != null && known != null) {
+                for (String id : known) {
+                    NamespacedKey key = NamespacedKey.minecraft(id);
+                    T made = open.apply(key);
+                    if (made != null) {
+                        built.put(key, made);
+                    }
+                }
+                listed = true;
+            }
         }
         return entries;
+    }
+
+    public synchronized void addEntry(T entry) {
+        entries().put(entry.getKey(), entry);
     }
 
     @Override
     public T get(NamespacedKey key) {
         T found = entries().get(key);
-        if (found == null && open != null && entries().isEmpty()) {
+        if (found == null && open != null && !listed) {
             synchronized (this) {
                 found = entries().get(key);
                 if (found == null) {

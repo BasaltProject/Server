@@ -11,17 +11,24 @@ final class KeyedProxy implements InvocationHandler {
     private final Class<?> type;
     private final NamespacedKey key;
     private final int ordinal;
+    private final java.util.Map<String, Object[]> built;
 
-    private KeyedProxy(Class<?> type, NamespacedKey key, int ordinal) {
+    private KeyedProxy(Class<?> type, NamespacedKey key, int ordinal, java.util.Map<String, Object[]> built) {
         this.type = type;
         this.key = key;
         this.ordinal = ordinal;
+        this.built = built;
     }
 
-    @SuppressWarnings("unchecked")
     static <T extends Keyed> T of(Class<T> type, NamespacedKey key, int ordinal) {
+        return of(type, key, ordinal, java.util.Map.of());
+    }
+
+    /** An entry whose getters answer with the value a builder was given under the same name. */
+    @SuppressWarnings("unchecked")
+    static <T extends Keyed> T of(Class<T> type, NamespacedKey key, int ordinal, java.util.Map<String, Object[]> built) {
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
-            new KeyedProxy(type, key, ordinal));
+            new KeyedProxy(type, key, ordinal, built));
     }
 
     @Override
@@ -58,6 +65,12 @@ final class KeyedProxy implements InvocationHandler {
                 return ordinal - ((Number) args[0].getClass().getMethod("ordinal").invoke(args[0])).intValue();
             default:
                 break;
+        }
+        Object[] given = built.get(method.getName());
+        if (given != null && given.length == 1 && (args == null || args.length == 0)
+            && (method.getReturnType().isInstance(given[0])
+                || method.getReturnType().isPrimitive() && given[0] != null)) {
+            return given[0];
         }
         Object fact = KeyedFacts.answer(type, key, method, args);
         if (fact != KeyedFacts.kNone) {

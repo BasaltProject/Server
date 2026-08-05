@@ -62,7 +62,7 @@ struct Clock {
     namespace events = server::plugins::pluginEventTypes;
     const server::plugins::PluginEvent* change = server::plugins::emit(
         context.environment().pluginEvents(), &events::worldTimeSkip(), [&](server::plugins::PluginEvent& event) {
-            event.set("world", clock.name);
+            event.set("world", clock.world->name());
             event.set("time", to);
             event.set("from_time", clock.world->clock().totalTicks());
             event.set("cause", std::string{cause});

@@ -47,11 +47,11 @@ public final class BasaltRegistryAccess implements RegistryAccess {
         Supplier<List<T>> source = () -> (List<T>) (List) entriesOf(name, type);
         switch (name) {
             case "game_event":
-                return new BasaltRegistry<T>(source, key -> (T) new BasaltGameEvent(key));
+                return new BasaltRegistry<T>(source, key -> (T) new BasaltGameEvent(key), kGameEvents);
             case "worldgen/structure":
-                return new BasaltRegistry<T>(source, key -> (T) new BasaltStructure(key));
+                return new BasaltRegistry<T>(source, key -> (T) new BasaltStructure(key), kStructures);
             case "worldgen/structure_type":
-                return new BasaltRegistry<T>(source, key -> (T) new BasaltStructureType(key));
+                return new BasaltRegistry<T>(source, key -> (T) new BasaltStructureType(key), kStructureTypes);
             default:
                 break;
         }
@@ -61,6 +61,34 @@ public final class BasaltRegistryAccess implements RegistryAccess {
         }
         return new BasaltRegistry<T>(source);
     }
+
+    /** parity: `GameEvent`'s registrations, in registry order. */
+    private static final java.util.List<String> kGameEvents = java.util.List.of("block_activate", "block_attach", "block_change", "block_close",
+        "block_deactivate", "block_destroy", "block_detach", "block_open", "block_place", "bounce", "container_close",
+        "container_open", "drink", "eat", "elytra_glide", "entity_damage", "entity_die", "entity_dismount",
+        "entity_interact", "entity_mount", "entity_place", "entity_action", "equip", "explode", "flap", "fluid_pickup",
+        "fluid_place", "hit_ground", "instrument_play", "item_interact_finish", "item_interact_start", "jukebox_play",
+        "jukebox_stop_play", "lightning_strike", "note_block_play", "prime_fuse", "projectile_land", "projectile_shoot",
+        "sculk_sensor_tendrils_clicking", "shear", "shriek", "splash", "step", "swim", "teleport", "unequip", "resonate_1", "resonate_2", "resonate_3", "resonate_4", "resonate_5", "resonate_6",
+        "resonate_7", "resonate_8", "resonate_9", "resonate_10", "resonate_11", "resonate_12", "resonate_13", "resonate_14",
+        "resonate_15");
+
+    private static final java.util.List<String> kStructures = java.util.List.of("pillager_outpost", "mineshaft",
+        "mineshaft_mesa", "mansion", "jungle_pyramid", "desert_pyramid", "igloo", "shipwreck", "shipwreck_beached",
+        "swamp_hut", "stronghold", "monument", "ocean_ruin_cold", "ocean_ruin_warm", "fortress", "nether_fossil",
+        "end_city", "buried_treasure", "bastion_remnant", "village_plains", "village_desert", "village_savanna",
+        "village_snowy", "village_taiga", "ruined_portal", "ruined_portal_desert", "ruined_portal_jungle",
+        "ruined_portal_swamp", "ruined_portal_mountain", "ruined_portal_ocean", "ruined_portal_nether", "ancient_city",
+        "trail_ruins", "trial_chambers", "abandoned_camp_bamboo_jungle", "abandoned_camp_birch_forest",
+        "abandoned_camp_cherry_grove", "abandoned_camp_dappled_forest", "abandoned_camp_flower_forest",
+        "abandoned_camp_forest", "abandoned_camp_meadow", "abandoned_camp_old_growth_birch_forest",
+        "abandoned_camp_old_growth_pine_taiga", "abandoned_camp_old_growth_spruce_taiga", "abandoned_camp_pale_garden",
+        "abandoned_camp_savanna", "abandoned_camp_snowy_taiga", "abandoned_camp_sparse_jungle", "abandoned_camp_swamp",
+        "abandoned_camp_taiga", "abandoned_camp_windswept_forest", "abandoned_camp_wooded_badlands");
+
+    private static final java.util.List<String> kStructureTypes = java.util.List.of("buried_treasure", "desert_pyramid",
+        "end_city", "fortress", "igloo", "jigsaw", "jungle_temple", "mineshaft", "nether_fossil", "ocean_monument",
+        "ocean_ruin", "ruined_portal", "shipwreck", "stronghold", "swamp_hut", "woodland_mansion");
 
     private static final java.util.Set<String> BUILT_IN = java.util.Set.of("block", "item", "worldgen/biome", "entity_type");
 

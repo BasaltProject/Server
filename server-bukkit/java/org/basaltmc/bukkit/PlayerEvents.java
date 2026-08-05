@@ -307,6 +307,10 @@ final class PlayerEvents {
         EventBridge.map("player.fish", org.bukkit.event.player.PlayerFishEvent.class, f -> {
             Player who = f.player();
             Entity hook = BasaltServer.instance().entityById(f.world(), (int) f.whole("hook_id"));
+            if (hook == null && who != null && f.world() != null) {
+                hook = org.basaltmc.bukkit.entity.EntityCore.template(f.world(), EntityType.FISHING_BOBBER,
+                    who.getLocation().getX(), who.getLocation().getY() + 1.5, who.getLocation().getZ(), 0f, 0f);
+            }
             if (who == null || !(hook instanceof org.bukkit.entity.FishHook fishHook)) {
                 return null;
             }
