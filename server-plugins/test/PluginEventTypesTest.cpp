@@ -49,7 +49,7 @@ namespace {
 
 TEST_CASE("the table of events is the table of events") {
     const std::vector<const PluginEventType*>& all = pluginEventTypes::all();
-    CHECK(all.size() == 167);
+    CHECK(all.size() == 168);
 
     std::set<std::string> names;
     std::string joined;
@@ -60,8 +60,8 @@ TEST_CASE("the table of events is the table of events") {
         }
         joined += describe(*type);
     }
-    CHECK(names.size() == 167);
-    CHECK(checksumOf(joined) == 1505735962850003388LL);
+    CHECK(names.size() == 168);
+    CHECK(checksumOf(joined) == 5357930441155668209LL);
 
     CHECK(describe(*all[0]) == "player.join|false|player_name,player_uuid,world,message,silent|message,silent");
     CHECK(describe(*all[1]) == "player.quit|false|player_name,player_uuid,world,message,silent|message,silent");
@@ -74,5 +74,5 @@ TEST_CASE("the table of events is the table of events") {
     CHECK(describe(*all[77]) == "block.fade|true|world,x,y,z,block,to_block,cause|");
 
     CHECK(std::count_if(all.begin(), all.end(), [](const PluginEventType* type) { return type->cancellable(); }) ==
-          120);
+          121);
 }

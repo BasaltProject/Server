@@ -279,6 +279,11 @@ const PluginEventType& serverCommand() {
     return type;
 }
 
+const PluginEventType& serverRemoteCommand() {
+    static const PluginEventType type{"server.remote_command", true, {"sender", "address", "command"}, {"command"}};
+    return type;
+}
+
 const PluginEventType& serverBroadcast() {
     static const PluginEventType type{"server.broadcast", true, {"message"}, {"message"}};
     return type;
@@ -800,6 +805,7 @@ const std::vector<const PluginEventType*>& all() {
                                                   &blockDrops()};
         built.insert(built.end(), hookEvents().begin(), hookEvents().end());
         built.push_back(&entityGoal());
+        built.push_back(&serverRemoteCommand());
         return built;
     }();
     return every;

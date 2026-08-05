@@ -52,6 +52,7 @@ namespace pluginEventTypes {
 [[nodiscard]] const PluginEventType& serverStop();
 [[nodiscard]] const PluginEventType& serverPing();
 [[nodiscard]] const PluginEventType& serverCommand();
+[[nodiscard]] const PluginEventType& serverRemoteCommand();
 [[nodiscard]] const PluginEventType& serverBroadcast();
 [[nodiscard]] const PluginEventType& entitySpawn();
 [[nodiscard]] const PluginEventType& entityTame();

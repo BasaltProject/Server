@@ -135,6 +135,40 @@ protocols = "all"
 # screen that offers to update the server instead.
 future-protocols = "warn"
 
+[network.rcon]
+# RCON, for tools that only speak it. It is PLAINTEXT: the password and every command cross the network
+# unencrypted, so keep it on loopback or behind a VPN and prefer [network.api] below. Off by default; it
+# also refuses to start with an empty password.
+enabled = false
+bind = "127.0.0.1"
+port = 25575
+password = ""
+# Wrong passwords from one address before it is locked out, and for how long the first lockout lasts.
+# Every further lockout of the same address doubles it, up to a day.
+max-failures = 5
+lockout-seconds = 30
+
+[network.api]
+# The management API: REST under /v1 and a WebSocket console at /v1/console, JSON everywhere. Every route
+# needs "Authorization: Bearer <token>". The token is generated on the first run, printed once in the log and
+# kept in .basalt/remote-token (state, readable only by its owner). Only loopback by default.
+enabled = true
+bind = "127.0.0.1"
+port = 25580
+# Serve HTTPS/WSS. Needs PEM files; without it the token crosses the network in the clear off loopback.
+tls = false
+tls-cert = ""
+tls-key = ""
+# Bad tokens from one address before it is locked out, and the first lockout (it doubles each time).
+max-failures = 5
+lockout-seconds = 30
+# Requests an address may make per minute, open connections at once, the largest request body, and how many
+# seconds a connection may stay silent before it is dropped.
+requests-per-minute = 120
+max-connections = 32
+max-body-bytes = 65536
+idle-seconds = 60
+
 # A proxy in front of this server (BungeeCord, Waterfall, Velocity, Gate) connects
 # on behalf of every player, so without forwarding the whole server sees one address
 # and one offline uuid: the proxy's. Forwarding is how the proxy passes on who is

@@ -22,6 +22,8 @@
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
+#include <basalt/server/remote/RemoteHost.hpp>
+#include <basalt/server/remote/RemoteService.hpp>
 #include <basalt/server/runtime/PersistenceCoordinator.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
@@ -126,6 +128,9 @@ private:
     void tickWorlds(bool worldRuns);
 
     void startBedrockListener();
+
+    void startRemote(std::chrono::steady_clock::time_point startedAt);
+    void stopRemote();
 
     void startBukkit();
     void enableBukkit();
@@ -348,6 +353,8 @@ private:
 
     std::optional<wire::io::TcpListener> listener_;
     std::unique_ptr<bedrock::BedrockListener> bedrockListener_;
+    std::unique_ptr<server::remote::RemoteHost> remoteHost_;
+    std::shared_ptr<server::remote::RemoteService> remote_;
     std::unique_ptr<BlockTests> blockTests_;
     std::atomic<bool> accepting_{true};
     std::atomic<bool> shuttingDown_{false};
