@@ -80,8 +80,10 @@ public final class BukkitRuntime {
         }
         root.addHandler(new LogBridge());
         root.setLevel(Level.INFO);
-        System.setOut(new java.io.PrintStream(new StandardStream(1, "STDOUT"), true, java.nio.charset.StandardCharsets.UTF_8));
-        System.setErr(new java.io.PrintStream(new StandardStream(2, "STDERR"), true, java.nio.charset.StandardCharsets.UTF_8));
+        System.setOut(new java.io.PrintStream(new StandardStream(1, "STDOUT"), true,
+                java.nio.charset.StandardCharsets.UTF_8));
+        System.setErr(new java.io.PrintStream(new StandardStream(2, "STDERR"), true,
+                java.nio.charset.StandardCharsets.UTF_8));
         Thread.setDefaultUncaughtExceptionHandler((thread, failure) -> org.basaltmc.bukkit.log.LogTags.write(3,
             org.basaltmc.bukkit.log.LogTags.ofThrowable(failure, "STDERR"),
             "Exception in thread \"" + thread.getName() + "\"", failure));

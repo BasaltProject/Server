@@ -160,7 +160,8 @@ public final class BasaltDragonBattle implements DragonBattle {
         @Override
         public String getTitle() {
             String json = facts()[10];
-            return Json.legacyOf(json.isEmpty() ? net.kyori.adventure.text.Component.translatable("entity.minecraft.ender_dragon")
+            return Json.legacyOf(json.isEmpty()
+                    ? net.kyori.adventure.text.Component.translatable("entity.minecraft.ender_dragon")
                 : Json.component(json));
         }
 

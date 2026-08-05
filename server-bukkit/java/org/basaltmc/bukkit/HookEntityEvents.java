@@ -20,7 +20,8 @@ final class HookEntityEvents {
     static void install() {
         EventBridge.map("entity.move", io.papermc.paper.event.entity.EntityMoveEvent.class, f -> {
             BasaltWorld world = f.world();
-            if (world == null || !(f.entity() instanceof LivingEntity living) || living instanceof org.bukkit.entity.Player) {
+            if (world == null || !(f.entity() instanceof LivingEntity living)
+                    || living instanceof org.bukkit.entity.Player) {
                 return null;
             }
             return new io.papermc.paper.event.entity.EntityMoveEvent(living,

@@ -164,7 +164,6 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         }
     }
     // parity: `Minecart.interact` seats whoever clicked it.
-    // and the other carts have no seat.
     if (world::detectorRails::isMinecart(entity->type())) {
         if (entity->type().path() == "minecart") {
             if (!session->sneaking && entity->passengerIds.empty()) {
@@ -173,8 +172,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         } else if (entity->type().path() == "chest_minecart") {
             owner_->menus().openEntityChest(*session, *entity);
         } else if (entity->type().path() == "furnace_minecart" && owner_->options().vehicles != nullptr) {
-            // parity: `MinecartFurnace.interact`: a piece of fuel from that hand, spent unless the.
-            // player has infinite materials.
+            // parity: `MinecartFurnace.interact`: a piece of fuel from that hand, spent unless infinite materials.
             const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
             const std::int32_t slot = mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot()
                                                : PlayerInventory::kOffhandSlot;
@@ -196,7 +194,6 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     // parity: `AbstractBoat.interact`, a seat for a player not crouching.
     if (entity::boats::isBoat(entity->type())) {
         // parity: `AbstractChestBoat.interact`.
-        // when there is no seat to be had.
         if (!boardBoat(*session, *entity) && entity::boats::hasChest(entity->type()) &&
             (session->sneaking ||
              static_cast<std::int32_t>(entity->passengerIds.size()) >= entity::boats::maxPassengers(entity->type()))) {
@@ -401,7 +398,6 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         return;
     }
     // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster.
-    // does nothing at all to one that is neither.
     const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
     if (entity::breeding::canFallInLove(*entity)) {
         entity::breeding::feed(*entity, session->uuid().toString());

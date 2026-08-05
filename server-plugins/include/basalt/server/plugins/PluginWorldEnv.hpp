@@ -159,8 +159,7 @@ public:
         static_cast<void>(second);
     }
 
-    /// "shriek" makes the sculk shrieker at the position shriek for the player (a uuid); "bloom" makes the sculk
-    /// catalyst at the position bloom and spread from the source block with a charge of `value`.
+    /// "shriek" makes the shrieker at the position shriek for a player uuid; "bloom" makes the catalyst spread.
     virtual bool sculk(std::string_view action, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t sourceX,
                        std::int32_t sourceY, std::int32_t sourceZ, std::int32_t value, std::string_view player) {
         static_cast<void>(action);
@@ -175,8 +174,7 @@ public:
         return false;
     }
 
-    /// "spawn" makes the creaking heart at the position spawn its creaking and answers the uuid; "resin" spreads a
-    /// resin clump from it and answers "x,y,z". Empty when nothing happened.
+    /// "spawn" answers the new creaking's uuid, "resin" answers the clump's "x,y,z"; empty when nothing happened.
     [[nodiscard]] virtual std::string creakingHeart(std::string_view action, std::int32_t x, std::int32_t y,
                                                     std::int32_t z) {
         static_cast<void>(action);
@@ -186,8 +184,7 @@ public:
         return {};
     }
 
-    /// Edits a raid's boss bar: "bar_title" (component JSON), "bar_color", "bar_style", "bar_flags" (bits one to four),
-    /// "bar_progress" (ten thousandths), "bar_visible", "bar_add" and "bar_remove" (a player's entity id), "bar_clear".
+    /// Edits a raid's boss bar by action: "bar_title", "bar_color", "bar_progress", "bar_add", ...
     virtual bool raidBar(std::int32_t id, std::string_view action, std::string_view text, std::int32_t value) {
         static_cast<void>(id);
         static_cast<void>(action);

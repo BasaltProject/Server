@@ -156,7 +156,8 @@ public abstract class MetaItemComponents extends MetaItemCore {
 
     @Override
     public org.bukkit.inventory.meta.components.EquippableComponent getEquippable() {
-        return has("minecraft:equippable") ? new MetaComponents.Equippable(Nbt.deepCopy(compoundOf("minecraft:equippable")))
+        return has("minecraft:equippable")
+                ? new MetaComponents.Equippable(Nbt.deepCopy(compoundOf("minecraft:equippable")))
             : MetaComponents.Equippable.empty();
     }
 
@@ -173,7 +174,8 @@ public abstract class MetaItemComponents extends MetaItemCore {
 
     @Override
     public org.bukkit.inventory.meta.components.UseCooldownComponent getUseCooldown() {
-        return has("minecraft:use_cooldown") ? new MetaComponents.Cooldown(Nbt.deepCopy(compoundOf("minecraft:use_cooldown")))
+        return has("minecraft:use_cooldown")
+                ? new MetaComponents.Cooldown(Nbt.deepCopy(compoundOf("minecraft:use_cooldown")))
             : MetaComponents.Cooldown.empty();
     }
 
@@ -223,7 +225,8 @@ public abstract class MetaItemComponents extends MetaItemCore {
     }
 
     @Override
-    public void setDamageResistantTypes(io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.damage.DamageType> types) {
+    public void setDamageResistantTypes(
+            io.papermc.paper.registry.set.RegistryKeySet<org.bukkit.damage.DamageType> types) {
         put("minecraft:damage_resistant", types == null ? null
             : org.basaltmc.bukkit.datacomponent.Builders.damageResistantNbt(types));
     }

@@ -70,8 +70,7 @@ public:
         return -1;
     }
 
-    /// An explosion of the given power; the source is an entity id or -1. Blocks are spared when `breakBlocks` is off,
-    /// and `fire` sets fires.
+    /// An explosion of the given power from an entity id or -1; `breakBlocks` and `fire` gate block damage and fires.
     virtual bool explode(double x, double y, double z, float power, bool breakBlocks, std::int32_t sourceEntityId,
                          bool fire) {
         static_cast<void>(fire);
@@ -447,8 +446,7 @@ public:
         return false;
     }
 
-    /// Edits the fight's boss bar: "bar_title" (component JSON), "bar_color", "bar_style", "bar_flags" (bits one to
-    /// four), "bar_add" and "bar_remove" (value is a player's entity id), or "bar_clear".
+    /// Edits the fight's boss bar by action: "bar_title", "bar_color", "bar_style", "bar_add", "bar_clear".
     virtual bool dragonFightBar(std::string_view action, std::string_view text, std::int32_t value) {
         static_cast<void>(action);
         static_cast<void>(text);

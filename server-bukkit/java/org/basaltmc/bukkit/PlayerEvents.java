@@ -120,7 +120,8 @@ final class PlayerEvents {
                     }
                 }
             }
-            org.bukkit.event.entity.PlayerDeathEvent event = new org.bukkit.event.entity.PlayerDeathEvent(who, generic(),
+            org.bukkit.event.entity.PlayerDeathEvent event = new org.bukkit.event.entity.PlayerDeathEvent(who,
+                    generic(),
                 drops, (int) f.whole("exp"), Component.text(f.text("cause")), f.flag("show_messages"));
             event.setKeepInventory(f.flag("keep_inventory"));
             event.setKeepLevel(f.flag("keep_level"));
@@ -181,7 +182,8 @@ final class PlayerEvents {
             }
             BlockFace face = face(f.text("face"));
             Block block = f.block();
-            return new org.bukkit.event.player.PlayerBucketEmptyEvent(who, block, block.getRelative(face.getOppositeFace()),
+            return new org.bukkit.event.player.PlayerBucketEmptyEvent(who, block,
+                    block.getRelative(face.getOppositeFace()),
                 face, held.getType(), held, EquipmentSlot.HAND);
         });
         EventBridge.map("player.bed", org.bukkit.event.player.PlayerBedEnterEvent.class, f -> {
@@ -419,7 +421,8 @@ final class PlayerEvents {
                     return null;
                 }
                 for (com.destroystokyo.paper.ClientOption<?> rest : java.util.List.of(
-                    com.destroystokyo.paper.ClientOption.CHAT_VISIBILITY, com.destroystokyo.paper.ClientOption.SKIN_PARTS,
+                    com.destroystokyo.paper.ClientOption.CHAT_VISIBILITY,
+                            com.destroystokyo.paper.ClientOption.SKIN_PARTS,
                     com.destroystokyo.paper.ClientOption.ALLOW_SERVER_LISTINGS,
                     com.destroystokyo.paper.ClientOption.TEXT_FILTERING_ENABLED,
                     com.destroystokyo.paper.ClientOption.PARTICLE_VISIBILITY)) {

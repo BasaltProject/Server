@@ -72,8 +72,7 @@ struct Throwable {
 
 [[nodiscard]] const Throwable* throwableOf(std::string_view item) {
     using wire::protocol::play::SoundSource;
-    // parity: `SnowballItem`, `EggItem`, `EnderpearlItem`, `ExperienceBottleItem`, `ThrowablePotionItem`,
-    // `WindChargeItem`.
+    // parity: `SnowballItem`, `EggItem`, `EnderpearlItem`, `ExperienceBottleItem`, `WindChargeItem`.
     static constexpr std::array<Throwable, 9> kThrowables{{
         {"ender_pearl", "ender_pearl", "ender_pearl", 1.5F, 0.0F, "entity.ender_pearl.throw", SoundSource::Neutral,
          false},

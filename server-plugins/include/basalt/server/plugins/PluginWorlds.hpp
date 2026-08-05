@@ -36,7 +36,6 @@ public:
     virtual std::shared_ptr<PluginWorldRef> create(std::string_view name, std::string_view dimension,
                                                    std::string_view type, std::optional<std::int64_t> seed) = 0;
 
-    /// A block state as `minecraft:oak_stairs[facing=east]` to its id, or -1.
     /// Takes a world that holds no player out of play, saving it first when asked; false for the default world.
     virtual bool unload(std::string_view name, bool save) {
         static_cast<void>(name);
@@ -122,8 +121,7 @@ public:
         return {};
     }
 
-    /// The state turned `rotation` quarter turns clockwise (0 to 3) after a mirror (0 none, 1 left-right, 2
-    /// front-back).
+    /// The state turned `rotation` quarter turns clockwise (0 to 3) after a mirror (0 none, 1 left-right, 2 back).
     [[nodiscard]] virtual std::int32_t transformState(std::int32_t stateId, std::int32_t rotation,
                                                       std::int32_t mirror) const {
         static_cast<void>(rotation);

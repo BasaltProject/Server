@@ -26,7 +26,8 @@ final class KeyedProxy implements InvocationHandler {
 
     /** An entry whose getters answer with the value a builder was given under the same name. */
     @SuppressWarnings("unchecked")
-    static <T extends Keyed> T of(Class<T> type, NamespacedKey key, int ordinal, java.util.Map<String, Object[]> built) {
+    static <T extends Keyed> T of(Class<T> type, NamespacedKey key, int ordinal,
+            java.util.Map<String, Object[]> built) {
         return (T) Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
             new KeyedProxy(type, key, ordinal, built));
     }
