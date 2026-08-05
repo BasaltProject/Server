@@ -125,7 +125,7 @@ struct PlayerConnection {
 
     std::function<void(const wire::text::Component& reason)> disconnect;
 
-    std::function<void(wire::protocol::play::Gamemode mode)> setGamemode;
+    std::function<void(wire::protocol::play::Gamemode mode, std::string_view cause)> setGamemode;
 
     std::function<void()> sendInventoryAll;
 

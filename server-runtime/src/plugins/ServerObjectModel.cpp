@@ -221,7 +221,7 @@ public:
         if (player == nullptr || !mode.has_value() || !player->connection().setGamemode) {
             return;
         }
-        player->connection().setGamemode(*mode);
+        player->connection().setGamemode(*mode, "plugin");
     }
 
     [[nodiscard]] std::int32_t level() const override {

@@ -431,7 +431,7 @@ public:
     void applyConsumeEffects(player::PlayerSession& session,
                              const std::vector<server::registry::ConsumeEffect>& effects);
 
-    void setGamemode(wire::protocol::play::Gamemode mode);
+    void setGamemode(wire::protocol::play::Gamemode mode, std::string_view cause = "unknown");
 
     bool switchWorld(world::LoadedWorld& target, double x, double y, double z);
 

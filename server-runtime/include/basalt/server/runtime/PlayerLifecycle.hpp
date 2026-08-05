@@ -32,7 +32,7 @@ public:
                            double& z)>
             respawned;
         std::function<bool(const player::PlayerSession& player, wire::protocol::play::Gamemode mode,
-                           wire::protocol::play::Gamemode previous)>
+                           wire::protocol::play::Gamemode previous, std::string_view cause)>
             gamemodeAllowed;
         std::function<void(const player::PlayerSession& player, const world::LoadedWorld& to,
                            const std::optional<std::string>& from)>
@@ -54,7 +54,7 @@ public:
     /// What `CraftPlayer.refreshPlayer` does after a skin changes: the tab list entry again and a respawn in place.
     void refreshProfile();
 
-    void setGamemode(wire::protocol::play::Gamemode mode);
+    void setGamemode(wire::protocol::play::Gamemode mode, std::string_view cause = "unknown");
 
     bool switchWorld(world::LoadedWorld& target, double x, double y, double z);
 

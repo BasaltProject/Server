@@ -113,7 +113,7 @@ const PluginEventType& playerSneak() {
 
 const PluginEventType& playerGamemodeChange() {
     static const PluginEventType type{
-        "player.gamemode_change", true, {"player_name", "player_uuid", "world", "gamemode", "from_gamemode"}};
+        "player.gamemode_change", true, {"player_name", "player_uuid", "world", "gamemode", "from_gamemode", "cause"}};
     return type;
 }
 
