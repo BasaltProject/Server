@@ -18,7 +18,15 @@ final class HookVehicleEvents {
             return f.entity() instanceof Vehicle vehicle && other != null
                 ? new org.bukkit.event.vehicle.VehicleEntityCollisionEvent(vehicle, other) : null;
         });
-        EventBridge.map("entity.add", org.bukkit.event.vehicle.VehicleCreateEvent.class, f ->
-            f.entity() instanceof Vehicle vehicle ? new org.bukkit.event.vehicle.VehicleCreateEvent(vehicle) : null);
+        EventBridge.map("entity.add", org.bukkit.event.vehicle.VehicleCreateEvent.class, f -> {
+            Entity added = f.entity();
+            if (added == null && f.world() != null) {
+                org.bukkit.entity.EntityType type = org.basaltmc.bukkit.entity.EntityCore.typeOf(f.text("entity_type"));
+                added = type == org.bukkit.entity.EntityType.UNKNOWN ? null
+                    : org.basaltmc.bukkit.entity.EntityCore.template(f.world(), type, f.real("x"), f.real("y"),
+                        f.real("z"), 0f, 0f);
+            }
+            return added instanceof Vehicle vehicle ? new org.bukkit.event.vehicle.VehicleCreateEvent(vehicle) : null;
+        });
     }
 }

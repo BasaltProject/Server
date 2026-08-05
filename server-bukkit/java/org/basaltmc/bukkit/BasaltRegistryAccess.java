@@ -67,14 +67,16 @@ public final class BasaltRegistryAccess implements RegistryAccess {
     }
 
     /** parity: `GameEvent`'s registrations, in registry order. */
-    private static final java.util.List<String> kGameEvents = java.util.List.of("block_activate", "block_attach", "block_change", "block_close",
-        "block_deactivate", "block_destroy", "block_detach", "block_open", "block_place", "bounce", "container_close",
-        "container_open", "drink", "eat", "elytra_glide", "entity_damage", "entity_die", "entity_dismount",
-        "entity_interact", "entity_mount", "entity_place", "entity_action", "equip", "explode", "flap", "fluid_pickup",
-        "fluid_place", "hit_ground", "instrument_play", "item_interact_finish", "item_interact_start", "jukebox_play",
-        "jukebox_stop_play", "lightning_strike", "note_block_play", "prime_fuse", "projectile_land", "projectile_shoot",
-        "sculk_sensor_tendrils_clicking", "shear", "shriek", "splash", "step", "swim", "teleport", "unequip", "resonate_1", "resonate_2", "resonate_3", "resonate_4", "resonate_5", "resonate_6",
-        "resonate_7", "resonate_8", "resonate_9", "resonate_10", "resonate_11", "resonate_12", "resonate_13", "resonate_14",
+    private static final java.util.List<String> kGameEvents = java.util.List.of(
+        "block_activate", "block_attach", "block_change", "block_close", "block_deactivate", "block_destroy",
+        "block_detach", "block_open", "block_place", "bounce", "container_close", "container_open", "drink", "eat",
+        "elytra_glide", "entity_damage", "entity_die", "entity_dismount", "entity_interact", "entity_mount",
+        "entity_place", "entity_action", "equip", "explode", "flap", "fluid_pickup", "fluid_place", "hit_ground",
+        "instrument_play", "item_interact_finish", "item_interact_start", "jukebox_play", "jukebox_stop_play",
+        "lightning_strike", "note_block_play", "prime_fuse", "projectile_land", "projectile_shoot",
+        "sculk_sensor_tendrils_clicking", "shear", "shriek", "splash", "step", "swim", "teleport", "unequip",
+        "resonate_1", "resonate_2", "resonate_3", "resonate_4", "resonate_5", "resonate_6", "resonate_7",
+        "resonate_8", "resonate_9", "resonate_10", "resonate_11", "resonate_12", "resonate_13", "resonate_14",
         "resonate_15");
 
     private static final java.util.List<String> kStructures = java.util.List.of("pillager_outpost", "mineshaft",
@@ -99,10 +101,11 @@ public final class BasaltRegistryAccess implements RegistryAccess {
         return WorldNatives.registryIds(name).length > 0 && !kCustomLists.contains(name);
     }
 
-    private static final java.util.Set<String> kCustomLists = java.util.Set.of("sound_event", "menu", "data_component_type",
-        "game_rule", "mob_effect", "block", "item", "entity_type", "worldgen/biome", "biome");
+    private static final java.util.Set<String> kCustomLists = java.util.Set.of("sound_event", "menu",
+        "data_component_type", "game_rule", "mob_effect", "block", "item", "entity_type", "worldgen/biome", "biome");
 
-    private static final java.util.Set<String> BUILT_IN = java.util.Set.of("block", "item", "worldgen/biome", "entity_type");
+    private static final java.util.Set<String> BUILT_IN =
+        java.util.Set.of("block", "item", "worldgen/biome", "entity_type");
 
     private static List<Keyed> entriesOf(String name, Class<?> type) {
         List<Keyed> out = new ArrayList<>();
