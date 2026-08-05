@@ -399,6 +399,7 @@ void ProtoChunks::runTask(Task& task) {
     }
     case Task::Kind::Finish:
         task.finishing->setStage(ChunkStage::Full);
+        task.finishing->markFresh();
         if (hooks_.finish) {
             hooks_.finish(*task.finishing, true);
         }

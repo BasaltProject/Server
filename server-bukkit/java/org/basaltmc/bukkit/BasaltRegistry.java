@@ -22,6 +22,7 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
     private final List<String> known;
     private Map<NamespacedKey, T> entries;
     private boolean listed;
+    private boolean sealed;
     private String name;
     private Map<NamespacedKey, Tag<T>> tags;
 
@@ -29,9 +30,16 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
         this(source, null);
     }
 
-    /** A registry the server cannot list at all still answers for a key a plugin names, through {@code open}. */
+    /** A registry the server cannot list in full still answers for a key a plugin names, through {@code open}. */
     BasaltRegistry(Supplier<List<T>> source, Function<NamespacedKey, T> open) {
         this(source, open, null);
+    }
+
+    /** The server's own list of this registry is complete, so a key it does not name does not exist. */
+    BasaltRegistry<T> complete() {
+        this.listed = true;
+        this.sealed = true;
+        return this;
     }
 
     /** A registry whose entries the server cannot list is told the vanilla ones, which {@code open} then makes. */
@@ -96,7 +104,7 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
             for (T entry : source.get()) {
                 built.put(entry.getKey(), entry);
             }
-            listed = !built.isEmpty();
+            listed = sealed || !built.isEmpty();
             entries = built;
             if (!listed && open != null && known != null) {
                 for (String id : known) {
@@ -119,7 +127,7 @@ public final class BasaltRegistry<T extends Keyed> implements Registry<T> {
     @Override
     public T get(NamespacedKey key) {
         T found = entries().get(key);
-        if (found == null && open != null && !listed) {
+        if (found == null && open != null && !(sealed || listed && known != null)) {
             synchronized (this) {
                 found = entries().get(key);
                 if (found == null) {

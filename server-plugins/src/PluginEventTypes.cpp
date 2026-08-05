@@ -434,7 +434,9 @@ const PluginEventType& inventoryMoveItem() {
 
 const PluginEventType& inventoryTrade() {
     static const PluginEventType type{
-        "inventory.trade", true, {"player_name", "player_uuid", "world", "entity_id", "index", "result"}};
+        "inventory.trade",
+        true,
+        {"player_name", "player_uuid", "world", "entity_id", "container_id", "index", "result"}};
     return type;
 }
 

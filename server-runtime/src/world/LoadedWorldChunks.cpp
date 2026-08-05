@@ -117,7 +117,8 @@ std::optional<Chunk> LoadedWorld::loadOrGenerateChunk(std::int32_t chunkX, std::
         timings_.of("world.generate")
             .record(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - started)
                         .count());
-        if (made.has_value() && !stored.has_value()) {
+        // A proto chunk set aside on disk is still a chunk nobody has seen finished.
+        if (made.has_value()) {
             made->markFresh();
         }
         return made;

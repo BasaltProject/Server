@@ -812,7 +812,8 @@ VillagerTradeController::Hooks villagerTrade(ClientSession& owner, const EventSi
         }
         return sink.allowed(&inventoryTrade, [&](PluginEvent& event) {
             EventSink::player(event, *who);
-            event.set("entity_id", static_cast<std::int64_t>(containerId));
+            event.set("entity_id", static_cast<std::int64_t>(owner.trades().tradingWith().value_or(-1)));
+            event.set("container_id", static_cast<std::int64_t>(containerId));
             event.set("index", static_cast<std::int64_t>(index));
             event.set("result", resultItem.value_or(std::string{}));
         });
