@@ -102,6 +102,7 @@ void registerEntityNatives(JNIEnv* env, jclass natives);
 void registerMiscNatives(JNIEnv* env, jclass natives);
 void registerPlayerNatives(JNIEnv* env, jclass natives);
 void registerWorldEnvNatives(JNIEnv* env, jclass natives);
+void registerWorldEnvMoreNatives(JNIEnv* env, jclass natives);
 void registerLeftoverNatives(JNIEnv* env, jclass natives);
 void registerRestNatives(JNIEnv* env, jclass natives);
 

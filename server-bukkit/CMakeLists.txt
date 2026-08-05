@@ -33,6 +33,7 @@ basalt_module(server-bukkit
         src/BukkitWorldChunksNatives.cpp
         src/BukkitWorldJobsNatives.cpp
         src/BukkitWorldEnvNatives.cpp
+        src/BukkitWorldEnvMoreNatives.cpp
         src/ShimHost.cpp
     DEPENDS basalt::server-plugins basalt::wire-common
 )
