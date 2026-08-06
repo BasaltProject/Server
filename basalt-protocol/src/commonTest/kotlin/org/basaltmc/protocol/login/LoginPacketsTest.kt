@@ -17,6 +17,32 @@ class LoginPacketsTest {
     }
 
     @Test
+    fun roundTripsHello() {
+        val packet =
+            HelloPacket(
+                serverId = "",
+                publicKey = ByteArray(162) { it.toByte() },
+                challenge = byteArrayOf(1, 2, 3, 4),
+                shouldAuthenticate = true,
+            )
+        val buffer = ByteBuffer()
+        packet.write(buffer)
+        assertEquals(packet, HelloPacket.read(buffer))
+    }
+
+    @Test
+    fun roundTripsKey() {
+        val packet =
+            KeyPacket(
+                encryptedSecret = ByteArray(128) { (it * 3).toByte() },
+                encryptedChallenge = ByteArray(128) { (it * 5).toByte() },
+            )
+        val buffer = ByteBuffer()
+        packet.write(buffer)
+        assertEquals(packet, KeyPacket.read(buffer))
+    }
+
+    @Test
     fun roundTripsLoginCompression() {
         val buffer = ByteBuffer()
         LoginCompressionPacket(256).write(buffer)
