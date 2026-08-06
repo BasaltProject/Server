@@ -32,12 +32,14 @@ public class Cfb8Cipher private constructor(
 
     public fun update(
         input: ByteArray,
+        offset: Int = 0,
+        length: Int = input.size - offset,
         encrypting: Boolean,
     ): ByteArray {
-        val output = ByteArray(input.size)
-        for (i in input.indices) {
+        val output = ByteArray(length)
+        for (i in 0 until length) {
             val keystreamByte = blockCipher.encryptBlocking(register)[0]
-            val inputByte = input[i]
+            val inputByte = input[offset + i]
             val outputByte = (inputByte.toInt() xor keystreamByte.toInt()).toByte()
             output[i] = outputByte
             val feedbackByte = if (encrypting) outputByte else inputByte
