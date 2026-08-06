@@ -20,6 +20,10 @@ import platform.posix.pthread_tVar
  * `TcpConnection` are meant to be driven from until a real event loop replaces it (see
  * `TcpSocket.kt`). A thin wrapper over `pthread_create`, since Kotlin/Native's stdlib does not
  * expose native thread spawning directly.
+ *
+ * An exception escaping [block] is caught rather than left to cross back into the C callback
+ * boundary: Kotlin/Native terminates the whole process when that happens, which would mean one
+ * connection's failure (a bad handshake, a bind failure) takes the entire server down with it.
  */
 public object NativeThread {
     public fun start(block: () -> Unit) {
@@ -34,7 +38,11 @@ public object NativeThread {
                         val ref = arg!!.asStableRef<() -> Unit>()
                         val fn = ref.get()
                         ref.dispose()
-                        fn()
+                        try {
+                            fn()
+                        } catch (e: Throwable) {
+                            println("Uncaught exception on a native thread: $e")
+                        }
                         null
                     },
                     stableRef.asCPointer(),

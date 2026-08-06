@@ -3,7 +3,6 @@
 package org.basaltmc.io
 
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.IntVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
@@ -12,19 +11,15 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
-import kotlinx.cinterop.value
 import platform.posix.AF_INET
 import platform.posix.INADDR_ANY
 import platform.posix.SOCK_STREAM
-import platform.posix.SOL_SOCKET
-import platform.posix.SO_REUSEADDR
 import platform.posix.accept
 import platform.posix.bind
 import platform.posix.connect
 import platform.posix.listen
 import platform.posix.recv
 import platform.posix.send
-import platform.posix.setsockopt
 import platform.posix.sockaddr
 import platform.posix.sockaddr_in
 import platform.posix.socket
@@ -58,6 +53,22 @@ internal expect fun ensureSocketsInitialized()
 
 /** `close()` on POSIX, `closesocket()` on Windows: a plain file descriptor doesn't work as a socket handle there. */
 internal expect fun closeSocket(fd: Long)
+
+/**
+ * Enables `SO_REUSEADDR` on a freshly created listening socket, so restarting the server doesn't
+ * have to wait out the previous socket's `TIME_WAIT`. Split out as `expect`/`actual` because
+ * POSIX's `setsockopt` takes `optval` as `const void*` (any pointer), while Winsock's C prototype
+ * takes it as `const char*`, which cinterop binds as a Kotlin `String`, not a pointer: there is no
+ * direct way to pass a raw 4-byte int through that binding. The Windows `actual` is a no-op rather
+ * than a guessed workaround; the only consequence is an occasional "address already in use" on a
+ * fast restart there, not a functional gap.
+ */
+internal expect fun enableAddressReuse(fd: Long)
+
+/** Sets the raw 32-bit address (`INADDR_ANY` or a parsed literal) on a [sockaddr_in]. Split out because
+ * Windows exposes it through a nested union (`S_un.S_addr`) rather than the `s_addr` macro cinterop
+ * doesn't see, unlike POSIX/BSD's direct `in_addr.s_addr` field. */
+internal expect fun sockaddr_in.setAddress(value: UInt)
 
 /**
  * Blocking IPv4 TCP sockets. This is a thread-per-connection building block, not an event loop:
@@ -95,15 +106,13 @@ public class TcpListener private constructor(
             val fd = socket(AF_INET, SOCK_STREAM, 0).toLong()
             if (fd < 0) throw SocketException("socket() failed")
 
-            memScoped {
-                val reuse = alloc<IntVar>()
-                reuse.value = 1
-                setsockopt(fd.convert(), SOL_SOCKET, SO_REUSEADDR, reuse.ptr, sizeOf<IntVar>().convert())
+            enableAddressReuse(fd)
 
+            memScoped {
                 val address = alloc<sockaddr_in>()
                 address.setAddressFamily()
                 address.sin_port = hostToNetworkShort(port)
-                address.sin_addr.s_addr = INADDR_ANY
+                address.setAddress(INADDR_ANY)
 
                 if (bind(fd.convert(), address.ptr.reinterpret<sockaddr>(), sizeOf<sockaddr_in>().convert()) != 0) {
                     closeSocket(fd)
@@ -169,7 +178,7 @@ public class TcpConnection internal constructor(
                 val address = alloc<sockaddr_in>()
                 address.setAddressFamily()
                 address.sin_port = hostToNetworkShort(port)
-                address.sin_addr.s_addr = parseIpv4NetworkOrder(host)
+                address.setAddress(parseIpv4NetworkOrder(host))
 
                 if (connect(fd.convert(), address.ptr.reinterpret<sockaddr>(), sizeOf<sockaddr_in>().convert()) != 0) {
                     closeSocket(fd)

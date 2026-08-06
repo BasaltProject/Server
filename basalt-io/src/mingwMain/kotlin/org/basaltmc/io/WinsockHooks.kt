@@ -22,12 +22,8 @@ import platform.posix.closesocket
  * aren't callable from Kotlin via cinterop, only real declarations are, so this is computed by
  * hand instead of referencing the macro).
  *
- * Unverified: this repo builds only macOS targets locally, and CI is not currently running.
- * `WSAStartup`/`WSADATA`/`closesocket` are assumed to live under `platform.posix` on the mingw
- * target because the rest of the Winsock-flavored socket API (`socket`/`bind`/
- * `connect`/`send`/`recv`/`setsockopt`/`listen`) already does, per the original Windows CI compile
- * errors (type mismatches, not unresolved-reference errors, for those). If that assumption is
- * wrong, the fix is almost certainly just swapping this import for `platform.windows`.
+ * Confirmed on real Windows CI: `WSAStartup`/`WSADATA`/`closesocket` do live under `platform.posix`
+ * on the mingw target, alongside the rest of the Winsock-flavored socket API.
  */
 internal actual fun ensureSocketsInitialized() {
     memScoped {
@@ -38,4 +34,14 @@ internal actual fun ensureSocketsInitialized() {
 
 internal actual fun closeSocket(fd: Long) {
     closesocket(fd.convert())
+}
+
+/**
+ * Deliberately not implemented: `SO_REUSEADDR` needs `optval` as a raw pointer, but Winsock's
+ * `setsockopt` declares it `const char*`, which cinterop binds as a Kotlin `String`, not a
+ * pointer. See [enableAddressReuse]'s KDoc in `TcpSocket.kt` for why that's a no-op here rather
+ * than a guessed workaround.
+ */
+internal actual fun enableAddressReuse(fd: Long) {
+    // intentionally a no-op on Windows; see the expect declaration's KDoc
 }

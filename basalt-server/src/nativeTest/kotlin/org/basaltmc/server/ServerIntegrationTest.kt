@@ -55,17 +55,29 @@ class ServerIntegrationTest {
         boundPort: Int,
         onlineMode: OnlineMode?,
     ) {
-        NativeThread.start { BasaltServer(boundPort, onlineMode).start() }
-        // Give the listener a moment to bind before the client connects.
-        val deadline =
-            kotlin.time.TimeSource.Monotonic
-                .markNow()
-        while (deadline.elapsedNow().inWholeMilliseconds < 500) {
-            try {
-                TcpConnection.connect("127.0.0.1", boundPort).close()
-                return
-            } catch (_: Exception) {
-                // not up yet, keep trying
+        // A bind() failure on the spawned thread no longer crashes the process (see
+        // NativeThread's KDoc), so it is safe to retry the whole attempt: CI runners have shown
+        // occasional transient bind failures that a fresh attempt clears.
+        repeat(3) { attempt ->
+            NativeThread.start { BasaltServer(boundPort, onlineMode).start() }
+            val deadline =
+                kotlin.time.TimeSource.Monotonic
+                    .markNow()
+            while (deadline.elapsedNow().inWholeMilliseconds < 500) {
+                try {
+                    TcpConnection.connect("127.0.0.1", boundPort).close()
+                    return
+                } catch (_: Exception) {
+                    // not up yet, keep trying
+                }
+            }
+            if (attempt < 2) {
+                val backoff =
+                    kotlin.time.TimeSource.Monotonic
+                        .markNow()
+                while (backoff.elapsedNow().inWholeMilliseconds < 200) {
+                    // brief pause before retrying the bind
+                }
             }
         }
     }
