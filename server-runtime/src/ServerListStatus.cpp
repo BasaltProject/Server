@@ -6,6 +6,7 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <utility>
 
@@ -18,7 +19,8 @@ using wire::protocol::status::ServerStatusPayload;
 using wire::text::Component;
 
 constexpr std::int32_t kIconSize = 64;
-constexpr std::size_t kSampleLimit = 12;
+// parity: `MinecraftServer.buildPlayerStatus`, twelve names.
+constexpr std::int32_t kSampleLimit = 12;
 
 // Hover lines use a nil UUID: the field is not optional and a made-up one would be a real player's id.
 constexpr std::string_view kNilUuid = "00000000-0000-0000-0000-000000000000";
@@ -106,8 +108,12 @@ ServerListStatus::sampleFor(const config::ServerListProfile& profile, const std:
         }
         return sample;
     }
+    // parity: `MinecraftServer.buildPlayerStatus` with `hide-online-players`, the count stays and the names go.
+    if (profile.hideOnlinePlayers.value_or(false)) {
+        return sample;
+    }
     for (const ListedPlayer& player : players) {
-        if (sample.size() >= kSampleLimit) {
+        if (sample.size() >= static_cast<std::size_t>(std::max(profile.sampleSize.value_or(kSampleLimit), 0))) {
             break;
         }
         sample.push_back({.name = player.name, .id = player.uuid});

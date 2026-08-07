@@ -87,6 +87,7 @@ struct CommandWiring {
     std::function<std::optional<std::string>(const std::string& name)> fetchMojangUuid;
     std::function<bool()> whitelistEnforced;
     std::function<void(bool)> setWhitelistEnforced;
+    std::function<void()> kickUnlistedPlayers;
     std::function<void(std::int32_t minutes)> setIdleTimeout;
 };
 

@@ -140,6 +140,9 @@ void TickLoop::runTicks() {
     TickMeter meter;
     std::int64_t tick = 0;
     std::int64_t ticksUntilSave = nextAutosaveInterval();
+    const std::int64_t playerSaveTicks =
+        static_cast<std::int64_t>(options_.playerSaveIntervalSeconds) * kTicksPerSecond;
+    std::int64_t ticksUntilPlayerSave = playerSaveTicks;
     const Clock::time_point clock = Clock::now();
     std::int64_t nextTickMillis = 0;
     std::int64_t emptyTicks = 0;
@@ -177,6 +180,10 @@ void TickLoop::runTicks() {
             ticksUntilSave = nextAutosaveInterval();
             sweepRequested_.store(true, std::memory_order_relaxed);
         }
+        if (playerSaveTicks > 0 && --ticksUntilPlayerSave <= 0) {
+            ticksUntilPlayerSave = playerSaveTicks;
+            playersRequested_.store(true, std::memory_order_relaxed);
+        }
         // Unloading is not gated on the save interval: a server that never saves periodically must still drop chunks.
         if (unloadIntervalTicks_ > 0 && tick % unloadIntervalTicks_ == 0) {
             unloadRequested_.store(true, std::memory_order_relaxed);
@@ -212,15 +219,19 @@ void TickLoop::runSweeper() {
     while (running_.load(std::memory_order_relaxed)) {
         bool saving = true;
         bool unloading = true;
+        bool players = true;
         saving = sweepRequested_.compare_exchange_strong(saving, false, std::memory_order_relaxed);
         unloading = unloadRequested_.compare_exchange_strong(unloading, false, std::memory_order_relaxed);
-        if (!saving && !unloading) {
+        players = playersRequested_.compare_exchange_strong(players, false, std::memory_order_relaxed);
+        if (!saving && !unloading && !players) {
             sleepMillis(kSweepPollMillis);
             continue;
         }
         sweeping_.store(true, std::memory_order_relaxed);
         if (saving && options_.onSaveInterval) {
             options_.onSaveInterval();
+        } else if (players && options_.onPlayerSaveInterval) {
+            options_.onPlayerSaveInterval();
         }
         if (unloading && options_.onUnloadInterval) {
             options_.onUnloadInterval();

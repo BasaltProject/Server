@@ -4,6 +4,8 @@
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/PlayerLifecycle.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/registry/PackRegistries.hpp>
 #include <basalt/server/runtime/registry/SyncedTags.hpp>
@@ -33,6 +35,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <regex>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -98,13 +101,32 @@ void ClientSession::handleHandshake(std::int32_t packetId, wire::io::ByteBuffer&
     translation_ = mv::java::javaTranslators::chainFor(packet->protocolVersion, options_.substitutionLabels);
     switch (packet->intent) {
     case wire::protocol::handshake::ClientIntent::Status:
+        // parity: `ServerHandshakePacketListenerImpl` drops a status request when `enable-status` is off.
+        if (!options_.tuning.statusReplies) {
+            connection_.close();
+            return;
+        }
         state_ = wire::protocol::ProtocolState::Status;
         break;
     case wire::protocol::handshake::ClientIntent::Login:
         state_ = wire::protocol::ProtocolState::Login;
         break;
     case wire::protocol::handshake::ClientIntent::Transfer:
-        connection_.close();
+        // parity: `ServerHandshakePacketListenerImpl.handleIntention`, TRANSFER without `accepts-transfers`.
+        if (!options_.tuning.acceptsTransfers) {
+            state_ = wire::protocol::ProtocolState::Login;
+            refuseLogin(messageFor("transfers-disabled",
+                                   wire::text::Component::translatable("multiplayer.disconnect.transfers_disabled")));
+            return;
+        }
+        state_ = wire::protocol::ProtocolState::Login;
+        break;
+    }
+    if (packet->intent != wire::protocol::handshake::ClientIntent::Status && options_.gate != nullptr &&
+        options_.gate->throttleLogin(peerAddress(), options_.tuning.connectionThrottleMs)) {
+        state_ = wire::protocol::ProtocolState::Login;
+        refuseLogin(messageFor("connection-throttled",
+                               wire::text::Component::text("Connection throttled! Please wait before reconnecting.")));
         return;
     }
     // Read now, acted on at login: a refusal there is a disconnect screen, not a silent close.
@@ -123,8 +145,8 @@ void ClientSession::handleStatus(std::int32_t packetId, wire::io::ByteBuffer& bo
         if (!options_.statusProvider) {
             return;
         }
-        wire::protocol::status::ServerStatusPayload status = options_.statusProvider(
-            protocol, handshake_.has_value() ? handshake_->hostName : "", connection_.remoteAddress());
+        wire::protocol::status::ServerStatusPayload status =
+            options_.statusProvider(protocol, handshake_.has_value() ? handshake_->hostName : "", peerAddress());
         // A client paints the entry red when its number differs, so echoing an accepted client's own avoids that.
         const bool refused = std::holds_alternative<mv::ProtocolVerdict::Refused>(verdict_.value);
         if (status.version.has_value() && status.version->protocol != protocol && !refused) {
@@ -164,6 +186,17 @@ void ClientSession::handleLogin(std::int32_t packetId, wire::io::ByteBuffer& bod
     }
 }
 
+// parity: `StringUtil.isValidPlayerName`, then the optional `username-pattern`.
+bool ClientSession::validUsername(const std::string& name) const {
+    if (name.size() > 16 || std::ranges::any_of(name, [](char c) {
+            return static_cast<unsigned char>(c) <= 32 || static_cast<unsigned char>(c) >= 127;
+        })) {
+        return false;
+    }
+    return options_.tuning.usernamePattern.empty() ||
+           std::regex_match(name, std::regex{options_.tuning.usernamePattern});
+}
+
 void ClientSession::handleLoginStart(wire::io::ByteBuffer& body) {
     const std::optional<login::LoginStartPacket> loginStart = login::LoginStartPacket::read(body);
     if (!loginStart.has_value()) {
@@ -186,6 +219,11 @@ void ClientSession::handleLoginStart(wire::io::ByteBuffer& body) {
             return loginStart->name + " is on " + translated->version.toString() + ", translated to " +
                    std::string{buildInfo::kMinecraftVersion} + ".";
         });
+    }
+    if (!validUsername(loginStart->name)) {
+        logger_.info([] { return std::string{"Refused a login: invalid characters in the username."}; });
+        disconnectFromLogin("<red>Invalid characters in username");
+        return;
     }
     pendingUsername_ = loginStart->name;
     // A proxy already authenticated this player, so what it says is their whole identity.
@@ -283,7 +321,10 @@ void ClientSession::handleForwardingAnswer(wire::io::ByteBuffer& body) {
 }
 
 void ClientSession::disconnectFromLogin(const std::string& miniMessage) {
-    const wire::text::Component reason = wire::text::miniMessage::parse(miniMessage);
+    refuseLogin(wire::text::miniMessage::parse(miniMessage));
+}
+
+void ClientSession::refuseLogin(const wire::text::Component& reason) {
     sendUncompressed(login::LoginDisconnectPacket::kId, [&reason](wire::io::ByteBuffer& buffer) {
         login::LoginDisconnectPacket{.reason = reason}.write(buffer);
     });
@@ -295,6 +336,11 @@ void ClientSession::refuseVersion(const std::string& name, const mv::ProtocolVer
         return "Refused " + name + " on " + mv::protocolVersions::describe(refusal.protocol) + ": " +
                std::string{reasonName(refusal.reason)} + ".";
     });
+    if (const std::string* custom = options_.messages == nullptr ? nullptr : options_.messages->find("outdated-client");
+        custom != nullptr) {
+        disconnectFromLogin(*custom);
+        return;
+    }
     disconnectFromLogin(versionRefusalOf(refusal.reason));
 }
 
@@ -320,7 +366,8 @@ void ClientSession::handleKey(wire::io::ByteBuffer& body) {
     encryptCipher_ = wire::auth::Cfb8Cipher::create(*secretKey);
 
     const std::string serverHash = wire::auth::sessionHash("", *secretKey, options_.keyPair->publicKeyDer());
-    const std::optional<wire::auth::SessionProfile> profile = online->hasJoined(*pendingUsername_, serverHash, "");
+    const std::optional<wire::auth::SessionProfile> profile =
+        online->hasJoined(*pendingUsername_, serverHash, options_.tuning.preventProxyConnections ? peerAddress() : "");
     if (!profile.has_value()) {
         connection_.close();
         return;
@@ -337,27 +384,52 @@ std::optional<wire::text::Component> ClientSession::loginRefusal(Uuid id, const 
     storage::AccessRepository& access = store->access();
     const std::optional<storage::BanRecord> ban = access.banOf(id.toString(), storage::BanKind::Player);
     if (ban.has_value()) {
-        return wire::text::Component::translatable("multiplayer.disconnect.banned.reason",
-                                                   {wire::text::Component::text(ban->reason)});
+        return messageFor("banned",
+                          wire::text::Component::translatable("multiplayer.disconnect.banned.reason",
+                                                              {wire::text::Component::text(ban->reason)}),
+                          ban->reason);
     }
     const std::optional<std::string> address = remoteAddress();
     if (address.has_value()) {
         const std::optional<storage::BanRecord> ipBan = access.banOf(*address, storage::BanKind::Ip);
         if (ipBan.has_value()) {
-            return wire::text::Component::translatable("multiplayer.disconnect.banned_ip.reason",
-                                                       {wire::text::Component::text(ipBan->reason)});
+            return messageFor("banned-ip",
+                              wire::text::Component::translatable("multiplayer.disconnect.banned_ip.reason",
+                                                                  {wire::text::Component::text(ipBan->reason)}),
+                              ipBan->reason);
         }
     }
     if (options_.whitelistEnforced && options_.whitelistEnforced() && !access.isWhitelisted(id.toString())) {
         logger_.info([&name] { return "Refused " + name + ": not on the whitelist."; });
-        return wire::text::Component::translatable("multiplayer.disconnect.not_whitelisted");
+        return messageFor("not-whitelisted",
+                          wire::text::Component::translatable("multiplayer.disconnect.not_whitelisted"));
     }
     return std::nullopt;
 }
 
+std::optional<wire::text::Component> ClientSession::serverFullRefusal(Uuid id) {
+    // parity: `PlayerList.canPlayerLogin`, where only an entry that bypasses the player limit gets past it.
+    if (options_.playerRegistry == nullptr || !options_.maxPlayers ||
+        static_cast<std::int32_t>(options_.playerRegistry->count()) < options_.maxPlayers()) {
+        return std::nullopt;
+    }
+    storage::PlayerStore* store = options_.playerStore;
+    if (store != nullptr && store->isOpen() && options_.commands != nullptr) {
+        const std::optional<storage::StoredPlayer> stored = store->players().load(id.toString());
+        if (stored.has_value() &&
+            options_.commands->environment().groups().resolve(stored->group, "basalt.bypass.player-limit")) {
+            return std::nullopt;
+        }
+    }
+    return messageFor("server-full", wire::text::Component::translatable("multiplayer.disconnect.server_full"));
+}
+
 void ClientSession::finishLogin(Uuid id, const std::string& name,
                                 const std::vector<wire::auth::SessionProfileProperty>& properties) {
-    const std::optional<wire::text::Component> refusal = loginRefusal(id, name);
+    std::optional<wire::text::Component> refusal = loginRefusal(id, name);
+    if (!refusal.has_value()) {
+        refusal = serverFullRefusal(id);
+    }
     if (refusal.has_value()) {
         sendUncompressed(login::LoginDisconnectPacket::kId, [&refusal](wire::io::ByteBuffer& buffer) {
             login::LoginDisconnectPacket{.reason = *refusal}.write(buffer);
@@ -366,10 +438,12 @@ void ClientSession::finishLogin(Uuid id, const std::string& name,
         return;
     }
     const std::int32_t threshold = options_.compressionThreshold;
-    sendUncompressed(login::LoginCompressionPacket::kId, [threshold](wire::io::ByteBuffer& buffer) {
-        login::LoginCompressionPacket{.threshold = threshold}.write(buffer);
-    });
-    compressionEnabled_ = true;
+    if (threshold >= 0) {
+        sendUncompressed(login::LoginCompressionPacket::kId, [threshold](wire::io::ByteBuffer& buffer) {
+            login::LoginCompressionPacket{.threshold = threshold}.write(buffer);
+        });
+        compressionEnabled_ = true;
+    }
 
     std::vector<login::GameProfileProperty> wireProperties;
     wireProperties.reserve(properties.size());
@@ -431,8 +505,10 @@ void ClientSession::sendServerLinks(const std::vector<server::plugins::PluginSer
 void ClientSession::enterConfiguration() {
     state_ = wire::protocol::ProtocolState::Configuration;
     // parity: `ServerConfigurationPacketListenerImpl`.
-    sendCompressed(wire::protocol::configuration::BrandPacket::kId, [](wire::io::ByteBuffer& buffer) {
-        wire::protocol::configuration::BrandPacket{.brand = "Basalt " + std::string{buildInfo::kMinecraftVersion}}
+    sendCompressed(wire::protocol::configuration::BrandPacket::kId, [this](wire::io::ByteBuffer& buffer) {
+        wire::protocol::configuration::BrandPacket{.brand = options_.tuning.brand.empty()
+                                                                ? "Basalt " + std::string{buildInfo::kMinecraftVersion}
+                                                                : options_.tuning.brand}
             .write(buffer);
     });
     // parity: `ServerLinks`; `Util.parseAndValidateUntrustedUri`.

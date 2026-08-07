@@ -1,10 +1,14 @@
+#include "SessionPlayShared.hpp"
+
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/wire/common/placeholder/Placeholders.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/protocol/play/ChatPackets.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/TextColor.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
@@ -135,12 +139,12 @@ bool ClientSession::handleChatPacket(std::int32_t packetId, wire::io::ByteBuffer
                 });
                 session->sendSystemMessage(
                     Component::translatable(std::string{kInvalidCommandSignature}).color(wire::text::kRed));
-                detectSpam(commandSpam_);
+                detectCommandSpam(packet->command);
                 return true;
             }
         }
         runCommand(packet->command);
-        detectSpam(commandSpam_);
+        detectCommandSpam(packet->command);
         return true;
     }
     if (packetId == play::SignedChatCommandPacket::kId) {
@@ -153,7 +157,7 @@ bool ClientSession::handleChatPacket(std::int32_t packetId, wire::io::ByteBuffer
             return true;
         }
         runSignedCommand(*packet, *seen);
-        detectSpam(commandSpam_);
+        detectCommandSpam(packet->command);
         return true;
     }
     if (packetId == play::ChatAckPacket::kId) {
@@ -320,6 +324,17 @@ void ClientSession::deliverChat(const chat::PlayerChatMessage& message, const ch
     }
 }
 
+void ClientSession::detectCommandSpam(const std::string& command) {
+    if (options_.limits != nullptr && !options_.limits->spamExcludedCommands.empty()) {
+        const std::string name = wire::common::placeholder::lowercaseAscii(command.substr(0, command.find(' ')));
+        if (std::ranges::find(options_.limits->spamExcludedCommands, name) !=
+            options_.limits->spamExcludedCommands.end()) {
+            return;
+        }
+    }
+    detectSpam(commandSpam_);
+}
+
 void ClientSession::detectSpam(chat::ChatThrottle& throttle) {
     throttle.increment();
     PlayerSession* session = playerSession_.get();
@@ -329,8 +344,34 @@ void ClientSession::detectSpam(chat::ChatThrottle& throttle) {
     const bool op = options_.commands != nullptr &&
                     options_.commands->environment().groups().resolve(session->group, command::kAdminPermission);
     if (!op) {
-        disconnect(Component::translatable("disconnect.spam"));
+        disconnect(messageFor("spam", Component::translatable("disconnect.spam")));
     }
+}
+
+// parity: `ServerGamePacketListenerImpl.tick`, the idle kick.
+void ClientSession::kickIfIdle() {
+    const PlayerSession* session = playerSession_.get();
+    if (session == nullptr || !options_.idleTimeoutMinutes || closeWhenDrained_.load()) {
+        return;
+    }
+    const std::int32_t minutes = options_.idleTimeoutMinutes();
+    const std::int64_t last = session->extras.lastActionMillis;
+    if (minutes > 0 && last > 0 && sessionPlay::steadyMillis() - last > static_cast<std::int64_t>(minutes) * 60'000) {
+        disconnect(messageFor("idle", Component::translatable("multiplayer.disconnect.idling")));
+    }
+}
+
+Component ClientSession::messageFor(std::string_view key, Component vanilla, std::string_view reason) const {
+    const std::string* custom = options_.messages == nullptr ? nullptr : options_.messages->find(key);
+    if (custom == nullptr) {
+        return vanilla;
+    }
+    std::string text = *custom;
+    for (std::size_t at = text.find("%reason%"); at != std::string::npos; at = text.find("%reason%", at)) {
+        text.replace(at, std::string_view{"%reason%"}.size(), reason);
+        at += reason.size();
+    }
+    return wire::text::miniMessage::parse(text);
 }
 
 } // namespace basalt::server::runtime

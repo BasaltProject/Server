@@ -92,6 +92,8 @@ public:
     static constexpr std::int32_t kStep = 20;
     static constexpr std::int32_t kThreshold = 20 * 10;
 
+    void configure(std::int32_t thresholdSeconds) noexcept { threshold_ = kStep * thresholdSeconds; }
+
     void increment() noexcept { count_.fetch_add(kStep); }
 
     void tick() noexcept {
@@ -100,9 +102,10 @@ public:
         }
     }
 
-    [[nodiscard]] bool underThreshold() const noexcept { return count_.load() < kThreshold; }
+    [[nodiscard]] bool underThreshold() const noexcept { return threshold_ <= 0 || count_.load() < threshold_; }
 
 private:
+    std::int32_t threshold_ = kThreshold;
     std::atomic<std::int32_t> count_{0};
 };
 

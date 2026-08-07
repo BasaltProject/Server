@@ -22,6 +22,7 @@
 #include <basalt/server/runtime/world/BiomeTagLoader.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/runtime/world/SummonAwards.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
@@ -310,6 +311,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     persistence_->persistEverything();
                 }
             },
+        .playerSaveIntervalSeconds = config.tuning.playerAutosaveSeconds,
+        .onPlayerSaveInterval =
+            [this] {
+                if (saveControl_ != nullptr && saveControl_->enabled()) {
+                    persistence_->persistPlayers();
+                }
+            },
         .onUnloadInterval = [this] { persistence_->unloadUnreachableChunks(); },
         .pauseWhenEmptySeconds = [this] { return settings_.pauseAllowed() ? settings_.pauseWhenEmptySeconds() : 0; },
         .hasPlayers = [this] { return playerRegistry_.count() > 0; },
@@ -401,6 +409,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     timingsReport_ = std::make_unique<timings::TimingsReport>(timings_, tickLoop_->durations(), std::move(sources));
     whitelistEnforced_ = config.whitelist;
+    idleTimeoutMinutes_ = config.tuning.playerIdleTimeoutMinutes;
+    world::neighbourUpdates::setChainedLimit(config.tuning.maxChainedNeighborUpdates);
 
     vanillaData_.lootTables.useScoreboard(&scoreboard_);
     loadScoreboard();
@@ -477,6 +487,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.fetchMojangUuid = [](const std::string& name) { return wire::auth::mojangUuidOf(name); };
     wiring.whitelistEnforced = [this] { return whitelistEnforced_; };
     wiring.setWhitelistEnforced = [this](bool value) { whitelistEnforced_ = value; };
+    wiring.kickUnlistedPlayers = [this] { kickUnlistedPlayers(); };
     wiring.setIdleTimeout = [this](std::int32_t minutes) { idleTimeoutMinutes_ = minutes; };
     wired_ = buildCommands(wiring);
     loadFunctions();

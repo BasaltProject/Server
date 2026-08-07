@@ -24,6 +24,10 @@ namespace neighbourUpdates {
 /// parity: `max-chained-neighbor-updates`.
 inline constexpr std::int32_t kMaxChainedNeighbourUpdates = 1000000;
 
+/// The server-wide limit every `Context` starts from; set once at startup from `max-chained-neighbor-updates`.
+[[nodiscard]] std::int32_t chainedLimit() noexcept;
+void setChainedLimit(std::int32_t limit) noexcept;
+
 /// The parts of what `Level.setBlock` sets off, each one runnable alone.
 namespace phase {
 /// `affectNeighborsAfterRemoval` of the state that left.
@@ -61,7 +65,7 @@ using WireReshape =
 struct Context {
     WorldState& world;
     std::string_view worldName;
-    std::int32_t maxChainedUpdates = kMaxChainedNeighbourUpdates;
+    std::int32_t maxChainedUpdates = chainedLimit();
     /// Nothing outside these bounds is broken, so a wrong pair only spares blocks; the defaults are the overworld's.
     std::int32_t minY = -64;
     std::int32_t maxY = 319;

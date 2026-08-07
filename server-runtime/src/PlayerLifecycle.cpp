@@ -276,6 +276,9 @@ void PlayerLifecycle::respawn() {
     owner_->sendPlayerPosition(session->x, session->y, session->z, session->yaw, session->pitch);
     // parity: `PlayerList.sendLevelInfo` again, which is what a respawn goes through too.
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        owner_->sendCompressed(
+            wire::protocol::play::InitializeBorderPacket::kId,
+            [world](wire::io::ByteBuffer& buffer) { world->border().initializePacket().write(buffer); });
         owner_->uiState().sendTime(*world);
         if (world->weather().raining) {
             owner_->uiState().sendWeather(world->weather());
@@ -358,6 +361,8 @@ void PlayerLifecycle::refreshProfile() {
     });
     owner_->uiState().forgetSentAttributes();
     owner_->sendPlayerPosition(session->x, session->y, session->z, session->yaw, session->pitch);
+    owner_->sendCompressed(wire::protocol::play::InitializeBorderPacket::kId,
+                           [world](wire::io::ByteBuffer& buffer) { world->border().initializePacket().write(buffer); });
     owner_->uiState().sendTime(*world);
     if (world->weather().raining) {
         owner_->uiState().sendWeather(world->weather());

@@ -82,11 +82,14 @@
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <exception>
 #include <random>
 #include <thread>
@@ -179,7 +182,22 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                             }));
 
     tickLoop_->start();
+    if (config_->tuning.watchdogSeconds > 0) {
+        serverWatchdog_ = std::make_unique<ServerWatchdog>(
+            std::chrono::seconds{config_->tuning.watchdogSeconds}, [this] { return tickLoop_->ticksRun(); },
+            [this](double stalledSeconds) {
+                logger_.error([stalledSeconds] {
+                    return "A single server tick took " + std::to_string(stalledSeconds) +
+                           " seconds (should be max 0.05); considering it to be crashed, the server will forcibly "
+                           "shut down.";
+                });
+                std::fflush(nullptr);
+                std::_Exit(1);
+            });
+    }
     enableBukkit();
+    runStartupCommands();
+    startQuery();
     const double elapsedSeconds = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                                                           std::chrono::steady_clock::now() - startedAt)
                                                           .count()) /
@@ -220,6 +238,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
 
 void BasaltServer::wireWorld(const std::string& name, world::LoadedWorld& worldRef) {
     world::LoadedWorld* world = &worldRef;
+    world->border().setAbsoluteMaxSize(config_->tuning.maxWorldSize);
     world->state().setOnChunkInstalled([this, worldName = name](server::world::Chunk& chunk) {
         static_cast<void>(server::plugins::emit(&plugins_->events(),
                                                 &server::plugins::pluginEventTypes::worldChunkLoad(),
@@ -301,9 +320,14 @@ void BasaltServer::shutdown() {
         persistence_->persistPlayers();
 
         logger_.info([&players] { return "Disconnecting " + std::to_string(players.size()) + " player(s)."; });
+        const std::shared_ptr<const config::ConfigSnapshot> snapshot = live_->current();
+        const std::string* custom = snapshot->messages.find("server-closed");
+        const wire::text::Component serverClosed =
+            custom != nullptr ? wire::text::miniMessage::parse(*custom)
+                              : wire::text::Component::text("Server closed").color(wire::text::kRed);
         for (player::PlayerSession* player : players) {
             if (player->connection().disconnect) {
-                player->connection().disconnect(wire::text::Component::text("Server closed").color(wire::text::kRed));
+                player->connection().disconnect(serverClosed);
             }
             playerRegistry_.remove(player->uuid());
         }
@@ -312,6 +336,8 @@ void BasaltServer::shutdown() {
         bedrockListener_->stop();
     }
 
+    serverWatchdog_.reset();
+    query_.reset();
     tickLoop_->stop();
     static_cast<void>(server::plugins::emit(
         &plugins_->events(), &server::plugins::pluginEventTypes::serverStop(),

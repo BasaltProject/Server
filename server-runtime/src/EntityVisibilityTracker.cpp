@@ -135,12 +135,15 @@ bool visibleTo(const ServerEntity& entity, const std::string& viewer) {
 }
 
 /// parity: `ChunkMap.TrackedEntity.updatePlayer`, the horizontal range an entity is drawn within.
-bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ, std::int32_t viewDistanceChunks) {
+bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ, std::int32_t viewDistanceChunks,
+                     std::int32_t broadcastPercentage) {
     const server::registry::entityTypeShapes::Shape* shape = server::registry::entityTypeShapes::of(entity.type());
     if (shape == nullptr || shape->trackingRange <= 0) {
         return true;
     }
-    const double range = std::min(shape->trackingRange, viewDistanceChunks) * 16.0;
+    // parity: `DedicatedServer.getScaledTrackingDistance`, whole blocks scaled by `entity-broadcast-range-percentage`.
+    const std::int32_t scaled = broadcastPercentage * (shape->trackingRange * 16) / 100;
+    const double range = std::min(static_cast<double>(scaled), viewDistanceChunks * 16.0);
     const double dx = viewerX - entity.x;
     const double dz = viewerZ - entity.z;
     return (dx * dx) + (dz * dz) <= range * range;
@@ -179,7 +182,8 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             continue;
         }
         if (!visibleTo(*entity, me) || session->extras.hiddenEntities.contains(entity->entityId()) ||
-            !inTrackingRange(*entity, session->x, session->z, viewDistance)) {
+            !inTrackingRange(*entity, session->x, session->z, viewDistance,
+                             owner_->options().tuning.entityBroadcastRangePercentage)) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());

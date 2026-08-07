@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/item/ItemLimits.hpp>
 #include <basalt/server/runtime/player/PlayerBooks.hpp>
 #include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -288,6 +289,20 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     }
     if (packetId == play::ServerboundEditBookPacket::kId) {
         const std::optional<play::ServerboundEditBookPacket> packet = play::ServerboundEditBookPacket::read(body);
+        if (packet.has_value() && session != nullptr && options_.limits != nullptr) {
+            const config::ItemCaps& caps = options_.limits->items;
+            const bool longPage =
+                caps.bookPageLength > 0 && std::ranges::any_of(packet->pages, [&caps](const std::string& page) {
+                    return item::itemLimits::lengthOf(page) > caps.bookPageLength;
+                });
+            const bool longTitle = caps.bookTitleLength > 0 && packet->title.has_value() &&
+                                   item::itemLimits::lengthOf(*packet->title) > caps.bookTitleLength;
+            if (longPage || longTitle) {
+                logger_.warn([session] { return session->name() + " sent a book past the limits in limits.toml"; });
+                menus_->sendInventoryAll();
+                return;
+            }
+        }
         if (packet.has_value() && session != nullptr) {
             std::vector<std::string> pages = packet->pages;
             std::optional<std::string> title = packet->title;

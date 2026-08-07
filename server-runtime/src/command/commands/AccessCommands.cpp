@@ -265,9 +265,10 @@ void BanListCommand::build(const CommandNodeBuilder& root) const {
 }
 
 WhitelistCommand::WhitelistCommand(std::function<bool()> enforced, std::function<void(bool)> setEnforced,
-                                   std::function<std::int64_t()> nowEpochSeconds)
-    : Command("whitelist", permissionLevel::kAdmins), enforced_(std::move(enforced)),
-      setEnforced_(std::move(setEnforced)), nowEpochSeconds_(std::move(nowEpochSeconds)) {}
+                                   std::function<std::int64_t()> nowEpochSeconds, std::function<void()> kickUnlisted)
+    : Command("whitelist", permissionLevel::kAdmins), kickUnlisted_(std::move(kickUnlisted)),
+      enforced_(std::move(enforced)), setEnforced_(std::move(setEnforced)),
+      nowEpochSeconds_(std::move(nowEpochSeconds)) {}
 
 void WhitelistCommand::build(const CommandNodeBuilder& root) const {
     for (const bool on : {true, false}) {
@@ -283,6 +284,9 @@ void WhitelistCommand::build(const CommandNodeBuilder& root) const {
                 }
                 context.success(
                     Component::translatable(on ? "commands.whitelist.enabled" : "commands.whitelist.disabled"), true);
+                if (on && kickUnlisted_) {
+                    kickUnlisted_();
+                }
                 return 1;
             });
         });
@@ -348,8 +352,8 @@ void WhitelistCommand::build(const CommandNodeBuilder& root) const {
         });
     });
 
-    root.literal("remove", [](const CommandNodeBuilder& form) {
-        form.argument("targets", gameProfileArgument(), [](const CommandNodeBuilder& targets) {
+    root.literal("remove", [this](const CommandNodeBuilder& form) {
+        form.argument("targets", gameProfileArgument(), [this](const CommandNodeBuilder& targets) {
             targets.suggestsFromServer([](const SuggestionContext& context) {
                 std::vector<std::string> listed;
                 if (storage::AccessRepository* access = context.environment().options().access; access != nullptr) {
@@ -359,7 +363,7 @@ void WhitelistCommand::build(const CommandNodeBuilder& root) const {
                 }
                 return context.matching(listed);
             });
-            targets.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
+            targets.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
                 const auto access = accessOf(context, "whitelist with");
                 if (!access.has_value()) {
                     return std::unexpected{access.error()};
@@ -374,6 +378,9 @@ void WhitelistCommand::build(const CommandNodeBuilder& root) const {
                 static_cast<void>((*access)->removeFromWhitelist(entry->uuid));
                 context.success(Component::translatable("commands.whitelist.remove.success", {Component::text(*name)}),
                                 true);
+                if (kickUnlisted_) {
+                    kickUnlisted_();
+                }
                 return 1;
             });
         });
