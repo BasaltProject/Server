@@ -10,6 +10,7 @@ kotlin {
             api(project(":basalt-random"))
             api(project(":basalt-registry"))
             api(project(":basalt-protocol"))
+            implementation(libs.kotlinx.serialization.json)
         }
     }
 }
