@@ -5,6 +5,7 @@ import org.basaltmc.auth.MinecraftCrypt
 import org.basaltmc.auth.OfflineUuid
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionProfileProperty
+import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
@@ -112,6 +113,7 @@ public class ClientSession(
     private val world: WorldState = WorldState(emptyList()),
     private val spawn: Triple<Double, Double, Double> = Triple(8.5, 4.0, 8.5),
 ) {
+    private val logger = Logger("Session")
     private val incoming = ByteBuffer()
     private var state = ProtocolState.HANDSHAKE
     private var compressionEnabled = false
@@ -474,6 +476,8 @@ public class ClientSession(
 
         val others = registry.snapshot()
         registry.add(session)
+        logger.info { "${session.name} logged in with entity id $entityId at ($spawnX, $spawnY, $spawnZ)" }
+        logger.info { "${session.name} joined the game" }
 
         sendCompressed(PlayerInfoAddPacket.ID) {
             PlayerInfoAddPacket(
@@ -665,6 +669,7 @@ public class ClientSession(
         val session = playerSession ?: return
         val registry = playerRegistry ?: return
         registry.remove(session.uuid)
+        logger.info { "${session.name} left the game" }
         for (other in registry.snapshot()) {
             other.connection.sendPlayPacket(
                 PlayerInfoRemovePacket.ID,
