@@ -17,6 +17,7 @@ import org.basaltmc.world.Chunk
 import org.basaltmc.world.NoiseWorldGenerator
 import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.RealTerrainGenerator
+import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -31,19 +32,21 @@ import kotlin.time.Instant
  * immediately (not only on a clean `stop`, so a crash or a `kill` right after first boot does not
  * throw away a freshly generated world that was never written to disk).
  *
- * [overworldRouter], when given, generates new chunks with [RealTerrainGenerator] (the real,
- * jar-verified Overworld density-function router) instead of [NoiseWorldGenerator]'s stand-in
- * approximation. [Main.kt][org.basaltmc.server] always builds and passes a real one for actual
- * gameplay; it stays optional here (not required) so protocol/session-focused tests, whose
- * concern is the network layer, not terrain fidelity, can keep using the fast, network-free
- * placeholder instead of downloading a real `server.jar` and paying real generation cost for
- * something they never inspect. Terrain fidelity itself has its own dedicated, real-jar-verified
- * tests (`RealTerrainGeneratorTest` and friends), not these.
+ * [overworldRouter]/[surfaceEnvironment], when both given, generate new chunks with
+ * [RealTerrainGenerator] (the real, jar-verified Overworld density-function router plus the real
+ * `SurfaceRules` tree) instead of [NoiseWorldGenerator]'s stand-in approximation.
+ * [Main.kt][org.basaltmc.server] always builds and passes real ones for actual gameplay; they stay
+ * optional here (not required) so protocol/session-focused tests, whose concern is the network
+ * layer, not terrain fidelity, can keep using the fast, network-free placeholder instead of
+ * downloading a real `server.jar` and paying real generation cost for something they never
+ * inspect. Terrain fidelity itself has its own dedicated, real-jar-verified tests
+ * (`RealTerrainGeneratorTest`/`SurfaceBuilderTest` and friends), not these.
  */
 public class BasaltServer(
     private val config: BasaltConfig,
     private val onlineMode: OnlineMode? = null,
     private val overworldRouter: OverworldNoiseRouter? = null,
+    private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
@@ -66,9 +69,15 @@ public class BasaltServer(
     private fun generateChunk(
         chunkX: Int,
         chunkZ: Int,
-    ): Chunk =
-        overworldRouter?.let { RealTerrainGenerator.generate(it, chunkX, chunkZ) }
-            ?: NoiseWorldGenerator.generate(chunkX, chunkZ)
+    ): Chunk {
+        val router = overworldRouter
+        val environment = surfaceEnvironment
+        return if (router != null && environment != null) {
+            RealTerrainGenerator.generate(router, environment, chunkX, chunkZ)
+        } else {
+            NoiseWorldGenerator.generate(chunkX, chunkZ)
+        }
+    }
 
     private fun loadOrGenerateWorld(): WorldState {
         val generated = mutableListOf<Chunk>()
