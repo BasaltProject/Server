@@ -36,5 +36,6 @@ eula.txt
 basalt.toml
 .basalt/
 /world/
+/logs/
 basalt_server_test_world/
 basalt_asset_cache_test/

@@ -15,6 +15,8 @@ import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.NoiseWorldGenerator
+import org.basaltmc.world.terrain.OverworldNoiseRouter
+import org.basaltmc.world.terrain.RealTerrainGenerator
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -28,10 +30,20 @@ import kotlin.time.Instant
  * saved there ([WorldPersistence]); chunks missing from disk are generated fresh and saved
  * immediately (not only on a clean `stop`, so a crash or a `kill` right after first boot does not
  * throw away a freshly generated world that was never written to disk).
+ *
+ * [overworldRouter], when given, generates new chunks with [RealTerrainGenerator] (the real,
+ * jar-verified Overworld density-function router) instead of [NoiseWorldGenerator]'s stand-in
+ * approximation. [Main.kt][org.basaltmc.server] always builds and passes a real one for actual
+ * gameplay; it stays optional here (not required) so protocol/session-focused tests, whose
+ * concern is the network layer, not terrain fidelity, can keep using the fast, network-free
+ * placeholder instead of downloading a real `server.jar` and paying real generation cost for
+ * something they never inspect. Terrain fidelity itself has its own dedicated, real-jar-verified
+ * tests (`RealTerrainGeneratorTest` and friends), not these.
  */
 public class BasaltServer(
     private val config: BasaltConfig,
     private val onlineMode: OnlineMode? = null,
+    private val overworldRouter: OverworldNoiseRouter? = null,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
@@ -51,20 +63,27 @@ public class BasaltServer(
             }
         }
 
+    private fun generateChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk =
+        overworldRouter?.let { RealTerrainGenerator.generate(it, chunkX, chunkZ) }
+            ?: NoiseWorldGenerator.generate(chunkX, chunkZ)
+
     private fun loadOrGenerateWorld(): WorldState {
         val generated = mutableListOf<Chunk>()
         val chunks =
             (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).flatMap { x ->
                 (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).map { z ->
                     WorldPersistence.loadChunk(config.worldName, DIMENSION, x, z)
-                        ?: NoiseWorldGenerator.generate(x, z).also { generated += it }
+                        ?: generateChunk(x, z).also { generated += it }
                 }
             }
         if (generated.isNotEmpty()) {
             logger.info { "Generated ${generated.size} new chunk(s), saving them now." }
             saveWorld(generated)
         }
-        return WorldState(chunks)
+        return WorldState(chunks, loadOrGenerate = ::generateChunk)
     }
 
     /** Where a player who has not been here before spawns: on top of the terrain at the world's own (8, 8) column, not a fixed Y that assumed a flat world. */

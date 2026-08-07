@@ -2,12 +2,17 @@ package org.basaltmc.server
 
 import org.basaltmc.assets.AssetCache
 import org.basaltmc.assets.EulaFile
+import org.basaltmc.assets.ServerJarAssets
 import org.basaltmc.assets.VersionManifest
 import org.basaltmc.auth.MojangSessionService
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionKeyPair
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.world.RealNoiseParameters
+import org.basaltmc.world.densityfunction.BlendedNoise
+import org.basaltmc.world.terrain.NoiseRouterData
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -33,11 +38,25 @@ public fun main(args: Array<String>) {
     val versionMetadata = VersionManifest().resolve(BuildInfo.MINECRAFT_VERSION)
     val clientJarPath = AssetCache(logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.CLIENT)
     assetsLogger.info { "Client assets ready at $clientJarPath." }
+    val serverJarPath = AssetCache(logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.SERVER)
+    assetsLogger.info { "Server assets ready at $serverJarPath." }
+
+    // Real Overworld density-function router (see NoiseRouterData/TerrainProvider), built once at
+    // startup and reused for every generated chunk. WORLD_SEED is a fixed placeholder, not yet
+    // read from config: documented gap, matches `NoiseWorldGenerator`'s own until real per-world
+    // seed configuration exists.
+    val serverJar = ServerJarAssets(serverJarPath, BuildInfo.MINECRAFT_VERSION)
+    val noiseRandom = XoroshiroRandom(WORLD_SEED).forkPositional()
+    val realNoises = RealNoiseParameters(serverJar, noiseRandom)
+    val base3d = BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0)
+    val overworldRouter = NoiseRouterData.overworld(realNoises::get, base3d)
 
     val configLogger = Logger("Config")
     val config = BasaltConfig.load(logger = configLogger)
     Logger.defaultMinLevel = config.logLevel
 
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
-    BasaltServer(config, onlineMode).start(startedAt)
+    BasaltServer(config, onlineMode, overworldRouter).start(startedAt)
 }
+
+private const val WORLD_SEED = 0L
