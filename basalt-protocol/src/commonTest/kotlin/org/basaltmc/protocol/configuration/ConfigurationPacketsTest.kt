@@ -82,4 +82,26 @@ class ConfigurationPacketsTest {
         packet.write(buffer)
         assertEquals(packet, ConfigurationKeepAlivePacket.read(buffer))
     }
+
+    @Test
+    fun tagsRoundTripsWithEntriesAndEmptyIds() {
+        val buffer = ByteBuffer()
+        val packet =
+            TagsPacket(
+                listOf(
+                    TagGroup("minecraft:damage_type", listOf(TagEntry("minecraft:is_fire", emptyList()))),
+                    TagGroup("minecraft:block", listOf(TagEntry("minecraft:logs", listOf(1, 2, 3)))),
+                ),
+            )
+        packet.write(buffer)
+        assertEquals(packet, TagsPacket.read(buffer))
+    }
+
+    @Test
+    fun tagsRoundTripsEmpty() {
+        val buffer = ByteBuffer()
+        val packet = TagsPacket(emptyList())
+        packet.write(buffer)
+        assertEquals(packet, TagsPacket.read(buffer))
+    }
 }
