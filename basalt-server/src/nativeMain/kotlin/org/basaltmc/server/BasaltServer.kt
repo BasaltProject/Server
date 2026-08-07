@@ -17,6 +17,7 @@ import org.basaltmc.world.Chunk
 import org.basaltmc.world.NoiseWorldGenerator
 import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.RealTerrainGenerator
+import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.system.exitProcess
 import kotlin.time.Clock
@@ -34,7 +35,8 @@ import kotlin.time.Instant
  *
  * [overworldRouter]/[surfaceEnvironment], when both given, generate new chunks with
  * [RealTerrainGenerator] (the real, jar-verified Overworld density-function router plus the real
- * `SurfaceRules` tree) instead of [NoiseWorldGenerator]'s stand-in approximation.
+ * `SurfaceRules` tree) instead of [NoiseWorldGenerator]'s stand-in approximation; [villageGenerator],
+ * also optional, additionally places real Plains villages during that same generation call.
  * [Main.kt][org.basaltmc.server] always builds and passes real ones for actual gameplay; they stay
  * optional here (not required) so protocol/session-focused tests, whose concern is the network
  * layer, not terrain fidelity, can keep using the fast, network-free placeholder instead of
@@ -47,6 +49,7 @@ public class BasaltServer(
     private val onlineMode: OnlineMode? = null,
     private val overworldRouter: OverworldNoiseRouter? = null,
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
+    private val villageGenerator: VillageStructureGenerator? = null,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
@@ -73,7 +76,7 @@ public class BasaltServer(
         val router = overworldRouter
         val environment = surfaceEnvironment
         return if (router != null && environment != null) {
-            RealTerrainGenerator.generate(router, environment, chunkX, chunkZ)
+            RealTerrainGenerator.generate(router, environment, chunkX, chunkZ, villageGenerator = villageGenerator)
         } else {
             NoiseWorldGenerator.generate(chunkX, chunkZ)
         }

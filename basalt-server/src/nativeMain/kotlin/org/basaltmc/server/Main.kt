@@ -12,8 +12,11 @@ import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.world.RealNoiseParameters
 import org.basaltmc.server.world.RealSurfaceEnvironment
+import org.basaltmc.server.world.VillageDataLoader
 import org.basaltmc.world.densityfunction.BlendedNoise
+import org.basaltmc.world.structure.StructurePlacementGrid
 import org.basaltmc.world.terrain.NoiseRouterData
+import org.basaltmc.world.terrain.VillageStructureGenerator
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -53,12 +56,28 @@ public fun main(args: Array<String>) {
     val overworldRouter = NoiseRouterData.overworld(realNoises::get, base3d)
     val surfaceEnvironment = RealSurfaceEnvironment(serverJar, noiseRandom, overworldRouter)
 
+    // Real villages.json placement values (spacing 34, separation 8, salt 10387312) and
+    // village_plains.json's own start_pool/size: see VillageStructureGenerator's own KDoc for the
+    // documented gaps in what actually gets placed.
+    val villageLoader = VillageDataLoader(serverJar)
+    val villageGrid = StructurePlacementGrid(spacing = 34, separation = 8, salt = 10387312)
+    val villageGenerator =
+        VillageStructureGenerator(
+            overworldRouter,
+            villageGrid,
+            startPoolName = "minecraft:village/plains/town_centers",
+            maxDepth = 6,
+            maxDistanceFromCenter = 80,
+            poolLookup = villageLoader.poolLookup,
+            templateLoader = villageLoader.templateLoader,
+        )
+
     val configLogger = Logger("Config")
     val config = BasaltConfig.load(logger = configLogger)
     Logger.defaultMinLevel = config.logLevel
 
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
-    BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment).start(startedAt)
+    BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment, villageGenerator).start(startedAt)
 }
 
 private const val WORLD_SEED = 0L

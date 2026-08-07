@@ -1,0 +1,139 @@
+package org.basaltmc.world.structure
+
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
+
+/** Thrown for a `worldgen/template_pool`/`processor_list` JSON shape this parser doesn't understand. */
+public class VillagePoolParseException(
+    message: String,
+) : Exception(message)
+
+/**
+ * Parses the real `data/minecraft/worldgen/template_pool/village/plains` and
+ * `data/minecraft/worldgen/processor_list` json formats, verbatim against the real values
+ * captured from the decompiled 26.2 jar (`town_centers.json`, `mossify_{10,20,70}_percent.json`,
+ * `farm_plains.json`, `street_plains.json`). Element kinds are narrowed to what real Plains
+ * village pools use: `legacy_single_pool_element`, `list_pool_element`, `empty_pool_element`
+ * (matching [StructurePoolElement]'s own documented scope).
+ */
+public object VillagePoolJson {
+    /** [resolveProcessors] resolves a named processor list reference (`"minecraft:mossify_20_percent"`) to its real JSON text; only called for string-form `processors` fields. */
+    public fun parsePool(
+        json: String,
+        resolveProcessors: (String) -> String?,
+    ): StructureTemplatePool {
+        val root = Json.parseToJsonElement(json).jsonObject
+        val fallback = root["fallback"]?.jsonPrimitive?.content ?: "minecraft:empty"
+        val elements = root["elements"]?.jsonArray ?: JsonArray(emptyList())
+        val weighted =
+            elements.map { entry ->
+                val entryObj = entry.jsonObject
+                val weight = entryObj["weight"]?.jsonPrimitive?.content?.toIntOrNull() ?: 1
+                val elementObj = entryObj["element"]?.jsonObject ?: throw VillagePoolParseException("Missing 'element'")
+                parseElement(elementObj, resolveProcessors) to weight
+            }
+        return StructureTemplatePool(fallback, weighted)
+    }
+
+    private fun parseElement(
+        json: JsonObject,
+        resolveProcessors: (String) -> String?,
+    ): StructurePoolElement {
+        val type =
+            json["element_type"]?.jsonPrimitive?.content ?: throw VillagePoolParseException("Missing 'element_type'")
+        return when (type) {
+            "minecraft:empty_pool_element" -> EmptyPoolElement
+            "minecraft:legacy_single_pool_element", "minecraft:single_pool_element" -> {
+                val location =
+                    json["location"]?.jsonPrimitive?.content ?: throw VillagePoolParseException("Missing 'location'")
+                val projection = parseProjection(json)
+                val processors = parseProcessorsField(json["processors"], resolveProcessors)
+                LegacySinglePoolElement(location, processors, projection)
+            }
+            "minecraft:list_pool_element" -> {
+                val elements = json["elements"]?.jsonArray ?: JsonArray(emptyList())
+                val projection = parseProjection(json)
+                ListPoolElement(elements.map { parseElement(it.jsonObject, resolveProcessors) }, projection)
+            }
+            else -> EmptyPoolElement
+        }
+    }
+
+    private fun parseProjection(json: JsonObject): StructureProjection =
+        when (json["projection"]?.jsonPrimitive?.content) {
+            "terrain_matching" -> StructureProjection.TERRAIN_MATCHING
+            else -> StructureProjection.RIGID
+        }
+
+    private fun parseProcessorsField(
+        field: kotlinx.serialization.json.JsonElement?,
+        resolveProcessors: (String) -> String?,
+    ): StructureProcessorList {
+        if (field == null) return StructureProcessorList.EMPTY
+        return when (field) {
+            is JsonPrimitive -> {
+                val name = field.content
+                val json = resolveProcessors(name) ?: return StructureProcessorList.EMPTY
+                parseProcessorList(json)
+            }
+            is JsonObject -> parseProcessorListObject(field)
+            else -> StructureProcessorList.EMPTY
+        }
+    }
+
+    /** Parses a standalone `data/minecraft/worldgen/processor_list/<name>.json` (`{"processors": [...]}`). */
+    public fun parseProcessorList(json: String): StructureProcessorList =
+        parseProcessorListObject(Json.parseToJsonElement(json).jsonObject)
+
+    private fun parseProcessorListObject(root: JsonObject): StructureProcessorList {
+        val processors = root["processors"]?.jsonArray ?: return StructureProcessorList.EMPTY
+        val rules = mutableListOf<StructureProcessorRule>()
+        for (processor in processors) {
+            val processorObj = processor.jsonObject
+            if (processorObj["processor_type"]?.jsonPrimitive?.content != "minecraft:rule") continue
+            for (rule in processorObj["rules"]?.jsonArray ?: JsonArray(emptyList())) {
+                rules.add(parseRule(rule.jsonObject))
+            }
+        }
+        return StructureProcessorList(rules)
+    }
+
+    private fun parseRule(json: JsonObject): StructureProcessorRule {
+        val input = parseRuleTest(json["input_predicate"]?.jsonObject)
+        val location = parseRuleTest(json["location_predicate"]?.jsonObject)
+        val outputName =
+            json["output_state"]
+                ?.jsonObject
+                ?.get("Name")
+                ?.jsonPrimitive
+                ?.content ?: "minecraft:air"
+        return StructureProcessorRule(
+            input ?: StructureRuleTest.BlockMatch(Blocks.AIR.stateId),
+            location,
+            Blocks.REGISTRY.byIdentifier(Identifier.parse(outputName))?.stateId ?: Blocks.AIR.stateId,
+        )
+    }
+
+    private fun parseRuleTest(json: JsonObject?): StructureRuleTest? {
+        if (json == null) return null
+        val blockName = json["block"]?.jsonPrimitive?.content
+        val stateId =
+            blockName?.let { Blocks.REGISTRY.byIdentifier(Identifier.parse(it))?.stateId } ?: Blocks.AIR.stateId
+        return when (json["predicate_type"]?.jsonPrimitive?.content) {
+            "minecraft:random_block_match" -> {
+                val probability = json["probability"]?.jsonPrimitive?.doubleOrNull?.toFloat() ?: 1.0f
+                StructureRuleTest.RandomBlockMatch(stateId, probability)
+            }
+            "minecraft:block_match" -> StructureRuleTest.BlockMatch(stateId)
+            else -> null
+        }
+    }
+}
