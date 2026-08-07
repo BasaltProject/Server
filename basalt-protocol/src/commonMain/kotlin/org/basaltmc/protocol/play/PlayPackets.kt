@@ -803,3 +803,144 @@ public data class ServerboundPositionLookPacket(
         }
     }
 }
+
+/** Clientbound, id 0x08: a single block changed. Mirrors `ClientboundBlockUpdatePacket`. */
+public data class ClientboundBlockUpdatePacket(
+    val pos: BlockPos,
+    val blockStateId: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeLong(pos.pack())
+        buffer.writeVarInt(blockStateId)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x08
+
+        public fun read(buffer: ByteBuffer): ClientboundBlockUpdatePacket =
+            ClientboundBlockUpdatePacket(BlockPos.unpack(buffer.readLong()), buffer.readVarInt())
+    }
+}
+
+/**
+ * Clientbound, id 0x04: acknowledges a client-predicted change (dig/place) up to [sequence], so the
+ * client can stop predicting past that point. Mirrors `ClientboundBlockChangedAckPacket`.
+ */
+public data class ClientboundBlockChangedAckPacket(
+    val sequence: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(sequence)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x04
+
+        public fun read(buffer: ByteBuffer): ClientboundBlockChangedAckPacket =
+            ClientboundBlockChangedAckPacket(buffer.readVarInt())
+    }
+}
+
+/**
+ * Serverbound, id 0x29: digging/breaking a block (start/abort/stop), or a non-block player action
+ * (drop item, swap hands...). Mirrors `ServerboundPlayerActionPacket`.
+ */
+public data class ServerboundPlayerActionPacket(
+    val action: Action,
+    val pos: BlockPos,
+    val direction: Direction,
+    val sequence: Int,
+) {
+    public enum class Action {
+        START_DESTROY_BLOCK,
+        ABORT_DESTROY_BLOCK,
+        STOP_DESTROY_BLOCK,
+        DROP_ALL_ITEMS,
+        DROP_ITEM,
+        RELEASE_USE_ITEM,
+        SWAP_ITEM_WITH_OFFHAND,
+        STAB,
+    }
+
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(action.ordinal)
+        buffer.writeLong(pos.pack())
+        buffer.writeByte(direction.ordinal.toByte())
+        buffer.writeVarInt(sequence)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x29
+
+        public fun read(buffer: ByteBuffer): ServerboundPlayerActionPacket {
+            val action = Action.entries[buffer.readVarInt()]
+            val pos = BlockPos.unpack(buffer.readLong())
+            val direction = Direction.entries[buffer.readByte().toInt() and 0xFF]
+            val sequence = buffer.readVarInt()
+            return ServerboundPlayerActionPacket(action, pos, direction, sequence)
+        }
+    }
+}
+
+/** Where on a block's face a `use_item_on` interaction landed. Mirrors `BlockHitResult`'s wire shape (`FriendlyByteBuf.readBlockHitResult`). */
+public data class BlockHitResult(
+    val pos: BlockPos,
+    val direction: Direction,
+    val clickX: Float,
+    val clickY: Float,
+    val clickZ: Float,
+    val inside: Boolean,
+    val worldBorderHit: Boolean,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeLong(pos.pack())
+        buffer.writeVarInt(direction.ordinal)
+        buffer.writeFloat(clickX)
+        buffer.writeFloat(clickY)
+        buffer.writeFloat(clickZ)
+        buffer.writeBoolean(inside)
+        buffer.writeBoolean(worldBorderHit)
+    }
+
+    public companion object {
+        public fun read(buffer: ByteBuffer): BlockHitResult {
+            val pos = BlockPos.unpack(buffer.readLong())
+            val direction = Direction.entries[buffer.readVarInt()]
+            val clickX = buffer.readFloat()
+            val clickY = buffer.readFloat()
+            val clickZ = buffer.readFloat()
+            val inside = buffer.readBoolean()
+            val worldBorderHit = buffer.readBoolean()
+            return BlockHitResult(pos, direction, clickX, clickY, clickZ, inside, worldBorderHit)
+        }
+    }
+}
+
+/** Serverbound, id 0x42: using the held item on a block (placing, opening a container...). Mirrors `ServerboundUseItemOnPacket`. */
+public data class ServerboundUseItemOnPacket(
+    val hand: Hand,
+    val blockHit: BlockHitResult,
+    val sequence: Int,
+) {
+    public enum class Hand {
+        MAIN_HAND,
+        OFF_HAND,
+    }
+
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(hand.ordinal)
+        blockHit.write(buffer)
+        buffer.writeVarInt(sequence)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x42
+
+        public fun read(buffer: ByteBuffer): ServerboundUseItemOnPacket {
+            val hand = Hand.entries[buffer.readVarInt()]
+            val blockHit = BlockHitResult.read(buffer)
+            val sequence = buffer.readVarInt()
+            return ServerboundUseItemOnPacket(hand, blockHit, sequence)
+        }
+    }
+}

@@ -6,9 +6,9 @@ import org.basaltmc.io.TcpListener
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.player.PlayerRegistry
+import org.basaltmc.server.world.WorldState
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
-import org.basaltmc.world.Chunk
 import org.basaltmc.world.FlatWorldGenerator
 
 /**
@@ -22,10 +22,12 @@ public class BasaltServer(
     private val onlineMode: OnlineMode? = null,
 ) {
     private val playerRegistry = PlayerRegistry()
-    private val world: List<Chunk> =
-        (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).flatMap { x ->
-            (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).map { z -> FlatWorldGenerator.generate(x, z) }
-        }
+    private val world =
+        WorldState(
+            (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).flatMap { x ->
+                (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).map { z -> FlatWorldGenerator.generate(x, z) }
+            },
+        )
     private val tickLoop = TickLoop(playerRegistry)
 
     public fun start() {

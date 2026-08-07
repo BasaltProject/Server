@@ -222,6 +222,87 @@ class PlayPacketsTest {
         val result = ServerboundPositionLookPacket.read(buffer)
         assertEquals(ServerboundPositionLookPacket(1.0, 2.0, 3.0, 90f, 0f, onGround = false), result)
     }
+
+    @Test
+    fun clientboundBlockUpdateRoundTrips() {
+        val buffer = ByteBuffer()
+        val packet = ClientboundBlockUpdatePacket(BlockPos(10, 64, -20), blockStateId = 12345)
+        packet.write(buffer)
+        assertEquals(packet, ClientboundBlockUpdatePacket.read(buffer))
+    }
+
+    @Test
+    fun clientboundBlockChangedAckRoundTrips() {
+        val buffer = ByteBuffer()
+        val packet = ClientboundBlockChangedAckPacket(sequence = 42)
+        packet.write(buffer)
+        assertEquals(packet, ClientboundBlockChangedAckPacket.read(buffer))
+    }
+
+    @Test
+    fun serverboundPlayerActionRoundTrips() {
+        val buffer = ByteBuffer()
+        val packet =
+            ServerboundPlayerActionPacket(
+                action = ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK,
+                pos = BlockPos(1, 65, -3),
+                direction = Direction.UP,
+                sequence = 7,
+            )
+        packet.write(buffer)
+        assertEquals(packet, ServerboundPlayerActionPacket.read(buffer))
+    }
+
+    @Test
+    fun serverboundPlayerActionRoundTripsForEveryActionAndDirection() {
+        for (action in ServerboundPlayerActionPacket.Action.entries) {
+            for (direction in Direction.entries) {
+                val buffer = ByteBuffer()
+                val packet = ServerboundPlayerActionPacket(action, BlockPos(0, 0, 0), direction, sequence = 1)
+                packet.write(buffer)
+                assertEquals(packet, ServerboundPlayerActionPacket.read(buffer))
+            }
+        }
+    }
+
+    @Test
+    fun blockHitResultRoundTrips() {
+        val buffer = ByteBuffer()
+        val hit =
+            BlockHitResult(
+                BlockPos(5, 70, 5),
+                Direction.NORTH,
+                0.5f,
+                1.0f,
+                0.0f,
+                inside = false,
+                worldBorderHit = false,
+            )
+        hit.write(buffer)
+        assertEquals(hit, BlockHitResult.read(buffer))
+    }
+
+    @Test
+    fun serverboundUseItemOnRoundTrips() {
+        val buffer = ByteBuffer()
+        val packet =
+            ServerboundUseItemOnPacket(
+                hand = ServerboundUseItemOnPacket.Hand.OFF_HAND,
+                blockHit =
+                    BlockHitResult(
+                        BlockPos(2, 64, 2),
+                        Direction.EAST,
+                        0.25f,
+                        0.75f,
+                        0.5f,
+                        inside = true,
+                        worldBorderHit = false,
+                    ),
+                sequence = 99,
+            )
+        packet.write(buffer)
+        assertEquals(packet, ServerboundUseItemOnPacket.read(buffer))
+    }
 }
 
 private const val AIR_STATE = 0
