@@ -9,7 +9,7 @@ import org.basaltmc.protocol.play.PalettedContainer
  * Turns a [Chunk] into the wire bytes `basalt-protocol`'s `MapChunkPacket.chunkData` and
  * `UpdateLightPacket` need. Biomes are always plains: `basalt-world` does not vary biomes yet.
  * Light is a uniform value per section, not real propagation: sections entirely above the flat
- * world's surface get full skylight, sections at or below get none. This is the "luz básica" a
+ * world's surface get full skylight, sections at or below get none. This is the basic lighting a
  * flat world needs, not a general light engine (that belongs to a later pass with real terrain to
  * propagate light across).
  */
