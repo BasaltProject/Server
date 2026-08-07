@@ -119,6 +119,34 @@ class LootTableTest {
     }
 
     @Test
+    fun matchesTheRealVanilla262ServerForAFixedSeed() {
+        // Live parity check, not just formula-by-formula against decompiled source: this exact
+        // pool (rolls=5, stone/dirt/sand at weight 1/2/3) was loaded into a real vanilla 26.2
+        // server as a datapack loot table, put on a chest with a fixed LootTableSeed of 2026 (the
+        // real jar's `RandomizableContainer`/`LootTable.fill` mechanism, which uses
+        // `RandomSource.create(seed)`, i.e. `LegacyRandomSource`, confirmed by decompiling it
+        // rather than assumed), and unpacked via RCON. The real server produced, in roll order:
+        // sand, sand, dirt, stone, sand. This engine produces the identical sequence for the
+        // identical seed.
+        val entries =
+            listOf(
+                LootEntry(item = Identifier.vanilla("stone"), weight = 1),
+                LootEntry(item = Identifier.vanilla("dirt"), weight = 2),
+                LootEntry(item = Identifier.vanilla("sand"), weight = 3),
+            )
+        val table =
+            LootTable(
+                pools = listOf(LootPool(entries = entries, rolls = NumberProvider.Constant(5f))),
+            )
+
+        val result = table.generate(LegacyRandom(2026L))
+
+        val expected =
+            listOf("sand", "sand", "dirt", "stone", "sand").map { Identifier.vanilla(it) }
+        assertEquals(expected, result.map { it.item })
+    }
+
+    @Test
     fun bonusRollsScaleWithLuck() {
         val table =
             LootTable(
