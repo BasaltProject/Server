@@ -1,0 +1,659 @@
+package org.basaltmc.protocol.play
+
+import org.basaltmc.io.ByteBuffer
+import org.basaltmc.protocol.readAnonymousNbt
+import org.basaltmc.protocol.readBoolean
+import org.basaltmc.protocol.readProtocolString
+import org.basaltmc.protocol.readUuid
+import org.basaltmc.protocol.readVarInt
+import org.basaltmc.protocol.writeAnonymousNbt
+import org.basaltmc.protocol.writeBoolean
+import org.basaltmc.protocol.writeProtocolString
+import org.basaltmc.protocol.writeUuid
+import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.text.Component
+import org.basaltmc.text.ComponentNbt
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+
+/** A world position in another dimension, e.g. a bed/respawn anchor or a death location. */
+public data class GlobalPos(
+    val dimensionName: String,
+    val location: BlockPos,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeProtocolString(dimensionName)
+        buffer.writeLong(location.pack())
+    }
+
+    public companion object {
+        public fun read(buffer: ByteBuffer): GlobalPos =
+            GlobalPos(buffer.readProtocolString(), BlockPos.unpack(buffer.readLong()))
+    }
+}
+
+public enum class Gamemode {
+    SURVIVAL,
+    CREATIVE,
+    ADVENTURE,
+    SPECTATOR,
+}
+
+/** The part of [LoginPlayPacket] vanilla calls `CommonPlayerSpawnInfo`. */
+public data class SpawnInfo(
+    val dimension: Int,
+    val dimensionName: String,
+    val hashedSeed: Long,
+    val gamemode: Gamemode,
+    val previousGamemode: Int,
+    val isDebug: Boolean,
+    val isFlat: Boolean,
+    val death: GlobalPos?,
+    val portalCooldown: Int,
+    val seaLevel: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(dimension)
+        buffer.writeProtocolString(dimensionName)
+        buffer.writeLong(hashedSeed)
+        buffer.writeByte(gamemode.ordinal.toByte())
+        buffer.writeByte(previousGamemode.toByte())
+        buffer.writeBoolean(isDebug)
+        buffer.writeBoolean(isFlat)
+        buffer.writeBoolean(death != null)
+        death?.write(buffer)
+        buffer.writeVarInt(portalCooldown)
+        buffer.writeVarInt(seaLevel)
+    }
+
+    public companion object {
+        public fun read(buffer: ByteBuffer): SpawnInfo =
+            SpawnInfo(
+                dimension = buffer.readVarInt(),
+                dimensionName = buffer.readProtocolString(),
+                hashedSeed = buffer.readLong(),
+                gamemode = Gamemode.entries[buffer.readByte().toInt()],
+                previousGamemode = buffer.readByte().toInt() and 0xFF,
+                isDebug = buffer.readBoolean(),
+                isFlat = buffer.readBoolean(),
+                death = if (buffer.readBoolean()) GlobalPos.read(buffer) else null,
+                portalCooldown = buffer.readVarInt(),
+                seaLevel = buffer.readVarInt(),
+            )
+    }
+}
+
+/** Clientbound, id 0x31: enters Play. Mirrors `ClientboundLoginPacket`. */
+public data class LoginPlayPacket(
+    val entityId: Int,
+    val isHardcore: Boolean,
+    val worldNames: List<String>,
+    val maxPlayers: Int,
+    val viewDistance: Int,
+    val simulationDistance: Int,
+    val reducedDebugInfo: Boolean,
+    val enableRespawnScreen: Boolean,
+    val doLimitedCrafting: Boolean,
+    val spawnInfo: SpawnInfo,
+    val enforcesSecureChat: Boolean,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeInt(entityId)
+        buffer.writeBoolean(isHardcore)
+        buffer.writeVarInt(worldNames.size)
+        for (name in worldNames) buffer.writeProtocolString(name)
+        buffer.writeVarInt(maxPlayers)
+        buffer.writeVarInt(viewDistance)
+        buffer.writeVarInt(simulationDistance)
+        buffer.writeBoolean(reducedDebugInfo)
+        buffer.writeBoolean(enableRespawnScreen)
+        buffer.writeBoolean(doLimitedCrafting)
+        spawnInfo.write(buffer)
+        buffer.writeBoolean(enforcesSecureChat)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x31
+
+        public fun read(buffer: ByteBuffer): LoginPlayPacket {
+            val entityId = buffer.readInt()
+            val isHardcore = buffer.readBoolean()
+            val worldCount = buffer.readVarInt()
+            val worldNames = List(worldCount) { buffer.readProtocolString() }
+            val maxPlayers = buffer.readVarInt()
+            val viewDistance = buffer.readVarInt()
+            val simulationDistance = buffer.readVarInt()
+            val reducedDebugInfo = buffer.readBoolean()
+            val enableRespawnScreen = buffer.readBoolean()
+            val doLimitedCrafting = buffer.readBoolean()
+            val spawnInfo = SpawnInfo.read(buffer)
+            val enforcesSecureChat = buffer.readBoolean()
+            return LoginPlayPacket(
+                entityId,
+                isHardcore,
+                worldNames,
+                maxPlayers,
+                viewDistance,
+                simulationDistance,
+                reducedDebugInfo,
+                enableRespawnScreen,
+                doLimitedCrafting,
+                spawnInfo,
+                enforcesSecureChat,
+            )
+        }
+    }
+}
+
+public enum class HeightmapType {
+    WORLD_SURFACE_WG,
+    WORLD_SURFACE,
+    OCEAN_FLOOR_WG,
+    OCEAN_FLOOR,
+    MOTION_BLOCKING,
+    MOTION_BLOCKING_NO_LEAVES,
+}
+
+public data class Heightmap(
+    val type: HeightmapType,
+    val data: LongArray,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(type.ordinal)
+        buffer.writeVarInt(data.size)
+        for (long in data) buffer.writeLong(long)
+    }
+
+    override fun equals(other: Any?): Boolean =
+        other is Heightmap && type == other.type && data.contentEquals(other.data)
+
+    override fun hashCode(): Int = 31 * type.hashCode() + data.contentHashCode()
+
+    public companion object {
+        public fun read(buffer: ByteBuffer): Heightmap {
+            val type = HeightmapType.entries[buffer.readVarInt()]
+            val length = buffer.readVarInt()
+            return Heightmap(type, LongArray(length) { buffer.readLong() })
+        }
+    }
+}
+
+/** Bitset per world section, matching `java.util.BitSet.toLongArray()`. */
+private fun ByteBuffer.writeLongBitset(bits: LongArray) {
+    writeVarInt(bits.size)
+    for (long in bits) writeLong(long)
+}
+
+private fun ByteBuffer.readLongBitset(): LongArray {
+    val length = readVarInt()
+    return LongArray(length) { readLong() }
+}
+
+private fun ByteBuffer.writeByteArrayList(arrays: List<ByteArray>) {
+    writeVarInt(arrays.size)
+    for (array in arrays) {
+        writeVarInt(array.size)
+        writeBytes(array)
+    }
+}
+
+private fun ByteBuffer.readByteArrayList(): List<ByteArray> {
+    val count = readVarInt()
+    return List(count) { readBytes(readVarInt()) }
+}
+
+/**
+ * Clientbound, id 0x2d: one chunk column's block/biome data. Mirrors `ClientboundLevelChunkPacket`.
+ * `basalt-world` has no block entities yet, so that array is always empty here.
+ */
+public data class MapChunkPacket(
+    val x: Int,
+    val z: Int,
+    val heightmaps: List<Heightmap>,
+    val chunkData: ByteArray,
+    val skyLightMask: LongArray,
+    val blockLightMask: LongArray,
+    val emptySkyLightMask: LongArray,
+    val emptyBlockLightMask: LongArray,
+    val skyLight: List<ByteArray>,
+    val blockLight: List<ByteArray>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeInt(x)
+        buffer.writeInt(z)
+        buffer.writeVarInt(heightmaps.size)
+        for (heightmap in heightmaps) heightmap.write(buffer)
+        buffer.writeVarInt(chunkData.size)
+        buffer.writeBytes(chunkData)
+        buffer.writeVarInt(0) // block entities: none yet
+        buffer.writeLongBitset(skyLightMask)
+        buffer.writeLongBitset(blockLightMask)
+        buffer.writeLongBitset(emptySkyLightMask)
+        buffer.writeLongBitset(emptyBlockLightMask)
+        buffer.writeByteArrayList(skyLight)
+        buffer.writeByteArrayList(blockLight)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x2d
+
+        public fun read(buffer: ByteBuffer): MapChunkPacket {
+            val x = buffer.readInt()
+            val z = buffer.readInt()
+            val heightmapCount = buffer.readVarInt()
+            val heightmaps = List(heightmapCount) { Heightmap.read(buffer) }
+            val chunkData = buffer.readBytes(buffer.readVarInt())
+            val blockEntityCount = buffer.readVarInt()
+            repeat(blockEntityCount) { error("block entities are not supported yet") }
+            val skyLightMask = buffer.readLongBitset()
+            val blockLightMask = buffer.readLongBitset()
+            val emptySkyLightMask = buffer.readLongBitset()
+            val emptyBlockLightMask = buffer.readLongBitset()
+            val skyLight = buffer.readByteArrayList()
+            val blockLight = buffer.readByteArrayList()
+            return MapChunkPacket(
+                x,
+                z,
+                heightmaps,
+                chunkData,
+                skyLightMask,
+                blockLightMask,
+                emptySkyLightMask,
+                emptyBlockLightMask,
+                skyLight,
+                blockLight,
+            )
+        }
+    }
+}
+
+/** Clientbound, id 0x30: the light half of chunk sync, sent alongside [MapChunkPacket]. Mirrors `ClientboundLightUpdatePacket`. */
+public data class UpdateLightPacket(
+    val chunkX: Int,
+    val chunkZ: Int,
+    val skyLightMask: LongArray,
+    val blockLightMask: LongArray,
+    val emptySkyLightMask: LongArray,
+    val emptyBlockLightMask: LongArray,
+    val skyLight: List<ByteArray>,
+    val blockLight: List<ByteArray>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(chunkX)
+        buffer.writeVarInt(chunkZ)
+        buffer.writeLongBitset(skyLightMask)
+        buffer.writeLongBitset(blockLightMask)
+        buffer.writeLongBitset(emptySkyLightMask)
+        buffer.writeLongBitset(emptyBlockLightMask)
+        buffer.writeByteArrayList(skyLight)
+        buffer.writeByteArrayList(blockLight)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x30
+
+        public fun read(buffer: ByteBuffer): UpdateLightPacket =
+            UpdateLightPacket(
+                chunkX = buffer.readVarInt(),
+                chunkZ = buffer.readVarInt(),
+                skyLightMask = buffer.readLongBitset(),
+                blockLightMask = buffer.readLongBitset(),
+                emptySkyLightMask = buffer.readLongBitset(),
+                emptyBlockLightMask = buffer.readLongBitset(),
+                skyLight = buffer.readByteArrayList(),
+                blockLight = buffer.readByteArrayList(),
+            )
+    }
+
+    override fun equals(other: Any?): Boolean =
+        other is UpdateLightPacket &&
+            chunkX == other.chunkX &&
+            chunkZ == other.chunkZ &&
+            skyLightMask.contentEquals(other.skyLightMask) &&
+            blockLightMask.contentEquals(other.blockLightMask) &&
+            emptySkyLightMask.contentEquals(other.emptySkyLightMask) &&
+            emptyBlockLightMask.contentEquals(other.emptyBlockLightMask) &&
+            skyLight.size == other.skyLight.size &&
+            skyLight.indices.all { skyLight[it].contentEquals(other.skyLight[it]) } &&
+            blockLight.size == other.blockLight.size &&
+            blockLight.indices.all { blockLight[it].contentEquals(other.blockLight[it]) }
+
+    override fun hashCode(): Int = chunkX * 31 + chunkZ
+}
+
+/** Clientbound, id 0x48: authoritative position sync (initial spawn or a server-forced teleport). Mirrors `ClientboundPlayerPositionPacket`. */
+public data class PlayerPositionPacket(
+    val teleportId: Int,
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val dx: Double,
+    val dy: Double,
+    val dz: Double,
+    val yaw: Float,
+    val pitch: Float,
+    val relativeFlags: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(teleportId)
+        buffer.writeDouble(x)
+        buffer.writeDouble(y)
+        buffer.writeDouble(z)
+        buffer.writeDouble(dx)
+        buffer.writeDouble(dy)
+        buffer.writeDouble(dz)
+        buffer.writeFloat(yaw)
+        buffer.writeFloat(pitch)
+        buffer.writeInt(relativeFlags)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x48
+
+        public fun read(buffer: ByteBuffer): PlayerPositionPacket =
+            PlayerPositionPacket(
+                teleportId = buffer.readVarInt(),
+                x = buffer.readDouble(),
+                y = buffer.readDouble(),
+                z = buffer.readDouble(),
+                dx = buffer.readDouble(),
+                dy = buffer.readDouble(),
+                dz = buffer.readDouble(),
+                yaw = buffer.readFloat(),
+                pitch = buffer.readFloat(),
+                relativeFlags = buffer.readInt(),
+            )
+    }
+}
+
+/** Serverbound, id 0x00: acknowledges a [PlayerPositionPacket] teleport. Mirrors `ServerboundAcceptTeleportationPacket`. */
+public data class AcceptTeleportationPacket(
+    val teleportId: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(teleportId)
+    }
+
+    public companion object {
+        public const val ID: Int = 0
+
+        public fun read(buffer: ByteBuffer): AcceptTeleportationPacket = AcceptTeleportationPacket(buffer.readVarInt())
+    }
+}
+
+/** Clientbound, id 0x61: the world spawn point shown on the compass. Mirrors `ClientboundSetDefaultSpawnPositionPacket`. */
+public data class SpawnPositionPacket(
+    val globalPos: GlobalPos,
+    val yaw: Float,
+    val pitch: Float,
+) {
+    public fun write(buffer: ByteBuffer) {
+        globalPos.write(buffer)
+        buffer.writeFloat(yaw)
+        buffer.writeFloat(pitch)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x61
+
+        public fun read(buffer: ByteBuffer): SpawnPositionPacket =
+            SpawnPositionPacket(GlobalPos.read(buffer), buffer.readFloat(), buffer.readFloat())
+    }
+}
+
+/**
+ * Clientbound, id 0x46: adds/updates entries in the tab list. Mirrors `ClientboundPlayerInfoUpdatePacket`.
+ * Only the `add_player`, `update_listed`, and `update_latency` actions are implemented: the
+ * bundle a real vanilla server sends for a freshly joined player. The others (`initialize_chat`,
+ * `update_game_mode`, `update_display_name`, `update_hat`, `update_list_order`) are a documented gap.
+ */
+public data class PlayerInfoEntry(
+    val uuid: Uuid,
+    val name: String,
+    val listed: Boolean,
+    val latencyMillis: Int,
+)
+
+@OptIn(ExperimentalUuidApi::class)
+public data class PlayerInfoAddPacket(
+    val entries: List<PlayerInfoEntry>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeByte(ACTIONS.toByte())
+        buffer.writeVarInt(entries.size)
+        for (entry in entries) {
+            buffer.writeUuid(entry.uuid)
+            buffer.writeProtocolString(entry.name, 16)
+            buffer.writeVarInt(0) // properties (skin, cape): none yet
+            buffer.writeBoolean(entry.listed)
+            buffer.writeVarInt(entry.latencyMillis)
+        }
+    }
+
+    public companion object {
+        public const val ID: Int = 0x46
+        private const val ACTIONS = 0b00011001 // add_player | update_listed | update_latency
+
+        public fun read(buffer: ByteBuffer): PlayerInfoAddPacket {
+            val actions = buffer.readByte().toInt() and 0xFF
+            require(actions == ACTIONS) { "Unsupported player_info action set: $actions" }
+            val count = buffer.readVarInt()
+            val entries =
+                List(count) {
+                    val uuid = buffer.readUuid()
+                    val name = buffer.readProtocolString(16)
+                    val propertyCount = buffer.readVarInt()
+                    repeat(propertyCount) { error("player properties are not supported yet") }
+                    val listed = buffer.readBoolean()
+                    val latency = buffer.readVarInt()
+                    PlayerInfoEntry(uuid, name, listed, latency)
+                }
+            return PlayerInfoAddPacket(entries)
+        }
+    }
+}
+
+/** Clientbound, id 0x45: removes entries from the tab list. Mirrors `ClientboundPlayerInfoRemovePacket`. */
+@OptIn(ExperimentalUuidApi::class)
+public data class PlayerInfoRemovePacket(
+    val players: List<Uuid>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(players.size)
+        for (uuid in players) buffer.writeUuid(uuid)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x45
+
+        public fun read(buffer: ByteBuffer): PlayerInfoRemovePacket {
+            val count = buffer.readVarInt()
+            return PlayerInfoRemovePacket(List(count) { buffer.readUuid() })
+        }
+    }
+}
+
+/** Clientbound, id 0x7d: an absolute position/rotation update for an entity other than the receiving player. Mirrors `ClientboundTeleportEntityPacket`. */
+public data class EntityTeleportPacket(
+    val entityId: Int,
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Byte,
+    val pitch: Byte,
+    val onGround: Boolean,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(entityId)
+        buffer.writeDouble(x)
+        buffer.writeDouble(y)
+        buffer.writeDouble(z)
+        buffer.writeByte(yaw)
+        buffer.writeByte(pitch)
+        buffer.writeBoolean(onGround)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x7d
+
+        public fun read(buffer: ByteBuffer): EntityTeleportPacket =
+            EntityTeleportPacket(
+                entityId = buffer.readVarInt(),
+                x = buffer.readDouble(),
+                y = buffer.readDouble(),
+                z = buffer.readDouble(),
+                yaw = buffer.readByte(),
+                pitch = buffer.readByte(),
+                onGround = buffer.readBoolean(),
+            )
+    }
+}
+
+/** Clientbound, id 0x2c / serverbound, id 0x1c. Mirrors `Client|ServerboundKeepAlivePacket` in Play. */
+public data class PlayKeepAlivePacket(
+    val keepAliveId: Long,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeLong(keepAliveId)
+    }
+
+    public companion object {
+        public const val CLIENTBOUND_ID: Int = 0x2c
+        public const val SERVERBOUND_ID: Int = 0x1c
+
+        public fun read(buffer: ByteBuffer): PlayKeepAlivePacket = PlayKeepAlivePacket(buffer.readLong())
+    }
+}
+
+/**
+ * Clientbound, id 0x79: an unsigned chat message. Mirrors `ClientboundSystemChatPacket`.
+ *
+ * Used both for real system messages and, for now, to relay player chat: real signed
+ * `player_chat` (chat session registration, message signing) is a documented gap, so relayed
+ * messages currently render with system styling rather than a player name/head in the client's
+ * chat UI. `basalt.toml`'s `online-mode` does not require signed chat, matching vanilla with
+ * `enforce-secure-chat=false`.
+ */
+public data class SystemChatPacket(
+    val content: Component,
+    val isActionBar: Boolean,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeAnonymousNbt(ComponentNbt.serialize(content))
+        buffer.writeBoolean(isActionBar)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x79
+
+        public fun read(buffer: ByteBuffer): SystemChatPacket {
+            val content = ComponentNbt.deserialize(buffer.readAnonymousNbt())
+            val isActionBar = buffer.readBoolean()
+            return SystemChatPacket(content, isActionBar)
+        }
+    }
+}
+
+/**
+ * Serverbound, id 0x09: a chat message. Mirrors `ServerboundChatPacket`. The signing-related
+ * fields ([signature], [offset], [acknowledged], [checksum]) are read/written to keep the wire
+ * format correct but are not validated: see [SystemChatPacket]'s KDoc for the signed-chat gap.
+ */
+public data class ChatMessagePacket(
+    val message: String,
+    val timestamp: Long,
+    val salt: Long,
+    val signature: ByteArray?,
+    val offset: Int,
+    val acknowledged: ByteArray,
+    val checksum: Byte,
+) {
+    public companion object {
+        public const val ID: Int = 0x09
+        private const val SIGNATURE_LENGTH = 256
+        private const val ACKNOWLEDGED_LENGTH = 3
+
+        public fun read(buffer: ByteBuffer): ChatMessagePacket {
+            val message = buffer.readProtocolString(256)
+            val timestamp = buffer.readLong()
+            val salt = buffer.readLong()
+            val signature = if (buffer.readBoolean()) buffer.readBytes(SIGNATURE_LENGTH) else null
+            val offset = buffer.readVarInt()
+            val acknowledged = buffer.readBytes(ACKNOWLEDGED_LENGTH)
+            val checksum = buffer.readByte()
+            return ChatMessagePacket(message, timestamp, salt, signature, offset, acknowledged, checksum)
+        }
+    }
+
+    override fun equals(other: Any?): Boolean =
+        other is ChatMessagePacket &&
+            message == other.message &&
+            timestamp == other.timestamp &&
+            salt == other.salt &&
+            signature.contentEquals(other.signature) &&
+            offset == other.offset &&
+            acknowledged.contentEquals(other.acknowledged) &&
+            checksum == other.checksum
+
+    override fun hashCode(): Int = message.hashCode()
+}
+
+/** Clientbound, id 0x20: kicks the player with a reason. Mirrors `ClientboundDisconnectPacket`. */
+public data class PlayDisconnectPacket(
+    val reason: Component,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeAnonymousNbt(ComponentNbt.serialize(reason))
+    }
+
+    public companion object {
+        public const val ID: Int = 0x20
+
+        public fun read(buffer: ByteBuffer): PlayDisconnectPacket =
+            PlayDisconnectPacket(ComponentNbt.deserialize(buffer.readAnonymousNbt()))
+    }
+}
+
+/** Serverbound, id 0x1e: a movement-only position update. Mirrors `ServerboundMovePlayerPacketPosOnly`. */
+public data class ServerboundPositionPacket(
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val onGround: Boolean,
+) {
+    public companion object {
+        public const val ID: Int = 0x1e
+
+        public fun read(buffer: ByteBuffer): ServerboundPositionPacket {
+            val x = buffer.readDouble()
+            val y = buffer.readDouble()
+            val z = buffer.readDouble()
+            val flags = buffer.readByte().toInt()
+            return ServerboundPositionPacket(x, y, z, onGround = (flags and 1) != 0)
+        }
+    }
+}
+
+/** Serverbound, id 0x1f: a position and rotation update. Mirrors `ServerboundMovePlayerPacketPosRot`. */
+public data class ServerboundPositionLookPacket(
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Float,
+    val pitch: Float,
+    val onGround: Boolean,
+) {
+    public companion object {
+        public const val ID: Int = 0x1f
+
+        public fun read(buffer: ByteBuffer): ServerboundPositionLookPacket {
+            val x = buffer.readDouble()
+            val y = buffer.readDouble()
+            val z = buffer.readDouble()
+            val yaw = buffer.readFloat()
+            val pitch = buffer.readFloat()
+            val flags = buffer.readByte().toInt()
+            return ServerboundPositionLookPacket(x, y, z, yaw, pitch, onGround = (flags and 1) != 0)
+        }
+    }
+}

@@ -9,6 +9,7 @@ kotlin {
             api(project(":basalt-nbt"))
             api(project(":basalt-random"))
             api(project(":basalt-registry"))
+            api(project(":basalt-protocol"))
         }
     }
 }
