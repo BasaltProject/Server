@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/config/RemoteConfig.hpp>
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
@@ -344,6 +345,11 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
     }
     config.forwarding = std::move(*forwarding);
 
+    std::expected<remote::RemoteSettings, std::string> remoteSettings = remoteConfig::fromToml(root, path);
+    if (!remoteSettings.has_value()) {
+        return std::unexpected(remoteSettings.error());
+    }
+    config.remote = std::move(*remoteSettings);
     std::expected<ServerTuning, std::string> tuning = ServerTuning::fromToml(root, path);
     if (!tuning.has_value()) {
         return std::unexpected(tuning.error());
