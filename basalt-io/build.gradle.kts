@@ -7,5 +7,8 @@ kotlin {
         commonMain.dependencies {
             api(project(":basalt-common"))
         }
+        nativeMain.dependencies {
+            implementation(libs.zstd.kmp)
+        }
     }
 }
