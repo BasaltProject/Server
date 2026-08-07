@@ -23,6 +23,8 @@ public object Blocks {
     public val GRASS_BLOCK: BlockState = register(9, "grass_block")
     public val DIRT: BlockState = register(10, "dirt")
     public val BEDROCK: BlockState = register(85, "bedrock")
+    public val OAK_LOG: BlockState = register(137, "oak_log")
+    public val OAK_LEAVES: BlockState = register(279, "oak_leaves")
 
     init {
         for ((stateId, path) in ALL_DEFAULT_BLOCK_STATES) {

@@ -16,6 +16,7 @@ import org.basaltmc.protocol.play.ChatMessagePacket
 import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
 import org.basaltmc.protocol.play.ChunkBatchStartPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
+import org.basaltmc.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.protocol.play.GameEventPacket
 import org.basaltmc.protocol.play.LoginPlayPacket
 import org.basaltmc.protocol.play.MapChunkPacket
@@ -48,8 +49,8 @@ import kotlin.uuid.Uuid
 class PlayFlowIntegrationTest {
     private val port = 25570
 
-    // BasaltServer generates a fixed 3x3 chunk grid (radius 1) around spawn at startup.
-    private val chunkCount = 9
+    // BasaltServer generates a fixed 7x7 chunk grid (radius 3) around spawn at startup.
+    private val chunkCount = 49
 
     // The full 29-registry RegistryDataLoader.SYNCHRONIZED_REGISTRIES set: dimension_type +
     // worldgen/biome + the 13 hard-required-non-empty + trim_material/damage_type/jukebox_song/
@@ -211,12 +212,42 @@ class PlayFlowIntegrationTest {
         assertEquals(10.0, aliceTeleport.z)
 
         // "ve a otro jugador moverse": Alice moves again, Bob must see a fresh teleport for her.
+        // (8.5, 8.5) -> (20.0, 20.0) crosses from chunk (0,0) into chunk (1,1): the view square
+        // (radius 3) re-centers, so Alice's own connection also streams the resulting delta before
+        // anything else, exercising ChunkTracker's real wiring, not just its standalone unit tests.
         sendCompressed(alice.connection, ServerboundPositionPacket.ID, alice.threshold) {
             it.writeDouble(20.0)
             it.writeDouble(4.0)
             it.writeDouble(20.0)
             it.writeBoolean(true)
         }
+
+        val aliceCenterBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(SetChunkCacheCenterPacket.ID, aliceCenterBody.readVarInt())
+        assertEquals(SetChunkCacheCenterPacket(1, 1), SetChunkCacheCenterPacket.read(aliceCenterBody))
+
+        // A 7x7 square shifted by (1,1) overlaps its old position in a 6x6 area: 49 - 36 = 13 chunks
+        // newly in range, 13 fell out of range.
+        val streamedChunkCount = 13
+        val aliceStreamBatchStartBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(ChunkBatchStartPacket.ID, aliceStreamBatchStartBody.readVarInt())
+        repeat(streamedChunkCount) {
+            val chunkBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+            assertEquals(MapChunkPacket.ID, chunkBody.readVarInt())
+            MapChunkPacket.read(chunkBody)
+            val lightBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+            assertEquals(UpdateLightPacket.ID, lightBody.readVarInt())
+            UpdateLightPacket.read(lightBody)
+        }
+        val aliceStreamBatchFinishedBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(ChunkBatchFinishedPacket.ID, aliceStreamBatchFinishedBody.readVarInt())
+        assertEquals(streamedChunkCount, ChunkBatchFinishedPacket.read(aliceStreamBatchFinishedBody).batchSize)
+        repeat(streamedChunkCount) {
+            val forgetBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+            assertEquals(ForgetLevelChunkPacket.ID, forgetBody.readVarInt())
+            ForgetLevelChunkPacket.read(forgetBody)
+        }
+
         val bobSeesAliceMoveBody = readFrame(bob.connection, bob.incoming, compressionEnabled = true)
         assertEquals(EntityTeleportPacket.ID, bobSeesAliceMoveBody.readVarInt())
         val aliceMoved = EntityTeleportPacket.read(bobSeesAliceMoveBody)

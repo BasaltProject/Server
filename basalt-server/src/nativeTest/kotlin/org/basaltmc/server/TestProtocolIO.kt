@@ -17,6 +17,12 @@ import kotlin.time.TimeSource
  * Retries the whole attempt on a bind failure: CI runners have shown occasional transient ones,
  * and a bind failure on the spawned thread no longer crashes the process (see [NativeThread]'s
  * KDoc), so a retry is safe.
+ *
+ * [worldName] is a distinctly-scoped scratch name, not `"world"`: [BasaltServer] now really
+ * generates and saves chunks (`NoiseWorldGenerator`/`WorldPersistence`), a real relative path a
+ * production run could plausibly also use, so tests need their own name to never collide with (or
+ * be mistaken for) an actual world directory. Not cleaned up automatically, same as
+ * `AssetCacheTest`'s own scratch directory: harmless small files, left for local inspection.
  */
 internal fun startTestServer(
     port: Int,
@@ -29,12 +35,15 @@ internal fun startTestServer(
                 motd = "A Basalt Server",
                 maxPlayers = 20,
                 onlineMode = onlineMode != null,
-                worldName = "world",
+                worldName = "basalt_server_test_world",
                 logLevel = LogLevel.INFO,
             )
         NativeThread.start { BasaltServer(config, onlineMode).start() }
+        // Generous, not tight: BasaltServer now generates and saves real chunks before it starts
+        // listening, several real seconds on a cold asset cache, not the near-instant startup this
+        // deadline was tuned for back when world generation was a fixed in-memory flat world.
         val deadline = TimeSource.Monotonic.markNow()
-        while (deadline.elapsedNow().inWholeMilliseconds < 500) {
+        while (deadline.elapsedNow().inWholeMilliseconds < 20000) {
             try {
                 TcpConnection.connect("127.0.0.1", port).close()
                 return

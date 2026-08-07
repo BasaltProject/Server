@@ -308,6 +308,30 @@ public object ChunkBatchStartPacket {
 }
 
 /**
+ * Clientbound, id 0x25: tells the client to discard a chunk column it no longer needs (the player
+ * moved far enough that it fell outside their view distance). Mirrors
+ * `ClientboundForgetLevelChunkPacket`, whose body is a single `ChunkPos.pack`ed `Long`
+ * (`x & 0xFFFFFFFF | (z & 0xFFFFFFFF) << 32`), not two separate ints like [MapChunkPacket].
+ */
+public data class ForgetLevelChunkPacket(
+    val chunkX: Int,
+    val chunkZ: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeLong((chunkX.toLong() and 0xFFFFFFFFL) or ((chunkZ.toLong() and 0xFFFFFFFFL) shl 32))
+    }
+
+    public companion object {
+        public const val ID: Int = 0x25
+
+        public fun read(buffer: ByteBuffer): ForgetLevelChunkPacket {
+            val packed = buffer.readLong()
+            return ForgetLevelChunkPacket((packed and 0xFFFFFFFFL).toInt(), (packed ushr 32).toInt())
+        }
+    }
+}
+
+/**
  * Clientbound, id 0x0b: marks the end of a chunk batch, with how many chunks it contained. Mirrors
  * `ClientboundChunkBatchFinishedPacket`. Without wrapping chunk sends in a start/finish pair
  * (confirmed live), a real client's "loading terrain" screen never dismisses: it tracks loading

@@ -29,7 +29,7 @@ name = "world"
 # Reserved for future tick/performance tuning.
 
 [plugins]
-# Reserved for PSMod loader settings.
+# Reserved for BSMod loader settings.
 
 [logging]
 # One of: trace, debug, info, warn, error.

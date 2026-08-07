@@ -14,7 +14,7 @@ kotlin {
             api(project(":basalt-protocol"))
             api(project(":basalt-assets"))
             api(project(":basalt-auth"))
-            api(project(":basalt-psmod"))
+            api(project(":basalt-bsmod"))
         }
         nativeTest.dependencies {
             // Only to play the client side of the online-mode handshake in ServerIntegrationTest.
