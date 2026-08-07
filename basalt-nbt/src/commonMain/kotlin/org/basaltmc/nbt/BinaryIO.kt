@@ -84,7 +84,8 @@ internal class GrowableByteWriter(
 internal class ArrayByteReader(
     private val array: ByteArray,
 ) : ByteReader {
-    private var position = 0
+    var position: Int = 0
+        private set
 
     val hasRemaining: Boolean get() = position < array.size
 
