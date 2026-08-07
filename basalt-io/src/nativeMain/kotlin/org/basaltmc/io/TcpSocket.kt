@@ -87,6 +87,9 @@ internal expect fun sockaddr_in.setAddress(value: UInt)
 public class TcpListener private constructor(
     private val fd: Long,
 ) {
+    /** For registering with [SelectEventLoop]; see [TcpListener]'s own KDoc for why `Int` is safe here. */
+    public val nativeFd: Int get() = fd.toInt()
+
     public fun accept(): TcpConnection {
         val clientFd = accept(fd.convert(), null, null).toLong()
         if (clientFd < 0) throw SocketException("accept() failed")
@@ -132,6 +135,9 @@ public class TcpListener private constructor(
 public class TcpConnection internal constructor(
     private val fd: Long,
 ) {
+    /** For registering with [SelectEventLoop]; see [TcpListener]'s own KDoc for why `Int` is safe here. */
+    public val nativeFd: Int get() = fd.toInt()
+
     public fun read(
         buffer: ByteArray,
         offset: Int = 0,
