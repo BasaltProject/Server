@@ -76,6 +76,8 @@ ServerListProfile ServerListProfile::from(ProfileHeader header, const TomlTable&
                              .versionName = text("version-name"),
                              .versionProtocol = number("version-protocol"),
                              .hidePlayerCount = table.boolean("hide-player-count"),
+                             .hideOnlinePlayers = table.boolean("hide-online-players"),
+                             .sampleSize = number("sample-size"),
                              .maxPlayers = number("max-players"),
                              .onlinePlayers = number("online-players"),
                              .hover = std::move(hover),
@@ -98,6 +100,12 @@ ServerListProfile ServerListProfile::inheriting(const ServerListProfile& fallbac
     }
     if (!filled.hidePlayerCount.has_value()) {
         filled.hidePlayerCount = fallback.hidePlayerCount;
+    }
+    if (!filled.hideOnlinePlayers.has_value()) {
+        filled.hideOnlinePlayers = fallback.hideOnlinePlayers;
+    }
+    if (!filled.sampleSize.has_value()) {
+        filled.sampleSize = fallback.sampleSize;
     }
     if (!filled.maxPlayers.has_value()) {
         filled.maxPlayers = fallback.maxPlayers;

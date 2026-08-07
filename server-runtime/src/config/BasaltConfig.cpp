@@ -1,12 +1,12 @@
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
-#include <basalt/server/runtime/config/RemoteConfig.hpp>
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <utility>
@@ -64,6 +64,59 @@ using wire::common::toml::TomlTable;
     logger.info(
         [&legacyPropertiesPath] { return "Found " + legacyPropertiesPath + ", importing recognized values once."; });
     return mergeLegacyProperties(kServerDefaultToml, parseJavaProperties(*legacy));
+}
+
+void replaceAfter(std::string& text, std::string_view marker, std::string_view written, const std::string& with) {
+    const std::size_t from = text.find(marker);
+    const std::size_t at = from == std::string::npos ? std::string::npos : text.find(written, from);
+    if (at != std::string::npos) {
+        text.replace(at, written.size(), with);
+    }
+}
+
+// The vanilla properties this build reads from server.toml, by the line the template carries them on.
+void importTuning(std::string& result, const std::map<std::string, std::string, std::less<>>& legacy) {
+    struct Row {
+        std::string_view property;
+        std::string_view marker;
+        std::string_view line;
+        bool boolean;
+    };
+
+    static constexpr std::array<Row, 14> kRows{{
+        {"allow-flight", "[server]", "allow-flight = false", true},
+        {"force-gamemode", "[server]", "force-gamemode = false", true},
+        {"enforce-whitelist", "[server]", "enforce-whitelist = false", true},
+        {"accepts-transfers", "[server]", "accepts-transfers = false", true},
+        {"prevent-proxy-connections", "[server]", "prevent-proxy-connections = false", true},
+        {"player-idle-timeout", "[server]", "player-idle-timeout = 0", false},
+        {"entity-broadcast-range-percentage", "[server]", "entity-broadcast-range-percentage = 100", false},
+        {"max-chained-neighbor-updates", "[server]", "max-chained-neighbor-updates = 1000000", false},
+        {"max-world-size", "[server]", "max-world-size = 29999984", false},
+        {"network-compression-threshold", "[network.java]", "compression-threshold = 256", false},
+        {"enable-status", "[network.java]", "status-replies = true", true},
+        {"enable-query", "[network.query]", "enabled = false", true},
+        {"query.port", "[network.query]", "port = 25565", false},
+        {"log-ips", "[logging]", "log-ips = true", true},
+    }};
+    for (const Row& row : kRows) {
+        const auto found = legacy.find(row.property);
+        if (found == legacy.end()) {
+            continue;
+        }
+        const std::string_view value = found->second;
+        const std::string key{row.line.substr(0, row.line.find(' '))};
+        if (row.boolean ? (value == "true" || value == "false") : asInteger(value).has_value()) {
+            replaceAfter(result, row.marker, row.line, key + " = " + std::string{value});
+        }
+    }
+    // parity: `max-tick-time` is milliseconds and `watchdog-seconds` is seconds; -1 turned the watchdog off.
+    if (const auto found = legacy.find("max-tick-time"); found != legacy.end()) {
+        if (const std::optional<std::int64_t> millis = asInteger(found->second); millis.has_value()) {
+            replaceAfter(result, "[performance]", "watchdog-seconds = 60",
+                         "watchdog-seconds = " + std::to_string(*millis <= 0 ? 0 : (*millis + 999) / 1000));
+        }
+    }
 }
 
 } // namespace
@@ -210,6 +263,7 @@ std::string mergeLegacyProperties(std::string_view templateText,
             replaceOnce("function-permission-level = 2", "function-permission-level = " + std::to_string(*number));
         }
     }
+    importTuning(result, legacy);
     // The view distance is a per-world setting that belongs to `worlds.toml`, so it is not imported here.
     return result;
 }
@@ -290,11 +344,11 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
     }
     config.forwarding = std::move(*forwarding);
 
-    std::expected<remote::RemoteSettings, std::string> remoteSettings = remoteConfig::fromToml(root, path);
-    if (!remoteSettings.has_value()) {
-        return std::unexpected(remoteSettings.error());
+    std::expected<ServerTuning, std::string> tuning = ServerTuning::fromToml(root, path);
+    if (!tuning.has_value()) {
+        return std::unexpected(tuning.error());
     }
-    config.remote = std::move(*remoteSettings);
+    config.tuning = std::move(*tuning);
 
     if (logging != nullptr) {
         const std::optional<std::string_view> level = logging->string("level");

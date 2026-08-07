@@ -1,0 +1,40 @@
+# What the server says when it turns a player away or removes them. Every message ships empty, which keeps the
+# vanilla text: the server sends a translation key and each client shows it in its own language. Write a message
+# here and it becomes literal text, the same for everyone.
+#
+# Messages are MiniMessage. %reason% in banned and banned-ip is the reason given when the ban was made.
+
+[kick]
+# The server has reached max-players. Vanilla: "The server is full!"
+server-full = ""
+
+# The whitelist is on and the player is not on it. Vanilla: "You are not whitelisted on this server!"
+not-whitelisted = ""
+
+# The player, or their address, is banned.
+banned = ""
+banned-ip = ""
+
+# Kicked by player-idle-timeout. Vanilla: "You have been idle for too long!"
+idle = ""
+
+# Kicked for floating too long while allow-flight is off. Vanilla: "Flying is not enabled on this server"
+flying = ""
+
+# Kicked by the chat or command spam limit (limits.toml). Vanilla: "Kicked for spamming"
+spam = ""
+
+# Kicked by the packet limits (limits.toml). Vanilla: "Kicked for spamming packets"
+packet-rate = ""
+
+# A transferred player on a server with accepts-transfers off. Vanilla: "Server transfers are disabled"
+transfers-disabled = ""
+
+# A login refused by connection-throttle-ms. Default: "Connection throttled! Please wait before reconnecting."
+connection-throttled = ""
+
+# What players are told when the server stops. Default: "Server closed" in red.
+server-closed = ""
+
+# A client whose version this server does not speak. Written once for every refusal reason.
+outdated-client = ""

@@ -4,6 +4,8 @@
 #include <basalt/server/runtime/config/CommandsConfig.hpp>
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
+#include <basalt/server/runtime/config/LimitsConfig.hpp>
+#include <basalt/server/runtime/config/MessagesConfig.hpp>
 #include <basalt/server/runtime/config/ServerListConfig.hpp>
 #include <basalt/server/runtime/config/UiConfigs.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -23,13 +25,16 @@ struct ConfigSnapshot {
     CommandsConfig commands;
     AnimationsConfig animations;
     UiConfigs ui;
+    LimitsConfig limits;
+    MessagesConfig messages;
 };
 
 class LiveConfigs {
 public:
-    static constexpr std::array<std::string_view, 7> kReloadableFiles{
-        GroupsConfig::kFileName,  ServerListConfig::kFileName, CommandsConfig::kFileName, AnimationsConfig::kFileName,
-        TabListConfig::kFileName, ScoreboardConfig::kFileName, BossBarConfig::kFileName};
+    static constexpr std::array<std::string_view, 9> kReloadableFiles{
+        GroupsConfig::kFileName,     ServerListConfig::kFileName, CommandsConfig::kFileName,
+        AnimationsConfig::kFileName, TabListConfig::kFileName,    ScoreboardConfig::kFileName,
+        BossBarConfig::kFileName,    LimitsConfig::kFileName,     MessagesConfig::kFileName};
 
     explicit LiveConfigs(ConfigSnapshot initial)
         : snapshot_(std::make_shared<const ConfigSnapshot>(std::move(initial))) {}

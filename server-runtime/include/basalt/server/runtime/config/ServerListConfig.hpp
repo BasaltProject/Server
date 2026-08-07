@@ -52,6 +52,8 @@ struct ServerListProfile {
     std::optional<std::string> versionName;
     std::optional<std::int32_t> versionProtocol;
     std::optional<bool> hidePlayerCount;
+    std::optional<bool> hideOnlinePlayers;
+    std::optional<std::int32_t> sampleSize;
     std::optional<std::int32_t> maxPlayers;
     std::optional<std::int32_t> onlinePlayers;
     std::optional<std::vector<std::string>> hover;

@@ -39,6 +39,12 @@ motd = [
     "              <bold><gradient:gray:white>BASALT SERVER</gradient></bold> <gray>[1.8-26.3]</gray>",
     "              <white>Welcome to your new server</white>",
 ]
+# Keep the count but leave the names out of the hover list, as vanilla's hide-online-players does. Lines
+# written in `hover` are still shown, since they are yours and not a player's.
+hide-online-players = false
+
+# How many player names the hover list shows at most, as vanilla's twelve (Spigot's sample-count). 0 shows none.
+sample-size = 12
 
 [profiles.legacy]
 # Gradients are RGB text, and RGB text arrived in 1.16: an older client renders
