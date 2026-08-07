@@ -116,6 +116,7 @@ public class ClientSession(
     private val playerRegistry: PlayerRegistry? = null,
     private val world: WorldState = WorldState(emptyList()),
     private val spawn: Triple<Double, Double, Double> = Triple(8.5, 4.0, 8.5),
+    private val configuredViewDistance: Int = 10,
 ) {
     private val logger = Logger("Session")
     private val incoming = ByteBuffer()
@@ -412,10 +413,7 @@ public class ClientSession(
             return
         }
 
-        // How far world actually extends from spawn, not a guess: the client must never be told
-        // to expect more chunks than get sent (see the packets right below).
-        val chunkRadius =
-            world.chunks.maxOfOrNull { maxOf(kotlin.math.abs(it.chunkX), kotlin.math.abs(it.chunkZ)) } ?: 0
+        val chunkRadius = configuredViewDistance
         val (spawnX, spawnY, spawnZ) = spawn
 
         val entityId = registry.allocateEntityId()
@@ -458,9 +456,9 @@ public class ClientSession(
         centerChunkX = spawnX.toInt() shr 4
         centerChunkZ = spawnZ.toInt() shr 4
         viewRadius = chunkRadius
-        // Seeds the tracker with exactly the square `world.chunks` already is (the fixed area
-        // BasaltServer generated around spawn), so later crossings compute deltas relative to it
-        // instead of re-sending everything as "newly loaded" on the first move.
+        // Seeds the tracker with exactly the square about to be sent below, so later crossings
+        // compute deltas relative to it instead of re-sending everything as "newly loaded" on the
+        // first move.
         chunkTracker.update(centerChunkX, centerChunkZ, viewRadius)
         sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(centerChunkX, centerChunkZ).write(it) }
         sendCompressed(SetChunkCacheRadiusPacket.ID) { SetChunkCacheRadiusPacket(chunkRadius).write(it) }
@@ -506,9 +504,18 @@ public class ClientSession(
         sendCompressed(GameEventPacket.ID) {
             GameEventPacket(GameEventPacket.LEVEL_CHUNKS_LOAD_START, 0f).write(it)
         }
+        // The declared view distance above is a promise: generate (in parallel, off this one
+        // thread; see WorldState.getOrGenerateChunks's own KDoc) and send every chunk it actually
+        // covers, not just whatever BasaltServer happened to pre-generate at startup. Chunks
+        // already warm from that startup batch are free hits in WorldState's own cache.
+        val loginPositions =
+            (-chunkRadius..chunkRadius).flatMap { dx ->
+                (-chunkRadius..chunkRadius).map { dz -> (centerChunkX + dx) to (centerChunkZ + dz) }
+            }
+        val loginChunks = world.getOrGenerateChunks(loginPositions)
         sendCompressed(ChunkBatchStartPacket.ID) { }
-        for (chunk in world.chunks) sendChunk(chunk)
-        sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(world.chunks.size).write(it) }
+        for (chunk in loginChunks) sendChunk(chunk)
+        sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(loginChunks.size).write(it) }
 
         for (other in others) {
             other.connection.sendPlayPacket(PlayerInfoAddPacket.ID) {

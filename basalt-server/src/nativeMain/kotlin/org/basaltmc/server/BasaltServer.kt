@@ -28,9 +28,13 @@ import kotlin.time.Instant
 
 /**
  * A thread-per-connection server, per `basalt-io`'s current scope (no event loop yet).
- * Handshake, Status, Login, Configuration and Play are implemented for a single fixed flat
- * world: [SPAWN_RADIUS_CHUNKS] chunks around spawn, no real view-distance-based loading yet.
- * Each chunk is loaded from [DIMENSION]'s region files under [BasaltConfig.worldName] if already
+ * Handshake, Status, Login, Configuration and Play are implemented for a single world.
+ * [SPAWN_RADIUS_CHUNKS] chunks generate eagerly at startup (a small warm cache so the server is
+ * ready to listen fast, see [generateChunksInParallel]'s own KDoc); each joining player then gets
+ * [BasaltConfig.viewDistance]'s full real view distance around their own spawn (generating
+ * whatever that startup batch didn't already cover), and further chunks stream in as they move
+ * ([org.basaltmc.server.ClientSession.streamChunksAround]). Each chunk is loaded from
+ * [DIMENSION]'s region files under [BasaltConfig.worldName] if already
  * saved there ([WorldPersistence]); chunks missing from disk are generated fresh and saved
  * immediately (not only on a clean `stop`, so a crash or a `kill` right after first boot does not
  * throw away a freshly generated world that was never written to disk).
@@ -176,6 +180,7 @@ public class BasaltServer(
                     playerRegistry = playerRegistry,
                     world = world,
                     spawn = spawn,
+                    configuredViewDistance = config.viewDistance,
                 ).run()
             }
         }
