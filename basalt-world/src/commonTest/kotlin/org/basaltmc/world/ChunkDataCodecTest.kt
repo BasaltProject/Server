@@ -21,7 +21,10 @@ class ChunkDataCodecTest {
         buffer.writeBytes(bytes)
 
         // First section (world floor: bedrock/dirt/dirt/grass/air) is the interesting one.
+        // LevelChunkSection.write always writes two shorts (non-empty block count, then fluid
+        // count): see ChunkDataCodec.encodeSections's KDoc-style comment.
         val nonAirCount = buffer.readShort()
+        buffer.readShort()
         val blockValues = PalettedContainer.read(buffer, 4096, PalettedContainer.BLOCK_MAX_INDIRECT_BITS)
         PalettedContainer.read(buffer, 64, PalettedContainer.BIOME_MAX_INDIRECT_BITS)
 
