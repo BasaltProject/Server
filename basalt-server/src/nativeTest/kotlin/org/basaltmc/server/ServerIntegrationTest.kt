@@ -10,6 +10,7 @@ import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionKeyPair
 import org.basaltmc.auth.SessionProfile
 import org.basaltmc.auth.SessionService
+import org.basaltmc.common.logging.LogLevel
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpConnection
@@ -30,6 +31,7 @@ import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.protocol.status.StatusRequestPacket
 import org.basaltmc.protocol.status.StatusResponsePacket
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.text.TextColor
 import kotlin.random.Random
 import kotlin.test.Test
@@ -59,7 +61,16 @@ class ServerIntegrationTest {
         // NativeThread's KDoc), so it is safe to retry the whole attempt: CI runners have shown
         // occasional transient bind failures that a fresh attempt clears.
         repeat(3) { attempt ->
-            NativeThread.start { BasaltServer(boundPort, onlineMode).start() }
+            val config =
+                BasaltConfig(
+                    port = boundPort,
+                    motd = "A Basalt Server",
+                    maxPlayers = 20,
+                    onlineMode = onlineMode != null,
+                    worldName = "world",
+                    logLevel = LogLevel.INFO,
+                )
+            NativeThread.start { BasaltServer(config, onlineMode).start() }
             val deadline =
                 kotlin.time.TimeSource.Monotonic
                     .markNow()

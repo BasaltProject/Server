@@ -4,6 +4,7 @@ import org.basaltmc.auth.OnlineMode
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpListener
 import org.basaltmc.protocol.status.ServerStatusPayload
+import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 
@@ -14,12 +15,12 @@ import org.basaltmc.text.TextColor
  * `ServerboundLoginAcknowledgedPacket` (Configuration/Play) exists yet.
  */
 public class BasaltServer(
-    private val port: Int,
+    private val config: BasaltConfig,
     private val onlineMode: OnlineMode? = null,
 ) {
     public fun start() {
-        val listener = TcpListener.bind(port)
-        println("Basalt listening on port $port (${if (onlineMode != null) "online" else "offline"}-mode)")
+        val listener = TcpListener.bind(config.port)
+        println("Basalt listening on port ${config.port} (${if (onlineMode != null) "online" else "offline"}-mode)")
         while (true) {
             val connection = listener.accept()
             NativeThread.start {
@@ -30,8 +31,8 @@ public class BasaltServer(
 
     private fun currentStatus(): ServerStatusPayload =
         ServerStatusPayload(
-            description = Component.text("A Basalt Server", TextColor.GRAY),
-            players = ServerStatusPayload.Players(max = 20, online = 0),
+            description = Component.text(config.motd, TextColor.GRAY),
+            players = ServerStatusPayload.Players(max = config.maxPlayers, online = 0),
             version = ServerStatusPayload.Version(BuildInfo.MINECRAFT_VERSION, BuildInfo.PROTOCOL_VERSION),
             favicon = Favicon.bytes,
         )
