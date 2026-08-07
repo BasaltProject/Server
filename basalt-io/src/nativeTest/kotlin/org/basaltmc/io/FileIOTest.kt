@@ -45,6 +45,45 @@ class FileIOTest {
         assertEquals("", FileIO.readText(path))
         removeTestFile(path)
     }
+
+    @Test
+    fun bytesRoundTrip() {
+        val path = "basalt_fileio_test_bytes.bin"
+        val bytes = byteArrayOf(0, 1, 2, -1, -128, 127)
+        FileIO.writeBytes(path, bytes)
+        assertTrue(FileIO.readBytes(path).contentEquals(bytes))
+        removeTestFile(path)
+    }
+
+    @Test
+    fun readBytesReturnsNullForAMissingFile() {
+        assertNull(FileIO.readBytes("basalt_fileio_test_bytes_does_not_exist.bin"))
+    }
+
+    @Test
+    fun createDirectoriesMakesNestedDirsUsableForAFileWrite() {
+        val dir = "basalt_fileio_test_dir/nested/deeper"
+        FileIO.createDirectories(dir)
+        val path = "$dir/file.txt"
+        FileIO.writeText(path, "hello")
+        assertEquals("hello", FileIO.readText(path))
+        removeTestFile(path)
+        platform.posix.remove("basalt_fileio_test_dir/nested/deeper")
+        platform.posix.remove("basalt_fileio_test_dir/nested")
+        platform.posix.remove("basalt_fileio_test_dir")
+    }
+
+    @Test
+    fun createDirectoriesIsIdempotent() {
+        val dir = "basalt_fileio_test_dir_repeat"
+        FileIO.createDirectories(dir)
+        FileIO.createDirectories(dir)
+        val path = "$dir/file.txt"
+        FileIO.writeText(path, "still works")
+        assertEquals("still works", FileIO.readText(path))
+        removeTestFile(path)
+        platform.posix.remove(dir)
+    }
 }
 
 private fun removeTestFile(path: String) {

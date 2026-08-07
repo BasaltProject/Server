@@ -57,9 +57,34 @@ public object FileIO {
         path: String,
         content: String,
     ) {
+        writeBytes(path, content.encodeToByteArray())
+    }
+
+    /** Returns `null` if [path] does not exist. */
+    public fun readBytes(path: String): ByteArray? {
+        val handle = fopen(path, "rb") ?: return null
+        try {
+            fseek(handle, 0, SEEK_END)
+            val size = ftell(handle)
+            fseek(handle, 0, SEEK_SET)
+            if (size <= 0) return ByteArray(0)
+
+            val buffer = ByteArray(size.toInt())
+            buffer.usePinned { pinned ->
+                fread(pinned.addressOf(0), 1.convert(), size.convert(), handle)
+            }
+            return buffer
+        } finally {
+            fclose(handle)
+        }
+    }
+
+    public fun writeBytes(
+        path: String,
+        bytes: ByteArray,
+    ) {
         val handle = fopen(path, "wb") ?: throw FileIOException("failed to open '$path' for writing")
         try {
-            val bytes = content.encodeToByteArray()
             if (bytes.isNotEmpty()) {
                 bytes.usePinned { pinned ->
                     fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), handle)
@@ -69,4 +94,29 @@ public object FileIO {
             fclose(handle)
         }
     }
+
+    /**
+     * `mkdir -p`: creates [path] and any missing parent directories. Ignores failures on segments
+     * that already exist (the only way to tell "already there" from a real error without a
+     * separate `stat` call, and a subsequent [writeBytes]/[writeText] fails loudly anyway if the
+     * directory genuinely couldn't be created).
+     */
+    public fun createDirectories(path: String) {
+        val segments = path.split('/').filter { it.isNotEmpty() }
+        val prefix = if (path.startsWith("/")) "/" else ""
+        var current = prefix
+        for (segment in segments) {
+            current += segment
+            createDirectory(current)
+            current += "/"
+        }
+    }
 }
+
+/**
+ * `mkdir`'s signature differs by platform: POSIX takes a mode, mingw-w64's compat shim doesn't
+ * (matching `_mkdir`'s single-argument MSVCRT semantics), the same class of ABI difference this
+ * project has hit repeatedly (`select()`, `setsockopt`, `sockaddr_in`). Return value is ignored by
+ * the only caller ([FileIO.createDirectories]), which treats "already exists" and "created" alike.
+ */
+internal expect fun createDirectory(path: String)
