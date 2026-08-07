@@ -108,6 +108,7 @@ class JigsawAssemblyTest {
                 maxDepth = 3,
                 WorldgenRandom(XoroshiroRandom(1L)),
                 projectStartToHeightmap = false,
+                maxDistanceFromCenter = 80,
             )
 
         assertEquals(2, pieces.size)
@@ -164,6 +165,7 @@ class JigsawAssemblyTest {
                 maxDepth = 3,
                 WorldgenRandom(XoroshiroRandom(7L)),
                 projectStartToHeightmap = false,
+                maxDistanceFromCenter = 80,
             )
 
         val chunk = Chunk(0, 0)
@@ -187,5 +189,60 @@ class JigsawAssemblyTest {
             for (x in 0 until 16) for (z in 0 until 16) if (chunk.getBlockStateId(x, y, z) == stoneId) stoneCount++
         }
         assertEquals(pieces.size, stoneCount, "each placed piece should have placed exactly its one stone block")
+    }
+
+    /**
+     * Regression test for a real bug: a pool that keeps connecting to copies of itself (every
+     * real chain-like pool, like village streets connecting to more streets) can extend forever
+     * unless something outer-bounds the search, exactly like real vanilla's own `maxDistanceFromCenter`
+     * does. A stress test hammering real Plains village generation across a wide area found this
+     * missing bound produced assemblies that never stopped growing (`maxDepth` alone wasn't a
+     * tight enough limit for real pool branching), pegging every worker thread's CPU. `maxDepth`
+     * here is deliberately absurd (1000) so only [maxDistanceFromCenter] can be what stops it.
+     */
+    @Test
+    fun boundsAssemblyToMaxDistanceFromCenterEvenWithASelfReferentialChainPool() {
+        val chainTemplate =
+            StructureTemplate().apply {
+                load(jigsawBoxNbt("test:chain", "minecraft:chain_link", "minecraft:chain_link"))
+            }
+        val templates = mapOf("test:chain_piece" to chainTemplate)
+        val loader: TemplateLoader = { templates[it] }
+        val chainPool =
+            StructureTemplatePool(
+                "minecraft:empty",
+                listOf(
+                    LegacySinglePoolElement(
+                        "test:chain_piece",
+                        StructureProcessorList.EMPTY,
+                        StructureProjection.RIGID,
+                    ) to
+                        1,
+                ),
+            )
+        val emptyPool = StructureTemplatePool("minecraft:empty", emptyList())
+        val pools = mapOf("test:chain" to chainPool, "minecraft:empty" to emptyPool)
+
+        val assembly = JigsawAssembly(poolLookup = { pools[it] }, templateLoader = loader, heightAt = { _, _ -> 64 })
+        val pieces =
+            assembly.assemble(
+                "test:chain",
+                StructurePos(0, 64, 0),
+                maxDepth = 1000,
+                WorldgenRandom(XoroshiroRandom(1L)),
+                projectStartToHeightmap = false,
+                maxDistanceFromCenter = 20,
+            )
+
+        assertTrue(
+            pieces.size in 1..25,
+            "expected the chain to stop well within maxDistanceFromCenter, got ${pieces.size} pieces",
+        )
+        for (piece in pieces) {
+            assertTrue(
+                piece.boundingBox.minX >= -20 && piece.boundingBox.maxX <= 20,
+                "piece at ${piece.boundingBox} escaped maxDistanceFromCenter",
+            )
+        }
     }
 }

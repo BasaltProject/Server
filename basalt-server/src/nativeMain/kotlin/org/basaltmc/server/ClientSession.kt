@@ -672,9 +672,10 @@ public class ClientSession(
 
     /**
      * Re-centers [chunkTracker] on the player's current chunk and applies the resulting delta: newly
-     * in-range chunks are generated on demand ([WorldState.getOrGenerateChunk]) and sent, chunks that
-     * fell out of range are forgotten client-side. A no-op when the player hasn't crossed into a new
-     * chunk, so this stays cheap on every movement packet, not just the ones that matter.
+     * in-range chunks are generated on demand ([WorldState.getOrGenerateChunks], across a worker
+     * pool, not serially) and sent, chunks that fell out of range are forgotten client-side. A
+     * no-op when the player hasn't crossed into a new chunk, so this stays cheap on every movement
+     * packet, not just the ones that matter.
      */
     private fun streamChunksAround(
         x: Double,
@@ -692,7 +693,10 @@ public class ClientSession(
         sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(chunkX, chunkZ).write(it) }
         if (delta.toLoad.isNotEmpty()) {
             sendCompressed(ChunkBatchStartPacket.ID) { }
-            for (pos in delta.toLoad) sendChunk(world.getOrGenerateChunk(pos.x, pos.z))
+            // Generation itself runs across a worker pool (WorldState.getOrGenerateChunks); only
+            // the actual network writes stay serialized here, on this connection's own thread.
+            val loaded = world.getOrGenerateChunks(delta.toLoad.map { it.x to it.z })
+            for (chunk in loaded) sendChunk(chunk)
             sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(delta.toLoad.size).write(it) }
         }
         for (pos in delta.toUnload) {

@@ -65,9 +65,18 @@ public object SurfaceRuleData {
     private val CINNABAR = state("cinnabar")
     private val SULFUR = state("sulfur")
 
-    /** // parity: SurfaceRuleData.overworld(HolderGetter). Always the real `overworldLike(true, false, true)`. */
-    public fun overworld(): RuleSource =
+    /**
+     * // parity: SurfaceRuleData.overworld(HolderGetter). Always the real `overworldLike(true,
+     * false, true)`. Built once and cached, not once per chunk: the tree itself carries no
+     * mutable state (every node reads from the [SurfaceRuleEnvironment]/[SurfaceRules.Context]
+     * passed to it at evaluation time, never its own fields), so one instance is safe to reuse,
+     * including from multiple chunk-generation threads at once.
+     */
+    private val cachedOverworld: RuleSource by lazy {
         overworldLike(doPreliminarySurfaceCheck = true, bedrockRoof = false, bedrockFloor = true)
+    }
+
+    public fun overworld(): RuleSource = cachedOverworld
 
     // parity: SurfaceRuleData.overworldLike.
     public fun overworldLike(
