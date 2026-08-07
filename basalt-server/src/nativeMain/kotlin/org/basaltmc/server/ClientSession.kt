@@ -8,6 +8,7 @@ import org.basaltmc.auth.SessionProfileProperty
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
+import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.protocol.PacketFraming
 import org.basaltmc.protocol.ProtocolState
 import org.basaltmc.protocol.configuration.ClientInformationPacket
@@ -16,6 +17,9 @@ import org.basaltmc.protocol.configuration.KnownPack
 import org.basaltmc.protocol.configuration.RegistryDataPacket
 import org.basaltmc.protocol.configuration.RegistryEntry
 import org.basaltmc.protocol.configuration.SelectKnownPacksPacket
+import org.basaltmc.protocol.configuration.TagEntry
+import org.basaltmc.protocol.configuration.TagGroup
+import org.basaltmc.protocol.configuration.TagsPacket
 import org.basaltmc.protocol.handshake.ClientIntent
 import org.basaltmc.protocol.handshake.HandshakePacket
 import org.basaltmc.protocol.login.GameProfile
@@ -29,7 +33,11 @@ import org.basaltmc.protocol.login.LoginStartPacket
 import org.basaltmc.protocol.play.AcceptTeleportationPacket
 import org.basaltmc.protocol.play.BlockPos
 import org.basaltmc.protocol.play.ChatMessagePacket
+import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
+import org.basaltmc.protocol.play.ChunkBatchReceivedPacket
+import org.basaltmc.protocol.play.ChunkBatchStartPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
+import org.basaltmc.protocol.play.GameEventPacket
 import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.protocol.play.GlobalPos
 import org.basaltmc.protocol.play.Heightmap
@@ -41,9 +49,13 @@ import org.basaltmc.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.protocol.play.PlayerInfoAddPacket
 import org.basaltmc.protocol.play.PlayerInfoEntry
 import org.basaltmc.protocol.play.PlayerInfoRemovePacket
+import org.basaltmc.protocol.play.PlayerLoadedPacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
 import org.basaltmc.protocol.play.ServerboundPositionLookPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
+import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
+import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
+import org.basaltmc.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.protocol.play.SpawnInfo
 import org.basaltmc.protocol.play.SpawnPositionPacket
 import org.basaltmc.protocol.play.SystemChatPacket
@@ -57,6 +69,7 @@ import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.server.registry.VanillaRegistryData
+import org.basaltmc.server.registry.VanillaTagData
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
@@ -268,19 +281,104 @@ public class ClientSession(
     }
 
     private fun sendRegistriesThenFinish() {
+        sendRegistry("minecraft:dimension_type", "minecraft:overworld", VanillaRegistryData.overworldDimensionType())
+        sendRegistry("minecraft:worldgen/biome", "minecraft:plains", VanillaRegistryData.plainsBiome())
+        // These 13 are the only registries a real client hard-requires non-empty (see
+        // VanillaRegistryData's KDoc); the rest of the full 29-registry set is a documented gap.
+        // Entry names matter here, not just presence: spawn eggs for wolf/pig/cow/chicken/zombie
+        // nautilus carry a default variant component resolving each registry's real `DEFAULT`
+        // ResourceKey (confirmed live: chicken_variant crashed looking up specifically
+        // minecraft:temperate, not just any entry). Cat and frog have no spawn egg and no DEFAULT
+        // in the real jar, so any entry name works for them.
+        sendRegistry("minecraft:wolf_variant", "minecraft:pale", VanillaRegistryData.wolfVariant())
+        sendRegistry("minecraft:wolf_sound_variant", "minecraft:classic", VanillaRegistryData.wolfSoundVariant())
+        sendRegistry("minecraft:pig_variant", "minecraft:temperate", VanillaRegistryData.pigVariant())
+        sendRegistry("minecraft:pig_sound_variant", "minecraft:classic", VanillaRegistryData.pigSoundVariant())
+        sendRegistry("minecraft:frog_variant", "minecraft:cold", VanillaRegistryData.frogVariant())
+        sendRegistry("minecraft:cat_variant", "minecraft:black", VanillaRegistryData.catVariant())
+        sendRegistry("minecraft:cat_sound_variant", "minecraft:classic", VanillaRegistryData.catSoundVariant())
+        sendRegistry("minecraft:cow_sound_variant", "minecraft:classic", VanillaRegistryData.cowSoundVariant())
+        sendRegistry("minecraft:cow_variant", "minecraft:temperate", VanillaRegistryData.cowVariant())
+        sendRegistry("minecraft:chicken_sound_variant", "minecraft:classic", VanillaRegistryData.chickenSoundVariant())
+        // egg/blue_egg/brown_egg each reference a distinct chicken variant directly, not just
+        // DEFAULT (confirmed live: minecraft:chicken_variant/minecraft:cold failed after temperate
+        // alone was fixed): see VanillaRegistryData.chickenVariant's KDoc.
         sendCompressed(RegistryDataPacket.ID) {
             RegistryDataPacket(
-                "minecraft:dimension_type",
-                listOf(RegistryEntry("minecraft:overworld", VanillaRegistryData.overworldDimensionType())),
+                "minecraft:chicken_variant",
+                listOf("temperate", "cold", "warm").map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.chickenVariant(id))
+                },
+            ).write(it)
+        }
+        sendRegistry(
+            "minecraft:zombie_nautilus_variant",
+            "minecraft:temperate",
+            VanillaRegistryData.zombieNautilusVariant(),
+        )
+        sendRegistry("minecraft:painting_variant", "minecraft:humble", VanillaRegistryData.paintingVariant())
+        // Not in the 13 "must be non-empty" registries, but several base items (redstone dust,
+        // ingots, gems, resin brick) carry a default trim-material component that resolves a
+        // specific entry by key regardless: confirmed live, a real client failed looking up
+        // minecraft:trim_material/minecraft:redstone while building item data components. All
+        // eleven vanilla items' referenced entries are needed (see VanillaRegistryData.trimMaterial).
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:trim_material",
+                VanillaRegistryData.trimMaterials.map { (id, color) ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.trimMaterial(id, color))
+                },
             ).write(it)
         }
         sendCompressed(RegistryDataPacket.ID) {
             RegistryDataPacket(
-                "minecraft:worldgen/biome",
-                listOf(RegistryEntry("minecraft:plains", VanillaRegistryData.plainsBiome())),
+                "minecraft:damage_type",
+                VanillaRegistryData.damageTypes.map { (id, value) -> RegistryEntry("minecraft:$id", value) },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:jukebox_song",
+                VanillaRegistryData.jukeboxSongs.map { (id, value) -> RegistryEntry("minecraft:$id", value) },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:instrument",
+                VanillaRegistryData.instruments.map { (id, value) -> RegistryEntry("minecraft:$id", value) },
+            ).write(it)
+        }
+        // The remaining registries in RegistryDataLoader.SYNCHRONIZED_REGISTRIES that nothing in
+        // item bootstrap needs populated yet: sent empty so the client's RegistryAccess has an
+        // entry for them at all (a registry that was never sent doesn't exist client-side, which
+        // breaks resolving tags scoped to it: confirmed live, see VanillaTagData's KDoc).
+        for (emptyRegistryId in EMPTY_SYNCHRONIZED_REGISTRIES) {
+            sendCompressed(RegistryDataPacket.ID) { RegistryDataPacket(emptyRegistryId, emptyList()).write(it) }
+        }
+        // Item/entity/block bootstrap looks up many tags by key directly (fire resistance,
+        // repairable materials, horse armor, banner patterns...), independent of whether the tagged
+        // registry itself is loaded: confirmed live, a real client failed looking up
+        // minecraft:damage_type's is_fire tag with no `tags` packet sent at all. Sending every tag
+        // name the real 26.2 jar ships (see VanillaTagData), each with empty entries: the lookup
+        // only needs the key to exist, not be populated yet.
+        sendCompressed(TagsPacket.ID) {
+            TagsPacket(
+                VanillaTagData.tagsByRegistry.map { (registryId, tagNames) ->
+                    TagGroup(registryId, tagNames.map { TagEntry(it, emptyList()) })
+                },
             ).write(it)
         }
         sendCompressed(FinishConfigurationPacket.ID) { }
+    }
+
+    private fun sendRegistry(
+        registryId: String,
+        entryName: String,
+        value: NbtCompound,
+    ) {
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(registryId, listOf(RegistryEntry(entryName, value))).write(it)
+        }
     }
 
     // --- Play ---
@@ -294,6 +392,11 @@ public class ClientSession(
             return
         }
 
+        // How far world actually extends from spawn, not a guess: the client must never be told
+        // to expect more chunks than get sent (see the packets right below).
+        val chunkRadius = world.maxOfOrNull { maxOf(kotlin.math.abs(it.chunkX), kotlin.math.abs(it.chunkZ)) } ?: 0
+        val (spawnX, spawnY, spawnZ) = spawn
+
         val entityId = registry.allocateEntityId()
         sendCompressed(LoginPlayPacket.ID) {
             LoginPlayPacket(
@@ -301,8 +404,8 @@ public class ClientSession(
                 isHardcore = false,
                 worldNames = listOf("minecraft:overworld"),
                 maxPlayers = 20,
-                viewDistance = 10,
-                simulationDistance = 10,
+                viewDistance = chunkRadius,
+                simulationDistance = chunkRadius,
                 reducedDebugInfo = false,
                 enableRespawnScreen = true,
                 doLimitedCrafting = false,
@@ -319,13 +422,24 @@ public class ClientSession(
                         portalCooldown = 0,
                         seaLevel = 63,
                     ),
+                onlineMode = onlineMode != null,
                 enforcesSecureChat = false,
             ).write(it)
         }
 
-        for (chunk in world) sendChunk(chunk)
+        // Without these, a real client's "loading terrain" screen never dismisses: it has no
+        // center to count chunks around and no radius to know when it has enough (confirmed live).
+        val centerChunkX = spawnX.toInt() shr 4
+        val centerChunkZ = spawnZ.toInt() shr 4
+        sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(centerChunkX, centerChunkZ).write(it) }
+        sendCompressed(SetChunkCacheRadiusPacket.ID) { SetChunkCacheRadiusPacket(chunkRadius).write(it) }
+        sendCompressed(SetSimulationDistancePacket.ID) { SetSimulationDistancePacket(chunkRadius).write(it) }
 
-        val (spawnX, spawnY, spawnZ) = spawn
+        // Mirrors real vanilla's join order (PlayerList.placeNewPlayer/sendLevelInfo, confirmed by
+        // decompiling the real jar): teleport and player info arrive before level data, and the
+        // level_chunks_load_start game event comes right before chunks, not after. Sending chunks
+        // first (as an earlier version of this code did) left a real client stuck on "loading
+        // terrain" forever, even with correct chunk data and a correct batch wrapper.
         sendCompressed(SpawnPositionPacket.ID) {
             SpawnPositionPacket(
                 GlobalPos("minecraft:overworld", BlockPos(spawnX.toInt(), spawnY.toInt(), spawnZ.toInt())),
@@ -352,6 +466,17 @@ public class ClientSession(
                     PlayerInfoEntry(session.uuid, session.name, listed = true, latencyMillis = 0),
             ).write(it)
         }
+
+        // The client only starts tracking/waiting for level chunks once it sees this event: without
+        // it (confirmed live) the loading screen never dismisses even after every chunk and a
+        // correct chunk-batch wrapper arrive, since the client was never told to start expecting them.
+        sendCompressed(GameEventPacket.ID) {
+            GameEventPacket(GameEventPacket.LEVEL_CHUNKS_LOAD_START, 0f).write(it)
+        }
+        sendCompressed(ChunkBatchStartPacket.ID) { }
+        for (chunk in world) sendChunk(chunk)
+        sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(world.size).write(it) }
+
         for (other in others) {
             other.connection.sendPlayPacket(PlayerInfoAddPacket.ID) {
                 PlayerInfoAddPacket(
@@ -378,7 +503,7 @@ public class ClientSession(
     private fun sendChunk(chunk: Chunk) {
         val chunkData = ChunkDataCodec.encodeSections(chunk)
         val light = ChunkDataCodec.encodeLight(chunk)
-        val heightmap = chunk.heightmap().map { it.toLong() }.toLongArray()
+        val heightmap = ChunkDataCodec.encodeHeightmap(chunk)
         sendCompressed(MapChunkPacket.ID) {
             MapChunkPacket(
                 x = chunk.chunkX,
@@ -431,7 +556,11 @@ public class ClientSession(
                 val chat = ChatMessagePacket.read(body)
                 broadcastChat(chat.message)
             }
-            AcceptTeleportationPacket.ID, PlayKeepAlivePacket.SERVERBOUND_ID -> Unit
+            AcceptTeleportationPacket.ID,
+            PlayKeepAlivePacket.SERVERBOUND_ID,
+            ChunkBatchReceivedPacket.ID,
+            PlayerLoadedPacket.ID,
+            -> Unit
         }
     }
 
@@ -535,5 +664,25 @@ public class ClientSession(
 
 /** [org.basaltmc.protocol.configuration.ConfigurationKeepAlivePacket]'s id, matched here just to no-op it explicitly. */
 private const val CONFIGURATION_KEEP_ALIVE_ID = 4
+
+/**
+ * The 10 registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing sent elsewhere in
+ * [ClientSession.sendRegistriesThenFinish] populates yet. Sent with zero entries: matches the real
+ * 29-registry synced set (see [VanillaRegistryData]'s KDoc) so the client's `RegistryAccess` has an
+ * entry for each, which [VanillaTagData]'s tags for them need to resolve at all.
+ */
+private val EMPTY_SYNCHRONIZED_REGISTRIES =
+    listOf(
+        "minecraft:chat_type",
+        "minecraft:trim_pattern",
+        "minecraft:sulfur_cube_archetype",
+        "minecraft:banner_pattern",
+        "minecraft:enchantment",
+        "minecraft:test_environment",
+        "minecraft:test_instance",
+        "minecraft:dialog",
+        "minecraft:world_clock",
+        "minecraft:timeline",
+    )
 
 private fun angleToByte(degrees: Float): Byte = ((degrees / 360f) * 256f).toInt().toByte()

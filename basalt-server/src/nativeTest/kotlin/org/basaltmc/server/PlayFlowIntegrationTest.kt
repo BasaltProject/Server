@@ -5,6 +5,7 @@ import org.basaltmc.io.TcpConnection
 import org.basaltmc.protocol.configuration.FinishConfigurationPacket
 import org.basaltmc.protocol.configuration.RegistryDataPacket
 import org.basaltmc.protocol.configuration.SelectKnownPacksPacket
+import org.basaltmc.protocol.configuration.TagsPacket
 import org.basaltmc.protocol.handshake.ClientIntent
 import org.basaltmc.protocol.handshake.HandshakePacket
 import org.basaltmc.protocol.login.LoginAcknowledgedPacket
@@ -12,12 +13,18 @@ import org.basaltmc.protocol.login.LoginCompressionPacket
 import org.basaltmc.protocol.login.LoginFinishedPacket
 import org.basaltmc.protocol.login.LoginStartPacket
 import org.basaltmc.protocol.play.ChatMessagePacket
+import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
+import org.basaltmc.protocol.play.ChunkBatchStartPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
+import org.basaltmc.protocol.play.GameEventPacket
 import org.basaltmc.protocol.play.LoginPlayPacket
 import org.basaltmc.protocol.play.MapChunkPacket
 import org.basaltmc.protocol.play.PlayerInfoAddPacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
+import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
+import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
+import org.basaltmc.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.protocol.play.SpawnPositionPacket
 import org.basaltmc.protocol.play.SystemChatPacket
 import org.basaltmc.protocol.play.UpdateLightPacket
@@ -43,6 +50,11 @@ class PlayFlowIntegrationTest {
 
     // BasaltServer generates a fixed 3x3 chunk grid (radius 1) around spawn at startup.
     private val chunkCount = 9
+
+    // The full 29-registry RegistryDataLoader.SYNCHRONIZED_REGISTRIES set: dimension_type +
+    // worldgen/biome + the 13 hard-required-non-empty + trim_material/damage_type/jukebox_song/
+    // instrument (needed by items' default holder components) + the 10 remaining sent empty.
+    private val registryCount = 29
 
     private class PlayerHandle(
         val connection: TcpConnection,
@@ -79,15 +91,26 @@ class PlayFlowIntegrationTest {
             SelectKnownPacksPacket(emptyList()).write(it)
         }
 
-        val dimensionRegistryBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(RegistryDataPacket.ID, dimensionRegistryBody.readVarInt())
-        val dimensionRegistry = RegistryDataPacket.read(dimensionRegistryBody)
-        assertEquals("minecraft:dimension_type", dimensionRegistry.registryId)
+        val receivedRegistries = mutableListOf<String>()
+        repeat(registryCount) {
+            val registryBody = readFrame(connection, incoming, compressionEnabled = true)
+            assertEquals(RegistryDataPacket.ID, registryBody.readVarInt())
+            receivedRegistries += RegistryDataPacket.read(registryBody).registryId
+        }
+        assertTrue(receivedRegistries.contains("minecraft:dimension_type"))
+        assertTrue(receivedRegistries.contains("minecraft:worldgen/biome"))
+        assertTrue(receivedRegistries.contains("minecraft:wolf_variant"))
+        assertTrue(receivedRegistries.contains("minecraft:painting_variant"))
+        assertTrue(receivedRegistries.contains("minecraft:trim_material"))
+        assertTrue(receivedRegistries.contains("minecraft:damage_type"))
+        assertTrue(receivedRegistries.contains("minecraft:jukebox_song"))
+        assertTrue(receivedRegistries.contains("minecraft:instrument"))
+        assertTrue(receivedRegistries.contains("minecraft:enchantment"))
+        assertTrue(receivedRegistries.contains("minecraft:banner_pattern"))
 
-        val biomeRegistryBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(RegistryDataPacket.ID, biomeRegistryBody.readVarInt())
-        val biomeRegistry = RegistryDataPacket.read(biomeRegistryBody)
-        assertEquals("minecraft:worldgen/biome", biomeRegistry.registryId)
+        val tagsBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(TagsPacket.ID, tagsBody.readVarInt())
+        TagsPacket.read(tagsBody)
 
         val finishConfigBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(FinishConfigurationPacket.ID, finishConfigBody.readVarInt())
@@ -98,14 +121,17 @@ class PlayFlowIntegrationTest {
         assertEquals(LoginPlayPacket.ID, loginPlayBody.readVarInt())
         val loginPlay = LoginPlayPacket.read(loginPlayBody)
 
-        repeat(chunkCount) {
-            val chunkBody = readFrame(connection, incoming, compressionEnabled = true)
-            assertEquals(MapChunkPacket.ID, chunkBody.readVarInt())
-            MapChunkPacket.read(chunkBody)
-            val lightBody = readFrame(connection, incoming, compressionEnabled = true)
-            assertEquals(UpdateLightPacket.ID, lightBody.readVarInt())
-            UpdateLightPacket.read(lightBody)
-        }
+        val chunkCacheCenterBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(SetChunkCacheCenterPacket.ID, chunkCacheCenterBody.readVarInt())
+        SetChunkCacheCenterPacket.read(chunkCacheCenterBody)
+
+        val chunkCacheRadiusBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(SetChunkCacheRadiusPacket.ID, chunkCacheRadiusBody.readVarInt())
+        SetChunkCacheRadiusPacket.read(chunkCacheRadiusBody)
+
+        val simulationDistanceBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(SetSimulationDistancePacket.ID, simulationDistanceBody.readVarInt())
+        SetSimulationDistancePacket.read(simulationDistanceBody)
 
         val spawnPositionBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(SpawnPositionPacket.ID, spawnPositionBody.readVarInt())
@@ -117,6 +143,26 @@ class PlayFlowIntegrationTest {
         assertEquals(PlayerInfoAddPacket.ID, playerInfoBody.readVarInt())
         val playerInfo = PlayerInfoAddPacket.read(playerInfoBody)
         assertTrue(playerInfo.entries.any { it.name == name })
+
+        val gameEventBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(GameEventPacket.ID, gameEventBody.readVarInt())
+        assertEquals(GameEventPacket.LEVEL_CHUNKS_LOAD_START, GameEventPacket.read(gameEventBody).event)
+
+        val chunkBatchStartBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(ChunkBatchStartPacket.ID, chunkBatchStartBody.readVarInt())
+
+        repeat(chunkCount) {
+            val chunkBody = readFrame(connection, incoming, compressionEnabled = true)
+            assertEquals(MapChunkPacket.ID, chunkBody.readVarInt())
+            MapChunkPacket.read(chunkBody)
+            val lightBody = readFrame(connection, incoming, compressionEnabled = true)
+            assertEquals(UpdateLightPacket.ID, lightBody.readVarInt())
+            UpdateLightPacket.read(lightBody)
+        }
+
+        val chunkBatchFinishedBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(ChunkBatchFinishedPacket.ID, chunkBatchFinishedBody.readVarInt())
+        assertEquals(chunkCount, ChunkBatchFinishedPacket.read(chunkBatchFinishedBody).batchSize)
 
         return PlayerHandle(connection, incoming, threshold, loginPlay.entityId, name)
     }

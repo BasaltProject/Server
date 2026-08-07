@@ -42,7 +42,7 @@ class PlayPacketsTest {
         val buffer = ByteBuffer()
         val info = SpawnInfo(0, "minecraft:overworld", 42L, Gamemode.SURVIVAL, 255, false, true, null, 0, 63)
         val packet =
-            LoginPlayPacket(1, false, listOf("minecraft:overworld"), 20, 10, 10, false, true, false, info, false)
+            LoginPlayPacket(1, false, listOf("minecraft:overworld"), 20, 10, 10, false, true, false, info, false, false)
         packet.write(buffer)
         assertEquals(packet, LoginPlayPacket.read(buffer))
     }
