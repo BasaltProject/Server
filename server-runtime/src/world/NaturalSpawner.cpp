@@ -489,9 +489,12 @@ bool canSpawnAt(LoadedWorld& world, const Identifier* type, MobCategory category
 
     if (category == MobCategory::Monster) {
         // parity: `Monster.isDarkEnoughToSpawn`: the sky has to be dark where it stands, and the.
-        const bool dark = monstersIgnoringLight().contains(typePath) ||
-                          (worldLight::skyLight(world.state(), x, y, z) <= random.nextInt(32) &&
-                           worldLight::blockLight(world.state(), x, y, z) <= 0);
+        const std::int32_t maxLight = world.mobSettings().monsterSpawnMaxLightLevel;
+        const bool dark =
+            monstersIgnoringLight().contains(typePath) ||
+            (maxLight >= 0 ? worldLight::rawBrightness(world.state(), x, y, z, true, world.skyDarken()) <= maxLight
+                           : worldLight::skyLight(world.state(), x, y, z) <= random.nextInt(32) &&
+                                 worldLight::blockLight(world.state(), x, y, z) <= 0);
         return dark && monsterTypeRule(typePath, *ground, world, x, y, z, random);
     }
     if (category == MobCategory::Creature) {

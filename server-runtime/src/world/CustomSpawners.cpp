@@ -59,11 +59,12 @@ using wire::common::Identifier;
 void PhantomSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vector<player::PlayerSession*>& players,
                           random::RandomSource& random, const Spawn& spawn) {
     constexpr std::int32_t kTicksPerSecond = 20;
-    constexpr std::int32_t kMinIntervalSeconds = 60;
-    constexpr std::int32_t kIntervalSecondsRange = 60;
+    const config::MobSettings& mobs = world.mobSettings();
+    const std::int32_t kMinIntervalSeconds = mobs.phantomMinSeconds;
+    const std::int32_t kIntervalSecondsRange = mobs.phantomMaxSeconds - mobs.phantomMinSeconds + 1;
     constexpr std::int32_t kMinSkyDarken = 5;
     constexpr float kMaxDifficultyRoll = 3.0F;
-    constexpr std::int32_t kMinTimeSinceRest = 72000;
+    const std::int32_t kMinTimeSinceRest = mobs.phantomInsomniaTicks;
     constexpr std::int32_t kMinHeight = 20;
     constexpr std::int32_t kHeightRange = 15;
     constexpr std::int32_t kHorizontalRadius = 10;
@@ -244,9 +245,10 @@ void CatSpawner::tick(LoadedWorld& world, const std::vector<player::PlayerSessio
 
 void PatrolSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vector<player::PlayerSession*>& players,
                          random::RandomSource& random, const Spawn& spawn) {
-    constexpr std::int32_t kBaseIntervalTicks = 12000;
-    constexpr std::int32_t kIntervalRangeTicks = 1200;
-    constexpr std::int32_t kAttemptOdds = 5;
+    const config::MobSettings& mobs = world.mobSettings();
+    const std::int32_t kBaseIntervalTicks = mobs.patrolIntervalTicks;
+    const std::int32_t kIntervalRangeTicks = mobs.patrolIntervalJitterTicks;
+    const std::int32_t kAttemptOdds = mobs.patrolAttemptOdds;
     constexpr std::int32_t kBrightOutsideDarken = 4;
     constexpr std::int32_t kVillageSectionDistance = 2;
     constexpr std::int32_t kMinPlayerOffset = 24;
@@ -254,7 +256,7 @@ void PatrolSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vecto
     constexpr std::int32_t kLoadedRadius = 10;
     constexpr std::int32_t kMemberSpread = 5;
     constexpr std::int32_t kMaxBlockLight = 8;
-    constexpr std::int64_t kPatrolsEnabledAt = 120000;
+    const std::int64_t kPatrolsEnabledAt = mobs.patrolStartTicks;
 
     if (world.declaration().dimension != config::WorldDimension::Overworld || !spawnEnemies ||
         !world.gameRules().get(gameRules::kSpawnPatrols)) {
@@ -442,11 +444,12 @@ WanderingTraderSpawner::WanderingTraderSpawner(WanderingTraderSpawnState state, 
 void WanderingTraderSpawner::tick(LoadedWorld& world, const std::vector<player::PlayerSession*>& players,
                                   random::RandomSource& levelRandom, const SpawnTrader& spawnTrader,
                                   const SpawnLlama& spawnLlama) {
-    constexpr std::int32_t kDefaultTickDelay = 1200;
-    constexpr std::int32_t kDefaultSpawnDelay = 24000;
-    constexpr std::int32_t kMinSpawnChance = 25;
-    constexpr std::int32_t kMaxSpawnChance = 75;
-    constexpr std::int32_t kSpawnChanceIncrease = 25;
+    const config::MobSettings& mobs = world.mobSettings();
+    const std::int32_t kDefaultTickDelay = mobs.traderCheckTicks;
+    const std::int32_t kDefaultSpawnDelay = mobs.traderSpawnDelayTicks;
+    const std::int32_t kMinSpawnChance = mobs.traderMinChance;
+    const std::int32_t kMaxSpawnChance = mobs.traderMaxChance;
+    const std::int32_t kSpawnChanceIncrease = mobs.traderChanceIncrease;
     constexpr std::int32_t kPercentRange = 100;
 
     if (world.declaration().dimension != config::WorldDimension::Overworld ||
@@ -458,7 +461,7 @@ void WanderingTraderSpawner::tick(LoadedWorld& world, const std::vector<player::
         return;
     }
     tickDelay_ = kDefaultTickDelay;
-    state_.spawnDelay -= kDefaultTickDelay;
+    state_.spawnDelay = std::min(state_.spawnDelay, kDefaultSpawnDelay) - kDefaultTickDelay;
     if (state_.spawnDelay > 0) {
         return;
     }

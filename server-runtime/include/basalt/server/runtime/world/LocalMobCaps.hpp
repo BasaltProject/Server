@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -23,7 +24,12 @@ public:
 
     static constexpr double kSpawningDistanceSquared = 128.0 * 128.0;
 
+    using Limits = std::array<std::int32_t, 7>;
+
     explicit LocalMobCaps(std::vector<MobCapPlayer> players);
+
+    /// Limits per capped category and the spawn range in chunks, in place of vanilla's.
+    LocalMobCaps(std::vector<MobCapPlayer> players, const Limits& limits, std::int32_t rangeChunks);
 
     [[nodiscard]] bool canSpawn(entity::MobCategory category, std::int32_t chunkX, std::int32_t chunkZ);
 
@@ -40,6 +46,9 @@ private:
     [[nodiscard]] const std::vector<std::size_t>& nearby(std::int32_t chunkX, std::int32_t chunkZ);
 
     std::vector<MobCapPlayer> players_;
+    std::optional<Limits> limits_;
+    std::int32_t rangeChunks_ = kGlobalCapRadius;
+    double distanceSquared_ = kSpawningDistanceSquared;
     std::map<std::int32_t, std::array<std::int32_t, kCategoryCount>> counts_;
     std::map<std::int64_t, std::vector<std::size_t>> nearbyCache_;
 };

@@ -114,8 +114,15 @@ inline constexpr std::int32_t kIdleBeforeRandom = 600;
 
 inline constexpr std::int32_t kRandomOdds = 800;
 
-[[nodiscard]] bool shouldDespawn(ServerEntity& mob, MobCategory category, std::optional<double> nearestDistance,
-                                 random::RandomSource& random);
+struct Ranges {
+    double soft = kNoDespawnDistance;
+    double hard = 0.0;
+    std::int32_t idleTicks = kIdleBeforeRandom;
+    std::int32_t randomOdds = kRandomOdds;
+};
+
+[[nodiscard]] bool shouldDespawn(ServerEntity& mob, MobCategory category, const Ranges& ranges,
+                                 std::optional<double> nearestDistance, random::RandomSource& random);
 
 } // namespace mobDespawn
 

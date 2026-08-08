@@ -134,16 +134,31 @@ bool visibleTo(const ServerEntity& entity, const std::string& viewer) {
     return std::ranges::find(*entity.visibleTo, viewer) != entity.visibleTo->end();
 }
 
+/// Spigot's tracking categories: animals, monsters, misc (non-mobs), display and other (misc-category mobs).
+std::size_t trackingCategory(const ServerEntity& entity) {
+    const std::string_view path = entity.type().path();
+    if (path == "block_display" || path == "item_display" || path == "text_display") {
+        return 3;
+    }
+    if (!entity::mobs::isMob(entity.type())) {
+        return 2;
+    }
+    const std::string_view category = entity::mobs::categoryOf(entity.type());
+    if (category == "monster") {
+        return 1;
+    }
+    return category == "misc" ? 4 : 0;
+}
+
 /// parity: `ChunkMap.TrackedEntity.updatePlayer`, the horizontal range an entity is drawn within.
 bool inTrackingRange(const ServerEntity& entity, double viewerX, double viewerZ, std::int32_t viewDistanceChunks,
-                     std::int32_t broadcastPercentage) {
+                     const config::MobSettings& mobs) {
     const server::registry::entityTypeShapes::Shape* shape = server::registry::entityTypeShapes::of(entity.type());
     if (shape == nullptr || shape->trackingRange <= 0) {
         return true;
     }
-    // parity: `DedicatedServer.getScaledTrackingDistance`, whole blocks scaled by `entity-broadcast-range-percentage`.
-    const std::int32_t scaled = broadcastPercentage * (shape->trackingRange * 16) / 100;
-    const double range = std::min(static_cast<double>(scaled), viewDistanceChunks * 16.0);
+    const std::int32_t configured = mobs.trackingRange[trackingCategory(entity)];
+    const double range = std::min(configured > 0 ? configured : shape->trackingRange, viewDistanceChunks) * 16.0;
     const double dx = viewerX - entity.x;
     const double dz = viewerZ - entity.z;
     return (dx * dx) + (dz * dz) <= range * range;
@@ -182,8 +197,7 @@ void EntityVisibilityTracker::syncSummonedEntities() {
             continue;
         }
         if (!visibleTo(*entity, me) || session->extras.hiddenEntities.contains(entity->entityId()) ||
-            !inTrackingRange(*entity, session->x, session->z, viewDistance,
-                             owner_->options().tuning.entityBroadcastRangePercentage)) {
+            !inTrackingRange(*entity, session->x, session->z, viewDistance, owner_->currentWorld()->mobSettings())) {
             if (trackedEntities_.erase(entity->entityId()) > 0) {
                 lastEntityPositions_.erase(entity->entityId());
                 lastRuntimeEntityMetadata_.erase(entity->entityId());
