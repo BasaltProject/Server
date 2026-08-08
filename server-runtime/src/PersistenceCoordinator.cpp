@@ -71,7 +71,8 @@ void PersistenceCoordinator::unloadUnreachableChunks() const {
         if (watched) {
             before = world->state().loadedChunkKeys();
         }
-        unloaded += world->unloadUnreachable(positions, options_.spawnRadiusChunks, options_.retainMarginChunks);
+        const config::GameplayRules& chunks = world->settings().rules.gameplay;
+        unloaded += world->unloadUnreachable(positions, chunks.keepSpawnLoadedRange, chunks.unloadMarginChunks);
         if (watched) {
             const std::vector<std::int64_t> keys = world->state().loadedChunkKeys();
             const std::set<std::int64_t> after{keys.begin(), keys.end()};

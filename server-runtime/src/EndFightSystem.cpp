@@ -455,7 +455,13 @@ void EndFightSystem::tickDeath(world::LoadedWorld& world, ServerEntity& dragon, 
                                                                  wire::common::mth::floor(dragon.z)},
                                            .data = 0,
                                            .global = true};
+        // Not vanilla when a radius is set: the sound reaches only players that close.
+        const double radius = world.settings().rules.gameplay.dragonDeathSoundRadius;
         for (PlayerSession* player : players_->snapshot()) {
+            if (radius > 0.0 && (player->worldName != world.name() || std::abs(player->x - dragon.x) > radius ||
+                                 std::abs(player->y - dragon.y) > radius || std::abs(player->z - dragon.z) > radius)) {
+                continue;
+            }
             if (player->connection().sendPlayPacket) {
                 player->connection().sendPlayPacket(play::LevelEventPacket::kId,
                                                     [&event](wire::io::ByteBuffer& buffer) { event.write(buffer); });
