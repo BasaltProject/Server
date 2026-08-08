@@ -4,6 +4,7 @@ import org.basaltmc.assets.ServerJarAssets
 import org.basaltmc.random.PositionalRandomFactory
 import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.densityfunction.FunctionContext
+import org.basaltmc.world.terrain.OverworldBiomeSource
 import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 
@@ -12,19 +13,20 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * [RealNoiseParameters], already built for the density router), the real per-world [random], and
  * [router]'s own `finalDensity` for [estimatedSurfaceHeight] (see that method's own KDoc for why
  * scanning the real density function directly, not reading an already-filled chunk, is the right
- * substitute here).
+ * substitute here). [biomeAt] resolves the real vanilla biome via [OverworldBiomeSource] (the real
+ * climate transitioner, [org.basaltmc.world.climate.OverworldBiomeBuilder]), not a fixed biome.
  *
- * **Documented gaps**: [isSteep] always reports `false` (real vanilla clamps its neighbor lookup to
+ * **Documented gap**: [isSteep] always reports `false` (real vanilla clamps its neighbor lookup to
  * the specific chunk under construction, which a single reusable environment object spanning every
- * chunk has no notion of) and biomes are always `"minecraft:plains"` (this project's whole current
- * scope), matching [org.basaltmc.world.terrain.surface.SurfaceRuleData]'s own KDoc: neither affects
- * Plains, since nothing in its own path depends on either.
+ * chunk has no notion of); [RealTerrainGenerator][org.basaltmc.world.terrain.RealTerrainGenerator]
+ * wraps this environment with a chunk-scoped one that does implement it correctly.
  */
 public class RealSurfaceEnvironment(
     serverJar: ServerJarAssets,
     private val random: PositionalRandomFactory,
     private val router: OverworldNoiseRouter,
 ) : SurfaceRuleEnvironment {
+    private val biomeSource = OverworldBiomeSource(router)
     private val noises = RealNoiseParameters(serverJar, random)
 
     override fun surfaceDepthNoise(
@@ -90,7 +92,7 @@ public class RealSurfaceEnvironment(
         x: Int,
         y: Int,
         z: Int,
-    ): String = "minecraft:plains"
+    ): String = biomeSource.biomeAt(x, y, z).id.toString()
 
     override fun isSteep(
         x: Int,

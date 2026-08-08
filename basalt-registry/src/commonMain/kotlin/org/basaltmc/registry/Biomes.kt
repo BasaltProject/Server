@@ -6,15 +6,74 @@ public data class Biome(
 )
 
 /**
- * Hand-authored subset of the vanilla biome registry: just enough for an in-memory flat world.
- *
- * // parity: ID read from `minecraft-data`'s `26.1` data set (`biomes.json`); see [Blocks] for why
- * that is the closest currently available reference to protocol 776.
+ * The full Overworld biome set, registered in the same order as the real jar's own
+ * `net.minecraft.data.worldgen.biome.BiomeData.bootstrap` (decompiled from `server-26.2.jar`),
+ * filtered to the Overworld entries: `THE_VOID` and every Nether/End biome are skipped, out of
+ * this project's current scope. Biome network IDs are a dynamic registry synced to each client at
+ * login (`minecraft:worldgen/biome`), not a fixed wire constant like a block state ID: unlike
+ * [Blocks], there is no vanilla numeric ID this registry must reproduce, only internal
+ * self-consistency between the synced registry and the IDs used in a chunk's biome palette. The
+ * real jar's own bootstrap order is used anyway, since it is the most natural and best-documented
+ * choice available, not because the client requires it.
  */
 public object Biomes {
     public val REGISTRY: Registry<Biome> = Registry()
 
-    public val PLAINS: Biome = register(40, "plains")
+    public val PLAINS: Biome = register(0, "plains")
+    public val SUNFLOWER_PLAINS: Biome = register(1, "sunflower_plains")
+    public val SNOWY_PLAINS: Biome = register(2, "snowy_plains")
+    public val ICE_SPIKES: Biome = register(3, "ice_spikes")
+    public val DESERT: Biome = register(4, "desert")
+    public val SWAMP: Biome = register(5, "swamp")
+    public val MANGROVE_SWAMP: Biome = register(6, "mangrove_swamp")
+    public val FOREST: Biome = register(7, "forest")
+    public val FLOWER_FOREST: Biome = register(8, "flower_forest")
+    public val BIRCH_FOREST: Biome = register(9, "birch_forest")
+    public val DARK_FOREST: Biome = register(10, "dark_forest")
+    public val PALE_GARDEN: Biome = register(11, "pale_garden")
+    public val OLD_GROWTH_BIRCH_FOREST: Biome = register(12, "old_growth_birch_forest")
+    public val OLD_GROWTH_PINE_TAIGA: Biome = register(13, "old_growth_pine_taiga")
+    public val OLD_GROWTH_SPRUCE_TAIGA: Biome = register(14, "old_growth_spruce_taiga")
+    public val TAIGA: Biome = register(15, "taiga")
+    public val SNOWY_TAIGA: Biome = register(16, "snowy_taiga")
+    public val SAVANNA: Biome = register(17, "savanna")
+    public val SAVANNA_PLATEAU: Biome = register(18, "savanna_plateau")
+    public val WINDSWEPT_HILLS: Biome = register(19, "windswept_hills")
+    public val WINDSWEPT_GRAVELLY_HILLS: Biome = register(20, "windswept_gravelly_hills")
+    public val WINDSWEPT_FOREST: Biome = register(21, "windswept_forest")
+    public val WINDSWEPT_SAVANNA: Biome = register(22, "windswept_savanna")
+    public val JUNGLE: Biome = register(23, "jungle")
+    public val SPARSE_JUNGLE: Biome = register(24, "sparse_jungle")
+    public val BAMBOO_JUNGLE: Biome = register(25, "bamboo_jungle")
+    public val BADLANDS: Biome = register(26, "badlands")
+    public val ERODED_BADLANDS: Biome = register(27, "eroded_badlands")
+    public val WOODED_BADLANDS: Biome = register(28, "wooded_badlands")
+    public val MEADOW: Biome = register(29, "meadow")
+    public val CHERRY_GROVE: Biome = register(30, "cherry_grove")
+    public val GROVE: Biome = register(31, "grove")
+    public val SNOWY_SLOPES: Biome = register(32, "snowy_slopes")
+    public val FROZEN_PEAKS: Biome = register(33, "frozen_peaks")
+    public val JAGGED_PEAKS: Biome = register(34, "jagged_peaks")
+    public val STONY_PEAKS: Biome = register(35, "stony_peaks")
+    public val RIVER: Biome = register(36, "river")
+    public val FROZEN_RIVER: Biome = register(37, "frozen_river")
+    public val BEACH: Biome = register(38, "beach")
+    public val SNOWY_BEACH: Biome = register(39, "snowy_beach")
+    public val STONY_SHORE: Biome = register(40, "stony_shore")
+    public val WARM_OCEAN: Biome = register(41, "warm_ocean")
+    public val LUKEWARM_OCEAN: Biome = register(42, "lukewarm_ocean")
+    public val DEEP_LUKEWARM_OCEAN: Biome = register(43, "deep_lukewarm_ocean")
+    public val OCEAN: Biome = register(44, "ocean")
+    public val DEEP_OCEAN: Biome = register(45, "deep_ocean")
+    public val COLD_OCEAN: Biome = register(46, "cold_ocean")
+    public val DEEP_COLD_OCEAN: Biome = register(47, "deep_cold_ocean")
+    public val FROZEN_OCEAN: Biome = register(48, "frozen_ocean")
+    public val DEEP_FROZEN_OCEAN: Biome = register(49, "deep_frozen_ocean")
+    public val MUSHROOM_FIELDS: Biome = register(50, "mushroom_fields")
+    public val DRIPSTONE_CAVES: Biome = register(51, "dripstone_caves")
+    public val LUSH_CAVES: Biome = register(52, "lush_caves")
+    public val DEEP_DARK: Biome = register(53, "deep_dark")
+    public val SULFUR_CAVES: Biome = register(54, "sulfur_caves")
 
     private fun register(
         id: Int,
