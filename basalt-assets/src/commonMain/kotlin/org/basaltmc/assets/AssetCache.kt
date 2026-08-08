@@ -51,16 +51,16 @@ public class AssetCache(
         if (FileIO.readText("$path.verified")?.trim() == "${download.sha1} ${download.size}" &&
             FileIO.size(path) == download.size
         ) {
-            logger.info { "${artifact.fileName} for ${metadata.id} already cached and verified." }
+            logger.info { "${metadata.id} assets already downloaded and verified." }
             return path
         }
 
-        logger.info { "Downloading ${artifact.fileName} for ${metadata.id}..." }
+        logger.info { "Downloading ${metadata.id} assets (${download.size / 1_000_000} MB)..." }
         val bytes = runBlocking { client.get(download.url).body<ByteArray>() }
         val actualSha1 = sha1Hex(bytes)
         if (actualSha1 != download.sha1) {
             throw AssetException(
-                "SHA-1 mismatch downloading ${artifact.fileName} for ${metadata.id}: " +
+                "SHA-1 mismatch downloading ${metadata.id} assets: " +
                     "expected ${download.sha1}, got $actualSha1",
             )
         }
@@ -68,7 +68,7 @@ public class AssetCache(
         FileIO.createDirectories(versionDir)
         FileIO.writeBytes(path, bytes)
         FileIO.writeText("$path.verified", "$actualSha1 ${bytes.size}")
-        logger.info { "${artifact.fileName} for ${metadata.id} downloaded and verified." }
+        logger.info { "${metadata.id} assets downloaded and verified." }
         return path
     }
 

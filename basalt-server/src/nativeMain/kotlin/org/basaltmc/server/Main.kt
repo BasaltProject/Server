@@ -37,23 +37,25 @@ public fun main(args: Array<String>) {
         exitProcess(EulaFile.REJECTED_EXIT_CODE)
     }
 
-    // Nothing here touches the network once the cache is warm: the version metadata is cached on
-    // disk alongside the jar, and the jar's SHA-1 was verified when it was downloaded rather than
-    // re-verified on every boot. Only `server.jar` is fetched; `client.jar` holds assets nothing
-    // reads yet (see `LangAssets`, still unused), and downloading it bought a log line.
+    // Downloading is the fallback, not the path: once a version's data is unpacked the lambda below
+    // is never invoked, so a warm install resolves no metadata, contacts no network and reads no
+    // archive. Only the server data is fetched; the client download holds assets nothing reads yet
+    // (see `LangAssets`, still unused), and fetching it bought a log line.
     val assetsLogger = Logger("Assets")
-    val httpClient = HttpClient()
-    val versionMetadata = VersionManifest(httpClient).resolveCached(BuildInfo.MINECRAFT_VERSION)
-    val serverJarPath =
-        AssetCache(httpClient, logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.SERVER)
-    httpClient.close()
-    assetsLogger.info { "Server assets ready at $serverJarPath." }
+    val dataRoot = "./.basalt/assets/${BuildInfo.MINECRAFT_VERSION}"
+    val serverJar =
+        ServerJarAssets(BuildInfo.MINECRAFT_VERSION, dataRoot, assetsLogger) {
+            HttpClient().use { httpClient ->
+                val versionMetadata = VersionManifest(httpClient).resolveCached(BuildInfo.MINECRAFT_VERSION)
+                AssetCache(httpClient, logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.SERVER)
+            }
+        }
+    assetsLogger.info { "${BuildInfo.MINECRAFT_VERSION} data ready at $dataRoot." }
 
     // Real Overworld density-function router (see NoiseRouterData/TerrainProvider), built once at
     // startup and reused for every generated chunk. WORLD_SEED is a fixed placeholder, not yet
     // read from config: documented gap, matches `NoiseWorldGenerator`'s own until real per-world
     // seed configuration exists.
-    val serverJar = ServerJarAssets(serverJarPath, BuildInfo.MINECRAFT_VERSION)
     val noiseRandom = XoroshiroRandom(WORLD_SEED).forkPositional()
     val realNoises = RealNoiseParameters(serverJar, noiseRandom)
     val base3d = BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0)
