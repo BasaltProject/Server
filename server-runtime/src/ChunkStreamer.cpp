@@ -1,6 +1,11 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/command/CommandEnvironment.hpp>
+#include <basalt/server/runtime/config/GroupsConfig.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/world/ChunkDataCodec.hpp>
@@ -55,9 +60,8 @@ server::world::ChunkTracker::Delta ChunkStreamer::initialJoin(double x, double z
     owner_->sendCompressed(SetChunkCacheRadiusPacket::kId, [radius](wire::io::ByteBuffer& buffer) {
         SetChunkCacheRadiusPacket{.radius = radius}.write(buffer);
     });
-    const world::LoadedWorld* current = owner_->currentWorld();
-    const std::int32_t simulation =
-        current == nullptr ? radius : current->tunables().simulationDistance.value_or(radius);
+    const world::LoadedWorld* joined = owner_->currentWorld();
+    const std::int32_t simulation = joined == nullptr ? radius : joined->settings().rules.simulationDistance;
     owner_->sendCompressed(SetSimulationDistancePacket::kId, [simulation](wire::io::ByteBuffer& buffer) {
         SetSimulationDistancePacket{.simulationDistance = simulation}.write(buffer);
     });
@@ -207,6 +211,17 @@ void ChunkStreamer::sendBiomes(const std::vector<std::pair<std::int32_t, std::in
     });
 }
 
+bool ChunkStreamer::bypassesAntiXray(const world::AntiXray& antiXray) const {
+    constexpr std::string_view kBypass = "basalt.antixray.bypass";
+    const player::PlayerSession* session = owner_->playerSession();
+    const command::CommandDispatcher* dispatcher = owner_->options().commands;
+    if (!antiXray.usePermission() || session == nullptr || dispatcher == nullptr) {
+        return false;
+    }
+    return session->permissionGrant(kBypass).value_or(
+        dispatcher->environment().groups().resolve(session->group, kBypass));
+}
+
 void ChunkStreamer::sendChunk(Chunk& chunk) {
     world::LoadedWorld* world = owner_->currentWorld();
     const bool hasSkylight = world == nullptr || config::dimensionFacts(world->declaration().dimension).hasSkylight;
@@ -222,8 +237,30 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
                                                     .emptyBlockLightMask = light.emptyBlockLightMask,
                                                     .skyLight = light.skyLight,
                                                     .blockLight = light.blockLight};
+    std::vector<std::vector<std::int32_t>> obfuscated;
+    if (const world::AntiXray* antiXray = world == nullptr ? nullptr : world->antiXray();
+        antiXray != nullptr && !bypassesAntiXray(*antiXray)) {
+        obfuscated =
+            antiXray->obfuscate(chunk, [world](const std::int32_t chunkX, const std::int32_t chunkZ) -> const Chunk* {
+                return world->state().chunkIfLoaded(chunkX, chunkZ);
+            });
+    }
+    const std::int32_t chunkMinY = chunk.verticalBounds().minY();
+    const auto hiddenAway = [&](const server::world::ChunkBlockEntity& blockEntity) {
+        const auto section = static_cast<std::size_t>((blockEntity.y() - chunkMinY) >> 4);
+        if (section >= obfuscated.size() || obfuscated[section].empty()) {
+            return false;
+        }
+        const std::size_t at = static_cast<std::size_t>(((blockEntity.y() & 15) << 8) | (blockEntity.localZ() << 4) |
+                                                        blockEntity.localX());
+        return obfuscated[section][at] !=
+               chunk.blockStateId(blockEntity.localX(), blockEntity.y(), blockEntity.localZ());
+    };
     std::vector<wire::protocol::play::ChunkBlockEntityInfo> blockEntities;
     for (const auto& blockEntity : chunk.blockEntities()) {
+        if (hiddenAway(blockEntity)) {
+            continue;
+        }
         const std::optional<std::int32_t> typeId = server::registry::blockEntityTypes::idOf(blockEntity.type());
         if (!typeId.has_value()) {
             if (loggedUnknownBlockEntities_.insert(blockEntity.type()).second) {
@@ -240,7 +277,7 @@ void ChunkStreamer::sendChunk(Chunk& chunk) {
             .typeId = *typeId,
             .tag = blockEntity.data()});
     }
-    const std::vector<std::uint8_t> chunkData = server::world::chunkDataCodec::encodeSections(chunk);
+    const std::vector<std::uint8_t> chunkData = server::world::chunkDataCodec::encodeSections(chunk, obfuscated);
     const std::vector<std::int64_t> heightmap = server::world::chunkDataCodec::encodeHeightmap(chunk);
     owner_->sendCompressed(MapChunkPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         MapChunkPacket{.x = chunk.chunkX(),

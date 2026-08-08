@@ -78,7 +78,10 @@ masked(const Chunk::PackedLight* sections) {
 
 } // namespace
 
-std::vector<std::uint8_t> encodeSections(const Chunk& chunk) {
+std::vector<std::uint8_t> encodeSections(const Chunk& chunk) { return encodeSections(chunk, {}); }
+
+std::vector<std::uint8_t> encodeSections(const Chunk& chunk,
+                                         const std::vector<std::vector<std::int32_t>>& replacements) {
     wire::io::ByteBuffer buffer;
     std::vector<std::int32_t> blockScratch(kBlocksPerSection);
     std::vector<std::int32_t> biomeScratch(kBiomesPerSection);
@@ -88,6 +91,9 @@ std::vector<std::uint8_t> encodeSections(const Chunk& chunk) {
         // parity: LevelChunkSection.write always writes two shorts, the non-empty block count and then the fluid.
         buffer.writeShort(static_cast<std::int16_t>(section.nonEmptyFluidCount()));
         section.copyBlockStateIdsInto(blockScratch);
+        if (i < replacements.size() && !replacements[i].empty()) {
+            blockScratch = replacements[i];
+        }
         play::palettedContainer::write(buffer, blockScratch, play::palettedContainer::kBlockMinIndirectBits,
                                        play::palettedContainer::kBlockMaxIndirectBits, blockDirectBits());
         writeBiomes(buffer, section, biomeScratch);

@@ -48,7 +48,14 @@ struct XorShift {
 void markBlock(std::vector<bool>& table, const std::string& name) {
     const wire::common::Identifier id = wire::common::Identifier::vanilla(name);
     const registry::blockStateDefinitions::Definition* definition = registry::blockStateDefinitions::of(id);
-    if (definition == nullptr || registry::blocks::isAir(definition->firstStateId())) {
+    if (definition == nullptr) {
+        const std::optional<std::int32_t> only = registry::blocks::defaultStateIdOf(id);
+        if (only.has_value() && !registry::blocks::isAir(*only)) {
+            table[static_cast<std::size_t>(*only)] = true;
+        }
+        return;
+    }
+    if (registry::blocks::isAir(definition->firstStateId())) {
         return;
     }
     for (std::int32_t i = 0; i < definition->stateCount(); i++) {

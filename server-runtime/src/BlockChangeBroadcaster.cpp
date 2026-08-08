@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
@@ -56,6 +57,24 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
                std::int32_t stateId) {
     for (const player::PlayerSession* player : watchers) {
         player::sendBlockChangeTo(*player, x, y, z, stateId);
+    }
+}
+
+void revealHiddenAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t removed) {
+    const world::AntiXray* antiXray = world.antiXray();
+    if (antiXray == nullptr || y > antiXray->highestRevealedY()) {
+        return;
+    }
+    const std::optional<std::int32_t> now = world.state().blockState(x, y, z);
+    if (!now.has_value() || !antiXray->opens(removed, *now)) {
+        return;
+    }
+    for (const std::array<std::int32_t, 3>& offset : antiXray->revealOffsets()) {
+        const std::optional<std::int32_t> state = world.state().blockState(x + offset[0], y + offset[1], z + offset[2]);
+        if (state.has_value() && antiXray->hides(*state)) {
+            sendBlock(watchers, x + offset[0], y + offset[1], z + offset[2], *state);
+        }
     }
 }
 
@@ -142,6 +161,9 @@ void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,
 void BlockChangeBroadcaster::settleBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                                          std::int32_t x, std::int32_t y, std::int32_t z,
                                          std::optional<std::int32_t> removed, std::uint32_t phases) {
+    if (removed.has_value()) {
+        revealHiddenAround(world, watchers, x, y, z, *removed);
+    }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
     world::neighbourUpdates::Context context = updateContext(world, random);
     context.phases = phases;
