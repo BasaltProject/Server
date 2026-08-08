@@ -6,16 +6,15 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 
 /**
- * Real Badlands `vegetal_decoration`: `patch_dead_bush_badlands`, ported from the real jar's own
- * `VegetationPlacements`. **Not ported**: `patch_grass_badlands`/`patch_dry_grass_badlands` (need a
- * `WeightedStateProvider` this project doesn't model yet), matching this project's own established
- * precedent of documenting gaps rather than approximating them.
+ * Badlands ground cover after `patch_grass_badlands`: `patch_dry_grass_badlands`, then
+ * `patch_dead_bush_badlands`, from the real jar's own `VegetationPlacements`.
  */
 public object BadlandsDecoration : BiomeVegetalDecoration {
     override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
+        DryGrassDecoration.BADLANDS.decorate(chunk, random)
         val feature = SimpleBlockFeature({ _, _ -> deadBushStateId })
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))

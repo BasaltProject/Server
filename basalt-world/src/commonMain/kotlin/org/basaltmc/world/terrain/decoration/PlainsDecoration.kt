@@ -10,14 +10,14 @@ import org.basaltmc.world.noise.SimplexNoise
 /**
  * Real Plains `vegetal_decoration` entries (the real jar's own `data/minecraft/worldgen/
  * placed_feature`/`configured_feature` values for `patch_grass_plain`/`patch_tall_grass_2`/
- * `flower_plains`/`patch_bush`, verbatim), ported the same way this project already treats other
+ * `flower_plains`/`patch_sunflower`, verbatim), ported the same way this project already treats other
  * single named real vanilla entries (`VanillaRegistryData`'s biome/damage-type/trim-material data):
  * literal values, not a generic runtime datapack loader, since this is specific known reference
  * data, not the seed-defining terrain-shape noise `NoiseParametersJson` is scoped to.
  *
- * **Not ported yet, documented gaps:** `glow_lichen`, `brown_mushroom_normal`/`red_mushroom_normal`,
- * `patch_pumpkin`, `patch_sugar_cane`, `patch_firefly_bush_near_water` (need water/light-level
- * checks this project doesn't model yet).
+ * **Not ported yet:** `glow_lichen`. Shared mushrooms, pumpkin, sugar-cane, and firefly-bush
+ * features are appended by [BiomeDecoration]. Mushroom placement uses the established surface
+ * survival approximation until the light engine exists.
  *
  * The shared [random][WorldgenRandom] this whole pipeline draws from must be the real
  * `WorldgenRandom` wrapping `XoroshiroRandomSource` (confirmed from `ChunkGenerator
@@ -34,10 +34,10 @@ public object PlainsDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        GRASS.decorate(chunk, random)
         TALL_GRASS.decorate(chunk, random)
-        placeFlowers(chunk, random)
-        placeBush(chunk, random)
+        ForestGroundDecoration.BUSH.decorate(chunk, random)
+        FLOWERS.decorate(chunk, random)
+        GRASS.decorate(chunk, random)
     }
 
     /** // parity: placed_feature/patch_grass_plain.json + configured_feature/grass.json, standalone: cherry_grove's own vegetation reuses exactly this real feature. */
@@ -79,48 +79,44 @@ public object PlainsDecoration : BiomeVegetalDecoration {
             )
         }
 
-    // parity: placed_feature/patch_bush.json + configured_feature/bush.json.
-    private fun placeBush(
-        chunk: Chunk,
-        random: WorldgenRandom,
-    ) {
-        val feature = SimpleBlockFeature({ _, _ -> bushStateId })
-        runPipeline(
-            chunk,
-            random,
-            listOf(
-                RarityFilter(4),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(24),
-                RandomOffsetPlacement(xzSpread = 5, ySpread = 3),
-                AirTargetFilter(),
-            ),
-            feature,
-        )
-    }
+    /** `patch_sunflower`: the sunflower-plains replacement for the regular plains bush. */
+    public val SUNFLOWER: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            val feature = SimpleBlockFeature({ _, _ -> sunflowerStateId }, isDoublePlant = true)
+            runPipeline(
+                chunk,
+                random,
+                listOf(
+                    RarityFilter(3),
+                    InSquarePlacement,
+                    HeightmapPlacement,
+                    CountPlacement(96),
+                    RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+                    AirTargetFilter(),
+                ),
+                feature,
+            )
+        }
 
-    // parity: placed_feature/flower_plains.json + configured_feature/flower_plain.json.
-    private fun placeFlowers(
-        chunk: Chunk,
-        random: WorldgenRandom,
-    ) {
-        val feature = SimpleBlockFeature(::flowerStateId)
-        runPipeline(
-            chunk,
-            random,
-            listOf(
-                NoiseThresholdCountPlacement(-0.8, belowNoise = 4, aboveNoise = 15),
-                RarityFilter(32),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(64),
-                RandomOffsetPlacement(xzSpread = 6, ySpread = 2),
-                AirTargetFilter(),
-            ),
-            feature,
-        )
-    }
+    /** // parity: placed_feature/flower_plains.json + configured_feature/flower_plain.json. */
+    public val FLOWERS: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            val feature = SimpleBlockFeature(::flowerStateId)
+            runPipeline(
+                chunk,
+                random,
+                listOf(
+                    NoiseThresholdCountPlacement(-0.8, belowNoise = 4, aboveNoise = 15),
+                    RarityFilter(32),
+                    InSquarePlacement,
+                    HeightmapPlacement,
+                    CountPlacement(64),
+                    RandomOffsetPlacement(xzSpread = 6, ySpread = 2),
+                    AirTargetFilter(),
+                ),
+                feature,
+            )
+        }
 
     /**
      * // parity: NoiseThresholdBlockStateProvider's real behavior for `flower_plain`: a dedicated
@@ -167,7 +163,7 @@ public object PlainsDecoration : BiomeVegetalDecoration {
 
     private val shortGrassStateId = blockId("short_grass")
     private val tallGrassStateId = blockId("tall_grass")
-    private val bushStateId = blockId("bush")
+    private val sunflowerStateId = blockId("sunflower")
     private val dandelionStateId = blockId("dandelion")
     private val highFlowerStates =
         listOf(blockId("poppy"), blockId("azure_bluet"), blockId("oxeye_daisy"), blockId("cornflower"))

@@ -9,9 +9,9 @@ import org.basaltmc.world.Chunk
  * Real Swamp `addSwampVegetation` ground cover beyond trees (already ported separately, see
  * `BiomeDecoration`): `flower_swamp` (blue orchid), `patch_grass_normal`, `patch_dead_bush`,
  * `patch_waterlily`, all ported from the real jar's own decompiled `VegetationPlacements`.
- * **Not ported**: `brown_mushroom_swamp`/`red_mushroom_swamp` (real mushroom placement needs a
- * light-level check this project doesn't model). [ExtraVegetationDecoration.SWAMP] supplies the
- * later sugar-cane, pumpkin, and firefly-bush features. Lily pads are placed the same simplified
+ * [MushroomDecoration.SWAMP] supplies the later swamp mushrooms, using the shared surface survival
+ * approximation until a light engine exists. [ExtraVegetationDecoration.SWAMP] supplies the later
+ * sugar-cane, pumpkin, and firefly-bush features. Lily pads are placed the same simplified
  * way as every other single-block feature here (air target only, no "must be over water" check,
  * see [SimpleBlockFeature]'s own KDoc).
  */
