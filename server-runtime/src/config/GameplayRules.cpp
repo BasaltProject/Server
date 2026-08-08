@@ -49,6 +49,58 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
         rules.blocks.bedExplosionFire = flag(*table, "bed-explosion-fire", rules.blocks.bedExplosionFire);
         rules.blocks.campfireLitWhenPlaced =
             flag(*table, "campfire-lit-when-placed", rules.blocks.campfireLitWhenPlaced);
+        rules.blocks.cactusBreaksFromSolidNeighbors =
+            flag(*table, "cactus-breaks-from-solid-neighbors", rules.blocks.cactusBreaksFromSolidNeighbors);
+        rules.blocks.coralDieOutsideWater = flag(*table, "coral-die-outside-water", rules.blocks.coralDieOutsideWater);
+        rules.blocks.chestOpenWithSolidBlockOnTop =
+            flag(*table, "chest-open-with-solid-block-on-top", rules.blocks.chestOpenWithSolidBlockOnTop);
+        rules.blocks.spongeAbsorbsLava = flag(*table, "sponge-absorbs-lava", rules.blocks.spongeAbsorbsLava);
+        rules.blocks.spongeAbsorbsWaterFromMud =
+            flag(*table, "sponge-absorbs-water-from-mud", rules.blocks.spongeAbsorbsWaterFromMud);
+        rules.blocks.noteBlockIgnoreAbove = flag(*table, "note-block-ignore-above", rules.blocks.noteBlockIgnoreAbove);
+        rules.blocks.beaconEffectRangeLevel1 =
+            whole(*table, "beacon-effect-range-level-1", rules.blocks.beaconEffectRangeLevel1, 0);
+        rules.blocks.beaconEffectRangeLevel2 =
+            whole(*table, "beacon-effect-range-level-2", rules.blocks.beaconEffectRangeLevel2, 0);
+        rules.blocks.beaconEffectRangeLevel3 =
+            whole(*table, "beacon-effect-range-level-3", rules.blocks.beaconEffectRangeLevel3, 0);
+        rules.blocks.beaconEffectRangeLevel4 =
+            whole(*table, "beacon-effect-range-level-4", rules.blocks.beaconEffectRangeLevel4, 0);
+        rules.blocks.beaconAllowEffectsWithTintedGlass =
+            flag(*table, "beacon-allow-effects-with-tinted-glass", rules.blocks.beaconAllowEffectsWithTintedGlass);
+        rules.blocks.respawnAnchorExplode = flag(*table, "respawn-anchor-explode", rules.blocks.respawnAnchorExplode);
+        rules.blocks.respawnAnchorExplosionPower =
+            decimal(*table, "respawn-anchor-explosion-power", rules.blocks.respawnAnchorExplosionPower, 0);
+        rules.blocks.respawnAnchorExplosionFire =
+            flag(*table, "respawn-anchor-explosion-fire", rules.blocks.respawnAnchorExplosionFire);
+        rules.blocks.endCrystalBaselessExplode =
+            flag(*table, "end-crystal-baseless-explode", rules.blocks.endCrystalBaselessExplode);
+        rules.blocks.endCrystalBaselessExplosionPower =
+            decimal(*table, "end-crystal-baseless-explosion-power", rules.blocks.endCrystalBaselessExplosionPower, 0);
+        rules.blocks.endCrystalBaselessExplosionFire =
+            flag(*table, "end-crystal-baseless-explosion-fire", rules.blocks.endCrystalBaselessExplosionFire);
+        rules.blocks.endCrystalBaseExplode =
+            flag(*table, "end-crystal-base-explode", rules.blocks.endCrystalBaseExplode);
+        rules.blocks.endCrystalBaseExplosionPower =
+            decimal(*table, "end-crystal-base-explosion-power", rules.blocks.endCrystalBaseExplosionPower, 0);
+        rules.blocks.endCrystalBaseExplosionFire =
+            flag(*table, "end-crystal-base-explosion-fire", rules.blocks.endCrystalBaseExplosionFire);
+        rules.blocks.endCrystalPlaceAnywhere =
+            flag(*table, "end-crystal-place-anywhere", rules.blocks.endCrystalPlaceAnywhere);
+        rules.blocks.dragonEggTeleport = flag(*table, "dragon-egg-teleport", rules.blocks.dragonEggTeleport);
+        rules.blocks.stonecutterDamage = decimal(*table, "stonecutter-damage", rules.blocks.stonecutterDamage, 0);
+        rules.blocks.spawnerDeactivateByRedstone =
+            flag(*table, "spawner-deactivate-by-redstone", rules.blocks.spawnerDeactivateByRedstone);
+        rules.blocks.lightningRodRange = whole(*table, "lightning-rod-range", rules.blocks.lightningRodRange, 1);
+        rules.blocks.farmlandDisableTrampling =
+            flag(*table, "farmland-disable-trampling", rules.blocks.farmlandDisableTrampling);
+        rules.blocks.farmlandOnlyPlayersTrample =
+            flag(*table, "farmland-only-players-trample", rules.blocks.farmlandOnlyPlayersTrample);
+        rules.blocks.farmlandFeatherFallDistanceAffectsTrampling =
+            flag(*table, "farmland-feather-fall-distance-affects-trampling",
+                 rules.blocks.farmlandFeatherFallDistanceAffectsTrampling);
+        rules.blocks.farmlandTrampleHeight =
+            decimal(*table, "farmland-trample-height", rules.blocks.farmlandTrampleHeight, -1);
     }
     if (const TomlTable* table = gameplay->table("mechanics"); table != nullptr) {
         rules.mechanics.drowningTicksPerDamage =
@@ -62,15 +114,51 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
             decimal(*table, "wither-degeneration-amount", rules.mechanics.witherDegenerationAmount, 0);
         rules.mechanics.hungerExhaustionAmount =
             decimal(*table, "hunger-exhaustion-amount", rules.mechanics.hungerExhaustionAmount, 0);
+        rules.mechanics.elytraDamagePerSecond =
+            whole(*table, "elytra-damage-per-second", rules.mechanics.elytraDamagePerSecond, 0);
+        rules.mechanics.elytraDamagePerFireworkBoost =
+            whole(*table, "elytra-damage-per-firework-boost", rules.mechanics.elytraDamagePerFireworkBoost, 0);
+        rules.mechanics.milkCuresBadOmen = flag(*table, "milk-cures-bad-omen", rules.mechanics.milkCuresBadOmen);
+        rules.mechanics.milkClearsBeneficialEffects =
+            flag(*table, "milk-clears-beneficial-effects", rules.mechanics.milkClearsBeneficialEffects);
+        rules.mechanics.raidCooldownSeconds =
+            whole(*table, "raid-cooldown-seconds", rules.mechanics.raidCooldownSeconds, 0);
+        rules.mechanics.animalBreedingCooldownSeconds =
+            whole(*table, "animal-breeding-cooldown-seconds", rules.mechanics.animalBreedingCooldownSeconds, 0);
     }
     if (const TomlTable* table = gameplay->table("player"); table != nullptr) {
         rules.player.criticalDamageMultiplier =
             decimal(*table, "critical-damage-multiplier", rules.player.criticalDamageMultiplier, 0);
         rules.player.totemOfUndyingWorksInInventory =
             flag(*table, "totem-of-undying-works-in-inventory", rules.player.totemOfUndyingWorksInInventory);
+        rules.player.expPickupDelayTicks = whole(*table, "exp-pickup-delay-ticks", rules.player.expPickupDelayTicks, 0);
     }
     if (const TomlTable* table = gameplay->table("items"); table != nullptr) {
         rules.items.enderPearlDamage = decimal(*table, "ender-pearl-damage", rules.items.enderPearlDamage, 0);
+        rules.items.enderPearlCooldown = whole(*table, "ender-pearl-cooldown", rules.items.enderPearlCooldown, 0);
+        rules.items.enderPearlCreativeCooldown =
+            whole(*table, "ender-pearl-creative-cooldown", rules.items.enderPearlCreativeCooldown, 0);
+        rules.items.enderPearlEndermiteSpawnChance =
+            decimal(*table, "ender-pearl-endermite-spawn-chance", rules.items.enderPearlEndermiteSpawnChance, 0);
+        rules.items.snowballDamage = whole(*table, "snowball-damage", rules.items.snowballDamage, -1);
+        rules.items.projectileOffsetBow = decimal(*table, "projectile-offset-bow", rules.items.projectileOffsetBow, 0);
+        rules.items.projectileOffsetCrossbow =
+            decimal(*table, "projectile-offset-crossbow", rules.items.projectileOffsetCrossbow, 0);
+        rules.items.projectileOffsetEgg = decimal(*table, "projectile-offset-egg", rules.items.projectileOffsetEgg, 0);
+        rules.items.projectileOffsetEnderPearl =
+            decimal(*table, "projectile-offset-ender-pearl", rules.items.projectileOffsetEnderPearl, 0);
+        rules.items.projectileOffsetThrowablePotion =
+            decimal(*table, "projectile-offset-throwable-potion", rules.items.projectileOffsetThrowablePotion, 0);
+        rules.items.projectileOffsetTrident =
+            decimal(*table, "projectile-offset-trident", rules.items.projectileOffsetTrident, 0);
+        rules.items.projectileOffsetSnowball =
+            decimal(*table, "projectile-offset-snowball", rules.items.projectileOffsetSnowball, 0);
+        rules.items.projectileOffsetWindCharge =
+            decimal(*table, "projectile-offset-wind-charge", rules.items.projectileOffsetWindCharge, 0);
+        rules.items.minecartMaxSpeed = decimal(*table, "minecart-max-speed", rules.items.minecartMaxSpeed, 0);
+        rules.items.minecartPlaceAnywhere = flag(*table, "minecart-place-anywhere", rules.items.minecartPlaceAnywhere);
+        rules.items.poweredRailBoostModifier =
+            decimal(*table, "powered-rail-boost-modifier", rules.items.poweredRailBoostModifier, 0);
     }
     return rules;
 }
