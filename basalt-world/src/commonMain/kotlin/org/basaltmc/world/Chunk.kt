@@ -87,18 +87,21 @@ public class Chunk(
                 OCEAN_FLOOR ->
                     stateId != Blocks.AIR.stateId &&
                         stateId != Blocks.WATER.stateId &&
-                        stateId !in NON_COLLIDING_STATE_IDS
+                        !isNonColliding(stateId)
                 MOTION_BLOCKING ->
                     Blocks.hasWaterFluid(stateId) ||
-                        (stateId != Blocks.AIR.stateId && stateId !in NON_COLLIDING_STATE_IDS)
+                        (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
                 MOTION_BLOCKING_NO_LEAVES ->
                     Blocks.hasWaterFluid(stateId) ||
                         (stateId != Blocks.AIR.stateId &&
-                            stateId !in NON_COLLIDING_STATE_IDS &&
+                            !isNonColliding(stateId) &&
                             stateId !in LEAF_STATE_IDS)
             }
 
         private companion object {
+            fun isNonColliding(stateId: Int): Boolean =
+                stateId in NON_COLLIDING_STATE_IDS || Blocks.isGlowLichenState(stateId) || Blocks.isVineState(stateId)
+
             val NON_COLLIDING_STATE_IDS: Set<Int> =
                 listOf(
                     "short_grass",

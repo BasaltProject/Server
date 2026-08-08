@@ -2,10 +2,12 @@ package org.basaltmc.world.region
 
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class ChunkNbtTest {
     @Test
@@ -81,4 +83,30 @@ class ChunkNbtTest {
         assertEquals(-42, read.chunkX)
         assertEquals(17, read.chunkZ)
     }
+
+    @Test
+    fun worldgenDerivedBlockStatesRoundTripWithProperties() {
+        val chunk = Chunk(0, 0)
+        val oakAxisX = Blocks.OAK_LOG.stateId - 1
+        val vineEast = stateId("vine") - 16
+        val glowLichenUp = stateId("glow_lichen") - 4
+        val sweetBerryAge3 = stateId("sweet_berry_bush") + 3
+        val states = listOf(oakAxisX, vineEast, glowLichenUp, sweetBerryAge3)
+        states.forEachIndexed { x, stateId -> chunk.setBlockStateId(x, 64, 0, stateId) }
+
+        val tag = ChunkNbt.write(chunk)
+        val section = tag.getList("sections")!!.map { it as NbtCompound }.first { it.getByte("Y").toInt() == 4 }
+        val palette = section.getCompound("block_states").getList("palette")!!
+        val oakEntry =
+            assertNotNull(
+                palette.map { it as NbtCompound }.firstOrNull { it.getString("Name") == "minecraft:oak_log" },
+            )
+        assertEquals("x", oakEntry.getCompound("Properties").getString("axis"))
+
+        val read = ChunkNbt.read(tag)
+        states.forEachIndexed { x, stateId -> assertEquals(stateId, read.getBlockStateId(x, 64, 0)) }
+    }
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 }
