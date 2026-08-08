@@ -108,8 +108,7 @@ public fun main(args: Array<String>) {
     BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment, villageGenerator).start(startedAt)
 }
 
-private fun versionLine(): String =
-    "Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})"
+private fun versionLine(): String = "Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})"
 
 private const val WORLD_SEED = 0L
 private const val LOG_ROOT = "./.basalt/logs"

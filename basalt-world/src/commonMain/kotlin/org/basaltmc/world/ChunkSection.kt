@@ -94,5 +94,4 @@ public class ChunkSection {
         }
         return (quartY shl 4) or (quartZ shl 2) or quartX
     }
-
 }

@@ -44,7 +44,8 @@ public class SimpleBlockFeature(
 
         chunk.setBlockStateId(localX, origin.y, localZ, stateId)
         if (isDoublePlant) {
-            val upperStateId = Blocks.upperDoublePlantStateId(stateId) ?: error("state $stateId is not a lower double plant")
+            val upperStateId =
+                Blocks.upperDoublePlantStateId(stateId) ?: error("state $stateId is not a lower double plant")
             chunk.setBlockStateId(localX, origin.y + 1, localZ, upperStateId)
         }
         return true

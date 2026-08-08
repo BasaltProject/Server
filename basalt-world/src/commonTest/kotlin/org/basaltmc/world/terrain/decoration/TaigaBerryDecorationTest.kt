@@ -53,6 +53,8 @@ class TaigaBerryDecorationTest {
     }
 
     private val sweetBerryAge3StateId =
-        (Blocks.REGISTRY.byIdentifier(Identifier.vanilla("sweet_berry_bush"))?.stateId
-            ?: error("unknown block 'sweet_berry_bush'")) + 3
+        (
+            Blocks.REGISTRY.byIdentifier(Identifier.vanilla("sweet_berry_bush"))?.stateId
+                ?: error("unknown block 'sweet_berry_bush'")
+        ) + 3
 }

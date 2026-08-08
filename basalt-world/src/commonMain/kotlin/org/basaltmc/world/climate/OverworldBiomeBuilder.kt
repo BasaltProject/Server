@@ -61,7 +61,13 @@ public class OverworldBiomeBuilder {
 
     private val oceans =
         arrayOf(
-            arrayOf(Biomes.DEEP_FROZEN_OCEAN, Biomes.DEEP_COLD_OCEAN, Biomes.DEEP_OCEAN, Biomes.DEEP_LUKEWARM_OCEAN, Biomes.WARM_OCEAN),
+            arrayOf(
+                Biomes.DEEP_FROZEN_OCEAN,
+                Biomes.DEEP_COLD_OCEAN,
+                Biomes.DEEP_OCEAN,
+                Biomes.DEEP_LUKEWARM_OCEAN,
+                Biomes.WARM_OCEAN,
+            ),
             arrayOf(Biomes.FROZEN_OCEAN, Biomes.COLD_OCEAN, Biomes.OCEAN, Biomes.LUKEWARM_OCEAN, Biomes.WARM_OCEAN),
         )
     private val middleBiomes =
@@ -82,7 +88,13 @@ public class OverworldBiomeBuilder {
         )
     private val plateauBiomes =
         arrayOf(
-            arrayOf(Biomes.SNOWY_PLAINS, Biomes.SNOWY_PLAINS, Biomes.SNOWY_PLAINS, Biomes.SNOWY_TAIGA, Biomes.SNOWY_TAIGA),
+            arrayOf(
+                Biomes.SNOWY_PLAINS,
+                Biomes.SNOWY_PLAINS,
+                Biomes.SNOWY_PLAINS,
+                Biomes.SNOWY_TAIGA,
+                Biomes.SNOWY_TAIGA,
+            ),
             arrayOf(Biomes.MEADOW, Biomes.MEADOW, Biomes.FOREST, Biomes.TAIGA, Biomes.OLD_GROWTH_SPRUCE_TAIGA),
             arrayOf(Biomes.MEADOW, Biomes.MEADOW, Biomes.MEADOW, Biomes.MEADOW, Biomes.PALE_GARDEN),
             arrayOf(Biomes.SAVANNA_PLATEAU, Biomes.SAVANNA_PLATEAU, Biomes.FOREST, Biomes.FOREST, Biomes.JUNGLE),
@@ -98,9 +110,27 @@ public class OverworldBiomeBuilder {
         )
     private val shatteredBiomes =
         arrayOf(
-            arrayOf(Biomes.WINDSWEPT_GRAVELLY_HILLS, Biomes.WINDSWEPT_GRAVELLY_HILLS, Biomes.WINDSWEPT_HILLS, Biomes.WINDSWEPT_FOREST, Biomes.WINDSWEPT_FOREST),
-            arrayOf(Biomes.WINDSWEPT_GRAVELLY_HILLS, Biomes.WINDSWEPT_GRAVELLY_HILLS, Biomes.WINDSWEPT_HILLS, Biomes.WINDSWEPT_FOREST, Biomes.WINDSWEPT_FOREST),
-            arrayOf(Biomes.WINDSWEPT_HILLS, Biomes.WINDSWEPT_HILLS, Biomes.WINDSWEPT_HILLS, Biomes.WINDSWEPT_FOREST, Biomes.WINDSWEPT_FOREST),
+            arrayOf(
+                Biomes.WINDSWEPT_GRAVELLY_HILLS,
+                Biomes.WINDSWEPT_GRAVELLY_HILLS,
+                Biomes.WINDSWEPT_HILLS,
+                Biomes.WINDSWEPT_FOREST,
+                Biomes.WINDSWEPT_FOREST,
+            ),
+            arrayOf(
+                Biomes.WINDSWEPT_GRAVELLY_HILLS,
+                Biomes.WINDSWEPT_GRAVELLY_HILLS,
+                Biomes.WINDSWEPT_HILLS,
+                Biomes.WINDSWEPT_FOREST,
+                Biomes.WINDSWEPT_FOREST,
+            ),
+            arrayOf(
+                Biomes.WINDSWEPT_HILLS,
+                Biomes.WINDSWEPT_HILLS,
+                Biomes.WINDSWEPT_HILLS,
+                Biomes.WINDSWEPT_FOREST,
+                Biomes.WINDSWEPT_FOREST,
+            ),
             arrayOf(null, null, null, null, null),
             arrayOf(null, null, null, null, null),
         )
@@ -119,11 +149,38 @@ public class OverworldBiomeBuilder {
     }
 
     private fun addOffCoastBiomes(emit: (ParameterPoint, Biome) -> Unit) {
-        addSurfaceBiome(emit, fullRange, fullRange, mushroomFieldsContinentalness, fullRange, fullRange, 0.0f, Biomes.MUSHROOM_FIELDS)
+        addSurfaceBiome(
+            emit,
+            fullRange,
+            fullRange,
+            mushroomFieldsContinentalness,
+            fullRange,
+            fullRange,
+            0.0f,
+            Biomes.MUSHROOM_FIELDS,
+        )
         for (t in temperatures.indices) {
             val temperature = temperatures[t]
-            addSurfaceBiome(emit, temperature, fullRange, deepOceanContinentalness, fullRange, fullRange, 0.0f, oceans[0][t])
-            addSurfaceBiome(emit, temperature, fullRange, oceanContinentalness, fullRange, fullRange, 0.0f, oceans[1][t])
+            addSurfaceBiome(
+                emit,
+                temperature,
+                fullRange,
+                deepOceanContinentalness,
+                fullRange,
+                fullRange,
+                0.0f,
+                oceans[0][t],
+            )
+            addSurfaceBiome(
+                emit,
+                temperature,
+                fullRange,
+                oceanContinentalness,
+                fullRange,
+                fullRange,
+                0.0f,
+                oceans[1][t],
+            )
         }
     }
 
@@ -153,31 +210,122 @@ public class OverworldBiomeBuilder {
                 val humidity = humidities[h]
                 val middleBiome = pickMiddleBiome(t, h, weirdness)
                 val middleBiomeOrBadlandsIfHot = pickMiddleBiomeOrBadlandsIfHot(t, h, weirdness)
-                val middleBiomeOrBadlandsIfHotOrSlopeIfCold = pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
+                val middleBiomeOrBadlandsIfHotOrSlopeIfCold =
+                    pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
                 val plateauBiome = pickPlateauBiome(t, h, weirdness)
                 val shatteredBiome = pickShatteredBiome(t, h, weirdness)
                 val shatteredBiomeOrWindsweptSavanna = maybePickWindsweptSavannaBiome(t, h, weirdness, shatteredBiome)
                 val peakBiome = pickPeakBiome(t, h, weirdness)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(coastContinentalness, farInlandContinentalness), erosions[0], weirdness, 0.0f, peakBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(coastContinentalness, nearInlandContinentalness), erosions[1], weirdness, 0.0f,
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, farInlandContinentalness),
+                    erosions[0],
+                    weirdness,
+                    0.0f,
+                    peakBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, nearInlandContinentalness),
+                    erosions[1],
+                    weirdness,
+                    0.0f,
                     middleBiomeOrBadlandsIfHotOrSlopeIfCold,
                 )
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[1], weirdness, 0.0f, peakBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(coastContinentalness, nearInlandContinentalness),
-                    Parameter.span(erosions[2], erosions[3]), weirdness, 0.0f, middleBiome,
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[1],
+                    weirdness,
+                    0.0f,
+                    peakBiome,
                 )
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[2], weirdness, 0.0f, plateauBiome)
-                addSurfaceBiome(emit, temperature, humidity, midInlandContinentalness, erosions[3], weirdness, 0.0f, middleBiomeOrBadlandsIfHot)
-                addSurfaceBiome(emit, temperature, humidity, farInlandContinentalness, erosions[3], weirdness, 0.0f, plateauBiome)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(coastContinentalness, farInlandContinentalness), erosions[4], weirdness, 0.0f, middleBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(coastContinentalness, nearInlandContinentalness), erosions[5], weirdness, 0.0f,
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, nearInlandContinentalness),
+                    Parameter.span(erosions[2], erosions[3]),
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[2],
+                    weirdness,
+                    0.0f,
+                    plateauBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    midInlandContinentalness,
+                    erosions[3],
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrBadlandsIfHot,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    farInlandContinentalness,
+                    erosions[3],
+                    weirdness,
+                    0.0f,
+                    plateauBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, farInlandContinentalness),
+                    erosions[4],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, nearInlandContinentalness),
+                    erosions[5],
+                    weirdness,
+                    0.0f,
                     shatteredBiomeOrWindsweptSavanna,
                 )
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[5], weirdness, 0.0f, shatteredBiome)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(coastContinentalness, farInlandContinentalness), erosions[6], weirdness, 0.0f, middleBiome)
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    shatteredBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, farInlandContinentalness),
+                    erosions[6],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
             }
         }
     }
@@ -192,31 +340,143 @@ public class OverworldBiomeBuilder {
                 val humidity = humidities[h]
                 val middleBiome = pickMiddleBiome(t, h, weirdness)
                 val middleBiomeOrBadlandsIfHot = pickMiddleBiomeOrBadlandsIfHot(t, h, weirdness)
-                val middleBiomeOrBadlandsIfHotOrSlopeIfCold = pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
+                val middleBiomeOrBadlandsIfHotOrSlopeIfCold =
+                    pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
                 val plateauBiome = pickPlateauBiome(t, h, weirdness)
                 val shatteredBiome = pickShatteredBiome(t, h, weirdness)
                 val middleBiomeOrWindsweptSavanna = maybePickWindsweptSavannaBiome(t, h, weirdness, middleBiome)
                 val slopeBiome = pickSlopeBiome(t, h, weirdness)
                 val peakBiome = pickPeakBiome(t, h, weirdness)
-                addSurfaceBiome(emit, temperature, humidity, coastContinentalness, Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f, middleBiome)
-                addSurfaceBiome(emit, temperature, humidity, nearInlandContinentalness, erosions[0], weirdness, 0.0f, slopeBiome)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[0], weirdness, 0.0f, peakBiome)
-                addSurfaceBiome(emit, temperature, humidity, nearInlandContinentalness, erosions[1], weirdness, 0.0f, middleBiomeOrBadlandsIfHotOrSlopeIfCold)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[1], weirdness, 0.0f, slopeBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(coastContinentalness, nearInlandContinentalness),
-                    Parameter.span(erosions[2], erosions[3]), weirdness, 0.0f, middleBiome,
+                    emit,
+                    temperature,
+                    humidity,
+                    coastContinentalness,
+                    Parameter.span(erosions[0], erosions[1]),
+                    weirdness,
+                    0.0f,
+                    middleBiome,
                 )
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[2], weirdness, 0.0f, plateauBiome)
-                addSurfaceBiome(emit, temperature, humidity, midInlandContinentalness, erosions[3], weirdness, 0.0f, middleBiomeOrBadlandsIfHot)
-                addSurfaceBiome(emit, temperature, humidity, farInlandContinentalness, erosions[3], weirdness, 0.0f, plateauBiome)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(coastContinentalness, farInlandContinentalness), erosions[4], weirdness, 0.0f, middleBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(coastContinentalness, nearInlandContinentalness), erosions[5], weirdness, 0.0f,
+                    emit,
+                    temperature,
+                    humidity,
+                    nearInlandContinentalness,
+                    erosions[0],
+                    weirdness,
+                    0.0f,
+                    slopeBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[0],
+                    weirdness,
+                    0.0f,
+                    peakBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    nearInlandContinentalness,
+                    erosions[1],
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrBadlandsIfHotOrSlopeIfCold,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[1],
+                    weirdness,
+                    0.0f,
+                    slopeBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, nearInlandContinentalness),
+                    Parameter.span(erosions[2], erosions[3]),
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[2],
+                    weirdness,
+                    0.0f,
+                    plateauBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    midInlandContinentalness,
+                    erosions[3],
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrBadlandsIfHot,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    farInlandContinentalness,
+                    erosions[3],
+                    weirdness,
+                    0.0f,
+                    plateauBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, farInlandContinentalness),
+                    erosions[4],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, nearInlandContinentalness),
+                    erosions[5],
+                    weirdness,
+                    0.0f,
                     middleBiomeOrWindsweptSavanna,
                 )
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[5], weirdness, 0.0f, shatteredBiome)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(coastContinentalness, farInlandContinentalness), erosions[6], weirdness, 0.0f, middleBiome)
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    shatteredBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, farInlandContinentalness),
+                    erosions[6],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
             }
         }
     }
@@ -225,14 +485,35 @@ public class OverworldBiomeBuilder {
         emit: (ParameterPoint, Biome) -> Unit,
         weirdness: Parameter,
     ) {
-        addSurfaceBiome(emit, fullRange, fullRange, coastContinentalness, Parameter.span(erosions[0], erosions[2]), weirdness, 0.0f, Biomes.STONY_SHORE)
         addSurfaceBiome(
-            emit, Parameter.span(temperatures[1], temperatures[2]), fullRange, Parameter.span(nearInlandContinentalness, farInlandContinentalness),
-            erosions[6], weirdness, 0.0f, Biomes.SWAMP,
+            emit,
+            fullRange,
+            fullRange,
+            coastContinentalness,
+            Parameter.span(erosions[0], erosions[2]),
+            weirdness,
+            0.0f,
+            Biomes.STONY_SHORE,
         )
         addSurfaceBiome(
-            emit, Parameter.span(temperatures[3], temperatures[4]), fullRange, Parameter.span(nearInlandContinentalness, farInlandContinentalness),
-            erosions[6], weirdness, 0.0f, Biomes.MANGROVE_SWAMP,
+            emit,
+            Parameter.span(temperatures[1], temperatures[2]),
+            fullRange,
+            Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.SWAMP,
+        )
+        addSurfaceBiome(
+            emit,
+            Parameter.span(temperatures[3], temperatures[4]),
+            fullRange,
+            Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.MANGROVE_SWAMP,
         )
 
         for (t in temperatures.indices) {
@@ -241,46 +522,191 @@ public class OverworldBiomeBuilder {
                 val humidity = humidities[h]
                 val middleBiome = pickMiddleBiome(t, h, weirdness)
                 val middleBiomeOrBadlandsIfHot = pickMiddleBiomeOrBadlandsIfHot(t, h, weirdness)
-                val middleBiomeOrBadlandsIfHotOrSlopeIfCold = pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
+                val middleBiomeOrBadlandsIfHotOrSlopeIfCold =
+                    pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
                 val shatteredBiome = pickShatteredBiome(t, h, weirdness)
                 val plateauBiome = pickPlateauBiome(t, h, weirdness)
                 val beachBiome = pickBeachBiome(t, h)
                 val middleBiomeOrWindsweptSavanna = maybePickWindsweptSavannaBiome(t, h, weirdness, middleBiome)
                 val shatteredCoastBiome = pickShatteredCoastBiome(t, h, weirdness)
                 val slopeBiome = pickSlopeBiome(t, h, weirdness)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(nearInlandContinentalness, farInlandContinentalness), erosions[0], weirdness, 0.0f, slopeBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(nearInlandContinentalness, midInlandContinentalness), erosions[1], weirdness, 0.0f,
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+                    erosions[0],
+                    weirdness,
+                    0.0f,
+                    slopeBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(nearInlandContinentalness, midInlandContinentalness),
+                    erosions[1],
+                    weirdness,
+                    0.0f,
                     middleBiomeOrBadlandsIfHotOrSlopeIfCold,
                 )
                 addSurfaceBiome(
-                    emit, temperature, humidity, farInlandContinentalness, erosions[1], weirdness, 0.0f,
+                    emit,
+                    temperature,
+                    humidity,
+                    farInlandContinentalness,
+                    erosions[1],
+                    weirdness,
+                    0.0f,
                     if (t == 0) slopeBiome else plateauBiome,
                 )
-                addSurfaceBiome(emit, temperature, humidity, nearInlandContinentalness, erosions[2], weirdness, 0.0f, middleBiome)
-                addSurfaceBiome(emit, temperature, humidity, midInlandContinentalness, erosions[2], weirdness, 0.0f, middleBiomeOrBadlandsIfHot)
-                addSurfaceBiome(emit, temperature, humidity, farInlandContinentalness, erosions[2], weirdness, 0.0f, plateauBiome)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(coastContinentalness, nearInlandContinentalness), erosions[3], weirdness, 0.0f, middleBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[3], weirdness, 0.0f,
+                    emit,
+                    temperature,
+                    humidity,
+                    nearInlandContinentalness,
+                    erosions[2],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    midInlandContinentalness,
+                    erosions[2],
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrBadlandsIfHot,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    farInlandContinentalness,
+                    erosions[2],
+                    weirdness,
+                    0.0f,
+                    plateauBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(coastContinentalness, nearInlandContinentalness),
+                    erosions[3],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[3],
+                    weirdness,
+                    0.0f,
                     middleBiomeOrBadlandsIfHot,
                 )
                 if (weirdness.max < 0L) {
-                    addSurfaceBiome(emit, temperature, humidity, coastContinentalness, erosions[4], weirdness, 0.0f, beachBiome)
-                    addSurfaceBiome(emit, temperature, humidity, Parameter.span(nearInlandContinentalness, farInlandContinentalness), erosions[4], weirdness, 0.0f, middleBiome)
+                    addSurfaceBiome(
+                        emit,
+                        temperature,
+                        humidity,
+                        coastContinentalness,
+                        erosions[4],
+                        weirdness,
+                        0.0f,
+                        beachBiome,
+                    )
+                    addSurfaceBiome(
+                        emit,
+                        temperature,
+                        humidity,
+                        Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+                        erosions[4],
+                        weirdness,
+                        0.0f,
+                        middleBiome,
+                    )
                 } else {
-                    addSurfaceBiome(emit, temperature, humidity, Parameter.span(coastContinentalness, farInlandContinentalness), erosions[4], weirdness, 0.0f, middleBiome)
+                    addSurfaceBiome(
+                        emit,
+                        temperature,
+                        humidity,
+                        Parameter.span(coastContinentalness, farInlandContinentalness),
+                        erosions[4],
+                        weirdness,
+                        0.0f,
+                        middleBiome,
+                    )
                 }
-                addSurfaceBiome(emit, temperature, humidity, coastContinentalness, erosions[5], weirdness, 0.0f, shatteredCoastBiome)
-                addSurfaceBiome(emit, temperature, humidity, nearInlandContinentalness, erosions[5], weirdness, 0.0f, middleBiomeOrWindsweptSavanna)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[5], weirdness, 0.0f, shatteredBiome)
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    coastContinentalness,
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    shatteredCoastBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    nearInlandContinentalness,
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrWindsweptSavanna,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    shatteredBiome,
+                )
                 if (weirdness.max < 0L) {
-                    addSurfaceBiome(emit, temperature, humidity, coastContinentalness, erosions[6], weirdness, 0.0f, beachBiome)
+                    addSurfaceBiome(
+                        emit,
+                        temperature,
+                        humidity,
+                        coastContinentalness,
+                        erosions[6],
+                        weirdness,
+                        0.0f,
+                        beachBiome,
+                    )
                 } else {
-                    addSurfaceBiome(emit, temperature, humidity, coastContinentalness, erosions[6], weirdness, 0.0f, middleBiome)
+                    addSurfaceBiome(
+                        emit,
+                        temperature,
+                        humidity,
+                        coastContinentalness,
+                        erosions[6],
+                        weirdness,
+                        0.0f,
+                        middleBiome,
+                    )
                 }
                 if (t == 0) {
-                    addSurfaceBiome(emit, temperature, humidity, Parameter.span(nearInlandContinentalness, farInlandContinentalness), erosions[6], weirdness, 0.0f, middleBiome)
+                    addSurfaceBiome(
+                        emit,
+                        temperature,
+                        humidity,
+                        Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+                        erosions[6],
+                        weirdness,
+                        0.0f,
+                        middleBiome,
+                    )
                 }
             }
         }
@@ -290,14 +716,35 @@ public class OverworldBiomeBuilder {
         emit: (ParameterPoint, Biome) -> Unit,
         weirdness: Parameter,
     ) {
-        addSurfaceBiome(emit, fullRange, fullRange, coastContinentalness, Parameter.span(erosions[0], erosions[2]), weirdness, 0.0f, Biomes.STONY_SHORE)
         addSurfaceBiome(
-            emit, Parameter.span(temperatures[1], temperatures[2]), fullRange, Parameter.span(nearInlandContinentalness, farInlandContinentalness),
-            erosions[6], weirdness, 0.0f, Biomes.SWAMP,
+            emit,
+            fullRange,
+            fullRange,
+            coastContinentalness,
+            Parameter.span(erosions[0], erosions[2]),
+            weirdness,
+            0.0f,
+            Biomes.STONY_SHORE,
         )
         addSurfaceBiome(
-            emit, Parameter.span(temperatures[3], temperatures[4]), fullRange, Parameter.span(nearInlandContinentalness, farInlandContinentalness),
-            erosions[6], weirdness, 0.0f, Biomes.MANGROVE_SWAMP,
+            emit,
+            Parameter.span(temperatures[1], temperatures[2]),
+            fullRange,
+            Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.SWAMP,
+        )
+        addSurfaceBiome(
+            emit,
+            Parameter.span(temperatures[3], temperatures[4]),
+            fullRange,
+            Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.MANGROVE_SWAMP,
         )
 
         for (t in temperatures.indices) {
@@ -306,31 +753,122 @@ public class OverworldBiomeBuilder {
                 val humidity = humidities[h]
                 val middleBiome = pickMiddleBiome(t, h, weirdness)
                 val middleBiomeOrBadlandsIfHot = pickMiddleBiomeOrBadlandsIfHot(t, h, weirdness)
-                val middleBiomeOrBadlandsIfHotOrSlopeIfCold = pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
+                val middleBiomeOrBadlandsIfHotOrSlopeIfCold =
+                    pickMiddleBiomeOrBadlandsIfHotOrSlopeIfCold(t, h, weirdness)
                 val beachBiome = pickBeachBiome(t, h)
                 val middleBiomeOrWindsweptSavanna = maybePickWindsweptSavannaBiome(t, h, weirdness, middleBiome)
                 val shatteredCoastBiome = pickShatteredCoastBiome(t, h, weirdness)
                 addSurfaceBiome(
-                    emit, temperature, humidity, nearInlandContinentalness, Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f,
+                    emit,
+                    temperature,
+                    humidity,
+                    nearInlandContinentalness,
+                    Parameter.span(erosions[0], erosions[1]),
+                    weirdness,
+                    0.0f,
                     middleBiomeOrBadlandsIfHot,
                 )
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness),
-                    Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f, middleBiomeOrBadlandsIfHotOrSlopeIfCold,
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    Parameter.span(erosions[0], erosions[1]),
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrBadlandsIfHotOrSlopeIfCold,
                 )
-                addSurfaceBiome(emit, temperature, humidity, nearInlandContinentalness, Parameter.span(erosions[2], erosions[3]), weirdness, 0.0f, middleBiome)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness),
-                    Parameter.span(erosions[2], erosions[3]), weirdness, 0.0f, middleBiomeOrBadlandsIfHot,
+                    emit,
+                    temperature,
+                    humidity,
+                    nearInlandContinentalness,
+                    Parameter.span(erosions[2], erosions[3]),
+                    weirdness,
+                    0.0f,
+                    middleBiome,
                 )
-                addSurfaceBiome(emit, temperature, humidity, coastContinentalness, Parameter.span(erosions[3], erosions[4]), weirdness, 0.0f, beachBiome)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(nearInlandContinentalness, farInlandContinentalness), erosions[4], weirdness, 0.0f, middleBiome)
-                addSurfaceBiome(emit, temperature, humidity, coastContinentalness, erosions[5], weirdness, 0.0f, shatteredCoastBiome)
-                addSurfaceBiome(emit, temperature, humidity, nearInlandContinentalness, erosions[5], weirdness, 0.0f, middleBiomeOrWindsweptSavanna)
-                addSurfaceBiome(emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness), erosions[5], weirdness, 0.0f, middleBiome)
-                addSurfaceBiome(emit, temperature, humidity, coastContinentalness, erosions[6], weirdness, 0.0f, beachBiome)
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    Parameter.span(erosions[2], erosions[3]),
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrBadlandsIfHot,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    coastContinentalness,
+                    Parameter.span(erosions[3], erosions[4]),
+                    weirdness,
+                    0.0f,
+                    beachBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+                    erosions[4],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    coastContinentalness,
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    shatteredCoastBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    nearInlandContinentalness,
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrWindsweptSavanna,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    erosions[5],
+                    weirdness,
+                    0.0f,
+                    middleBiome,
+                )
+                addSurfaceBiome(
+                    emit,
+                    temperature,
+                    humidity,
+                    coastContinentalness,
+                    erosions[6],
+                    weirdness,
+                    0.0f,
+                    beachBiome,
+                )
                 if (t == 0) {
-                    addSurfaceBiome(emit, temperature, humidity, Parameter.span(nearInlandContinentalness, farInlandContinentalness), erosions[6], weirdness, 0.0f, middleBiome)
+                    addSurfaceBiome(
+                        emit,
+                        temperature,
+                        humidity,
+                        Parameter.span(nearInlandContinentalness, farInlandContinentalness),
+                        erosions[6],
+                        weirdness,
+                        0.0f,
+                        middleBiome,
+                    )
                 }
             }
         }
@@ -341,35 +879,113 @@ public class OverworldBiomeBuilder {
         weirdness: Parameter,
     ) {
         addSurfaceBiome(
-            emit, frozenRange, fullRange, coastContinentalness, Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f,
+            emit,
+            frozenRange,
+            fullRange,
+            coastContinentalness,
+            Parameter.span(erosions[0], erosions[1]),
+            weirdness,
+            0.0f,
             if (weirdness.max < 0L) Biomes.STONY_SHORE else Biomes.FROZEN_RIVER,
         )
         addSurfaceBiome(
-            emit, unfrozenRange, fullRange, coastContinentalness, Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f,
+            emit,
+            unfrozenRange,
+            fullRange,
+            coastContinentalness,
+            Parameter.span(erosions[0], erosions[1]),
+            weirdness,
+            0.0f,
             if (weirdness.max < 0L) Biomes.STONY_SHORE else Biomes.RIVER,
         )
-        addSurfaceBiome(emit, frozenRange, fullRange, nearInlandContinentalness, Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f, Biomes.FROZEN_RIVER)
-        addSurfaceBiome(emit, unfrozenRange, fullRange, nearInlandContinentalness, Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f, Biomes.RIVER)
         addSurfaceBiome(
-            emit, frozenRange, fullRange, Parameter.span(coastContinentalness, farInlandContinentalness), Parameter.span(erosions[2], erosions[5]),
-            weirdness, 0.0f, Biomes.FROZEN_RIVER,
+            emit,
+            frozenRange,
+            fullRange,
+            nearInlandContinentalness,
+            Parameter.span(erosions[0], erosions[1]),
+            weirdness,
+            0.0f,
+            Biomes.FROZEN_RIVER,
         )
         addSurfaceBiome(
-            emit, unfrozenRange, fullRange, Parameter.span(coastContinentalness, farInlandContinentalness), Parameter.span(erosions[2], erosions[5]),
-            weirdness, 0.0f, Biomes.RIVER,
-        )
-        addSurfaceBiome(emit, frozenRange, fullRange, coastContinentalness, erosions[6], weirdness, 0.0f, Biomes.FROZEN_RIVER)
-        addSurfaceBiome(emit, unfrozenRange, fullRange, coastContinentalness, erosions[6], weirdness, 0.0f, Biomes.RIVER)
-        addSurfaceBiome(
-            emit, Parameter.span(temperatures[1], temperatures[2]), fullRange, Parameter.span(inlandContinentalness, farInlandContinentalness),
-            erosions[6], weirdness, 0.0f, Biomes.SWAMP,
-        )
-        addSurfaceBiome(
-            emit, Parameter.span(temperatures[3], temperatures[4]), fullRange, Parameter.span(inlandContinentalness, farInlandContinentalness),
-            erosions[6], weirdness, 0.0f, Biomes.MANGROVE_SWAMP,
+            emit,
+            unfrozenRange,
+            fullRange,
+            nearInlandContinentalness,
+            Parameter.span(erosions[0], erosions[1]),
+            weirdness,
+            0.0f,
+            Biomes.RIVER,
         )
         addSurfaceBiome(
-            emit, frozenRange, fullRange, Parameter.span(inlandContinentalness, farInlandContinentalness), erosions[6], weirdness, 0.0f,
+            emit,
+            frozenRange,
+            fullRange,
+            Parameter.span(coastContinentalness, farInlandContinentalness),
+            Parameter.span(erosions[2], erosions[5]),
+            weirdness,
+            0.0f,
+            Biomes.FROZEN_RIVER,
+        )
+        addSurfaceBiome(
+            emit,
+            unfrozenRange,
+            fullRange,
+            Parameter.span(coastContinentalness, farInlandContinentalness),
+            Parameter.span(erosions[2], erosions[5]),
+            weirdness,
+            0.0f,
+            Biomes.RIVER,
+        )
+        addSurfaceBiome(
+            emit,
+            frozenRange,
+            fullRange,
+            coastContinentalness,
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.FROZEN_RIVER,
+        )
+        addSurfaceBiome(
+            emit,
+            unfrozenRange,
+            fullRange,
+            coastContinentalness,
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.RIVER,
+        )
+        addSurfaceBiome(
+            emit,
+            Parameter.span(temperatures[1], temperatures[2]),
+            fullRange,
+            Parameter.span(inlandContinentalness, farInlandContinentalness),
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.SWAMP,
+        )
+        addSurfaceBiome(
+            emit,
+            Parameter.span(temperatures[3], temperatures[4]),
+            fullRange,
+            Parameter.span(inlandContinentalness, farInlandContinentalness),
+            erosions[6],
+            weirdness,
+            0.0f,
+            Biomes.MANGROVE_SWAMP,
+        )
+        addSurfaceBiome(
+            emit,
+            frozenRange,
+            fullRange,
+            Parameter.span(inlandContinentalness, farInlandContinentalness),
+            erosions[6],
+            weirdness,
+            0.0f,
             Biomes.FROZEN_RIVER,
         )
 
@@ -379,21 +995,60 @@ public class OverworldBiomeBuilder {
                 val humidity = humidities[h]
                 val middleBiomeOrBadlandsIfHot = pickMiddleBiomeOrBadlandsIfHot(t, h, weirdness)
                 addSurfaceBiome(
-                    emit, temperature, humidity, Parameter.span(midInlandContinentalness, farInlandContinentalness),
-                    Parameter.span(erosions[0], erosions[1]), weirdness, 0.0f, middleBiomeOrBadlandsIfHot,
+                    emit,
+                    temperature,
+                    humidity,
+                    Parameter.span(midInlandContinentalness, farInlandContinentalness),
+                    Parameter.span(erosions[0], erosions[1]),
+                    weirdness,
+                    0.0f,
+                    middleBiomeOrBadlandsIfHot,
                 )
             }
         }
     }
 
     private fun addUndergroundBiomes(emit: (ParameterPoint, Biome) -> Unit) {
-        addUndergroundBiome(emit, fullRange, fullRange, Parameter.span(0.8f, 1.0f), fullRange, fullRange, 0.0f, Biomes.DRIPSTONE_CAVES)
-        addUndergroundBiome(emit, fullRange, Parameter.span(0.7f, 1.0f), fullRange, fullRange, fullRange, 0.0f, Biomes.LUSH_CAVES)
         addUndergroundBiome(
-            emit, fullRange, fullRange, Parameter.span(coastContinentalness, inlandContinentalness), Parameter.span(erosions[5], erosions[6]),
-            Parameter.span(-1.1f, -0.85f), 0.0f, Biomes.SULFUR_CAVES,
+            emit,
+            fullRange,
+            fullRange,
+            Parameter.span(0.8f, 1.0f),
+            fullRange,
+            fullRange,
+            0.0f,
+            Biomes.DRIPSTONE_CAVES,
         )
-        addBottomBiome(emit, fullRange, fullRange, fullRange, Parameter.span(erosions[0], erosions[1]), fullRange, 0.0f, Biomes.DEEP_DARK)
+        addUndergroundBiome(
+            emit,
+            fullRange,
+            Parameter.span(0.7f, 1.0f),
+            fullRange,
+            fullRange,
+            fullRange,
+            0.0f,
+            Biomes.LUSH_CAVES,
+        )
+        addUndergroundBiome(
+            emit,
+            fullRange,
+            fullRange,
+            Parameter.span(coastContinentalness, inlandContinentalness),
+            Parameter.span(erosions[5], erosions[6]),
+            Parameter.span(-1.1f, -0.85f),
+            0.0f,
+            Biomes.SULFUR_CAVES,
+        )
+        addBottomBiome(
+            emit,
+            fullRange,
+            fullRange,
+            fullRange,
+            Parameter.span(erosions[0], erosions[1]),
+            fullRange,
+            0.0f,
+            Biomes.DEEP_DARK,
+        )
     }
 
     private fun pickMiddleBiome(
@@ -494,8 +1149,30 @@ public class OverworldBiomeBuilder {
         offset: Float,
         biome: Biome,
     ) {
-        emit(ParameterPoint(temperature, humidity, continentalness, erosion, Parameter.point(0.0f), weirdness, Parameter.quantizeCoord(offset)), biome)
-        emit(ParameterPoint(temperature, humidity, continentalness, erosion, Parameter.point(1.0f), weirdness, Parameter.quantizeCoord(offset)), biome)
+        emit(
+            ParameterPoint(
+                temperature,
+                humidity,
+                continentalness,
+                erosion,
+                Parameter.point(0.0f),
+                weirdness,
+                Parameter.quantizeCoord(offset),
+            ),
+            biome,
+        )
+        emit(
+            ParameterPoint(
+                temperature,
+                humidity,
+                continentalness,
+                erosion,
+                Parameter.point(1.0f),
+                weirdness,
+                Parameter.quantizeCoord(offset),
+            ),
+            biome,
+        )
     }
 
     private fun addUndergroundBiome(
@@ -508,7 +1185,18 @@ public class OverworldBiomeBuilder {
         offset: Float,
         biome: Biome,
     ) {
-        emit(ParameterPoint(temperature, humidity, continentalness, erosion, Parameter.span(0.2f, 0.9f), weirdness, Parameter.quantizeCoord(offset)), biome)
+        emit(
+            ParameterPoint(
+                temperature,
+                humidity,
+                continentalness,
+                erosion,
+                Parameter.span(0.2f, 0.9f),
+                weirdness,
+                Parameter.quantizeCoord(offset),
+            ),
+            biome,
+        )
     }
 
     private fun addBottomBiome(
@@ -521,6 +1209,17 @@ public class OverworldBiomeBuilder {
         offset: Float,
         biome: Biome,
     ) {
-        emit(ParameterPoint(temperature, humidity, continentalness, erosion, Parameter.point(1.1f), weirdness, Parameter.quantizeCoord(offset)), biome)
+        emit(
+            ParameterPoint(
+                temperature,
+                humidity,
+                continentalness,
+                erosion,
+                Parameter.point(1.1f),
+                weirdness,
+                Parameter.quantizeCoord(offset),
+            ),
+            biome,
+        )
     }
 }

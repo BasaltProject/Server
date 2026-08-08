@@ -14,12 +14,13 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
     ) {
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-        for (modifier in
-            listOf(
-                CountPlacement(1),
-                InSquarePlacement,
-                HeightmapPlacement(Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES),
-            )
+        for (
+        modifier in
+        listOf(
+            CountPlacement(1),
+            InSquarePlacement,
+            HeightmapPlacement(Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES),
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }

@@ -21,13 +21,23 @@ class PerlinSimplexNoiseTest {
         val zs = doubleArrayOf(0.0, -8.0, 44.5, -12.25, 1000.0, -0.5, -77.75)
         val expectedTemperature =
             doubleArrayOf(
-                0.0, -0.07641525504430638, 0.718654881614431, 0.8449865607379375,
-                -0.1515667691373931, 0.2951624419786104, 0.49520855886444215,
+                0.0,
+                -0.07641525504430638,
+                0.718654881614431,
+                0.8449865607379375,
+                -0.1515667691373931,
+                0.2951624419786104,
+                0.49520855886444215,
             )
         val expectedFrozen =
             doubleArrayOf(
-                0.0, -0.04376992009740707, -0.24215671138946523, -0.06287236205638891,
-                -0.07978575914177771, 0.3159448449441774, -0.08709533599218736,
+                0.0,
+                -0.04376992009740707,
+                -0.24215671138946523,
+                -0.06287236205638891,
+                -0.07978575914177771,
+                0.3159448449441774,
+                -0.08709533599218736,
             )
         for (i in xs.indices) {
             assertEquals(expectedTemperature[i], temperature.getValue(xs[i], zs[i]), "temperature at index $i")
@@ -38,7 +48,11 @@ class PerlinSimplexNoiseTest {
         val zs2 = doubleArrayOf(5.0, 44.0, -9.5)
         val expectedFrozenScaled = doubleArrayOf(0.4854785727425417, -0.4128040443062369, 0.04715321975795093)
         for (i in xs2.indices) {
-            assertEquals(expectedFrozenScaled[i], frozen.getValue(xs2[i] * 0.05, zs2[i] * 0.05), "scaled frozen at index $i")
+            assertEquals(
+                expectedFrozenScaled[i],
+                frozen.getValue(xs2[i] * 0.05, zs2[i] * 0.05),
+                "scaled frozen at index $i",
+            )
         }
     }
 }

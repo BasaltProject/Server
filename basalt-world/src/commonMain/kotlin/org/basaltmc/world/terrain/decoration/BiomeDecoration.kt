@@ -3,8 +3,8 @@ package org.basaltmc.world.terrain.decoration
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
-import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
 import org.basaltmc.world.terrain.decoration.tree.FallenTreeConfigs
+import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
 
 /** One biome's real `vegetal_decoration` (and friends) generation step. // parity: the `Decoration.VEGETAL_DECORATION`-and-later portion of a biome's own `BiomeGenerationSettings`. */
 public fun interface BiomeVegetalDecoration {
@@ -95,11 +95,21 @@ public object BiomeDecoration {
             Identifier.vanilla("flower_forest") to FlowerForestDecoration,
             // parity: OverworldBiomes.forest(birch=true, tall=false)/addBirchTrees: TREES_BIRCH, birch default.
             Identifier.vanilla("birch_forest") to
-                TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenBirchTree), birchBees0002Tree, 10, 0.1f, 1),
+                TreeDecoration.candidateSequenceCountExtra(
+                    listOf(0.0125f to fallenBirchTree),
+                    birchBees0002Tree,
+                    10,
+                    0.1f,
+                    1,
+                ),
             // parity: OverworldBiomes.forest(birch=true, tall=true)/addTallBirchTrees: BIRCH_TALL, super_birch default.
             Identifier.vanilla("old_growth_birch_forest") to
                 TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.00625f to fallenSuperBirchTree, 0.5f to superBirchBees0002Tree, 0.0125f to fallenBirchTree),
+                    listOf(
+                        0.00625f to fallenSuperBirchTree,
+                        0.5f to superBirchBees0002Tree,
+                        0.0125f to fallenBirchTree,
+                    ),
                     birchBees0002Tree,
                     10,
                     0.1f,
@@ -122,7 +132,13 @@ public object BiomeDecoration {
             // parity: OverworldBiomes.taiga(snowy=true)/addSnowyTrees+addDefaultFlowers: TREES_SNOWY, spruce default.
             Identifier.vanilla("snowy_taiga") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenSpruceTree), spruceTree, 0, 0.1f, 1),
+                    TreeDecoration.candidateSequenceCountExtra(
+                        listOf(0.0125f to fallenSpruceTree),
+                        spruceTree,
+                        0,
+                        0.1f,
+                        1,
+                    ),
                     DefaultVegetationDecoration.FLOWERS,
                 ),
             // parity: OverworldBiomes.oldGrowthTaiga(spruce=true)/TREES_OLD_GROWTH_SPRUCE_TAIGA: 33.3% mega_spruce,
@@ -163,12 +179,24 @@ public object BiomeDecoration {
             // parity: OverworldBiomes.plains(snowy=true, spikes=false/true)/addSnowyTrees: same TREES_SNOWY feature.
             Identifier.vanilla("snowy_plains") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenSpruceTree), spruceTree, 0, 0.1f, 1),
+                    TreeDecoration.candidateSequenceCountExtra(
+                        listOf(0.0125f to fallenSpruceTree),
+                        spruceTree,
+                        0,
+                        0.1f,
+                        1,
+                    ),
                     DefaultVegetationDecoration,
                 ),
             Identifier.vanilla("ice_spikes") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenSpruceTree), spruceTree, 0, 0.1f, 1),
+                    TreeDecoration.candidateSequenceCountExtra(
+                        listOf(0.0125f to fallenSpruceTree),
+                        spruceTree,
+                        0,
+                        0.1f,
+                        1,
+                    ),
                     DefaultVegetationDecoration,
                 ),
             // parity: OverworldBiomes.savanna/addSavannaTrees+addWarmFlowers: TREES_SAVANNA (80% acacia else oak,
@@ -232,7 +260,11 @@ public object BiomeDecoration {
             Identifier.vanilla("sparse_jungle") to
                 combine(
                     TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.1f to fancyOakTree, 0.5f to TreeDecoration.tree(TreeConfigs.JUNGLE_BUSH), 0.0125f to fallenJungleTree),
+                        listOf(
+                            0.1f to fancyOakTree,
+                            0.5f to TreeDecoration.tree(TreeConfigs.JUNGLE_BUSH),
+                            0.0125f to fallenJungleTree,
+                        ),
                         TreeDecoration.tree(TreeConfigs.JUNGLE_TREE),
                         2,
                         0.1f,
@@ -245,7 +277,12 @@ public object BiomeDecoration {
             // TREES_WINDSWEPT_HILLS: fallen spruce 0.8325%, spruce 66.6%, fancy oak 10%, fallen oak 1.25%, oak default.
             Identifier.vanilla("windswept_hills") to
                 TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.008325f to fallenSpruceTree, 0.666f to spruceTree, 0.1f to fancyOakTree, 0.0125f to fallenOakTree),
+                    listOf(
+                        0.008325f to fallenSpruceTree,
+                        0.666f to spruceTree,
+                        0.1f to fancyOakTree,
+                        0.0125f to fallenOakTree,
+                    ),
                     oakTree,
                     0,
                     0.1f,
@@ -253,7 +290,12 @@ public object BiomeDecoration {
                 ),
             Identifier.vanilla("windswept_gravelly_hills") to
                 TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.008325f to fallenSpruceTree, 0.666f to spruceTree, 0.1f to fancyOakTree, 0.0125f to fallenOakTree),
+                    listOf(
+                        0.008325f to fallenSpruceTree,
+                        0.666f to spruceTree,
+                        0.1f to fancyOakTree,
+                        0.0125f to fallenOakTree,
+                    ),
                     oakTree,
                     0,
                     0.1f,
@@ -262,14 +304,20 @@ public object BiomeDecoration {
             // parity: OverworldBiomes.windsweptHills(moreTrees=true)/addMountainForestTrees: TREES_WINDSWEPT_FOREST, same species mix.
             Identifier.vanilla("windswept_forest") to
                 TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.008325f to fallenSpruceTree, 0.666f to spruceTree, 0.1f to fancyOakTree, 0.0125f to fallenOakTree),
+                    listOf(
+                        0.008325f to fallenSpruceTree,
+                        0.666f to spruceTree,
+                        0.1f to fancyOakTree,
+                        0.0125f to fallenOakTree,
+                    ),
                     oakTree,
                     3,
                     0.1f,
                     1,
                 ),
             // parity: OverworldBiomes.grove/addGroveTrees: TREES_GROVE, 33.3% pine else spruce (real "on snow" placement filter dropped).
-            Identifier.vanilla("grove") to TreeDecoration.choice(TreeConfigs.PINE, 0.33333334f, TreeConfigs.SPRUCE, 10, 0.1f, 1),
+            Identifier.vanilla("grove") to
+                TreeDecoration.choice(TreeConfigs.PINE, 0.33333334f, TreeConfigs.SPRUCE, 10, 0.1f, 1),
             // parity: peaks have no vegetal features; snowy slopes adds only patch_pumpkin later.
             // Explicit empty bases keep their earlier shared disk stage reachable through forBiome.
             Identifier.vanilla("snowy_slopes") to noVegetalDecoration,
@@ -281,7 +329,13 @@ public object BiomeDecoration {
             // real feature DefaultVegetationDecoration.GRASS already builds) and patch_dead_bush_badlands.
             Identifier.vanilla("wooded_badlands") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenOakTree), oakLeafLitterTree, 5, 0.1f, 1),
+                    TreeDecoration.candidateSequenceCountExtra(
+                        listOf(0.0125f to fallenOakTree),
+                        oakLeafLitterTree,
+                        5,
+                        0.1f,
+                        1,
+                    ),
                     DefaultVegetationDecoration.GRASS,
                     BadlandsDecoration,
                 ),
@@ -290,7 +344,8 @@ public object BiomeDecoration {
             Identifier.vanilla("eroded_badlands") to combine(DefaultVegetationDecoration.GRASS, BadlandsDecoration),
             // parity: OverworldBiomes.swamp/addSwampVegetation: TREES_SWAMP (swamp_oak, a single feature, not a
             // random selector) plus flower_swamp/patch_grass_normal/patch_dead_bush/patch_waterlily.
-            Identifier.vanilla("swamp") to combine(TreeDecoration.single(TreeConfigs.SWAMP_OAK, 2, 0.1f, 1), SwampDecoration),
+            Identifier.vanilla("swamp") to
+                combine(TreeDecoration.single(TreeConfigs.SWAMP_OAK, 2, 0.1f, 1), SwampDecoration),
             // parity: OverworldBiomes.desert/addDesertVegetation+addDesertExtraVegetation: patch_cactus_desert, patch_dead_bush_2.
             Identifier.vanilla("desert") to DesertDecoration,
             // parity: OverworldBiomes.darkForest(isPaleGarden=false)/DARK_FOREST_VEGETATION: real RANDOM_SELECTOR,
@@ -334,7 +389,12 @@ public object BiomeDecoration {
             // parity: OverworldBiomes.bambooJungle/baseJungle: addWarmFlowers+addJungleGrass (shared with
             // jungle/sparse_jungle), after dense bamboo and the bamboo_vegetation selector.
             Identifier.vanilla("bamboo_jungle") to
-                combine(BambooDecoration.DENSE, BambooVegetationDecoration, DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
+                combine(
+                    BambooDecoration.DENSE,
+                    BambooVegetationDecoration,
+                    DefaultVegetationDecoration.WARM_FLOWERS,
+                    JungleGrassDecoration,
+                ),
             // parity: OverworldBiomes.dripstoneCaves/deepDark: both call addPlainGrass+addPlainVegetation, the
             // exact same real features Plains itself uses (PlainsDecoration already builds them). Real vanilla
             // also runs addDripstone/addSculk here (cave-specific structures, not ported); this project has no
@@ -373,7 +433,10 @@ public object BiomeDecoration {
             // (the same real features SwampDecoration.GROUND_COVER already builds, no flower_swamp here).
             // Real MangroveRootPlacer ported: trunks start elevated on simulated roots.
             Identifier.vanilla("mangrove_swamp") to
-                combine(TreeDecoration.sequence(listOf(0.85f to TreeConfigs.TALL_MANGROVE), TreeConfigs.MANGROVE, 25), SwampDecoration.GROUND_COVER),
+                combine(
+                    TreeDecoration.sequence(listOf(0.85f to TreeConfigs.TALL_MANGROVE), TreeConfigs.MANGROVE, 25),
+                    SwampDecoration.GROUND_COVER,
+                ),
             // parity: OverworldBiomes.mushroomFields/addMushroomFieldVegetation: mushroom_island_vegetation
             // (huge red/brown 50/50, one attempt per chunk) + brown_mushroom_taiga (rarity 4) +
             // red_mushroom_taiga (rarity 256). Shared near-water vegetation is appended by forBiome.
@@ -396,204 +459,211 @@ public object BiomeDecoration {
 
     public fun forBiome(id: Identifier): BiomeVegetalDecoration? {
         val path = id.path
-        val body = when (path) {
-            "plains" ->
-                combine(
-                    PlainsDecoration.TALL_GRASS,
-                    ForestGroundDecoration.BUSH,
-                    requireBase(id),
-                    PlainsDecoration.FLOWERS,
-                    PlainsDecoration.GRASS,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "sunflower_plains" ->
-                combine(
-                    PlainsDecoration.TALL_GRASS,
-                    PlainsDecoration.SUNFLOWER,
-                    requireBase(id),
-                    PlainsDecoration.FLOWERS,
-                    PlainsDecoration.GRASS,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "ocean" -> oceanWithExtra(AquaticDecoration.OCEAN)
-            "deep_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_OCEAN)
-            "cold_ocean" -> oceanWithExtra(AquaticDecoration.COLD_OCEAN)
-            "deep_cold_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_COLD_OCEAN)
-            "lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.LUKEWARM_OCEAN)
-            "deep_lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_LUKEWARM_OCEAN)
-            "warm_ocean" -> oceanWithExtra(AquaticDecoration.WARM_OCEAN)
-            "frozen_ocean", "deep_frozen_ocean" ->
-                combine(
-                    TreeDecoration.WATER,
-                    requireBase(id),
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "river" ->
-                combine(
-                    TreeDecoration.WATER,
-                    ForestGroundDecoration.BUSH,
-                    DefaultVegetationDecoration,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                    AquaticDecoration.RIVER,
-                )
-            "frozen_river" ->
-                combine(
-                    TreeDecoration.WATER,
-                    ForestGroundDecoration.BUSH,
-                    requireBase(id),
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "swamp" ->
-                combine(
-                    requireBase(id),
-                    MushroomDecoration.SWAMP,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.SWAMP,
-                    AquaticDecoration.SWAMP,
-                )
-            "mangrove_swamp" ->
-                combine(requireBase(id), AquaticDecoration.SWAMP, ExtraVegetationDecoration.MANGROVE)
-            "desert" -> combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.DESERT)
-            "badlands", "eroded_badlands", "wooded_badlands" ->
-                combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.BADLANDS)
-            "mushroom_fields" -> combine(requireBase(id), ExtraVegetationDecoration.NEAR_WATER)
-            "jungle", "bamboo_jungle" ->
-                combine(
-                    requireBase(id),
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                    JungleVineDecoration,
-                    JungleMelonDecoration.NORMAL,
-                )
-            "sparse_jungle" ->
-                combine(
-                    requireBase(id),
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                    JungleVineDecoration,
-                    JungleMelonDecoration.SPARSE,
-                )
-            "savanna", "savanna_plateau" ->
-                combine(
-                    SavannaGroundDecoration.TALL_GRASS,
-                    requireBase(id),
-                    SavannaGroundDecoration.SAVANNA,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "windswept_savanna" ->
-                combine(
-                    requireBase(id),
-                    SavannaGroundDecoration.WINDSWEPT,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "forest" ->
-                combine(
-                    ForestFlowerDecoration.NORMAL,
-                    requireBase(id),
-                    ForestGroundDecoration.BUSH,
-                    DefaultVegetationDecoration.FLOWERS,
-                    ForestGroundDecoration.GRASS,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "birch_forest", "old_growth_birch_forest" ->
-                combine(
-                    ForestFlowerDecoration.NORMAL,
-                    ForestFloorDecoration.BIRCH_WILDFLOWERS,
-                    requireBase(id),
-                    ForestGroundDecoration.BUSH,
-                    DefaultVegetationDecoration.FLOWERS,
-                    ForestGroundDecoration.GRASS,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "dark_forest" ->
-                combine(
-                    requireBase(id),
-                    ForestFlowerDecoration.NORMAL,
-                    DefaultVegetationDecoration.FLOWERS,
-                    ForestGroundDecoration.GRASS,
-                    MushroomDecoration.NORMAL,
-                    ForestFloorDecoration.LEAF_LITTER,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "pale_garden" ->
-                combine(
-                    requireBase(id),
-                    PaleMossDecoration,
-                    PaleGardenDecoration.FLOWER_PATCH,
-                    PaleGardenDecoration.RARE_FLOWER,
-                    ForestGroundDecoration.GRASS,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "flower_forest" ->
-                combine(
-                    ForestFlowerDecoration.FLOWER_FOREST,
-                    requireBase(id),
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            "windswept_hills", "windswept_gravelly_hills", "windswept_forest" ->
-                combine(
-                    requireBase(id),
-                    ForestGroundDecoration.BUSH,
-                    DefaultVegetationDecoration,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                )
-            in OLD_GROWTH_TAIGA_PATHS ->
-                combine(
-                    TaigaGroundDecoration.LARGE_FERN,
-                    requireBase(id),
-                    TaigaGroundDecoration.OLD_GROWTH,
-                    MushroomDecoration.OLD_GROWTH,
-                    MushroomDecoration.NORMAL,
-                    ExtraVegetationDecoration.DEFAULT,
-                    TaigaGroundDecoration.COMMON_BERRY,
-                )
-            "taiga" ->
-                combine(
-                    TaigaGroundDecoration.LARGE_FERN,
-                    requireBase(id),
-                    TaigaGroundDecoration.NORMAL,
-                    MushroomDecoration.TAIGA,
-                    ExtraVegetationDecoration.DEFAULT,
-                    TaigaGroundDecoration.COMMON_BERRY,
-                )
-            "snowy_taiga" ->
-                combine(
-                    TaigaGroundDecoration.LARGE_FERN,
-                    requireBase(id),
-                    TaigaGroundDecoration.NORMAL,
-                    MushroomDecoration.TAIGA,
-                    ExtraVegetationDecoration.DEFAULT,
-                    TaigaGroundDecoration.RARE_BERRY,
-                )
-            in DEFAULT_EXTRA_PATHS ->
-                if (path == "pale_garden") {
-                    combine(requireBase(id), ExtraVegetationDecoration.DEFAULT)
-                } else {
-                    combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.DEFAULT)
-                }
-            in PUMPKIN_ONLY_PATHS ->
-                if (path == "dripstone_caves" || path == "deep_dark") {
-                    combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.PUMPKIN_ONLY)
-                } else {
-                    combine(requireBase(id), ExtraVegetationDecoration.PUMPKIN_ONLY)
-                }
-            else -> byBiome[id]
-        }
+        val body =
+            when (path) {
+                "plains" ->
+                    combine(
+                        PlainsDecoration.TALL_GRASS,
+                        ForestGroundDecoration.BUSH,
+                        requireBase(id),
+                        PlainsDecoration.FLOWERS,
+                        PlainsDecoration.GRASS,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "sunflower_plains" ->
+                    combine(
+                        PlainsDecoration.TALL_GRASS,
+                        PlainsDecoration.SUNFLOWER,
+                        requireBase(id),
+                        PlainsDecoration.FLOWERS,
+                        PlainsDecoration.GRASS,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "ocean" -> oceanWithExtra(AquaticDecoration.OCEAN)
+                "deep_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_OCEAN)
+                "cold_ocean" -> oceanWithExtra(AquaticDecoration.COLD_OCEAN)
+                "deep_cold_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_COLD_OCEAN)
+                "lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.LUKEWARM_OCEAN)
+                "deep_lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_LUKEWARM_OCEAN)
+                "warm_ocean" -> oceanWithExtra(AquaticDecoration.WARM_OCEAN)
+                "frozen_ocean", "deep_frozen_ocean" ->
+                    combine(
+                        TreeDecoration.WATER,
+                        requireBase(id),
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "river" ->
+                    combine(
+                        TreeDecoration.WATER,
+                        ForestGroundDecoration.BUSH,
+                        DefaultVegetationDecoration,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                        AquaticDecoration.RIVER,
+                    )
+                "frozen_river" ->
+                    combine(
+                        TreeDecoration.WATER,
+                        ForestGroundDecoration.BUSH,
+                        requireBase(id),
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "swamp" ->
+                    combine(
+                        requireBase(id),
+                        MushroomDecoration.SWAMP,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.SWAMP,
+                        AquaticDecoration.SWAMP,
+                    )
+                "mangrove_swamp" ->
+                    combine(requireBase(id), AquaticDecoration.SWAMP, ExtraVegetationDecoration.MANGROVE)
+                "desert" -> combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.DESERT)
+                "badlands", "eroded_badlands", "wooded_badlands" ->
+                    combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.BADLANDS)
+                "mushroom_fields" -> combine(requireBase(id), ExtraVegetationDecoration.NEAR_WATER)
+                "jungle", "bamboo_jungle" ->
+                    combine(
+                        requireBase(id),
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                        JungleVineDecoration,
+                        JungleMelonDecoration.NORMAL,
+                    )
+                "sparse_jungle" ->
+                    combine(
+                        requireBase(id),
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                        JungleVineDecoration,
+                        JungleMelonDecoration.SPARSE,
+                    )
+                "savanna", "savanna_plateau" ->
+                    combine(
+                        SavannaGroundDecoration.TALL_GRASS,
+                        requireBase(id),
+                        SavannaGroundDecoration.SAVANNA,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "windswept_savanna" ->
+                    combine(
+                        requireBase(id),
+                        SavannaGroundDecoration.WINDSWEPT,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "forest" ->
+                    combine(
+                        ForestFlowerDecoration.NORMAL,
+                        requireBase(id),
+                        ForestGroundDecoration.BUSH,
+                        DefaultVegetationDecoration.FLOWERS,
+                        ForestGroundDecoration.GRASS,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "birch_forest", "old_growth_birch_forest" ->
+                    combine(
+                        ForestFlowerDecoration.NORMAL,
+                        ForestFloorDecoration.BIRCH_WILDFLOWERS,
+                        requireBase(id),
+                        ForestGroundDecoration.BUSH,
+                        DefaultVegetationDecoration.FLOWERS,
+                        ForestGroundDecoration.GRASS,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "dark_forest" ->
+                    combine(
+                        requireBase(id),
+                        ForestFlowerDecoration.NORMAL,
+                        DefaultVegetationDecoration.FLOWERS,
+                        ForestGroundDecoration.GRASS,
+                        MushroomDecoration.NORMAL,
+                        ForestFloorDecoration.LEAF_LITTER,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "pale_garden" ->
+                    combine(
+                        requireBase(id),
+                        PaleMossDecoration,
+                        PaleGardenDecoration.FLOWER_PATCH,
+                        PaleGardenDecoration.RARE_FLOWER,
+                        ForestGroundDecoration.GRASS,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "flower_forest" ->
+                    combine(
+                        ForestFlowerDecoration.FLOWER_FOREST,
+                        requireBase(id),
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                "windswept_hills", "windswept_gravelly_hills", "windswept_forest" ->
+                    combine(
+                        requireBase(id),
+                        ForestGroundDecoration.BUSH,
+                        DefaultVegetationDecoration,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                    )
+                in OLD_GROWTH_TAIGA_PATHS ->
+                    combine(
+                        TaigaGroundDecoration.LARGE_FERN,
+                        requireBase(id),
+                        TaigaGroundDecoration.OLD_GROWTH,
+                        MushroomDecoration.OLD_GROWTH,
+                        MushroomDecoration.NORMAL,
+                        ExtraVegetationDecoration.DEFAULT,
+                        TaigaGroundDecoration.COMMON_BERRY,
+                    )
+                "taiga" ->
+                    combine(
+                        TaigaGroundDecoration.LARGE_FERN,
+                        requireBase(id),
+                        TaigaGroundDecoration.NORMAL,
+                        MushroomDecoration.TAIGA,
+                        ExtraVegetationDecoration.DEFAULT,
+                        TaigaGroundDecoration.COMMON_BERRY,
+                    )
+                "snowy_taiga" ->
+                    combine(
+                        TaigaGroundDecoration.LARGE_FERN,
+                        requireBase(id),
+                        TaigaGroundDecoration.NORMAL,
+                        MushroomDecoration.TAIGA,
+                        ExtraVegetationDecoration.DEFAULT,
+                        TaigaGroundDecoration.RARE_BERRY,
+                    )
+                in DEFAULT_EXTRA_PATHS ->
+                    if (path == "pale_garden") {
+                        combine(requireBase(id), ExtraVegetationDecoration.DEFAULT)
+                    } else {
+                        combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.DEFAULT)
+                    }
+                in PUMPKIN_ONLY_PATHS ->
+                    if (path == "dripstone_caves" || path == "deep_dark") {
+                        combine(requireBase(id), MushroomDecoration.NORMAL, ExtraVegetationDecoration.PUMPKIN_ONLY)
+                    } else {
+                        combine(requireBase(id), ExtraVegetationDecoration.PUMPKIN_ONLY)
+                    }
+                else -> byBiome[id]
+            }
         body ?: return null
         return when (path) {
             "ice_spikes" -> combine(IceSpikesDecoration, SoftDiskDecoration.DEFAULT, GlowLichenDecoration, body)
-            "frozen_ocean", "deep_frozen_ocean" -> combine(FrozenOceanDecoration, SoftDiskDecoration.DEFAULT, GlowLichenDecoration, body)
+            "frozen_ocean", "deep_frozen_ocean" ->
+                combine(
+                    FrozenOceanDecoration,
+                    SoftDiskDecoration.DEFAULT,
+                    GlowLichenDecoration,
+                    body,
+                )
             "swamp" -> combine(SoftDiskDecoration.SWAMP, GlowLichenDecoration, body)
             "mangrove_swamp" -> combine(SoftDiskDecoration.MANGROVE, GlowLichenDecoration, body)
             else -> combine(SoftDiskDecoration.DEFAULT, GlowLichenDecoration, body)
@@ -601,7 +671,13 @@ public object BiomeDecoration {
     }
 
     private fun oceanWithExtra(aquatic: BiomeVegetalDecoration): BiomeVegetalDecoration =
-        combine(TreeDecoration.WATER, DefaultVegetationDecoration, MushroomDecoration.NORMAL, ExtraVegetationDecoration.DEFAULT, aquatic)
+        combine(
+            TreeDecoration.WATER,
+            DefaultVegetationDecoration,
+            MushroomDecoration.NORMAL,
+            ExtraVegetationDecoration.DEFAULT,
+            aquatic,
+        )
 
     private fun requireBase(id: Identifier): BiomeVegetalDecoration =
         byBiome[id] ?: error("missing base decoration for $id")

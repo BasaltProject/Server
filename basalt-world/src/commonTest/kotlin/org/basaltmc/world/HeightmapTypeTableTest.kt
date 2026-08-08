@@ -55,18 +55,50 @@ class HeightmapTypeTableTest {
             Blocks.isKelpState(stateId) ||
             Blocks.isSeaPickleState(stateId) ||
             Blocks.isCoralPlantState(stateId) ||
-            NON_COLLIDING_NAMES.any { Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla(it))?.stateId == stateId }
+            NON_COLLIDING_NAMES.any {
+                Blocks.REGISTRY
+                    .byIdentifier(
+                        org.basaltmc.registry.Identifier
+                            .vanilla(it),
+                    )?.stateId ==
+                    stateId
+            }
 
     private companion object {
         val NON_COLLIDING_NAMES =
             listOf(
-                "short_grass", "tall_grass", "bush", "dandelion", "poppy", "azure_bluet",
-                "oxeye_daisy", "cornflower", "orange_tulip", "red_tulip", "pink_tulip",
-                "white_tulip", "seagrass", "tall_seagrass", "kelp", "kelp_plant", "sea_pickle",
-                "tube_coral", "brain_coral", "bubble_coral", "fire_coral", "horn_coral",
-                "tube_coral_fan", "brain_coral_fan", "bubble_coral_fan", "fire_coral_fan",
-                "horn_coral_fan", "tube_coral_wall_fan", "brain_coral_wall_fan",
-                "bubble_coral_wall_fan", "fire_coral_wall_fan", "horn_coral_wall_fan",
+                "short_grass",
+                "tall_grass",
+                "bush",
+                "dandelion",
+                "poppy",
+                "azure_bluet",
+                "oxeye_daisy",
+                "cornflower",
+                "orange_tulip",
+                "red_tulip",
+                "pink_tulip",
+                "white_tulip",
+                "seagrass",
+                "tall_seagrass",
+                "kelp",
+                "kelp_plant",
+                "sea_pickle",
+                "tube_coral",
+                "brain_coral",
+                "bubble_coral",
+                "fire_coral",
+                "horn_coral",
+                "tube_coral_fan",
+                "brain_coral_fan",
+                "bubble_coral_fan",
+                "fire_coral_fan",
+                "horn_coral_fan",
+                "tube_coral_wall_fan",
+                "brain_coral_wall_fan",
+                "bubble_coral_wall_fan",
+                "fire_coral_wall_fan",
+                "horn_coral_wall_fan",
             )
     }
 }

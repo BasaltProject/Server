@@ -171,8 +171,10 @@ public class Chunk(
                         (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
                 MOTION_BLOCKING_NO_LEAVES ->
                     !Blocks.isLeavesState(stateId) &&
-                        (Blocks.hasWaterFluid(stateId) ||
-                            (stateId != Blocks.AIR.stateId && !isNonColliding(stateId)))
+                        (
+                            Blocks.hasWaterFluid(stateId) ||
+                                (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
+                        )
             }
 
         private companion object {

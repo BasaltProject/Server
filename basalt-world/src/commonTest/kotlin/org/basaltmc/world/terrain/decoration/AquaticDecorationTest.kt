@@ -45,7 +45,12 @@ class AquaticDecorationTest {
         assertTrue(kelpTopStates.isNotEmpty(), "expected at least one kelp top")
         assertTrue(
             kelpTopStates.all { stateId ->
-                Blocks.byStateId(stateId)?.properties?.get("age")?.toIntOrNull()?.let { it in 20..23 } == true
+                Blocks
+                    .byStateId(stateId)
+                    ?.properties
+                    ?.get("age")
+                    ?.toIntOrNull()
+                    ?.let { it in 20..23 } == true
             },
             "expected kelp top ages 20 through 23",
         )
@@ -92,7 +97,11 @@ class AquaticDecorationTest {
         assertTrue(coralPlantStates.all { Blocks.byStateId(it)?.properties?.get("waterlogged") == "true" })
         val wallCoralStates =
             coralPlantStates.filter { stateId ->
-                Blocks.byStateId(stateId)?.block?.path?.endsWith("_coral_wall_fan") == true
+                Blocks
+                    .byStateId(stateId)
+                    ?.block
+                    ?.path
+                    ?.endsWith("_coral_wall_fan") == true
             }
         assertTrue(wallCoralStates.isNotEmpty())
         assertTrue(
@@ -118,11 +127,13 @@ class AquaticDecorationTest {
         }
 
         assertTrue(states.isNotEmpty())
-        assertTrue(states.all { stateId ->
-            val properties = Blocks.byStateId(stateId)?.properties ?: return@all false
-            properties["pickles"]?.toIntOrNull()?.let { it in 1..4 } == true &&
-                properties["waterlogged"] == "true"
-        })
+        assertTrue(
+            states.all { stateId ->
+                val properties = Blocks.byStateId(stateId)?.properties ?: return@all false
+                properties["pickles"]?.toIntOrNull()?.let { it in 1..4 } == true &&
+                    properties["waterlogged"] == "true"
+            },
+        )
     }
 
     @Test

@@ -103,7 +103,8 @@ public object AquaticDecoration {
                 x,
                 y + 1,
                 z,
-                Blocks.upperDoublePlantStateId(Blocks.TALL_SEAGRASS.stateId) ?: error("missing tall seagrass upper half"),
+                Blocks.upperDoublePlantStateId(Blocks.TALL_SEAGRASS.stateId)
+                    ?: error("missing tall seagrass upper half"),
             )
         } else {
             chunk.setLocalBlock(x, y, z, Blocks.SEAGRASS.stateId)

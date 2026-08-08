@@ -6,8 +6,8 @@ import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.noise.NormalNoise
-import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
 import org.basaltmc.world.terrain.decoration.tree.FallenTreeConfigs
+import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -51,16 +51,17 @@ public object FlowerForestDecoration : BiomeVegetalDecoration {
         val feature = SimpleBlockFeature({ _, pos -> flowerAt(pos.x, pos.y, pos.z) })
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-        for (modifier in
-            listOf(
-                CountPlacement(3),
-                RarityFilter(2),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(96),
-                RandomOffsetPlacement(xzSpread = 6, ySpread = 2),
-                AirTargetFilter(),
-            )
+        for (
+        modifier in
+        listOf(
+            CountPlacement(3),
+            RarityFilter(2),
+            InSquarePlacement,
+            HeightmapPlacement,
+            CountPlacement(96),
+            RandomOffsetPlacement(xzSpread = 6, ySpread = 2),
+            AirTargetFilter(),
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }
@@ -83,13 +84,23 @@ public object FlowerForestDecoration : BiomeVegetalDecoration {
     // parity: NoiseBasedStateProvider(seed=2345L, NoiseParameters(0, [1.0]), 0.020833334F).
     private val FLOWER_NOISE = NormalNoise.create(LegacyRandom(2345L), 0, doubleArrayOf(1.0))
 
-    private fun state(name: String): Int = Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
+    private fun state(name: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
 
     // parity: real order matters (index selects into this list): dandelion, poppy, allium, azure_bluet,
     // red_tulip, orange_tulip, white_tulip, pink_tulip, oxeye_daisy, cornflower, lily_of_the_valley.
     private val flowerStateIds =
         listOf(
-            "dandelion", "poppy", "allium", "azure_bluet", "red_tulip", "orange_tulip",
-            "white_tulip", "pink_tulip", "oxeye_daisy", "cornflower", "lily_of_the_valley",
+            "dandelion",
+            "poppy",
+            "allium",
+            "azure_bluet",
+            "red_tulip",
+            "orange_tulip",
+            "white_tulip",
+            "pink_tulip",
+            "oxeye_daisy",
+            "cornflower",
+            "lily_of_the_valley",
         ).map { state(it) }
 }

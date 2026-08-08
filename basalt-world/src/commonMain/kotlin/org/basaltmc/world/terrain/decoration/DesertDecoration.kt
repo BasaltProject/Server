@@ -52,5 +52,6 @@ public object DesertDecoration : BiomeVegetalDecoration {
         positions.forEach { pos -> place(chunk, random, pos) }
     }
 
-    private val deadBushStateId = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dead_bush"))?.stateId ?: error("unknown block 'dead_bush'")
+    private val deadBushStateId =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dead_bush"))?.stateId ?: error("unknown block 'dead_bush'")
 }

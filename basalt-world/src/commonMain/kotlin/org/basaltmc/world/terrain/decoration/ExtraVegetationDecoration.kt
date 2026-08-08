@@ -94,11 +94,19 @@ public object ExtraVegetationDecoration {
         noLeavesHeightmap: Boolean,
     ) {
         val type =
-            if (noLeavesHeightmap) Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES
-            else Chunk.HeightmapType.MOTION_BLOCKING
+            if (noLeavesHeightmap) {
+                Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES
+            } else {
+                Chunk.HeightmapType.MOTION_BLOCKING
+            }
         repeat(outerCount) {
             val origin = inSquareAtHeight(chunk, random, type)
-            if (!isAir(chunk, origin) || !canBushSurvive(chunk, origin) || !hasAdjacentWaterBelow(chunk, origin)) return@repeat
+            if (!isAir(chunk, origin) ||
+                !canBushSurvive(chunk, origin) ||
+                !hasAdjacentWaterBelow(chunk, origin)
+            ) {
+                return@repeat
+            }
             repeat(20) {
                 val pos = triangleOffset(origin, random, 4, 3)
                 if (isAir(chunk, pos) && canBushSurvive(chunk, pos)) set(chunk, pos, Blocks.FIREFLY_BUSH.stateId)
@@ -159,7 +167,8 @@ public object ExtraVegetationDecoration {
         pos: DecorationPos,
     ): Boolean {
         val below = get(chunk, pos.x, pos.y - 1, pos.z)
-        return (below == Blocks.SUGAR_CANE.stateId || below in sugarCaneSupportStateIds) && hasAdjacentWaterBelow(chunk, pos)
+        return (below == Blocks.SUGAR_CANE.stateId || below in sugarCaneSupportStateIds) &&
+            hasAdjacentWaterBelow(chunk, pos)
     }
 
     private fun canBushSurvive(
@@ -201,8 +210,11 @@ public object ExtraVegetationDecoration {
         y: Int,
         z: Int,
     ): Int =
-        if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) chunk.getBlockStateId(x and 15, y, z and 15)
-        else Blocks.AIR.stateId
+        if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+            chunk.getBlockStateId(x and 15, y, z and 15)
+        } else {
+            Blocks.AIR.stateId
+        }
 
     private fun set(
         chunk: Chunk,

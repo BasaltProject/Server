@@ -36,15 +36,16 @@ public object CherryGroveDecoration : BiomeVegetalDecoration {
             })
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-        for (modifier in
-            listOf(
-                NoiseThresholdCountPlacement(-0.8, belowNoise = 5, aboveNoise = 10),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(96),
-                RandomOffsetPlacement(xzSpread = 6, ySpread = 2),
-                AirTargetFilter(),
-            )
+        for (
+        modifier in
+        listOf(
+            NoiseThresholdCountPlacement(-0.8, belowNoise = 5, aboveNoise = 10),
+            InSquarePlacement,
+            HeightmapPlacement,
+            CountPlacement(96),
+            RandomOffsetPlacement(xzSpread = 6, ySpread = 2),
+            AirTargetFilter(),
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }

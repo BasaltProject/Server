@@ -63,11 +63,22 @@ class FallenTreeFeatureTest {
     @Test
     fun fallenLogsReceiveWeightedMushroomsAboveTheirLogs() {
         val mushrooms = setOf(stateId("red_mushroom"), stateId("brown_mushroom"))
-        val sidewaysBirch = setOf(FallenTreeConfigs.SUPER_BIRCH.logStateId - 1, FallenTreeConfigs.SUPER_BIRCH.logStateId + 1)
+        val sidewaysBirch =
+            setOf(
+                FallenTreeConfigs.SUPER_BIRCH.logStateId - 1,
+                FallenTreeConfigs.SUPER_BIRCH.logStateId + 1,
+            )
         var placed = 0
         for (seed in 0L..31L) {
             val chunk = flatChunk()
-            FallenTreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 8, 63, 8, FallenTreeConfigs.SUPER_BIRCH)
+            FallenTreeFeature.place(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(seed)),
+                8,
+                63,
+                8,
+                FallenTreeConfigs.SUPER_BIRCH,
+            )
             for (x in 0 until 16) {
                 for (z in 0 until 16) {
                     for (y in 64..66) {

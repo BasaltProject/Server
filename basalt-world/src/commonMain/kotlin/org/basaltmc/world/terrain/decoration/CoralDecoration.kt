@@ -206,8 +206,7 @@ public object CoralDecoration : BiomeVegetalDecoration {
 
     private fun DecorationPos.inWorld(): Boolean = y in WorldHeight.MIN_Y..WorldHeight.MAX_Y
 
-    private fun Chunk.blockAt(pos: DecorationPos): Int =
-        getBlockStateId(pos.x and 15, pos.y, pos.z and 15)
+    private fun Chunk.blockAt(pos: DecorationPos): Int = getBlockStateId(pos.x and 15, pos.y, pos.z and 15)
 
     private fun Chunk.setBlock(
         pos: DecorationPos,

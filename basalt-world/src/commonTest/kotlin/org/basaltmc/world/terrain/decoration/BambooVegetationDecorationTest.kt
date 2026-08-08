@@ -53,5 +53,6 @@ class BambooVegetationDecorationTest {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     private val grassStates = setOf(state("short_grass"), state("fern"))
-    private val generatedStates = grassStates + setOf(state("oak_log"), state("jungle_log"), state("oak_leaves"), state("jungle_leaves"))
+    private val generatedStates =
+        grassStates + setOf(state("oak_log"), state("jungle_log"), state("oak_leaves"), state("jungle_leaves"))
 }

@@ -89,7 +89,11 @@ public class LogFile private constructor(
         }
 
         @OptIn(ExperimentalTime::class)
-        private fun today(): String = Clock.System.now().toString().substring(0, 10)
+        private fun today(): String =
+            Clock.System
+                .now()
+                .toString()
+                .substring(0, 10)
 
         /** [days] before today as `yyyy-MM-dd`, doing the calendar arithmetic on the instant itself. */
         @OptIn(ExperimentalTime::class)

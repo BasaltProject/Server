@@ -19,13 +19,14 @@ public object ForestFlowerDecoration {
         BiomeVegetalDecoration { chunk, random ->
             val context = PlacementContext(chunk)
             var positions: Sequence<DecorationPos> = sequenceOf(chunkOrigin(chunk))
-            for (modifier in
-                listOf(
-                    RarityFilter(7),
-                    InSquarePlacement,
-                    HeightmapPlacement,
-                    CountPlacement(outerCount),
-                )
+            for (
+            modifier in
+            listOf(
+                RarityFilter(7),
+                InSquarePlacement,
+                HeightmapPlacement,
+                CountPlacement(outerCount),
+            )
             ) {
                 positions = positions.flatMap { modifier.getPositions(context, random, it) }
             }
@@ -41,12 +42,13 @@ public object ForestFlowerDecoration {
         val selected = flowerStates[random.nextInt(flowerStates.size)]
         val feature = SimpleBlockFeature({ _, _ -> selected.stateId }, isDoublePlant = selected.doublePlant)
         var positions: Sequence<DecorationPos> = sequenceOf(origin)
-        for (modifier in
-            listOf(
-                CountPlacement(96),
-                RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
-                AirTargetFilter(),
-            )
+        for (
+        modifier in
+        listOf(
+            CountPlacement(96),
+            RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+            AirTargetFilter(),
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }

@@ -13,13 +13,14 @@ public object BambooVegetationDecoration : BiomeVegetalDecoration {
     ) {
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-        for (modifier in
-            listOf(
-                CountPlacement(IntProvider.Weighted(30 to 9, 31 to 1)),
-                InSquarePlacement,
-                SurfaceWaterDepthFilter(0),
-                HeightmapPlacement(Chunk.HeightmapType.OCEAN_FLOOR),
-            )
+        for (
+        modifier in
+        listOf(
+            CountPlacement(IntProvider.Weighted(30 to 9, 31 to 1)),
+            InSquarePlacement,
+            SurfaceWaterDepthFilter(0),
+            HeightmapPlacement(Chunk.HeightmapType.OCEAN_FLOOR),
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }

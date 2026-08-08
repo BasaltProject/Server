@@ -9,10 +9,10 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.io.NativeThread
-import org.basaltmc.io.sleepMillis
 import org.basaltmc.io.SocketException
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
+import org.basaltmc.io.sleepMillis
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.protocol.PacketFraming
 import org.basaltmc.protocol.ProtocolState
@@ -89,13 +89,13 @@ import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkDataCodec
-import org.basaltmc.world.ChunkTracker
 import org.basaltmc.world.ChunkPos
+import org.basaltmc.world.ChunkTracker
 import kotlin.concurrent.AtomicInt
 import kotlin.random.Random
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
@@ -225,7 +225,6 @@ public class ClientSession(
             incoming.discardReadBytes()
             handleFrame(ByteBuffer(frame.size).also { it.writeBytes(frame) })
         }
-
     }
 
     private fun handleFrame(body: ByteBuffer) {
@@ -370,7 +369,9 @@ public class ClientSession(
         sendCompressed(RegistryDataPacket.ID) {
             RegistryDataPacket(
                 "minecraft:worldgen/biome",
-                VanillaBiomes.ALL.map { entry -> RegistryEntry("minecraft:${entry.path}", with(VanillaBiomes) { entry.toNbt() }) },
+                VanillaBiomes.ALL.map { entry ->
+                    RegistryEntry("minecraft:${entry.path}", with(VanillaBiomes) { entry.toNbt() })
+                },
             ).write(it)
         }
         // These 13 are the only registries a real client hard-requires non-empty (see

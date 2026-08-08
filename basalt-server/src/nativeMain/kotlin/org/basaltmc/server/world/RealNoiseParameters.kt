@@ -32,7 +32,12 @@ public class RealNoiseParameters(
     public fun get(id: String): NormalNoise {
         cache[id]?.let { return it }
         val parameters = NoiseParametersJson.parse(serverJar.readText("data/minecraft/worldgen/noise/$id.json"))
-        val noise = NormalNoise.create(random.fromHashOf("minecraft:$id"), parameters.firstOctave, parameters.amplitudes)
+        val noise =
+            NormalNoise.create(
+                random.fromHashOf("minecraft:$id"),
+                parameters.firstOctave,
+                parameters.amplitudes,
+            )
         return cache[id] ?: noise.also { cache = cache + (id to it) }
     }
 }

@@ -103,8 +103,7 @@ public object Blocks {
     }
 
     /** Whether [stateId] is one of the 28 distance, persistence, and water states of a leaves block. */
-    public fun isLeavesState(stateId: Int): Boolean =
-        stateId in LEAVES_FIRST_STATE_ID..LEAVES_LAST_STATE_ID
+    public fun isLeavesState(stateId: Int): Boolean = stateId in LEAVES_FIRST_STATE_ID..LEAVES_LAST_STATE_ID
 
     /** Returns the vanilla distance property for a leaves state, or null for any other block. */
     public fun leafDistance(stateId: Int): Int? =
@@ -134,7 +133,8 @@ public object Blocks {
         snowy: Boolean,
     ): Int? {
         val defaultStateId =
-            SNOWY_BLOCK_DEFAULT_STATE_IDS.firstOrNull { candidate -> stateId in candidate - 1..candidate } ?: return null
+            SNOWY_BLOCK_DEFAULT_STATE_IDS.firstOrNull { candidate -> stateId in candidate - 1..candidate }
+                ?: return null
         return if (snowy) defaultStateId - 1 else defaultStateId
     }
 
@@ -202,12 +202,10 @@ public object Blocks {
         stateId in GLOW_LICHEN_FIRST_STATE_ID..GLOW_LICHEN_DEFAULT_STATE_ID
 
     /** Whether [stateId] is one of vine's 32 face-property combinations. */
-    public fun isVineState(stateId: Int): Boolean =
-        stateId in VINE_FIRST_STATE_ID..VINE_DEFAULT_STATE_ID
+    public fun isVineState(stateId: Int): Boolean = stateId in VINE_FIRST_STATE_ID..VINE_DEFAULT_STATE_ID
 
     /** Whether [stateId] is one of cocoa's age and facing combinations. */
-    public fun isCocoaState(stateId: Int): Boolean =
-        stateId in COCOA_DEFAULT_STATE_ID..COCOA_LAST_STATE_ID
+    public fun isCocoaState(stateId: Int): Boolean = stateId in COCOA_DEFAULT_STATE_ID..COCOA_LAST_STATE_ID
 
     /** Whether [stateId] is one of pale hanging moss's tip states. */
     public fun isPaleHangingMossState(stateId: Int): Boolean =
@@ -226,8 +224,7 @@ public object Blocks {
         stateId in LEAF_LITTER_DEFAULT_STATE_ID..LEAF_LITTER_LAST_STATE_ID
 
     /** Whether [stateId] is one of bee nest's facing and honey-level combinations. */
-    public fun isBeeNestState(stateId: Int): Boolean =
-        stateId in BEE_NEST_DEFAULT_STATE_ID..BEE_NEST_LAST_STATE_ID
+    public fun isBeeNestState(stateId: Int): Boolean = stateId in BEE_NEST_DEFAULT_STATE_ID..BEE_NEST_LAST_STATE_ID
 
     private fun register(
         stateId: Int,
@@ -273,14 +270,16 @@ public object Blocks {
         REGISTRY.byIdentifier(Identifier.vanilla("cocoa"))?.stateId ?: error("unknown block 'cocoa'")
     private val COCOA_LAST_STATE_ID: Int = COCOA_DEFAULT_STATE_ID + 11
     private val PALE_HANGING_MOSS_DEFAULT_STATE_ID: Int =
-        REGISTRY.byIdentifier(Identifier.vanilla("pale_hanging_moss"))?.stateId ?: error("unknown block 'pale_hanging_moss'")
+        REGISTRY.byIdentifier(Identifier.vanilla("pale_hanging_moss"))?.stateId
+            ?: error("unknown block 'pale_hanging_moss'")
     private val PALE_HANGING_MOSS_LAST_STATE_ID: Int = PALE_HANGING_MOSS_DEFAULT_STATE_ID + 1
     private val CREAKING_HEART_DEFAULT_STATE_ID: Int =
         REGISTRY.byIdentifier(Identifier.vanilla("creaking_heart"))?.stateId ?: error("unknown block 'creaking_heart'")
     private val CREAKING_HEART_FIRST_STATE_ID: Int = CREAKING_HEART_DEFAULT_STATE_ID - 7
     private val CREAKING_HEART_LAST_STATE_ID: Int = CREAKING_HEART_DEFAULT_STATE_ID + 10
     private val MANGROVE_PROPAGULE_DEFAULT_STATE_ID: Int =
-        REGISTRY.byIdentifier(Identifier.vanilla("mangrove_propagule"))?.stateId ?: error("unknown block 'mangrove_propagule'")
+        REGISTRY.byIdentifier(Identifier.vanilla("mangrove_propagule"))?.stateId
+            ?: error("unknown block 'mangrove_propagule'")
     private val MANGROVE_PROPAGULE_FIRST_STATE_ID: Int = MANGROVE_PROPAGULE_DEFAULT_STATE_ID - 5
     private val MANGROVE_PROPAGULE_LAST_STATE_ID: Int = MANGROVE_PROPAGULE_DEFAULT_STATE_ID + 34
     private val LEAF_LITTER_DEFAULT_STATE_ID: Int =
@@ -292,31 +291,45 @@ public object Blocks {
     private val DOUBLE_PLANT_BLOCKS: List<String> =
         listOf("sunflower", "lilac", "rose_bush", "peony", "tall_grass", "large_fern", "tall_seagrass")
     private val DOUBLE_PLANT_DEFAULT_STATE_IDS: IntArray =
-        DOUBLE_PLANT_BLOCKS.map { path ->
-            REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
-        }.toIntArray()
+        DOUBLE_PLANT_BLOCKS
+            .map { path ->
+                REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+            }.toIntArray()
     private val SNOWY_BLOCK_DEFAULT_STATE_IDS: IntArray =
-        listOf("grass_block", "podzol", "mycelium").map { path ->
-            REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
-        }.toIntArray()
+        listOf("grass_block", "podzol", "mycelium")
+            .map { path ->
+                REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+            }.toIntArray()
     private val CORAL_WATERLOGGED_DEFAULT_STATE_IDS: IntArray =
         listOf(
-            "tube_coral", "brain_coral", "bubble_coral", "fire_coral", "horn_coral",
-            "tube_coral_fan", "brain_coral_fan", "bubble_coral_fan", "fire_coral_fan", "horn_coral_fan",
+            "tube_coral",
+            "brain_coral",
+            "bubble_coral",
+            "fire_coral",
+            "horn_coral",
+            "tube_coral_fan",
+            "brain_coral_fan",
+            "bubble_coral_fan",
+            "fire_coral_fan",
+            "horn_coral_fan",
         ).map { path ->
             REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
         }.toIntArray()
     private val CORAL_WALL_FAN_DEFAULT_STATE_IDS: IntArray =
         listOf(
-            "tube_coral_wall_fan", "brain_coral_wall_fan", "bubble_coral_wall_fan",
-            "fire_coral_wall_fan", "horn_coral_wall_fan",
+            "tube_coral_wall_fan",
+            "brain_coral_wall_fan",
+            "bubble_coral_wall_fan",
+            "fire_coral_wall_fan",
+            "horn_coral_wall_fan",
         ).map { path ->
             REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
         }.toIntArray()
     private val HUGE_MUSHROOM_DEFAULT_STATE_IDS: IntArray =
-        listOf("brown_mushroom_block", "red_mushroom_block", "mushroom_stem").map { path ->
-            REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
-        }.toIntArray()
+        listOf("brown_mushroom_block", "red_mushroom_block", "mushroom_stem")
+            .map { path ->
+                REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+            }.toIntArray()
     private val TALL_SEAGRASS_UPPER_STATE_ID: Int = TALL_SEAGRASS.stateId - 1
     private val WILDFLOWERS_DEFAULT_STATE_ID: Int =
         REGISTRY.byIdentifier(Identifier.vanilla("wildflowers"))?.stateId ?: error("unknown block 'wildflowers'")
@@ -377,7 +390,8 @@ public object Blocks {
                 )
             }
 
-            val glowLichen = REGISTRY.byIdentifier(Identifier.vanilla("glow_lichen")) ?: error("unknown block 'glow_lichen'")
+            val glowLichen =
+                REGISTRY.byIdentifier(Identifier.vanilla("glow_lichen")) ?: error("unknown block 'glow_lichen'")
             for (stateId in GLOW_LICHEN_FIRST_STATE_ID..GLOW_LICHEN_DEFAULT_STATE_ID) {
                 val falseBits = stateId - GLOW_LICHEN_FIRST_STATE_ID
                 put(
@@ -398,9 +412,20 @@ public object Blocks {
                 )
             }
 
-            val sweetBerry = REGISTRY.byIdentifier(Identifier.vanilla("sweet_berry_bush")) ?: error("unknown block 'sweet_berry_bush'")
+            val sweetBerry =
+                REGISTRY.byIdentifier(Identifier.vanilla("sweet_berry_bush"))
+                    ?: error("unknown block 'sweet_berry_bush'")
             for (age in 0..3) {
-                put(sweetBerry.stateId + age, BlockState(sweetBerry.block, sweetBerry.stateId + age, mapOf("age" to age.toString())))
+                put(
+                    sweetBerry.stateId + age,
+                    BlockState(
+                        sweetBerry.block,
+                        sweetBerry.stateId + age,
+                        mapOf(
+                            "age" to age.toString(),
+                        ),
+                    ),
+                )
             }
 
             val cocoa = REGISTRY.byIdentifier(Identifier.vanilla("cocoa")) ?: error("unknown block 'cocoa'")
@@ -408,16 +433,46 @@ public object Blocks {
             for (age in 0..2) {
                 for ((facingOffset, facing) in facings.withIndex()) {
                     val stateId = cocoa.stateId + age * facings.size + facingOffset
-                    put(stateId, BlockState(cocoa.block, stateId, linkedMapOf("age" to age.toString(), "facing" to facing)))
+                    put(
+                        stateId,
+                        BlockState(
+                            cocoa.block,
+                            stateId,
+                            linkedMapOf(
+                                "age" to age.toString(),
+                                "facing" to facing,
+                            ),
+                        ),
+                    )
                 }
             }
 
             val paleHangingMoss =
-                REGISTRY.byIdentifier(Identifier.vanilla("pale_hanging_moss")) ?: error("unknown block 'pale_hanging_moss'")
-            put(paleHangingMoss.stateId, BlockState(paleHangingMoss.block, paleHangingMoss.stateId, mapOf("tip" to "true")))
-            put(paleHangingMoss.stateId + 1, BlockState(paleHangingMoss.block, paleHangingMoss.stateId + 1, mapOf("tip" to "false")))
+                REGISTRY.byIdentifier(Identifier.vanilla("pale_hanging_moss"))
+                    ?: error("unknown block 'pale_hanging_moss'")
+            put(
+                paleHangingMoss.stateId,
+                BlockState(
+                    paleHangingMoss.block,
+                    paleHangingMoss.stateId,
+                    mapOf(
+                        "tip" to "true",
+                    ),
+                ),
+            )
+            put(
+                paleHangingMoss.stateId + 1,
+                BlockState(
+                    paleHangingMoss.block,
+                    paleHangingMoss.stateId + 1,
+                    mapOf(
+                        "tip" to "false",
+                    ),
+                ),
+            )
 
-            val creakingHeart = REGISTRY.byIdentifier(Identifier.vanilla("creaking_heart")) ?: error("unknown block 'creaking_heart'")
+            val creakingHeart =
+                REGISTRY.byIdentifier(Identifier.vanilla("creaking_heart")) ?: error("unknown block 'creaking_heart'")
             val axes = listOf("x", "y", "z")
             val heartStates = listOf("uprooted", "dormant", "awake")
             var stateId = CREAKING_HEART_FIRST_STATE_ID
@@ -438,7 +493,8 @@ public object Blocks {
             }
 
             val mangrovePropagule =
-                REGISTRY.byIdentifier(Identifier.vanilla("mangrove_propagule")) ?: error("unknown block 'mangrove_propagule'")
+                REGISTRY.byIdentifier(Identifier.vanilla("mangrove_propagule"))
+                    ?: error("unknown block 'mangrove_propagule'")
             var propaguleStateId = MANGROVE_PROPAGULE_FIRST_STATE_ID
             for (age in 0..4) {
                 for (hanging in listOf("true", "false")) {
@@ -463,7 +519,8 @@ public object Blocks {
                 }
             }
 
-            val leafLitter = REGISTRY.byIdentifier(Identifier.vanilla("leaf_litter")) ?: error("unknown block 'leaf_litter'")
+            val leafLitter =
+                REGISTRY.byIdentifier(Identifier.vanilla("leaf_litter")) ?: error("unknown block 'leaf_litter'")
             var leafLitterStateId = LEAF_LITTER_DEFAULT_STATE_ID
             for (facing in listOf("north", "south", "west", "east")) {
                 for (segmentAmount in 1..4) {

@@ -18,12 +18,13 @@ public object JungleGrassDecoration : BiomeVegetalDecoration {
     ) {
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-        for (modifier in
-            listOf(
-                CountPlacement(25),
-                InSquarePlacement,
-                HeightmapPlacement,
-            )
+        for (
+        modifier in
+        listOf(
+            CountPlacement(25),
+            InSquarePlacement,
+            HeightmapPlacement,
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }
@@ -38,18 +39,26 @@ public object JungleGrassDecoration : BiomeVegetalDecoration {
     ) {
         val feature = SimpleBlockFeature({ r, _ -> if (r.nextInt(4) < 3) shortGrassStateId else fernStateId })
         var positions: Sequence<DecorationPos> = sequenceOf(origin)
-        for (modifier in listOf(CountPlacement(32), RandomOffsetPlacement(xzSpread = 7, ySpread = 3), AIR_NOT_ON_PODZOL)) {
+        for (modifier in listOf(
+            CountPlacement(32),
+            RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+            AIR_NOT_ON_PODZOL,
+        )) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }
         positions.forEach { position -> feature.place(chunk, random, position) }
     }
 
-    private val shortGrassStateId = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_grass"))?.stateId ?: error("unknown block 'short_grass'")
-    private val fernStateId = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("fern"))?.stateId ?: error("unknown block 'fern'")
+    private val shortGrassStateId =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_grass"))?.stateId ?: error("unknown block 'short_grass'")
+    private val fernStateId =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("fern"))?.stateId ?: error("unknown block 'fern'")
     private val podzolStateId = Blocks.PODZOL.stateId
     private val AIR_NOT_ON_PODZOL =
         PlacementFilter { context, _, position ->
-            if (position.y <= org.basaltmc.world.WorldHeight.MIN_Y || position.y > org.basaltmc.world.WorldHeight.MAX_Y) {
+            if (position.y <= org.basaltmc.world.WorldHeight.MIN_Y ||
+                position.y > org.basaltmc.world.WorldHeight.MAX_Y
+            ) {
                 false
             } else {
                 val x = position.x and 15

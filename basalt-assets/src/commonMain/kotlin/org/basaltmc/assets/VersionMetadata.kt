@@ -24,8 +24,7 @@ public data class VersionMetadata(
     val server: DownloadArtifact,
 ) {
     /** The same shape piston-meta returns, so a cached copy parses through the same code path. */
-    internal fun toJson(): String =
-        """{"downloads":{"client":${client.toJson()},"server":${server.toJson()}}}"""
+    internal fun toJson(): String = """{"downloads":{"client":${client.toJson()},"server":${server.toJson()}}}"""
 }
 
 private fun DownloadArtifact.toJson(): String = """{"url":"$url","sha1":"$sha1","size":"$size"}"""

@@ -115,7 +115,9 @@ public object ChunkNbt {
         val localX = worldX - chunk.chunkX * 16
         val localZ = worldZ - chunk.chunkZ * 16
         if (localX !in 0..15 || localZ !in 0..15 || y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-            throw ChunkNbtException("block entity $id at ($worldX,$y,$worldZ) is outside chunk (${chunk.chunkX},${chunk.chunkZ})")
+            throw ChunkNbtException(
+                "block entity $id at ($worldX,$y,$worldZ) is outside chunk (${chunk.chunkX},${chunk.chunkZ})",
+            )
         }
         val data = NbtCompound()
         for ((name, value) in tag) {
@@ -154,12 +156,17 @@ public object ChunkNbt {
         val paletteIds =
             paletteList.map { entry ->
                 val entryTag = entry as? NbtCompound ?: throw ChunkNbtException("invalid block palette entry: $entry")
-                val name = entryTag.getString("Name").takeIf { it.isNotEmpty() }
-                    ?: throw ChunkNbtException("invalid block palette entry: $entry")
+                val name =
+                    entryTag.getString("Name").takeIf { it.isNotEmpty() }
+                        ?: throw ChunkNbtException("invalid block palette entry: $entry")
                 val propertiesTag = entryTag.getCompound("Properties")
                 val properties =
                     propertiesTag.associate { (key, value) ->
-                        key to ((value as? NbtString)?.value ?: throw ChunkNbtException("invalid property $key for block $name"))
+                        key to
+                            (
+                                (value as? NbtString)?.value
+                                    ?: throw ChunkNbtException("invalid property $key for block $name")
+                            )
                     }
                 Blocks.stateIdOf(Identifier.parse(name), properties)
                     ?: throw ChunkNbtException("unknown block state $name$properties")

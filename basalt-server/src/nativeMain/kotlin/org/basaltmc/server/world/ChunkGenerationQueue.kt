@@ -46,7 +46,15 @@ public class ChunkGenerationQueue(
                         // discovering the queue is empty, and it is contention everything else
                         // then has to win against.
                         idleSpins++
-                        sleepMillis(if (idleSpins > IDLE_SPINS_BEFORE_BACKOFF) IDLE_BACKOFF_MILLIS else IDLE_POLL_MILLIS)
+                        sleepMillis(
+                            if (idleSpins >
+                                IDLE_SPINS_BEFORE_BACKOFF
+                            ) {
+                                IDLE_BACKOFF_MILLIS
+                            } else {
+                                IDLE_POLL_MILLIS
+                            },
+                        )
                         continue
                     }
                     idleSpins = 0

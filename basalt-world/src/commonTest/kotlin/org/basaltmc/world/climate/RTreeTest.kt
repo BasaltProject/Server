@@ -1,7 +1,7 @@
 package org.basaltmc.world.climate
 
-import org.basaltmc.registry.Biome
 import org.basaltmc.random.XoroshiroRandom
+import org.basaltmc.registry.Biome
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

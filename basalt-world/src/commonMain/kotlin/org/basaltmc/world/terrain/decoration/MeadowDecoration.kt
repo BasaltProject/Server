@@ -81,7 +81,10 @@ public object MeadowDecoration : BiomeVegetalDecoration {
                 val value = slowNoise(position.x + index * 54545, position.y, position.z + index * 34234)
                 stateFromNoise(flowerStateIds, value)
             }
-        return stateFromNoise(possible, fastNoise.getValue(position.x.toDouble(), position.y.toDouble(), position.z.toDouble()))
+        return stateFromNoise(
+            possible,
+            fastNoise.getValue(position.x.toDouble(), position.y.toDouble(), position.z.toDouble()),
+        )
     }
 
     private fun slowNoise(

@@ -45,16 +45,21 @@ public object MushroomDecoration {
         val feature = SimpleBlockFeature({ _, _ -> stateId })
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-        if (outerCount != 1) positions = positions.flatMap { CountPlacement(outerCount).getPositions(context, random, it) }
+        if (outerCount !=
+            1
+        ) {
+            positions = positions.flatMap { CountPlacement(outerCount).getPositions(context, random, it) }
+        }
         if (rarity != null) positions = positions.flatMap { RarityFilter(rarity).getPositions(context, random, it) }
-        for (modifier in
-            listOf(
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(96),
-                RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
-                AirTargetFilter(),
-            )
+        for (
+        modifier in
+        listOf(
+            InSquarePlacement,
+            HeightmapPlacement,
+            CountPlacement(96),
+            RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+            AirTargetFilter(),
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }

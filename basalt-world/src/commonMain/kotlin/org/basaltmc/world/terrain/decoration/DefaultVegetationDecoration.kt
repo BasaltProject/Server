@@ -23,7 +23,13 @@ public object DefaultVegetationDecoration : BiomeVegetalDecoration {
             runPipeline(
                 chunk,
                 random,
-                listOf(InSquarePlacement, HeightmapPlacement, CountPlacement(32), RandomOffsetPlacement(xzSpread = 7, ySpread = 3), AirTargetFilter()),
+                listOf(
+                    InSquarePlacement,
+                    HeightmapPlacement,
+                    CountPlacement(32),
+                    RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+                    AirTargetFilter(),
+                ),
             ) { c, r, pos -> feature.place(c, r, pos) }
         }
 
@@ -70,7 +76,10 @@ public object DefaultVegetationDecoration : BiomeVegetalDecoration {
         positions.forEach { pos -> place(chunk, random, pos) }
     }
 
-    private val shortGrassStateId = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_grass"))?.stateId ?: error("unknown block 'short_grass'")
-    private val poppyStateId = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("poppy"))?.stateId ?: error("unknown block 'poppy'")
-    private val dandelionStateId = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dandelion"))?.stateId ?: error("unknown block 'dandelion'")
+    private val shortGrassStateId =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_grass"))?.stateId ?: error("unknown block 'short_grass'")
+    private val poppyStateId =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("poppy"))?.stateId ?: error("unknown block 'poppy'")
+    private val dandelionStateId =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dandelion"))?.stateId ?: error("unknown block 'dandelion'")
 }

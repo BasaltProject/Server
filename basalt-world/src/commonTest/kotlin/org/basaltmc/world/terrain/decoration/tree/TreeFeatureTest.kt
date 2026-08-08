@@ -88,7 +88,8 @@ class TreeFeatureTest {
     @Test
     fun nullRandomSelectorEntryConsumesTheRollWithoutPlacingTheDefault() {
         val chunk = chunkWithFlatGround(0)
-        TreeDecoration.sequence(listOf(1.0f to null), TreeConfigs.OAK, 1)
+        TreeDecoration
+            .sequence(listOf(1.0f to null), TreeConfigs.OAK, 1)
             .decorate(chunk, WorldgenRandom(XoroshiroRandom(5L)))
 
         for (x in 0 until 16) {
@@ -189,7 +190,14 @@ class TreeFeatureTest {
             var vines = 0
             for (x in 0 until 16) {
                 for (z in 0 until 16) {
-                    for (y in 1..40) if (org.basaltmc.registry.Blocks.isVineState(chunk.getBlockStateId(x, y, z))) vines++
+                    for (y in 1..40) {
+                        if (org.basaltmc.registry.Blocks.isVineState(
+                                chunk.getBlockStateId(x, y, z),
+                            )
+                        ) {
+                            vines++
+                        }
+                    }
                 }
             }
             assertTrue(vines > 0, "expected decorated tree $index to place vines")
@@ -202,13 +210,23 @@ class TreeFeatureTest {
         var vineBlocks = 0
         for (seed in 0L..63L) {
             val chunk = chunkWithFlatGround(0)
-            assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 7, 1, 7, TreeConfigs.JUNGLE_TREE))
+            assertTrue(
+                TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 7, 1, 7, TreeConfigs.JUNGLE_TREE),
+            )
             for (x in 0 until 16) {
                 for (z in 0 until 16) {
                     for (y in 1..24) {
                         val stateId = chunk.getBlockStateId(x, y, z)
-                        if (org.basaltmc.registry.Blocks.isCocoaState(stateId)) cocoaBlocks++
-                        if (org.basaltmc.registry.Blocks.isVineState(stateId)) vineBlocks++
+                        if (org.basaltmc.registry.Blocks
+                                .isCocoaState(stateId)
+                        ) {
+                            cocoaBlocks++
+                        }
+                        if (org.basaltmc.registry.Blocks
+                                .isVineState(stateId)
+                        ) {
+                            vineBlocks++
+                        }
                     }
                 }
             }
@@ -253,7 +271,11 @@ class TreeFeatureTest {
                     for (y in 0..20) {
                         val stateId = chunk.getBlockStateId(x, y, z)
                         if (stateId == paleMossBlockState) groundMoss++
-                        if (org.basaltmc.registry.Blocks.isPaleHangingMossState(stateId)) hangingMoss++
+                        if (org.basaltmc.registry.Blocks
+                                .isPaleHangingMossState(stateId)
+                        ) {
+                            hangingMoss++
+                        }
                     }
                 }
             }
@@ -268,7 +290,9 @@ class TreeFeatureTest {
         var hearts = 0
         for (seed in 0L..255L) {
             val chunk = chunkWithFlatGround(0)
-            assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 7, 1, 7, TreeConfigs.PALE_OAK_CREAKING))
+            assertTrue(
+                TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 7, 1, 7, TreeConfigs.PALE_OAK_CREAKING),
+            )
             for (x in 0 until 16) {
                 for (z in 0 until 16) {
                     for (y in 1..20) if (chunk.getBlockStateId(x, y, z) == naturalDormantCreakingHeartState) hearts++
@@ -374,7 +398,9 @@ class TreeFeatureTest {
                 for (z in 0 until 16) {
                     for (y in 1..24) {
                         val stateId = chunk.getBlockStateId(x, y, z)
-                        if (org.basaltmc.registry.Blocks.isMangrovePropaguleState(stateId)) {
+                        if (org.basaltmc.registry.Blocks
+                                .isMangrovePropaguleState(stateId)
+                        ) {
                             propaguleState = stateId
                             break@outer
                         }
@@ -384,7 +410,8 @@ class TreeFeatureTest {
             if (propaguleState != null) break
         }
         val state =
-            org.basaltmc.registry.Blocks.byStateId(propaguleState ?: error("expected a hanging propagule"))
+            org.basaltmc.registry.Blocks
+                .byStateId(propaguleState ?: error("expected a hanging propagule"))
                 ?: error("unknown propagule state")
         assertTrue(state.properties["hanging"] == "true")
         assertTrue(state.properties["stage"] == "0")
@@ -402,15 +429,24 @@ class TreeFeatureTest {
             for (z in 0 until 16) {
                 for (y in 1..4) {
                     val stateId = chunk.getBlockStateId(x, y, z)
-                    if (org.basaltmc.registry.Blocks.isLeafLitterState(stateId)) {
-                        states += org.basaltmc.registry.Blocks.byStateId(stateId) ?: error("unknown leaf litter state")
+                    if (org.basaltmc.registry.Blocks
+                            .isLeafLitterState(stateId)
+                    ) {
+                        states += org.basaltmc.registry.Blocks
+                            .byStateId(stateId) ?: error("unknown leaf litter state")
                     }
                 }
             }
         }
         assertTrue(states.isNotEmpty(), "expected PlaceOnGroundDecorator to add leaf litter")
         assertTrue(states.all { it.properties["facing"] in setOf("north", "east", "south", "west") })
-        assertTrue(states.all { it.properties["segment_amount"]?.toIntOrNull()?.let { amount -> amount in 1..4 } == true })
+        assertTrue(
+            states.all {
+                it.properties["segment_amount"]?.toIntOrNull()?.let { amount ->
+                    amount in 1..4
+                } == true
+            },
+        )
     }
 
     @Test
@@ -419,13 +455,19 @@ class TreeFeatureTest {
         var decoratedChunk: Chunk? = null
         for (seed in 0L..255L) {
             val chunk = chunkWithFlatGround(0)
-            assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 8, 1, 8, TreeConfigs.FANCY_OAK_BEES))
+            assertTrue(
+                TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 8, 1, 8, TreeConfigs.FANCY_OAK_BEES),
+            )
             outer@ for (x in 0 until 16) {
                 for (z in 0 until 16) {
                     for (y in 1..24) {
                         val stateId = chunk.getBlockStateId(x, y, z)
-                        if (org.basaltmc.registry.Blocks.isBeeNestState(stateId)) {
-                            beeNest = org.basaltmc.registry.Blocks.byStateId(stateId)
+                        if (org.basaltmc.registry.Blocks
+                                .isBeeNestState(stateId)
+                        ) {
+                            beeNest =
+                                org.basaltmc.registry.Blocks
+                                    .byStateId(stateId)
                             break@outer
                         }
                     }
@@ -441,7 +483,11 @@ class TreeFeatureTest {
         assertTrue(nest.properties["honey_level"] == "0")
 
         val blockEntity = decoratedChunk!!.blockEntities().single()
-        assertEquals(org.basaltmc.registry.Identifier.vanilla("beehive"), blockEntity.type)
+        assertEquals(
+            org.basaltmc.registry.Identifier
+                .vanilla("beehive"),
+            blockEntity.type,
+        )
         val bees = blockEntity.data.getList("bees") ?: error("expected stored bee occupants")
         assertTrue(bees.size in 2..3)
         for (entry in bees) {
@@ -463,7 +509,9 @@ class TreeFeatureTest {
                 for (y in 1..20) {
                     val stateId = chunk.getBlockStateId(x, y, z)
                     if (isLeavesOf(stateId, oakLeavesState)) {
-                        distances += org.basaltmc.registry.Blocks.leafDistance(stateId) ?: error("missing leaf distance")
+                        distances +=
+                            org.basaltmc.registry.Blocks
+                                .leafDistance(stateId) ?: error("missing leaf distance")
                     }
                 }
             }
@@ -481,64 +529,96 @@ class TreeFeatureTest {
     private companion object {
         val oakLogState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("oak_log"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("oak_log"),
+                )?.stateId ?: error("unknown block")
         val oakLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("oak_leaves"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("oak_leaves"),
+                )?.stateId ?: error("unknown block")
         val spruceLogState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("spruce_log"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("spruce_log"),
+                )?.stateId ?: error("unknown block")
         val spruceLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("spruce_leaves"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("spruce_leaves"),
+                )?.stateId ?: error("unknown block")
         val darkOakLogState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("dark_oak_log"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("dark_oak_log"),
+                )?.stateId ?: error("unknown block")
         val darkOakLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("dark_oak_leaves"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("dark_oak_leaves"),
+                )?.stateId ?: error("unknown block")
         val mangroveLogState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("mangrove_log"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("mangrove_log"),
+                )?.stateId ?: error("unknown block")
         val mangroveLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("mangrove_leaves"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("mangrove_leaves"),
+                )?.stateId ?: error("unknown block")
         val cherryLogState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("cherry_log"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("cherry_log"),
+                )?.stateId ?: error("unknown block")
         val cherryLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("cherry_leaves"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("cherry_leaves"),
+                )?.stateId ?: error("unknown block")
         val jungleLogState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("jungle_log"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("jungle_log"),
+                )?.stateId ?: error("unknown block")
         val jungleLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("jungle_leaves"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("jungle_leaves"),
+                )?.stateId ?: error("unknown block")
         val mangroveRootsState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("mangrove_roots"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("mangrove_roots"),
+                )?.stateId ?: error("unknown block")
         val podzolState = org.basaltmc.registry.Blocks.PODZOL.stateId
         val paleMossBlockState =
             org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("pale_moss_block"))
-                ?.stateId ?: error("unknown block")
+                .byIdentifier(
+                    org.basaltmc.registry.Identifier
+                        .vanilla("pale_moss_block"),
+                )?.stateId ?: error("unknown block")
         val naturalDormantCreakingHeartState =
-            (org.basaltmc.registry.Blocks.REGISTRY
-                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("creaking_heart"))
-                ?.stateId ?: error("unknown block")) + 1
+            (
+                org.basaltmc.registry.Blocks.REGISTRY
+                    .byIdentifier(
+                        org.basaltmc.registry.Identifier
+                            .vanilla("creaking_heart"),
+                    )?.stateId ?: error("unknown block")
+            ) + 1
     }
 }

@@ -34,21 +34,56 @@ public object VillageFeatures {
             "minecraft:pile_melon" -> placeBlockPile(chunk, random, x, y, z) { state("melon") }
             "minecraft:pile_snow" -> placeBlockPile(chunk, random, x, y, z) { state("snow") }
             // parity: pile_ice's real weighted_state_provider: blue_ice weight 1, packed_ice weight 5.
-            "minecraft:pile_ice" -> placeBlockPile(chunk, random, x, y, z) { r -> if (r.nextInt(6) == 0) state("blue_ice") else state("packed_ice") }
+            "minecraft:pile_ice" ->
+                placeBlockPile(chunk, random, x, y, z) { r ->
+                    if (r.nextInt(6) ==
+                        0
+                    ) {
+                        state("blue_ice")
+                    } else {
+                        state("packed_ice")
+                    }
+                }
             // parity: pile_pumpkin's real weighted_state_provider: pumpkin weight 19, jack_o_lantern weight 1.
-            "minecraft:pile_pumpkin" -> placeBlockPile(chunk, random, x, y, z) { r -> if (r.nextInt(20) == 19) state("jack_o_lantern") else state("pumpkin") }
+            "minecraft:pile_pumpkin" ->
+                placeBlockPile(chunk, random, x, y, z) { r ->
+                    if (r.nextInt(20) ==
+                        19
+                    ) {
+                        state("jack_o_lantern")
+                    } else {
+                        state("pumpkin")
+                    }
+                }
             "minecraft:acacia" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.ACACIA)
             "minecraft:spruce" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.SPRUCE)
             "minecraft:pine" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.PINE)
-            "minecraft:patch_cactus" -> placePatch(chunk, random, x, y, z, 10) { c, r, pos -> CactusFeature.place(c, r, pos) }
+            "minecraft:patch_cactus" ->
+                placePatch(
+                    chunk,
+                    random,
+                    x,
+                    y,
+                    z,
+                    10,
+                ) { c, r, pos -> CactusFeature.place(c, r, pos) }
             "minecraft:patch_taiga_grass" ->
                 // parity: taiga_grass's real weighted_state_provider: short_grass weight 1, fern weight 4.
                 placePatch(chunk, random, x, y, z, 32) { c, r, pos ->
-                    SimpleBlockFeature({ pr, _ -> if (pr.nextInt(5) == 0) state("short_grass") else state("fern") }).place(c, r, pos)
+                    SimpleBlockFeature({ pr, _ ->
+                        if (pr.nextInt(5) ==
+                            0
+                        ) {
+                            state("short_grass")
+                        } else {
+                            state("fern")
+                        }
+                    }).place(c, r, pos)
                 }
-            "minecraft:patch_berry_bush" -> placePatch(chunk, random, x, y, z, 96, requireGrassBelow = true) { c, r, pos ->
-                SimpleBlockFeature({ _, _ -> state("sweet_berry_bush") }).place(c, r, pos)
-            }
+            "minecraft:patch_berry_bush" ->
+                placePatch(chunk, random, x, y, z, 96, requireGrassBelow = true) { c, r, pos ->
+                    SimpleBlockFeature({ _, _ -> state("sweet_berry_bush") }).place(c, r, pos)
+                }
             // Pools only reference the features above; an unknown name places nothing.
             else -> Unit
         }
@@ -117,13 +152,17 @@ public object VillageFeatures {
     ) {
         val context = PlacementContext(chunk)
         val offset = RandomOffsetPlacement(xzSpread = 7, ySpread = 3)
-        var positions: Sequence<DecorationPos> = CountPlacement(count).getPositions(context, random, DecorationPos(x, y, z))
+        var positions: Sequence<DecorationPos> =
+            CountPlacement(
+                count,
+            ).getPositions(context, random, DecorationPos(x, y, z))
         positions = positions.flatMap { offset.getPositions(context, random, it) }
         if (requireGrassBelow) {
             val grassId = state("grass_block")
             positions =
                 positions.filter { pos ->
-                    pos.y - 1 >= WorldHeight.MIN_Y && chunk.getBlockStateId(pos.x and 15, pos.y - 1, pos.z and 15) == grassId
+                    pos.y - 1 >= WorldHeight.MIN_Y &&
+                        chunk.getBlockStateId(pos.x and 15, pos.y - 1, pos.z and 15) == grassId
                 }
         }
         positions.forEach { pos -> place(chunk, random, pos) }

@@ -79,8 +79,11 @@ public object SoftDiskDecoration {
         y: Int,
         z: Int,
     ): Int =
-        if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) chunk.getBlockStateId(x and 15, y, z and 15)
-        else Blocks.AIR.stateId
+        if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+            chunk.getBlockStateId(x and 15, y, z and 15)
+        } else {
+            Blocks.AIR.stateId
+        }
 
     private fun set(
         chunk: Chunk,
@@ -126,5 +129,4 @@ public object SoftDiskDecoration {
                 Blocks.DIRT.stateId
             }
         }
-
 }

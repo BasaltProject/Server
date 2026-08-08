@@ -132,8 +132,7 @@ public class RegionStore(
     }
 
     /** Caller must hold [mutex]. Moves an already-cached region to the back of the LRU and returns it. */
-    private fun touch(key: Long): LinearRegion? =
-        cached.remove(key)?.also { cached[key] = it }
+    private fun touch(key: Long): LinearRegion? = cached.remove(key)?.also { cached[key] = it }
 
     /** Caller must hold [mutex]. Reads from disk if needed; only the save path, which is already under the lock. */
     private fun region(
