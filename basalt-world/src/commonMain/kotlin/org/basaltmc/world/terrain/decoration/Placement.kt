@@ -175,3 +175,25 @@ public class AirTargetFilter(
         return true
     }
 }
+
+/**
+ * // parity: net.minecraft.data.worldgen.placement.PlacementUtils.countExtra, reduced to its own
+ * real two-outcome weighted list: [count] with weight `1/chance - 1`, `count + extra` with weight
+ * `1`. `random.nextInt(weight)` landing on the last slot (index `weight - 1`) picks the rarer
+ * `count + extra` outcome, matching real vanilla's own insertion-order cumulative-weight walk.
+ */
+public class CountExtraPlacement(
+    private val count: Int,
+    private val chance: Float,
+    private val extra: Int,
+) : PlacementModifier {
+    override fun getPositions(
+        context: PlacementContext,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Sequence<DecorationPos> {
+        val weight = (1.0f / chance).toInt()
+        val n = if (random.nextInt(weight) == weight - 1) count + extra else count
+        return (0 until n).asSequence().map { origin }
+    }
+}
