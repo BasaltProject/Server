@@ -1,0 +1,32 @@
+
+# Gameplay rules. Anything left out is inherited from config/worlds.toml's [defaults.gameplay.*]. Restart to apply.
+
+# [gameplay.blocks]
+# water-infinite-required-sources = 2
+# lava-infinite-required-sources = -1
+# lava-speed-nether = 10
+# lava-speed-not-nether = 30
+# sponge-absorption-area = 65
+# sponge-absorption-radius = 6
+# piston-block-push-limit = 12
+# powered-rail-activation-range = 8
+# magma-block-damage-when-sneaking = false
+# bed-explode = true
+# bed-explosion-power = 5.0
+# bed-explosion-fire = true
+# campfire-lit-when-placed = true
+
+# [gameplay.mechanics]
+# drowning-ticks-per-damage = 20
+# drowning-damage = 2.0
+# health-regen-amount = 1.0
+# poison-degeneration-amount = 1.0
+# wither-degeneration-amount = 1.0
+# hunger-exhaustion-amount = 0.005
+
+# [gameplay.player]
+# critical-damage-multiplier = 1.5
+# totem-of-undying-works-in-inventory = false
+
+# [gameplay.items]
+# ender-pearl-damage = 5.0
