@@ -10,7 +10,7 @@ using wire::common::toml::TomlTable;
 using wire::common::toml::TomlValue;
 
 constexpr std::string_view kTemplate = R"(# Rules that change how this world plays. Every value shown is vanilla's.
-# Anything that differs from vanilla is marked NOT VANILLA.
+# Anything that differs from vanilla is marked NOT VANILLA. Read when a world loads, so editing needs a restart.
 
 [gamerules]
 # Initial game rules of a world that is being created. A world that already has its level data keeps
