@@ -6,7 +6,10 @@ import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.GenerationMetrics
 import org.basaltmc.world.WorldHeight
+import org.basaltmc.world.densityfunction.DensityCache
+import org.basaltmc.world.densityfunction.Marker
 import org.basaltmc.world.terrain.decoration.BiomeDecoration
 import org.basaltmc.world.terrain.decoration.SurfaceFreezingDecoration
 import org.basaltmc.world.terrain.surface.SurfaceBuilder
@@ -67,6 +70,9 @@ public object RealTerrainGenerator {
         villageGenerator: VillageStructureGenerator? = null,
     ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
+        // One cache for the whole chunk, shared by terrain shape, surface rules and biome filling:
+        // they all walk the same router subtrees, so a cache per phase would throw away most of it.
+        val cache = DensityCache(chunkX, chunkZ, Marker.slotCount)
         val sampler =
             DensityChunkSampler(
                 router.finalDensity,
@@ -76,36 +82,47 @@ public object RealTerrainGenerator {
                 WorldHeight.HEIGHT,
                 CELL_WIDTH,
                 CELL_HEIGHT,
+                cache,
             )
-        for (x in 0 until 16) {
-            for (z in 0 until 16) {
-                for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-                    if (sampler.sample(x, y, z) > 0.0) {
-                        chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
-                    } else if (y < SEA_LEVEL) {
-                        // parity: NoiseGeneratorSettings' global Overworld FluidPicker. Full
-                        // aquifers are still absent, but outside caves their fallback is exactly
-                        // water below sea level and air at/above it.
-                        chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
+        GenerationMetrics.measure(GenerationMetrics.Phase.DENSITY_GRID) { sampler.prepare() }
+        GenerationMetrics.measure(GenerationMetrics.Phase.TERRAIN_FILL) {
+            for (x in 0 until 16) {
+                for (z in 0 until 16) {
+                    for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                        if (sampler.sample(x, y, z) > 0.0) {
+                            chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                        } else if (y < SEA_LEVEL) {
+                            // parity: NoiseGeneratorSettings' global Overworld FluidPicker. Full
+                            // aquifers are still absent, but outside caves their fallback is exactly
+                            // water below sea level and air at/above it.
+                            chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
+                        }
                     }
                 }
             }
         }
         val heightmap = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
-        val chunkEnvironment = ChunkScopedSurfaceEnvironment(environment, heightmap)
-        SurfaceBuilder.buildSurface(
-            chunk,
-            chunkEnvironment,
-            SurfaceRuleData.overworld(),
-        )
-        villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
-        val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
-        decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
-        val centerY = heightmap[8 + 8 * 16]
-        val biomeId = Identifier.parse(chunkEnvironment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
-        BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
-        SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
-        fillBiomes(chunk, chunkEnvironment)
+        val chunkEnvironment = ChunkScopedSurfaceEnvironment(environment, heightmap, cache)
+        GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_RULES) {
+            SurfaceBuilder.buildSurface(
+                chunk,
+                chunkEnvironment,
+                SurfaceRuleData.overworld(),
+            )
+        }
+        GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) {
+            villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
+        }
+        GenerationMetrics.measure(GenerationMetrics.Phase.DECORATION) {
+            val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
+            decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
+            val centerY = heightmap[8 + 8 * 16]
+            val biomeId = Identifier.parse(chunkEnvironment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
+            BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
+            SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
+        }
+        GenerationMetrics.measure(GenerationMetrics.Phase.BIOME_FILL) { fillBiomes(chunk, chunkEnvironment) }
+        if (GenerationMetrics.enabled) GenerationMetrics.countChunk()
         return chunk
     }
 
@@ -154,6 +171,7 @@ public object RealTerrainGenerator {
 private class ChunkScopedSurfaceEnvironment(
     private val delegate: SurfaceRuleEnvironment,
     private val heightmap: IntArray,
+    private val cache: DensityCache,
 ) : SurfaceRuleEnvironment by delegate {
     private val biomeCache = HashMap<Long, String>()
 
@@ -167,7 +185,7 @@ private class ChunkScopedSurfaceEnvironment(
                 (((y shr 2).toLong() and 0xFFFFFL) shl 21) or
                 (((z shr 2).toLong() and 0x1FFFFFL) shl 41)
         biomeCache[key]?.let { return it }
-        val biome = delegate.biomeAt(x, y, z)
+        val biome = delegate.biomeAt(x, y, z, cache)
         biomeCache[key] = biome
         return biome
     }

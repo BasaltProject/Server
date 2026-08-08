@@ -1,6 +1,7 @@
 package org.basaltmc.world.terrain
 
 import org.basaltmc.common.Mth
+import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.FunctionContext
 
@@ -30,6 +31,7 @@ public class DensityChunkSampler(
     private val height: Int,
     private val cellWidth: Int,
     private val cellHeight: Int,
+    private val cache: DensityCache? = null,
 ) {
     init {
         require(16 % cellWidth == 0) { "cellWidth must evenly divide 16, got $cellWidth" }
@@ -50,8 +52,13 @@ public class DensityChunkSampler(
             val worldX = chunkX * 16 + gx * cellWidth
             val worldY = minY + gy * cellHeight
             val worldZ = chunkZ * 16 + gz * cellWidth
-            density.compute(FunctionContext(worldX, worldY, worldZ))
+            density.compute(FunctionContext(worldX, worldY, worldZ, cache))
         }
+    }
+
+    /** Forces the corner grid now, so callers can time grid construction apart from interpolation. */
+    public fun prepare() {
+        grid
     }
 
     private fun cornerValue(

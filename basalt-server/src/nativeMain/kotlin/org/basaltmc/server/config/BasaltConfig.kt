@@ -29,7 +29,11 @@ name = "world"
 view-distance = 10
 
 [performance]
-# Reserved for future tick/performance tuning.
+# Count noise evaluations, biome lookups and per-phase timings while generating
+# chunks, then log a report once the startup chunks are ready. Diagnostics only:
+# it also forces startup generation onto a single thread so the counts are exact,
+# so leave it off unless you are measuring.
+generation-metrics = false
 
 [plugins]
 # Reserved for BSMod loader settings.
@@ -48,6 +52,7 @@ public data class BasaltConfig(
     public val worldName: String,
     public val viewDistance: Int,
     public val logLevel: LogLevel,
+    public val generationMetrics: Boolean,
 ) {
     public companion object {
         private val DEFAULT =
@@ -59,6 +64,7 @@ public data class BasaltConfig(
                 worldName = "world",
                 viewDistance = 10,
                 logLevel = LogLevel.INFO,
+                generationMetrics = false,
             )
 
         /**
@@ -90,6 +96,7 @@ public data class BasaltConfig(
             val server = root.tableOrNull("server")
             val world = root.tableOrNull("world")
             val logging = root.tableOrNull("logging")
+            val performance = root.tableOrNull("performance")
             return BasaltConfig(
                 port = server?.intOrNull("port")?.toInt() ?: DEFAULT.port,
                 motd = server?.stringOrNull("motd") ?: DEFAULT.motd,
@@ -98,6 +105,8 @@ public data class BasaltConfig(
                 worldName = world?.stringOrNull("name") ?: DEFAULT.worldName,
                 viewDistance = world?.intOrNull("view-distance")?.toInt() ?: DEFAULT.viewDistance,
                 logLevel = logging?.stringOrNull("level")?.let(::parseLogLevel) ?: DEFAULT.logLevel,
+                generationMetrics =
+                    performance?.boolOrNull("generation-metrics") ?: DEFAULT.generationMetrics,
             )
         }
 

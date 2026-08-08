@@ -1,6 +1,7 @@
 package org.basaltmc.world.terrain.surface
 
 import org.basaltmc.random.BasaltRandom
+import org.basaltmc.world.densityfunction.DensityCache
 
 /**
  * Everything [SurfaceRules] node types need from outside `basalt-world` (real noise data, the
@@ -79,6 +80,18 @@ public interface SurfaceRuleEnvironment {
         y: Int,
         z: Int,
     ): String
+
+    /**
+     * [biomeAt] against one chunk's own [DensityCache], so the climate router's `flatCache` subtrees
+     * resolve once per quart column instead of once per query. Defaults to the uncached path for
+     * environments with no density functions behind them.
+     */
+    public fun biomeAt(
+        x: Int,
+        y: Int,
+        z: Int,
+        cache: DensityCache?,
+    ): String = biomeAt(x, y, z)
 
     /** // parity: net.minecraft.world.level.levelgen.SurfaceRules.Context.SteepMaterialCondition. */
     public fun isSteep(

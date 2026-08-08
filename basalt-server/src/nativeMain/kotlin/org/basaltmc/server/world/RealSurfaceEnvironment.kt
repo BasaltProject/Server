@@ -4,6 +4,7 @@ import org.basaltmc.assets.ServerJarAssets
 import org.basaltmc.random.BasaltRandom
 import org.basaltmc.random.PositionalRandomFactory
 import org.basaltmc.world.WorldHeight
+import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.FunctionContext
 import org.basaltmc.world.terrain.OverworldBiomeSource
 import org.basaltmc.world.terrain.OverworldNoiseRouter
@@ -108,6 +109,13 @@ public class RealSurfaceEnvironment(
         y: Int,
         z: Int,
     ): String = biomeSource.biomeAt(x, y, z).id.toString()
+
+    override fun biomeAt(
+        x: Int,
+        y: Int,
+        z: Int,
+        cache: DensityCache?,
+    ): String = biomeSource.biomeAt(x, y, z, cache).id.toString()
 
     override fun isSteep(
         x: Int,

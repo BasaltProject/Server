@@ -1,6 +1,7 @@
 package org.basaltmc.world.noise
 
 import org.basaltmc.random.BasaltRandom
+import org.basaltmc.world.GenerationMetrics
 
 /**
  * // parity: net.minecraft.world.level.levelgen.synth.NormalNoise. Two independent [PerlinNoise]
@@ -43,6 +44,7 @@ public class NormalNoise private constructor(
         y: Double,
         z: Double,
     ): Double {
+        if (GenerationMetrics.enabled) GenerationMetrics.countNormalNoise()
         val x2 = x * INPUT_FACTOR
         val y2 = y * INPUT_FACTOR
         val z2 = z * INPUT_FACTOR
