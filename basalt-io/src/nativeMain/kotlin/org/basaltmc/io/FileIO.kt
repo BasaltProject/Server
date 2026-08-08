@@ -2,6 +2,7 @@
 
 package org.basaltmc.io
 
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
@@ -18,7 +19,37 @@ import platform.posix.fopen
 import platform.posix.fread
 import platform.posix.fseek
 import platform.posix.ftell
+import platform.posix.FILE
 import platform.posix.fwrite
+
+/**
+ * An open file being written sequentially, with the ability to go back and patch what was already
+ * written. Formats whose header declares the length of what follows (Linear's compressed size, for
+ * one) can then be streamed straight to disk: write the header with a hole, stream the body, seek
+ * back and fill the hole in. The alternative is building the whole body in memory first, which for
+ * a region is tens of megabytes.
+ */
+public class FileWriter internal constructor(
+    private val handle: CPointer<FILE>,
+) {
+    public fun write(
+        bytes: ByteArray,
+        length: Int = bytes.size,
+    ) {
+        if (length <= 0) return
+        bytes.usePinned { pinned ->
+            fwrite(pinned.addressOf(0), 1.convert(), length.convert(), handle)
+        }
+    }
+
+    public fun seek(offset: Long) {
+        fseek(handle, offset.convert(), SEEK_SET)
+    }
+
+    public fun close() {
+        fclose(handle)
+    }
+}
 
 /** Thrown for file I/O failures (missing parent directory, permissions, disk full). */
 public class FileIOException(
@@ -36,6 +67,12 @@ public object FileIO {
         val handle = fopen(path, "rb") ?: return false
         fclose(handle)
         return true
+    }
+
+    /** Opens [path] for writing, truncating it. The caller closes it, ideally in a `finally`. */
+    public fun openWrite(path: String): FileWriter {
+        val handle = fopen(path, "wb") ?: throw FileIOException("failed to open '$path' for writing")
+        return FileWriter(handle)
     }
 
     /** Removes [path], returning whether it was there to remove. */
@@ -127,6 +164,24 @@ public object FileIO {
                 fread(pinned.addressOf(0), 1.convert(), size.convert(), handle)
             }
             return buffer
+        } finally {
+            fclose(handle)
+        }
+    }
+
+    /** Writes the first [length] bytes of [bytes], so callers can hand over a reused buffer. */
+    public fun writeBytes(
+        path: String,
+        bytes: ByteArray,
+        length: Int,
+    ) {
+        val handle = fopen(path, "wb") ?: throw FileIOException("failed to open '$path' for writing")
+        try {
+            if (length > 0) {
+                bytes.usePinned { pinned ->
+                    fwrite(pinned.addressOf(0), 1.convert(), length.convert(), handle)
+                }
+            }
         } finally {
             fclose(handle)
         }

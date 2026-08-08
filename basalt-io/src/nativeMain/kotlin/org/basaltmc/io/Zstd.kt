@@ -1,5 +1,6 @@
 package org.basaltmc.io
 
+import com.squareup.zstd.ZSTD_e_continue
 import com.squareup.zstd.ZSTD_e_end
 import com.squareup.zstd.getErrorName
 import com.squareup.zstd.zstdCompressor
@@ -24,11 +25,13 @@ public object Zstd {
     private const val ZSTD_C_COMPRESSION_LEVEL = 100
     private const val CHUNK_SIZE = 64 * 1024
 
+    /** [length] lets a caller compress the used prefix of a reused buffer without copying it first. */
     public fun compress(
         data: ByteArray,
         level: Int = 3,
+        length: Int = data.size,
     ): ByteArray {
-        if (data.isEmpty()) return ByteArray(0)
+        if (length == 0) return ByteArray(0)
         return zstdCompressor().use { compressor ->
             checkError(compressor.setParameter(ZSTD_C_COMPRESSION_LEVEL, level))
             val chunks = mutableListOf<ByteArray>()
@@ -42,17 +45,66 @@ public object Zstd {
                         outputEnd = output.size,
                         outputStart = 0,
                         inputByteArray = data,
-                        inputEnd = data.size,
+                        inputEnd = length,
                         inputStart = inputStart,
                         mode = ZSTD_e_end,
                     )
                 checkError(result)
                 inputStart += compressor.inputBytesProcessed
                 if (compressor.outputBytesProcessed > 0) chunks += output.copyOf(compressor.outputBytesProcessed)
-            } while (inputStart < data.size || result != 0L)
+            } while (inputStart < length || result != 0L)
             concatenate(chunks)
         }
     }
+
+    /**
+     * Compresses a sequence of pieces as one stream, handing each block of output to [sink] as it
+     * is produced. Never holds the input or the output whole.
+     *
+     * This is what lets a caller compress something far larger than anything it allocates: a Linear
+     * region is written from the chunk blobs it already holds, straight to the file, instead of
+     * concatenating tens of megabytes and then compressing that. Buffers that size come from `mmap`
+     * on Kotlin/Native and their pages are never returned, so avoiding them entirely is worth more
+     * than reusing them.
+     */
+    public fun compressStreaming(
+        level: Int = 3,
+        sink: (ByteArray, Int) -> Unit,
+        pieces: (feed: (ByteArray, Int) -> Unit) -> Unit,
+    ) {
+        zstdCompressor().use { compressor ->
+            checkError(compressor.setParameter(ZSTD_C_COMPRESSION_LEVEL, level))
+            val output = ByteArray(CHUNK_SIZE)
+
+            fun drive(
+                input: ByteArray,
+                length: Int,
+                mode: Int,
+            ) {
+                var inputStart = 0
+                do {
+                    val result =
+                        compressor.compressStream2(
+                            outputByteArray = output,
+                            outputEnd = output.size,
+                            outputStart = 0,
+                            inputByteArray = input,
+                            inputEnd = length,
+                            inputStart = inputStart,
+                            mode = mode,
+                        )
+                    checkError(result)
+                    inputStart += compressor.inputBytesProcessed
+                    if (compressor.outputBytesProcessed > 0) sink(output, compressor.outputBytesProcessed)
+                } while (inputStart < length || (mode == ZSTD_e_end && result != 0L))
+            }
+
+            pieces { bytes, length -> if (length > 0) drive(bytes, length, ZSTD_e_continue) }
+            drive(EMPTY, 0, ZSTD_e_end)
+        }
+    }
+
+    private val EMPTY = ByteArray(0)
 
     public fun decompress(data: ByteArray): ByteArray {
         if (data.isEmpty()) return ByteArray(0)

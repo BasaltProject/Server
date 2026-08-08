@@ -16,8 +16,11 @@ import kotlin.concurrent.AtomicInt
  * [org.basaltmc.server.ClientSession].
  */
 public class TickLoop(
+    saveIntervalSeconds: Int = DEFAULT_SAVE_INTERVAL_SECONDS,
     private val onSaveInterval: () -> Unit = {},
 ) {
+    /** 0 seconds means no periodic save at all; chunks still go out when they unload or on stop. */
+    private val saveIntervalTicks: Long = saveIntervalSeconds.toLong() * TICKS_PER_SECOND
     private val running = AtomicInt(0)
 
     public fun start() {
@@ -26,7 +29,7 @@ public class TickLoop(
             var tick = 0L
             while (running.value == 1) {
                 tick++
-                if (tick % SAVE_INTERVAL_TICKS == 0L) onSaveInterval()
+                if (saveIntervalTicks > 0 && tick % saveIntervalTicks == 0L) onSaveInterval()
                 sleepMillis(TICK_MILLIS)
             }
         }
@@ -36,10 +39,14 @@ public class TickLoop(
         running.value = 0
     }
 
-    private companion object {
-        const val TICK_MILLIS = 50L
-        // How much exploration a crash can cost. Every 5 seconds, not every tick: each flush
-        // rewrites one region file per region it touches.
-        const val SAVE_INTERVAL_TICKS = 100L
+    public companion object {
+        public const val TICK_MILLIS: Long = 50L
+        public const val TICKS_PER_SECOND: Long = 20L
+
+        // How much exploration a crash can cost, and an operator's to change (`save-interval-seconds`).
+        // Linear compresses a region as one stream, so saving any chunk rewrites all 1024 of its
+        // neighbours; that is affordable now only because a region streams straight to disk instead
+        // of being built in memory first.
+        public const val DEFAULT_SAVE_INTERVAL_SECONDS: Int = 30
     }
 }

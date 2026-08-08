@@ -10,6 +10,7 @@ import org.basaltmc.world.terrain.OverworldBiomeSource
 import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.surface.BadlandsClayBands
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
+import kotlin.concurrent.Volatile
 
 /**
  * The real [SurfaceRuleEnvironment]: real noise parameters from the downloaded [serverJar] (via
@@ -32,6 +33,9 @@ public class RealSurfaceEnvironment(
     private val biomeSource = OverworldBiomeSource(router)
     private val noises = RealNoiseParameters(serverJar, random)
     private val clayBands = BadlandsClayBands(random.fromHashOf("minecraft:clay_bands"))
+
+    @Volatile
+    private var gradientRandoms: Map<String, PositionalRandomFactory> = emptyMap()
 
     override fun surfaceDepthNoise(
         x: Int,
@@ -66,17 +70,31 @@ public class RealSurfaceEnvironment(
         z: Int,
     ): Double = noises.get(noiseId).getValue(x.toDouble(), y.toDouble(), z.toDouble())
 
+    /**
+     * The factory per name is built once, not per block.
+     *
+     * Surface rules ask for this for essentially every block near the surface, and each call used
+     * to concatenate a string, MD5 it, and build two generators, all to arrive at something that
+     * depends only on [name] and on a handful of fixed names at that. A profile put a tenth of a
+     * whole session's allocation in this one line.
+     *
+     * Copy-on-write, because a single environment is shared by every generation worker: readers
+     * see a fully built immutable map or the previous one, and never a map mid-update. Two threads
+     * racing to add the same name both derive the same factory, so whichever lands is equivalent.
+     */
     override fun verticalGradientRandom(
         name: String,
         x: Int,
         y: Int,
         z: Int,
-    ): Float =
-        random
-            .fromHashOf("minecraft:$name")
-            .forkPositional()
-            .at(x, y, z)
-            .nextFloat()
+    ): Float {
+        val known = gradientRandoms[name]
+        val factory =
+            known ?: random.fromHashOf("minecraft:$name").forkPositional().also {
+                gradientRandoms = gradientRandoms + (name to it)
+            }
+        return factory.at(x, y, z).nextFloat()
+    }
 
     override fun positionalRandom(
         x: Int,

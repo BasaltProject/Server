@@ -1,6 +1,7 @@
 package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.LogLevel
+import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,6 +9,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BasaltConfigTest {
+    private fun silentLogger() = Logger("BasaltConfigTest").apply { minLevel = LogLevel.ERROR }
+
     @Test
     fun generatesACommentedDefaultOnFirstRun() {
         val path = "basalt_config_test_default.toml"
@@ -79,6 +82,30 @@ class BasaltConfigTest {
         assertFalse(config.onlineMode)
         deleteIfExists(configPath)
         deleteIfExists(legacyPath)
+    }
+
+    @Test
+    fun readsTheSaveInterval() {
+        val path = "./basalt_save_interval_test.toml"
+        FileIO.writeText(path, "[world]\nsave-interval-seconds = 120\n")
+        try {
+            assertEquals(120, BasaltConfig.load(path, logger = silentLogger()).saveIntervalSeconds)
+        } finally {
+            platform.posix.remove(path)
+        }
+    }
+
+    @Test
+    fun rejectsANegativeSaveInterval() {
+        val path = "./basalt_save_interval_negative_test.toml"
+        FileIO.writeText(path, "[world]\nsave-interval-seconds = -5\n")
+        try {
+            // Clamped rather than obeyed: a negative interval has no meaning, and 0 already says
+            // "never save periodically".
+            assertEquals(0, BasaltConfig.load(path, logger = silentLogger()).saveIntervalSeconds)
+        } finally {
+            platform.posix.remove(path)
+        }
     }
 }
 

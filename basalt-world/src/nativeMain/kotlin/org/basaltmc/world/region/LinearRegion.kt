@@ -1,6 +1,7 @@
 package org.basaltmc.world.region
 
 import org.basaltmc.io.ByteBuffer
+import org.basaltmc.io.FileIO
 import org.basaltmc.io.Zstd
 
 /** Thrown for a corrupt or unsupported Linear region file: bad signature, size mismatch, wrong version. */
@@ -57,32 +58,115 @@ public class LinearRegion(
      * a handful of regions in a row was enough to put gigabytes of short-lived arrays in flight,
      * which is what made a busy save balloon rather than merely take a while.
      */
-    public fun write(compressionLevel: Int = 1): ByteArray {
+    /**
+     * Serializes into [scratch], a buffer the caller owns and reuses, and returns how many bytes of
+     * it are the finished file. Nothing here allocates per call.
+     *
+     * A region is tens of megabytes uncompressed, and building one used to allocate that much fresh
+     * every time, plus the compressed copy, plus the framed copy. Kotlin/Native's allocator serves
+     * blocks that size straight from `mmap` and does not hand the pages back, so every save left
+     * hundreds of megabytes mapped for good: a profile attributed four gigabytes of a one-minute
+     * session to this one method. Reusing a buffer keeps the peak flat instead.
+     */
+    /**
+     * Writes this region straight to [path], compressing as it goes.
+     *
+     * Peak memory is a fixed 64 KB output block plus an 8 KB chunk table, whatever the region's
+     * size. The chunk blobs are already held individually, so nothing needs concatenating: the old
+     * approach built the whole region uncompressed, then the whole compressed copy, then the framed
+     * copy, tens of megabytes each. Kotlin/Native serves allocations that size from `mmap` and does
+     * not give the pages back, so a session spent exploring grew by gigabytes it could never reuse.
+     *
+     * The header carries the compressed length, which is only known at the end, so it goes out as a
+     * hole and is patched once the body is done.
+     */
+    public fun writeTo(
+        path: String,
+        compressionLevel: Int = 1,
+    ) {
         var newestTimestamp = 0
         var chunkCount = 0
-        var payloadSize = 0
         for (i in 0 until DIMENSION * DIMENSION) {
             val data = chunks[i] ?: continue
-            payloadSize += data.size
             if (timestamps[i] > newestTimestamp) newestTimestamp = timestamps[i]
             chunkCount++
         }
 
-        val inner = ByteArray(INNER_HEADER_SIZE + payloadSize)
-        var at = 0
+        val table = ByteArray(INNER_HEADER_SIZE)
         for (i in 0 until DIMENSION * DIMENSION) {
             val data = chunks[i]
-            inner.writeIntAt(at, data?.size ?: 0)
-            inner.writeIntAt(at + 4, if (data != null) timestamps[i] else 0)
-            at += 8
-        }
-        for (data in chunks) {
-            if (data == null) continue
-            data.copyInto(inner, at)
-            at += data.size
+            table.writeIntAt(i * 8, data?.size ?: 0)
+            table.writeIntAt(i * 8 + 4, if (data != null) timestamps[i] else 0)
         }
 
-        val compressed = Zstd.compress(inner, compressionLevel)
+        val header = ByteArray(HEADER_SIZE)
+        header.writeLongAt(0, SIGNATURE)
+        header[8] = VERSION.toByte()
+        header.writeLongAt(9, newestTimestamp.toLong())
+        header[17] = compressionLevel.toByte()
+        header.writeShortAt(18, chunkCount.toShort())
+        header.writeIntAt(20, 0) // patched below, once the compressed length is known
+        header.writeLongAt(24, 0L)
+
+        val writer = FileIO.openWrite(path)
+        try {
+            writer.write(header)
+            var compressedSize = 0
+            Zstd.compressStreaming(
+                level = compressionLevel,
+                sink = { block, length ->
+                    writer.write(block, length)
+                    compressedSize += length
+                },
+                pieces = { feed ->
+                    feed(table, table.size)
+                    for (data in chunks) if (data != null) feed(data, data.size)
+                },
+            )
+
+            val footer = ByteArray(FOOTER_SIZE)
+            footer.writeLongAt(0, SIGNATURE)
+            writer.write(footer)
+
+            val patch = ByteArray(4)
+            patch.writeIntAt(0, compressedSize)
+            writer.seek(20L)
+            writer.write(patch)
+        } finally {
+            writer.close()
+        }
+    }
+
+    /**
+     * The whole file as bytes. For tests and callers with no path to write to; the server uses
+     * [writeTo], which never holds a region-sized buffer at all.
+     */
+    public fun write(compressionLevel: Int = 1): ByteArray {
+        var newestTimestamp = 0
+        var chunkCount = 0
+        for (i in 0 until DIMENSION * DIMENSION) {
+            val data = chunks[i] ?: continue
+            if (timestamps[i] > newestTimestamp) newestTimestamp = timestamps[i]
+            chunkCount++
+        }
+
+        val table = ByteArray(INNER_HEADER_SIZE)
+        for (i in 0 until DIMENSION * DIMENSION) {
+            val data = chunks[i]
+            table.writeIntAt(i * 8, data?.size ?: 0)
+            table.writeIntAt(i * 8 + 4, if (data != null) timestamps[i] else 0)
+        }
+
+        val body = ByteBuffer()
+        Zstd.compressStreaming(
+            level = compressionLevel,
+            sink = { block, length -> body.writeBytes(block, 0, length) },
+            pieces = { feed ->
+                feed(table, table.size)
+                for (data in chunks) if (data != null) feed(data, data.size)
+            },
+        )
+        val compressed = body.toByteArray()
 
         val out = ByteArray(HEADER_SIZE + compressed.size + FOOTER_SIZE)
         out.writeLongAt(0, SIGNATURE)

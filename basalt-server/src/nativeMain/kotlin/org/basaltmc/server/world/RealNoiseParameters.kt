@@ -4,6 +4,7 @@ import org.basaltmc.assets.ServerJarAssets
 import org.basaltmc.random.PositionalRandomFactory
 import org.basaltmc.world.noise.NoiseParametersJson
 import org.basaltmc.world.noise.NormalNoise
+import kotlin.concurrent.Volatile
 
 /**
  * Resolves a named noise (`"continentalness"`, `"offset"`, ...) into a real, correctly-seeded
@@ -20,11 +21,18 @@ public class RealNoiseParameters(
     private val serverJar: ServerJarAssets,
     private val random: PositionalRandomFactory,
 ) {
-    private val cache = mutableMapOf<String, NormalNoise>()
+    // Copy-on-write, not a plain mutable map: one instance is shared by every generation worker,
+    // and a `MutableMap` written from several threads at once corrupts its own backing array, which
+    // this project has already been bitten by once (see OverworldBiomeSource's own KDoc). Two
+    // threads racing to build the same noise both derive it from the same seed, so either result
+    // is equivalent and the loser is simply discarded.
+    @Volatile
+    private var cache: Map<String, NormalNoise> = emptyMap()
 
-    public fun get(id: String): NormalNoise =
-        cache.getOrPut(id) {
-            val parameters = NoiseParametersJson.parse(serverJar.readText("data/minecraft/worldgen/noise/$id.json"))
-            NormalNoise.create(random.fromHashOf("minecraft:$id"), parameters.firstOctave, parameters.amplitudes)
-        }
+    public fun get(id: String): NormalNoise {
+        cache[id]?.let { return it }
+        val parameters = NoiseParametersJson.parse(serverJar.readText("data/minecraft/worldgen/noise/$id.json"))
+        val noise = NormalNoise.create(random.fromHashOf("minecraft:$id"), parameters.firstOctave, parameters.amplitudes)
+        return cache[id] ?: noise.also { cache = cache + (id to it) }
+    }
 }
