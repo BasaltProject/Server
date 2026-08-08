@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
+#include <basalt/server/runtime/entity/MobOverrides.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
@@ -111,7 +112,8 @@ void MobActionSystem::tickPiglin(world::LoadedWorld& world, entity::ai::MobConte
     if (state.brute && context.random.nextFloat() < 0.0125F && state.activity == Activity::Fight) {
         makeSound(world, piglin, "entity.piglin_brute.angry", 1.0F);
     }
-    if (!state.brute && !piglin.dying && world.gameRules().get(world::gameRules::kMobGriefing)) {
+    if (!state.brute && !piglin.dying &&
+        entity::mobOverrides::griefing(piglin, world.gameRules().get(world::gameRules::kMobGriefing))) {
         piglinPicksUp(world, piglin, state);
     }
 }

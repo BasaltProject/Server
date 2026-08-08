@@ -183,7 +183,7 @@ void travel(world::WorldState& world, ServerEntity& entity, double forward, doub
     }
 
     // parity: gravity comes off after the move, and the drag after that; a long jump keeps it all.
-    entity.velocityY -= gravity;
+    entity.velocityY -= entity.noGravity ? 0.0 : gravity;
     const double horizontalDrag = entity.discardFriction ? 1.0 : blockFriction * kAirDrag;
     entity.velocityX *= horizontalDrag;
     entity.velocityY *= kVerticalDrag;
