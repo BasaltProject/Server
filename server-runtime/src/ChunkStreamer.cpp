@@ -60,8 +60,9 @@ server::world::ChunkTracker::Delta ChunkStreamer::initialJoin(double x, double z
     owner_->sendCompressed(SetChunkCacheRadiusPacket::kId, [radius](wire::io::ByteBuffer& buffer) {
         SetChunkCacheRadiusPacket{.radius = radius}.write(buffer);
     });
-    const world::LoadedWorld* joined = owner_->currentWorld();
-    const std::int32_t simulation = joined == nullptr ? radius : joined->settings().rules.simulationDistance;
+    const world::LoadedWorld* current = owner_->currentWorld();
+    const std::int32_t simulation =
+        current == nullptr ? radius : current->tunables().simulationDistance.value_or(radius);
     owner_->sendCompressed(SetSimulationDistancePacket::kId, [simulation](wire::io::ByteBuffer& buffer) {
         SetSimulationDistancePacket{.simulationDistance = simulation}.write(buffer);
     });

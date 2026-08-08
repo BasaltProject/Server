@@ -52,6 +52,7 @@
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
@@ -238,7 +239,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
 
 void BasaltServer::wireWorld(const std::string& name, world::LoadedWorld& worldRef) {
     world::LoadedWorld* world = &worldRef;
-    world->border().setAbsoluteMaxSize(config_->tuning.maxWorldSize);
+    world->border().absoluteMaxSize = std::min(world->border().absoluteMaxSize, config_->tuning.maxWorldSize);
     world->state().setOnChunkInstalled([this, worldName = name](server::world::Chunk& chunk) {
         static_cast<void>(server::plugins::emit(&plugins_->events(),
                                                 &server::plugins::pluginEventTypes::worldChunkLoad(),
@@ -690,16 +691,25 @@ void BasaltServer::startBedrockListener() {
             if (worldRegistry_ == nullptr) {
                 return;
             }
-            worldRegistry_->scheduler().global().submit(
-                [this, columns = std::move(columns), protocol, send = std::move(send), done = std::move(done)] {
-                    world::LoadedWorld& world = worldRegistry_->defaultWorld();
-                    for (const auto& [x, z] : columns) {
-                        send(bedrock::writeColumn(world.state().getOrGenerateChunk(x, z), protocol));
+            worldRegistry_->scheduler().global().submit([this, columns = std::move(columns), protocol,
+                                                         send = std::move(send), done = std::move(done)] {
+                world::LoadedWorld& world = worldRegistry_->defaultWorld();
+                for (const auto& [x, z] : columns) {
+                    const server::world::Chunk& chunk = world.state().getOrGenerateChunk(x, z);
+                    std::vector<std::vector<std::int32_t>> hidden;
+                    if (const world::AntiXray* antiXray = world.antiXray(); antiXray != nullptr) {
+                        hidden =
+                            antiXray->obfuscate(chunk, [&world](const std::int32_t chunkX, const std::int32_t chunkZ) {
+                                return static_cast<const server::world::Chunk*>(
+                                    world.state().chunkIfLoaded(chunkX, chunkZ));
+                            });
                     }
-                    if (done) {
-                        done();
-                    }
-                });
+                    send(bedrock::writeColumn(chunk, protocol, hidden));
+                }
+                if (done) {
+                    done();
+                }
+            });
         };
 
         context.stored = [this](const wire::common::Uuid& uuid) -> std::optional<storage::StoredPlayer> {
