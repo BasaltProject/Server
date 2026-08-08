@@ -25,7 +25,8 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 public fun main(args: Array<String>) {
     val startedAt = Clock.System.now()
-    println("Basalt ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})")
+    println(BANNER)
+    println("Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})")
 
     // No readLine()/prompts, no TTY detection: identical behavior interactive, headless, or
     // containerized. --accept-eula is a deliberate operator act, not a fallback. (This is about
@@ -87,3 +88,17 @@ public fun main(args: Array<String>) {
 }
 
 private const val WORLD_SEED = 0L
+
+// Raw string on purpose: the art is full of backslashes and escaping them all would make it
+// unreadable and unmaintainable in source.
+private val BANNER =
+    """
+
+  ____                  _ _      _____
+ |  _ \                | | |    / ____|
+ | |_) | __ _ ___  __ _| | |_  | (___   ___ _ ____   _____ _ __
+ |  _ < / _` / __|/ _` | | __|  \___ \ / _ \ '__\ \ / / _ \ '__|
+ | |_) | (_| \__ \ (_| | | |_   ____) |  __/ |   \ V /  __/ |
+ |____/ \__,_|___/\__,_|_|\__| |_____/ \___|_|    \_/ \___|_|
+
+    """.trimEnd()

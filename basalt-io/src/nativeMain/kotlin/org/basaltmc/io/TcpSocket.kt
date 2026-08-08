@@ -12,11 +12,17 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
 import platform.posix.AF_INET
+import platform.posix.ECONNRESET
+import platform.posix.EINTR
+import platform.posix.ENOTCONN
+import platform.posix.EPIPE
+import platform.posix.ETIMEDOUT
 import platform.posix.INADDR_ANY
 import platform.posix.SOCK_STREAM
 import platform.posix.accept
 import platform.posix.bind
 import platform.posix.connect
+import platform.posix.errno
 import platform.posix.listen
 import platform.posix.recv
 import platform.posix.send
@@ -138,19 +144,33 @@ public class TcpConnection internal constructor(
     /** For registering with [SelectEventLoop]; see [TcpListener]'s own KDoc for why `Int` is safe here. */
     public val nativeFd: Int get() = fd.toInt()
 
+    /**
+     * Returns 0 at end of stream, including when the peer reset the connection instead of closing
+     * it politely. A client that pings the server list and yanks the socket the moment it has its
+     * answer is doing something completely ordinary, not failing, so it must not surface as an
+     * error; `ECONNRESET` is how that arrives. `EINTR` is retried, since a signal interrupting the
+     * syscall says nothing about the connection.
+     */
     public fun read(
         buffer: ByteArray,
         offset: Int = 0,
         length: Int = buffer.size - offset,
     ): Int {
-        val received =
-            buffer.usePinned { pinned ->
-                recv(fd.convert(), pinned.addressOf(offset), length.convert(), 0)
+        while (true) {
+            val received =
+                buffer.usePinned { pinned ->
+                    recv(fd.convert(), pinned.addressOf(offset), length.convert(), 0)
+                }
+            if (received >= 0) return received.toInt()
+            when (errno) {
+                EINTR -> continue
+                ECONNRESET, ENOTCONN, ETIMEDOUT, EPIPE -> return 0
+                else -> throw SocketException("recv() failed with errno $errno")
             }
-        if (received < 0) throw SocketException("recv() failed")
-        return received.toInt()
+        }
     }
 
+    /** Stops silently if the peer is already gone, for the same reason [read] returns 0 rather than throwing. */
     public fun write(
         buffer: ByteArray,
         offset: Int = 0,
@@ -162,7 +182,13 @@ public class TcpConnection internal constructor(
                 buffer.usePinned { pinned ->
                     send(fd.convert(), pinned.addressOf(offset + written), (length - written).convert(), 0)
                 }
-            if (sent < 0) throw SocketException("send() failed")
+            if (sent < 0) {
+                when (errno) {
+                    EINTR -> continue
+                    ECONNRESET, ENOTCONN, ETIMEDOUT, EPIPE -> return
+                    else -> throw SocketException("send() failed with errno $errno")
+                }
+            }
             written += sent.toInt()
         }
     }
