@@ -1,11 +1,13 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.assets.ServerJarAssets
+import org.basaltmc.random.BasaltRandom
 import org.basaltmc.random.PositionalRandomFactory
 import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.densityfunction.FunctionContext
 import org.basaltmc.world.terrain.OverworldBiomeSource
 import org.basaltmc.world.terrain.OverworldNoiseRouter
+import org.basaltmc.world.terrain.surface.BadlandsClayBands
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 
 /**
@@ -28,6 +30,7 @@ public class RealSurfaceEnvironment(
 ) : SurfaceRuleEnvironment {
     private val biomeSource = OverworldBiomeSource(router)
     private val noises = RealNoiseParameters(serverJar, random)
+    private val clayBands = BadlandsClayBands(random.fromHashOf("minecraft:clay_bands"))
 
     override fun surfaceDepthNoise(
         x: Int,
@@ -49,6 +52,12 @@ public class RealSurfaceEnvironment(
         z: Int,
     ): Double = noises.get(noiseId).getValue(x.toDouble(), 0.0, z.toDouble())
 
+    override fun sample2dScaled(
+        noiseId: String,
+        x: Double,
+        z: Double,
+    ): Double = noises.get(noiseId).getValue(x, 0.0, z)
+
     override fun sample3d(
         noiseId: String,
         x: Int,
@@ -67,6 +76,12 @@ public class RealSurfaceEnvironment(
             .forkPositional()
             .at(x, y, z)
             .nextFloat()
+
+    override fun positionalRandom(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): BasaltRandom = random.at(x, y, z)
 
     /**
      * // parity: net.minecraft.world.level.levelgen.NoiseChunk.preliminarySurfaceLevel (a
@@ -98,4 +113,10 @@ public class RealSurfaceEnvironment(
         x: Int,
         z: Int,
     ): Boolean = false
+
+    override fun clayBand(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int = clayBands.stateId(y, noises.get("clay_bands_offset").getValue(x.toDouble(), 0.0, z.toDouble()))
 }

@@ -83,8 +83,10 @@ public object BiomeDecoration {
                     DefaultVegetationDecoration.FLOWERS,
                 ),
             // parity: OverworldBiomes.plains(snowy=true, spikes=false/true)/addSnowyTrees: same TREES_SNOWY feature.
-            Identifier.vanilla("snowy_plains") to TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1),
-            Identifier.vanilla("ice_spikes") to TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1),
+            Identifier.vanilla("snowy_plains") to
+                combine(TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1), DefaultVegetationDecoration),
+            Identifier.vanilla("ice_spikes") to
+                combine(IceSpikesDecoration, TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1), DefaultVegetationDecoration),
             // parity: OverworldBiomes.savanna/addSavannaTrees+addWarmFlowers: TREES_SAVANNA (80% acacia else oak,
             // fallen_oak entry dropped) plus flower_warm (real flowerDefault, rarity 1/16).
             Identifier.vanilla("savanna") to
@@ -186,7 +188,7 @@ public object BiomeDecoration {
                 combine(TreeDecoration.sequence(listOf(0.85f to TreeConfigs.TALL_MANGROVE), TreeConfigs.MANGROVE, 25), SwampDecoration.GROUND_COVER),
             // parity: OverworldBiomes.mushroomFields/addMushroomFieldVegetation: mushroom_island_vegetation
             // (huge red/brown 50/50, one attempt per chunk) + brown_mushroom_taiga (rarity 4) +
-            // red_mushroom_taiga (rarity 256). addNearWaterVegetation not ported (needs water modeling).
+            // red_mushroom_taiga (rarity 256). Shared near-water vegetation is appended by forBiome.
             Identifier.vanilla("mushroom_fields") to MushroomFieldsDecoration,
             // parity: OverworldBiomes.ocean/coldOcean/lukeWarmOcean. Each variant selects the
             // matching real seagrass count/tall probability, then its cold or warm kelp density.
@@ -198,11 +200,76 @@ public object BiomeDecoration {
             Identifier.vanilla("deep_lukewarm_ocean") to AquaticDecoration.DEEP_LUKEWARM_OCEAN,
             // parity: warm ocean adds coral first, then seagrass_warm and sea_pickle.
             Identifier.vanilla("warm_ocean") to AquaticDecoration.WARM_OCEAN,
-            // parity: frozenOcean calls the same default flower/grass features as beaches, plus
-            // water trees and mushrooms not yet modeled by this decoration engine.
-            Identifier.vanilla("frozen_ocean") to DefaultVegetationDecoration,
-            Identifier.vanilla("deep_frozen_ocean") to DefaultVegetationDecoration,
+            // parity: frozenOcean adds packed/blue icebergs in LOCAL_MODIFICATIONS, blue ice in
+            // SURFACE_STRUCTURES, then the same default flower/grass features as beaches. Water
+            // trees and mushrooms remain unported.
+            Identifier.vanilla("frozen_ocean") to combine(FrozenOceanDecoration, DefaultVegetationDecoration),
+            Identifier.vanilla("deep_frozen_ocean") to combine(FrozenOceanDecoration, DefaultVegetationDecoration),
         )
 
-    public fun forBiome(id: Identifier): BiomeVegetalDecoration? = byBiome[id]
+    public fun forBiome(id: Identifier): BiomeVegetalDecoration? {
+        val path = id.path
+        return when (path) {
+            "ocean" -> oceanWithExtra(AquaticDecoration.OCEAN)
+            "deep_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_OCEAN)
+            "cold_ocean" -> oceanWithExtra(AquaticDecoration.COLD_OCEAN)
+            "deep_cold_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_COLD_OCEAN)
+            "lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.LUKEWARM_OCEAN)
+            "deep_lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_LUKEWARM_OCEAN)
+            "warm_ocean" -> oceanWithExtra(AquaticDecoration.WARM_OCEAN)
+            "river" -> combine(DefaultVegetationDecoration, ExtraVegetationDecoration.DEFAULT, AquaticDecoration.RIVER)
+            "swamp" -> combine(requireBase(id), ExtraVegetationDecoration.SWAMP, AquaticDecoration.SWAMP)
+            "mangrove_swamp" ->
+                combine(requireBase(id), AquaticDecoration.SWAMP, ExtraVegetationDecoration.MANGROVE)
+            "desert" -> combine(requireBase(id), ExtraVegetationDecoration.DESERT)
+            "badlands", "eroded_badlands", "wooded_badlands" ->
+                combine(requireBase(id), ExtraVegetationDecoration.BADLANDS)
+            "mushroom_fields" -> combine(requireBase(id), ExtraVegetationDecoration.NEAR_WATER)
+            in DEFAULT_EXTRA_PATHS -> combine(requireBase(id), ExtraVegetationDecoration.DEFAULT)
+            in PUMPKIN_ONLY_PATHS -> combine(requireBase(id), ExtraVegetationDecoration.PUMPKIN_ONLY)
+            else -> byBiome[id]
+        }
+    }
+
+    private fun oceanWithExtra(aquatic: BiomeVegetalDecoration): BiomeVegetalDecoration =
+        combine(DefaultVegetationDecoration, ExtraVegetationDecoration.DEFAULT, aquatic)
+
+    private fun requireBase(id: Identifier): BiomeVegetalDecoration =
+        byBiome[id] ?: error("missing base decoration for $id")
+
+    private val DEFAULT_EXTRA_PATHS: Set<String> =
+        setOf(
+            "plains",
+            "sunflower_plains",
+            "snowy_plains",
+            "ice_spikes",
+            "forest",
+            "flower_forest",
+            "birch_forest",
+            "old_growth_birch_forest",
+            "dark_forest",
+            "pale_garden",
+            "old_growth_pine_taiga",
+            "old_growth_spruce_taiga",
+            "taiga",
+            "snowy_taiga",
+            "savanna",
+            "savanna_plateau",
+            "windswept_savanna",
+            "windswept_hills",
+            "windswept_gravelly_hills",
+            "windswept_forest",
+            "jungle",
+            "sparse_jungle",
+            "bamboo_jungle",
+            "frozen_river",
+            "beach",
+            "snowy_beach",
+            "stony_shore",
+            "frozen_ocean",
+            "deep_frozen_ocean",
+        )
+
+    private val PUMPKIN_ONLY_PATHS: Set<String> =
+        setOf("grove", "snowy_slopes", "dripstone_caves", "deep_dark")
 }

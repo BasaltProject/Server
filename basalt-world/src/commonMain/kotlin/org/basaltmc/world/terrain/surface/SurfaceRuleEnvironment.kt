@@ -1,5 +1,7 @@
 package org.basaltmc.world.terrain.surface
 
+import org.basaltmc.random.BasaltRandom
+
 /**
  * Everything [SurfaceRules] node types need from outside `basalt-world` (real noise data, the
  * real per-world seed, biome lookup): kept as an interface, not a direct dependency on
@@ -26,6 +28,13 @@ public interface SurfaceRuleEnvironment {
         z: Int,
     ): Double
 
+    /** Noise lookup at a scaled, non-integral coordinate, used by SurfaceSystem extensions. */
+    public fun sample2dScaled(
+        noiseId: String,
+        x: Double,
+        z: Double,
+    ): Double = sample2d(noiseId, x.toInt(), z.toInt())
+
     public fun sample3d(
         noiseId: String,
         x: Int,
@@ -33,13 +42,24 @@ public interface SurfaceRuleEnvironment {
         z: Int,
     ): Double
 
-    /** A uniform `[0, 1)` draw from the named [PositionalRandomFactory][org.basaltmc.random.PositionalRandomFactory], for `VerticalGradientConditionSource`. */
+    /**
+     * A uniform `[0, 1)` draw from the named
+     * [PositionalRandomFactory][org.basaltmc.random.PositionalRandomFactory], for
+     * `VerticalGradientConditionSource`.
+     */
     public fun verticalGradientRandom(
         name: String,
         x: Int,
         y: Int,
         z: Int,
     ): Float
+
+    /** The world's root positional random at a block coordinate. */
+    public fun positionalRandom(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): BasaltRandom = error("positional random is required by biome-specific surface extensions")
 
     /**
      * A stand-in for vanilla's `NoiseChunk.preliminarySurfaceLevel` (an estimate from the density

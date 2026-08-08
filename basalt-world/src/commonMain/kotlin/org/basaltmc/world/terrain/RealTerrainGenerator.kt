@@ -8,6 +8,7 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.terrain.decoration.BiomeDecoration
+import org.basaltmc.world.terrain.decoration.SurfaceFreezingDecoration
 import org.basaltmc.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
@@ -103,6 +104,7 @@ public object RealTerrainGenerator {
         val centerY = heightmap[8 + 8 * 16]
         val biomeId = Identifier.parse(chunkEnvironment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
         BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
+        SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
         fillBiomes(chunk, chunkEnvironment)
         return chunk
     }

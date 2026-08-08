@@ -6,39 +6,15 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 
 /**
- * Real Desert `vegetal_decoration`: `patch_cactus_desert` and `patch_dead_bush_2`, ported from the
- * real jar's own `VegetationPlacements`. **Not ported**: `patch_dry_grass_desert` (a
- * `WeightedStateProvider` between two dry-grass variants, not modeled yet),
- * `patch_sugar_cane_desert`/`patch_pumpkin` (need water-adjacency/specific-noise checks this
- * project doesn't model), matching [PlainsDecoration]'s own precedent for documenting gaps rather
- * than approximating them.
+ * Desert ground cover before [ExtraVegetationDecoration.DESERT]: `patch_dead_bush_2`.
+ * `patch_dry_grass_desert` remains unported.
  */
 public object DesertDecoration : BiomeVegetalDecoration {
     override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        placeCactus(chunk, random)
         placeDeadBush(chunk, random)
-    }
-
-    // parity: placed_feature/patch_cactus_desert.json.
-    private fun placeCactus(
-        chunk: Chunk,
-        random: WorldgenRandom,
-    ) {
-        runPipeline(
-            chunk,
-            random,
-            listOf(
-                RarityFilter(6),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(10),
-                RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
-                AirTargetFilter(),
-            ),
-        ) { c, r, pos -> CactusFeature.place(c, r, pos) }
     }
 
     // parity: placed_feature/patch_dead_bush_2.json (VegetationPlacements.worldSurfaceSquaredWithCount(2) + copyAndAdd).

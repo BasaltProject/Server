@@ -54,8 +54,8 @@ public object DefaultVegetationDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        GRASS.decorate(chunk, random)
         FLOWERS.decorate(chunk, random)
+        GRASS.decorate(chunk, random)
     }
 
     private fun runPipeline(
