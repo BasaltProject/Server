@@ -4,6 +4,7 @@ import org.basaltmc.random.LegacyRandom
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.noise.SimplexNoise
+import kotlin.math.ceil
 
 /** A position a [PlacementModifier] pipeline is scattering, chunk-relative on X/Z. */
 public data class DecorationPos(
@@ -12,17 +13,24 @@ public data class DecorationPos(
     val z: Int,
 )
 
-/** // parity: net.minecraft.world.level.levelgen.placement.PlacementContext, narrowed to what this project's single-heightmap [Chunk] model needs. */
+/** // parity: net.minecraft.world.level.levelgen.placement.PlacementContext, narrowed to chunk heightmaps. */
 public class PlacementContext(
     public val chunk: Chunk,
 ) {
-    private val heightmap: IntArray = chunk.heightmap()
+    private val worldSurfaceHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)
+    private val oceanFloorHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
+    private val motionBlockingHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING)
 
-    /** Real vanilla distinguishes OCEAN_FLOOR/MOTION_BLOCKING/WORLD_SURFACE(_WG); this project has no fluids yet, so all four coincide. */
     public fun height(
         localX: Int,
         localZ: Int,
-    ): Int = heightmap[localX + localZ * 16]
+        type: Chunk.HeightmapType = Chunk.HeightmapType.MOTION_BLOCKING,
+    ): Int =
+        when (type) {
+            Chunk.HeightmapType.WORLD_SURFACE -> worldSurfaceHeightmap
+            Chunk.HeightmapType.OCEAN_FLOOR -> oceanFloorHeightmap
+            Chunk.HeightmapType.MOTION_BLOCKING -> motionBlockingHeightmap
+        }[localX + localZ * 16]
 }
 
 /** // parity: net.minecraft.world.level.levelgen.placement.PlacementModifier. Each modifier turns one position into zero or more. */
@@ -98,6 +106,12 @@ public class RandomOffsetPlacement(
 
 /** // parity: net.minecraft.world.level.levelgen.placement.HeightmapPlacement, this project's single heightmap standing in for every real heightmap type. */
 public object HeightmapPlacement : PlacementModifier {
+    public operator fun invoke(type: Chunk.HeightmapType): PlacementModifier =
+        PlacementModifier { context, _, origin ->
+            val height = context.height(origin.x and 15, origin.z and 15, type)
+            sequenceOf(DecorationPos(origin.x, height, origin.z))
+        }
+
     override fun getPositions(
         context: PlacementContext,
         random: WorldgenRandom,
@@ -107,6 +121,27 @@ public object HeightmapPlacement : PlacementModifier {
         val localZ = origin.z and 15
         val height = context.height(localX, localZ)
         return sequenceOf(DecorationPos(origin.x, height, origin.z))
+    }
+}
+
+/** // parity: NoiseBasedCountPlacement, using the fixed `Biome.BIOME_INFO_NOISE`. */
+public class NoiseBasedCountPlacement(
+    private val noiseToCountRatio: Int,
+    private val noiseFactor: Double,
+    private val noiseOffset: Double = 0.0,
+) : PlacementModifier {
+    override fun getPositions(
+        context: PlacementContext,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Sequence<DecorationPos> {
+        val noise = BIOME_INFO_NOISE.getValue(origin.x / noiseFactor, origin.z / noiseFactor)
+        val count = ceil((noise + noiseOffset) * noiseToCountRatio).toInt()
+        return (0 until count).asSequence().map { origin }
+    }
+
+    private companion object {
+        val BIOME_INFO_NOISE = SimplexNoise(LegacyRandom(2345L))
     }
 }
 

@@ -7,9 +7,11 @@ import org.basaltmc.protocol.play.PalettedContainer
 
 /**
  * Turns a [Chunk] into the wire bytes `basalt-protocol`'s `MapChunkPacket.chunkData` and
- * `UpdateLightPacket` need. Biomes are always plains: `basalt-world` does not vary biomes yet.
- * Light is a uniform value per section, not real propagation: sections entirely below the
- * chunk's own tallest column get no skylight, everything at or above it gets full skylight. This
+ * `UpdateLightPacket` need. Biomes come from each section's own quart-resolution biome palette
+ * (filled by [org.basaltmc.world.terrain.RealTerrainGenerator] from the real climate sampler;
+ * the flat-world generator leaves them all 0, plains). Light is a uniform value per section, not
+ * real propagation: sections entirely below the chunk's own tallest column get no skylight,
+ * everything at or above it gets full skylight. This
  * is the basic lighting a flat world needs, not a general light engine (that belongs to a later
  * pass with real terrain to propagate light across); using the chunk's tallest column rather than
  * a single fixed one (`heightmap()[0]`, correct only when every column in the chunk is the same
@@ -21,24 +23,15 @@ public object ChunkDataCodec {
     private const val BLOCK_DIRECT_BITS = 8
     private const val BIOME_DIRECT_BITS = 4
 
-    // `minecraft:worldgen/biome` is a network-synced registry (unlike Block): entries are numbered
-    // by the order ClientSession sends them in RegistryDataPacket, not org.basaltmc.registry.Biomes'
-    // own numbering (that mirrors the real full vanilla biome list, e.g. plains = 40 there). Since
-    // ClientSession currently sends exactly one biome entry (plains, first and only), its
-    // client-side id is 0: confirmed live, sending 40 crashed with "No value with id 40".
-    private const val PLAINS_ID = 0
-
     public fun encodeSections(chunk: Chunk): ByteArray {
         val buffer = ByteBuffer()
-        val biomeValues = IntArray(64) { PLAINS_ID }
         for (i in 0 until chunk.sectionCount) {
             val section = chunk.section(i)
             buffer.writeShort(section.nonAirBlockCount.toShort())
             // LevelChunkSection.write always writes two shorts (non-empty block count, then fluid
             // count), never just one: confirmed live, a real client overran the buffer reading the
-            // next section's data because this field was missing entirely. basalt-world doesn't
-            // track fluids yet, so 0 is always correct for now (no water/lava in flat worlds).
-            buffer.writeShort(0)
+            // next section's data because this field was missing entirely.
+            buffer.writeShort(section.nonEmptyFluidCount.toShort())
             PalettedContainer.write(
                 buffer,
                 section.blockStateIds(),
@@ -48,7 +41,7 @@ public object ChunkDataCodec {
             )
             PalettedContainer.write(
                 buffer,
-                biomeValues,
+                section.biomeIds(),
                 PalettedContainer.BIOME_MIN_INDIRECT_BITS,
                 PalettedContainer.BIOME_MAX_INDIRECT_BITS,
                 BIOME_DIRECT_BITS,

@@ -22,15 +22,26 @@ public object Blocks {
     public val STONE: BlockState = register(1, "stone")
     public val GRASS_BLOCK: BlockState = register(9, "grass_block")
     public val DIRT: BlockState = register(10, "dirt")
+    public val PODZOL: BlockState = register(13, "podzol")
     public val BEDROCK: BlockState = register(85, "bedrock")
+    public val WATER: BlockState = register(86, "water")
     public val OAK_LOG: BlockState = register(137, "oak_log")
     public val OAK_LEAVES: BlockState = register(279, "oak_leaves")
+    public val SEAGRASS: BlockState = register(2254, "seagrass")
+    public val TALL_SEAGRASS: BlockState = register(2256, "tall_seagrass")
+    public val KELP: BlockState = register(15062, "kelp")
+    public val KELP_PLANT: BlockState = register(15088, "kelp_plant")
+    public val SEA_PICKLE: BlockState = register(15267, "sea_pickle")
+    public val BAMBOO: BlockState = register(15279, "bamboo")
 
     init {
         for ((stateId, path) in ALL_DEFAULT_BLOCK_STATES) {
             if (REGISTRY.byId(stateId) == null) register(stateId, path)
         }
     }
+
+    /** Whether this default block state exposes a non-empty water fluid state. */
+    public fun hasWaterFluid(stateId: Int): Boolean = stateId in WATER_FLUID_STATE_IDS
 
     private fun register(
         stateId: Int,
@@ -39,4 +50,29 @@ public object Blocks {
         val identifier = Identifier.vanilla(path)
         return REGISTRY.register(stateId, identifier, BlockState(identifier, stateId))
     }
+
+    private val WATER_FLUID_STATE_IDS: Set<Int> =
+        listOf(
+            "water",
+            "seagrass",
+            "tall_seagrass",
+            "kelp",
+            "kelp_plant",
+            "sea_pickle",
+            "tube_coral",
+            "brain_coral",
+            "bubble_coral",
+            "fire_coral",
+            "horn_coral",
+            "tube_coral_fan",
+            "brain_coral_fan",
+            "bubble_coral_fan",
+            "fire_coral_fan",
+            "horn_coral_fan",
+            "tube_coral_wall_fan",
+            "brain_coral_wall_fan",
+            "bubble_coral_wall_fan",
+            "fire_coral_wall_fan",
+            "horn_coral_wall_fan",
+        ).mapNotNull { REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
 }

@@ -55,14 +55,8 @@ public object VanillaRegistryData {
                 }
         }
 
-    public fun plainsBiome(): NbtCompound =
-        NbtCompound().apply {
-            putBoolean("has_precipitation", true)
-            putFloat("temperature", 0.8f)
-            putFloat("downfall", 0.4f)
-            val effects = NbtCompound().apply { putInt("water_color", 4159204) }
-            this["effects"] = effects
-        }
+    // The biome registry (`minecraft:worldgen/biome`) is synced in full by [VanillaBiomes]: all 55
+    // real Overworld entries, not a single plains stand-in.
 
     // The 13 registries below are the only ones a real 26.2 client hard-requires non-empty to
     // finish Configuration (confirmed live: RegistryDataLoader.SYNCHRONIZED_REGISTRIES marks

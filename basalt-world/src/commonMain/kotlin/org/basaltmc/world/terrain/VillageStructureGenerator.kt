@@ -15,7 +15,10 @@ import kotlin.concurrent.AtomicReference
 import kotlin.math.abs
 
 /**
- * Places real Plains village structures during chunk generation. // parity, narrowed:
+ * Places real village structures during chunk generation, picking the real variant (plains,
+ * desert, savanna, snowy or taiga) per candidate position from the biome there, exactly like the
+ * shared `villages` structure set does in real vanilla (see [selectVariantStartPool]).
+ * // parity, narrowed:
  * `ChunkGenerator.createStructure`/`WorldGenRegion`'s own structure-starts-then-references
  * pipeline caches a structure's assembled pieces once (in the placement chunk's own saved data)
  * and has every overlapping chunk *reference* that cache when placing blocks. This project's
@@ -38,7 +41,7 @@ import kotlin.math.abs
 public class VillageStructureGenerator(
     private val router: OverworldNoiseRouter,
     private val grid: StructurePlacementGrid,
-    private val startPoolName: String,
+    private val biomeAt: (x: Int, y: Int, z: Int) -> String,
     private val maxDepth: Int,
     private val maxDistanceFromCenter: Int,
     poolLookup: (String) -> StructureTemplatePool?,
@@ -114,6 +117,7 @@ public class VillageStructureGenerator(
         val startPosition = StructurePos(candidateChunkX * 16, 0, candidateChunkZ * 16)
         val random = WorldgenRandom(LegacyRandom(0L))
         random.setLargeFeatureWithSalt(seed, candidateChunkX, candidateChunkZ, VILLAGE_ASSEMBLY_SALT)
+        val startPoolName = selectVariantStartPool(candidateChunkX, candidateChunkZ, seed) ?: return emptyList()
         val assembled =
             assembly.assemble(
                 startPoolName,
@@ -129,6 +133,42 @@ public class VillageStructureGenerator(
             current[key]?.let { return it }
             if (assemblyCache.compareAndSet(current, current + (key to assembled))) return assembled
         }
+    }
+
+    /**
+     * // parity: ChunkGenerator's own structure-set generation loop (its real `else` branch for
+     * multi-entry sets): the five real `village_*` structures share one `villages` structure set,
+     * all weight 1, and are tried in a seeded weighted draw without replacement until one's
+     * `has_structure/village_*` biome tag matches the biome at the candidate's own center column
+     * (sampled at the density-derived surface height, the same spot the real heightmap-projected
+     * start uses). No match anywhere means no village at that candidate at all, real behavior too.
+     */
+    private fun selectVariantStartPool(
+        candidateChunkX: Int,
+        candidateChunkZ: Int,
+        seed: Long,
+    ): String? {
+        val random = WorldgenRandom(LegacyRandom(0L))
+        random.setLargeFeatureSeed(seed, candidateChunkX, candidateChunkZ)
+        val centerX = candidateChunkX * 16 + 8
+        val centerZ = candidateChunkZ * 16 + 8
+        val biome = biomeAt(centerX, surfaceHeightAt(centerX, centerZ), centerZ).substringAfter(':')
+        val options = VARIANTS.toMutableList()
+        var total = options.size
+        while (options.isNotEmpty()) {
+            var choice = random.nextInt(total)
+            var index = 0
+            for (variant in options) {
+                choice -= 1 // every real entry weighs 1
+                if (choice < 0) break
+                index++
+            }
+            val variant = options[index]
+            if (biome in variant.biomes) return variant.startPool
+            options.removeAt(index)
+            total -= 1
+        }
+        return null
     }
 
     /**
@@ -196,5 +236,21 @@ public class VillageStructureGenerator(
         const val VILLAGE_ASSEMBLY_SALT = 0
         const val CELL_WIDTH = 4
         const val CELL_HEIGHT = 8
+
+        data class Variant(
+            val startPool: String,
+            val biomes: Set<String>,
+        )
+
+        // parity: villages.json's five entries in file order (all weight 1) with each structure's
+        // own real `has_structure/village_*` biome tag contents.
+        val VARIANTS =
+            listOf(
+                Variant("minecraft:village/plains/town_centers", setOf("plains", "meadow")),
+                Variant("minecraft:village/desert/town_centers", setOf("desert")),
+                Variant("minecraft:village/savanna/town_centers", setOf("savanna")),
+                Variant("minecraft:village/snowy/town_centers", setOf("snowy_plains")),
+                Variant("minecraft:village/taiga/town_centers", setOf("taiga")),
+            )
     }
 }

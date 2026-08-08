@@ -32,7 +32,10 @@ public object TreeDecoration {
         val origin = DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
         var positions = frequency.getPositions(context, random, origin)
         positions = positions.flatMap { InSquarePlacement.getPositions(context, random, it) }
-        positions = positions.flatMap { HeightmapPlacement.getPositions(context, random, it) }
+        positions =
+            positions.flatMap {
+                HeightmapPlacement(Chunk.HeightmapType.OCEAN_FLOOR).getPositions(context, random, it)
+            }
         positions.forEach { pos -> pick(random)?.let { TreeFeature.place(chunk, random, pos.x, pos.y, pos.z, it) } }
     }
 

@@ -27,7 +27,7 @@ public class SimpleBlockFeature(
         val localZ = origin.z and 15
         if (chunk.getBlockStateId(localX, origin.y, localZ) != Blocks.AIR.stateId) return false
         if (origin.y - 1 < WorldHeight.MIN_Y ||
-            chunk.getBlockStateId(localX, origin.y - 1, localZ) == Blocks.AIR.stateId
+            !Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getBlockStateId(localX, origin.y - 1, localZ))
         ) {
             return false
         }

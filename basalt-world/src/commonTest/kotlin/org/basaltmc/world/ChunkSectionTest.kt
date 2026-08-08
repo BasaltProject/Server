@@ -38,4 +38,12 @@ class ChunkSectionTest {
         assertFailsWith<IllegalArgumentException> { section.getBlockStateId(16, 0, 0) }
         assertFailsWith<IllegalArgumentException> { section.getBlockStateId(0, -1, 0) }
     }
+
+    @Test
+    fun countsWaterAndWaterPlantsAsNonEmptyFluids() {
+        val section = ChunkSection()
+        section.setBlockStateId(0, 0, 0, Blocks.WATER.stateId)
+        section.setBlockStateId(1, 0, 0, Blocks.SEAGRASS.stateId)
+        assertEquals(2, section.nonEmptyFluidCount)
+    }
 }
