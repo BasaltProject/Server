@@ -5,6 +5,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/config/WorldRules.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
@@ -32,6 +33,12 @@
 #include <utility>
 
 namespace basalt::server::runtime::world {
+
+const config::WorldRules& WorldState::rules() const noexcept {
+    static const config::WorldRules kVanilla;
+    return rules_ == nullptr ? kVanilla : *rules_;
+}
+
 using server::world::Chunk;
 using server::world::ChunkScheduledTick;
 

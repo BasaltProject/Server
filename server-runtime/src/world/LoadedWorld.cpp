@@ -71,6 +71,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       hardcore_(metadata_.hardcore.value_or(settings_.hardcore)), defaultGamemode_(metadata_.defaultGamemode) {
     tunables_.lootRefill = settings_.lootRefill;
     tunables_.lootRelootSeconds = settings_.lootRelootSeconds;
+    state_.setRules(&settings_.rules);
     if (settings_.rules.antiXray.enabled) {
         antiXray_ = std::make_shared<const AntiXray>(settings_.rules.antiXray, declaration_.dimension);
     }

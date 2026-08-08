@@ -53,8 +53,36 @@ struct EnvironmentRules {
     bool disableThunder = false;
     std::int32_t fishingMinWaitTicks = 100;
     std::int32_t fishingMaxWaitTicks = 600;
+    std::int32_t netherCeilingVoidDamageHeight = 0;
 
     friend bool operator==(const EnvironmentRules&, const EnvironmentRules&) = default;
+};
+
+struct HungerRules {
+    float sprintExhaustion = 0.1F;
+    float swimExhaustion = 0.01F;
+    float jumpExhaustion = 0.05F;
+    float sprintJumpExhaustion = 0.2F;
+    float combatExhaustion = 0.1F;
+    float regenExhaustion = 6.0F;
+
+    friend bool operator==(const HungerRules&, const HungerRules&) = default;
+};
+
+struct GameplayRules {
+    std::int32_t fireTickDelay = 30;
+    std::int32_t cactusMaxHeight = 3;
+    std::int32_t sugarCaneMaxHeight = 3;
+    std::int32_t bambooMaxHeight = 16;
+    double dragonDeathSoundRadius = 0.0;
+    double witherSpawnSoundRadius = 0.0;
+    std::int32_t keepSpawnLoadedRange = 1;
+    std::int32_t unloadMarginChunks = 4;
+    bool keepSprintOnAttack = false;
+    bool playerCollisions = true;
+    HungerRules hunger;
+
+    friend bool operator==(const GameplayRules&, const GameplayRules&) = default;
 };
 
 struct AntiXrayRules {
@@ -79,6 +107,9 @@ struct WorldRules {
     std::map<std::string, std::string> gameRules;
     GrowthPercents growth;
     std::int32_t hopperTransferTicks = 8;
+    std::int32_t hopperAmount = 1;
+    std::int32_t hopperCheckTicks = 1;
+    GameplayRules gameplay;
     EnvironmentRules environment;
     BorderRules border;
     AntiXrayRules antiXray = AntiXrayRules::vanilla();
@@ -87,6 +118,13 @@ struct WorldRules {
 
     friend bool operator==(const WorldRules&, const WorldRules&) = default;
 };
+
+/// Shared with the gameplay half of the template, which lives in its own file.
+[[nodiscard]] std::string renderRulesTemplate(std::string_view text, bool forDefaults);
+
+[[nodiscard]] std::string_view gameplayRulesTemplate() noexcept;
+
+void readGameplayRules(const wire::common::toml::TomlTable& table, GameplayRules& rules);
 
 /// The commented sections of the rules, as `[defaults.x]` for worlds.toml or commented `[x]` for a world's own file.
 [[nodiscard]] std::string worldRulesTemplate(bool forDefaults);
