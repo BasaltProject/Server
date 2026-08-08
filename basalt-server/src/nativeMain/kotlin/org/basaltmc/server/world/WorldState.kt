@@ -36,23 +36,44 @@ public class WorldState(
     private val loadOrGenerate: (chunkX: Int, chunkZ: Int) -> Chunk = NoiseWorldGenerator::generate,
 ) {
     private val mutex = NativeMutex()
+
+    // Keyed by packed coordinates, not by `Pair`. A Pair key allocates an object and boxes both
+    // ints on *every* lookup, and these are the most called methods in the server: the login path
+    // alone polls hundreds of positions per millisecond.
     private val chunksByPos =
-        mutableMapOf<Pair<Int, Int>, Chunk>().apply {
-            for (chunk in initialChunks) this[chunk.chunkX to chunk.chunkZ] = chunk
+        HashMap<Long, Chunk>().apply {
+            for (chunk in initialChunks) this[key(chunk.chunkX, chunk.chunkZ)] = chunk
         }
 
     public val chunks: List<Chunk> get() = mutex.withLock { chunksByPos.values.toList() }
 
     public val loadedChunkCount: Int get() = mutex.withLock { chunksByPos.size }
 
-    /** Only the chunks holding something the region files do not, which is all a save has to write. */
-    public fun dirtyChunks(): List<Chunk> = mutex.withLock { chunksByPos.values.filter { it.isDirty } }
+    /**
+     * Only the chunks holding something the region files do not, which is all a save has to write.
+     *
+     * Snapshots under the lock and filters outside it. Every generation worker needs this same lock
+     * twice per chunk, so holding it across a scan of everything loaded, from a single thread
+     * competing with eight, is how that thread ends up never being scheduled at all.
+     */
+    public fun dirtyChunks(): List<Chunk> = snapshot().filter { it.isDirty }
 
-    /** Every loaded chunk [shouldKeep] rejects. Separate from [evictClean] so the caller can save them unlocked. */
+    /** Every loaded chunk [shouldKeep] rejects. Filtered outside the lock, for the reason [dirtyChunks] gives. */
     public fun evictionCandidates(shouldKeep: (chunkX: Int, chunkZ: Int) -> Boolean): List<Chunk> =
-        mutex.withLock {
-            chunksByPos.values.filter { !shouldKeep(it.chunkX, it.chunkZ) }
-        }
+        snapshot().filter { !shouldKeep(it.chunkX, it.chunkZ) }
+
+    private fun snapshot(): List<Chunk> = mutex.withLock { chunksByPos.values.toList() }
+
+    /** How many of [positions] are still missing, counted in one pass under one lock acquisition. */
+    public fun countMissing(positions: List<Pair<Int, Int>>): Int =
+        mutex.withLock { positions.count { key(it.first, it.second) !in chunksByPos } }
+
+    private companion object {
+        fun key(
+            chunkX: Int,
+            chunkZ: Int,
+        ): Long = (chunkX.toLong() and 0xFFFFFFFFL) or (chunkZ.toLong() shl 32)
+    }
 
     /**
      * Drops [chunks] from memory, skipping any that became dirty again since the caller saved them:
@@ -64,7 +85,7 @@ public class WorldState(
             var removed = 0
             for (chunk in chunks) {
                 if (chunk.isDirty) continue
-                if (chunksByPos.remove(chunk.chunkX to chunk.chunkZ) != null) removed++
+                if (chunksByPos.remove(key(chunk.chunkX, chunk.chunkZ)) != null) removed++
             }
             removed
         }
@@ -73,20 +94,20 @@ public class WorldState(
     public fun isLoaded(
         chunkX: Int,
         chunkZ: Int,
-    ): Boolean = mutex.withLock { (chunkX to chunkZ) in chunksByPos }
+    ): Boolean = mutex.withLock { key(chunkX, chunkZ) in chunksByPos }
 
     /** The chunk if it is already in memory, or `null`. Never generates, so it is safe on a connection thread. */
     public fun chunkIfLoaded(
         chunkX: Int,
         chunkZ: Int,
-    ): Chunk? = mutex.withLock { chunksByPos[chunkX to chunkZ] }
+    ): Chunk? = mutex.withLock { chunksByPos[key(chunkX, chunkZ)] }
 
     /** Returns the chunk at this position, generating (but not sending or persisting) it first if unseen. */
     public fun getOrGenerateChunk(
         chunkX: Int,
         chunkZ: Int,
     ): Chunk {
-        val key = chunkX to chunkZ
+        val key = key(chunkX, chunkZ)
         mutex.withLock { chunksByPos[key] }?.let { return it }
         val generated = loadOrGenerate(chunkX, chunkZ)
         return mutex.withLock { chunksByPos.getOrPut(key) { generated } }
@@ -98,7 +119,7 @@ public class WorldState(
         z: Int,
     ): Int? =
         mutex.withLock {
-            val chunk = chunksByPos[(x shr 4) to (z shr 4)] ?: return@withLock null
+            val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock null
             chunk.getBlockStateId(x and 15, y, z and 15)
         }
 
@@ -110,7 +131,7 @@ public class WorldState(
         stateId: Int,
     ): Boolean =
         mutex.withLock {
-            val chunk = chunksByPos[(x shr 4) to (z shr 4)] ?: return@withLock false
+            val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock false
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
             true
         }
