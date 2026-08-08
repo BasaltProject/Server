@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <doctest.h>
@@ -83,6 +84,8 @@ TEST_CASE("every commented default is valid TOML") {
         {"server.toml", kServerDefaultToml},
         {"server_list.toml", kServerListDefaultToml},
         {"tab_list.toml", kTabListDefaultToml},
+        {"world_mobs.toml", kWorldMobsDefaultToml},
+        {"world_mobs_local.toml", kWorldMobsLocalDefaultToml},
         {"world_settings.toml", kWorldSettingsDefaultToml},
         {"worlds.toml", kWorldsDefaultToml},
     };
@@ -92,4 +95,20 @@ TEST_CASE("every commented default is valid TOML") {
         CHECK(contents.find('#') != std::string_view::npos);
         CHECK(toml::parse(contents).has_value());
     }
+}
+
+TEST_CASE("the generated mob defaults are vanilla's") {
+    const std::string root = scratch("config-mobs");
+    const std::expected<MobSettings, std::string> loaded = loadMobDefaults(ConfigDirectory{root});
+    REQUIRE(loaded.has_value());
+    CHECK(*loaded == MobSettings::vanilla());
+}
+
+TEST_CASE("an override naming an unknown field is refused with the file") {
+    const std::expected<toml::TomlTable, toml::TomlError> parsed = toml::parse("[overrides.zombie]\nmax-helth = 5\n");
+    REQUIRE(parsed.has_value());
+    const std::expected<MobSettings, std::string> settings =
+        MobSettings::from(*parsed, MobSettings::vanilla(), "mobs.toml");
+    REQUIRE_FALSE(settings.has_value());
+    CHECK(settings.error().starts_with("mobs.toml: overrides.zombie.max-helth"));
 }

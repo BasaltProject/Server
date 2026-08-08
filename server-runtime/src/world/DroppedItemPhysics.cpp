@@ -181,7 +181,7 @@ std::vector<DroppedItem> DroppedItemPhysics::expiring(const sched::Region* regio
     const WorldReadLock lock{*mutex_};
     std::vector<DroppedItem> found;
     for (const DroppedItem& item : droppedItems_) {
-        if (item.age != kUnlimitedLifetimeAge && item.age + 1 >= kItemLifetimeTicks &&
+        if (item.age != kUnlimitedLifetimeAge && item.age + 1 >= lifetimeTicks_ &&
             (region == nullptr || region->ownsPosition(item.x, item.z))) {
             found.push_back(item);
         }
@@ -216,7 +216,7 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         if (item.pickupDelay > 0) {
             --item.pickupDelay;
         }
-        if (item.age >= kItemLifetimeTicks) {
+        if (item.age >= lifetimeTicks_) {
             despawned.push_back(item.entityId);
             droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
             continue;
@@ -271,7 +271,7 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
         // parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to.
         if (candidate.item != item.item || candidate.count <= 0 ||
             !sameComponents(candidate.components, item.components) || item.count + candidate.count > maxOf(candidate) ||
-            std::abs(candidate.x - item.x) > kMergeRange || std::abs(candidate.z - item.z) > kMergeRange ||
+            std::abs(candidate.x - item.x) > mergeRange_ || std::abs(candidate.z - item.z) > mergeRange_ ||
             std::abs(candidate.y - item.y) > kMergeHeight) {
             ++other;
             continue;

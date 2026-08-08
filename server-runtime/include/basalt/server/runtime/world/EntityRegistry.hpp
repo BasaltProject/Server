@@ -11,6 +11,10 @@
 #include <utility>
 #include <vector>
 
+namespace basalt::server::runtime::config {
+struct MobSettings;
+}
+
 namespace basalt::server::runtime::world {
 
 class EntityRegistry {
@@ -35,10 +39,13 @@ public:
 
     entity::ServerEntity& spawnEntity(std::unique_ptr<entity::ServerEntity> entity);
 
+    void setMobSettings(const config::MobSettings* settings) noexcept { mobSettings_ = settings; }
+
     [[nodiscard]] std::vector<std::int32_t> collectRemovedEntities();
 
 private:
     WorldMutex* mutex_;
+    const config::MobSettings* mobSettings_ = nullptr;
     std::vector<std::unique_ptr<entity::ServerEntity>> entities_;
     std::unordered_map<std::int32_t, entity::ServerEntity*> byId_;
     std::vector<wire::nbt::NbtCompound> pendingEntities_;

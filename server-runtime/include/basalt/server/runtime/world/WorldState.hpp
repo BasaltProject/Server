@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
@@ -375,6 +376,11 @@ public:
 
     entity::ServerEntity& spawnEntity(std::unique_ptr<entity::ServerEntity> entity);
 
+    void setMobSettings(const config::MobSettings* settings);
+
+    /// This world's mob settings, vanilla's until the owning world supplies its own.
+    [[nodiscard]] const config::MobSettings& mobSettings() const noexcept;
+
     [[nodiscard]] std::vector<std::int32_t> collectRemovedEntities();
 
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
@@ -495,6 +501,7 @@ private:
     std::uint64_t shapeChangeCount_ = 0;
     mutable poi::PoiManager poi_;
     EntityRegistry entityRegistry_;
+    const config::MobSettings* mobSettings_ = nullptr;
     DroppedItemPhysics itemPhysics_;
 };
 

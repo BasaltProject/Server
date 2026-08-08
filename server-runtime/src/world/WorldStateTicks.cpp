@@ -346,6 +346,19 @@ entity::ServerEntity& WorldState::spawnEntity(std::unique_ptr<entity::ServerEnti
     return entityRegistry_.spawnEntity(std::move(entity));
 }
 
+void WorldState::setMobSettings(const config::MobSettings* settings) {
+    mobSettings_ = settings;
+    entityRegistry_.setMobSettings(settings);
+    if (settings != nullptr) {
+        itemPhysics_.setRules(settings->itemDespawnTicks, settings->itemMergeRadius);
+    }
+}
+
+const config::MobSettings& WorldState::mobSettings() const noexcept {
+    static const config::MobSettings kVanilla;
+    return mobSettings_ != nullptr ? *mobSettings_ : kVanilla;
+}
+
 std::vector<std::int32_t> WorldState::collectRemovedEntities() { return entityRegistry_.collectRemovedEntities(); }
 
 bool WorldState::tntMayPrime(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view reason,
