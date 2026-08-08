@@ -26,6 +26,8 @@ public:
     Resolver(const Context& context, Position piston, BlockFace pushing)
         : context_(context), piston_(piston), pushing_(pushing) {}
 
+    [[nodiscard]] std::int32_t pushLimit() const { return context_.world.gameplay().blocks.pistonBlockPushLimit; }
+
     /// parity: `addBlockLine`.
     bool addLine(const Position& start, BlockFace connection) {
         std::optional<std::int32_t> nextState = stateAt(start);
@@ -37,7 +39,7 @@ public:
             return true;
         }
         std::int32_t blockCount = 1;
-        if (blockCount + static_cast<std::int32_t>(toPush.size()) > kPushLimit) {
+        if (blockCount + static_cast<std::int32_t>(toPush.size()) > pushLimit()) {
             return false;
         }
         while (isSticky(*nextState)) {
@@ -50,7 +52,7 @@ public:
                 break;
             }
             ++blockCount;
-            if (blockCount + static_cast<std::int32_t>(toPush.size()) > kPushLimit) {
+            if (blockCount + static_cast<std::int32_t>(toPush.size()) > pushLimit()) {
                 return false;
             }
         }
@@ -89,7 +91,7 @@ public:
                 destroyed.push_back(position);
                 return true;
             }
-            if (static_cast<std::int32_t>(toPush.size()) >= kPushLimit) {
+            if (static_cast<std::int32_t>(toPush.size()) >= pushLimit()) {
                 return false;
             }
             toPush.push_back(position);

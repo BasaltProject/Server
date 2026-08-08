@@ -32,7 +32,7 @@ constexpr std::array<std::string_view, 3> kEastWestShapes{"east_west", "ascendin
 /// parity: `findPoweredRailSignal`.
 [[nodiscard]] bool findSignal(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                               std::int32_t z, const wire::common::Identifier& block, bool forward, std::int32_t depth) {
-    if (depth >= kSearchLimit) {
+    if (depth >= world.gameplay().blocks.poweredRailActivationRange) {
         return false;
     }
     const std::string shape = shapeAt(world, x, y, z);

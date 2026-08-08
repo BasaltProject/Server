@@ -339,8 +339,8 @@ inline void bookLiquidTurn(const Context& context, const std::int32_t x, const s
         return;
     }
     const std::int32_t delay = *kind == FluidKind::Water ? fluidFlow::kWaterTickDelay
-                               : context.ultrawarm       ? fluidFlow::kFastLavaTickDelay
-                                                         : fluidFlow::kLavaTickDelay;
+                               : context.ultrawarm       ? context.world.gameplay().blocks.lavaSpeedNether
+                                                         : context.world.gameplay().blocks.lavaSpeedNotNether;
     context.world.scheduleFluidTick(x, y, z, fluidId(*kind, sourceHere), delay);
 }
 

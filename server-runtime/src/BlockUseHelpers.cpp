@@ -628,8 +628,9 @@ player::SleepContext BlockInteractionHandler::sleepContext() {
     context.explode = [this](world::LoadedWorld& world, const double x, const double y, const double z,
                              const std::int32_t byEntityId) {
         if (ExplosionSystem* explosions = owner_->options().explosions; explosions != nullptr) {
-            explosions->blowUp(world, owner_->playersInSameWorld(), x, y, z, world::explosions::kBedPower, "bed",
-                               byEntityId);
+            const config::GameplayRules::Blocks& blocks = world.state().gameplay().blocks;
+            explosions->blowUp(world, owner_->playersInSameWorld(), x, y, z, blocks.bedExplosionPower, "bed",
+                               byEntityId, {}, {}, blocks.bedExplosionFire);
         }
     };
     return context;

@@ -219,7 +219,8 @@ private:
         if (kind == FluidKind::Water) {
             return fluidFlow::kWaterTickDelay;
         }
-        return context_.ultrawarm ? fluidFlow::kFastLavaTickDelay : fluidFlow::kLavaTickDelay;
+        const config::GameplayRules::Blocks& blocks = context_.world.gameplay().blocks;
+        return context_.ultrawarm ? blocks.lavaSpeedNether : blocks.lavaSpeedNotNether;
     }
 
     [[nodiscard]] std::int32_t slopeFindDistance(FluidKind kind) const {
@@ -287,7 +288,7 @@ private:
             highest = std::max(highest, amountOf(neighbour));
         }
 
-        if (sources >= 2 && canConvertToSource(kind)) {
+        if (convertsToSource(kind, sources)) {
             const std::int32_t below = at(x, y - 1, z);
             // parity: `getNewLiquid` asks `isSolid`.
             if (registry::blockShapes::isSolidState(below) || (fluidFlow::kindOf(below) == kind && isSource(below))) {
@@ -302,6 +303,15 @@ private:
 
         const std::int32_t amount = highest - dropOff(kind);
         return amount <= 0 ? kEmpty : stateFor(kind, amount, false);
+    }
+
+    [[nodiscard]] bool convertsToSource(FluidKind kind, std::int32_t sources) const {
+        const config::GameplayRules::Blocks& blocks = context_.world.gameplay().blocks;
+        if (kind == FluidKind::Lava && blocks.lavaInfiniteRequiredSources > 0) {
+            return sources >= blocks.lavaInfiniteRequiredSources;
+        }
+        const std::int32_t required = kind == FluidKind::Water ? blocks.waterInfiniteRequiredSources : 2;
+        return sources >= required && canConvertToSource(kind);
     }
 
     /// parity: the `water_source_conversion`/`lava_source_conversion` rules infinite water rides on.

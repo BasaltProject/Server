@@ -373,6 +373,8 @@ void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
     return TotemContext{
         .registry = context.registry,
         .bypassesInvulnerability = bypassesInvulnerability,
+        .worksAnywhereInInventory = context.world && context.world() != nullptr &&
+                                    context.world()->state().gameplay().player.totemOfUndyingWorksInInventory,
         .nextFloat =
             [] {
                 random::RandomSource random =

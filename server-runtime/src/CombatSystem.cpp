@@ -279,7 +279,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     }
     if (path == "ender_pearl") {
         if (hit.has_value() || targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
-            landEnderPearl(watchers, entity);
+            landEnderPearl(watchers, entity, world.state().gameplay().items.enderPearlDamage);
         }
         return;
     }

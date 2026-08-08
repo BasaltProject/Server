@@ -80,7 +80,7 @@ bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const 
     return true;
 }
 
-void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, ServerEntity& pearl) {
+void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, ServerEntity& pearl, float damage) {
     pearl.removed = true;
     if (!pearl.ownerId.has_value()) {
         return;
@@ -108,7 +108,7 @@ void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, S
     // parity: `ThrownEnderpearl.onHit` lets go of the thrower's impulse.
     player::impulse::reset(*owner);
     if (owner->connection().hurt) {
-        owner->connection().hurt(kEnderPearlDamage, kDeathFall, world::damageTypes::kEnderPearl, std::nullopt);
+        owner->connection().hurt(damage, kDeathFall, world::damageTypes::kEnderPearl, std::nullopt);
     }
 }
 

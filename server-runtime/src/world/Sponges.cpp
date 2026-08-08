@@ -14,10 +14,6 @@
 namespace basalt::server::runtime::world::sponges {
 namespace {
 
-/// parity: `SpongeBlock`'s own two limits.
-constexpr std::int32_t kReach = 6;
-constexpr std::int32_t kMaxAbsorbed = 65;
-
 constexpr std::array<std::array<std::int32_t, 3>, 6> kFaces{{
     {0, -1, 0},
     {0, 1, 0},
@@ -104,11 +100,12 @@ void absorb(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, c
     std::vector<std::array<std::int32_t, 3>> frontier{{x, y, z}};
     std::int32_t absorbed = 0;
     std::vector<Drunk> drunk;
-    for (std::int32_t step = 1; step <= kReach; ++step) {
+    const std::int32_t maxAbsorbed = world.gameplay().blocks.spongeAbsorptionArea;
+    for (std::int32_t step = 1; step <= world.gameplay().blocks.spongeAbsorptionRadius; ++step) {
         std::vector<std::array<std::int32_t, 3>> next;
         for (const std::array<std::int32_t, 3>& position : frontier) {
             for (const std::array<std::int32_t, 3>& face : kFaces) {
-                if (absorbed >= kMaxAbsorbed) {
+                if (absorbed >= maxAbsorbed) {
                     break;
                 }
                 const std::int32_t nx = position[0] + face[0];
@@ -121,7 +118,7 @@ void absorb(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, c
                 next.push_back({nx, ny, nz});
             }
         }
-        if (next.empty() || absorbed >= kMaxAbsorbed) {
+        if (next.empty() || absorbed >= maxAbsorbed) {
             break;
         }
         frontier = std::move(next);

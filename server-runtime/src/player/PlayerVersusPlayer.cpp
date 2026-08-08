@@ -419,8 +419,9 @@ bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& 
     }
     const bool smash = mace::smashes(attacker, swing.weapon);
     const float bonus = mace::damageBonus(attacker, swing.weapon, definitionOf);
-    const combat::Swing blow = combat::swingOf(swing.strength, swing.base, enchanted, swing.falling, attacker.onGround,
-                                               attacker.sprinting, bonus);
+    const combat::Swing blow =
+        combat::swingOf(swing.strength, swing.base, enchanted, swing.falling, attacker.onGround, attacker.sprinting,
+                        bonus, world.state().gameplay().player.criticalDamageMultiplier);
     if (blow.knockbackAttack) {
         soundAt(context, attacker, "entity.player.attack.knockback");
     }

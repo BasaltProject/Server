@@ -13,8 +13,6 @@ namespace basalt::server::runtime::world {
 /// parity: `ServerExplosion.calculateExplodedPositions`.
 namespace explosions {
 
-inline constexpr float kBedPower = 5.0F;
-
 struct Broken {
     std::int32_t x = 0;
     std::int32_t y = 0;

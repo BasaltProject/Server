@@ -69,9 +69,6 @@ constexpr std::string_view kSoundSplash = "entity.splash_potion.break";
 constexpr std::string_view kSoundTeleport = "entity.player.teleport";
 constexpr std::string_view kDeathFall = "fall";
 
-/// parity: `ThrownEnderpearl.onHit`, five points of fall damage on arrival.
-constexpr float kEnderPearlDamage = 5.0F;
-
 /// parity: `EntityType.PLAYER`.
 inline const Identifier& playerType() {
     static const Identifier kType = Identifier::vanilla("player");

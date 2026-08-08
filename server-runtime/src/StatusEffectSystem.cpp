@@ -14,7 +14,6 @@ namespace {
 constexpr std::int32_t kRegenerationInterval = 50;
 constexpr std::int32_t kPoisonInterval = 25;
 constexpr std::int32_t kWitherInterval = 40;
-constexpr float kHungerExhaustion = 0.005F;
 
 /// parity: `shouldApplyEffectTickThisTick`, whose interval halves with every level.
 [[nodiscard]] bool onInterval(std::int32_t ticks, std::int32_t base, std::int32_t amplifier) {
@@ -66,19 +65,22 @@ void StatusEffectSystem::applyEffectTick(world::LoadedWorld& world, player::Play
     if (active.effect == world::mobEffects::regeneration()) {
         if (onInterval(ticks, kRegenerationInterval, active.amplifier) && player.health() < player.maxHealth() &&
             connection.heal) {
-            connection.heal(1.0F, "magic_regen");
+            connection.heal(world.state().gameplay().mechanics.healthRegenAmount, "magic_regen");
         }
     } else if (active.effect == world::mobEffects::poison()) {
         // parity: poison never kills, so it stops at one point of health rather than at zero.
         if (onInterval(ticks, kPoisonInterval, active.amplifier) && player.health() > 1.0F && connection.hurt) {
-            connection.hurt(1.0F, "magic", world::damageTypes::kMagic, std::nullopt);
+            connection.hurt(world.state().gameplay().mechanics.poisonDegenerationAmount, "magic",
+                            world::damageTypes::kMagic, std::nullopt);
         }
     } else if (active.effect == world::mobEffects::wither()) {
         if (onInterval(ticks, kWitherInterval, active.amplifier) && connection.hurt) {
-            connection.hurt(1.0F, "wither", world::damageTypes::kWither, std::nullopt);
+            connection.hurt(world.state().gameplay().mechanics.witherDegenerationAmount, "wither",
+                            world::damageTypes::kWither, std::nullopt);
         }
     } else if (active.effect == world::mobEffects::hunger()) {
-        player.food.addExhaustion(kHungerExhaustion * static_cast<float>(active.amplifier + 1));
+        player.food.addExhaustion(world.state().gameplay().mechanics.hungerExhaustionAmount *
+                                  static_cast<float>(active.amplifier + 1));
     } else if (active.effect == world::mobEffects::badOmen() || active.effect == world::mobEffects::raidOmen()) {
         if (tickOmens_) {
             tickOmens_(world, player, active);

@@ -42,7 +42,7 @@ struct Swing {
 };
 
 [[nodiscard]] Swing swingOf(float strength, float base, float enchanted, bool falling, bool onGround, bool sprinting,
-                            float bonus = 0.0F);
+                            float bonus = 0.0F, float criticalMultiplier = kCriticalMultiplier);
 
 [[nodiscard]] float afterResistance(float damage, std::int32_t amplifier);
 

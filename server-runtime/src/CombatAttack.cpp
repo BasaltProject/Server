@@ -211,7 +211,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     const float bonus = player::mace::damageBonus(*session, heldStack, definitionOf);
     const player::combat::Swing swing = player::combat::swingOf(
         strength, base, enchanted, player::pvp::criticalPossible(*session, *world, fallDistance > 0.0),
-        session->onGround, session->sprinting, bonus);
+        session->onGround, session->sprinting, bonus, world->state().gameplay().player.criticalDamageMultiplier);
     const Identifier& damageType = smash ? world::damageTypes::kMaceSmash : world::damageTypes::kPlayerAttack;
     const float damage = swing.damage;
     const bool fullStrength = swing.fullStrength;

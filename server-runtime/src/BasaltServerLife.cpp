@@ -900,7 +900,8 @@ void BasaltServer::startBedrockListener() {
                 const float bonus = player::mace::damageBonus(*session, held, definitionOf);
                 const player::combat::Swing swing = player::combat::swingOf(
                     strength, base, enchanted, player::pvp::criticalPossible(*session, world, falling),
-                    session->onGround, session->sprinting, bonus);
+                    session->onGround, session->sprinting, bonus,
+                    world.state().gameplay().player.criticalDamageMultiplier);
                 if (swing.damage <= 0.0F) {
                     return;
                 }
@@ -1625,8 +1626,9 @@ void BasaltServer::startBedrockListener() {
                                         watchers.push_back(other);
                                     }
                                 }
-                                explosions_->blowUp(where, watchers, bx, by, bz, world::explosions::kBedPower, "bed",
-                                                    byEntityId);
+                                const config::GameplayRules::Blocks& blocks = where.state().gameplay().blocks;
+                                explosions_->blowUp(where, watchers, bx, by, bz, blocks.bedExplosionPower, "bed",
+                                                    byEntityId, {}, {}, blocks.bedExplosionFire);
                             };
                             static_cast<void>(player::sleepInBedFor(sleeping, *session, *found->second, hit.x, hit.y,
                                                                     hit.z, *clickedState));

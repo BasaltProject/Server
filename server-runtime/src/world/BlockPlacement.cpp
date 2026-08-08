@@ -347,7 +347,8 @@ constexpr std::int64_t kQuarterTable = 16384;
     // parity: `CampfireBlock.getStateForPlacement`.
     if (path.ends_with("campfire") && world != nullptr) {
         properties["signal_fire"] = pathOf(stateAt(*world, x, y - 1, z)) == "hay_block" ? "true" : "false";
-        properties["lit"] = properties["waterlogged"] != "true" ? "true" : "false";
+        properties["lit"] =
+            properties["waterlogged"] != "true" && world->gameplay().blocks.campfireLitWhenPlaced ? "true" : "false";
     }
     // parity: `ChestBlock.getStateForPlacement` into `getChestType`.
     if (std::ranges::find(reshapes::chestBlocks(), path) != reshapes::chestBlocks().end() && world != nullptr) {

@@ -17,11 +17,6 @@ namespace fluids {
 
 inline constexpr std::int32_t kMaxAir = 300;
 
-/// parity: `LivingEntity.shouldTakeDrowningDamage`.
-inline constexpr std::int32_t kDrowningAir = -20;
-
-inline constexpr float kDrownDamage = 2.0F;
-
 inline constexpr float kLavaDamage = 4.0F;
 inline constexpr std::int32_t kLavaFireTicks = 15 * 20;
 inline constexpr float kFireDamage = 1.0F;

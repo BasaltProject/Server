@@ -99,7 +99,7 @@ bool withinAttackReach(const double playerX, const double playerY, const double 
 }
 
 Swing swingOf(const float strength, const float base, const float enchanted, const bool falling, const bool onGround,
-              const bool sprinting, const float bonus) {
+              const bool sprinting, const float bonus, const float criticalMultiplier) {
     /// parity: `Player.attack`, where a swing counts as charged from nine tenths.
     constexpr float kFullStrength = 0.9F;
 
@@ -109,7 +109,7 @@ Swing swingOf(const float strength, const float base, const float enchanted, con
     swing.knockbackAttack = sprinting && swing.fullStrength;
     swing.damage = (base * chargeScale(strength)) + bonus;
     if (swing.critical) {
-        swing.damage *= kCriticalMultiplier;
+        swing.damage *= criticalMultiplier;
     }
     swing.damage += strength * (enchanted - base);
     return swing;

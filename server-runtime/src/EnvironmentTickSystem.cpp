@@ -421,7 +421,8 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
                 if (player->connection().hurt) {
                     player->connection().hurt(amount, deathMessageId, type, std::nullopt);
                 }
-            });
+            },
+            world.state().gameplay().blocks.magmaBlockDamageWhenSneaking);
         const double eyeY = player->y + world::fluids::eyeHeight(player->sneaking);
         const auto blockX = static_cast<std::int32_t>(std::floor(player->x));
         const auto blockZ = static_cast<std::int32_t>(std::floor(player->z));
@@ -450,11 +451,11 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
                 player->airSupply = static_cast<std::int32_t>(*edited);
             }
         }
-        if (drowns && player->airSupply <= world::fluids::kDrowningAir) {
+        if (drowns && player->airSupply <= -world.state().gameplay().mechanics.drowningTicksPerDamage) {
             player->airSupply = 0;
             if (player->connection().hurt) {
-                player->connection().hurt(world::fluids::kDrownDamage, "drown", world::damageTypes::kDrown,
-                                          std::nullopt);
+                player->connection().hurt(world.state().gameplay().mechanics.drowningDamage, "drown",
+                                          world::damageTypes::kDrown, std::nullopt);
             }
         }
 
