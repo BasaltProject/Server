@@ -1,6 +1,8 @@
 package org.basaltmc.protocol.play
 
 import org.basaltmc.io.ByteBuffer
+import org.basaltmc.nbt.NbtCompound
+import org.basaltmc.nbt.NbtEnd
 import org.basaltmc.protocol.readAnonymousNbt
 import org.basaltmc.protocol.readBoolean
 import org.basaltmc.protocol.readProtocolString
@@ -237,15 +239,50 @@ public object PlayerLoadedPacket {
     public const val ID: Int = 0x2c
 }
 
-/**
- * Clientbound, id 0x2d: one chunk column's block/biome data. Mirrors `ClientboundLevelChunkPacket`.
- * `basalt-world` has no block entities yet, so that array is always empty here.
- */
+/** Network form of `ClientboundLevelChunkPacketData.BlockEntityInfo`. */
+public data class ChunkBlockEntityInfo(
+    val packedXZ: Int,
+    val y: Int,
+    val typeId: Int,
+    val tag: NbtCompound?,
+) {
+    init {
+        require(packedXZ in 0..255)
+        require(y in Short.MIN_VALUE..Short.MAX_VALUE)
+        require(typeId >= 0)
+    }
+
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeByte(packedXZ.toByte())
+        buffer.writeShort(y.toShort())
+        buffer.writeVarInt(typeId)
+        buffer.writeAnonymousNbt(tag ?: NbtEnd)
+    }
+
+    public companion object {
+        public fun read(buffer: ByteBuffer): ChunkBlockEntityInfo {
+            val packedXZ = buffer.readByte().toInt() and 0xFF
+            val y = buffer.readShort().toInt()
+            val typeId = buffer.readVarInt()
+            val nbt = buffer.readAnonymousNbt()
+            val tag =
+                when (nbt) {
+                    NbtEnd -> null
+                    is NbtCompound -> nbt
+                    else -> error("block entity update tag is not a compound")
+                }
+            return ChunkBlockEntityInfo(packedXZ, y, typeId, tag)
+        }
+    }
+}
+
+/** Clientbound, id 0x2d: one chunk column's block/biome data. Mirrors `ClientboundLevelChunkPacket`. */
 public data class MapChunkPacket(
     val x: Int,
     val z: Int,
     val heightmaps: List<Heightmap>,
     val chunkData: ByteArray,
+    val blockEntities: List<ChunkBlockEntityInfo>,
     val skyLightMask: LongArray,
     val blockLightMask: LongArray,
     val emptySkyLightMask: LongArray,
@@ -260,7 +297,8 @@ public data class MapChunkPacket(
         for (heightmap in heightmaps) heightmap.write(buffer)
         buffer.writeVarInt(chunkData.size)
         buffer.writeBytes(chunkData)
-        buffer.writeVarInt(0) // block entities: none yet
+        buffer.writeVarInt(blockEntities.size)
+        for (blockEntity in blockEntities) blockEntity.write(buffer)
         buffer.writeLongBitset(skyLightMask)
         buffer.writeLongBitset(blockLightMask)
         buffer.writeLongBitset(emptySkyLightMask)
@@ -279,7 +317,7 @@ public data class MapChunkPacket(
             val heightmaps = List(heightmapCount) { Heightmap.read(buffer) }
             val chunkData = buffer.readBytes(buffer.readVarInt())
             val blockEntityCount = buffer.readVarInt()
-            repeat(blockEntityCount) { error("block entities are not supported yet") }
+            val blockEntities = List(blockEntityCount) { ChunkBlockEntityInfo.read(buffer) }
             val skyLightMask = buffer.readLongBitset()
             val blockLightMask = buffer.readLongBitset()
             val emptySkyLightMask = buffer.readLongBitset()
@@ -291,6 +329,7 @@ public data class MapChunkPacket(
                 z,
                 heightmaps,
                 chunkData,
+                blockEntities,
                 skyLightMask,
                 blockLightMask,
                 emptySkyLightMask,

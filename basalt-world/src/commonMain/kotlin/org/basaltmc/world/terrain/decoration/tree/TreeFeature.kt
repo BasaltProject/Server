@@ -1,10 +1,18 @@
 package org.basaltmc.world.terrain.decoration.tree
 
+import org.basaltmc.nbt.NbtCompound
+import org.basaltmc.nbt.NbtList
+import org.basaltmc.nbt.NbtTag
+import org.basaltmc.nbt.NbtType
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.WorldHeight
+import org.basaltmc.world.terrain.decoration.DecorationPos
 import org.basaltmc.world.terrain.decoration.IntProvider
+import org.basaltmc.world.terrain.decoration.PaleMossDecoration
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
@@ -29,11 +37,7 @@ import kotlin.math.sqrt
  * exactly like every other decoration feature here already does).
  *
  * **Documented gaps**, narrowing real vanilla's own `TreeFeature.place`:
- * - No tree decorators (beehives, vines, cocoa, leaf litter), no below-trunk-block provider
- *   (podzol/coarse dirt swaps under certain biomes' trees).
- * - No leaf `distance` blockstate post-processing (the real jar's own `updateLeaves` BFS): leaves
- *   get whatever default `distance` their block state starts with, so persistence/decay-from-a-cut-log
- *   behavior isn't modeled. Doesn't affect initial worldgen shape, only later griefing behavior.
+ * - All configured tree-decorator algorithms used by current Overworld trees are implemented.
  */
 public data class FoliageAttachment(
     val x: Int,
@@ -113,6 +117,19 @@ public sealed class TrunkPlacer(
         return true
     }
 
+    /** // parity: TrunkPlacer.placeBelowTrunkBlock with the default rule provider. */
+    protected fun placeBelowTrunkBlock(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
+        val stateId = chunk.getBlockStateId(x and 15, y, z and 15)
+        val path = Blocks.byStateId(stateId)?.block?.path
+        if (path !in CANNOT_REPLACE_BELOW_TREE_TRUNK_PATHS) setBlock(chunk, x, y, z, Blocks.DIRT.stateId)
+    }
+
     public fun isFree(
         chunk: Chunk,
         x: Int,
@@ -143,6 +160,8 @@ public sealed class TrunkPlacer(
     }
 
     private companion object {
+        val CANNOT_REPLACE_BELOW_TREE_TRUNK_PATHS =
+            setOf("dirt", "coarse_dirt", "rooted_dirt", "mud", "muddy_mangrove_roots", "moss_block", "pale_moss_block", "podzol")
         val leafStateIds: Set<Int> by lazy {
             listOf(
                 "oak_leaves", "birch_leaves", "spruce_leaves", "jungle_leaves", "acacia_leaves",
@@ -168,6 +187,7 @@ public class StraightTrunkPlacer(
         originZ: Int,
         trunkStateId: Int,
     ): List<FoliageAttachment> {
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ)
         for (y in 0 until treeHeight) placeLog(chunk, originX, originY + y, originZ, trunkStateId)
         return listOf(FoliageAttachment(originX, originY + treeHeight, originZ, 0, false))
     }
@@ -190,6 +210,7 @@ public class FancyTrunkPlacer(
     ): List<FoliageAttachment> {
         val height = treeHeight + 2
         val trunkHeight = floor(height * TRUNK_HEIGHT_SCALE).toInt()
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ)
         val clustersPerY = min(1, floor(CLUSTER_DENSITY_MAGIC + (height.toDouble() / 13.0) * (height.toDouble() / 13.0)).toInt())
         val trunkTop = originY + trunkHeight
         var relativeY = height - ASSUMED_FOLIAGE_HEIGHT
@@ -371,6 +392,7 @@ public class ForkingTrunkPlacer(
         originZ: Int,
         trunkStateId: Int,
     ): List<FoliageAttachment> {
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ)
         val attachments = mutableListOf<FoliageAttachment>()
         val leanDirection = HORIZONTAL_DIRECTIONS[random.nextInt(4)]
         val leanHeight = treeHeight - random.nextInt(4) - 1
@@ -414,7 +436,7 @@ public class ForkingTrunkPlacer(
     }
 }
 
-/** // parity: DarkOakTrunkPlacer, a 2x2 trunk with random side branches. No below-trunk-block placement (documented gap, see this file's own KDoc). */
+/** // parity: DarkOakTrunkPlacer, a 2x2 trunk with random side branches. */
 public class DarkOakTrunkPlacer(
     baseHeight: Int,
     heightRandA: Int,
@@ -430,6 +452,10 @@ public class DarkOakTrunkPlacer(
         trunkStateId: Int,
     ): List<FoliageAttachment> {
         val attachments = mutableListOf<FoliageAttachment>()
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ)
+        placeBelowTrunkBlock(chunk, originX + 1, originY - 1, originZ)
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ + 1)
+        placeBelowTrunkBlock(chunk, originX + 1, originY - 1, originZ + 1)
         val leanDirection = HORIZONTAL_DIRECTIONS[random.nextInt(4)]
         val leanHeight = treeHeight - random.nextInt(4)
         var leanSteps = 2 - random.nextInt(3)
@@ -468,7 +494,7 @@ public class DarkOakTrunkPlacer(
     }
 }
 
-/** // parity: GiantTrunkPlacer (mega spruce/pine): a solid 2x2 trunk, no lean/branches. No below-trunk-block placement (documented gap). */
+/** // parity: GiantTrunkPlacer (mega spruce/pine): a solid 2x2 trunk, no lean/branches. */
 public open class GiantTrunkPlacer(
     baseHeight: Int,
     heightRandA: Int,
@@ -483,6 +509,10 @@ public open class GiantTrunkPlacer(
         originZ: Int,
         trunkStateId: Int,
     ): List<FoliageAttachment> {
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ)
+        placeBelowTrunkBlock(chunk, originX + 1, originY - 1, originZ)
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ + 1)
+        placeBelowTrunkBlock(chunk, originX + 1, originY - 1, originZ + 1)
         for (hh in 0 until treeHeight) {
             placeLogIfFree(chunk, originX, originY + hh, originZ, trunkStateId)
             if (hh < treeHeight - 1) {
@@ -615,7 +645,7 @@ public class UpwardsBranchingTrunkPlacer(
  * // parity: CherryTrunkPlacer: a trunk with one or two horizontal side branches, plus a middle
  * foliage attachment when the branch-count roll lands on 3. Axis-oriented log states are not
  * modeled (a single [trunkStateId] everywhere), the same documented simplification the rest of
- * this file already uses. No below-trunk-block placement (documented gap, see this file's own KDoc).
+ * this file already uses.
  */
 public class CherryTrunkPlacer(
     baseHeight: Int,
@@ -639,6 +669,7 @@ public class CherryTrunkPlacer(
         originZ: Int,
         trunkStateId: Int,
     ): List<FoliageAttachment> {
+        placeBelowTrunkBlock(chunk, originX, originY - 1, originZ)
         val firstBranchOffset = max(0, treeHeight - 1 + branchStartOffsetFromTop.sample(random))
         var secondBranchOffset = max(0, treeHeight - 1 + secondBranchStartOffsetFromTop.sample(random))
         if (secondBranchOffset >= firstBranchOffset) secondBranchOffset++
@@ -1496,7 +1527,50 @@ public class TreeConfiguration(
     public val foliagePlacer: FoliagePlacer,
     public val minimumSize: FeatureSize,
     public val rootPlacer: MangroveRootPlacer? = null,
+    public val decorators: List<TreeDecoratorConfiguration> = emptyList(),
 )
+
+public sealed interface TreeDecoratorConfiguration {
+    public data object AlterGroundToPodzol : TreeDecoratorConfiguration
+
+    public data object TrunkVines : TreeDecoratorConfiguration
+
+    public data class LeafVines(
+        val probability: Float,
+    ) : TreeDecoratorConfiguration
+
+    public data class Cocoa(
+        val probability: Float,
+    ) : TreeDecoratorConfiguration
+
+    public data class PaleMoss(
+        val leavesProbability: Float,
+        val trunkProbability: Float,
+        val groundProbability: Float,
+    ) : TreeDecoratorConfiguration
+
+    public data class CreakingHeart(
+        val probability: Float,
+    ) : TreeDecoratorConfiguration
+
+    public data class MangrovePropagules(
+        val probability: Float,
+        val exclusionRadiusXZ: Int,
+        val exclusionRadiusY: Int,
+        val requiredEmptyBlocks: Int,
+    ) : TreeDecoratorConfiguration
+
+    public data class GroundLeafLitter(
+        val tries: Int,
+        val radius: Int,
+        val height: Int,
+        val maxSegmentAmount: Int,
+    ) : TreeDecoratorConfiguration
+
+    public data class Beehive(
+        val probability: Float,
+    ) : TreeDecoratorConfiguration
+}
 
 /** // parity: TreeFeature.place/doPlace/getMaxFreeTreeHeight, narrowed per this file's own KDoc. */
 public object TreeFeature {
@@ -1521,15 +1595,654 @@ public object TreeFeature {
 
         val clippedTreeHeight = maxFreeTreeHeight(chunk, treeHeight, originX, trunkOriginY, originZ, config)
         if (clippedTreeHeight < treeHeight) return false
-        if (config.rootPlacer != null && !config.rootPlacer.placeRoots(chunk, random, originX, originY, originZ, trunkOriginY)) return false
+        val recorder = TreePlacementRecorder(chunk)
+        val generated =
+            chunk.observeBlockWrites(recorder::record) {
+                generateTree(
+                    chunk,
+                    random,
+                    originX,
+                    originY,
+                    originZ,
+                    trunkOriginY,
+                    clippedTreeHeight,
+                    foliageHeight,
+                    leafRadius,
+                    config,
+                    recorder,
+                )
+            }
+        if (!generated) return false
+        val decoratorContext = recorder.context()
+        if (config.decorators.isNotEmpty()) {
+            recorder.phase = PlacementPhase.DECORATION
+            chunk.observeBlockWrites(recorder::record) {
+                for (decorator in config.decorators) decorate(chunk, random, decoratorContext, decorator)
+            }
+        }
+        updateLeaves(chunk, recorder.context())
+        return true
+    }
 
-        val attachments = config.trunkPlacer.placeTrunk(chunk, random, clippedTreeHeight, originX, trunkOriginY, originZ, config.trunkStateId)
+    private fun generateTree(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        originX: Int,
+        originY: Int,
+        originZ: Int,
+        trunkOriginY: Int,
+        clippedTreeHeight: Int,
+        foliageHeight: Int,
+        leafRadius: Int,
+        config: TreeConfiguration,
+        recorder: TreePlacementRecorder?,
+    ): Boolean {
+        recorder?.phase = PlacementPhase.ROOT
+        if (config.rootPlacer != null && !config.rootPlacer.placeRoots(chunk, random, originX, originY, originZ, trunkOriginY)) return false
+        recorder?.phase = PlacementPhase.LOG
+        val attachments =
+            config.trunkPlacer.placeTrunk(chunk, random, clippedTreeHeight, originX, trunkOriginY, originZ, config.trunkStateId)
         val offset = config.foliagePlacer.offset(random)
+        recorder?.phase = PlacementPhase.LEAF
         for (attachment in attachments) {
             config.foliagePlacer.createFoliage(chunk, random, config.foliageStateId, attachment, foliageHeight, leafRadius, offset)
         }
         return true
     }
+
+    private fun decorate(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        context: TreeDecoratorContext,
+        decorator: TreeDecoratorConfiguration,
+    ) {
+        when (decorator) {
+            TreeDecoratorConfiguration.AlterGroundToPodzol -> alterGroundToPodzol(chunk, random, context.logs, context.roots)
+            TreeDecoratorConfiguration.TrunkVines -> decorateTrunkVines(chunk, random, context.logs)
+            is TreeDecoratorConfiguration.LeafVines -> decorateLeafVines(chunk, random, context.leaves, decorator.probability)
+            is TreeDecoratorConfiguration.Cocoa -> decorateCocoa(chunk, random, context.logs, decorator.probability)
+            is TreeDecoratorConfiguration.PaleMoss -> decoratePaleMoss(chunk, random, context, decorator)
+            is TreeDecoratorConfiguration.CreakingHeart -> decorateCreakingHeart(chunk, random, context.logs, decorator.probability)
+            is TreeDecoratorConfiguration.MangrovePropagules -> decorateMangrovePropagules(chunk, random, context.leaves, decorator)
+            is TreeDecoratorConfiguration.GroundLeafLitter -> decorateGroundLeafLitter(chunk, random, context, decorator)
+            is TreeDecoratorConfiguration.Beehive -> decorateBeehive(chunk, random, context, decorator.probability)
+        }
+    }
+
+    /** // parity: TreeFeature.updateLeaves, distance buckets 0 through 6 and six-direction propagation. */
+    private fun updateLeaves(
+        chunk: Chunk,
+        context: TreeDecoratorContext,
+    ) {
+        val boundsPositions = context.roots + context.logs + context.leaves + context.decorations
+        if (context.logs.isEmpty() || boundsPositions.isEmpty()) return
+        val minX = boundsPositions.minOf(BlockPos::x)
+        val maxX = boundsPositions.maxOf(BlockPos::x)
+        val minY = boundsPositions.minOf(BlockPos::y)
+        val maxY = boundsPositions.maxOf(BlockPos::y)
+        val minZ = boundsPositions.minOf(BlockPos::z)
+        val maxZ = boundsPositions.maxOf(BlockPos::z)
+        fun isInside(pos: BlockPos): Boolean =
+            pos.x in minX..maxX && pos.y in minY..maxY && pos.z in minZ..maxZ
+
+        val toCheck = Array(7) { LinkedHashSet<BlockPos>() }
+        toCheck[0].addAll(context.logs)
+        val filled = (context.roots + context.decorations).toMutableSet()
+        var smallestDistance = 0
+        while (smallestDistance < 7) {
+            while (smallestDistance < 7 && toCheck[smallestDistance].isEmpty()) smallestDistance++
+            if (smallestDistance >= 7) return
+            val iterator = toCheck[smallestDistance].iterator()
+            val pos = iterator.next()
+            iterator.remove()
+            if (!isInside(pos) || !filled.add(pos)) continue
+
+            if (smallestDistance != 0) {
+                val currentStateId = chunk.getBlockStateId(pos.x and 15, pos.y, pos.z and 15)
+                val updatedStateId = Blocks.withLeafDistance(currentStateId, smallestDistance) ?: continue
+                chunk.setBlockStateId(pos.x and 15, pos.y, pos.z and 15, updatedStateId)
+            }
+
+            for ((dx, dy, dz) in BLOCK_NEIGHBOURS) {
+                val neighbor = BlockPos(pos.x + dx, pos.y + dy, pos.z + dz)
+                if (!isInside(neighbor) || neighbor in filled) continue
+                val stateId = chunk.getBlockStateId(neighbor.x and 15, neighbor.y, neighbor.z and 15)
+                val currentDistance = Blocks.leafDistance(stateId) ?: continue
+                val newDistance = min(currentDistance, smallestDistance + 1)
+                if (newDistance < 7) {
+                    toCheck[newDistance] += neighbor
+                    smallestDistance = min(smallestDistance, newDistance)
+                }
+            }
+        }
+    }
+
+    /** // parity: AlterGroundDecorator with the beneath_tree_podzol_replaceable rule provider. */
+    private fun alterGroundToPodzol(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        logs: List<BlockPos>,
+        roots: List<BlockPos>,
+    ) {
+        val blockPositions =
+            when {
+                roots.isEmpty() -> logs
+                logs.isNotEmpty() && roots.first().y == logs.first().y -> logs + roots
+                else -> roots
+            }
+        if (blockPositions.isEmpty()) return
+        val minY = blockPositions.first().y
+        for (log in blockPositions.filter { it.y == minY }) {
+            placePodzolCircle(chunk, log.x - 1, log.y, log.z - 1)
+            placePodzolCircle(chunk, log.x + 2, log.y, log.z - 1)
+            placePodzolCircle(chunk, log.x - 1, log.y, log.z + 2)
+            placePodzolCircle(chunk, log.x + 2, log.y, log.z + 2)
+            repeat(5) {
+                val placement = random.nextInt(64)
+                val x = placement % 8
+                val z = placement / 8
+                if (x == 0 || x == 7 || z == 0 || z == 7) {
+                    placePodzolCircle(chunk, log.x - 3 + x, log.y, log.z - 3 + z)
+                }
+            }
+        }
+    }
+
+    private fun decorateTrunkVines(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        logs: List<BlockPos>,
+    ) {
+        for (log in logs) {
+            for (vine in TRUNK_VINES) {
+                if (random.nextInt(3) > 0 && isAir(chunk, log.x + vine.dx, log.y, log.z + vine.dz)) {
+                    setBlock(chunk, log.x + vine.dx, log.y, log.z + vine.dz, defaultVineStateId - vine.faceBit)
+                }
+            }
+        }
+    }
+
+    private fun decorateLeafVines(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        leaves: List<BlockPos>,
+        probability: Float,
+    ) {
+        for (leaf in leaves) {
+            for (vine in TRUNK_VINES) {
+                if (random.nextFloat() < probability && isAir(chunk, leaf.x + vine.dx, leaf.y, leaf.z + vine.dz)) {
+                    addHangingVine(chunk, leaf.x + vine.dx, leaf.y, leaf.z + vine.dz, vine.faceBit)
+                }
+            }
+        }
+    }
+
+    private fun decorateCocoa(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        logs: List<BlockPos>,
+        probability: Float,
+    ) {
+        if (random.nextFloat() >= probability || logs.isEmpty()) return
+        val treeY = logs.first().y
+        for (log in logs) {
+            if (log.y - treeY > 2) continue
+            for (cocoa in COCOA_DIRECTIONS) {
+                if (random.nextFloat() <= 0.25f) {
+                    val x = log.x + cocoa.dx
+                    val z = log.z + cocoa.dz
+                    if (isAir(chunk, x, log.y, z)) {
+                        val age = random.nextInt(3)
+                        setBlock(chunk, x, log.y, z, defaultCocoaStateId + age * 4 + cocoa.facingOffset)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun decoratePaleMoss(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        context: TreeDecoratorContext,
+        decorator: TreeDecoratorConfiguration.PaleMoss,
+    ) {
+        val shuffledLogs = context.logs.toMutableList()
+        shuffle(shuffledLogs, random)
+        if (shuffledLogs.isEmpty()) return
+        val origin = shuffledLogs.minBy(BlockPos::y)
+        if (random.nextFloat() < decorator.groundProbability) {
+            PaleMossDecoration.placePatchAt(chunk, random, DecorationPos(origin.x, origin.y + 1, origin.z))
+        }
+        for (log in context.logs) {
+            if (random.nextFloat() < decorator.trunkProbability && isAir(chunk, log.x, log.y - 1, log.z)) {
+                addPaleMossHanger(chunk, random, log.x, log.y - 1, log.z)
+            }
+        }
+        for (leaf in context.leaves) {
+            if (random.nextFloat() < decorator.leavesProbability && isAir(chunk, leaf.x, leaf.y - 1, leaf.z)) {
+                addPaleMossHanger(chunk, random, leaf.x, leaf.y - 1, leaf.z)
+            }
+        }
+    }
+
+    private fun addPaleMossHanger(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        x: Int,
+        startY: Int,
+        z: Int,
+    ) {
+        var y = startY
+        while (isAir(chunk, x, y - 1, z) && random.nextFloat() >= 0.5f) {
+            setBlock(chunk, x, y, z, paleHangingMossTipFalseStateId)
+            y--
+        }
+        setBlock(chunk, x, y, z, paleHangingMossTipTrueStateId)
+    }
+
+    private fun decorateCreakingHeart(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        logs: List<BlockPos>,
+        probability: Float,
+    ) {
+        if (logs.isEmpty() || random.nextFloat() >= probability) return
+        val candidates = logs.toMutableList()
+        shuffle(candidates, random)
+        val target =
+            candidates.firstOrNull { position ->
+                BLOCK_NEIGHBOURS.all { (dx, dy, dz) ->
+                    val y = position.y + dy
+                    y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
+                        Blocks.byStateId(chunk.getBlockStateId((position.x + dx) and 15, y, (position.z + dz) and 15))
+                            ?.block
+                            ?.path
+                            ?.let(LOG_BLOCK_PATHS::contains) == true
+                }
+            } ?: return
+        setBlock(chunk, target.x, target.y, target.z, naturalDormantCreakingHeartStateId)
+    }
+
+    /** // parity: AttachedToLeavesDecorator used by both mangrove tree configurations. */
+    private fun decorateMangrovePropagules(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        leaves: List<BlockPos>,
+        decorator: TreeDecoratorConfiguration.MangrovePropagules,
+    ) {
+        val blacklist = mutableSetOf<BlockPos>()
+        val candidates = leaves.toMutableList()
+        shuffle(candidates, random)
+        for (leaf in candidates) {
+            random.nextInt(1) // Util.getRandom over the single DOWN direction.
+            val placement = BlockPos(leaf.x, leaf.y - 1, leaf.z)
+            if (placement in blacklist || random.nextFloat() >= decorator.probability) continue
+            if ((1..decorator.requiredEmptyBlocks).any { !isAir(chunk, leaf.x, leaf.y - it, leaf.z) }) continue
+            for (x in placement.x - decorator.exclusionRadiusXZ..placement.x + decorator.exclusionRadiusXZ) {
+                for (y in placement.y - decorator.exclusionRadiusY..placement.y + decorator.exclusionRadiusY) {
+                    for (z in placement.z - decorator.exclusionRadiusXZ..placement.z + decorator.exclusionRadiusXZ) {
+                        blacklist += BlockPos(x, y, z)
+                    }
+                }
+            }
+            val age = random.nextInt(5)
+            setBlock(chunk, placement.x, placement.y, placement.z, hangingMangrovePropaguleAge0StateId + age * 8)
+        }
+    }
+
+    /** // parity: PlaceOnGroundDecorator with VegetationFeatures.leafLitterPatchBuilder. */
+    private fun decorateGroundLeafLitter(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        context: TreeDecoratorContext,
+        decorator: TreeDecoratorConfiguration.GroundLeafLitter,
+    ) {
+        val supportPositions = lowestTrunkOrRootPositions(context)
+        if (supportPositions.isEmpty()) return
+        val minY = supportPositions.first().y
+        var minX = supportPositions.first().x
+        var maxX = minX
+        var minZ = supportPositions.first().z
+        var maxZ = minZ
+        for (position in supportPositions) {
+            if (position.y != minY) continue
+            minX = min(minX, position.x)
+            maxX = max(maxX, position.x)
+            minZ = min(minZ, position.z)
+            maxZ = max(maxZ, position.z)
+        }
+        minX -= decorator.radius
+        maxX += decorator.radius
+        minZ -= decorator.radius
+        maxZ += decorator.radius
+        val minSampleY = minY - decorator.height
+        val maxSampleY = minY + decorator.height
+
+        repeat(decorator.tries) {
+            val x = minX + random.nextInt(maxX - minX + 1)
+            val y = minSampleY + random.nextInt(maxSampleY - minSampleY + 1)
+            val z = minZ + random.nextInt(maxZ - minZ + 1)
+            val aboveY = y + 1
+            if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || aboveY !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return@repeat
+            val aboveStateId = chunk.getBlockStateId(x and 15, aboveY, z and 15)
+            if (aboveStateId != Blocks.AIR.stateId && !Blocks.isVineState(aboveStateId)) return@repeat
+            val supportStateId = chunk.getBlockStateId(x and 15, y, z and 15)
+            if (!isSolidRender(supportStateId)) return@repeat
+            if (chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES) > aboveY) return@repeat
+            val choice = random.nextInt(decorator.maxSegmentAmount * 4)
+            val segmentOffset = choice / 4
+            val facingOffset = LEAF_LITTER_FACING_STATE_OFFSETS[choice % 4]
+            setBlock(chunk, x, aboveY, z, defaultLeafLitterStateId + facingOffset + segmentOffset)
+        }
+    }
+
+    /** // parity: BeehiveDecorator placement, occupant data, and RNG. */
+    private fun decorateBeehive(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        context: TreeDecoratorContext,
+        probability: Float,
+    ) {
+        if (context.logs.isEmpty() || random.nextFloat() >= probability) return
+        val hiveY =
+            if (context.leaves.isNotEmpty()) {
+                max(context.leaves.first().y - 1, context.logs.first().y + 1)
+            } else {
+                min(context.logs.first().y + 1 + random.nextInt(3), context.logs.last().y)
+            }
+        val placements = mutableListOf<BlockPos>()
+        for (log in context.logs) {
+            if (log.y != hiveY) continue
+            for ((dx, dz) in BEEHIVE_SPAWN_DIRECTIONS) placements += BlockPos(log.x + dx, hiveY, log.z + dz)
+        }
+        if (placements.isEmpty()) return
+        shuffle(placements, random)
+        val hive = placements.firstOrNull { isAir(chunk, it.x, it.y, it.z) && isAir(chunk, it.x, it.y, it.z + 1) } ?: return
+        setBlock(chunk, hive.x, hive.y, hive.z, southEmptyBeeNestStateId)
+        val beeCount = 2 + random.nextInt(2)
+        val bees = mutableListOf<NbtTag>()
+        repeat(beeCount) {
+            val entityData = NbtCompound()
+            entityData.putString("id", "minecraft:bee")
+            val occupant = NbtCompound()
+            occupant["entity_data"] = entityData
+            occupant.putInt("ticks_in_hive", random.nextInt(599))
+            occupant.putInt("min_ticks_in_hive", 600)
+            bees += occupant
+        }
+        val data = NbtCompound()
+        data["bees"] = NbtList(NbtType.COMPOUND, bees)
+        chunk.setBlockEntity(
+            ChunkBlockEntity(hive.x and 15, hive.y, hive.z and 15, Identifier.vanilla("beehive"), data),
+        )
+    }
+
+    private fun lowestTrunkOrRootPositions(context: TreeDecoratorContext): List<BlockPos> =
+        when {
+            context.roots.isEmpty() -> context.logs
+            context.logs.isNotEmpty() && context.roots.first().y == context.logs.first().y -> context.logs + context.roots
+            else -> context.roots
+        }
+
+    private fun isSolidRender(stateId: Int): Boolean {
+        if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId)) return false
+        val path = Blocks.byStateId(stateId)?.block?.path ?: return false
+        return !path.endsWith("_leaves") && path !in NON_SOLID_RENDER_BLOCK_PATHS
+    }
+
+    private fun <T> shuffle(
+        values: MutableList<T>,
+        random: WorldgenRandom,
+    ) {
+        for (size in values.size downTo 2) {
+            val swapTo = random.nextInt(size)
+            val last = values[size - 1]
+            values[size - 1] = values[swapTo]
+            values[swapTo] = last
+        }
+    }
+
+    private fun addHangingVine(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+        faceBit: Int,
+    ) {
+        val stateId = defaultVineStateId - faceBit
+        setBlock(chunk, x, y, z, stateId)
+        var cursorY = y - 1
+        var remaining = 4
+        while (remaining > 0 && isAir(chunk, x, cursorY, z)) {
+            setBlock(chunk, x, cursorY, z, stateId)
+            cursorY--
+            remaining--
+        }
+    }
+
+    private fun placePodzolCircle(
+        chunk: Chunk,
+        centerX: Int,
+        centerY: Int,
+        centerZ: Int,
+    ) {
+        for (dx in -2..2) {
+            for (dz in -2..2) {
+                if (abs(dx) != 2 || abs(dz) != 2) placePodzolAt(chunk, centerX + dx, centerY, centerZ + dz)
+            }
+        }
+    }
+
+    private fun placePodzolAt(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        for (dy in 2 downTo -3) {
+            val cursorY = y + dy
+            if (cursorY !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) continue
+            val stateId = chunk.getBlockStateId(x and 15, cursorY, z and 15)
+            if (stateId in beneathTreePodzolReplaceable) {
+                chunk.setBlockStateId(x and 15, cursorY, z and 15, Blocks.PODZOL.stateId)
+                return
+            }
+            if (stateId != Blocks.AIR.stateId && dy < 0) return
+        }
+    }
+
+    private fun javaHashSetOrder(positions: List<BlockPos>): Sequence<BlockPos> =
+        sequence {
+            var capacity = 16
+            while (positions.size > capacity * 3 / 4) capacity *= 2
+            for (bucket in 0 until capacity) {
+                for (position in positions) {
+                    val hash = (position.y + position.z * 31) * 31 + position.x
+                    val spread = hash xor (hash ushr 16)
+                    if (spread and (capacity - 1) == bucket) yield(position)
+                }
+            }
+        }
+
+    private fun isAir(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean =
+        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
+            chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+
+    private data class BlockPos(
+        val x: Int,
+        val y: Int,
+        val z: Int,
+    )
+
+    private data class VinePlacement(
+        val dx: Int,
+        val dz: Int,
+        val faceBit: Int,
+    )
+
+    private data class CocoaPlacement(
+        val dx: Int,
+        val dz: Int,
+        val facingOffset: Int,
+    )
+
+    private enum class PlacementPhase { ROOT, LOG, LEAF, DECORATION }
+
+    private data class TreeDecoratorContext(
+        val logs: List<BlockPos>,
+        val leaves: List<BlockPos>,
+        val roots: List<BlockPos>,
+        val decorations: List<BlockPos>,
+    )
+
+    private class TreePlacementRecorder(
+        private val chunk: Chunk,
+    ) {
+        var phase: PlacementPhase = PlacementPhase.ROOT
+        private val logs = LinkedHashSet<BlockPos>()
+        private val leaves = LinkedHashSet<BlockPos>()
+        private val roots = LinkedHashSet<BlockPos>()
+        private val decorations = LinkedHashSet<BlockPos>()
+
+        fun record(
+            x: Int,
+            y: Int,
+            z: Int,
+            oldStateId: Int,
+            newStateId: Int,
+        ) {
+            if (oldStateId == newStateId) return
+            val position = BlockPos(chunk.chunkX * 16 + x, y, chunk.chunkZ * 16 + z)
+            when (phase) {
+                PlacementPhase.ROOT -> roots += position
+                PlacementPhase.LOG -> logs += position
+                PlacementPhase.LEAF -> leaves += position
+                PlacementPhase.DECORATION -> decorations += position
+            }
+        }
+
+        fun context(): TreeDecoratorContext =
+            TreeDecoratorContext(sorted(logs), sorted(leaves), sorted(roots), sorted(decorations))
+
+        private fun sorted(positions: Set<BlockPos>): List<BlockPos> =
+            javaHashSetOrder(positions.toList()).toList().sortedBy(BlockPos::y)
+    }
+
+    private val beneathTreePodzolReplaceable: Set<Int> =
+        listOf(
+            "dirt",
+            "coarse_dirt",
+            "rooted_dirt",
+            "mud",
+            "muddy_mangrove_roots",
+            "moss_block",
+            "pale_moss_block",
+            "grass_block",
+            "podzol",
+            "mycelium",
+        ).mapNotNull { Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla(it))?.stateId }.toSet()
+
+    private val TRUNK_VINES =
+        listOf(
+            VinePlacement(-1, 0, 16),
+            VinePlacement(1, 0, 1),
+            VinePlacement(0, -1, 4),
+            VinePlacement(0, 1, 8),
+        )
+    private val defaultVineStateId =
+        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("vine"))?.stateId
+            ?: error("unknown block 'vine'")
+    private val COCOA_DIRECTIONS =
+        listOf(
+            CocoaPlacement(0, 1, 0),
+            CocoaPlacement(-1, 0, 3),
+            CocoaPlacement(0, -1, 1),
+            CocoaPlacement(1, 0, 2),
+        )
+    private val defaultCocoaStateId =
+        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("cocoa"))?.stateId
+            ?: error("unknown block 'cocoa'")
+    private val paleHangingMossTipTrueStateId =
+        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("pale_hanging_moss"))?.stateId
+            ?: error("unknown block 'pale_hanging_moss'")
+    private val paleHangingMossTipFalseStateId = paleHangingMossTipTrueStateId + 1
+    private val naturalDormantCreakingHeartStateId =
+        (Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("creaking_heart"))?.stateId
+            ?: error("unknown block 'creaking_heart'")) + 1
+    private val hangingMangrovePropaguleAge0StateId =
+        (Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("mangrove_propagule"))?.stateId
+            ?: error("unknown block 'mangrove_propagule'")) - 4
+    private val defaultLeafLitterStateId =
+        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("leaf_litter"))?.stateId
+            ?: error("unknown block 'leaf_litter'")
+    private val southEmptyBeeNestStateId =
+        (Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("bee_nest"))?.stateId
+            ?: error("unknown block 'bee_nest'")) + 6
+    private val BEEHIVE_SPAWN_DIRECTIONS = listOf(1 to 0, 0 to 1, -1 to 0)
+    private val LEAF_LITTER_FACING_STATE_OFFSETS = intArrayOf(0, 12, 4, 8)
+    private val NON_SOLID_RENDER_BLOCK_PATHS: Set<String> =
+        setOf(
+            "snow",
+            "cactus",
+            "cactus_flower",
+            "sugar_cane",
+            "bamboo",
+            "bamboo_sapling",
+            "pointed_dripstone",
+            "lily_pad",
+            "brown_mushroom",
+            "red_mushroom",
+            "fern",
+            "large_fern",
+            "dead_bush",
+            "sweet_berry_bush",
+            "firefly_bush",
+            "wildflowers",
+            "pink_petals",
+            "pale_moss_carpet",
+            "closed_eyeblossom",
+            "open_eyeblossom",
+            "sunflower",
+            "lilac",
+            "rose_bush",
+            "peony",
+        )
+    // parity: BlockTags.LOGS, expanded from the 26.2 server data pack.
+    private val LOG_BLOCK_PATHS: Set<String> =
+        buildSet {
+            for (wood in listOf("dark_oak", "pale_oak", "oak", "acacia", "birch", "jungle", "spruce", "mangrove", "cherry")) {
+                add("${wood}_log")
+                add("${wood}_wood")
+                add("stripped_${wood}_log")
+                add("stripped_${wood}_wood")
+            }
+            addAll(
+                listOf(
+                    "crimson_stem",
+                    "stripped_crimson_stem",
+                    "crimson_hyphae",
+                    "stripped_crimson_hyphae",
+                    "warped_stem",
+                    "stripped_warped_stem",
+                    "warped_hyphae",
+                    "stripped_warped_hyphae",
+                ),
+            )
+        }
+    private val BLOCK_NEIGHBOURS =
+        listOf(
+            Triple(0, -1, 0),
+            Triple(0, 1, 0),
+            Triple(0, 0, -1),
+            Triple(0, 0, 1),
+            Triple(-1, 0, 0),
+            Triple(1, 0, 0),
+        )
 
     private fun maxFreeTreeHeight(
         chunk: Chunk,

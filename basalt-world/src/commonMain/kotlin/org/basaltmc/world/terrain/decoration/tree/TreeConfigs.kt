@@ -40,7 +40,14 @@ public object TreeConfigs {
 
     // parity: TreeFeatures.createStraightBlobTree(OAK_LOG, OAK_LEAVES, 5, 3, 0, 3) (swamp_oak).
     public val SWAMP_OAK: TreeConfiguration =
-        TreeConfiguration(OAK_LOG, StraightTrunkPlacer(5, 3, 0), OAK_LEAVES, BlobFoliagePlacer(IntProvider.of(3), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
+        TreeConfiguration(
+            OAK_LOG,
+            StraightTrunkPlacer(5, 3, 0),
+            OAK_LEAVES,
+            BlobFoliagePlacer(IntProvider.of(3), IntProvider.of(0), 3),
+            FeatureSizeTwoLayers(1, 0, 1),
+            decorators = listOf(TreeDecoratorConfiguration.LeafVines(0.25f)),
+        )
 
     // parity: TreeFeatures.createBirch/createStraightBlobTree(BIRCH_LOG, BIRCH_LEAVES, 5, 2, 0, 2).
     public val BIRCH: TreeConfiguration =
@@ -50,8 +57,7 @@ public object TreeConfigs {
     public val SUPER_BIRCH: TreeConfiguration =
         TreeConfiguration(BIRCH_LOG, StraightTrunkPlacer(5, 2, 6), BIRCH_LEAVES, BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
 
-    // parity: TreeFeatures.FANCY_OAK registration. FANCY_OAK_BEES uses this same shape plus a
-    // guaranteed BeehiveDecorator, which remains part of the shared tree-decorator gap.
+    // parity: TreeFeatures.FANCY_OAK registration.
     public val FANCY_OAK: TreeConfiguration =
         TreeConfiguration(
             OAK_LOG,
@@ -63,7 +69,19 @@ public object TreeConfigs {
 
     // parity: TreeFeatures.createJungleTree/createStraightBlobTree(JUNGLE_LOG, JUNGLE_LEAVES, 4, 8, 0, 2).
     public val JUNGLE_TREE: TreeConfiguration =
-        TreeConfiguration(JUNGLE_LOG, StraightTrunkPlacer(4, 8, 0), JUNGLE_LEAVES, BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
+        TreeConfiguration(
+            JUNGLE_LOG,
+            StraightTrunkPlacer(4, 8, 0),
+            JUNGLE_LEAVES,
+            BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
+            FeatureSizeTwoLayers(1, 0, 1),
+            decorators =
+                listOf(
+                    TreeDecoratorConfiguration.Cocoa(0.2f),
+                    TreeDecoratorConfiguration.TrunkVines,
+                    TreeDecoratorConfiguration.LeafVines(0.25f),
+                ),
+        )
 
     // parity: TreeFeatures.JUNGLE_BUSH registration.
     public val JUNGLE_BUSH: TreeConfiguration =
@@ -75,8 +93,7 @@ public object TreeConfigs {
             FeatureSizeTwoLayers(0, 0, 0),
         )
 
-    // parity: TreeFeatures.MEGA_JUNGLE_TREE registration. Trunk and leaf vines remain part of the
-    // shared tree-decorator gap.
+    // parity: TreeFeatures.MEGA_JUNGLE_TREE registration, including trunk and leaf vines.
     public val MEGA_JUNGLE: TreeConfiguration =
         TreeConfiguration(
             JUNGLE_LOG,
@@ -84,6 +101,11 @@ public object TreeConfigs {
             JUNGLE_LEAVES,
             MegaJungleFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 2),
             FeatureSizeTwoLayers(1, 1, 2),
+            decorators =
+                listOf(
+                    TreeDecoratorConfiguration.TrunkVines,
+                    TreeDecoratorConfiguration.LeafVines(0.25f),
+                ),
         )
 
     // parity: TreeFeatures.SPRUCE registration.
@@ -134,9 +156,25 @@ public object TreeConfigs {
             PALE_OAK_LEAVES,
             DarkOakFoliagePlacer(IntProvider.of(0), IntProvider.of(0)),
             FeatureSizeThreeLayers(1, 1, 0, 1, 2),
+            decorators = listOf(TreeDecoratorConfiguration.PaleMoss(0.15f, 0.4f, 0.8f)),
         )
 
-    // parity: TreeFeatures.MEGA_SPRUCE registration (AlterGroundDecorator podzol swap not ported, documented gap).
+    // parity: TreeFeatures.PALE_OAK_CREAKING, pale moss followed by a guaranteed heart attempt.
+    public val PALE_OAK_CREAKING: TreeConfiguration =
+        TreeConfiguration(
+            PALE_OAK_LOG,
+            DarkOakTrunkPlacer(6, 2, 1),
+            PALE_OAK_LEAVES,
+            DarkOakFoliagePlacer(IntProvider.of(0), IntProvider.of(0)),
+            FeatureSizeThreeLayers(1, 1, 0, 1, 2),
+            decorators =
+                listOf(
+                    TreeDecoratorConfiguration.PaleMoss(0.15f, 0.4f, 0.8f),
+                    TreeDecoratorConfiguration.CreakingHeart(1.0f),
+                ),
+        )
+
+    // parity: TreeFeatures.MEGA_SPRUCE registration.
     public val MEGA_SPRUCE: TreeConfiguration =
         TreeConfiguration(
             SPRUCE_LOG,
@@ -144,6 +182,7 @@ public object TreeConfigs {
             SPRUCE_LEAVES,
             MegaPineFoliagePlacer(IntProvider.of(0), IntProvider.of(0), IntProvider.uniform(13, 17)),
             FeatureSizeTwoLayers(1, 1, 2),
+            decorators = listOf(TreeDecoratorConfiguration.AlterGroundToPodzol),
         )
 
     // parity: TreeFeatures.MEGA_PINE registration.
@@ -154,11 +193,11 @@ public object TreeConfigs {
             SPRUCE_LEAVES,
             MegaPineFoliagePlacer(IntProvider.of(0), IntProvider.of(0), IntProvider.uniform(3, 7)),
             FeatureSizeTwoLayers(1, 1, 2),
+            decorators = listOf(TreeDecoratorConfiguration.AlterGroundToPodzol),
         )
 
     // parity: TreeFeatures.MANGROVE registration (the small variant; real MangroveRootPlacer with
-    // trunk_offset_y uniform(1, 3); the real LeaveVineDecorator/AttachedToLeavesDecorator are not
-    // ported, tree decorators are this engine's documented gap).
+    // trunk_offset_y uniform(1, 3)).
     public val MANGROVE: TreeConfiguration =
         TreeConfiguration(
             MANGROVE_LOG,
@@ -167,6 +206,12 @@ public object TreeConfigs {
             RandomSpreadFoliagePlacer(IntProvider.of(3), IntProvider.of(0), IntProvider.of(2), 70),
             FeatureSizeTwoLayers(2, 0, 2),
             MangroveRootPlacer(IntProvider.uniform(1, 3)),
+            decorators =
+                listOf(
+                    TreeDecoratorConfiguration.LeafVines(0.125f),
+                    TreeDecoratorConfiguration.MangrovePropagules(0.14f, 1, 0, 2),
+                    TreeDecoratorConfiguration.Beehive(0.01f),
+                ),
         )
 
     // parity: TreeFeatures.TALL_MANGROVE registration (trunk_offset_y uniform(3, 7)).
@@ -178,10 +223,15 @@ public object TreeConfigs {
             RandomSpreadFoliagePlacer(IntProvider.of(3), IntProvider.of(0), IntProvider.of(2), 70),
             FeatureSizeTwoLayers(3, 0, 2),
             MangroveRootPlacer(IntProvider.uniform(3, 7)),
+            decorators =
+                listOf(
+                    TreeDecoratorConfiguration.LeafVines(0.125f),
+                    TreeDecoratorConfiguration.MangrovePropagules(0.14f, 1, 0, 2),
+                    TreeDecoratorConfiguration.Beehive(0.01f),
+                ),
         )
 
-    // parity: TreeFeatures.cherry (CHERRY registration; CHERRY_BEES_005 is this same config plus a
-    // BeehiveDecorator(0.05), tree decorators not ported). branchCount is the real WeightedListInt
+    // parity: TreeFeatures.cherry (CHERRY registration). branchCount is the real WeightedListInt
     // over ConstantInt(1/2/3), one weight each.
     public val CHERRY: TreeConfiguration =
         TreeConfiguration(
@@ -199,4 +249,49 @@ public object TreeConfigs {
             CherryFoliagePlacer(IntProvider.of(4), IntProvider.of(0), IntProvider.of(5), 0.25f, 0.5f, 0.16666667f, 0.33333334f),
             FeatureSizeTwoLayers(1, 0, 2),
         )
+
+    private val LEAF_LITTER_DECORATORS =
+        listOf(
+            TreeDecoratorConfiguration.GroundLeafLitter(96, 4, 2, 3),
+            TreeDecoratorConfiguration.GroundLeafLitter(150, 2, 2, 4),
+        )
+
+    // parity: sparseLeafLitter followed by thickLeafLitter on the dedicated 26.2 tree configs.
+    public val OAK_LEAF_LITTER: TreeConfiguration = withDecorators(OAK, LEAF_LITTER_DECORATORS)
+    public val BIRCH_LEAF_LITTER: TreeConfiguration = withDecorators(BIRCH, LEAF_LITTER_DECORATORS)
+    public val FANCY_OAK_LEAF_LITTER: TreeConfiguration = withDecorators(FANCY_OAK, LEAF_LITTER_DECORATORS)
+    public val DARK_OAK_LEAF_LITTER: TreeConfiguration = withDecorators(DARK_OAK, LEAF_LITTER_DECORATORS)
+
+    public val OAK_BEES_0002_LEAF_LITTER: TreeConfiguration =
+        withDecorators(OAK, listOf(TreeDecoratorConfiguration.Beehive(0.002f)) + LEAF_LITTER_DECORATORS)
+    public val BIRCH_BEES_0002_LEAF_LITTER: TreeConfiguration =
+        withDecorators(BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.002f)) + LEAF_LITTER_DECORATORS)
+    public val FANCY_OAK_BEES_0002_LEAF_LITTER: TreeConfiguration =
+        withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.002f)) + LEAF_LITTER_DECORATORS)
+
+    public val OAK_BEES_002: TreeConfiguration = withDecorators(OAK, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
+    public val BIRCH_BEES_002: TreeConfiguration = withDecorators(BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
+    public val FANCY_OAK_BEES_002: TreeConfiguration = withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
+    public val OAK_BEES_005: TreeConfiguration = withDecorators(OAK, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
+    public val FANCY_OAK_BEES_005: TreeConfiguration = withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
+    public val BIRCH_BEES_0002: TreeConfiguration = withDecorators(BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.002f)))
+    public val SUPER_BIRCH_BEES_0002: TreeConfiguration = withDecorators(SUPER_BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.002f)))
+    public val FANCY_OAK_BEES: TreeConfiguration = withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(1.0f)))
+    public val SUPER_BIRCH_BEES: TreeConfiguration = withDecorators(SUPER_BIRCH, listOf(TreeDecoratorConfiguration.Beehive(1.0f)))
+    public val CHERRY_BEES_005: TreeConfiguration = withDecorators(CHERRY, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
+
+    private fun withDecorators(
+        base: TreeConfiguration,
+        decorators: List<TreeDecoratorConfiguration>,
+    ): TreeConfiguration =
+        TreeConfiguration(
+            base.trunkStateId,
+            base.trunkPlacer,
+            base.foliageStateId,
+            base.foliagePlacer,
+            base.minimumSize,
+            base.rootPlacer,
+            decorators,
+        )
+
 }

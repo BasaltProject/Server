@@ -14,8 +14,31 @@ class SurfaceFreezingDecorationTest {
         SurfaceFreezingDecoration.decorate(chunk, environment("minecraft:snowy_plains"))
 
         for (x in 0 until 16) {
-            for (z in 0 until 16) assertEquals(Blocks.SNOW.stateId, chunk.getBlockStateId(x, 63, z))
+            for (z in 0 until 16) {
+                assertEquals(Blocks.SNOW.stateId, chunk.getBlockStateId(x, 63, z))
+                assertEquals(Blocks.GRASS_BLOCK.stateId - 1, chunk.getBlockStateId(x, 62, z))
+            }
         }
+    }
+
+    @Test
+    fun snowMarksEverySnowyBlockTypeBelowIt() {
+        val chunk = flatChunk(Blocks.DIRT.stateId)
+        val surfaceStates =
+            listOf(
+                Blocks.GRASS_BLOCK.stateId,
+                Blocks.PODZOL.stateId,
+                stateId("mycelium"),
+            )
+        surfaceStates.forEachIndexed { x, stateId -> chunk.setBlockStateId(x, 62, 0, stateId) }
+
+        SurfaceFreezingDecoration.decorate(chunk, environment("minecraft:snowy_plains"))
+
+        surfaceStates.forEachIndexed { x, stateId ->
+            assertEquals(Blocks.SNOW.stateId, chunk.getBlockStateId(x, 63, 0))
+            assertEquals(stateId - 1, chunk.getBlockStateId(x, 62, 0))
+        }
+        assertEquals(Blocks.DIRT.stateId, chunk.getBlockStateId(3, 62, 0))
     }
 
     @Test
@@ -66,6 +89,10 @@ class SurfaceFreezingDecorationTest {
         }
 
     private fun environment(biomeId: String): SurfaceRuleEnvironment = environment { biomeId }
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla(path))?.stateId
+            ?: error("unknown block '$path'")
 
     private fun environment(biomeForX: (Int) -> String): SurfaceRuleEnvironment =
         object : SurfaceRuleEnvironment {

@@ -1,9 +1,12 @@
 package org.basaltmc.world.region
 
 import org.basaltmc.nbt.NbtCompound
+import org.basaltmc.nbt.NbtList
+import org.basaltmc.nbt.NbtType
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.WorldHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -91,8 +94,46 @@ class ChunkNbtTest {
         val vineEast = stateId("vine") - 16
         val glowLichenUp = stateId("glow_lichen") - 4
         val sweetBerryAge3 = stateId("sweet_berry_bush") + 3
-        val states = listOf(oakAxisX, vineEast, glowLichenUp, sweetBerryAge3)
-        states.forEachIndexed { x, stateId -> chunk.setBlockStateId(x, 64, 0, stateId) }
+        val cocoaAge2East = stateId("cocoa") + 11
+        val paleHangingMossNotTip = stateId("pale_hanging_moss") + 1
+        val naturalDormantCreakingHeart = stateId("creaking_heart") + 1
+        val hangingMangrovePropaguleAge4 = stateId("mangrove_propagule") + 28
+        val eastFourSegmentLeafLitter = stateId("leaf_litter") + 15
+        val southEmptyBeeNest = stateId("bee_nest") + 6
+        val oakLeavesDistance3 = stateId("oak_leaves") - 16
+        val upperSunflower = stateId("sunflower") - 1
+        val eastFourWildflowers = stateId("wildflowers") + 15
+        val kelpAge23 = stateId("kelp") + 23
+        val fourWaterloggedSeaPickles = stateId("sea_pickle") + 6
+        val upperTallSeagrass = stateId("tall_seagrass") - 1
+        val snowyGrass = stateId("grass_block") - 1
+        val eastWaterloggedWallCoral = stateId("tube_coral_wall_fan") + 6
+        val generatedMushroomStem = stateId("mushroom_stem") + 34
+        val centerBrownMushroomCap = stateId("brown_mushroom_block") + 61
+        val states =
+            listOf(
+                oakAxisX,
+                vineEast,
+                glowLichenUp,
+                sweetBerryAge3,
+                cocoaAge2East,
+                paleHangingMossNotTip,
+                naturalDormantCreakingHeart,
+                hangingMangrovePropaguleAge4,
+                eastFourSegmentLeafLitter,
+                southEmptyBeeNest,
+                oakLeavesDistance3,
+                upperSunflower,
+                eastFourWildflowers,
+                kelpAge23,
+                fourWaterloggedSeaPickles,
+                upperTallSeagrass,
+                snowyGrass,
+                eastWaterloggedWallCoral,
+                generatedMushroomStem,
+                centerBrownMushroomCap,
+            )
+        states.forEachIndexed { index, stateId -> chunk.setBlockStateId(index % 16, 64, index / 16, stateId) }
 
         val tag = ChunkNbt.write(chunk)
         val section = tag.getList("sections")!!.map { it as NbtCompound }.first { it.getByte("Y").toInt() == 4 }
@@ -104,7 +145,40 @@ class ChunkNbtTest {
         assertEquals("x", oakEntry.getCompound("Properties").getString("axis"))
 
         val read = ChunkNbt.read(tag)
-        states.forEachIndexed { x, stateId -> assertEquals(stateId, read.getBlockStateId(x, 64, 0)) }
+        states.forEachIndexed { index, stateId ->
+            assertEquals(stateId, read.getBlockStateId(index % 16, 64, index / 16))
+        }
+    }
+
+    @Test
+    fun blockEntitiesRoundTripAbsoluteDiskCoordinatesAndCustomData() {
+        val chunk = Chunk(-2, 3)
+        val beeNest = stateId("bee_nest") + 6
+        chunk.setBlockStateId(15, -12, 4, beeNest)
+        val entityData = NbtCompound().apply { putString("id", "minecraft:bee") }
+        val occupant =
+            NbtCompound().apply {
+                putCompound("entity_data", entityData)
+                putInt("ticks_in_hive", 321)
+                putInt("min_ticks_in_hive", 600)
+            }
+        val customData = NbtCompound().apply { set("bees", NbtList(NbtType.COMPOUND, listOf(occupant))) }
+        chunk.setBlockEntity(ChunkBlockEntity(15, -12, 4, Identifier.vanilla("beehive"), customData))
+
+        val tag = ChunkNbt.write(chunk)
+        val written = tag.getList("block_entities")!![0] as NbtCompound
+        assertEquals("minecraft:beehive", written.getString("id"))
+        assertEquals(-17, written.getInt("x"))
+        assertEquals(-12, written.getInt("y"))
+        assertEquals(52, written.getInt("z"))
+        assertEquals(1, written.getList("bees")!!.size)
+
+        val read = ChunkNbt.read(tag)
+        val blockEntity = assertNotNull(read.blockEntityAt(15, -12, 4))
+        assertEquals(Identifier.vanilla("beehive"), blockEntity.type)
+        assertEquals(customData, blockEntity.data)
+        assertEquals(false, "id" in blockEntity.data)
+        assertEquals(false, "x" in blockEntity.data)
     }
 
     private fun stateId(path: String): Int =

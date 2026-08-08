@@ -9,6 +9,7 @@ import org.basaltmc.protocol.play.BitStorage
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.ChunkSection
 import org.basaltmc.world.WorldHeight
 
@@ -34,8 +35,9 @@ public class ChunkNbtException(
  *
  * Non-default states emitted by worldgen preserve their vanilla `Properties` compound in the
  * palette and resolve it back to the same network state ID when loaded. Deliberately out of scope
- * for now: block/light data (`BlockLight`/`SkyLight`), entities, block entities, ticks, heightmaps,
- * and structures. Biomes are always a single-entry `minecraft:plains` palette, matching [Chunk]'s
+ * for now: block/light data (`BlockLight`/`SkyLight`), entities, ticks, heightmaps, and structures.
+ * Block entities preserve full custom NBT plus vanilla id/x/y/z metadata. Biomes are always a
+ * single-entry `minecraft:plains` palette, matching [Chunk]'s
  * own single-biome model.
  */
 public object ChunkNbt {
@@ -45,6 +47,7 @@ public object ChunkNbt {
     private const val BLOCK_MAX_INDIRECT_BITS = 8
     private const val SECTION_BLOCK_COUNT = 16 * 16 * 16
     private val blockDirectBits = bitsFor(Blocks.stateCount)
+    private val BLOCK_ENTITY_METADATA_KEYS = setOf("id", "x", "y", "z", "keepPacked")
 
     public fun write(chunk: Chunk): NbtCompound {
         val tag = NbtCompound()
@@ -65,6 +68,7 @@ public object ChunkNbt {
             sections += sectionTag
         }
         tag["sections"] = NbtList(NbtType.COMPOUND, sections)
+        tag["block_entities"] = NbtList(NbtType.COMPOUND, chunk.blockEntities().map { encodeBlockEntity(chunk, it) })
         return tag
     }
 
@@ -79,7 +83,45 @@ public object ChunkNbt {
             val blockStates = sectionTag.getCompound("block_states")
             chunk.section(index).setBlockStateIds(decodeBlockStates(blockStates))
         }
+        val blockEntities = tag.getList("block_entities")
+        if (blockEntities != null) {
+            for (entry in blockEntities) chunk.setBlockEntity(decodeBlockEntity(chunk, entry))
+        }
         return chunk
+    }
+
+    private fun encodeBlockEntity(
+        chunk: Chunk,
+        blockEntity: ChunkBlockEntity,
+    ): NbtCompound {
+        val tag = NbtCompound()
+        for ((name, value) in blockEntity.data) tag[name] = value
+        tag.putString("id", blockEntity.type.toString())
+        tag.putInt("x", chunk.chunkX * 16 + blockEntity.localX)
+        tag.putInt("y", blockEntity.y)
+        tag.putInt("z", chunk.chunkZ * 16 + blockEntity.localZ)
+        return tag
+    }
+
+    private fun decodeBlockEntity(
+        chunk: Chunk,
+        entry: NbtTag,
+    ): ChunkBlockEntity {
+        val tag = entry as? NbtCompound ?: throw ChunkNbtException("block entity entry is not a compound")
+        val id = tag.getString("id").takeIf(String::isNotEmpty) ?: throw ChunkNbtException("block entity has no id")
+        val worldX = tag.getInt("x")
+        val y = tag.getInt("y")
+        val worldZ = tag.getInt("z")
+        val localX = worldX - chunk.chunkX * 16
+        val localZ = worldZ - chunk.chunkZ * 16
+        if (localX !in 0..15 || localZ !in 0..15 || y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+            throw ChunkNbtException("block entity $id at ($worldX,$y,$worldZ) is outside chunk (${chunk.chunkX},${chunk.chunkZ})")
+        }
+        val data = NbtCompound()
+        for ((name, value) in tag) {
+            if (name !in BLOCK_ENTITY_METADATA_KEYS) data[name] = value
+        }
+        return ChunkBlockEntity(localX, y, localZ, Identifier.parse(id), data)
     }
 
     private fun encodeBlockStates(section: ChunkSection): NbtCompound =

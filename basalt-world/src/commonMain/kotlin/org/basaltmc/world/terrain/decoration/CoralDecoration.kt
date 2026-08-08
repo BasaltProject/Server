@@ -6,7 +6,10 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 
-/** // parity: warm_ocean_vegetation and the three CoralFeature implementations. */
+/**
+ * // parity: warm_ocean_vegetation and the three CoralFeature implementations, including
+ * waterlogged coral states, wall-fan facing, and sea-pickle count.
+ */
 public object CoralDecoration : BiomeVegetalDecoration {
     override fun decorate(
         chunk: Chunk,
@@ -153,7 +156,10 @@ public object CoralDecoration : BiomeVegetalDecoration {
     ): Boolean {
         if (!pos.inWorld() || !pos.up().inWorld()) return false
         val target = chunk.blockAt(pos)
-        if ((target != Blocks.WATER.stateId && target !in CORALS) || chunk.blockAt(pos.up()) != Blocks.WATER.stateId) {
+        if (
+            (target != Blocks.WATER.stateId && !Blocks.isCoralPlantState(target)) ||
+            chunk.blockAt(pos.up()) != Blocks.WATER.stateId
+        ) {
             return false
         }
 
@@ -161,15 +167,19 @@ public object CoralDecoration : BiomeVegetalDecoration {
         if (random.nextFloat() < 0.25f) {
             chunk.setBlock(pos.up(), CORALS[random.nextInt(CORALS.size)])
         } else if (random.nextFloat() < 0.05f) {
-            random.nextInt(4)
-            chunk.setBlock(pos.up(), Blocks.SEA_PICKLE.stateId)
+            chunk.setBlock(pos.up(), Blocks.SEA_PICKLE.stateId + random.nextInt(4) * 2)
         }
 
         for (direction in HORIZONTAL_DIRECTIONS) {
             if (random.nextFloat() < 0.2f) {
                 val side = pos.move(direction)
                 if (chunk.blockAt(side) == Blocks.WATER.stateId) {
-                    chunk.setBlock(side, WALL_CORALS[random.nextInt(WALL_CORALS.size)])
+                    val wallCoralStateId = WALL_CORALS[random.nextInt(WALL_CORALS.size)]
+                    chunk.setBlock(
+                        side,
+                        Blocks.coralWallFanStateId(wallCoralStateId, direction.horizontalFacing(), waterlogged = true)
+                            ?: error("invalid wall coral state '$wallCoralStateId'"),
+                    )
                 }
             }
         }
@@ -216,6 +226,14 @@ public object CoralDecoration : BiomeVegetalDecoration {
         fun counterClockwise(): Direction = Direction(z, y, -x)
 
         fun opposite(): Direction = Direction(-x, -y, -z)
+
+        fun horizontalFacing(): String =
+            when {
+                z < 0 -> "north"
+                x > 0 -> "east"
+                z > 0 -> "south"
+                else -> "west"
+            }
 
         companion object {
             val UP = Direction(0, 1, 0)

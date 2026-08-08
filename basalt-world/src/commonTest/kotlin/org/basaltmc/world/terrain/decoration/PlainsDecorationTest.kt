@@ -43,7 +43,7 @@ class PlainsDecorationTest {
         for (x in 0 until 16) {
             for (z in 0 until 16) {
                 if (chunk.getBlockStateId(x, 65, z) == sunflower) lower++
-                if (chunk.getBlockStateId(x, 66, z) == sunflower) upper++
+                if (chunk.getBlockStateId(x, 66, z) == sunflower - 1) upper++
             }
         }
         assertTrue(lower > 0)

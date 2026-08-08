@@ -1,6 +1,7 @@
 package org.basaltmc.protocol.play
 
 import org.basaltmc.io.ByteBuffer
+import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.protocol.writeBoolean
 import org.basaltmc.protocol.writeProtocolString
 import org.basaltmc.protocol.writeVarInt
@@ -60,12 +61,14 @@ class PlayPacketsTest {
         val buffer = ByteBuffer()
         val blockValues = IntArray(4096) { if (it < 256) BEDROCK_STATE else AIR_STATE }
         val chunkData = buildSingleSectionChunkData(blockValues)
+        val beeNestTag = NbtCompound().apply { putString("custom_name", "Basalt nest") }
         val packet =
             MapChunkPacket(
                 x = 3,
                 z = -4,
                 heightmaps = listOf(Heightmap(HeightmapType.MOTION_BLOCKING, longArrayOf(0L))),
                 chunkData = chunkData,
+                blockEntities = listOf(ChunkBlockEntityInfo(packedXZ = 0xa5, y = -12, typeId = 33, tag = beeNestTag)),
                 skyLightMask = longArrayOf(0b1L),
                 blockLightMask = longArrayOf(0L),
                 emptySkyLightMask = longArrayOf(0L),
@@ -79,11 +82,20 @@ class PlayPacketsTest {
         assertEquals(packet.z, result.z)
         assertEquals(packet.heightmaps, result.heightmaps)
         assertEquals(packet.chunkData.toList(), result.chunkData.toList())
+        assertEquals(packet.blockEntities, result.blockEntities)
         assertEquals(packet.skyLightMask.toList(), result.skyLightMask.toList())
         assertEquals(packet.emptyBlockLightMask.toList(), result.emptyBlockLightMask.toList())
         assertEquals(1, result.skyLight.size)
         assertEquals(packet.skyLight[0].toList(), result.skyLight[0].toList())
         assertEquals(0, result.blockLight.size)
+    }
+
+    @Test
+    fun chunkBlockEntityInfoRoundTripsANullUpdateTag() {
+        val buffer = ByteBuffer()
+        val info = ChunkBlockEntityInfo(packedXZ = 0xff, y = 319, typeId = 33, tag = null)
+        info.write(buffer)
+        assertEquals(info, ChunkBlockEntityInfo.read(buffer))
     }
 
     @Test

@@ -21,7 +21,7 @@ class MeadowFlowerDecorationTest {
     fun meadowWildflowersUseBiomeNoiseDensity() {
         val chunk = flatGrassChunk()
         ForestFloorDecoration.MEADOW_WILDFLOWERS.decorate(chunk, WorldgenRandom(XoroshiroRandom(19L)))
-        assertTrue(count(chunk, setOf(stateId("wildflowers"))) > 0)
+        assertTrue(countMatching(chunk, Blocks::isWildflowersState) > 0)
     }
 
     @Test
@@ -72,6 +72,20 @@ class MeadowFlowerDecorationTest {
         for (x in 0 until 16) {
             for (z in 0 until 16) {
                 for (y in 63..90) if (chunk.getBlockStateId(x, y, z) in states) result++
+            }
+        }
+        return result
+    }
+
+    private fun countMatching(
+        chunk: Chunk,
+        matches: (Int) -> Boolean,
+    ): Int {
+        var result = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                if (matches(chunk.getBlockStateId(x, 63, z))) result++
+                if (matches(chunk.getBlockStateId(x, 64, z))) result++
             }
         }
         return result

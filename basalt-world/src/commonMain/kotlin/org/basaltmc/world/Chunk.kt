@@ -9,6 +9,8 @@ public class Chunk(
     public val chunkZ: Int,
 ) {
     private val sections = Array(WorldHeight.SECTION_COUNT) { ChunkSection() }
+    private val blockEntitiesByPosition = LinkedHashMap<Int, ChunkBlockEntity>()
+    private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
 
     public val sectionCount: Int get() = sections.size
 
@@ -26,13 +28,59 @@ public class Chunk(
         z: Int,
         stateId: Int,
     ) {
-        sectionFor(y).setBlockStateId(x, y and 15, z, stateId)
+        val section = sectionFor(y)
+        val observer = blockWriteObserver
+        if (observer == null) {
+            if (blockEntitiesByPosition.isNotEmpty() && section.getBlockStateId(x, y and 15, z) != stateId) {
+                blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
+            }
+            section.setBlockStateId(x, y and 15, z, stateId)
+        } else {
+            val oldStateId = section.getBlockStateId(x, y and 15, z)
+            section.setBlockStateId(x, y and 15, z, stateId)
+            if (oldStateId != stateId) {
+                blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
+                observer(x, y, z, oldStateId, stateId)
+            }
+        }
+    }
+
+    public fun setBlockEntity(blockEntity: ChunkBlockEntity) {
+        blockEntitiesByPosition[blockEntityKey(blockEntity.localX, blockEntity.y, blockEntity.localZ)] = blockEntity
+    }
+
+    public fun blockEntityAt(
+        localX: Int,
+        y: Int,
+        localZ: Int,
+    ): ChunkBlockEntity? = blockEntitiesByPosition[blockEntityKey(localX, y, localZ)]
+
+    public fun blockEntities(): Collection<ChunkBlockEntity> = blockEntitiesByPosition.values
+
+    /** Synchronously records changed block writes without allocating on the normal write path. */
+    internal fun <T> observeBlockWrites(
+        observer: (x: Int, y: Int, z: Int, oldStateId: Int, newStateId: Int) -> Unit,
+        action: () -> T,
+    ): T {
+        check(blockWriteObserver == null) { "nested block write observers are not supported" }
+        blockWriteObserver = observer
+        try {
+            return action()
+        } finally {
+            blockWriteObserver = null
+        }
     }
 
     private fun sectionFor(y: Int): ChunkSection {
         require(y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) { "y=$y out of world bounds" }
         return sections[(y shr 4) - WorldHeight.MIN_SECTION]
     }
+
+    private fun blockEntityKey(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int = ((y - WorldHeight.MIN_Y) shl 8) or ((z and 15) shl 4) or (x and 15)
 
     /**
      * Sets the biome network ID at quart (4-block) resolution. [quartY] is the world quart
@@ -92,15 +140,26 @@ public class Chunk(
                     Blocks.hasWaterFluid(stateId) ||
                         (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
                 MOTION_BLOCKING_NO_LEAVES ->
-                    Blocks.hasWaterFluid(stateId) ||
-                        (stateId != Blocks.AIR.stateId &&
-                            !isNonColliding(stateId) &&
-                            stateId !in LEAF_STATE_IDS)
+                    !Blocks.isLeavesState(stateId) &&
+                        (Blocks.hasWaterFluid(stateId) ||
+                            (stateId != Blocks.AIR.stateId && !isNonColliding(stateId)))
             }
 
         private companion object {
             fun isNonColliding(stateId: Int): Boolean =
-                stateId in NON_COLLIDING_STATE_IDS || Blocks.isGlowLichenState(stateId) || Blocks.isVineState(stateId)
+                stateId in NON_COLLIDING_STATE_IDS ||
+                    Blocks.isGlowLichenState(stateId) ||
+                    Blocks.isVineState(stateId) ||
+                    Blocks.isCocoaState(stateId) ||
+                    Blocks.isPaleHangingMossState(stateId) ||
+                    Blocks.isMangrovePropaguleState(stateId) ||
+                    Blocks.isLeafLitterState(stateId) ||
+                    Blocks.isDoublePlantState(stateId) ||
+                    Blocks.isWildflowersState(stateId) ||
+                    Blocks.isPinkPetalsState(stateId) ||
+                    Blocks.isKelpState(stateId) ||
+                    Blocks.isSeaPickleState(stateId) ||
+                    Blocks.isCoralPlantState(stateId)
 
             val NON_COLLIDING_STATE_IDS: Set<Int> =
                 listOf(
@@ -138,20 +197,6 @@ public class Chunk(
                     "horn_coral_wall_fan",
                 ).mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
 
-            val LEAF_STATE_IDS: Set<Int> =
-                listOf(
-                    "oak_leaves",
-                    "spruce_leaves",
-                    "birch_leaves",
-                    "jungle_leaves",
-                    "acacia_leaves",
-                    "cherry_leaves",
-                    "dark_oak_leaves",
-                    "pale_oak_leaves",
-                    "mangrove_leaves",
-                    "azalea_leaves",
-                    "flowering_azalea_leaves",
-                ).mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
         }
     }
 }

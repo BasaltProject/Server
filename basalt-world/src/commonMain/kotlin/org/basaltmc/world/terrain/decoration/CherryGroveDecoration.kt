@@ -12,12 +12,7 @@ import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
  * exact real feature [PlainsDecoration.GRASS] builds), `flower_cherry` (pink petals) and
  * `trees_cherry`.
  *
- * **Documented gaps**: real `trees_cherry` points at `cherry_bees_005`, the plain cherry config
- * plus a `BeehiveDecorator(0.05)`; tree decorators aren't ported (see TreeFeature.kt's own KDoc).
- * Pink petals' 16 real weighted block states (amount 1-4 x 4 horizontal facings, one weight each)
- * collapse to the default state here (block states aren't modeled yet, the same documented gap as
- * leaf `distance`); the provider's real `nextInt(16)` draw is still consumed per placed position
- * to keep the shared random stream aligned with real vanilla.
+ * Pink petals preserve all 16 weighted block states: amount 1-4 and four horizontal facings.
  */
 public object CherryGroveDecoration : BiomeVegetalDecoration {
     override fun decorate(
@@ -26,7 +21,7 @@ public object CherryGroveDecoration : BiomeVegetalDecoration {
     ) {
         PlainsDecoration.GRASS.decorate(chunk, random)
         placePinkPetals(chunk, random)
-        TreeDecoration.single(TreeConfigs.CHERRY, 10, 0.1f, 1).decorate(chunk, random)
+        TreeDecoration.single(TreeConfigs.CHERRY_BEES_005, 10, 0.1f, 1).decorate(chunk, random)
     }
 
     // parity: placed_feature/flower_cherry.json + configured_feature/flower_cherry.json
@@ -37,8 +32,7 @@ public object CherryGroveDecoration : BiomeVegetalDecoration {
     ) {
         val feature =
             SimpleBlockFeature({ r, _ ->
-                r.nextInt(16)
-                pinkPetalsStateId
+                pinkPetalsStateId(r.nextInt(16))
             })
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
@@ -59,4 +53,12 @@ public object CherryGroveDecoration : BiomeVegetalDecoration {
 
     private val pinkPetalsStateId =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla("pink_petals"))?.stateId ?: error("unknown block 'pink_petals'")
+
+    private fun pinkPetalsStateId(choice: Int): Int {
+        val amountOffset = choice / 4
+        val facingOffset = HORIZONTAL_FACING_STATE_OFFSETS[choice % 4]
+        return pinkPetalsStateId + facingOffset + amountOffset
+    }
+
+    private val HORIZONTAL_FACING_STATE_OFFSETS = intArrayOf(0, 12, 4, 8)
 }
