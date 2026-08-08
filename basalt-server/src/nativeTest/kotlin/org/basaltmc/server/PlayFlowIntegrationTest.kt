@@ -228,25 +228,43 @@ class PlayFlowIntegrationTest {
 
         // A 7x7 square shifted by (1,1) overlaps its old position in a 6x6 area: 49 - 36 = 13 chunks
         // newly in range, 13 fell out of range.
+        //
+        // What falls out of range is dropped immediately, before anything new is sent: the client
+        // does not have to hold onto chunks it no longer needs while replacements are still being
+        // generated. The replacements themselves arrive afterwards, across however many batches it
+        // takes, because generation runs on a worker pool and the sending side never waits for it.
         val streamedChunkCount = 13
-        val aliceStreamBatchStartBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
-        assertEquals(ChunkBatchStartPacket.ID, aliceStreamBatchStartBody.readVarInt())
-        repeat(streamedChunkCount) {
-            val chunkBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
-            assertEquals(MapChunkPacket.ID, chunkBody.readVarInt())
-            MapChunkPacket.read(chunkBody)
-            val lightBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
-            assertEquals(UpdateLightPacket.ID, lightBody.readVarInt())
-            UpdateLightPacket.read(lightBody)
-        }
-        val aliceStreamBatchFinishedBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
-        assertEquals(ChunkBatchFinishedPacket.ID, aliceStreamBatchFinishedBody.readVarInt())
-        assertEquals(streamedChunkCount, ChunkBatchFinishedPacket.read(aliceStreamBatchFinishedBody).batchSize)
         repeat(streamedChunkCount) {
             val forgetBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
             assertEquals(ForgetLevelChunkPacket.ID, forgetBody.readVarInt())
             ForgetLevelChunkPacket.read(forgetBody)
         }
+
+        var streamedChunksSeen = 0
+        while (streamedChunksSeen < streamedChunkCount) {
+            val batchStartBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+            assertEquals(ChunkBatchStartPacket.ID, batchStartBody.readVarInt())
+            val batchSizeBody: ByteBuffer
+            var inThisBatch = 0
+            while (true) {
+                val body = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+                val id = body.readVarInt()
+                if (id == ChunkBatchFinishedPacket.ID) {
+                    batchSizeBody = body
+                    break
+                }
+                assertEquals(MapChunkPacket.ID, id)
+                MapChunkPacket.read(body)
+                val lightBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+                assertEquals(UpdateLightPacket.ID, lightBody.readVarInt())
+                UpdateLightPacket.read(lightBody)
+                inThisBatch++
+            }
+            assertEquals(inThisBatch, ChunkBatchFinishedPacket.read(batchSizeBody).batchSize)
+            assertTrue(inThisBatch > 0, "the server announced a chunk batch and then sent no chunks")
+            streamedChunksSeen += inThisBatch
+        }
+        assertEquals(streamedChunkCount, streamedChunksSeen)
 
         val bobSeesAliceMoveBody = readFrame(bob.connection, bob.incoming, compressionEnabled = true)
         assertEquals(EntityTeleportPacket.ID, bobSeesAliceMoveBody.readVarInt())

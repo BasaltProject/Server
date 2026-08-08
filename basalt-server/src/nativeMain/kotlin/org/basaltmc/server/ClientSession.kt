@@ -7,6 +7,7 @@ import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionProfileProperty
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.ByteBuffer
+import org.basaltmc.io.NativeMutex
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
 import org.basaltmc.nbt.NbtCompound
@@ -79,12 +80,14 @@ import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.server.registry.VanillaBiomes
 import org.basaltmc.server.registry.VanillaRegistryData
 import org.basaltmc.server.registry.VanillaTagData
+import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkDataCodec
 import org.basaltmc.world.ChunkTracker
+import org.basaltmc.world.ChunkPos
 import kotlin.random.Random
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -119,8 +122,10 @@ public class ClientSession(
     private val world: WorldState = WorldState(emptyList()),
     private val spawn: Triple<Double, Double, Double> = Triple(8.5, 4.0, 8.5),
     private val configuredViewDistance: Int = 10,
+    private val generationQueue: ChunkGenerationQueue = ChunkGenerationQueue(world, "overworld"),
 ) {
     private val logger = Logger("Session")
+    private val sendMutex = NativeMutex()
     private val incoming = ByteBuffer()
     private var state = ProtocolState.HANDSHAKE
     private var compressionEnabled = false
@@ -137,6 +142,11 @@ public class ClientSession(
     private var viewRadius = 0
     private var centerChunkX = 0
     private var centerChunkZ = 0
+
+    // Requested from the generation queue, not yet on the wire. Both this connection's thread and
+    // the tick loop drain it, so it is guarded.
+    private val chunkStreamMutex = NativeMutex()
+    private val pendingChunks = mutableListOf<ChunkPos>()
 
     public fun run() {
         val readChunk = ByteArray(4096)
@@ -166,6 +176,9 @@ public class ClientSession(
             incoming.discardReadBytes()
             handleFrame(ByteBuffer(frame.size).also { it.writeBytes(frame) })
         }
+        // A client in Play sends position packets continuously, so this runs many times a second
+        // and is what actually gets generated chunks onto the wire without any thread waiting.
+        if (state == ProtocolState.PLAY) flushReadyChunks()
     }
 
     private fun handleFrame(body: ByteBuffer) {
@@ -513,15 +526,16 @@ public class ClientSession(
         sendCompressed(GameEventPacket.ID) {
             GameEventPacket(GameEventPacket.LEVEL_CHUNKS_LOAD_START, 0f).write(it)
         }
-        // The declared view distance above is a promise: generate (in parallel, off this one
-        // thread; see WorldState.getOrGenerateChunks's own KDoc) and send every chunk it actually
-        // covers, not just whatever BasaltServer happened to pre-generate at startup. Chunks
-        // already warm from that startup batch are free hits in WorldState's own cache.
+        // The declared view distance above is a promise: send every chunk it actually covers, not
+        // just whatever BasaltServer happened to pre-generate at startup. This one batch is the
+        // only place that still waits for generation, because a client cannot enter the world
+        // without ground under it; from here on chunks stream in through `flushReadyChunks`.
+        // Ordered nearest-first so the queue builds what the player is looking at before the edges.
         val loginPositions =
-            (-chunkRadius..chunkRadius).flatMap { dx ->
-                (-chunkRadius..chunkRadius).map { dz -> (centerChunkX + dx) to (centerChunkZ + dz) }
-            }
-        val loginChunks = world.getOrGenerateChunks(loginPositions)
+            (-chunkRadius..chunkRadius)
+                .flatMap { dx -> (-chunkRadius..chunkRadius).map { dz -> (centerChunkX + dx) to (centerChunkZ + dz) } }
+                .sortedBy { squaredDistanceToCenter(it.first, it.second) }
+        val loginChunks = generationQueue.awaitAll(loginPositions)
         sendCompressed(ChunkBatchStartPacket.ID) { }
         for (chunk in loginChunks) sendChunk(chunk)
         sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(loginChunks.size).write(it) }
@@ -715,6 +729,8 @@ public class ClientSession(
         val chunkX = x.toInt() shr 4
         val chunkZ = z.toInt() shr 4
         if (chunkX == centerChunkX && chunkZ == centerChunkZ) return
+        val previousCenterX = centerChunkX
+        val previousCenterZ = centerChunkZ
         centerChunkX = chunkX
         centerChunkZ = chunkZ
 
@@ -722,17 +738,94 @@ public class ClientSession(
         if (delta.toLoad.isEmpty() && delta.toUnload.isEmpty()) return
 
         sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(chunkX, chunkZ).write(it) }
-        if (delta.toLoad.isNotEmpty()) {
-            sendCompressed(ChunkBatchStartPacket.ID) { }
-            // Generation itself runs across a worker pool (WorldState.getOrGenerateChunks); only
-            // the actual network writes stay serialized here, on this connection's own thread.
-            val loaded = world.getOrGenerateChunks(delta.toLoad.map { it.x to it.z })
-            for (chunk in loaded) sendChunk(chunk)
-            sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(delta.toLoad.size).write(it) }
+        chunkStreamMutex.withLock {
+            for (pos in delta.toLoad) pendingChunks.add(pos)
+            for (pos in delta.toUnload) pendingChunks.remove(pos)
         }
+        for (pos in delta.toLoad) {
+            generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
+        }
+        prefetchAhead(chunkX, chunkZ, movedX = chunkX - previousCenterX, movedZ = chunkZ - previousCenterZ)
+        // Unloads go out straight away rather than waiting behind generation: the client can drop
+        // what it no longer needs before the replacements are even built.
         for (pos in delta.toUnload) {
             sendCompressed(ForgetLevelChunkPacket.ID) { ForgetLevelChunkPacket(pos.x, pos.z).write(it) }
         }
+        flushReadyChunks()
+    }
+
+    /**
+     * Asks for a margin of chunks just beyond the view distance, in whichever direction the player
+     * is actually travelling. Without this the first time a chunk is wanted is the moment it comes
+     * into view, so at speed the player outruns generation no matter how fast a single chunk is;
+     * with it, the chunks ahead are already warm by the time the view reaches them. They are never
+     * sent from here, only generated: they go out normally once [chunkTracker] takes them in.
+     *
+     * Requested behind everything already visible ([PREFETCH_PRIORITY_PENALTY]), so speculative
+     * work can never delay a chunk the player is currently staring at.
+     */
+    private fun prefetchAhead(
+        chunkX: Int,
+        chunkZ: Int,
+        movedX: Int,
+        movedZ: Int,
+    ) {
+        if (movedX == 0 && movedZ == 0) return
+        val stepX = movedX.coerceIn(-1, 1)
+        val stepZ = movedZ.coerceIn(-1, 1)
+        for (margin in 1..PREFETCH_MARGIN_CHUNKS) {
+            val aheadX = chunkX + stepX * (viewRadius + margin)
+            val aheadZ = chunkZ + stepZ * (viewRadius + margin)
+            for (offset in -viewRadius..viewRadius) {
+                val x = if (stepX != 0) aheadX else chunkX + offset
+                val z = if (stepZ != 0) aheadZ else chunkZ + offset
+                generationQueue.request(x, z, squaredDistanceToCenter(x, z) + PREFETCH_PRIORITY_PENALTY)
+            }
+        }
+    }
+
+    /**
+     * Sends whichever requested chunks have finished generating, nearest first, and leaves the rest
+     * pending. Never blocks on generation.
+     *
+     * Driven from [TickLoop] rather than only from this connection's own read loop: a server that
+     * only pushed chunks when the client happened to send something would stall the moment a client
+     * went quiet, and "the client keeps sending position packets" is not a guarantee worth resting
+     * chunk delivery on. The read loop calls it too, so a client that is streaming input gets its
+     * chunks at input rate rather than waiting for the next tick.
+     *
+     * Capped per call so one flush cannot monopolize the socket while the client is also waiting on
+     * movement and entity updates.
+     */
+    internal fun flushReadyChunks() {
+        if (state != ProtocolState.PLAY) return
+        val ready =
+            chunkStreamMutex.withLock {
+                if (pendingChunks.isEmpty()) return
+                pendingChunks.sortBy { squaredDistanceToCenter(it.x, it.z) }
+                val found = mutableListOf<Chunk>()
+                val iterator = pendingChunks.iterator()
+                while (iterator.hasNext() && found.size < MAX_CHUNKS_PER_FLUSH) {
+                    val pos = iterator.next()
+                    val chunk = world.chunkIfLoaded(pos.x, pos.z) ?: continue
+                    found.add(chunk)
+                    iterator.remove()
+                }
+                found
+            }
+        if (ready.isEmpty()) return
+        sendCompressed(ChunkBatchStartPacket.ID) { }
+        for (chunk in ready) sendChunk(chunk)
+        sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(ready.size).write(it) }
+    }
+
+    private fun squaredDistanceToCenter(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Int {
+        val dx = chunkX - centerChunkX
+        val dz = chunkZ - centerChunkZ
+        return dx * dx + dz * dz
     }
 
     private fun broadcastChat(message: String) {
@@ -797,9 +890,30 @@ public class ClientSession(
         writeToSocket(wire.toByteArray())
     }
 
+    /**
+     * One packet reaches the socket at a time. This connection's own thread is not the only writer:
+     * another player's thread broadcasts movement and chat straight into this session, and the tick
+     * loop writes keep-alives, so without this two writers interleave their bytes mid-packet and
+     * the client desynchronizes on the very next frame length. The cipher is inside the lock
+     * because CFB8 is stateful: encrypting two packets concurrently corrupts both even if the
+     * writes themselves were ordered.
+     */
     private fun writeToSocket(bytes: ByteArray) {
-        val cipher = encryptCipher
-        connection.write(if (cipher != null) cipher.update(bytes, encrypting = true) else bytes)
+        sendMutex.withLock {
+            val cipher = encryptCipher
+            connection.write(if (cipher != null) cipher.update(bytes, encrypting = true) else bytes)
+        }
+    }
+
+    private companion object {
+        // How far past the view distance to generate ahead of a moving player, in chunks.
+        const val PREFETCH_MARGIN_CHUNKS = 2
+
+        // Added to a prefetched chunk's priority so every visible chunk anywhere outranks it: the
+        // largest squared distance inside the view is radius^2 + radius^2, well under this.
+        const val PREFETCH_PRIORITY_PENALTY = 1 shl 20
+
+        const val MAX_CHUNKS_PER_FLUSH = 16
     }
 }
 

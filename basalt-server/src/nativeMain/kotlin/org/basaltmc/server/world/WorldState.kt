@@ -1,11 +1,8 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.io.NativeMutex
-import org.basaltmc.io.NativeThread
-import org.basaltmc.io.sleepMillis
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.NoiseWorldGenerator
-import kotlin.concurrent.AtomicInt
 
 /**
  * Shared, mutable view over the currently loaded chunks, guarding both block mutations and the
@@ -29,11 +26,10 @@ import kotlin.concurrent.AtomicInt
  * simply discarded in favor of whichever finished first: rare, and cheaper than making every
  * chunk load wait on every other one.
  *
- * Chunks generated on demand past the initial fixed startup set aren't persisted incrementally as
- * they're generated (only the whole set gets saved at `stop`, same as the initial set): a documented
- * gap, acceptable since [NoiseWorldGenerator] is deterministic per chunk position (round-tripping a
- * server restart mid-exploration regenerates the same terrain, just loses any player edits in chunks
- * that were never saved).
+ * [loadOrGenerate] is expected to consult the region files before generating anything: a chunk seen
+ * once during exploration and saved must come back off disk on the next visit, player edits and
+ * all, rather than being regenerated from the seed. [ChunkGenerationQueue] is what drives it, and
+ * what collects the freshly generated chunks for persistence.
  */
 public class WorldState(
     initialChunks: List<Chunk>,
@@ -47,6 +43,18 @@ public class WorldState(
 
     public val chunks: List<Chunk> get() = mutex.withLock { chunksByPos.values.toList() }
 
+    /** Whether this chunk is already in memory, without generating it: what the queue and the send path poll. */
+    public fun isLoaded(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Boolean = mutex.withLock { (chunkX to chunkZ) in chunksByPos }
+
+    /** The chunk if it is already in memory, or `null`. Never generates, so it is safe on a connection thread. */
+    public fun chunkIfLoaded(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk? = mutex.withLock { chunksByPos[chunkX to chunkZ] }
+
     /** Returns the chunk at this position, generating (but not sending or persisting) it first if unseen. */
     public fun getOrGenerateChunk(
         chunkX: Int,
@@ -56,34 +64,6 @@ public class WorldState(
         mutex.withLock { chunksByPos[key] }?.let { return it }
         val generated = loadOrGenerate(chunkX, chunkZ)
         return mutex.withLock { chunksByPos.getOrPut(key) { generated } }
-    }
-
-    /**
-     * Like [getOrGenerateChunk], but for a whole batch at once, generating any never-before-seen
-     * positions across [GENERATION_WORKERS] worker threads instead of one at a time: what
-     * [org.basaltmc.server.ClientSession.streamChunksAround] calls so a player moving fast (or
-     * just connecting cold) doesn't serialize the whole batch of newly-visible chunks behind its
-     * own single thread. Order of [positions] is preserved in the result.
-     */
-    public fun getOrGenerateChunks(positions: List<Pair<Int, Int>>): List<Chunk> {
-        if (positions.isEmpty()) return emptyList()
-        val results = arrayOfNulls<Chunk>(positions.size)
-        val workerCount = minOf(GENERATION_WORKERS, positions.size)
-        val remaining = AtomicInt(workerCount)
-        for (worker in 0 until workerCount) {
-            NativeThread.start {
-                var i = worker
-                while (i < positions.size) {
-                    val (x, z) = positions[i]
-                    results[i] = getOrGenerateChunk(x, z)
-                    i += workerCount
-                }
-                remaining.decrementAndGet()
-            }
-        }
-        while (remaining.value > 0) sleepMillis(1L)
-        @Suppress("UNCHECKED_CAST")
-        return results.asList() as List<Chunk>
     }
 
     public fun getBlockState(
@@ -108,8 +88,4 @@ public class WorldState(
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
             true
         }
-
-    private companion object {
-        const val GENERATION_WORKERS = 8
-    }
 }
