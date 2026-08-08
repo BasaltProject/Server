@@ -53,7 +53,7 @@ public class Logger(
         message: () -> String,
     ) {
         if (level.ordinal < minLevel.ordinal) return
-        println("[${timestamp()}] [${level.label}] [$name]: ${message()}")
+        LogOutput.emit(level, timestamp(), name, message())
     }
 
     public companion object {

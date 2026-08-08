@@ -8,9 +8,12 @@ import org.basaltmc.assets.VersionManifest
 import org.basaltmc.auth.MojangSessionService
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionKeyPair
+import org.basaltmc.common.logging.LogOutput
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.io.LogFile
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.config.ColorMode
 import org.basaltmc.server.world.RealNoiseParameters
 import org.basaltmc.server.world.RealSurfaceEnvironment
 import org.basaltmc.server.world.VillageDataLoader
@@ -18,6 +21,8 @@ import org.basaltmc.world.densityfunction.BlendedNoise
 import org.basaltmc.world.structure.StructurePlacementGrid
 import org.basaltmc.world.terrain.NoiseRouterData
 import org.basaltmc.world.terrain.VillageStructureGenerator
+import platform.posix.STDOUT_FILENO
+import platform.posix.isatty
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -26,7 +31,7 @@ import kotlin.time.ExperimentalTime
 public fun main(args: Array<String>) {
     val startedAt = Clock.System.now()
     println(BANNER)
-    println("Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})")
+    println(versionLine())
 
     // No readLine()/prompts, no TTY detection: identical behavior interactive, headless, or
     // containerized. --accept-eula is a deliberate operator act, not a fallback. (This is about
@@ -36,6 +41,26 @@ public fun main(args: Array<String>) {
     val eulaResult = EulaFile.check(acceptFlag = "--accept-eula" in args, logger = logger)
     if (eulaResult is EulaFile.Result.Rejected) {
         exitProcess(EulaFile.REJECTED_EXIT_CODE)
+    }
+
+    // Escape codes are a terminal affordance; piped or redirected output gets none. Applied before
+    // the config is read so that loading it is itself coloured, then re-applied once the operator's
+    // own choice is known.
+    val attachedToTerminal = isatty(STDOUT_FILENO) == 1
+    LogOutput.useColor = attachedToTerminal
+
+    // Before anything else that logs: configuration decides where log lines go, so loading it later
+    // would mean the whole asset and world-generation startup never reached the log file.
+    val config = BasaltConfig.load(logger = Logger("Config"))
+    Logger.defaultMinLevel = config.logLevel
+    LogOutput.useColor =
+        when (config.logColor) {
+            ColorMode.ALWAYS -> true
+            ColorMode.NEVER -> false
+            ColorMode.AUTO -> attachedToTerminal
+        }
+    if (config.logToFile) {
+        LogFile.install(LOG_ROOT, keepDays = config.logKeepDays, header = versionLine())
     }
 
     // Downloading is the fallback, not the path: once a version's data is unpacked the lambda below
@@ -79,26 +104,25 @@ public fun main(args: Array<String>) {
             templateLoader = villageLoader.templateLoader,
         )
 
-    val configLogger = Logger("Config")
-    val config = BasaltConfig.load(logger = configLogger)
-    Logger.defaultMinLevel = config.logLevel
-
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
     BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment, villageGenerator).start(startedAt)
 }
 
+private fun versionLine(): String =
+    "Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})"
+
 private const val WORLD_SEED = 0L
+private const val LOG_ROOT = "./.basalt/logs"
 
-// Raw string on purpose: the art is full of backslashes and escaping them all would make it
-// unreadable and unmaintainable in source.
-private val BANNER =
+// Raw string, and deliberately not indented: the art is full of backslashes, and every leading
+// space in it is significant. One blank line above and one below come from the newlines this
+// string opens and closes with, plus println's own.
+private const val BANNER =
     """
-
   ____                  _ _      _____
  |  _ \                | | |    / ____|
  | |_) | __ _ ___  __ _| | |_  | (___   ___ _ ____   _____ _ __
  |  _ < / _` / __|/ _` | | __|  \___ \ / _ \ '__\ \ / / _ \ '__|
  | |_) | (_| \__ \ (_| | | |_   ____) |  __/ |   \ V /  __/ |
  |____/ \__,_|___/\__,_|_|\__| |_____/ \___|_|    \_/ \___|_|
-
-    """.trimEnd()
+"""

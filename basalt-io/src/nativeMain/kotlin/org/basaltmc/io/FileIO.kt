@@ -5,8 +5,13 @@ package org.basaltmc.io
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.convert
+import kotlinx.cinterop.pointed
+import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
 import platform.posix.SEEK_END
+import platform.posix.closedir
+import platform.posix.opendir
+import platform.posix.readdir
 import platform.posix.SEEK_SET
 import platform.posix.fclose
 import platform.posix.fopen
@@ -35,6 +40,40 @@ public object FileIO {
 
     /** Removes [path], returning whether it was there to remove. */
     public fun delete(path: String): Boolean = platform.posix.remove(path) == 0
+
+    /** Entry names directly inside [path] (no recursion, no `.`/`..`), empty if it is not a readable directory. */
+    public fun list(path: String): List<String> {
+        val dir = opendir(path) ?: return emptyList()
+        try {
+            val names = mutableListOf<String>()
+            while (true) {
+                val entry = readdir(dir) ?: break
+                val name = entry.pointed.d_name.toKString()
+                if (name != "." && name != "..") names += name
+            }
+            return names
+        } finally {
+            closedir(dir)
+        }
+    }
+
+    /** Appends to [path], creating it if needed: what the log file writes through. */
+    public fun appendText(
+        path: String,
+        content: String,
+    ) {
+        val bytes = content.encodeToByteArray()
+        val handle = fopen(path, "ab") ?: throw FileIOException("failed to open '$path' for appending")
+        try {
+            if (bytes.isNotEmpty()) {
+                bytes.usePinned { pinned ->
+                    fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), handle)
+                }
+            }
+        } finally {
+            fclose(handle)
+        }
+    }
 
     /** Byte length without reading the contents, or `null` if [path] does not exist. */
     public fun size(path: String): Long? {
