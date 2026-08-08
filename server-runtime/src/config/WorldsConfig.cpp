@@ -66,6 +66,7 @@ WorldSettings WorldSettings::from(const TomlTable* table, const WorldSettings& i
         std::max(whole("loot-refill-max-seconds", inherited.lootRefillMaxSeconds, 0), settings.lootRefillMinSeconds);
     settings.lootMaxRefills = whole("loot-max-refills", inherited.lootMaxRefills, -1);
     settings.lootRelootSeconds = whole("loot-reloot-seconds", inherited.lootRelootSeconds, -1);
+    settings.rules = WorldRules::from(table, inherited.rules);
     return settings;
 }
 
@@ -213,7 +214,7 @@ WorldSettings WorldsConfig::settingsFor(const WorldDeclaration& world) const {
     if (!text.has_value()) {
         // Asked rather than left to the write failing: what is being decided is whether the world exists.
         if (wire::io::fileIO::isDirectory(directory)) {
-            wire::io::fileIO::writeText(path, kWorldSettingsDefaultToml);
+            wire::io::fileIO::writeText(path, std::string{kWorldSettingsDefaultToml} + worldRulesTemplate(false));
         }
         return settings;
     }
@@ -275,7 +276,8 @@ std::expected<WorldsConfig, std::string> WorldsConfig::load(const ConfigDirector
                                                             const std::string& worldsRoot,
                                                             const wire::common::Logger& logger) {
     const std::string path = directory.pathOf(kFileName);
-    const std::expected<TomlTable, std::string> root = directory.load(kFileName, kWorldsDefaultToml);
+    const std::expected<TomlTable, std::string> root =
+        directory.load(kFileName, std::string{kWorldsDefaultToml} + worldRulesTemplate(true));
     if (!root.has_value()) {
         return std::unexpected(root.error());
     }

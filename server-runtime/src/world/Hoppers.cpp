@@ -34,7 +34,6 @@ using Slots = blockInventory::Slots;
 using ItemStack = server::world::loot::ItemStack;
 
 /// parity: `HopperBlockEntity.MOVE_ITEM_SPEED`, the eight ticks between moves.
-constexpr std::int32_t kCooldown = 8;
 
 /// parity: `Hopper.SUCK_AABB`, `Block.column(16, 11, 32)`: from 11/16 up to two blocks.
 constexpr double kSuckBottom = 11.0 / 16.0;
@@ -593,7 +592,7 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
         return false;
     }
     blockInventory::write(entity->data(), slots);
-    entity->data().putInt(kCooldownKey, kCooldown);
+    entity->data().putInt(kCooldownKey, around.transferTicks);
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return true;
 }

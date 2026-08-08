@@ -38,7 +38,7 @@ void spawnFire(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
 [[nodiscard]] std::optional<BlockChange> releaseRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: the roll a chunk makes while the sky is thundering.
-[[nodiscard]] bool shouldStrike(random::RandomSource& random);
+[[nodiscard]] bool shouldStrike(random::RandomSource& random, std::int32_t odds = kStrikeOdds);
 
 } // namespace lightning
 

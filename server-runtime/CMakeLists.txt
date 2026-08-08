@@ -44,6 +44,7 @@ basalt_module(server-runtime-core
         src/config/ServerListConfig.cpp
         src/config/ServerTuning.cpp
         src/config/UiConfigs.cpp
+        src/config/WorldRules.cpp
         src/entity/Aabb.cpp
         src/entity/BlockClip.cpp
         src/entity/BlockRay.cpp
@@ -587,6 +588,7 @@ basalt_module(server-runtime-core
         src/world/Beehives.cpp
         src/world/Books.cpp
         src/world/AnvilEnchantments.cpp
+        src/world/AntiXray.cpp
         src/world/EnchantmentBooks.cpp
         src/world/Enchanting.cpp
         src/world/Grindstones.cpp

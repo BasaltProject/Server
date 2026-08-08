@@ -28,27 +28,27 @@ wire::protocol::play::InitializeBorderPacket WorldBorder::initializePacket() con
                                                         .oldSize = size_,
                                                         .newSize = targetSize_,
                                                         .lerpTimeTicks = lerpTimeTicks_,
-                                                        .absoluteMaxSize = absoluteMaxSize_,
+                                                        .absoluteMaxSize = absoluteMaxSize,
                                                         .warningBlocks = warningBlocks,
                                                         .warningSeconds = warningSeconds};
 }
 
+double WorldBorder::clampedBound(const double bound) const noexcept {
+    return std::clamp(bound, -static_cast<double>(absoluteMaxSize), static_cast<double>(absoluteMaxSize));
+}
+
 double WorldBorder::distanceOutside(double x, double z) const {
     const double half = targetSize_ / 2.0;
-    const double limit = absoluteMaxSize_;
-    const double outsideX =
-        std::max({std::clamp(centerX_ - half, -limit, limit) - x, x - std::clamp(centerX_ + half, -limit, limit), 0.0});
-    const double outsideZ =
-        std::max({std::clamp(centerZ_ - half, -limit, limit) - z, z - std::clamp(centerZ_ + half, -limit, limit), 0.0});
+    const double outsideX = std::max({clampedBound(centerX_ - half) - x, x - clampedBound(centerX_ + half), 0.0});
+    const double outsideZ = std::max({clampedBound(centerZ_ - half) - z, z - clampedBound(centerZ_ + half), 0.0});
     return std::max(outsideX, outsideZ);
 }
 
 bool WorldBorder::contains(double x, double z) const {
-    // parity: `isWithinBounds(x, z, 0)`, the extent's edges clamped to `max-world-size`.
+    // parity: `isWithinBounds(x, z, 0)`.
     const double half = size_ / 2.0;
-    const double limit = absoluteMaxSize_;
-    return x >= std::clamp(centerX_ - half, -limit, limit) && x < std::clamp(centerX_ + half, -limit, limit) &&
-           z >= std::clamp(centerZ_ - half, -limit, limit) && z < std::clamp(centerZ_ + half, -limit, limit);
+    return x >= clampedBound(centerX_ - half) && x < clampedBound(centerX_ + half) &&
+           z >= clampedBound(centerZ_ - half) && z < clampedBound(centerZ_ + half);
 }
 
 float WorldBorder::damageAt(double x, double z) const {

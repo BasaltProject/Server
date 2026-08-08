@@ -52,6 +52,8 @@ class EventSink;
 
 namespace basalt::server::runtime::world {
 
+class AntiXray;
+
 struct LoadedWorldOptions {
     wire::common::Timings* timings = nullptr;
     const server::world::terrain::NoiseRouter* overworldRouter = nullptr;
@@ -90,7 +92,8 @@ public:
 
     [[nodiscard]] const config::WorldSettings& settings() const noexcept { return settings_; }
 
-    [[nodiscard]] const config::MobSettings& mobSettings() const noexcept { return settings_.mobs; }
+    /// Null unless the world hides its ores.
+    [[nodiscard]] const AntiXray* antiXray() const noexcept { return antiXray_.get(); }
 
     [[nodiscard]] const WorldMetadata& metadata() const noexcept { return metadata_; }
 
@@ -425,6 +428,7 @@ private:
     WorldBorder border_;
     SpawnTunables spawnTunables_;
     Tunables tunables_;
+    std::shared_ptr<const AntiXray> antiXray_;
     mutable std::mutex fillerMutex_;
     ChunkFiller chunkFiller_;
     FillerTraits fillerTraits_;

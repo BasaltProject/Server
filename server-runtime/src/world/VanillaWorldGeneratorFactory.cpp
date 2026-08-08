@@ -171,6 +171,7 @@ struct VanillaWorldGeneratorFactory::Built {
     std::unique_ptr<terrain::NeighbourTerrainCache> structureHeights;
     std::unique_ptr<SpawnEquipmentFinalizer> equipment;
     terrain::TerrainStructureGenerators generators;
+    bool structures = true;
     std::int64_t seed = 0;
     bool spawnMobs = false;
 };
@@ -208,7 +209,9 @@ server::world::densityfunction::WorldgenReader VanillaWorldGeneratorFactory::wor
 }
 
 VanillaWorldGeneratorFactory::Generators
-VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration, const WorldMetadata& metadata) {
+VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration, const WorldMetadata& metadata,
+                                     const bool generateStructures) {
+    structuresEnabled_ = generateStructures;
     const bool spawnMobs = metadata.gameRules.get(gameRules::kSpawnMobs);
     switch (declaration.dimension) {
     case config::WorldDimension::Overworld:
@@ -231,6 +234,7 @@ VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld(std::int64_t seed, bool spawnMobs,
                                                                                  std::string_view settings) {
     auto built = std::make_unique<Built>();
+    built->structures = structuresEnabled_;
     built->seed = seed;
     built->spawnMobs = spawnMobs;
     built->templates = std::make_unique<StructureTemplates>(
@@ -355,6 +359,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                                             .igloo = built->igloos.get(),
                                                             .ancientCity = built->ancientCities.get(),
                                                             .trialChamber = built->trialChambers.get()};
+    if (!structuresEnabled_) {
+        built->generators = {};
+    }
 
     Built& world = *built;
     built->structureHeights =
@@ -554,6 +561,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std::int64_t seed, bool spawnMobs) {
     auto built = std::make_unique<Built>();
+    built->structures = structuresEnabled_;
     built->seed = seed;
     built->spawnMobs = spawnMobs;
     built->templates = std::make_unique<StructureTemplates>(
@@ -586,6 +594,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
         0, plainsEverywhere, biomesOf(tags, "minecraft:has_structure/stronghold"), -63, 0);
     built->generators =
         terrain::TerrainStructureGenerators{.village = built->village.get(), .stronghold = built->strongholds.get()};
+    if (!structuresEnabled_) {
+        built->generators = {};
+    }
 
     Built& world = *built;
     Generators answer;
@@ -613,6 +624,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(std::int64_t seed, bool spawnMobs) {
     auto built = std::make_unique<Built>();
+    built->structures = structuresEnabled_;
     built->seed = seed;
     built->spawnMobs = spawnMobs;
     built->templates = std::make_unique<StructureTemplates>(
@@ -648,8 +660,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
     answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ,
                                        const server::world::blending::Blender*) {
         return terrain::realTerrainGenerator::GeneratedTerrain{
-            terrain::dimensionTerrainGenerator::netherTerrain(*world.netherRouter, *world.netherBiomes, chunkX, chunkZ,
-                                                              world.seed, world.netherStructures.get()),
+            terrain::dimensionTerrainGenerator::netherTerrain(
+                *world.netherRouter, *world.netherBiomes, chunkX, chunkZ, world.seed,
+                world.structures ? world.netherStructures.get() : nullptr),
             nullptr, nullptr};
     };
     answer.pipeline.adopt = [](server::world::Chunk chunk) {
@@ -700,6 +713,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
 
 VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::int64_t seed) {
     auto built = std::make_unique<Built>();
+    built->structures = structuresEnabled_;
     built->seed = seed;
     built->templates = std::make_unique<StructureTemplates>(
         StructureTemplates::Jar{.readEntry = jar_.readEntry, .dataIds = jar_.dataIds});
@@ -723,7 +737,8 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
                                        const server::world::blending::Blender*) {
         return terrain::realTerrainGenerator::GeneratedTerrain{
             terrain::dimensionTerrainGenerator::endTerrain(*world.endRouter, *world.endBiomes, chunkX, chunkZ,
-                                                           world.seed, world.endCities.get()),
+                                                           world.seed,
+                                                           world.structures ? world.endCities.get() : nullptr),
             nullptr, nullptr};
     };
     answer.pipeline.adopt = [](server::world::Chunk chunk) {
