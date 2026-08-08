@@ -79,6 +79,8 @@ public:
 
     wire::protocol::play::Gamemode gamemode = wire::protocol::play::Gamemode::Survival;
     bool sprinting = false;
+    /// Set from the world each tick; not vanilla when true.
+    bool keepSprintOnAttack = false;
 
     bool sneaking = false;
 

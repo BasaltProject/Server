@@ -91,7 +91,6 @@ constexpr std::string_view kSoundAttackCrit = "entity.player.attack.crit";
 constexpr std::string_view kSoundAttackStrong = "entity.player.attack.strong";
 constexpr std::string_view kSoundAttackWeak = "entity.player.attack.weak";
 
-constexpr float kAttackExhaustion = 0.1F;
 constexpr std::int32_t kPanicTicks = 40;
 
 /// parity: `ItemEntity`'s default pickup delay of forty ticks.

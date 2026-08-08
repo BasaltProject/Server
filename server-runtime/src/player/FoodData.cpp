@@ -10,15 +10,9 @@ namespace {
 constexpr float kMaxExhaustion = 40.0F;
 constexpr float kExhaustionPerPoint = 4.0F;
 constexpr std::int32_t kRegenFoodThreshold = 18;
-constexpr float kRegenExhaustion = 6.0F;
 constexpr float kSaturatedRegenCost = 6.0F;
 constexpr float kStarveFloorEasy = 10.0F;
 constexpr float kStarveFloorHard = 1.0F;
-
-constexpr float kSprintExhaustionPerCm = 0.1F;
-constexpr float kSwimExhaustionPerCm = 0.01F;
-constexpr float kJumpExhaustion = 0.05F;
-constexpr float kSprintJumpExhaustion = 0.2F;
 
 /// parity: `Math.round(float)`.
 [[nodiscard]] std::int32_t rounded(float value) { return static_cast<std::int32_t>(std::floor(value + 0.5F)); }
@@ -78,7 +72,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth,
         tickTimer_++;
         if (tickTimer_ >= unsaturatedRegenTicks) {
             heal(1.0F, false);
-            addExhaustion(kRegenExhaustion);
+            addExhaustion(tuning.regen);
             tickTimer_ = 0;
         }
         return;
@@ -98,7 +92,7 @@ void FoodData::tick(Difficulty difficulty, float health, float maxHealth,
     tickTimer_ = 0;
 }
 
-float FoodData::movementExhaustion(double dx, double dy, double dz, bool sprinting, bool onGround, bool inWater) {
+float FoodData::movementExhaustion(double dx, double dy, double dz, bool sprinting, bool onGround, bool inWater) const {
     // parity: `Player.checkMovementStatistics`.
     const double distance = inWater ? std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) : std::sqrt((dx * dx) + (dz * dz));
     const std::int32_t centimetres = rounded(static_cast<float>(distance) * 100.0F);
@@ -106,14 +100,14 @@ float FoodData::movementExhaustion(double dx, double dy, double dz, bool sprinti
         return 0.0F;
     }
     if (inWater) {
-        return kSwimExhaustionPerCm * static_cast<float>(centimetres) * 0.01F;
+        return tuning.swim * static_cast<float>(centimetres) * 0.01F;
     }
     if (onGround && sprinting) {
-        return kSprintExhaustionPerCm * static_cast<float>(centimetres) * 0.01F;
+        return tuning.sprint * static_cast<float>(centimetres) * 0.01F;
     }
     return 0.0F;
 }
 
-float FoodData::jumpExhaustion(bool sprinting) { return sprinting ? kSprintJumpExhaustion : kJumpExhaustion; }
+float FoodData::jumpExhaustion(bool sprinting) const { return sprinting ? tuning.sprintJump : tuning.jump; }
 
 } // namespace basalt::server::runtime::player

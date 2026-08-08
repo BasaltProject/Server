@@ -354,6 +354,9 @@ void EntityPushSystem::pushByPlayer(world::LoadedWorld& world, PlayerSession& pl
 }
 
 void EntityPushSystem::doPush(world::LoadedWorld& world, const Body& pusher, const Body& target) {
+    if (!world.settings().rules.gameplay.playerCollisions && pusher.player != nullptr && target.player != nullptr) {
+        return;
+    }
     if (pusher.mob != nullptr) {
         ServerEntity& mob = *pusher.mob;
         const std::string_view path = mob.type().path();

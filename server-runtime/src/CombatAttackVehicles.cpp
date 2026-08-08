@@ -262,7 +262,7 @@ void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) 
     if (enchanted - base > 0.0F) {
         broadcastAnimation(vehicle.entityId(), wire::protocol::play::AnimatePacket::kMagicCriticalHit);
     }
-    session.food.addExhaustion(kAttackExhaustion);
+    session.food.addExhaustion(session.food.tuning.combat);
 }
 
 void CombatHandler::breakCushion(PlayerSession& session, ServerEntity& cushion) {
