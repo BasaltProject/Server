@@ -80,4 +80,18 @@ public object TreeDecoration {
                 entries.firstOrNull { (chance, _) -> r.nextFloat() < chance }?.second ?: default
             }
         }
+
+    /** Same as [sequence], but with a real `treePlacement(countExtra(...))` frequency instead of a fixed count (e.g. `trees_old_growth_pine_taiga`). */
+    public fun sequenceCountExtra(
+        entries: List<Pair<Float, TreeConfiguration?>>,
+        default: TreeConfiguration,
+        count: Int,
+        chance: Float,
+        extra: Int,
+    ): BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            place(chunk, random, CountExtraPlacement(count, chance, extra)) { r ->
+                entries.firstOrNull { (c, _) -> r.nextFloat() < c }?.second ?: default
+            }
+        }
 }

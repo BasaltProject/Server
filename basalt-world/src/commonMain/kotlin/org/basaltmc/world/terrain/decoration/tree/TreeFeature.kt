@@ -113,6 +113,17 @@ public sealed class TrunkPlacer(
         z: Int,
     ): Boolean = isValidTreePos(chunk, x, y, z)
 
+    /** // parity: TrunkPlacer.placeLogIfFree. */
+    protected fun placeLogIfFree(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+        trunkStateId: Int,
+    ) {
+        if (isFree(chunk, x, y, z)) placeLog(chunk, x, y, z, trunkStateId)
+    }
+
     protected fun isAirOrLeaves(
         chunk: Chunk,
         x: Int,
@@ -267,6 +278,33 @@ public class DarkOakTrunkPlacer(
             }
         }
         return attachments
+    }
+}
+
+/** // parity: GiantTrunkPlacer (mega spruce/pine): a solid 2x2 trunk, no lean/branches. No below-trunk-block placement (documented gap). */
+public class GiantTrunkPlacer(
+    baseHeight: Int,
+    heightRandA: Int,
+    heightRandB: Int,
+) : TrunkPlacer(baseHeight, heightRandA, heightRandB) {
+    override fun placeTrunk(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        treeHeight: Int,
+        originX: Int,
+        originY: Int,
+        originZ: Int,
+        trunkStateId: Int,
+    ): List<FoliageAttachment> {
+        for (hh in 0 until treeHeight) {
+            placeLogIfFree(chunk, originX, originY + hh, originZ, trunkStateId)
+            if (hh < treeHeight - 1) {
+                placeLogIfFree(chunk, originX + 1, originY + hh, originZ, trunkStateId)
+                placeLogIfFree(chunk, originX + 1, originY + hh, originZ + 1, trunkStateId)
+                placeLogIfFree(chunk, originX, originY + hh, originZ + 1, trunkStateId)
+            }
+        }
+        return listOf(FoliageAttachment(originX, originY + treeHeight, originZ, 0, true))
     }
 }
 
@@ -570,6 +608,48 @@ public class DarkOakFoliagePlacer(
         if (y == -1 && !doubleTrunk) return dx == currentRadius && dz == currentRadius
         return if (y == 1) dx + dz > currentRadius * 2 - 2 else false
     }
+}
+
+/** // parity: MegaPineFoliagePlacer (mega spruce/pine): a tapered conical crown with a jagged-edge alternation every other row. */
+public class MegaPineFoliagePlacer(
+    radius: IntProvider,
+    offset: IntProvider,
+    private val crownHeight: IntProvider,
+) : FoliagePlacer(radius, offset) {
+    override fun foliageHeight(
+        random: WorldgenRandom,
+        treeHeight: Int,
+    ): Int = crownHeight.sample(random)
+
+    override fun createFoliage(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        foliageStateId: Int,
+        attachment: FoliageAttachment,
+        foliageHeight: Int,
+        leafRadius: Int,
+        offset: Int,
+    ) {
+        var prevRadius = 0
+        val topY = attachment.y + offset
+        val bottomY = attachment.y - foliageHeight + offset
+        for (yy in bottomY..topY) {
+            val yo = attachment.y - yy
+            val smoothRadius = leafRadius + attachment.radiusOffset + kotlin.math.floor(yo.toFloat() / foliageHeight * 3.5f).toInt()
+            val jaggedRadius = if (yo > 0 && smoothRadius == prevRadius && yy and 1 == 0) smoothRadius + 1 else smoothRadius
+            placeLeavesRow(chunk, random, foliageStateId, attachment.x, yy, attachment.z, jaggedRadius, 0, attachment.doubleTrunk)
+            prevRadius = smoothRadius
+        }
+    }
+
+    override fun shouldSkipLocation(
+        random: WorldgenRandom,
+        dx: Int,
+        y: Int,
+        dz: Int,
+        currentRadius: Int,
+        doubleTrunk: Boolean,
+    ): Boolean = if (dx + dz >= 7) true else dx * dx + dz * dz > currentRadius * currentRadius
 }
 
 public class TreeConfiguration(
