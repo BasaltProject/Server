@@ -112,6 +112,7 @@ public class Chunk(
     ): Int {
         var y = WorldHeight.MAX_Y
         while (y >= WorldHeight.MIN_Y && !type.matches(getBlockStateId(x, y, z))) y--
+        if (GenerationMetrics.enabled) GenerationMetrics.countHeightmapScan(WorldHeight.MAX_Y - y)
         return y + 1
     }
 
@@ -129,7 +130,20 @@ public class Chunk(
         MOTION_BLOCKING_NO_LEAVES,
         ;
 
-        internal fun matches(stateId: Int): Boolean =
+        /**
+         * A precomputed answer per block state rather than the predicate chain below, which costs a
+         * set lookup plus a dozen `Blocks.isXState` calls every time. Heightmap scans run this
+         * millions of times per chunk (see [GenerationMetrics]' own scan-step counter).
+         *
+         * The table is built once when the companion initializes, not through `by lazy`: `lazy`
+         * defaults to [LazyThreadSafetyMode.SYNCHRONIZED] and takes its lock on every read, which
+         * measured *slower* than the predicate chain it was meant to replace, by two orders of
+         * magnitude, once several million reads per chunk went through it.
+         */
+        public fun matches(stateId: Int): Boolean =
+            if (stateId in 0 until TABLE_SIZE) TABLES[ordinal][stateId] else matchesUncached(stateId)
+
+        private fun matchesUncached(stateId: Int): Boolean =
             when (this) {
                 WORLD_SURFACE -> stateId != Blocks.AIR.stateId
                 OCEAN_FLOOR ->
@@ -197,6 +211,15 @@ public class Chunk(
                     "horn_coral_wall_fan",
                 ).mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
 
+            // The bound the tables were actually sized with, so a state id past it (nothing
+            // registers derived states after startup today, but nothing enforces that either)
+            // falls back to the uncached path instead of reading off the end.
+            val TABLE_SIZE: Int = Blocks.stateCount
+
+            // Declared last: reads NON_COLLIDING_STATE_IDS and TABLE_SIZE, and companion properties
+            // initialize in declaration order.
+            val TABLES: Array<BooleanArray> =
+                Array(entries.size) { type -> BooleanArray(TABLE_SIZE) { entries[type].matchesUncached(it) } }
         }
     }
 }

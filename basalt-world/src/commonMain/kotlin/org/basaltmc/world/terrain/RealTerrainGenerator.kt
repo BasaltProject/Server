@@ -86,16 +86,31 @@ public object RealTerrainGenerator {
             )
         GenerationMetrics.measure(GenerationMetrics.Phase.DENSITY_GRID) { sampler.prepare() }
         GenerationMetrics.measure(GenerationMetrics.Phase.TERRAIN_FILL) {
-            for (x in 0 until 16) {
-                for (z in 0 until 16) {
-                    for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-                        if (sampler.sample(x, y, z) > 0.0) {
-                            chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
-                        } else if (y < SEA_LEVEL) {
-                            // parity: NoiseGeneratorSettings' global Overworld FluidPicker. Full
-                            // aquifers are still absent, but outside caves their fallback is exactly
-                            // water below sea level and air at/above it.
-                            chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
+            // Cell by cell rather than column by column, so a cell of open sky (all eight corners
+            // non-positive and entirely at or above sea level, which is most of a chunk's height)
+            // is skipped whole: those blocks are air, and air is already what the chunk holds.
+            // Within a cell the order is y, then z, then x, matching ChunkSection's own
+            // (y shl 8) or (z shl 4) or x layout so writes run forwards through its array.
+            for (cellY in 0 until sampler.verticalCells) {
+                val cellMinY = WorldHeight.MIN_Y + cellY * CELL_HEIGHT
+                val cellMaxY = cellMinY + CELL_HEIGHT - 1
+                for (cellX in 0 until sampler.horizontalCells) {
+                    for (cellZ in 0 until sampler.horizontalCells) {
+                        if (cellMinY >= SEA_LEVEL && sampler.cellIsAllNonPositive(cellX, cellY, cellZ)) continue
+                        for (y in cellMinY..cellMaxY) {
+                            for (z in cellZ * CELL_WIDTH until (cellZ + 1) * CELL_WIDTH) {
+                                for (x in cellX * CELL_WIDTH until (cellX + 1) * CELL_WIDTH) {
+                                    if (sampler.sample(x, y, z) > 0.0) {
+                                        chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                                    } else if (y < SEA_LEVEL) {
+                                        // parity: NoiseGeneratorSettings' global Overworld
+                                        // FluidPicker. Full aquifers are still absent, but outside
+                                        // caves their fallback is exactly water below sea level and
+                                        // air at or above it.
+                                        chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -119,6 +134,8 @@ public object RealTerrainGenerator {
             val centerY = heightmap[8 + 8 * 16]
             val biomeId = Identifier.parse(chunkEnvironment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
             BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
+        }
+        GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_FREEZE) {
             SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.BIOME_FILL) { fillBiomes(chunk, chunkEnvironment) }

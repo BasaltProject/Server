@@ -61,6 +61,32 @@ public class DensityChunkSampler(
         grid
     }
 
+    /**
+     * Whether every one of a cell's eight corners is non-positive, in which case no block inside it
+     * can be solid: trilinear interpolation of eight values that are all `<= 0` is itself `<= 0`.
+     * Lets a caller skip whole 4x8x4 cells of empty sky instead of interpolating each block only to
+     * write nothing. Coordinates are cell indices, not blocks.
+     */
+    public fun cellIsAllNonPositive(
+        cellX: Int,
+        cellY: Int,
+        cellZ: Int,
+    ): Boolean {
+        for (dx in 0..1) {
+            for (dy in 0..1) {
+                for (dz in 0..1) {
+                    if (cornerValue(cellX + dx, cellY + dy, cellZ + dz) > 0.0) return false
+                }
+            }
+        }
+        return true
+    }
+
+    /** Cell counts, so a caller can iterate the same grid this samples from. */
+    public val horizontalCells: Int get() = cellsPerAxis
+
+    public val verticalCells: Int get() = cellsVertical
+
     private fun cornerValue(
         gx: Int,
         gy: Int,

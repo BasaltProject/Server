@@ -60,9 +60,23 @@ public object Blocks {
         return derivedStateIds[StateKey(block, properties)]
     }
 
-    /** Number of IDs required by vanilla's direct block-state palette. */
-    public val stateCount: Int
-        get() = maxOf(ALL_DEFAULT_BLOCK_STATES.last().first, derivedStatesById.keys.maxOrNull() ?: 0) + 1
+    /**
+     * Number of IDs required by vanilla's direct block-state palette.
+     *
+     * Computed once, on purpose. This used to be a plain getter that scanned all of
+     * [derivedStatesById] for its maximum on every read: indistinguishable from a stored field at
+     * the call site, and O(n) each time, so using it as a loop bound or inside a per-block check
+     * cost far more than the work it was guarding (measured at three orders of magnitude on a
+     * per-block path in `basalt-world`). If you add another derived-state source, keep this cheap.
+     *
+     * [LazyThreadSafetyMode.PUBLICATION] rather than `lazy`'s default `SYNCHRONIZED`, which takes
+     * its lock on *every* read and not just the first: that default is the same trap in a different
+     * shape. Publication mode races only the first computation, which is deterministic here, so at
+     * worst two threads compute the same number once.
+     */
+    public val stateCount: Int by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        maxOf(ALL_DEFAULT_BLOCK_STATES.last().first, derivedStatesById.keys.maxOrNull() ?: 0) + 1
+    }
 
     /** Whether this default block state exposes a non-empty water fluid state. */
     public fun hasWaterFluid(stateId: Int): Boolean {

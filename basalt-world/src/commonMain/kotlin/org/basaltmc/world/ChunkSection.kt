@@ -21,7 +21,14 @@ public class ChunkSection {
         z: Int,
         stateId: Int,
     ) {
-        blockStateIds[index(x, y, z)] = stateId
+        val at = index(x, y, z)
+        val previous = blockStateIds[at]
+        if (previous == stateId) return
+        blockStateIds[at] = stateId
+        if (previous != Blocks.AIR.stateId) trackedNonAirBlockCount--
+        if (stateId != Blocks.AIR.stateId) trackedNonAirBlockCount++
+        if (Blocks.hasWaterFluid(previous)) trackedNonEmptyFluidCount--
+        if (Blocks.hasWaterFluid(stateId)) trackedNonEmptyFluidCount++
     }
 
     public fun getBiomeId(
@@ -42,13 +49,18 @@ public class ChunkSection {
     /** A copy of the raw biome IDs, in `(y * 4 + z) * 4 + x` order: the layout the biome `PalettedContainer` expects. */
     public fun biomeIds(): IntArray = biomeIds.copyOf()
 
+    // Both counts are maintained on write rather than recounted on read: they used to scan all 4096
+    // entries every time they were read, which is once per section per chunk send.
+    private var trackedNonAirBlockCount = 0
+    private var trackedNonEmptyFluidCount = 0
+
     /** Blocks that count toward lighting (i.e. not air), matching vanilla's per-section block count. */
     public val nonAirBlockCount: Int
-        get() = blockStateIds.count { it != Blocks.AIR.stateId }
+        get() = trackedNonAirBlockCount
 
     /** Blocks whose default state carries water, matching vanilla's section fluid-state count. */
     public val nonEmptyFluidCount: Int
-        get() = blockStateIds.count(Blocks::hasWaterFluid)
+        get() = trackedNonEmptyFluidCount
 
     /** A copy of the raw state IDs, in `(y * 16 + z) * 16 + x` order: the layout `PalettedContainer` expects. */
     public fun blockStateIds(): IntArray = blockStateIds.copyOf()
@@ -57,6 +69,8 @@ public class ChunkSection {
     public fun setBlockStateIds(ids: IntArray) {
         require(ids.size == blockStateIds.size) { "expected ${blockStateIds.size} state ids, got ${ids.size}" }
         ids.copyInto(blockStateIds)
+        trackedNonAirBlockCount = blockStateIds.count { it != Blocks.AIR.stateId }
+        trackedNonEmptyFluidCount = blockStateIds.count(Blocks::hasWaterFluid)
     }
 
     private fun index(
