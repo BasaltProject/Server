@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/bedrock/BedrockSeen.hpp>
 #include <basalt/server/runtime/bedrock/BedrockShield.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>

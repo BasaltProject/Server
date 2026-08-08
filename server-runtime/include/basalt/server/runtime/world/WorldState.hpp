@@ -1,6 +1,5 @@
 #pragma once
 
-#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
@@ -29,6 +28,10 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+namespace basalt::server::runtime::config {
+struct GameplayRules;
+} // namespace basalt::server::runtime::config
 
 namespace basalt::server::runtime::plugins {
 class EventSink;
@@ -84,9 +87,9 @@ public:
 
     void setHasSkylight(bool hasSkylight) noexcept { hasSkylight_ = hasSkylight; }
 
-    void setGameplay(const config::GameplayRules& gameplay) { gameplay_ = gameplay; }
+    void setGameplay(std::shared_ptr<const config::GameplayRules> gameplay) { gameplay_ = std::move(gameplay); }
 
-    [[nodiscard]] const config::GameplayRules& gameplay() const noexcept { return gameplay_; }
+    [[nodiscard]] const config::GameplayRules& gameplay() const noexcept;
 
     void setSettlesGeneration(bool settles) noexcept { settlesGeneration_ = settles; }
 
@@ -419,7 +422,7 @@ public:
 
 private:
     bool hasSkylight_ = true;
-    config::GameplayRules gameplay_;
+    std::shared_ptr<const config::GameplayRules> gameplay_;
     bool settlesGeneration_ = true;
     void mine(std::string_view what) const;
 

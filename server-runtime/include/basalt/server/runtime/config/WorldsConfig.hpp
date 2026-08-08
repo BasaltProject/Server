@@ -1,18 +1,20 @@
 #pragma once
 
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
 #include <expected>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::config {
+
+struct GameplayRules;
 
 struct WorldSettings {
     std::string difficulty = "easy";
@@ -28,7 +30,7 @@ struct WorldSettings {
     std::int32_t lootMaxRefills = -1;
     std::int32_t lootRelootSeconds = -1;
 
-    GameplayRules gameplay;
+    std::shared_ptr<const GameplayRules> gameplay;
 
     [[nodiscard]] static WorldSettings vanilla() { return WorldSettings{}; }
 
