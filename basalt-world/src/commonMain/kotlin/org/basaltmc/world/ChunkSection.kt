@@ -4,10 +4,10 @@ import org.basaltmc.registry.Blocks
 
 /** One 16x16x16 slice of a [Chunk]. Block state IDs default to 0, which is [Blocks.AIR]'s ID. */
 public class ChunkSection {
-    private val blockStateIds = IntArray(16 * 16 * 16)
+    private val blockStateIds = PalettedContainer(16 * 16 * 16, Blocks.AIR.stateId)
 
     /** Biome network IDs at quart (4-block) resolution, 4x4x4 per section; default 0 (plains). */
-    private val biomeIds = IntArray(64)
+    private val biomeIds = PalettedContainer(64)
 
     public fun getBlockStateId(
         x: Int,
@@ -15,20 +15,21 @@ public class ChunkSection {
         z: Int,
     ): Int = blockStateIds[index(x, y, z)]
 
+    /** Returns whether the block actually changed, so callers can track a chunk as modified without re-reading it. */
     public fun setBlockStateId(
         x: Int,
         y: Int,
         z: Int,
         stateId: Int,
-    ) {
+    ): Boolean {
         val at = index(x, y, z)
         val previous = blockStateIds[at]
-        if (previous == stateId) return
-        blockStateIds[at] = stateId
+        if (!blockStateIds.set(at, stateId)) return false
         if (previous != Blocks.AIR.stateId) trackedNonAirBlockCount--
         if (stateId != Blocks.AIR.stateId) trackedNonAirBlockCount++
         if (Blocks.hasWaterFluid(previous)) trackedNonEmptyFluidCount--
         if (Blocks.hasWaterFluid(stateId)) trackedNonEmptyFluidCount++
+        return true
     }
 
     public fun getBiomeId(
@@ -47,7 +48,7 @@ public class ChunkSection {
     }
 
     /** A copy of the raw biome IDs, in `(y * 4 + z) * 4 + x` order: the layout the biome `PalettedContainer` expects. */
-    public fun biomeIds(): IntArray = biomeIds.copyOf()
+    public fun biomeIds(): IntArray = biomeIds.toIntArray()
 
     // Both counts are maintained on write rather than recounted on read: they used to scan all 4096
     // entries every time they were read, which is once per section per chunk send.
@@ -63,14 +64,13 @@ public class ChunkSection {
         get() = trackedNonEmptyFluidCount
 
     /** A copy of the raw state IDs, in `(y * 16 + z) * 16 + x` order: the layout `PalettedContainer` expects. */
-    public fun blockStateIds(): IntArray = blockStateIds.copyOf()
+    public fun blockStateIds(): IntArray = blockStateIds.toIntArray()
 
     /** Overwrites every state ID at once, in the same `(y * 16 + z) * 16 + x` order [blockStateIds] returns. */
     public fun setBlockStateIds(ids: IntArray) {
-        require(ids.size == blockStateIds.size) { "expected ${blockStateIds.size} state ids, got ${ids.size}" }
-        ids.copyInto(blockStateIds)
-        trackedNonAirBlockCount = blockStateIds.count { it != Blocks.AIR.stateId }
-        trackedNonEmptyFluidCount = blockStateIds.count(Blocks::hasWaterFluid)
+        blockStateIds.setAll(ids)
+        trackedNonAirBlockCount = ids.count { it != Blocks.AIR.stateId }
+        trackedNonEmptyFluidCount = ids.count(Blocks::hasWaterFluid)
     }
 
     private fun index(

@@ -43,6 +43,32 @@ public class WorldState(
 
     public val chunks: List<Chunk> get() = mutex.withLock { chunksByPos.values.toList() }
 
+    public val loadedChunkCount: Int get() = mutex.withLock { chunksByPos.size }
+
+    /** Only the chunks holding something the region files do not, which is all a save has to write. */
+    public fun dirtyChunks(): List<Chunk> = mutex.withLock { chunksByPos.values.filter { it.isDirty } }
+
+    /** Every loaded chunk [shouldKeep] rejects. Separate from [evictClean] so the caller can save them unlocked. */
+    public fun evictionCandidates(shouldKeep: (chunkX: Int, chunkZ: Int) -> Boolean): List<Chunk> =
+        mutex.withLock {
+            chunksByPos.values.filter { !shouldKeep(it.chunkX, it.chunkZ) }
+        }
+
+    /**
+     * Drops [chunks] from memory, skipping any that became dirty again since the caller saved them:
+     * evicting a chunk whose changes are not on disk throws away whatever the player built in it,
+     * and it will simply come up for eviction again on the next sweep.
+     */
+    public fun evictClean(chunks: List<Chunk>): Int =
+        mutex.withLock {
+            var removed = 0
+            for (chunk in chunks) {
+                if (chunk.isDirty) continue
+                if (chunksByPos.remove(chunk.chunkX to chunk.chunkZ) != null) removed++
+            }
+            removed
+        }
+
     /** Whether this chunk is already in memory, without generating it: what the queue and the send path poll. */
     public fun isLoaded(
         chunkX: Int,

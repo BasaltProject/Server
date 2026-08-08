@@ -22,6 +22,19 @@ public class Chunk(
         z: Int,
     ): Int = sectionFor(y).getBlockStateId(x, y and 15, z)
 
+    /**
+     * Whether this chunk holds anything the region files do not: set by every real block change and
+     * cleared by [markClean] once it has been written out. Saving only what changed is what keeps
+     * `stop` from reserializing every chunk a session ever loaded.
+     */
+    public var isDirty: Boolean = false
+        private set
+
+    /** Called after this chunk has been persisted, or right after loading one straight off disk. */
+    public fun markClean() {
+        isDirty = false
+    }
+
     public fun setBlockStateId(
         x: Int,
         y: Int,
@@ -34,11 +47,12 @@ public class Chunk(
             if (blockEntitiesByPosition.isNotEmpty() && section.getBlockStateId(x, y and 15, z) != stateId) {
                 blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
             }
-            section.setBlockStateId(x, y and 15, z, stateId)
+            if (section.setBlockStateId(x, y and 15, z, stateId)) isDirty = true
         } else {
             val oldStateId = section.getBlockStateId(x, y and 15, z)
             section.setBlockStateId(x, y and 15, z, stateId)
             if (oldStateId != stateId) {
+                isDirty = true
                 blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
                 observer(x, y, z, oldStateId, stateId)
             }
@@ -47,6 +61,7 @@ public class Chunk(
 
     public fun setBlockEntity(blockEntity: ChunkBlockEntity) {
         blockEntitiesByPosition[blockEntityKey(blockEntity.localX, blockEntity.y, blockEntity.localZ)] = blockEntity
+        isDirty = true
     }
 
     public fun blockEntityAt(
@@ -94,6 +109,7 @@ public class Chunk(
     ) {
         require(quartY in 0 until WorldHeight.HEIGHT / 4) { "quartY=$quartY out of world bounds" }
         sections[quartY shr 2].setBiomeId(quartX, quartY and 3, quartZ, biomeId)
+        isDirty = true
     }
 
     /** Topmost matching Y plus one per column, matching vanilla's heightmap convention. */
