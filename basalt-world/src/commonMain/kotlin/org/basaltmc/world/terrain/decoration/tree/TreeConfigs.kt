@@ -7,10 +7,10 @@ import org.basaltmc.world.terrain.decoration.IntProvider
 /**
  * Real per-tree [TreeConfiguration]s, ported verbatim from the real jar's own decompiled
  * `net.minecraft.data.worldgen.features.TreeFeatures` (`createOak`/`createBirch`/
- * `createSuperBirch`/`createJungleTree`, and the inline `SPRUCE`/`PINE`/`ACACIA` registrations).
+ * `createSuperBirch`/`createJungleTree`/`cherry`, and the inline `SPRUCE`/`PINE`/`ACACIA` registrations).
  * Only the configs this project's currently-ported [org.basaltmc.world.terrain.decoration.tree.TrunkPlacer]/
  * [org.basaltmc.world.terrain.decoration.tree.FoliagePlacer] types can drive are included: no
- * fancy oak, mega/giant trunks, cherry, mangrove or azalea yet.
+ * fancy oak, mega jungle or azalea yet.
  */
 public object TreeConfigs {
     private fun state(name: String): Int = Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
@@ -29,6 +29,10 @@ public object TreeConfigs {
     private val DARK_OAK_LEAVES = state("dark_oak_leaves")
     private val PALE_OAK_LOG = state("pale_oak_log")
     private val PALE_OAK_LEAVES = state("pale_oak_leaves")
+    private val MANGROVE_LOG = state("mangrove_log")
+    private val MANGROVE_LEAVES = state("mangrove_leaves")
+    private val CHERRY_LOG = state("cherry_log")
+    private val CHERRY_LEAVES = state("cherry_leaves")
 
     // parity: TreeFeatures.createOak/createStraightBlobTree(OAK_LOG, OAK_LEAVES, 4, 2, 0, 2).
     public val OAK: TreeConfiguration =
@@ -118,5 +122,49 @@ public object TreeConfigs {
             SPRUCE_LEAVES,
             MegaPineFoliagePlacer(IntProvider.of(0), IntProvider.of(0), IntProvider.uniform(3, 7)),
             FeatureSizeTwoLayers(1, 1, 2),
+        )
+
+    // parity: TreeFeatures.MANGROVE registration (the small variant; real MangroveRootPlacer with
+    // trunk_offset_y uniform(1, 3); the real LeaveVineDecorator/AttachedToLeavesDecorator are not
+    // ported, tree decorators are this engine's documented gap).
+    public val MANGROVE: TreeConfiguration =
+        TreeConfiguration(
+            MANGROVE_LOG,
+            UpwardsBranchingTrunkPlacer(2, 1, 4, IntProvider.uniform(1, 4), 0.5f, IntProvider.uniform(0, 1)),
+            MANGROVE_LEAVES,
+            RandomSpreadFoliagePlacer(IntProvider.of(3), IntProvider.of(0), IntProvider.of(2), 70),
+            FeatureSizeTwoLayers(2, 0, 2),
+            MangroveRootPlacer(IntProvider.uniform(1, 3)),
+        )
+
+    // parity: TreeFeatures.TALL_MANGROVE registration (trunk_offset_y uniform(3, 7)).
+    public val TALL_MANGROVE: TreeConfiguration =
+        TreeConfiguration(
+            MANGROVE_LOG,
+            UpwardsBranchingTrunkPlacer(4, 1, 9, IntProvider.uniform(1, 6), 0.5f, IntProvider.uniform(0, 1)),
+            MANGROVE_LEAVES,
+            RandomSpreadFoliagePlacer(IntProvider.of(3), IntProvider.of(0), IntProvider.of(2), 70),
+            FeatureSizeTwoLayers(3, 0, 2),
+            MangroveRootPlacer(IntProvider.uniform(3, 7)),
+        )
+
+    // parity: TreeFeatures.cherry (CHERRY registration; CHERRY_BEES_005 is this same config plus a
+    // BeehiveDecorator(0.05), tree decorators not ported). branchCount is the real WeightedListInt
+    // over ConstantInt(1/2/3), one weight each.
+    public val CHERRY: TreeConfiguration =
+        TreeConfiguration(
+            CHERRY_LOG,
+            CherryTrunkPlacer(
+                7,
+                1,
+                0,
+                IntProvider.Weighted(1 to 1, 2 to 1, 3 to 1),
+                IntProvider.uniform(2, 4),
+                IntProvider.Uniform(-4, -3),
+                IntProvider.uniform(-1, 0),
+            ),
+            CHERRY_LEAVES,
+            CherryFoliagePlacer(IntProvider.of(4), IntProvider.of(0), IntProvider.of(5), 0.25f, 0.5f, 0.16666667f, 0.33333334f),
+            FeatureSizeTwoLayers(1, 0, 2),
         )
 }

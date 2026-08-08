@@ -17,9 +17,7 @@ import org.basaltmc.world.noise.SimplexNoise
  *
  * **Not ported yet, documented gaps:** `glow_lichen`, `brown_mushroom_normal`/`red_mushroom_normal`,
  * `patch_pumpkin`, `patch_sugar_cane`, `patch_firefly_bush_near_water` (need water/light-level
- * checks this project doesn't model yet), and `trees_plains` (a `random_selector` between real oak
- * tree configs with trunk/foliage placers, its own substantial piece of work, not a `simple_block`
- * feature like the others here).
+ * checks this project doesn't model yet).
  *
  * The shared [random][WorldgenRandom] this whole pipeline draws from must be the real
  * `WorldgenRandom` wrapping `XoroshiroRandomSource` (confirmed from `ChunkGenerator
@@ -36,54 +34,50 @@ public object PlainsDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        placeGrass(chunk, random)
-        placeTallGrass(chunk, random)
+        GRASS.decorate(chunk, random)
+        TALL_GRASS.decorate(chunk, random)
         placeFlowers(chunk, random)
         placeBush(chunk, random)
     }
 
-    // parity: placed_feature/patch_grass_plain.json + configured_feature/grass.json.
-    private fun placeGrass(
-        chunk: Chunk,
-        random: WorldgenRandom,
-    ) {
-        val feature = SimpleBlockFeature({ _, _ -> shortGrassStateId })
-        runPipeline(
-            chunk,
-            random,
-            listOf(
-                NoiseThresholdCountPlacement(-0.8, belowNoise = 10, aboveNoise = 5),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(32),
-                RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
-                AirTargetFilter(),
-            ),
-            feature,
-        )
-    }
+    /** // parity: placed_feature/patch_grass_plain.json + configured_feature/grass.json, standalone: cherry_grove's own vegetation reuses exactly this real feature. */
+    public val GRASS: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            val feature = SimpleBlockFeature({ _, _ -> shortGrassStateId })
+            runPipeline(
+                chunk,
+                random,
+                listOf(
+                    NoiseThresholdCountPlacement(-0.8, belowNoise = 10, aboveNoise = 5),
+                    InSquarePlacement,
+                    HeightmapPlacement,
+                    CountPlacement(32),
+                    RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+                    AirTargetFilter(),
+                ),
+                feature,
+            )
+        }
 
-    // parity: placed_feature/patch_tall_grass_2.json + configured_feature/tall_grass.json.
-    private fun placeTallGrass(
-        chunk: Chunk,
-        random: WorldgenRandom,
-    ) {
-        val feature = SimpleBlockFeature({ _, _ -> tallGrassStateId }, isDoublePlant = true)
-        runPipeline(
-            chunk,
-            random,
-            listOf(
-                NoiseThresholdCountPlacement(-0.8, belowNoise = 7, aboveNoise = 0),
-                RarityFilter(32),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(96),
-                RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
-                AirTargetFilter(alsoCheckAbove = true),
-            ),
-            feature,
-        )
-    }
+    /** // parity: placed_feature/patch_tall_grass_2.json + configured_feature/tall_grass.json (real "addPlainGrass"), standalone: lush_caves/sulfur_caves use only this, not the rest of Plains' own decoration. */
+    public val TALL_GRASS: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            val feature = SimpleBlockFeature({ _, _ -> tallGrassStateId }, isDoublePlant = true)
+            runPipeline(
+                chunk,
+                random,
+                listOf(
+                    NoiseThresholdCountPlacement(-0.8, belowNoise = 7, aboveNoise = 0),
+                    RarityFilter(32),
+                    InSquarePlacement,
+                    HeightmapPlacement,
+                    CountPlacement(96),
+                    RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+                    AirTargetFilter(alsoCheckAbove = true),
+                ),
+                feature,
+            )
+        }
 
     // parity: placed_feature/patch_bush.json + configured_feature/bush.json.
     private fun placeBush(
