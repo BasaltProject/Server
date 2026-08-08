@@ -59,15 +59,17 @@ public fun interface PlacementFilter : PlacementModifier {
     ): Sequence<DecorationPos> = if (shouldPlace(context, random, origin)) sequenceOf(origin) else emptySequence()
 }
 
-/** // parity: net.minecraft.world.level.levelgen.placement.CountPlacement, constant-count case only (this project's Plains list never uses a weighted count). */
+/** // parity: net.minecraft.world.level.levelgen.placement.CountPlacement. */
 public class CountPlacement(
-    private val count: Int,
+    private val count: IntProvider,
 ) : PlacementModifier {
+    public constructor(count: Int) : this(IntProvider.of(count))
+
     override fun getPositions(
         context: PlacementContext,
         random: WorldgenRandom,
         origin: DecorationPos,
-    ): Sequence<DecorationPos> = (0 until count).asSequence().map { origin }
+    ): Sequence<DecorationPos> = (0 until count.sample(random)).asSequence().map { origin }
 }
 
 /** // parity: net.minecraft.world.level.levelgen.placement.InSquarePlacement. Scatters X/Z uniformly within the 16x16 chunk. */
@@ -103,6 +105,35 @@ public class RandomOffsetPlacement(
         val y = origin.y + trapezoid(ySpread)
         val z = origin.z + trapezoid(xzSpread)
         return sequenceOf(DecorationPos(x, y, z))
+    }
+}
+
+/** // parity: HeightRangePlacement with an inclusive UniformHeight provider. */
+public class UniformHeightRangePlacement(
+    private val minInclusive: Int,
+    private val maxInclusive: Int,
+) : PlacementModifier {
+    override fun getPositions(
+        context: PlacementContext,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Sequence<DecorationPos> =
+        sequenceOf(origin.copy(y = minInclusive + random.nextInt(maxInclusive - minInclusive + 1)))
+}
+
+/** // parity: SurfaceRelativeThresholdFilter. */
+public class SurfaceRelativeThresholdFilter(
+    private val heightmap: Chunk.HeightmapType,
+    private val minInclusive: Int = Int.MIN_VALUE,
+    private val maxInclusive: Int = Int.MAX_VALUE,
+) : PlacementFilter {
+    override fun shouldPlace(
+        context: PlacementContext,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Boolean {
+        val surfaceY = context.height(origin.x and 15, origin.z and 15, heightmap).toLong()
+        return origin.y.toLong() in surfaceY + minInclusive..surfaceY + maxInclusive
     }
 }
 

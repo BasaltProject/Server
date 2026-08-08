@@ -15,9 +15,9 @@ import org.basaltmc.world.noise.SimplexNoise
  * literal values, not a generic runtime datapack loader, since this is specific known reference
  * data, not the seed-defining terrain-shape noise `NoiseParametersJson` is scoped to.
  *
- * **Not ported yet:** `glow_lichen`. Shared mushrooms, pumpkin, sugar-cane, and firefly-bush
- * features are appended by [BiomeDecoration]. Mushroom placement uses the established surface
- * survival approximation until the light engine exists.
+ * Shared glow lichen, mushrooms, pumpkin, sugar-cane, and firefly-bush features are appended by
+ * [BiomeDecoration]. Mushroom placement uses the established surface survival approximation until
+ * the light engine exists.
  *
  * The shared [random][WorldgenRandom] this whole pipeline draws from must be the real
  * `WorldgenRandom` wrapping `XoroshiroRandomSource` (confirmed from `ChunkGenerator

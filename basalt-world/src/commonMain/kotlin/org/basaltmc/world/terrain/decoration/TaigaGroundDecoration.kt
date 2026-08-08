@@ -7,6 +7,12 @@ import org.basaltmc.world.Chunk
 
 /** Taiga large ferns and the two taiga-specific grass/fern ground-cover variants. */
 public object TaigaGroundDecoration {
+    /** `patch_berry_rare`, appended after extra vegetation in snowy taiga. */
+    public val RARE_BERRY: BiomeVegetalDecoration = berry(chance = 384)
+
+    /** `patch_berry_common`, appended after extra vegetation in the other three taigas. */
+    public val COMMON_BERRY: BiomeVegetalDecoration = berry(chance = 32)
+
     /** `patch_large_fern`, placed before trees in all four taiga variants. */
     public val LARGE_FERN: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
@@ -65,6 +71,24 @@ public object TaigaGroundDecoration {
             )
         }
 
+    private fun berry(chance: Int): BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            place(
+                chunk,
+                random,
+                listOf(
+                    RarityFilter(chance),
+                    InSquarePlacement,
+                    HeightmapPlacement(Chunk.HeightmapType.WORLD_SURFACE),
+                    CountPlacement(96),
+                    RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+                    AirTargetFilter(),
+                    GrassBelowFilter,
+                ),
+                SimpleBlockFeature({ _, _ -> sweetBerryAge3StateId }),
+            )
+        }
+
     private fun place(
         chunk: Chunk,
         random: WorldgenRandom,
@@ -84,4 +108,17 @@ public object TaigaGroundDecoration {
     private val shortGrassStateId = stateId("short_grass")
     private val fernStateId = stateId("fern")
     private val deadBushStateId = stateId("dead_bush")
+
+    // The 26.2 state definition orders age=0..3 contiguously. The generated default-state table
+    // identifies age=0; the configured berry_bush feature explicitly requests age=3.
+    private val sweetBerryAge3StateId = stateId("sweet_berry_bush") + 3
+
+    private object GrassBelowFilter : PlacementFilter {
+        override fun shouldPlace(
+            context: PlacementContext,
+            random: WorldgenRandom,
+            origin: DecorationPos,
+        ): Boolean =
+            context.chunk.getBlockStateId(origin.x and 15, origin.y - 1, origin.z and 15) == Blocks.GRASS_BLOCK.stateId
+    }
 }

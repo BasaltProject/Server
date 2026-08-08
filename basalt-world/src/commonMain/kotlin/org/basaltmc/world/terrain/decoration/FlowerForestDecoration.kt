@@ -17,8 +17,7 @@ import kotlin.math.min
  * (`flower_flower_forest`'s real 11-flower `NoiseProvider`, seed `2345L`, `NoiseParameters(0, [1.0])`,
  * scale `0.020833334`) plus its real trees (`trees_flower_forest`) and default grass.
  *
- * **Not ported**: `flower_forest_flowers` (a second, separate wildflower patch real vanilla places
- * before the ores step; this project only ports the main `flower_flower_forest` NoiseProvider one).
+ * The preceding `flower_forest_flowers` selector is composed by [BiomeDecoration].
  */
 public object FlowerForestDecoration : BiomeVegetalDecoration {
     override fun decorate(

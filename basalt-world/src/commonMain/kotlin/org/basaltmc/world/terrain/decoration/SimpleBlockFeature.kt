@@ -22,6 +22,9 @@ public class SimpleBlockFeature(
         random: WorldgenRandom,
         origin: DecorationPos,
     ): Boolean {
+        // parity: vanilla asks the state provider before evaluating canSurvive, so weighted/noise
+        // providers consume RNG even when the candidate ultimately cannot be placed.
+        val stateId = toPlace(random, origin)
         if (origin.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
         val localX = origin.x and 15
         val localZ = origin.z and 15
@@ -39,7 +42,6 @@ public class SimpleBlockFeature(
             }
         }
 
-        val stateId = toPlace(random, origin)
         chunk.setBlockStateId(localX, origin.y, localZ, stateId)
         if (isDoublePlant) chunk.setBlockStateId(localX, origin.y + 1, localZ, stateId)
         return true
