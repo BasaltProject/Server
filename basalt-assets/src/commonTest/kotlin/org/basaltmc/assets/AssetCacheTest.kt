@@ -30,8 +30,18 @@ class AssetCacheTest {
     @AfterTest
     fun cleanup() {
         platform.posix.remove("$cacheRoot/26.2/client.jar")
+        platform.posix.remove("$cacheRoot/26.2/client.jar.verified")
         platform.posix.remove("$cacheRoot/26.2")
         platform.posix.remove(cacheRoot)
+    }
+
+    /** What `ensure` writes after a verified download, so "already cached" tests start from a real cache. */
+    private fun markVerified(
+        fileName: String = "client.jar",
+        sha1: String = validSha1,
+        size: Int = validBytes.size,
+    ) {
+        FileIO.writeText("$cacheRoot/26.2/$fileName.verified", "$sha1 $size")
     }
 
     private fun mockClient(bytes: ByteArray = validBytes): HttpClient =
@@ -53,6 +63,7 @@ class AssetCacheTest {
     fun skipsRedownloadWhenAlreadyCachedAndValid() {
         FileIO.createDirectories("$cacheRoot/26.2")
         FileIO.writeBytes("$cacheRoot/26.2/client.jar", validBytes)
+        markVerified()
 
         var requested = false
         val engine =
@@ -68,7 +79,7 @@ class AssetCacheTest {
     }
 
     @Test
-    fun redownloadsWhenTheCachedFileFailsVerification() {
+    fun redownloadsWhenTheCachedFileWasNeverVerified() {
         FileIO.createDirectories("$cacheRoot/26.2")
         FileIO.writeBytes("$cacheRoot/26.2/client.jar", "corrupted".encodeToByteArray())
 
@@ -76,6 +87,39 @@ class AssetCacheTest {
         cache.ensure(metadata, AssetCache.Artifact.CLIENT)
 
         assertTrue(FileIO.readBytes("$cacheRoot/26.2/client.jar").contentEquals(validBytes))
+    }
+
+    /** A truncated or half-written download keeps its sidecar but no longer matches the recorded size. */
+    @Test
+    fun redownloadsWhenTheCachedFileNoLongerMatchesItsRecordedSize() {
+        FileIO.createDirectories("$cacheRoot/26.2")
+        FileIO.writeBytes("$cacheRoot/26.2/client.jar", validBytes.copyOf(4))
+        markVerified()
+
+        val cache = AssetCache(mockClient(), cacheRoot, silentLogger())
+        cache.ensure(metadata, AssetCache.Artifact.CLIENT)
+
+        assertTrue(FileIO.readBytes("$cacheRoot/26.2/client.jar").contentEquals(validBytes))
+    }
+
+    @Test
+    fun redownloadsWhenTheSidecarRecordsADifferentVersionsHash() {
+        FileIO.createDirectories("$cacheRoot/26.2")
+        FileIO.writeBytes("$cacheRoot/26.2/client.jar", validBytes)
+        markVerified(sha1 = "0000000000000000000000000000000000000000")
+
+        val cache = AssetCache(mockClient(), cacheRoot, silentLogger())
+        cache.ensure(metadata, AssetCache.Artifact.CLIENT)
+
+        assertEquals("$validSha1 ${validBytes.size}", FileIO.readText("$cacheRoot/26.2/client.jar.verified")?.trim())
+    }
+
+    @Test
+    fun recordsTheVerifiedHashAndSizeAfterDownloading() {
+        val cache = AssetCache(mockClient(), cacheRoot, silentLogger())
+        cache.ensure(metadata, AssetCache.Artifact.CLIENT)
+
+        assertEquals("$validSha1 ${validBytes.size}", FileIO.readText("$cacheRoot/26.2/client.jar.verified")?.trim())
     }
 
     @Test

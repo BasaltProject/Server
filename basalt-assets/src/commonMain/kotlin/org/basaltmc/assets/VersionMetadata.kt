@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import org.basaltmc.io.FileIO
 
 /** One downloadable artifact from a version's metadata: `downloads.client`/`downloads.server`. */
 public data class DownloadArtifact(
@@ -21,7 +22,13 @@ public data class VersionMetadata(
     val id: String,
     val client: DownloadArtifact,
     val server: DownloadArtifact,
-)
+) {
+    /** The same shape piston-meta returns, so a cached copy parses through the same code path. */
+    internal fun toJson(): String =
+        """{"downloads":{"client":${client.toJson()},"server":${server.toJson()}}}"""
+}
+
+private fun DownloadArtifact.toJson(): String = """{"url":"$url","sha1":"$sha1","size":"$size"}"""
 
 /**
  * Resolves a Minecraft version id to its [VersionMetadata] via Mojang's public piston-meta API:
@@ -32,7 +39,29 @@ public data class VersionMetadata(
  */
 public class VersionManifest(
     private val client: HttpClient = HttpClient(),
+    private val cacheRoot: String? = "./.basalt/assets",
 ) {
+    /**
+     * The resolved metadata, from [cacheRoot] if it was already resolved once. Without this the
+     * server makes two piston-meta round trips on every single boot, and cannot start at all
+     * without a working network connection even when both jars are already downloaded and verified.
+     */
+    public fun resolveCached(versionId: String): VersionMetadata {
+        val path = cacheRoot?.let { "$it/$versionId/metadata.json" }
+        if (path != null) {
+            FileIO.readText(path)?.let { cached ->
+                runCatching { parseMetadata(versionId, Json.parseToJsonElement(cached) as JsonObject) }
+                    .onSuccess { return it }
+            }
+        }
+        val resolved = resolve(versionId)
+        if (path != null) {
+            FileIO.createDirectories("$cacheRoot/$versionId")
+            FileIO.writeText(path, resolved.toJson())
+        }
+        return resolved
+    }
+
     public fun resolve(versionId: String): VersionMetadata =
         runBlocking {
             val manifestBody = client.get(VERSION_MANIFEST_URL).bodyAsText()
@@ -46,14 +75,20 @@ public class VersionManifest(
             val metadataUrl = (entry["url"] as JsonPrimitive).content
 
             val metadataBody = client.get(metadataUrl).bodyAsText()
-            val metadata = Json.parseToJsonElement(metadataBody) as JsonObject
-            val downloads = metadata["downloads"] as JsonObject
-            VersionMetadata(
-                id = versionId,
-                client = downloads.parseArtifact("client"),
-                server = downloads.parseArtifact("server"),
-            )
+            parseMetadata(versionId, Json.parseToJsonElement(metadataBody) as JsonObject)
         }
+
+    private fun parseMetadata(
+        versionId: String,
+        metadata: JsonObject,
+    ): VersionMetadata {
+        val downloads = metadata["downloads"] as JsonObject
+        return VersionMetadata(
+            id = versionId,
+            client = downloads.parseArtifact("client"),
+            server = downloads.parseArtifact("server"),
+        )
+    }
 
     private fun JsonObject.parseArtifact(key: String): DownloadArtifact {
         val artifact = this[key] as JsonObject

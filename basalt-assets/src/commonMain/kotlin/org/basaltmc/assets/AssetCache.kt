@@ -28,7 +28,18 @@ public class AssetCache(
         SERVER("server.jar"),
     }
 
-    /** Returns the local path to the cached, verified jar, downloading it first if needed. */
+    /**
+     * Returns the local path to the cached, verified jar, downloading it first if needed.
+     *
+     * Verification happens once, at download time, and is then recorded in a `.verified` sidecar
+     * holding the hash that was checked and the size it was checked at. Re-hashing tens of
+     * megabytes on every boot to re-learn something already established costs real startup time
+     * and proves nothing new. The size is re-checked because it is free (no read, just a seek) and
+     * catches the realistic corruption case, a truncated or half-written download; a jar edited in
+     * place to exactly the same length is not detected, which is the deliberate trade. A sidecar
+     * that is missing, malformed or no longer matching means a re-download, which is also what
+     * happens once for caches written before the sidecar existed.
+     */
     public fun ensure(
         metadata: VersionMetadata,
         artifact: Artifact,
@@ -37,8 +48,9 @@ public class AssetCache(
         val versionDir = "$cacheRoot/${metadata.id}"
         val path = "$versionDir/${artifact.fileName}"
 
-        val cached = FileIO.readBytes(path)
-        if (cached != null && sha1Hex(cached) == download.sha1) {
+        if (FileIO.readText("$path.verified")?.trim() == "${download.sha1} ${download.size}" &&
+            FileIO.size(path) == download.size
+        ) {
             logger.info { "${artifact.fileName} for ${metadata.id} already cached and verified." }
             return path
         }
@@ -55,6 +67,7 @@ public class AssetCache(
 
         FileIO.createDirectories(versionDir)
         FileIO.writeBytes(path, bytes)
+        FileIO.writeText("$path.verified", "$actualSha1 ${bytes.size}")
         logger.info { "${artifact.fileName} for ${metadata.id} downloaded and verified." }
         return path
     }

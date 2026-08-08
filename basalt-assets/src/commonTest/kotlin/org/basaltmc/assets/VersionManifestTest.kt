@@ -63,4 +63,24 @@ class VersionManifestTest {
     fun throwsForAnUnknownVersion() {
         assertFailsWith<AssetException> { VersionManifest(mockClient()).resolve("not-a-real-version") }
     }
+
+    @Test
+    fun cachesResolvedMetadataOnDisk() {
+        val cacheRoot = "./basalt_manifest_cache_test"
+        try {
+            val first = VersionManifest(mockClient(), cacheRoot).resolveCached("26.2")
+
+            // No client at all the second time round: anything that still needed the network here
+            // would throw rather than quietly fall back, which is the point of the cache.
+            val second = VersionManifest(failingClient(), cacheRoot).resolveCached("26.2")
+
+            assertEquals(first, second)
+        } finally {
+            platform.posix.remove("$cacheRoot/26.2/metadata.json")
+            platform.posix.remove("$cacheRoot/26.2")
+            platform.posix.remove(cacheRoot)
+        }
+    }
+
+    private fun failingClient(): HttpClient = HttpClient(MockEngine { error("the network must not be touched") })
 }
