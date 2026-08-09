@@ -78,7 +78,10 @@ public class PlayerPlaceholders(
         )
 
     override fun names(): Collection<String> =
-        (eitherWay.keys + ofPlayer.keys + NOT_IMPLEMENTED.keys + "$PERMISSION_PREFIX<node>").sorted()
+        (
+            eitherWay.keys + ofPlayer.keys + NOT_IMPLEMENTED.keys +
+                listOf("$PERMISSION_PREFIX<node>", "$STAT_PREFIX<name>", "<any number>_<decimals>")
+        ).sorted()
 
     override fun resolve(
         params: String,

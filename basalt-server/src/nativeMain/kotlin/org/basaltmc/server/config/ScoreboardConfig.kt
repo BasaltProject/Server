@@ -15,6 +15,9 @@ internal const val SCOREBOARD_DEFAULT_TOML = """# The panel down the right-hand 
 # A line that would repeat another is quietly given a different invisible key, so
 # two identical lines are allowed; the client keys rows by their owner, not their
 # text.
+#
+# Any number takes a `_<decimals>` suffix: %basalt_player_x% is the true position
+# and unreadable (21.70704236703265), %basalt_player_x_1% is 21.7.
 
 enabled = false
 
@@ -27,7 +30,7 @@ title = "<bold><gradient:gray:white>BASALT</gradient></bold>"
 lines = [
     "",
     "<gray>World</gray> <white>%basalt_player_world%</white>",
-    "<gray>Position</gray> <white>%basalt_player_x%, %basalt_player_y%, %basalt_player_z%</white>",
+    "<gray>Position</gray> <white>%basalt_player_x_1%, %basalt_player_y_1%, %basalt_player_z_1%</white>",
     "",
     "<gray>Online</gray> <white>%basalt_server_online%/%basalt_server_max_players%</white>",
     "<gray>TPS</gray> <white>%basalt_server_tps%</white>",
@@ -44,7 +47,7 @@ when = ["%basalt_player_dimension% = the_nether"]
 title = "<bold><red>NETHER</red></bold>"
 lines = [
     "",
-    "<gray>Position</gray> <white>%basalt_player_x%, %basalt_player_y%, %basalt_player_z%</white>",
+    "<gray>Position</gray> <white>%basalt_player_x_1%, %basalt_player_y_1%, %basalt_player_z_1%</white>",
     "<gray>Overworld</gray> <white>divide by 8</white>",
     "",
     "<gray>%basalt_animation_website%</gray>",
@@ -56,7 +59,7 @@ when = ["%basalt_player_dimension% = the_end"]
 title = "<bold><light_purple>THE END</light_purple></bold>"
 lines = [
     "",
-    "<gray>Position</gray> <white>%basalt_player_x%, %basalt_player_y%, %basalt_player_z%</white>",
+    "<gray>Position</gray> <white>%basalt_player_x_1%, %basalt_player_y_1%, %basalt_player_z_1%</white>",
     "",
     "<gray>%basalt_animation_website%</gray>",
 ]
