@@ -6,6 +6,10 @@ import org.basaltmc.io.FileIO
 
 private const val DEFAULT_TOML = """# Basalt server configuration, generated once with vanilla-parity defaults.
 # Delete a value and restart to have it regenerated.
+#
+# This is one file of several under config/. Options move out of here as their own domain grows a
+# file of its own (worlds, permission groups, server list, commands); see the file each one lands
+# in for where an option went.
 
 [server]
 # Port the server listens on.
@@ -72,7 +76,14 @@ public enum class ColorMode {
     NEVER,
 }
 
-/** Parsed `basalt.toml`. Only the fields Basalt currently reads are exposed; everything else is a documented placeholder in the file itself. */
+/**
+ * Parsed `config/server.toml`. Only the fields Basalt currently reads are exposed; everything else
+ * is a documented placeholder in the file itself.
+ *
+ * Some of these are on their way out of this file as their own domain grows one: `motd` to
+ * `server_list.toml`, `operators`/`opPermissionLevel` to `groups.toml` plus a column in
+ * `players.db`, `worldName` to `worlds.toml`.
+ */
 public data class BasaltConfig(
     public val port: Int,
     public val motd: String,
@@ -112,29 +123,43 @@ public data class BasaltConfig(
                 generationMetrics = false,
             )
 
+        /** The file this configuration lives in, inside [ConfigDirectory]. */
+        public const val FILE_NAME: String = "server.toml"
+
         /**
-         * Loads `basalt.toml` from [path], generating a commented default on first run. If
-         * `server.properties` exists and `basalt.toml` does not, imports the overlapping keys once;
-         * it is not kept in sync afterward.
+         * Loads `config/server.toml`, generating a commented default on first run.
+         *
+         * A vanilla `server.properties` sitting next to it has its overlapping keys imported once,
+         * so moving an existing vanilla server over is "copy the folder and start". It is an
+         * import, not a compatibility layer: nothing is kept in sync afterwards.
          */
         public fun load(
-            path: String = "basalt.toml",
+            directory: ConfigDirectory = ConfigDirectory(),
             legacyPropertiesPath: String = "server.properties",
             logger: Logger = Logger("Config"),
         ): BasaltConfig {
+            val path = directory.pathOf(FILE_NAME)
             if (!FileIO.exists(path)) {
-                val legacy = FileIO.readText(legacyPropertiesPath)
-                if (legacy != null) {
-                    logger.info { "Found $legacyPropertiesPath, importing recognized values into $path once." }
-                    FileIO.writeText(path, mergeLegacyProperties(DEFAULT_TOML, parseJavaProperties(legacy)))
-                } else {
-                    logger.info { "$path not found, generating one with vanilla-parity defaults." }
-                    FileIO.writeText(path, DEFAULT_TOML)
-                }
+                FileIO.createDirectories(directory.root)
+                val contents = initialContents(legacyPropertiesPath, logger)
+                FileIO.writeText(path, contents)
             }
-            val text = FileIO.readText(path) ?: throw TomlFormatException("Failed to read $path after writing it")
+            val root = directory.load(FILE_NAME, DEFAULT_TOML)
             logger.info { "Loaded configuration from $path." }
-            return fromToml(Toml.parse(text))
+            return fromToml(root)
+        }
+
+        /** What to write into a freshly created `server.toml`: an imported `server.properties`, or the default. */
+        private fun initialContents(
+            legacyPropertiesPath: String,
+            logger: Logger,
+        ): String {
+            val legacy = FileIO.readText(legacyPropertiesPath)
+            if (legacy != null) {
+                logger.info { "Found $legacyPropertiesPath, importing recognized values once." }
+                return mergeLegacyProperties(DEFAULT_TOML, parseJavaProperties(legacy))
+            }
+            return DEFAULT_TOML
         }
 
         private fun fromToml(root: TomlValue.Table): BasaltConfig {

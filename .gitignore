@@ -37,7 +37,7 @@ gradle-app.setting
 # so test worlds and player databases were committed for several releases without anyone noticing.
 # Tests now write under build/ instead, and these are the net that catches the next mistake.
 eula.txt
-basalt.toml
+config/
 .basalt/
 logs/
 worlds/
