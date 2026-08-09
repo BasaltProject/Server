@@ -9,7 +9,8 @@ internal const val TAB_LIST_DEFAULT_TOML = """# The header and footer of the pla
 # game has nowhere to put it. Nothing here needs turning off for them.
 #
 # This is the one UI file switched on out of the box, because a header and a
-# footer are decoration: they cannot cover the screen or get in the way.
+# footer are decoration: they cannot cover the screen or get in the way. The
+# scoreboard and the boss bar ship off for exactly that reason.
 #
 # Profiles work exactly as in server_list.toml: highest priority among those
 # switched on with `active` or whose every `when` holds, falling back to the one
@@ -25,26 +26,26 @@ enabled = true
 # ceiling on how smooth any animation in here can look. 0 sends it once on join
 # and never again.
 #
-# Lowering it is fine and is what animation needs: a redraw only becomes a packet
-# when the text it produces actually changed, so static panels stay free however
-# often they are drawn. What costs is animated text, at one packet per player per
-# change. 1 is 20 a second per player; with a hundred players that is 2000 packets
-# a second for this panel alone, which is affordable but no longer nothing.
-update-interval-ticks = 20
+# One tick is what makes the animation below move. Lowering it is fine: a redraw
+# only becomes a packet when the text it produces actually changed, so a static
+# panel stays free however often it is drawn. What costs is animated text, at one
+# packet per player per change. 1 is 20 a second per player; with a hundred
+# players that is 2000 packets a second for this panel alone, which is affordable
+# but no longer nothing.
+update-interval-ticks = 1
 
 [profiles.default]
 default = true
 header = [
-    " ",
-    "              <bold><gradient:gray:white>BASALT SERVER</gradient></bold>",
-    " ",
+    "                                                            ",
+    "<bold><gradient:gray:white>BASALT SERVER</gradient></bold>",
+    "<gray>%basalt_animation_website%</gray>",
+    "                                                            ",
 ]
 footer = [
     " ",
     "<gray>TPS <white>%basalt_server_tps%</white>   RAM <white>%basalt_server_ram_used%MB</white>   CPU <white>%basalt_server_cpu%%</white></gray>",
     "<gray>Players <white>%basalt_server_online%/%basalt_server_max_players%</white>   Chunks <white>%basalt_server_total_chunks%</white>   Up <white>%basalt_server_uptime%</white></gray>",
-    " ",
-    "<gray>%basalt_animation_website%</gray>",
     " ",
 ]
 

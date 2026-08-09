@@ -91,7 +91,7 @@ private fun run(args: Array<String>) {
 
     // Read once for the things that cannot be redone per instance: the log file would archive
     // itself on every restart, and colour is a property of the terminal, not of the server.
-    val bootConfig = BasaltConfig.load(logger = Logger("Config"))
+    val bootConfig = BasaltConfig.load(logger = Logger("Config"), announce = false)
     Logger.defaultMinLevel = bootConfig.logLevel
     LogOutput.useColor =
         when (bootConfig.logColor) {

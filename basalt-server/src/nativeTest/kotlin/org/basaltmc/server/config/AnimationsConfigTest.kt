@@ -43,11 +43,19 @@ class AnimationsConfigTest {
     }
 
     @Test
-    fun anIntervalBelowTheFloorIsRaisedToIt() {
-        val config = load("floor", "[animations.a]\nchange-interval-ms = 1\nframes = [\"x\", \"y\"]\n")
+    fun anIntervalIsTakenExactlyAsWritten() {
+        val config = load("floor", "[animations.a]\nchange-interval-ms = 20\nframes = [\"x\", \"y\"]\n")
 
-        // Nothing redraws every millisecond; allowing it would only burn packets.
-        assertTrue(kotlin.test.assertNotNull(config["a"]).changeIntervalMillis >= 50)
+        // Asking for less than a tick is a legitimate choice that skips frames, not a mistake to
+        // correct: the floor used to be 50 and quietly turned a 20 into something else.
+        assertEquals(20, kotlin.test.assertNotNull(config["a"]).changeIntervalMillis)
+    }
+
+    @Test
+    fun anIntervalOfZeroIsRaisedBecauseItCannotBeDividedBy() {
+        val config = load("zero", "[animations.a]\nchange-interval-ms = 0\nframes = [\"x\", \"y\"]\n")
+
+        assertTrue(kotlin.test.assertNotNull(config["a"]).changeIntervalMillis >= 1)
     }
 
     @Test

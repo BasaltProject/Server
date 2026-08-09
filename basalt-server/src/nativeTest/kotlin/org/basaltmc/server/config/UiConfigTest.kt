@@ -49,15 +49,22 @@ class UiConfigTest {
         assertTrue(tabList.enabled)
         assertFalse(scoreboard.enabled)
         assertFalse(bossBar.enabled)
+        // All three redraw every tick all the same, so whichever is switched on animates.
+        assertEquals(1, tabList.updateIntervalTicks)
+        assertEquals(1, scoreboard.updateIntervalTicks)
+        assertEquals(1, bossBar.updateIntervalTicks)
     }
 
     @Test
-    fun theShippedTabListHasAnEmptyFirstLineAndTheServerName() {
+    fun theShippedTabListOpensWithBlankSpaceAndTheServerName() {
         val config = TabListConfig.load(write("tab_shape", TabListConfig.FILE_NAME, TAB_LIST_DEFAULT_TOML))
         val header = assertNotNull(config.defaultProfile.headerLines)
 
-        assertEquals(" ", header.first())
+        // A run of spaces rather than one: it is what widens the panel, so the header does not sit
+        // squeezed against the player names. Blank to look at, load-bearing to the layout.
+        assertTrue(header.first().isNotEmpty() && header.first().isBlank())
         assertTrue(header.any { it.contains("BASALT SERVER") && it.contains("<gradient:") })
+        assertTrue(header.any { it.contains("%basalt_animation_website%") })
     }
 
     @Test

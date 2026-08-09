@@ -21,8 +21,10 @@ internal const val SCOREBOARD_DEFAULT_TOML = """# The panel down the right-hand 
 
 enabled = false
 
-# How often each player's board is redrawn, in ticks (20 = one second).
-update-interval-ticks = 20
+# How often each player's board is redrawn, in ticks (20 = one second). One tick
+# is what makes the animation at the bottom move, and only matters once the board
+# above is switched on.
+update-interval-ticks = 1
 
 [profiles.default]
 default = true

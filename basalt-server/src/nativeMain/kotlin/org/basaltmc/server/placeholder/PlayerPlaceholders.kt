@@ -105,8 +105,17 @@ public class PlayerPlaceholders(
             val node = params.removePrefix(PERMISSION_PREFIX)
             return session?.let { PlaceholderValue.of(groups().resolve(it.group, node)) } ?: needsPlayer(ping)
         }
-        val answer = ofPlayer[params] ?: return PlaceholderValue.Unknown
-        return session?.let(answer) ?: needsPlayer(ping)
+        ofPlayer[params]?.let { answer -> return session?.let(answer) ?: needsPlayer(ping) }
+
+        // `x_1` and friends: the same placeholder, rounded. Tried last, so a real name that happens
+        // to end in a digit is never mistaken for a precision.
+        Decimals.split(params)?.let { (base, digits) ->
+            val answer = ofPlayer[base] ?: return PlaceholderValue.Unknown
+            val player = session ?: return needsPlayer(ping)
+            val number = answer(player).textOrNull?.toDoubleOrNull() ?: return PlaceholderValue.Unknown
+            return PlaceholderValue.Text(Decimals.format(number, digits))
+        }
+        return PlaceholderValue.Unknown
     }
 
     private fun needsPlayer(ping: PingRequest?): PlaceholderValue =

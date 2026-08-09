@@ -109,6 +109,8 @@ public data class BasaltConfig(
             directory: ConfigDirectory = ConfigDirectory(),
             legacyPropertiesPath: String = "server.properties",
             logger: Logger = Logger("Config"),
+            /** The boot read that only exists to set up logging says nothing, so startup shows one line, not two. */
+            announce: Boolean = true,
         ): BasaltConfig {
             val path = directory.pathOf(FILE_NAME)
             if (!FileIO.exists(path)) {
@@ -117,7 +119,7 @@ public data class BasaltConfig(
                 FileIO.writeText(path, contents)
             }
             val root = directory.load(FILE_NAME, DEFAULT_TOML)
-            logger.info { "Loaded configuration from $path." }
+            if (announce) logger.info { "Loaded configuration from $path." }
             return fromToml(root)
         }
 

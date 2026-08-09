@@ -23,13 +23,15 @@ internal const val BOSS_BAR_DEFAULT_TOML = """# The bar across the top of the sc
 
 enabled = false
 
-update-interval-ticks = 20
+# One tick, so the animation below moves rather than stepping once a second.
+# Only matters once the bar above is switched on.
+update-interval-ticks = 1
 
 [profiles.default]
 default = true
 text = "<white>%basalt_animation_website%</white>   <gray>%basalt_server_online%/%basalt_server_max_players% online</gray>"
-color = "purple"
-overlay = "notched_10"
+color = "white"
+overlay = "notched_20"
 progress = "1.0"
 
 # Shown instead when the server is filling up: same bar, used as a gauge.
