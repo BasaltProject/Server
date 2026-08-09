@@ -4,8 +4,8 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 
 /**
- * The real `data/minecraft/...` datapack entries the official server ships, unpacked into
- * [dataRoot] once and read as plain files from then on.
+ * The real `data/minecraft/...` datapack entries the official server ships, plus its language
+ * files, unpacked into [dataRoot] once and read as plain files from then on.
  *
  * The download is unpacked exactly once, and the archive it came from is deleted immediately
  * afterwards: what Basalt needs is a few megabytes of JSON and NBT out of a download several times
@@ -17,6 +17,11 @@ import org.basaltmc.io.FileIO
  * (`worldgen/noise/continentalness.json`, not `data/data/minecraft/worldgen/...`), while callers
  * keep using the full vanilla entry names. Anything outside the `minecraft` namespace keeps its
  * full path, so a non-vanilla namespace could not collide with a vanilla one.
+ *
+ * The language files under `assets/minecraft/lang/` come out too, keeping their full path. They are
+ * the only `assets/` entries taken, and they are taken because the server console has to resolve
+ * the same translation keys it sends to clients (see [LangAssets]): a client translates
+ * `commands.gamemode.success.self` for itself, a log file cannot.
  *
  * This class only ever reads entries already present in the official download: it has no embedded
  * values of its own, matching [org.basaltmc.registry.tags.TagFileJson]/`NoiseParametersJson`'s own
@@ -33,14 +38,18 @@ public class ServerJarAssets(
 
     init {
         val marker = "$dataRoot/.unpacked"
+        // The marker carries what was unpacked, not just which version: widening the set of
+        // entries taken has to invalidate a cache that was written under the narrower one, or an
+        // existing install silently keeps missing whatever was added.
+        val stamp = "$versionId $UNPACK_FORMAT"
         entryNames =
-            if (FileIO.readText(marker)?.trim() == versionId) {
+            if (FileIO.readText(marker)?.trim() == stamp) {
                 readIndex()
             } else {
                 unpack(source(), versionId).also { names ->
                     FileIO.writeText("$dataRoot/.index", names.joinToString("\n"))
                     // Written last, so an interrupted unpack is redone rather than trusted.
-                    FileIO.writeText(marker, versionId)
+                    FileIO.writeText(marker, stamp)
                 }
             }
     }
@@ -87,7 +96,8 @@ public class ServerJarAssets(
         val inner = ZipReader(innerBytes)
         val unpacked = mutableListOf<String>()
         for (name in inner.entryNames) {
-            if (!name.startsWith(DATA_PREFIX) || name.endsWith('/')) continue
+            if (name.endsWith('/')) continue
+            if (!name.startsWith(DATA_PREFIX) && !name.startsWith(LANG_PREFIX)) continue
             val bytes = inner.readEntry(name) ?: continue
             val path = pathFor(name)
             FileIO.createDirectories(path.substringBeforeLast('/'))
@@ -106,6 +116,10 @@ public class ServerJarAssets(
 
     private companion object {
         const val DATA_PREFIX = "data/"
+        const val LANG_PREFIX = "assets/minecraft/lang/"
         const val VANILLA_PREFIX = "data/minecraft/"
+
+        // Bumped whenever the set of entries unpacked above changes, so existing caches redo it.
+        const val UNPACK_FORMAT = "v2-lang"
     }
 }

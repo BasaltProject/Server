@@ -3,42 +3,44 @@ package org.basaltmc.assets
 import org.basaltmc.io.FileIO
 import org.basaltmc.text.LangTable
 
-/** Extracts a locale's lang JSON from the cached `client.jar`: the only place these ship, they're never in `server.jar`. */
+/**
+ * The official language table, which is what lets the server console print the same messages it
+ * sends to clients as sentences rather than as translation keys.
+ *
+ * A client resolves `commands.gamemode.success.self` against its own language; nothing does that
+ * for a log file, so the server has to. The file comes out of the **server** jar, under
+ * `assets/minecraft/lang/`: it ships there as well as in `client.jar`, so no extra download is
+ * needed (only the outer bundler archive lacks it, which is what made an earlier version of this
+ * class reach for `client.jar` instead). [ServerJarAssets] unpacks it alongside the datapack data.
+ */
 public object LangAssets {
+    /** Extracts a locale's lang JSON straight from a jar, for a jar that has not been unpacked. */
+    public fun load(
+        jarPath: String,
+        locale: String = "en_us",
+    ): LangTable {
+        val jarBytes = FileIO.readBytes(jarPath) ?: throw AssetException("jar not found at $jarPath")
+        val entryName = "$LANG_PREFIX$locale.json"
+        val entryBytes =
+            ZipReader(jarBytes).readEntry(entryName)
+                ?: throw AssetException("'$entryName' not found in $jarPath")
+        return LangTable.parse(entryBytes.decodeToString())
+    }
+
     /**
-     * The locale table for [versionDir], or an empty one if it cannot be had without going to the
-     * network.
+     * The locale table [ServerJarAssets] unpacked into [versionDir], or an empty one if it is not
+     * there.
      *
-     * Reads an already-extracted `lang/<locale>.json` if there is one, otherwise extracts it from a
-     * `client.jar` that is already in the cache and leaves it extracted so the next boot does not
-     * reopen a jar of tens of megabytes. Deliberately never downloads: the server only fetches
-     * `server.jar` on its own, and the fallback (an empty table, so translation keys print as
-     * themselves) is a cosmetic loss in the console, not a broken server.
+     * Empty is a cosmetic loss (the console prints keys), never a failure, so a cache written
+     * before language files were unpacked degrades instead of refusing to start.
      */
     public fun loadCachedOrEmpty(
         versionDir: String,
         locale: String = "en_us",
     ): LangTable {
-        val extracted = "$versionDir/lang/$locale.json"
-        FileIO.readText(extracted)?.let { return LangTable.parse(it) }
-        val clientJar = "$versionDir/client.jar"
-        if ((FileIO.size(clientJar) ?: 0L) <= 0L) return LangTable.EMPTY
-        val jarBytes = FileIO.readBytes(clientJar) ?: return LangTable.EMPTY
-        val entryBytes = ZipReader(jarBytes).readEntry("assets/minecraft/lang/$locale.json") ?: return LangTable.EMPTY
-        FileIO.createDirectories("$versionDir/lang")
-        FileIO.writeBytes(extracted, entryBytes)
-        return LangTable.parse(entryBytes.decodeToString())
+        val path = "$versionDir/$LANG_PREFIX$locale.json"
+        return FileIO.readText(path)?.let { LangTable.parse(it) } ?: LangTable.EMPTY
     }
 
-    public fun load(
-        clientJarPath: String,
-        locale: String = "en_us",
-    ): LangTable {
-        val jarBytes = FileIO.readBytes(clientJarPath) ?: throw AssetException("client.jar not found at $clientJarPath")
-        val entryName = "assets/minecraft/lang/$locale.json"
-        val entryBytes =
-            ZipReader(jarBytes).readEntry(entryName)
-                ?: throw AssetException("'$entryName' not found in $clientJarPath")
-        return LangTable.parse(entryBytes.decodeToString())
-    }
+    private const val LANG_PREFIX = "assets/minecraft/lang/"
 }

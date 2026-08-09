@@ -178,11 +178,12 @@ public data class ClientCommandPacket(
 }
 
 /**
- * Serverbound, id 0x2b: a state the client entered on its own. Mirrors
+ * Serverbound, id 0x2a: a state the client entered on its own. Mirrors
  * `ServerboundPlayerCommandPacket`.
  *
- * Sneaking is not in this list: it moved to `ServerboundPlayerInputPacket`. Sprinting is, and the
- * server needs it because sprinting is the only movement that costs hunger in 26.2.
+ * Sneaking is not in this list: it moved to `ServerboundPlayerInputPacket`, which is the *next* id
+ * (0x2b) and carries a one-byte bitfield rather than these three varints. Sprinting is here, and
+ * the server needs it because sprinting is the only movement that costs hunger in 26.2.
  */
 public data class PlayerCommandPacket(
     val entityId: Int,
@@ -206,7 +207,7 @@ public data class PlayerCommandPacket(
     }
 
     public companion object {
-        public const val ID: Int = 0x2b
+        public const val ID: Int = 0x2a
 
         public fun read(buffer: ByteBuffer): PlayerCommandPacket =
             PlayerCommandPacket(buffer.readVarInt(), Action.entries[buffer.readVarInt()], buffer.readVarInt())

@@ -30,24 +30,23 @@ class LangAssetsTest {
     }
 
     @Test
-    fun theCachedLoaderExtractsFromTheJarOnceAndReadsTheExtractedFileAfterwards() {
+    fun theCachedLoaderReadsWhatTheServerJarUnpackLeftBehind() {
         val versionDir = "./basalt_lang_assets_test_version"
-        FileIO.createDirectories(versionDir)
-        FileIO.writeBytes("$versionDir/client.jar", fixtureBytes)
+        val langDir = "$versionDir/assets/minecraft/lang"
+        FileIO.createDirectories(langDir)
+        FileIO.writeText("$langDir/en_us.json", "{\"item.minecraft.stick\": \"Stick\"}")
 
         assertEquals("Stick", LangAssets.loadCachedOrEmpty(versionDir).getOrDefault("item.minecraft.stick", "?"))
 
-        // The jar is now irrelevant: the extracted copy is what gets read.
-        platform.posix.remove("$versionDir/client.jar")
-        assertEquals("Stick", LangAssets.loadCachedOrEmpty(versionDir).getOrDefault("item.minecraft.stick", "?"))
-
-        platform.posix.remove("$versionDir/lang/en_us.json")
-        platform.posix.rmdir("$versionDir/lang")
+        platform.posix.remove("$langDir/en_us.json")
+        platform.posix.rmdir(langDir)
+        platform.posix.rmdir("$versionDir/assets/minecraft")
+        platform.posix.rmdir("$versionDir/assets")
         platform.posix.rmdir(versionDir)
     }
 
     @Test
-    fun theCachedLoaderFallsBackToAnEmptyTableWithNothingCached() {
+    fun theCachedLoaderFallsBackToAnEmptyTableWithNothingUnpacked() {
         val table = LangAssets.loadCachedOrEmpty("./basalt_lang_assets_test_missing")
         assertEquals("fallback", table.getOrDefault("item.minecraft.stick", "fallback"))
     }
