@@ -4,15 +4,22 @@ import org.basaltmc.auth.OnlineMode
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpListener
+import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.protocol.status.ServerStatusPayload
-import org.basaltmc.server.command.ConsoleCommandRegistry
+import org.basaltmc.server.command.CommandDispatcher
+import org.basaltmc.server.command.CommandEnvironment
 import org.basaltmc.server.command.ConsoleReader
+import org.basaltmc.server.command.OperatorList
+import org.basaltmc.server.command.registerVanillaCommands
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.config.rewriteOperators
+import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.RegionStore
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.text.Component
+import org.basaltmc.text.LangTable
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.GenerationMetrics
@@ -61,6 +68,8 @@ public class BasaltServer(
     private val overworldRouter: OverworldNoiseRouter? = null,
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
+    private val worldSeed: Long = 0L,
+    private val lang: LangTable = LangTable.EMPTY,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
@@ -82,13 +91,29 @@ public class BasaltServer(
         ChunkGenerationQueue(world, DIMENSION, workerCount = if (config.generationMetrics) 1 else 8)
     private val spawn = warmStartupChunksAndComputeSpawn()
     private val tickLoop = TickLoop(config.saveIntervalSeconds, onSaveInterval = ::persistAndUnload)
-    private val consoleCommands =
-        ConsoleCommandRegistry().apply {
-            register("stop") { shutdown() }
-            register("help") {
-                logger.info { "Known commands: stop, help." }
-            }
-        }
+
+    // Names are matched case-insensitively, and a change writes straight back to basalt.toml so
+    // `op` at the console survives a restart the way vanilla's ops.json does.
+    private val operators =
+        OperatorList(config.operators, config.opPermissionLevel) { names -> rewriteOperators(names) }
+
+    private val commands =
+        CommandDispatcher(
+            CommandEnvironment(
+                players = playerRegistry,
+                operators = operators,
+                worldSeed = worldSeed,
+                maxPlayers = config.maxPlayers,
+                stopServer = ::shutdown,
+                lang = lang,
+            ),
+        ).also(::registerVanillaCommands)
+
+    private val defaultGamemode =
+        Gamemode.entries.firstOrNull { it.name.equals(config.gamemode, ignoreCase = true) } ?: Gamemode.SURVIVAL
+
+    private val difficulty =
+        Difficulty.entries.firstOrNull { it.name.equals(config.difficulty, ignoreCase = true) } ?: Difficulty.EASY
 
     private fun generateChunk(
         chunkX: Int,
@@ -294,7 +319,7 @@ public class BasaltServer(
     public fun start(startedAt: Instant = Clock.System.now()) {
         val listener = TcpListener.bind(config.port).also { this.listener = it }
         tickLoop.start()
-        ConsoleReader.start(consoleCommands)
+        ConsoleReader.start(commands)
         val elapsedSeconds = (Clock.System.now() - startedAt).inWholeMilliseconds / 1000.0
         logger.info {
             "Done (${elapsedSeconds}s)! Listening on port ${config.port} " +
@@ -312,6 +337,9 @@ public class BasaltServer(
                     spawn = spawn,
                     configuredViewDistance = config.viewDistance,
                     generationQueue = generationQueue,
+                    commands = commands,
+                    defaultGamemode = defaultGamemode,
+                    difficulty = difficulty,
                 ).run()
             }
         }
