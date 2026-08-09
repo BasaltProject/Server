@@ -17,6 +17,7 @@ import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
 import org.basaltmc.server.config.GroupsConfig
+import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.TomlFormatException
 import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.world.RealNoiseParameters
@@ -114,6 +115,10 @@ private fun run(args: Array<String>) {
     // startup and reused for every generated chunk.
     val worldsConfig = WorldsConfig.load(logger = Logger("Config"))
     val groupsConfig = GroupsConfig.load(logger = Logger("Config"))
+    // The MOTD is the one thing the server list takes from a vanilla server.properties, and only
+    // while generating the file for the first time.
+    val serverListConfig =
+        ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
     // The seed comes from the world itself, not from configuration: a world already on disk was
     // generated with one, and that is the one its terrain matches.
     val worldMetadata =
@@ -156,6 +161,7 @@ private fun run(args: Array<String>) {
         villageGenerator,
         worldsConfig,
         groupsConfig,
+        serverListConfig,
         lang,
         worldMetadata,
     ).start(startedAt)

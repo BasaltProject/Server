@@ -3,8 +3,17 @@
 package org.basaltmc.io
 
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.IntVar
+import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.value
 import platform.posix.AF_INET
+import platform.posix.getpeername
+import platform.posix.sockaddr
 import platform.posix.sockaddr_in
 
 /**
@@ -27,3 +36,21 @@ internal actual fun sockaddr_in.setAddressFamily() {
 internal actual fun sockaddr_in.setAddress(value: UInt) {
     sin_addr.S_un.S_addr = value
 }
+
+/**
+ * Winsock's `getpeername` takes its length as `int*`, not POSIX's `socklen_t*`, which is the whole
+ * reason this is per-platform. Unverified for the same reason as the two above: confirm on the next
+ * Windows CI run. A wrong answer here costs the server list greeting and nothing else, since the
+ * address is never used to decide anything.
+ */
+internal actual fun peerAddress(fd: Long): UInt? =
+    memScoped {
+        val address = alloc<sockaddr_in>()
+        val length = alloc<IntVar>()
+        length.value = sizeOf<sockaddr_in>().convert()
+        if (getpeername(fd.convert(), address.ptr.reinterpret<sockaddr>(), length.ptr) != 0) {
+            return@memScoped null
+        }
+        if (address.sin_family.toInt() != AF_INET) return@memScoped null
+        address.sin_addr.S_un.S_addr
+    }

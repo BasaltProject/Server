@@ -77,6 +77,15 @@ internal expect fun enableAddressReuse(fd: Long)
 internal expect fun sockaddr_in.setAddress(value: UInt)
 
 /**
+ * The raw 32-bit address at the other end of a connected socket, or null if it cannot be read.
+ *
+ * Split per platform for the same reason [enableAddressReuse] is: `getpeername`'s length argument
+ * is a `socklen_t*` on POSIX and an `int*` on Winsock, and the two bind to different Kotlin types.
+ * Returning the raw value rather than a formatted string keeps the platform half to the syscall.
+ */
+internal expect fun peerAddress(fd: Long): UInt?
+
+/**
  * Blocking IPv4 TCP sockets. This is a thread-per-connection building block, not an event loop:
  * `epoll`/`kqueue`/IOCP-based async I/O is deliberately out of scope for this pass and is a
  * tracked follow-up.
@@ -96,10 +105,17 @@ public class TcpListener private constructor(
     /** For registering with [SelectEventLoop]; see [TcpListener]'s own KDoc for why `Int` is safe here. */
     public val nativeFd: Int get() = fd.toInt()
 
+    /**
+     * Accepts one connection, and asks who it is from straight away.
+     *
+     * Straight away because this is the last moment the answer is guaranteed to be there: a client
+     * that pings the server list and drops the socket the instant it has its answer is completely
+     * ordinary, and by the time anything wants the address the peer can already be gone.
+     */
     public fun accept(): TcpConnection {
         val clientFd = accept(fd.convert(), null, null).toLong()
         if (clientFd < 0) throw SocketException("accept() failed")
-        return TcpConnection(clientFd)
+        return TcpConnection(clientFd, peerAddress(clientFd)?.let(::formatIpv4NetworkOrder))
     }
 
     public fun close() {
@@ -140,6 +156,11 @@ public class TcpListener private constructor(
 
 public class TcpConnection internal constructor(
     private val fd: Long,
+    /**
+     * The peer's literal IPv4 address, or null when the socket was not accepted from a listener
+     * (an outgoing [connect], or a test harness) and so nobody recorded one.
+     */
+    public val remoteAddress: String? = null,
 ) {
     /** For registering with [SelectEventLoop]; see [TcpListener]'s own KDoc for why `Int` is safe here. */
     public val nativeFd: Int get() = fd.toInt()
@@ -224,6 +245,10 @@ public class TcpConnection internal constructor(
 
 /** Byte-swaps [value] for a little-endian host so it lands in the field in network byte order. */
 private fun hostToNetworkShort(value: Int): UShort = (((value and 0xFF) shl 8) or ((value ushr 8) and 0xFF)).toUShort()
+
+/** The inverse of [parseIpv4NetworkOrder], and it shares that function's little-endian-host assumption. */
+private fun formatIpv4NetworkOrder(value: UInt): String =
+    "${value and 0xFFu}.${(value shr 8) and 0xFFu}.${(value shr 16) and 0xFFu}.${(value shr 24) and 0xFFu}"
 
 /** Parses a literal IPv4 address (e.g. "127.0.0.1") into the little-endian-host in_addr value. */
 private fun parseIpv4NetworkOrder(address: String): UInt {

@@ -7,13 +7,13 @@ import org.basaltmc.io.ShutdownSignal
 import org.basaltmc.io.TcpListener
 import org.basaltmc.io.sleepMillis
 import org.basaltmc.protocol.play.Gamemode
-import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.CommandEnvironment
 import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.command.registerVanillaCommands
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.GroupsConfig
+import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
@@ -71,6 +71,7 @@ public class BasaltServer(
     private val villageGenerator: VillageStructureGenerator? = null,
     private val worldsConfig: WorldsConfig,
     private val groupsConfig: GroupsConfig,
+    private val serverListConfig: ServerListConfig,
     private val lang: LangTable = LangTable.EMPTY,
     /**
      * The world's own metadata, already loaded. `Main` needs the seed before this class exists (it
@@ -173,6 +174,25 @@ public class BasaltServer(
                 worlds = worlds,
             ),
         ).also(::registerVanillaCommands)
+
+    /**
+     * The server list, rebuilt per ping from `server_list.toml`.
+     *
+     * The online count comes from the registry rather than from a counter kept alongside it: a
+     * second source of truth for "how many players are connected" is how a server ends up
+     * advertising numbers that never come back down.
+     */
+    private val serverList =
+        ServerListStatus(
+            config = serverListConfig,
+            slots = config.maxPlayers,
+            versionName = BuildInfo.MINECRAFT_VERSION,
+            protocolVersion = BuildInfo.PROTOCOL_VERSION,
+            onlinePlayers = {
+                playerRegistry.snapshot().map { ListedPlayer(it.name, it.uuid.toString()) }
+            },
+            lookupPlayerByAddress = playerStore.players::findNameByAddress,
+        )
 
     private val defaultGamemode =
         Gamemode.entries.firstOrNull { it.name.equals(config.gamemode, ignoreCase = true) } ?: Gamemode.SURVIVAL
@@ -314,7 +334,7 @@ public class BasaltServer(
             NativeThread.start {
                 ClientSession(
                     connection,
-                    ::currentStatus,
+                    serverList::statusFor,
                     onlineMode = onlineMode,
                     playerRegistry = playerRegistry,
                     worlds = worlds,
@@ -323,6 +343,7 @@ public class BasaltServer(
                     defaultGamemode = defaultGamemode,
                     difficulty = difficulty,
                     playerStore = playerStore,
+                    rememberAddress = if (serverListConfig.rememberIp) connection.remoteAddress else null,
                 ).run()
             }
         }
@@ -349,14 +370,6 @@ public class BasaltServer(
         // Only reachable if the shutdown wedged: it normally ends the process itself long before.
         logger.error { "Shutdown did not finish within ${SHUTDOWN_WAIT_TIMEOUT_MILLIS}ms, exiting anyway." }
     }
-
-    private fun currentStatus(): ServerStatusPayload =
-        ServerStatusPayload(
-            description = Component.text(config.motd, TextColor.GRAY),
-            players = ServerStatusPayload.Players(max = config.maxPlayers, online = 0),
-            version = ServerStatusPayload.Version(BuildInfo.MINECRAFT_VERSION, BuildInfo.PROTOCOL_VERSION),
-            favicon = Favicon.bytes,
-        )
 
     private companion object {
         // 1 declared a view/simulation distance of 1 chunk to the client, below what a real

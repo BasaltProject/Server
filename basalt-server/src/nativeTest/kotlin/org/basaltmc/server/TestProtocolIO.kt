@@ -19,6 +19,7 @@ import org.basaltmc.server.config.WorldDeclaration
 import org.basaltmc.server.config.WorldSettings
 import org.basaltmc.server.config.WorldType
 import org.basaltmc.server.config.WorldsConfig
+import org.basaltmc.server.config.testServerList
 import kotlin.time.TimeSource
 
 /**
@@ -46,7 +47,6 @@ internal fun startTestServer(
         val config =
             BasaltConfig(
                 port = port,
-                motd = "A Basalt Server",
                 maxPlayers = 20,
                 onlineMode = onlineMode != null,
                 gamemode = "survival",
@@ -86,6 +86,7 @@ internal fun startTestServer(
                 onlineMode,
                 worldsConfig = worldsConfig,
                 groupsConfig = testGroups(),
+                serverListConfig = testServerList(),
                 playersDatabasePath = playersDatabase,
                 worldsRoot = "$TEST_DATA_ROOT/worlds",
             ).start()

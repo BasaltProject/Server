@@ -14,9 +14,9 @@ private const val DEFAULT_TOML = """# Basalt server configuration, generated onc
 [server]
 # Port the server listens on.
 port = 25565
-# Message of the day, shown in the server list.
-motd = "A Basalt Server"
-# Maximum concurrent players.
+# How many players can be connected at once. What the server list *shows* is a
+# separate thing, in server_list.toml, since a profile can advertise whatever it
+# likes without changing who actually gets in.
 max-players = 20
 # Verify players against Mojang's session server. Disabling this accepts any
 # claimed username with no verification (vanilla's "cracked" mode).
@@ -61,13 +61,12 @@ public enum class ColorMode {
  * Parsed `config/server.toml`. Only the fields Basalt currently reads are exposed; everything else
  * is a documented placeholder in the file itself.
  *
- * `motd` is still on its way out of here, to `server_list.toml`. Worlds already left, to
- * `worlds.toml`, and so did operators: what a group is lives in `groups.toml`, and who is in it is
- * a column in `players.db`.
+ * What is left here is what has no larger domain of its own. Worlds left for `worlds.toml`, the
+ * message of the day for `server_list.toml`, and operators for `groups.toml` plus a column in
+ * `players.db`.
  */
 public data class BasaltConfig(
     public val port: Int,
-    public val motd: String,
     public val maxPlayers: Int,
     public val onlineMode: Boolean,
     public val gamemode: String,
@@ -81,7 +80,6 @@ public data class BasaltConfig(
         private val DEFAULT =
             BasaltConfig(
                 port = 25565,
-                motd = "A Basalt Server",
                 maxPlayers = 20,
                 onlineMode = true,
                 gamemode = "survival",
@@ -94,6 +92,10 @@ public data class BasaltConfig(
 
         /** The file this configuration lives in, inside [ConfigDirectory]. */
         public const val FILE_NAME: String = "server.toml"
+
+        /** The `motd` of a vanilla `server.properties`, for whoever writes the server list file. */
+        public fun legacyMotd(legacyPropertiesPath: String = "server.properties"): String? =
+            FileIO.readText(legacyPropertiesPath)?.let { parseJavaProperties(it)["motd"] }
 
         /**
          * Loads `config/server.toml`, generating a commented default on first run.
@@ -137,7 +139,6 @@ public data class BasaltConfig(
             val performance = root.tableOrNull("performance")
             return BasaltConfig(
                 port = server?.intOrNull("port")?.toInt() ?: DEFAULT.port,
-                motd = server?.stringOrNull("motd") ?: DEFAULT.motd,
                 maxPlayers = server?.intOrNull("max-players")?.toInt() ?: DEFAULT.maxPlayers,
                 onlineMode = server?.boolOrNull("online-mode") ?: DEFAULT.onlineMode,
                 gamemode = server?.stringOrNull("gamemode") ?: DEFAULT.gamemode,
@@ -174,10 +175,6 @@ public data class BasaltConfig(
             var result = template
             legacy["server-port"]?.toIntOrNull()?.let {
                 result = result.replace("port = 25565", "port = $it")
-            }
-            legacy["motd"]?.let {
-                val escaped = it.replace("\"", "\\\"")
-                result = result.replace("motd = \"A Basalt Server\"", "motd = \"$escaped\"")
             }
             legacy["max-players"]?.toIntOrNull()?.let {
                 result = result.replace("max-players = 20", "max-players = $it")

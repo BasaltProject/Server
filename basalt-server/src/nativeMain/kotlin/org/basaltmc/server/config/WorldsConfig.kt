@@ -31,8 +31,8 @@ type = "normal"
 # Only "overworld" is implemented so far.
 dimension = "overworld"
 
-# More worlds go here. Declaring them is supported; loading more than one at a time
-# is not implemented yet, so any extra world is reported and skipped at startup.
+# More worlds go here. Each one gets its own chunks, region files and settings,
+# and players travel between them with /tp.
 # [worlds.lobby]
 # type = "void"
 # [worlds.creative]
