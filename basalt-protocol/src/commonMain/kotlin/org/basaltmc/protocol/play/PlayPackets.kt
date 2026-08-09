@@ -210,11 +210,13 @@ private fun ByteBuffer.readByteArrayList(): List<ByteArray> {
 
 /**
  * Clientbound, id 0x26: a miscellaneous world/game-state notification, one of a fixed set of
- * numeric event types (see companion constants). Mirrors `ClientboundGameEventPacket`. Only
- * [LEVEL_CHUNKS_LOAD_START] is used so far: real vanilla's join sequence sends it right before
- * chunk data, and the client only starts tracking/waiting for chunks once it sees it (confirmed
- * live: without it, the "loading terrain" screen never dismisses, even with correct chunks and a
- * correct chunk-batch wrapper).
+ * numeric event types (see companion constants). Mirrors `ClientboundGameEventPacket`.
+ *
+ * [LEVEL_CHUNKS_LOAD_START] is what real vanilla's join sequence sends right before chunk data, and
+ * the client only starts tracking/waiting for chunks once it sees it (confirmed live: without it,
+ * the "loading terrain" screen never dismisses, even with correct chunks and a correct chunk-batch
+ * wrapper). [CHANGE_GAME_MODE] carries the new mode's id in [param]: vanilla has no dedicated
+ * packet for a game mode change, it rides on this one.
  */
 public data class GameEventPacket(
     val event: Int,
@@ -227,6 +229,7 @@ public data class GameEventPacket(
 
     public companion object {
         public const val ID: Int = 0x26
+        public const val CHANGE_GAME_MODE: Int = 3
         public const val LEVEL_CHUNKS_LOAD_START: Int = 13
 
         public fun read(buffer: ByteBuffer): GameEventPacket =

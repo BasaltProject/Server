@@ -64,4 +64,35 @@ class TranslationResolverTest {
         val nestedArg = Component.text("outer").append(Component.text(" inner"))
         assertEquals("outer inner", Component.Translatable("nested", args = listOf(nestedArg)).resolvePlainText(table))
     }
+
+    @Test
+    fun resolvesEveryTranslationInATreeIncludingNestedArguments() {
+        val table =
+            LangTable.parse(
+                """
+                {
+                  "chat.type.admin": "[%s: %s]",
+                  "commands.gamemode.success.self": "Set own game mode to %s",
+                  "gameMode.creative": "Creative Mode"
+                }
+                """.trimIndent(),
+            )
+        val message =
+            Component.translatable(
+                "chat.type.admin",
+                Component.text("Whiron"),
+                Component.translatable(
+                    "commands.gamemode.success.self",
+                    Component.translatable("gameMode.creative"),
+                ),
+            )
+
+        assertEquals("[Whiron: Set own game mode to Creative Mode]", message.resolvePlainText(table))
+    }
+
+    @Test
+    fun anEmptyTableLeavesTheKeysThemselves() {
+        val message = Component.translatable("commands.seed.success", Component.text("42"))
+        assertEquals("commands.seed.success", message.resolvePlainText(LangTable.EMPTY))
+    }
 }

@@ -29,6 +29,15 @@ public class ChunkTracker {
         val toUnload: List<ChunkPos>,
     )
 
+    /**
+     * Forgets everything, so the next [update] reports the whole view as newly loaded. A respawn
+     * needs this: the client discards its own level when it respawns, so chunks it was previously
+     * sent are gone on its side while this tracker still believed it had them.
+     */
+    public fun reset() {
+        loadedChunks.clear()
+    }
+
     public fun update(
         centerX: Int,
         centerZ: Int,
