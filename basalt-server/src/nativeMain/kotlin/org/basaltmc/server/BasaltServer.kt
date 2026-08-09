@@ -13,6 +13,7 @@ import org.basaltmc.server.command.CommandEnvironment
 import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.command.registerVanillaCommands
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.config.CommandsConfig
 import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.WorldsConfig
@@ -76,6 +77,7 @@ public class BasaltServer(
     private val worldsConfig: WorldsConfig,
     private val groupsConfig: GroupsConfig,
     private val serverListConfig: ServerListConfig,
+    private val commandsConfig: CommandsConfig = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
     private val lang: LangTable = LangTable.EMPTY,
     /**
      * The world's own metadata, already loaded. `Main` needs the seed before this class exists (it
@@ -205,6 +207,7 @@ public class BasaltServer(
                 playerRepository = playerStore.players,
                 worlds = worlds,
                 placeholders = placeholders,
+                commands = commandsConfig,
             ),
         ).also(::registerVanillaCommands)
 

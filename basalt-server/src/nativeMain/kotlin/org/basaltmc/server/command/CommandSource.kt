@@ -108,11 +108,15 @@ public class PlayerCommandSource(
 public class CommandFeedback(
     private val environment: CommandEnvironment,
 ) {
+    private val overrides =
+        MessageOverrides(environment.commands.messages, environment.placeholders, environment.lang)
+
     public fun success(
         source: CommandSource,
-        message: Component,
+        rawMessage: Component,
         broadcastToAdmins: Boolean,
     ) {
+        val message = overrides.apply(rawMessage, source)
         source.sendSystemMessage(message)
         if (!broadcastToAdmins) return
         val broadcast =
@@ -132,7 +136,7 @@ public class CommandFeedback(
         source: CommandSource,
         message: Component,
     ) {
-        source.sendSystemMessage(message.color(TextColor.RED))
+        source.sendSystemMessage(overrides.apply(message, source).color(TextColor.RED))
     }
 }
 
