@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class LangAssetsTest {
-    private val fakeClientJarPath = "./basalt_lang_assets_test_client.jar"
+    private val fakeClientJarPath = "build/test-data/lang_client.jar"
 
     // A real ZIP built with Python's `zipfile` module: `assets/minecraft/lang/en_us.json` with one entry.
     private val fixtureBytes = LANG_FIXTURE_BASE64.decodeBase64()
@@ -19,6 +19,7 @@ class LangAssetsTest {
 
     @Test
     fun extractsAndParsesTheDefaultLocaleFromAJar() {
+        FileIO.createDirectories(fakeClientJarPath.substringBeforeLast('/'))
         FileIO.writeBytes(fakeClientJarPath, fixtureBytes)
         val table = LangAssets.load(fakeClientJarPath)
         assertEquals("Stick", table.getOrDefault("item.minecraft.stick", "?"))
@@ -31,7 +32,7 @@ class LangAssetsTest {
 
     @Test
     fun theCachedLoaderReadsWhatTheServerJarUnpackLeftBehind() {
-        val versionDir = "./basalt_lang_assets_test_version"
+        val versionDir = "build/test-data/lang_version"
         val langDir = "$versionDir/assets/minecraft/lang"
         FileIO.createDirectories(langDir)
         FileIO.writeText("$langDir/en_us.json", "{\"item.minecraft.stick\": \"Stick\"}")
@@ -47,12 +48,13 @@ class LangAssetsTest {
 
     @Test
     fun theCachedLoaderFallsBackToAnEmptyTableWithNothingUnpacked() {
-        val table = LangAssets.loadCachedOrEmpty("./basalt_lang_assets_test_missing")
+        val table = LangAssets.loadCachedOrEmpty("build/test-data/lang_missing")
         assertEquals("fallback", table.getOrDefault("item.minecraft.stick", "fallback"))
     }
 
     @Test
     fun missingLocaleEntryThrows() {
+        FileIO.createDirectories(fakeClientJarPath.substringBeforeLast('/'))
         FileIO.writeBytes(fakeClientJarPath, fixtureBytes)
         assertFailsWith<AssetException> { LangAssets.load(fakeClientJarPath, locale = "xx_xx") }
     }

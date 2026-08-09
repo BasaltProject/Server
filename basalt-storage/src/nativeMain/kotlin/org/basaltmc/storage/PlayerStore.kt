@@ -6,6 +6,7 @@ import app.cash.sqldelight.driver.native.wrapConnection
 import co.touchlab.sqliter.DatabaseConfiguration
 import co.touchlab.sqliter.JournalMode
 import co.touchlab.sqliter.SynchronousFlag
+import org.basaltmc.io.FileIO
 import org.basaltmc.storage.db.PlayerDatabase
 
 /**
@@ -49,6 +50,9 @@ public class PlayerStore private constructor(
             val separator = path.lastIndexOf('/')
             val directory = if (separator >= 0) path.substring(0, separator).ifEmpty { "/" } else "."
             val fileName = if (separator >= 0) path.substring(separator + 1) else path
+            // A configured path whose directory does not exist yet should work, not fail: the
+            // driver opens the file but will not create the folder around it.
+            FileIO.createDirectories(directory)
 
             val schema = PlayerDatabase.Schema
             val configuration =

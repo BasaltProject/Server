@@ -51,7 +51,7 @@ internal fun startTestServer(
                 // reading and writing the same region files at once is a genuine race: a worker
                 // that reads a half-written region dies, and the startup that was waiting on its
                 // chunks never finishes binding.
-                worldName = "basalt_server_test_world_$port",
+                worldName = "test_world_$port",
                 difficulty = "easy",
                 viewDistance = 3,
                 saveIntervalSeconds = 30,
@@ -61,11 +61,19 @@ internal fun startTestServer(
                 logColor = ColorMode.NEVER,
                 generationMetrics = false,
             )
-        // Its own database file per port, for the same reason each test server owns its own world:
-        // a shared players.db would carry one test's saved positions into the next one's join.
-        val playersDatabase = "./basalt_server_test_players_$port.db"
+        // Everything a test server writes goes under build/: it is already gitignored, `clean`
+        // wipes it, and writing into the module directory is how test worlds and databases ended up
+        // committed to the repository once already.
+        val playersDatabase = "$TEST_DATA_ROOT/players_$port.db"
         for (suffix in listOf("", "-wal", "-shm")) platform.posix.remove("$playersDatabase$suffix")
-        NativeThread.start { BasaltServer(config, onlineMode, playersDatabasePath = playersDatabase).start() }
+        NativeThread.start {
+            BasaltServer(
+                config,
+                onlineMode,
+                playersDatabasePath = playersDatabase,
+                worldsRoot = "$TEST_DATA_ROOT/worlds",
+            ).start()
+        }
         // Generous, not tight: BasaltServer now generates and saves real chunks before it starts
         // listening, several real seconds on a cold asset cache, not the near-instant startup this
         // deadline was tuned for back when world generation was a fixed in-memory flat world.
@@ -191,3 +199,6 @@ internal fun readFrameEncrypted(
 
 private fun isKeepAlive(frame: ByteArray): Boolean =
     ByteBuffer(frame.size).also { it.writeBytes(frame) }.readVarInt() == PlayKeepAlivePacket.CLIENTBOUND_ID
+
+/** Where every test artefact goes: inside build/, never in the module directory. */
+internal const val TEST_DATA_ROOT: String = "build/test-data"

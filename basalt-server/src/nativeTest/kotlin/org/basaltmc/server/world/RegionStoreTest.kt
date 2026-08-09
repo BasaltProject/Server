@@ -11,7 +11,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class RegionStoreTest {
-    private val worldName = "./region_store_test_world"
+    private val worldName = "region_store_test_world"
     private val dimension = "overworld"
 
     @BeforeTest

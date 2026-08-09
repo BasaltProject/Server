@@ -17,6 +17,7 @@ import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.RegionStore
+import org.basaltmc.server.world.WORLDS_ROOT
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.storage.PlayerStore
 import org.basaltmc.text.Component
@@ -72,6 +73,7 @@ public class BasaltServer(
     private val worldSeed: Long = 0L,
     private val lang: LangTable = LangTable.EMPTY,
     playersDatabasePath: String = PLAYERS_DATABASE,
+    worldsRoot: String = WORLDS_ROOT,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
@@ -91,7 +93,7 @@ public class BasaltServer(
      */
     private val playerStore = PlayerStore.open(playersDatabasePath)
 
-    private val regions = RegionStore(config.worldName, DIMENSION)
+    private val regions = RegionStore(config.worldName, DIMENSION, worldsRoot)
     private val world = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
 
     // One worker while measuring: GenerationMetrics counts without atomics on purpose, so its
