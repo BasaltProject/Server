@@ -31,17 +31,24 @@ gradle-app.setting
 # macOS
 .DS_Store
 
-# Local server data, generated at runtime and never committed. These are patterns rather than
-# exact paths on purpose: the earlier list named `basalt_server_test_world/` and `/world/`, which
-# matched neither `basalt-server/basalt_server_test_world_39566/` nor the current `worlds/` layout,
-# so test worlds and player databases were committed for several releases without anyone noticing.
-# Tests now write under build/ instead, and these are the net that catches the next mistake.
-eula.txt
-config/
-.basalt/
-logs/
-worlds/
-world/
+# Local server data, generated at runtime and never committed.
+#
+# The directory entries are anchored with a leading slash on purpose. Written as `config/` or
+# `world/` they match a directory of that name at ANY depth, which silently swallowed the
+# `org/basaltmc/server/config/` and `org/basaltmc/world/` source packages: ten source files were
+# never committed, and a fresh clone would not have compiled. Anchored, they mean only the runtime
+# directories that sit next to the binary.
+#
+# The extension patterns are deliberately not anchored: a stray .db or .linear anywhere is runtime
+# data. Tests write under build/ instead, so these are only the net for the next mistake.
+/eula.txt
+/eula.toml
+/basalt.toml
+/config/
+/.basalt/
+/logs/
+/worlds/
+/world/
 *.linear
 *.db
 *.db-shm
