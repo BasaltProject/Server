@@ -1,7 +1,10 @@
 package org.basaltmc.common.logging
 
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * A minimal, dependency-free leveled logger. Writes to stdout via [println]; there is no
@@ -62,12 +65,46 @@ public class Logger(
 
         @OptIn(ExperimentalTime::class)
         @PublishedApi
-        internal fun timestamp(): String {
-            // kotlin.time.Instant.toString() is fixed ISO-8601 ("yyyy-MM-ddTHH:mm:ss[.fraction]Z"),
-            // so slicing out the date and whole-second time is simpler and just as reliable as
-            // decomposing the instant into calendar fields by hand.
-            val iso = Clock.System.now().toString()
-            return "${iso.substring(0, 10)} ${iso.substring(11, 19)}"
+        internal fun timestamp(): String = format(Clock.System.now())
+
+        /**
+         * A stored instant in the same shape as the timestamp on every log line, so a date inside a
+         * message reads like the one in front of it instead of as a number nobody can decode.
+         */
+        @OptIn(ExperimentalTime::class)
+        public fun formatEpochSeconds(epochSeconds: Long): String = format(Instant.fromEpochSeconds(epochSeconds))
+
+        /**
+         * Just the local calendar date, `yyyy-MM-dd`, for things named after a day rather than a
+         * moment. It has to be the local date for the same reason the timestamps are local: an
+         * archive written at one in the morning belongs to the day the operator thinks it does, not
+         * to the previous one because UTC had not turned over yet.
+         */
+        @OptIn(ExperimentalTime::class)
+        public fun formatLocalDate(instant: Instant): String = format(instant).substring(0, 10)
+
+        /**
+         * Local time, not UTC: an operator reads their own console against their own clock, and a
+         * log two hours off their wall clock is a small tax paid on every single line. It is also
+         * what vanilla does. The time zone is resolved per call rather than cached so that a server
+         * running across a daylight-saving change keeps telling the truth.
+         */
+        @OptIn(ExperimentalTime::class)
+        private fun format(instant: Instant): String {
+            val local = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+            return buildString {
+                append(local.year.toString().padStart(4, '0'))
+                append('-')
+                append(local.monthNumber.toString().padStart(2, '0'))
+                append('-')
+                append(local.day.toString().padStart(2, '0'))
+                append(' ')
+                append(local.hour.toString().padStart(2, '0'))
+                append(':')
+                append(local.minute.toString().padStart(2, '0'))
+                append(':')
+                append(local.second.toString().padStart(2, '0'))
+            }
         }
     }
 }

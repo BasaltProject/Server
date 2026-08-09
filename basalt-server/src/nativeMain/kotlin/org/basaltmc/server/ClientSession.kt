@@ -588,7 +588,10 @@ public class ClientSession(
                 session.y = spawnY
                 session.z = spawnZ
             }
-            logger.info { "Loaded ${session.name} from players.db (last seen ${stored.lastSeenEpochSeconds})." }
+            logger.info {
+                "Loaded ${session.name} from players.db " +
+                    "(last seen ${Logger.formatEpochSeconds(stored.lastSeenEpochSeconds)})."
+            }
         }
         playerSession = session
 

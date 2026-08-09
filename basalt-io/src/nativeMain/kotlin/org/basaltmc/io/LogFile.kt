@@ -1,6 +1,7 @@
 package org.basaltmc.io
 
 import org.basaltmc.common.logging.LogOutput
+import org.basaltmc.common.logging.Logger
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -89,19 +90,11 @@ public class LogFile private constructor(
         }
 
         @OptIn(ExperimentalTime::class)
-        private fun today(): String =
-            Clock.System
-                .now()
-                .toString()
-                .substring(0, 10)
+        private fun today(): String = Logger.formatLocalDate(Clock.System.now())
 
-        /** [days] before today as `yyyy-MM-dd`, doing the calendar arithmetic on the instant itself. */
+        /** [days] before today as `yyyy-MM-dd`, in the same local zone the archive names use. */
         @OptIn(ExperimentalTime::class)
         internal fun daysBeforeToday(days: Int): String =
-            Clock.System
-                .now()
-                .minus(kotlin.time.Duration.parse("${days}d"))
-                .toString()
-                .substring(0, 10)
+            Logger.formatLocalDate(Clock.System.now().minus(kotlin.time.Duration.parse("${days}d")))
     }
 }
