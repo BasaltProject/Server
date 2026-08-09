@@ -6,6 +6,8 @@ import org.basaltmc.auth.OfflineUuid
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionProfileProperty
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.common.placeholder.PlaceholderContext
+import org.basaltmc.common.placeholder.PlaceholderRegistry
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.io.NativeThread
@@ -92,6 +94,7 @@ import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.registry.Blocks
 import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.PlayerCommandSource
+import org.basaltmc.server.placeholder.PlaceholderSlots
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.FoodData
 import org.basaltmc.server.player.PlayerPersistence
@@ -100,6 +103,8 @@ import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.server.registry.VanillaBiomes
 import org.basaltmc.server.registry.VanillaRegistryData
 import org.basaltmc.server.registry.VanillaTagData
+import org.basaltmc.server.ui.PlayerUi
+import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.WorldState
@@ -166,6 +171,8 @@ public class ClientSession(
     private val playerStore: PlayerStore? = null,
     /** Where this connection came from, or null when nothing should be remembered about it. */
     private val rememberAddress: String? = null,
+    private val ui: UiConfigs = UiConfigs(),
+    private val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
 ) {
     private val logger = Logger("Session")
 
@@ -188,6 +195,13 @@ public class ClientSession(
 
     // Written once per session rather than on every flush: it only changes when someone logs in.
     private var addressRecorded = false
+
+    /**
+     * This player's tab list, scoreboard and boss bar. Ticked from the outbound loop below, because
+     * everything it does writes to this socket and the shared tick thread must never do that.
+     */
+    private val playerUi = PlayerUi(ui, placeholders, ::sendPlayPacket)
+    private var uiTick = 0L
 
     // Persisted counters, carried across sessions. Play time is counted by the same 20 Hz loop that
     // ticks hunger, so it is ticks played rather than wall-clock time connected.
@@ -250,6 +264,7 @@ public class ClientSession(
                         val allowed = sendBudget.toInt()
                         if (allowed > 0) sendBudget -= flushReadyChunks(allowed).toFloat()
                         tickPlayer()
+                        tickUi()
                         sendKeepAliveIfDue()
                     }
                     sleepMillis(OUTBOUND_INTERVAL_MILLIS)
@@ -1146,6 +1161,15 @@ public class ClientSession(
     }
 
     // --- Player state ---
+
+    /** Redraws whatever is due. Failures are swallowed: decoration must never drop a connection. */
+    private fun tickUi() {
+        if (!ui.anyEnabled) return
+        val session = playerSession ?: return
+        val context = PlaceholderContext.EMPTY.with(PlaceholderSlots.PLAYER, session)
+        runCatching { playerUi.tick(uiTick++, context) }
+            .onFailure { logger.debug { "UI update failed for ${session.name}: ${it.message}" } }
+    }
 
     /**
      * One player tick, driven from this connection's own outbound loop rather than [TickLoop].

@@ -21,6 +21,10 @@ public class ServerFacts(
     public val uniqueJoins: () -> Long,
     public val loadedChunks: () -> Int,
     public val liveHeapBytes: () -> Long?,
+    /** Ticks per second over one, five and fifteen minutes, or null before anything has been measured. */
+    public val tickRates: () -> Triple<Double, Double, Double>? = { null },
+    /** Share of one core this process is using, as a percentage, or null where the platform cannot say. */
+    public val cpuPercent: () -> Double? = { null },
 )
 
 /**
@@ -46,7 +50,44 @@ public class ServerPlaceholders(
             "uptime_seconds" to { PlaceholderValue.of((Clock.System.now() - facts.startedAt).inWholeSeconds) },
             // The one memory figure a native runtime with no fixed heap can honestly report.
             "ram_used" to { PlaceholderValue.of(facts.liveHeapBytes()?.let { it / 1_048_576 }) },
+            "cpu" to { PlaceholderValue.of(facts.cpuPercent()?.let { format(it) }) },
+            "tps" to { tps(0) },
+            "tps_1" to { tps(0) },
+            "tps_5" to { tps(1) },
+            "tps_15" to { tps(2) },
+            "tps_1_colored" to { coloured(tps(0)) },
+            "tps_5_colored" to { coloured(tps(1)) },
+            "tps_15_colored" to { coloured(tps(2)) },
         )
+
+    private fun tps(window: Int): PlaceholderValue {
+        val rates = facts.tickRates() ?: return PlaceholderValue.Unavailable("nothing has measured the tick rate yet")
+        val value =
+            when (window) {
+                0 -> rates.first
+                1 -> rates.second
+                else -> rates.third
+            }
+        return PlaceholderValue.of(format(value))
+    }
+
+    /**
+     * The same number wrapped in a colour, as MiniMessage.
+     *
+     * It is markup rather than a component because placeholders are substituted *before* the text is
+     * parsed, which is what lets a colour from here blend into whatever the operator wrote around it.
+     */
+    private fun coloured(value: PlaceholderValue): PlaceholderValue {
+        val text = value.textOrNull ?: return value
+        val number = text.toDoubleOrNull() ?: return value
+        val colour =
+            when {
+                number >= 18.0 -> "green"
+                number >= 15.0 -> "yellow"
+                else -> "red"
+            }
+        return PlaceholderValue.Text("<$colour>$text</$colour>")
+    }
 
     override fun names(): Collection<String> =
         (answers.keys + NOT_IMPLEMENTED.keys + listOf("online_<world>", "time_<format>")).sorted()
@@ -72,22 +113,6 @@ public class ServerPlaceholders(
     private companion object {
         val NOT_IMPLEMENTED =
             buildMap {
-                for (
-                name in listOf(
-                    "tps",
-                    "tps_1",
-                    "tps_5",
-                    "tps_15",
-                    "tps_1_colored",
-                    "tps_5_colored",
-                    "tps_15_colored",
-                )
-                ) {
-                    // Measuring it would report the sleep, not the work: the loop sleeps a fixed 50ms
-                    // per tick instead of subtracting how long the tick took, so it can only ever
-                    // read just under 20. A real figure needs that loop fixed first.
-                    put(name, "the tick loop does not measure or compensate for tick time yet")
-                }
                 for (name in listOf("ram_free", "ram_total", "ram_max")) {
                     put(name, "the native runtime has no fixed heap: only what is live after a collection is known")
                 }
@@ -97,6 +122,12 @@ public class ServerPlaceholders(
                 put("total_entities", "there is no entity system yet")
                 put("total_living_entities", "there is no entity system yet")
             }
+
+        /** Two decimals, without pulling in a formatting library for one number. */
+        fun format(value: Double): String {
+            val rounded = kotlin.math.round(value * 100).toLong()
+            return "${rounded / 100}.${(rounded % 100).toString().padStart(2, '0')}"
+        }
 
         fun formatUptime(elapsed: kotlin.time.Duration): String {
             val days = elapsed.inWholeDays

@@ -14,13 +14,18 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.LogFile
 import org.basaltmc.io.SocketException
 import org.basaltmc.random.XoroshiroRandom
+import org.basaltmc.server.config.AnimationsConfig
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.config.BossBarConfig
 import org.basaltmc.server.config.ColorMode
 import org.basaltmc.server.config.CommandsConfig
 import org.basaltmc.server.config.GroupsConfig
+import org.basaltmc.server.config.ScoreboardConfig
 import org.basaltmc.server.config.ServerListConfig
+import org.basaltmc.server.config.TabListConfig
 import org.basaltmc.server.config.TomlFormatException
 import org.basaltmc.server.config.WorldsConfig
+import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.RealNoiseParameters
 import org.basaltmc.server.world.RealSurfaceEnvironment
 import org.basaltmc.server.world.VillageDataLoader
@@ -126,6 +131,13 @@ private fun run(args: Array<String>) {
     val serverListConfig =
         ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
     val commandsConfig = CommandsConfig.load(logger = Logger("Config"))
+    val animationsConfig = AnimationsConfig.load(logger = Logger("Config"))
+    val uiConfigs =
+        UiConfigs(
+            tabList = TabListConfig.load(logger = Logger("Config")),
+            scoreboard = ScoreboardConfig.load(logger = Logger("Config")),
+            bossBar = BossBarConfig.load(logger = Logger("Config")),
+        )
     // The seed comes from the world itself, not from configuration: a world already on disk was
     // generated with one, and that is the one its terrain matches.
     val worldMetadata =
@@ -170,6 +182,8 @@ private fun run(args: Array<String>) {
         groupsConfig,
         serverListConfig,
         commandsConfig,
+        animationsConfig,
+        uiConfigs,
         lang,
         worldMetadata,
     ).start(startedAt)

@@ -1,6 +1,7 @@
 package org.basaltmc.server
 
 import org.basaltmc.common.placeholder.PlaceholderCondition
+import org.basaltmc.server.config.ProfileHeader
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.ServerListProfile
 import org.basaltmc.server.config.testPlaceholders
@@ -30,7 +31,14 @@ class ServerListStatusTest {
         lookupPlayerByAddress = knownAt::get,
     ).statusFor(protocolVersion, host, address)
 
-    private val plain = ServerListProfile(name = "default", isDefault = true, motd = listOf("Hello"))
+    private fun header(
+        name: String = "default",
+        isDefault: Boolean = true,
+        priority: Int = 0,
+        conditions: List<PlaceholderCondition> = emptyList(),
+    ) = ProfileHeader(name, priority, isDefault, isActive = false, conditions = conditions)
+
+    private val plain = ServerListProfile(header(), motd = listOf("Hello"))
 
     @Test
     fun theCountsComeFromWhoIsActuallyConnected() {
@@ -67,11 +75,16 @@ class ServerListStatusTest {
     @Test
     fun aPlayerRecognisedByAddressIsGreetedByName() {
         val greeter =
-            plain.copy(
+            ServerListProfile(
+                header(
+                    name = "returning",
+                    isDefault = false,
+                    priority = 1,
+                    conditions = listOf(PlaceholderCondition("%basalt_player_known%")),
+                ),
                 motd = listOf("Welcome back, %basalt_player_name%"),
-                conditions = listOf(PlaceholderCondition("%basalt_player_known%")),
             )
-        val profiles = listOf(plain, greeter.copy(name = "returning", isDefault = false, priority = 1))
+        val profiles = listOf(plain, greeter)
 
         val known = statusOf(profiles, knownAt = mapOf("203.0.113.7" to "Whiron"))
         assertEquals("Welcome back, Whiron", PlainTextSerializer.serialize(known.description))
