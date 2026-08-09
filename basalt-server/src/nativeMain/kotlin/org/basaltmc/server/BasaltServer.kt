@@ -3,7 +3,9 @@ package org.basaltmc.server
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.NativeThread
+import org.basaltmc.io.ShutdownSignal
 import org.basaltmc.io.TcpListener
+import org.basaltmc.io.sleepMillis
 import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.server.command.CommandDispatcher
@@ -78,6 +80,9 @@ public class BasaltServer(
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
     private val accepting = AtomicInt(1)
+
+    /** Guards against running the shutdown twice: `/stop` and a signal can arrive together. */
+    private val shuttingDown = AtomicInt(0)
     private var listener: TcpListener? = null
 
     // Before `world`, which generates the startup chunks: declaration order is what makes the flag
@@ -101,7 +106,12 @@ public class BasaltServer(
     private val generationQueue =
         ChunkGenerationQueue(world, DIMENSION, workerCount = if (config.generationMetrics) 1 else 8)
     private val spawn = warmStartupChunksAndComputeSpawn()
-    private val tickLoop = TickLoop(config.saveIntervalSeconds, onSaveInterval = ::persistAndUnload)
+    private val tickLoop =
+        TickLoop(
+            config.saveIntervalSeconds,
+            onSaveInterval = ::persistAndUnload,
+            onTick = ::shutdownIfSignalled,
+        )
 
     // Names are matched case-insensitively, and a change writes straight back to basalt.toml so
     // `op` at the console survives a restart the way vanilla's ops.json does.
@@ -117,6 +127,8 @@ public class BasaltServer(
                 maxPlayers = config.maxPlayers,
                 stopServer = ::shutdown,
                 lang = lang,
+                defaultWorldName = config.worldName,
+                playerRepository = playerStore.players,
             ),
         ).also(::registerVanillaCommands)
 
@@ -193,6 +205,16 @@ public class BasaltServer(
     }
 
     /**
+     * The bridge between a signal and an orderly stop: the handler only sets a flag (it may not do
+     * anything else safely), and this is what notices, once per tick.
+     */
+    private fun shutdownIfSignalled() {
+        if (!ShutdownSignal.isRequested) return
+        logger.info { "Termination signal received, shutting down." }
+        shutdown()
+    }
+
+    /**
      * Brings everything to a stop *before* saving, in that order and for that reason.
      *
      * Saving while the server is still live is not merely slow, it may never finish: connected
@@ -203,7 +225,13 @@ public class BasaltServer(
      * So: disconnect everyone first (nothing new can be requested), stop the tick loop (no
      * competing save), let the queue drain (no chunk half-generated), and only then write, once.
      */
+
     private fun shutdown() {
+        // Once only. `/stop` and a signal can arrive together, and running this twice would mean two
+        // concurrent saves of the same regions, which is exactly the situation the ordering below
+        // exists to avoid.
+        if (!shuttingDown.compareAndSet(0, 1)) return
+
         // First of all, so nothing new can arrive while the rest is winding down. Without this a
         // client with auto-reconnect walks straight back in mid-save and starts requesting chunks
         // again, which is exactly the work shutting down is trying to finish.
@@ -347,6 +375,8 @@ public class BasaltServer(
         // would not be discovered until the first player joined, which is the worst possible moment
         // to find out. It also creates the file, so the layout is complete before anyone connects.
         logger.info { "Player database ready: ${playerStore.players.count()} player(s) known." }
+        // Before the tick loop, which is what polls the flag it sets.
+        ShutdownSignal.install()
         val listener = TcpListener.bind(config.port).also { this.listener = it }
         tickLoop.start()
         ConsoleReader.start(commands)
@@ -375,6 +405,28 @@ public class BasaltServer(
                 ).run()
             }
         }
+
+        awaitShutdown()
+    }
+
+    /**
+     * Keeps `main` alive while a shutdown finishes on another thread.
+     *
+     * [shutdown] runs on whoever asked for it (the console thread, or the tick loop on a signal) and
+     * ends by terminating the process. Its very first act is to close the listener, which unblocks
+     * the `accept()` above and drops out of the loop, so without this wait `main` returns and takes
+     * the process down *while the save is still running*. That is not hypothetical: it silently
+     * truncated the shutdown after "Saving the world.", which is how `players.db` was being left
+     * with all of its rows still in the write-ahead log.
+     */
+    private fun awaitShutdown() {
+        if (shuttingDown.value == 0) return
+        val deadline = TimeSource.Monotonic.markNow()
+        while (deadline.elapsedNow().inWholeMilliseconds < SHUTDOWN_WAIT_TIMEOUT_MILLIS) {
+            sleepMillis(20)
+        }
+        // Only reachable if the shutdown wedged: it normally ends the process itself long before.
+        logger.error { "Shutdown did not finish within ${SHUTDOWN_WAIT_TIMEOUT_MILLIS}ms, exiting anyway." }
     }
 
     private fun currentStatus(): ServerStatusPayload =
@@ -404,5 +456,9 @@ public class BasaltServer(
         // Long enough for an in-flight chunk to land, short enough that a wedged worker cannot
         // hold the shutdown open indefinitely.
         const val SHUTDOWN_DRAIN_TIMEOUT_MILLIS = 5_000L
+
+        // Generous on purpose: saving a large world legitimately takes a while, and cutting a save
+        // short is far worse than waiting for one.
+        const val SHUTDOWN_WAIT_TIMEOUT_MILLIS = 120_000L
     }
 }

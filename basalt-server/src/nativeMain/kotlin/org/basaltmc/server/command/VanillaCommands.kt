@@ -5,6 +5,7 @@ import org.basaltmc.server.command.commands.EmoteCommand
 import org.basaltmc.server.command.commands.ExperienceCommand
 import org.basaltmc.server.command.commands.GameModeCommand
 import org.basaltmc.server.command.commands.HelpCommand
+import org.basaltmc.server.command.commands.ImportPlayersCommand
 import org.basaltmc.server.command.commands.KickCommand
 import org.basaltmc.server.command.commands.KillCommand
 import org.basaltmc.server.command.commands.ListPlayersCommand
@@ -24,6 +25,9 @@ import org.basaltmc.server.command.commands.TeleportCommand
  *
  * What is *not* here is most of vanilla's command set (the world, scoreboard, data and datapack
  * families) plus the selector filter syntax: both are declared gaps, not silent ones.
+ *
+ * `import-players` is the one command with no vanilla counterpart, because it administers something
+ * vanilla does not have: a player database outside the world directories.
  */
 public val VANILLA_COMMANDS: List<Command> =
     listOf(
@@ -40,6 +44,7 @@ public val VANILLA_COMMANDS: List<Command> =
         OpCommand(),
         DeopCommand(),
         StopCommand(),
+        ImportPlayersCommand(),
     )
 
 public fun registerVanillaCommands(dispatcher: CommandDispatcher) {

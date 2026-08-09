@@ -1,5 +1,6 @@
 package org.basaltmc.storage
 
+import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import app.cash.sqldelight.driver.native.wrapConnection
@@ -27,11 +28,23 @@ public class PlayerStore private constructor(
 ) : AutoCloseable {
     public val players: PlayerRepository = PlayerRepository(database)
 
+    /**
+     * Folds the write-ahead log back into the database file, then closes.
+     *
+     * The checkpoint is not optional, which is worth stating because the opposite looks true:
+     * SQLite is documented to checkpoint when the last connection closes, but measured here it does
+     * not happen through this driver. Without this call a clean shutdown left `players.db` at 4 KB
+     * with every row sitting in a 24 KB `-wal` beside it. Nothing is lost (any SQLite reader
+     * replays the log) but the database is only complete as a *set* of files, so copying
+     * `players.db` on its own for a backup would silently copy an empty database.
+     *
+     * It goes through `executeQuery` rather than `execute` because `PRAGMA wal_checkpoint` answers
+     * with a row, and the driver refuses to run a row-returning statement as a plain execute.
+     */
     override fun close() {
-        // No explicit checkpoint: SQLite folds the write-ahead log back into the database file and
-        // removes it when the last connection to it closes, which this is. Asking for one by hand
-        // is both unnecessary and awkward, since `PRAGMA wal_checkpoint` answers with a row and the
-        // driver refuses to run a row-returning statement as a plain execute.
+        runCatching {
+            driver.executeQuery(null, "PRAGMA wal_checkpoint(TRUNCATE)", { QueryResult.Value(Unit) }, 0)
+        }
         driver.close()
     }
 
