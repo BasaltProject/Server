@@ -61,7 +61,11 @@ internal fun startTestServer(
                 logColor = ColorMode.NEVER,
                 generationMetrics = false,
             )
-        NativeThread.start { BasaltServer(config, onlineMode).start() }
+        // Its own database file per port, for the same reason each test server owns its own world:
+        // a shared players.db would carry one test's saved positions into the next one's join.
+        val playersDatabase = "./basalt_server_test_players_$port.db"
+        for (suffix in listOf("", "-wal", "-shm")) platform.posix.remove("$playersDatabase$suffix")
+        NativeThread.start { BasaltServer(config, onlineMode, playersDatabasePath = playersDatabase).start() }
         // Generous, not tight: BasaltServer now generates and saves real chunks before it starts
         // listening, several real seconds on a cold asset cache, not the near-instant startup this
         // deadline was tuned for back when world generation was a fixed in-memory flat world.

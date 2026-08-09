@@ -6,6 +6,7 @@ ktlint-gradle = "13.0.0"
 cryptography-kotlin = "0.6.0"
 ktor = "3.5.2"
 zstd-kmp = "0.4.0"
+sqldelight = "2.3.2"
 
 [libraries]
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
@@ -19,6 +20,7 @@ ktor-client-curl = { module = "io.ktor:ktor-client-curl", version.ref = "ktor" }
 ktor-client-winhttp = { module = "io.ktor:ktor-client-winhttp", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 zstd-kmp = { module = "com.squareup.zstd:zstd-kmp", version.ref = "zstd-kmp" }
+sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }

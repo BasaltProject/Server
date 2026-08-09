@@ -18,6 +18,7 @@ import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.RegionStore
 import org.basaltmc.server.world.WorldState
+import org.basaltmc.storage.PlayerStore
 import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
 import org.basaltmc.text.TextColor
@@ -70,6 +71,7 @@ public class BasaltServer(
     private val villageGenerator: VillageStructureGenerator? = null,
     private val worldSeed: Long = 0L,
     private val lang: LangTable = LangTable.EMPTY,
+    playersDatabasePath: String = PLAYERS_DATABASE,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
@@ -81,6 +83,13 @@ public class BasaltServer(
     init {
         GenerationMetrics.enabled = config.generationMetrics
     }
+
+    /**
+     * Player state, deliberately outside every world directory: `players.db` sits beside `worlds/`,
+     * so a world can be deleted, copied or reset without touching a single row. That is the whole
+     * reason it is not where vanilla puts it.
+     */
+    private val playerStore = PlayerStore.open(playersDatabasePath)
 
     private val regions = RegionStore(config.worldName, DIMENSION)
     private val world = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
@@ -163,12 +172,21 @@ public class BasaltServer(
         saveWorld(world.dirtyChunks())
     }
 
-    /** One tick-loop hook for both: unloading has to save what it drops, so they belong together. */
+    /** Writes every online player as one transaction, on the same interval the world saves on. */
+    private fun persistPlayers() {
+        val snapshots = playerRegistry.snapshot().mapNotNull { it.connection.storedSnapshot() }
+        if (snapshots.isEmpty()) return
+        runCatching { playerStore.players.saveAll(snapshots) }
+            .onFailure { logger.error(it) { "Failed to save ${snapshots.size} player(s)" } }
+    }
+
+    /** One tick-loop hook for all three: unloading has to save what it drops, so they belong together. */
     private fun persistAndUnload() {
         // Emitted before the work, not after: if this method ever stops completing, the last thing
         // in the log is where it got to, instead of nothing at all.
         logger.debug { "Sweep starting: ${world.loadedChunkCount} loaded, ${generationQueue.pendingCount()} pending." }
         persistChangedChunks()
+        persistPlayers()
         unloadUnreachableChunks()
     }
 
@@ -206,6 +224,9 @@ public class BasaltServer(
         logger.info { "Saving the world." }
         saveWorld(world.dirtyChunks())
         regions.flush()
+        // After the players have been disconnected above, which already saved each of them: this is
+        // the checkpoint that leaves players.db as one self-contained file.
+        runCatching { playerStore.close() }.onFailure { logger.error(it) { "Failed to close players.db" } }
         logger.info { "Stopping the server." }
         exitProcess(0)
     }
@@ -320,6 +341,10 @@ public class BasaltServer(
 
     @OptIn(ExperimentalTime::class)
     public fun start(startedAt: Instant = Clock.System.now()) {
+        // The driver opens lazily, so without a query here a bad path or an unreadable database
+        // would not be discovered until the first player joined, which is the worst possible moment
+        // to find out. It also creates the file, so the layout is complete before anyone connects.
+        logger.info { "Player database ready: ${playerStore.players.count()} player(s) known." }
         val listener = TcpListener.bind(config.port).also { this.listener = it }
         tickLoop.start()
         ConsoleReader.start(commands)
@@ -343,6 +368,8 @@ public class BasaltServer(
                     commands = commands,
                     defaultGamemode = defaultGamemode,
                     difficulty = difficulty,
+                    playerStore = playerStore,
+                    worldName = config.worldName,
                 ).run()
             }
         }
@@ -364,6 +391,9 @@ public class BasaltServer(
         // while staying in the range a real client behaves normally at.
         const val SPAWN_RADIUS_CHUNKS = 3
         const val DIMENSION = "overworld"
+
+        // Beside worlds/, never inside one.
+        const val PLAYERS_DATABASE = "players.db"
 
         // Beyond the view distance, so a chunk already requested or prefetched by a session is
         // still there when that session gets round to sending it.

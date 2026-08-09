@@ -1,0 +1,5 @@
+# Only here to carry the statically compiled SQLite into the binary: the Kotlin bindings this
+# generates are unused, because SQLDelight's driver declares its own. See basalt.sqlite-native.
+package = org.basaltmc.storage.sqlite3
+headers = sqlite3.h
+headerFilter = sqlite3.h
