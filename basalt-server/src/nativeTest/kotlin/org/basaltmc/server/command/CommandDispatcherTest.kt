@@ -176,6 +176,47 @@ class CommandDispatcherTest {
     }
 
     @Test
+    fun registeringACommandObjectCarriesItsNamePermissionAndAliases() {
+        // The contract a BSMod command will be written against: declare the three, fill in build().
+        val dispatcher = CommandDispatcher(testEnvironment())
+        var ran = 0
+        dispatcher.register(
+            object : Command(name = "warp", permissionLevel = PermissionLevel.GAMEMASTERS, aliases = listOf("w")) {
+                override fun build(root: CommandNodeBuilder) {
+                    root.argument("amount", IntegerArgument()) {
+                        executes {
+                            ran++
+                            1
+                        }
+                    }
+                }
+            },
+        )
+
+        assertEquals(1, dispatcher.execute(RecordingSource(), "warp 3"))
+        assertEquals(1, dispatcher.execute(RecordingSource(), "w 3"))
+        assertEquals(2, ran)
+
+        // Sub-commands inherit the command's permission, so a player below it sees neither form.
+        val outsider = RecordingSource(permissionLevel = PermissionLevel.ALL)
+        assertEquals(0, dispatcher.execute(outsider, "warp 3"))
+        assertEquals("Unknown command", outsider.messages.first())
+        assertTrue(dispatcher.treeFor(outsider).nodes.none { it.name == "warp" || it.name == "w" })
+    }
+
+    @Test
+    fun everyVanillaCommandRegistersWithoutClashing() {
+        val dispatcher = CommandDispatcher(testEnvironment())
+        registerVanillaCommands(dispatcher)
+
+        val names = dispatcher.usableCommands(RecordingSource()).map { it.name }
+        assertEquals(names.distinct(), names)
+        assertContains(names, "gamemode")
+        assertContains(names, "tp")
+        assertContains(names, "xp")
+    }
+
+    @Test
     fun smartUsageMatchesBrigadiersBracketRules() {
         val dispatcher = CommandDispatcher(testEnvironment())
         val gamemode =
