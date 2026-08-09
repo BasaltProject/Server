@@ -25,7 +25,7 @@ internal fun testServerList(): ServerListConfig {
 
 /** Only the player side: nothing here asks the server about itself. */
 internal fun testPlaceholders(): PlaceholderRegistry =
-    PlaceholderRegistry().apply { register("basalt_player", PlayerPlaceholders(testGroups())) }
+    PlaceholderRegistry().apply { register("basalt_player", PlayerPlaceholders({ testGroups() })) }
 
 class ServerListConfigTest {
     private val placeholders = testPlaceholders()

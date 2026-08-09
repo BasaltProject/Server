@@ -13,13 +13,18 @@ import org.basaltmc.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.server.command.testGroups
+import org.basaltmc.server.config.AnimationsConfig
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
+import org.basaltmc.server.config.CommandsConfig
+import org.basaltmc.server.config.ConfigSnapshot
+import org.basaltmc.server.config.LiveConfigs
 import org.basaltmc.server.config.WorldDeclaration
 import org.basaltmc.server.config.WorldSettings
 import org.basaltmc.server.config.WorldType
 import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.config.testServerList
+import org.basaltmc.server.ui.UiConfigs
 import kotlin.time.TimeSource
 
 /**
@@ -85,8 +90,16 @@ internal fun startTestServer(
                 config,
                 onlineMode,
                 worldsConfig = worldsConfig,
-                groupsConfig = testGroups(),
-                serverListConfig = testServerList(),
+                live =
+                    LiveConfigs(
+                        ConfigSnapshot(
+                            groups = testGroups(),
+                            serverList = testServerList(),
+                            commands = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
+                            animations = AnimationsConfig(emptyMap()),
+                            ui = UiConfigs(),
+                        ),
+                    ),
                 playersDatabasePath = playersDatabase,
                 worldsRoot = "$TEST_DATA_ROOT/worlds",
             ).start()

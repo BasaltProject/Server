@@ -21,7 +21,7 @@ class ServerListStatusTest {
         host: String = "example.com",
         address: String? = "203.0.113.7",
     ) = ServerListStatus(
-        config = ServerListConfig(profiles, profiles.first { it.isDefault }, rememberIp),
+        config = { ServerListConfig(profiles, profiles.first { it.isDefault }, rememberIp) },
         placeholders = testPlaceholders(),
         slots = 20,
         versionName = "26.2",
@@ -99,7 +99,7 @@ class ServerListStatusTest {
         var lookups = 0
         val status =
             ServerListStatus(
-                config = ServerListConfig(listOf(plain), plain, rememberIp = false),
+                config = { ServerListConfig(listOf(plain), plain, rememberIp = false) },
                 placeholders = testPlaceholders(),
                 slots = 20,
                 versionName = "26.2",

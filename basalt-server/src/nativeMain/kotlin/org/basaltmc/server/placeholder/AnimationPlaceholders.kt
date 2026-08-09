@@ -23,11 +23,11 @@ import kotlin.time.ExperimentalTime
  */
 @OptIn(ExperimentalTime::class)
 public class AnimationPlaceholders(
-    private val animations: AnimationsConfig,
+    private val animations: () -> AnimationsConfig,
     private val registry: () -> PlaceholderRegistry,
 ) : PlaceholderProvider,
     PlaceholderCatalog {
-    override fun names(): Collection<String> = animations.names.sorted()
+    override fun names(): Collection<String> = animations().names.sorted()
 
     override fun resolve(
         params: String,
@@ -35,7 +35,7 @@ public class AnimationPlaceholders(
     ): PlaceholderValue {
         if (params.isEmpty()) return PlaceholderValue.Unknown
         val animation =
-            animations[params]
+            animations()[params]
                 ?: return PlaceholderValue.Unavailable(
                     "no animation named '$params' in ${AnimationsConfig.FILE_NAME}",
                 )

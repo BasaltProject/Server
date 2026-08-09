@@ -12,20 +12,16 @@ import org.basaltmc.auth.SessionKeyPair
 import org.basaltmc.common.logging.LogOutput
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.LogFile
+import org.basaltmc.io.ShutdownSignal
 import org.basaltmc.io.SocketException
 import org.basaltmc.random.XoroshiroRandom
-import org.basaltmc.server.config.AnimationsConfig
+import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.config.BasaltConfig
-import org.basaltmc.server.config.BossBarConfig
 import org.basaltmc.server.config.ColorMode
-import org.basaltmc.server.config.CommandsConfig
-import org.basaltmc.server.config.GroupsConfig
-import org.basaltmc.server.config.ScoreboardConfig
+import org.basaltmc.server.config.LiveConfigs
 import org.basaltmc.server.config.ServerListConfig
-import org.basaltmc.server.config.TabListConfig
 import org.basaltmc.server.config.TomlFormatException
 import org.basaltmc.server.config.WorldsConfig
-import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.RealNoiseParameters
 import org.basaltmc.server.world.RealSurfaceEnvironment
 import org.basaltmc.server.world.VillageDataLoader
@@ -93,19 +89,53 @@ private fun run(args: Array<String>) {
     val attachedToTerminal = isatty(STDOUT_FILENO) == 1
     LogOutput.useColor = attachedToTerminal
 
-    // Before anything else that logs: configuration decides where log lines go, so loading it later
-    // would mean the whole asset and world-generation startup never reached the log file.
-    val config = BasaltConfig.load(logger = Logger("Config"))
-    Logger.defaultMinLevel = config.logLevel
+    // Read once for the things that cannot be redone per instance: the log file would archive
+    // itself on every restart, and colour is a property of the terminal, not of the server.
+    val bootConfig = BasaltConfig.load(logger = Logger("Config"))
+    Logger.defaultMinLevel = bootConfig.logLevel
     LogOutput.useColor =
-        when (config.logColor) {
+        when (bootConfig.logColor) {
             ColorMode.ALWAYS -> true
             ColorMode.NEVER -> false
             ColorMode.AUTO -> attachedToTerminal
         }
-    if (config.logToFile) {
-        LogFile.install(LOG_ROOT, keepDays = config.logKeepDays, header = versionLine())
+    if (bootConfig.logToFile) {
+        LogFile.install(LOG_ROOT, keepDays = bootConfig.logKeepDays, header = versionLine())
     }
+
+    // Installed once for the process, not once per server: a second handler would leave the first
+    // one pointing at an instance that has already stopped.
+    ShutdownSignal.install()
+
+    // The console outlives the server it talks to, because `/restart` replaces that server while
+    // this thread is parked inside a blocking read of stdin. See ConsoleReader's own KDoc.
+    var server: BasaltServer? = null
+    ConsoleReader.start { server?.commands }
+
+    // One instance per turn around this loop. A restart is not a re-exec and not a new process: the
+    // old instance winds itself down exactly as `/stop` does, and then a new one is built from the
+    // files as they are now. That is what makes server.toml and worlds.toml applicable, which
+    // `/reload` deliberately cannot do.
+    var first = true
+    while (true) {
+        val instanceStartedAt = if (first) startedAt else Clock.System.now()
+        first = false
+        val instance = buildServer(attachedToTerminal)
+        server = instance
+        instance.start(instanceStartedAt)
+        if (!instance.shouldRestart) break
+        server = null
+    }
+    exitProcess(0)
+}
+
+/** Builds one server from the configuration as it stands right now. Called again on every restart. */
+@OptIn(ExperimentalTime::class)
+private fun buildServer(attachedToTerminal: Boolean): BasaltServer {
+    // Read again on every start, so a restart really does pick up an edited server.toml: the port,
+    // the game mode and the log level are all decided here.
+    val config = BasaltConfig.load(logger = Logger("Config"))
+    Logger.defaultMinLevel = config.logLevel
 
     // Downloading is the fallback, not the path: once a version's data is unpacked the lambda below
     // is never invoked, so a warm install resolves no metadata, contacts no network and reads no
@@ -125,19 +155,12 @@ private fun run(args: Array<String>) {
     // Real Overworld density-function router (see NoiseRouterData/TerrainProvider), built once at
     // startup and reused for every generated chunk.
     val worldsConfig = WorldsConfig.load(logger = Logger("Config"))
-    val groupsConfig = GroupsConfig.load(logger = Logger("Config"))
     // The MOTD is the one thing the server list takes from a vanilla server.properties, and only
     // while generating the file for the first time.
-    val serverListConfig =
-        ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
-    val commandsConfig = CommandsConfig.load(logger = Logger("Config"))
-    val animationsConfig = AnimationsConfig.load(logger = Logger("Config"))
-    val uiConfigs =
-        UiConfigs(
-            tabList = TabListConfig.load(logger = Logger("Config")),
-            scoreboard = ScoreboardConfig.load(logger = Logger("Config")),
-            bossBar = BossBarConfig.load(logger = Logger("Config")),
-        )
+    // Generated on first run before anything else reads them, so the MOTD import from a vanilla
+    // server.properties happens exactly once, here.
+    ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
+    val live = LiveConfigs(LiveConfigs.read(logger = Logger("Config")))
     // The seed comes from the world itself, not from configuration: a world already on disk was
     // generated with one, and that is the one its terrain matches.
     val worldMetadata =
@@ -172,21 +195,17 @@ private fun run(args: Array<String>) {
     // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
     // server.jar as everything else, so this costs no extra download.
     val lang = LangAssets.loadCachedOrEmpty(dataRoot)
-    BasaltServer(
+    return BasaltServer(
         config,
         onlineMode,
         overworldRouter,
         surfaceEnvironment,
         villageGenerator,
         worldsConfig,
-        groupsConfig,
-        serverListConfig,
-        commandsConfig,
-        animationsConfig,
-        uiConfigs,
+        live,
         lang,
         worldMetadata,
-    ).start(startedAt)
+    )
 }
 
 private fun versionLine(): String = "Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})"

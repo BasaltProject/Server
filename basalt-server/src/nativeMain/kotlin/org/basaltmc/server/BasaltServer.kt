@@ -10,13 +10,11 @@ import org.basaltmc.io.sleepMillis
 import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.CommandEnvironment
-import org.basaltmc.server.command.ConsoleReader
+import org.basaltmc.server.command.commands.ReloadCommand
+import org.basaltmc.server.command.commands.RestartCommand
 import org.basaltmc.server.command.registerVanillaCommands
-import org.basaltmc.server.config.AnimationsConfig
 import org.basaltmc.server.config.BasaltConfig
-import org.basaltmc.server.config.CommandsConfig
-import org.basaltmc.server.config.GroupsConfig
-import org.basaltmc.server.config.ServerListConfig
+import org.basaltmc.server.config.LiveConfigs
 import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.placeholder.AnimationPlaceholders
 import org.basaltmc.server.placeholder.PlayerPlaceholders
@@ -24,7 +22,6 @@ import org.basaltmc.server.placeholder.ServerFacts
 import org.basaltmc.server.placeholder.ServerPlaceholders
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
-import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.WORLDS_ROOT
 import org.basaltmc.server.world.WorldMetadata
@@ -39,7 +36,6 @@ import org.basaltmc.world.terrain.RealTerrainGenerator
 import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.concurrent.AtomicInt
-import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -78,11 +74,11 @@ public class BasaltServer(
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
     private val worldsConfig: WorldsConfig,
-    private val groupsConfig: GroupsConfig,
-    private val serverListConfig: ServerListConfig,
-    private val commandsConfig: CommandsConfig = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
-    private val animationsConfig: AnimationsConfig = AnimationsConfig(emptyMap()),
-    private val uiConfigs: UiConfigs = UiConfigs(),
+    /**
+     * Everything `/reload` can swap under a running server, read through this rather than copied:
+     * see [LiveConfigs] for where the line between reloadable and not is drawn and why.
+     */
+    public val live: LiveConfigs,
     private val lang: LangTable = LangTable.EMPTY,
     /**
      * The world's own metadata, already loaded. `Main` needs the seed before this class exists (it
@@ -100,6 +96,14 @@ public class BasaltServer(
 
     /** Guards against running the shutdown twice: `/stop` and a signal can arrive together. */
     private val shuttingDown = AtomicInt(0)
+
+    /** Set once the shutdown has finished its last write, so the caller knows it is safe to proceed. */
+    private val shutdownComplete = AtomicInt(0)
+
+    /** Whether this instance stopped in order to be replaced by a fresh one in the same process. */
+    private val restarting = AtomicInt(0)
+
+    public val shouldRestart: Boolean get() = restarting.value == 1
     private var listener: TcpListener? = null
 
     // Before `world`, which generates the startup chunks: declaration order is what makes the flag
@@ -182,8 +186,11 @@ public class BasaltServer(
      */
     public val placeholders: PlaceholderRegistry =
         PlaceholderRegistry().apply {
-            register("basalt_player", PlayerPlaceholders(groupsConfig) { worlds })
-            register(AnimationPlaceholders.IDENTIFIER, AnimationPlaceholders(animationsConfig) { placeholders })
+            register("basalt_player", PlayerPlaceholders({ live.current.groups }) { worlds })
+            register(
+                AnimationPlaceholders.IDENTIFIER,
+                AnimationPlaceholders({ live.current.animations }) { placeholders },
+            )
             register(
                 "basalt_server",
                 ServerPlaceholders(
@@ -207,11 +214,11 @@ public class BasaltServer(
             )
         }
 
-    private val commands =
+    public val commands: CommandDispatcher =
         CommandDispatcher(
             CommandEnvironment(
                 players = playerRegistry,
-                groups = groupsConfig,
+                groupsProvider = { live.current.groups },
                 worldSeed = worldSeed,
                 maxPlayers = config.maxPlayers,
                 stopServer = ::shutdown,
@@ -220,9 +227,11 @@ public class BasaltServer(
                 playerRepository = playerStore.players,
                 worlds = worlds,
                 placeholders = placeholders,
-                commands = commandsConfig,
+                commandsProvider = { live.current.commands },
             ),
         ).also(::registerVanillaCommands)
+            .also { it.register(ReloadCommand(live, ::onConfigsReloaded)) }
+            .also { it.register(RestartCommand(::requestRestart)) }
 
     /**
      * The server list, rebuilt per ping from `server_list.toml`.
@@ -233,7 +242,7 @@ public class BasaltServer(
      */
     private val serverList =
         ServerListStatus(
-            config = serverListConfig,
+            config = { live.current.serverList },
             placeholders = placeholders,
             slots = config.maxPlayers,
             versionName = BuildInfo.MINECRAFT_VERSION,
@@ -243,6 +252,21 @@ public class BasaltServer(
             },
             lookupPlayerByAddress = playerStore.players::findNameByAddress,
         )
+
+    /**
+     * What has to be told that the configuration changed.
+     *
+     * The tab list, scoreboard, boss bar and server list all read their file on every use, so they
+     * need nothing. The command tree does not: a command's permission and aliases are baked in when
+     * it is registered, and the client holds its own copy for autocompletion, so both have to be
+     * built again and sent out.
+     */
+    private fun onConfigsReloaded() {
+        commands.rebuild()
+        for (player in playerRegistry.snapshot()) {
+            runCatching { player.connection.sendCommandTree() }
+        }
+    }
 
     private val defaultGamemode =
         Gamemode.entries.firstOrNull { it.name.equals(config.gamemode, ignoreCase = true) } ?: Gamemode.SURVIVAL
@@ -368,8 +392,21 @@ public class BasaltServer(
         // The players were saved before being disconnected, above. This is the checkpoint that
         // leaves players.db as one self-contained file.
         runCatching { playerStore.close() }.onFailure { logger.error(it) { "Failed to close players.db" } }
-        logger.info { "Stopping the server." }
-        exitProcess(0)
+        logger.info { if (shouldRestart) "Restarting the server." else "Stopping the server." }
+        shutdownComplete.value = 1
+    }
+
+    /**
+     * Stops this instance so that a fresh one can take its place **in the same process**.
+     *
+     * Nothing is re-executed and no new process is spawned: everything this instance owns is wound
+     * down exactly as `/stop` winds it down, and the caller then builds another one. That is what
+     * makes `server.toml` and `worlds.toml` applicable, which `/reload` cannot do: the port is
+     * rebound and the worlds are loaded again from scratch, because they really are new.
+     */
+    internal fun requestRestart() {
+        restarting.value = 1
+        shutdown()
     }
 
     @OptIn(ExperimentalTime::class)
@@ -378,11 +415,8 @@ public class BasaltServer(
         // would not be discovered until the first player joined, which is the worst possible moment
         // to find out. It also creates the file, so the layout is complete before anyone connects.
         logger.info { "Player database ready: ${playerStore.players.count()} player(s) known." }
-        // Before the tick loop, which is what polls the flag it sets.
-        ShutdownSignal.install()
         val listener = TcpListener.bind(config.port).also { this.listener = it }
         tickLoop.start()
-        ConsoleReader.start(commands)
         val elapsedSeconds = (Clock.System.now() - startedAt).inWholeMilliseconds / 1000.0
         logger.info {
             "Done (${elapsedSeconds}s)! Listening on port ${config.port} " +
@@ -402,8 +436,8 @@ public class BasaltServer(
                     defaultGamemode = defaultGamemode,
                     difficulty = difficulty,
                     playerStore = playerStore,
-                    rememberAddress = if (serverListConfig.rememberIp) connection.remoteAddress else null,
-                    ui = uiConfigs,
+                    rememberAddress = if (live.current.serverList.rememberIp) connection.remoteAddress else null,
+                    ui = { live.current.ui },
                     placeholders = placeholders,
                 ).run()
             }
@@ -415,21 +449,22 @@ public class BasaltServer(
     /**
      * Keeps `main` alive while a shutdown finishes on another thread.
      *
-     * [shutdown] runs on whoever asked for it (the console thread, or the tick loop on a signal) and
-     * ends by terminating the process. Its very first act is to close the listener, which unblocks
-     * the `accept()` above and drops out of the loop, so without this wait `main` returns and takes
-     * the process down *while the save is still running*. That is not hypothetical: it silently
-     * truncated the shutdown after "Saving the world.", which is how `players.db` was being left
-     * with all of its rows still in the write-ahead log.
+     * [shutdown] runs on whoever asked for it (the console thread, or the tick loop on a signal).
+     * Its very first act is to close the listener, which unblocks the `accept()` above and drops out
+     * of the loop, so without this wait the caller carries on *while the save is still running*.
+     * That is not hypothetical: it silently truncated the shutdown after "Saving the world.", which
+     * is how `players.db` was being left with all of its rows still in the write-ahead log. On a
+     * restart it matters twice over, since the next instance would otherwise open the database and
+     * bind the port while this one is still closing them.
      */
     private fun awaitShutdown() {
         if (shuttingDown.value == 0) return
         val deadline = TimeSource.Monotonic.markNow()
         while (deadline.elapsedNow().inWholeMilliseconds < SHUTDOWN_WAIT_TIMEOUT_MILLIS) {
+            if (shutdownComplete.value == 1) return
             sleepMillis(20)
         }
-        // Only reachable if the shutdown wedged: it normally ends the process itself long before.
-        logger.error { "Shutdown did not finish within ${SHUTDOWN_WAIT_TIMEOUT_MILLIS}ms, exiting anyway." }
+        logger.error { "Shutdown did not finish within ${SHUTDOWN_WAIT_TIMEOUT_MILLIS}ms, carrying on anyway." }
     }
 
     private companion object {

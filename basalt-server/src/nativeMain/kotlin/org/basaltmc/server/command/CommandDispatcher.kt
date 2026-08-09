@@ -181,8 +181,33 @@ public class CommandDispatcher(
     private val root = RootNode()
     internal val feedback: CommandFeedback = CommandFeedback(environment)
 
+    /** What was registered from code, so a reload can build the tree again from the same list. */
+    private var registered: List<Command> = emptyList()
+
     init {
+        registerCustom()
+    }
+
+    private fun registerCustom() {
         for (definition in environment.commands.custom) register(ConfiguredCommand(definition))
+    }
+
+    /**
+     * Builds the tree again from the current `commands.toml`.
+     *
+     * The whole tree, not a patch of it: a command's permission, its aliases and whether it exists
+     * at all are decided while it is being registered, so working out the difference would mean
+     * reimplementing registration a second way. Rebuilding is cheap (it is a few dozen nodes) and
+     * cannot drift from what a fresh start would have produced, which for a reload is the property
+     * that matters.
+     *
+     * The caller is responsible for sending the new tree to every connected client: until it does,
+     * their client still autocompletes the old one.
+     */
+    public fun rebuild() {
+        root.children.clear()
+        registerCustom()
+        for (command in registered) registerBuilt(command)
     }
 
     /**
@@ -193,6 +218,13 @@ public class CommandDispatcher(
      * refusal. A command that answers "you may not do that" tells everyone it exists.
      */
     public fun register(command: Command): LiteralNode? {
+        // Remembered before the override is consulted, so a command switched off in the file can be
+        // switched back on by a later reload.
+        if (registered.none { it.name == command.name }) registered = registered + command
+        return registerBuilt(command)
+    }
+
+    private fun registerBuilt(command: Command): LiteralNode? {
         val override = environment.commands[command.name]
         if (!override.enabled) return null
 
