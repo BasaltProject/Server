@@ -152,23 +152,30 @@ public class ServerListStatus(
      * Placeholders are filled in before MiniMessage parses, so `%...%` and `<...>` never have to
      * agree about anything.
      *
-     * A placeholder that cannot be answered is left visible in the text and reported once. Blanking
-     * it would leave the operator with a sentence missing a word and nothing to go on.
+     * The two failures are treated differently on purpose, and the difference is what the MOTD is:
+     * a line strangers read.
+     *
+     * A name nobody registered is the operator's mistake. It stays visible and is warned about, so
+     * that a typo is found rather than silently eating a word.
+     *
+     * A real name this ping cannot answer is *ordinary*. `%basalt_player_name%` is unanswerable for
+     * everyone who has never connected before, which is most of the people who will ever ping. It
+     * resolves to nothing and is only noted in the debug log: showing `%basalt_player_name%` to a
+     * stranger, or warning once per server about something working as designed, are both wrong.
      */
     private fun substitute(
         text: String,
         context: PlaceholderContext,
     ): String =
         PlaceholderText.substitute(text, placeholders, context) { name, value ->
-            reportOnce(
-                when {
-                    value is PlaceholderValue.Unavailable && value.reason != null ->
-                        "The server list uses %$name%, which it cannot fill in here: ${value.reason}."
-                    value is PlaceholderValue.Unknown ->
-                        "The server list uses %$name%, which is not a placeholder this server knows."
-                    else -> "The server list uses %$name%, which cannot be filled in here."
-                },
-            )
+            if (value is PlaceholderValue.Unknown) {
+                reportOnce("The server list uses %$name%, which is not a placeholder this server knows.")
+                null
+            } else {
+                val reason = (value as? PlaceholderValue.Unavailable)?.reason ?: "no reason given"
+                logger.debug { "Server list placeholder %$name% is empty here: $reason." }
+                ""
+            }
         }
 
     private fun reportOnce(message: String) {

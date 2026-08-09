@@ -7,16 +7,19 @@ package org.basaltmc.common.placeholder
  * more" has no placeholder in it, because neither run between two per cent signs is a single word.
  * `%%` is a literal per cent sign for the cases that rule does not cover.
  *
- * A name nobody can answer is left exactly as written rather than blanked. Text that still says
- * `%basalt_player_name%` tells the operator what went wrong; text that silently lost a word does
- * not.
+ * A name nobody can answer is left exactly as written by default: text that still says
+ * `%basalt_player_name%` tells the operator what went wrong, where text that silently lost a word
+ * does not. A caller that knows better decides otherwise from [onUnresolved], because "leave the
+ * debug text in" is the right answer for a config file being checked and the wrong one for a line
+ * that strangers read.
  */
 public object PlaceholderText {
     public fun substitute(
         text: String,
         registry: PlaceholderRegistry,
         context: PlaceholderContext = PlaceholderContext.EMPTY,
-        onProblem: (name: String, value: PlaceholderValue) -> Unit = { _, _ -> },
+        /** What to put there, or null to keep the placeholder as written. Called only on failure. */
+        onUnresolved: (name: String, value: PlaceholderValue) -> String? = { _, _ -> null },
     ): String {
         if ('%' !in text) return text
         val result = StringBuilder(text.length)
@@ -43,8 +46,8 @@ public object PlaceholderText {
             when (val value = registry.resolve(name, context)) {
                 is PlaceholderValue.Text -> result.append(value.value)
                 else -> {
-                    result.append(text, index, close + 1)
-                    onProblem(name, value)
+                    val replacement = onUnresolved(name, value)
+                    if (replacement == null) result.append(text, index, close + 1) else result.append(replacement)
                 }
             }
             index = close + 1

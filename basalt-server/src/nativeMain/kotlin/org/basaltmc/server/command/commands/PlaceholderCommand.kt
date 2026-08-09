@@ -152,6 +152,9 @@ public class PlaceholderCommand :
     ): String =
         PlaceholderText.substitute(text, context.environment.placeholders, placeholderContext) { name, value ->
             context.source.sendSystemMessage(problem(name, value))
+            // Kept as written: this command exists to show what a line does, and a blank where a
+            // placeholder was is exactly what nobody can debug.
+            null
         }
 
     private fun describe(

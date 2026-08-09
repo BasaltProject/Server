@@ -69,6 +69,7 @@ public class PlaceholderCondition(
                         },
                     )
             }
+            null
         }
         val leftText = PlaceholderText.substitute(left, registry, context, report)
         val rightText = PlaceholderText.substitute(right, registry, context, report)

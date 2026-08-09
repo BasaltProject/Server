@@ -119,11 +119,20 @@ class ServerListStatusTest {
     }
 
     @Test
-    fun aPlaceholderThisSituationCannotFillInIsLeftVisible() {
-        // Not blanked: a line that lost a word gives the operator nothing to search for.
-        val profile = plain.copy(motd = listOf("at %basalt_player_x%"))
+    fun aPlaceholderThisPingCannotAnswerLeavesNothingRatherThanDebugText() {
+        // The MOTD is read by strangers. Nobody has ever connected from this address, so there is no
+        // name to greet with, and that is ordinary rather than a mistake: showing them
+        // %basalt_player_name% would be showing them the inside of the config file.
+        val profile = plain.copy(motd = listOf("hello %basalt_player_name%"))
 
-        assertEquals("at %basalt_player_x%", PlainTextSerializer.serialize(statusOf(listOf(profile)).description))
+        assertEquals("hello ", PlainTextSerializer.serialize(statusOf(listOf(profile)).description))
+    }
+
+    @Test
+    fun aPlaceholderNobodyRegisteredStaysVisibleBecauseItIsATypo() {
+        val profile = plain.copy(motd = listOf("at %basalt_nope_at_all%"))
+
+        assertEquals("at %basalt_nope_at_all%", PlainTextSerializer.serialize(statusOf(listOf(profile)).description))
     }
 
     @Test

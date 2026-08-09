@@ -132,10 +132,22 @@ class PlaceholderTextTest {
     fun whatCannotBeAnsweredStaysVisibleAndIsReported() {
         val problems = mutableListOf<String>()
         val result =
-            PlaceholderText.substitute("at %basalt_server_tps% now", registry) { name, _ -> problems += name }
+            PlaceholderText.substitute("at %basalt_server_tps% now", registry) { name, _ ->
+                problems += name
+                null
+            }
 
         assertEquals("at %basalt_server_tps% now", result)
         assertEquals(listOf("basalt_server_tps"), problems)
+    }
+
+    @Test
+    fun aCallerCanChooseWhatGoesInPlaceOfWhatCannotBeAnswered() {
+        // The server list does exactly this: a MOTD is read by strangers, and showing them
+        // %basalt_player_name% is worse than showing them nothing.
+        val blanked = PlaceholderText.substitute("at %basalt_server_tps% now", registry) { _, _ -> "" }
+
+        assertEquals("at  now", blanked)
     }
 
     @Test

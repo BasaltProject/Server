@@ -10,6 +10,11 @@ import co.touchlab.sqliter.SynchronousFlag
 import org.basaltmc.io.FileIO
 import org.basaltmc.storage.db.PlayerDatabase
 
+/** Thrown when `players.db` was written by a build with a different schema, since there are no migrations. */
+public class PlayerDatabaseSchemaException(
+    message: String,
+) : Exception(message)
+
 /**
  * The one player database, opened once for the whole server.
  *
@@ -66,6 +71,8 @@ public class PlayerStore private constructor(
          * *machine* loses power; a crash of this process alone still cannot corrupt the file, which
          * is the property that matters here and the one vanilla's `.dat` writes do not have.
          */
+        private const val SCHEMA_CHECK_FILE = "basalt_schema_check.db"
+
         public fun open(path: String): PlayerStore {
             // The driver takes a directory and a file name, not a path, so a caller can keep
             // thinking in paths: `players.db` next to the server, `worlds/` beside it.
@@ -96,7 +103,91 @@ public class PlayerStore private constructor(
                         ),
                 )
             val driver = NativeSqliteDriver(configuration)
+            verifySchema(driver, path, directory)
             return PlayerStore(driver, PlayerDatabase(driver))
         }
+
+        /**
+         * Refuses to run against a database this build cannot actually use.
+         *
+         * There are no migrations on purpose: nobody is running Basalt yet, so a schema change is
+         * made cleanly and the old file is deleted. What must not happen is what did happen once,
+         * which is that the mismatch stayed invisible until the first query that touched a new
+         * column, and surfaced as a native stack trace in the middle of answering a server list
+         * ping. Wrong at startup, by name, beats wrong later, anywhere.
+         *
+         * The expected columns come from creating the schema in memory rather than from a list
+         * written out here, so this check cannot fall behind the `.sq` files it is checking.
+         */
+        private fun verifySchema(
+            driver: SqlDriver,
+            path: String,
+            directory: String,
+        ) {
+            val expected = referenceColumns(directory)
+            for ((table, columns) in expected) {
+                val actual = columnsOf(driver, table)
+                val missing = columns - actual
+                if (missing.isEmpty()) continue
+                throw PlayerDatabaseSchemaException(
+                    "$path was written by an older build: its '$table' table has no " +
+                        "${missing.sorted().joinToString(", ")} column. Basalt has no database " +
+                        "migrations yet, so delete $path (and its -wal and -shm files) and start again. " +
+                        "Players will be recreated on their next login.",
+                )
+            }
+        }
+
+        /**
+         * The tables and columns a freshly created database has, read back from a throwaway one.
+         *
+         * A scratch file rather than sqliter's `inMemory`, which does not open memory through this
+         * driver: it builds a `?mode=memory&cache=shared` *name* that gets opened as a plain file,
+         * so the first version of this check quietly created a file with that name in the working
+         * directory (and committed two of them). Deleted in a `finally`, and named `.db` so the
+         * ignore rules already cover it if a crash ever leaves one behind.
+         */
+        private fun referenceColumns(directory: String): Map<String, Set<String>> {
+            val schema = PlayerDatabase.Schema
+            val reference =
+                NativeSqliteDriver(
+                    DatabaseConfiguration(
+                        name = SCHEMA_CHECK_FILE,
+                        version = schema.version.toInt(),
+                        journalMode = JournalMode.WAL,
+                        create = { connection -> wrapConnection(connection) { schema.create(it) } },
+                        upgrade = { _, _, _ -> },
+                        extendedConfig = DatabaseConfiguration.Extended(basePath = directory),
+                    ),
+                )
+            return try {
+                tablesOf(reference).associateWith { columnsOf(reference, it) }
+            } finally {
+                reference.close()
+                for (suffix in listOf("", "-wal", "-shm")) FileIO.delete("$directory/$SCHEMA_CHECK_FILE$suffix")
+            }
+        }
+
+        private fun tablesOf(driver: SqlDriver): List<String> =
+            driver
+                .executeQuery(null, "SELECT name FROM sqlite_master WHERE type = 'table'", { cursor ->
+                    val names = mutableListOf<String>()
+                    while (cursor.next().value) cursor.getString(0)?.let { names += it }
+                    QueryResult.Value(names)
+                }, 0)
+                .value
+                .filterNot { it.startsWith("sqlite_") }
+
+        private fun columnsOf(
+            driver: SqlDriver,
+            table: String,
+        ): Set<String> =
+            driver
+                .executeQuery(null, "PRAGMA table_info($table)", { cursor ->
+                    val names = mutableSetOf<String>()
+                    while (cursor.next().value) cursor.getString(1)?.let { names += it }
+                    QueryResult.Value(names)
+                }, 0)
+                .value
     }
 }

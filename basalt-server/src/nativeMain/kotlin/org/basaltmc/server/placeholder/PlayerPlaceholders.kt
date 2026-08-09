@@ -82,7 +82,7 @@ public class PlayerPlaceholders(
         val ping = context[PlaceholderSlots.PING]
 
         eitherWay[params]?.let { answer ->
-            val value = answer(session, ping) ?: return noSubject()
+            val value = answer(session, ping) ?: return unanswered(ping)
             return PlaceholderValue.Text(value.toString())
         }
         NOT_IMPLEMENTED[params]?.let { return notImplemented(it) }
@@ -99,10 +99,26 @@ public class PlayerPlaceholders(
             if (ping == null) NO_SUBJECT else "there is no player yet: this is a server list ping, before login",
         )
 
-    private fun noSubject(): PlaceholderValue = PlaceholderValue.Unavailable(NO_SUBJECT)
+    /**
+     * A name a ping *could* have answered and did not, which is not the same as having no subject.
+     *
+     * `%basalt_player_name%` in the server list is a fair question: it is asking who is looking. It
+     * simply has no answer for somebody this server has never seen, and saying "this text is not
+     * about any player" there was plainly wrong, since it is about the person pinging.
+     */
+    private fun unanswered(ping: PingRequest?): PlaceholderValue =
+        PlaceholderValue.Unavailable(
+            when {
+                ping == null -> NO_SUBJECT
+                else -> NOT_RECOGNISED
+            },
+        )
 
     private companion object {
         const val NO_SUBJECT = "this text is not about any player"
+        const val NOT_RECOGNISED =
+            "nobody has connected from that address before, so there is no name to greet. " +
+                "Put the greeting in a profile with when = [\"%basalt_player_known%\"]"
         const val PERMISSION_PREFIX = "has_permission_"
 
         /** parity: the compass directions vanilla's F3 screen shows, from the same yaw ranges. */
