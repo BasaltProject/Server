@@ -235,3 +235,26 @@ public data class PlayerCombatKillPacket(
             PlayerCombatKillPacket(buffer.readVarInt(), ComponentNbt.deserialize(buffer.readAnonymousNbt()))
     }
 }
+
+/**
+ * Clientbound, id 0x4d: stop tracking these entities. Mirrors `ClientboundRemoveEntitiesPacket`.
+ *
+ * Needed the moment a server has more than one world: a player who leaves for another world is
+ * still an entity everyone in the old one is tracking, and without this they stay frozen in place
+ * there forever.
+ */
+public data class RemoveEntitiesPacket(
+    val entityIds: List<Int>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(entityIds.size)
+        for (id in entityIds) buffer.writeVarInt(id)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x4d
+
+        public fun read(buffer: ByteBuffer): RemoveEntitiesPacket =
+            RemoveEntitiesPacket(List(buffer.readVarInt()) { buffer.readVarInt() })
+    }
+}

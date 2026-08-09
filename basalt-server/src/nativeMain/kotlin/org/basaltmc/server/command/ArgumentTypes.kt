@@ -68,6 +68,36 @@ public object GameProfileArgument : ArgumentType<String> {
     ): String = reader.readString()
 }
 
+/**
+ * A loaded world, by name.
+ *
+ * `brigadier:string` on the wire rather than `minecraft:dimension`: vanilla's dimension argument
+ * resolves against the client's own dimension registry, and a Basalt world is not a dimension, it is
+ * a level. Declaring it as a dimension would have the client reject names it has never heard of.
+ */
+public object WorldArgument : ArgumentType<org.basaltmc.server.world.LoadedWorld> {
+    override val wire: ArgumentParser = ArgumentParser.BrigadierString(ArgumentParser.BrigadierString.Kind.SINGLE_WORD)
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): org.basaltmc.server.world.LoadedWorld {
+        val start = reader.cursor
+        val name = reader.readString()
+        return environment.worlds[name] ?: run {
+            reader.cursor = start
+            throw CommandSyntaxException(
+                Component.text(
+                    "Unknown world '$name'. Loaded worlds: ${environment.worlds.keys.sorted().joinToString(", ")}.",
+                ),
+                reader.string,
+                reader.cursor,
+            )
+        }
+    }
+}
+
 public class IntegerArgument(
     private val min: Int = Int.MIN_VALUE,
     private val max: Int = Int.MAX_VALUE,

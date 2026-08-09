@@ -12,12 +12,16 @@ import org.basaltmc.auth.SessionKeyPair
 import org.basaltmc.common.logging.LogOutput
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.LogFile
+import org.basaltmc.io.SocketException
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
+import org.basaltmc.server.config.TomlFormatException
+import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.world.RealNoiseParameters
 import org.basaltmc.server.world.RealSurfaceEnvironment
 import org.basaltmc.server.world.VillageDataLoader
+import org.basaltmc.server.world.WorldMetadata
 import org.basaltmc.world.densityfunction.BlendedNoise
 import org.basaltmc.world.structure.StructurePlacementGrid
 import org.basaltmc.world.terrain.NoiseRouterData
@@ -28,8 +32,34 @@ import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
+/**
+ * Exit codes an orchestrator can tell apart, the same way [EulaFile] already has one.
+ *
+ * A configuration mistake is the failure an operator actually hits (a typo in a world type, a
+ * malformed table), and it deserves one readable line, not a Kotlin stack trace: the trace says
+ * nothing they can act on and buries the message that does.
+ */
+private const val CONFIG_EXIT_CODE = 2
+private const val BIND_EXIT_CODE = 3
+
 @OptIn(ExperimentalTime::class)
 public fun main(args: Array<String>) {
+    try {
+        run(args)
+    } catch (e: TomlFormatException) {
+        Logger("Config").error { e.message ?: "Invalid configuration." }
+        exitProcess(CONFIG_EXIT_CODE)
+    } catch (e: SocketException) {
+        Logger("Server").error {
+            "${e.message}. Another server is probably already running on that port; " +
+                "stop it or change `port` in config/server.toml."
+        }
+        exitProcess(BIND_EXIT_CODE)
+    }
+}
+
+@OptIn(ExperimentalTime::class)
+private fun run(args: Array<String>) {
     val startedAt = Clock.System.now()
     println(BANNER)
     println(versionLine())
@@ -80,10 +110,17 @@ public fun main(args: Array<String>) {
     assetsLogger.info { "${BuildInfo.MINECRAFT_VERSION} data ready at $dataRoot." }
 
     // Real Overworld density-function router (see NoiseRouterData/TerrainProvider), built once at
-    // startup and reused for every generated chunk. WORLD_SEED is a fixed placeholder, not yet
-    // read from config: documented gap, matches `NoiseWorldGenerator`'s own until real per-world
-    // seed configuration exists.
-    val noiseRandom = XoroshiroRandom(WORLD_SEED).forkPositional()
+    // startup and reused for every generated chunk.
+    val worldsConfig = WorldsConfig.load(logger = Logger("Config"))
+    // The seed comes from the world itself, not from configuration: a world already on disk was
+    // generated with one, and that is the one its terrain matches.
+    val worldMetadata =
+        WorldMetadata.loadOrCreate(
+            worldRoot = "worlds/${worldsConfig.default.name}",
+            declaredSeed = worldsConfig.default.seed,
+            defaultSpawn = WorldMetadata.DEFAULT_SPAWN,
+        )
+    val noiseRandom = XoroshiroRandom(worldMetadata.seed).forkPositional()
     val realNoises = RealNoiseParameters(serverJar, noiseRandom)
     val base3d = BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0)
     val overworldRouter = NoiseRouterData.overworld(realNoises::get, base3d)
@@ -109,13 +146,20 @@ public fun main(args: Array<String>) {
     // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
     // server.jar as everything else, so this costs no extra download.
     val lang = LangAssets.loadCachedOrEmpty(dataRoot)
-    BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment, villageGenerator, WORLD_SEED, lang)
-        .start(startedAt)
+    BasaltServer(
+        config,
+        onlineMode,
+        overworldRouter,
+        surfaceEnvironment,
+        villageGenerator,
+        worldsConfig,
+        lang,
+        worldMetadata,
+    ).start(startedAt)
 }
 
 private fun versionLine(): String = "Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})"
 
-private const val WORLD_SEED = 0L
 private const val LOG_ROOT = "./.basalt/logs"
 
 // Raw string, and deliberately not indented: the art is full of backslashes, and every leading

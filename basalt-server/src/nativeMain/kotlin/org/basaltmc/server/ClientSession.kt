@@ -66,6 +66,7 @@ import org.basaltmc.protocol.play.PlayerInfoRemovePacket
 import org.basaltmc.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.protocol.play.PlayerLoadedPacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
+import org.basaltmc.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.protocol.play.RespawnPacket
 import org.basaltmc.protocol.play.ServerboundPlayerAbilitiesPacket
 import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
@@ -100,6 +101,7 @@ import org.basaltmc.server.registry.VanillaBiomes
 import org.basaltmc.server.registry.VanillaRegistryData
 import org.basaltmc.server.registry.VanillaTagData
 import org.basaltmc.server.world.ChunkGenerationQueue
+import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.storage.PlayerStore
 import org.basaltmc.storage.StoredPlayer
@@ -149,15 +151,13 @@ public class ClientSession(
     private val compressionThreshold: Int = 256,
     private val onlineMode: OnlineMode? = null,
     private val playerRegistry: PlayerRegistry? = null,
-    private val world: WorldState = WorldState(emptyList()),
-    private val spawn: Triple<Double, Double, Double> = Triple(8.5, 4.0, 8.5),
-    private val configuredViewDistance: Int = 10,
-    private val generationQueue: ChunkGenerationQueue = ChunkGenerationQueue(world, "overworld"),
+    /** Every loaded world, by name: a joining player goes into the one their stored row names. */
+    private val worlds: Map<String, LoadedWorld> = emptyMap(),
+    private val defaultWorld: LoadedWorld? = null,
     private val commands: CommandDispatcher? = null,
     private val defaultGamemode: Gamemode = Gamemode.SURVIVAL,
     private val difficulty: Difficulty = Difficulty.EASY,
     private val playerStore: PlayerStore? = null,
-    private val worldName: String = "world",
 ) {
     private val logger = Logger("Session")
 
@@ -182,6 +182,13 @@ public class ClientSession(
 
     private var pendingProfile: GameProfile? = null
     private var playerSession: PlayerSession? = null
+
+    /** Resolved in [enterPlay] from the player's stored world, falling back to the default. */
+    private var currentWorld: LoadedWorld? = null
+
+    private val world: WorldState get() = requireNotNull(currentWorld).state
+    private val generationQueue: ChunkGenerationQueue get() = requireNotNull(currentWorld).generationQueue
+    private val worldName: String get() = currentWorld?.name ?: ""
 
     private val chunkTracker = ChunkTracker()
     private var viewRadius = 0
@@ -537,10 +544,28 @@ public class ClientSession(
             return
         }
 
-        val chunkRadius = configuredViewDistance
-        val (spawnX, spawnY, spawnZ) = spawn
-
         val entityId = registry.allocateEntityId()
+
+        // Which world this player belongs to is decided before anything is sent, because the login
+        // packet already carries a position. A stored world that is no longer declared (its table
+        // was removed from worlds.toml) is not an error: the player goes to the default world and
+        // the log says so, which is the whole point of keeping player state outside worlds.
+        val stored = playerStore?.players?.load(profile.id.toString())
+        val requested = stored?.world
+        val world =
+            worlds[requested]
+                ?: defaultWorld
+                ?: run {
+                    connection.close()
+                    return
+                }
+        if (requested != null && requested != world.name) {
+            logger.info { "${profile.name}'s world '$requested' is not loaded; sending them to '${world.name}'." }
+        }
+        currentWorld = world
+
+        val chunkRadius = world.settings.viewDistance
+        val (spawnX, spawnY, spawnZ) = world.spawn
         // Before the login packet rather than after it, because everything below this point (the
         // abilities packet, the command tree) describes this player and so needs them to exist.
         val session = PlayerSession(profile.id, profile.name, entityId, this, gamemode = defaultGamemode)
@@ -548,13 +573,21 @@ public class ClientSession(
         session.y = spawnY
         session.z = spawnZ
         session.flying = defaultGamemode == Gamemode.SPECTATOR
+        session.worldName = world.name
         // Before a single packet goes out: the login packet carries the game mode and the position,
         // so restoring afterwards would mean announcing one state and then correcting it.
-        val stored = playerStore?.players?.load(session.uuid.toString())
         if (stored != null) {
             PlayerPersistence.restore(session, stored)
             firstSeenEpochSeconds = stored.firstSeenEpochSeconds
             playTimeTicks = stored.playTimeTicks
+            // Only the *position* is meaningless when the stored world is gone. Health, hunger,
+            // experience and game mode are the player's, not the world's, and dropping them along
+            // with the coordinates would undo the whole reason player state lives outside worlds.
+            if (requested != world.name) {
+                session.x = spawnX
+                session.y = spawnY
+                session.z = spawnZ
+            }
             logger.info { "Loaded ${session.name} from players.db (last seen ${stored.lastSeenEpochSeconds})." }
         }
         playerSession = session
@@ -563,14 +596,18 @@ public class ClientSession(
             LoginPlayPacket(
                 entityId = entityId,
                 isHardcore = false,
-                worldNames = listOf("minecraft:overworld"),
+                // Every world, so the client accepts being moved into any of them later.
+                worldNames = worlds.values.map { it.levelKey },
                 maxPlayers = 20,
                 viewDistance = chunkRadius,
                 simulationDistance = chunkRadius,
                 reducedDebugInfo = false,
                 enableRespawnScreen = true,
                 doLimitedCrafting = false,
-                spawnInfo = spawnInfo(defaultGamemode),
+                // The session's mode, not the configured default: a returning player was restored
+                // above, and sending the default here left the client showing a survival HUD while
+                // its abilities and block breaking followed the creative mode the server believed.
+                spawnInfo = spawnInfo(session.gamemode),
                 onlineMode = onlineMode != null,
                 enforcesSecureChat = false,
             ).write(it)
@@ -602,7 +639,7 @@ public class ClientSession(
         // terrain" forever, even with correct chunk data and a correct batch wrapper.
         sendCompressed(SpawnPositionPacket.ID) {
             SpawnPositionPacket(
-                GlobalPos("minecraft:overworld", BlockPos(spawnX.toInt(), spawnY.toInt(), spawnZ.toInt())),
+                GlobalPos(world.levelKey, BlockPos(spawnX.toInt(), spawnY.toInt(), spawnZ.toInt())),
                 yaw = 0f,
                 pitch = 0f,
             ).write(it)
@@ -694,8 +731,10 @@ public class ClientSession(
     /** The `CommonPlayerSpawnInfo` both joining and respawning need, which differ only in game mode. */
     private fun spawnInfo(gamemode: Gamemode): SpawnInfo =
         SpawnInfo(
+            // The dimension *type* is the same for every world so far (overworld); the level key
+            // is what distinguishes them, and what makes a world change a real dimension change.
             dimension = 0,
-            dimensionName = "minecraft:overworld",
+            dimensionName = currentWorld?.levelKey ?: "minecraft:overworld",
             hashedSeed = 0L,
             gamemode = gamemode,
             previousGamemode = 255,
@@ -874,11 +913,17 @@ public class ClientSession(
         }
         if (!changed) return
 
-        for (player in playerRegistry?.snapshot().orEmpty()) {
+        for (player in playersInSameWorld()) {
             player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
                 ClientboundBlockUpdatePacket(action.pos, Blocks.AIR.stateId).write(it)
             }
         }
+    }
+
+    /** Everyone who can actually see this player: the tab list is server-wide, entities are not. */
+    private fun playersInSameWorld(): List<PlayerSession> {
+        val name = playerSession?.worldName ?: return emptyList()
+        return playerRegistry?.snapshot()?.filter { it.worldName == name }.orEmpty()
     }
 
     private fun updatePosition(
@@ -900,7 +945,7 @@ public class ClientSession(
         session.pitch = pitch
         session.onGround = onGround
         streamChunksAround(x, z)
-        for (other in playerRegistry?.snapshot().orEmpty()) {
+        for (other in playersInSameWorld()) {
             if (other.uuid == session.uuid) continue
             other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
                 EntityTeleportPacket(
@@ -1160,7 +1205,7 @@ public class ClientSession(
         // parity: `handleClientCommand` returns without doing anything if the player is still
         // alive, so a client that sends this spuriously cannot teleport itself to spawn.
         if (session.health > 0f) return
-        val (spawnX, spawnY, spawnZ) = spawn
+        val (spawnX, spawnY, spawnZ) = requireNotNull(currentWorld).spawn
         session.resetForRespawn()
         session.x = spawnX
         session.y = spawnY
@@ -1183,7 +1228,10 @@ public class ClientSession(
         }
         sendCompressed(SpawnPositionPacket.ID) {
             SpawnPositionPacket(
-                GlobalPos("minecraft:overworld", BlockPos(spawnX.toInt(), spawnY.toInt(), spawnZ.toInt())),
+                GlobalPos(
+                    requireNotNull(currentWorld).levelKey,
+                    BlockPos(spawnX.toInt(), spawnY.toInt(), spawnZ.toInt()),
+                ),
                 yaw = 0f,
                 pitch = 0f,
             ).write(it)
@@ -1204,7 +1252,7 @@ public class ClientSession(
         for (pos in delta.toLoad) generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
         flushReadyChunks()
 
-        for (other in playerRegistry?.snapshot().orEmpty()) {
+        for (other in playersInSameWorld()) {
             if (other.uuid == session.uuid) continue
             other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
                 EntityTeleportPacket(session.entityId, spawnX, spawnY, spawnZ, 0, 0, onGround = true).write(it)
@@ -1234,6 +1282,83 @@ public class ClientSession(
                 PlayerInfoUpdatePacket.gameMode(session.uuid, mode).write(it)
             }
         }
+    }
+
+    /**
+     * Moves this player into another world, or does nothing if they are already in it.
+     *
+     * A world change is a *level* change to the client, which is why each world has its own
+     * [LoadedWorld.levelKey]: the respawn packet makes the client throw away its chunk cache and
+     * rebuild it, and it only does that when the level key differs. Everything else here follows
+     * from that: the tracker is reset because the client no longer has anything, the chunks are
+     * re-requested from the new world's queue, and the players left behind are told to forget this
+     * entity so it does not stand frozen in the world they are still in.
+     */
+    internal fun switchWorld(
+        target: LoadedWorld,
+        x: Double,
+        y: Double,
+        z: Double,
+    ): Boolean {
+        val session = playerSession ?: return false
+        val previous = currentWorld
+        if (previous == null || previous.name == target.name) return false
+
+        val leftBehind = playersInSameWorld().filter { it.uuid != session.uuid }
+        currentWorld = target
+        session.worldName = target.name
+        session.x = x
+        session.y = y
+        session.z = z
+
+        for (other in leftBehind) {
+            other.connection.sendPlayPacket(RemoveEntitiesPacket.ID) {
+                RemoveEntitiesPacket(listOf(session.entityId)).write(it)
+            }
+        }
+
+        sendCompressed(RespawnPacket.ID) {
+            RespawnPacket(spawnInfo(session.gamemode), dataToKeep = RespawnPacket.KEEP_ALL_DATA).write(it)
+        }
+        sendCompressed(PlayerPositionPacket.ID) {
+            PlayerPositionPacket(0, x, y, z, 0.0, 0.0, 0.0, session.yaw, session.pitch, relativeFlags = 0).write(it)
+        }
+        sendAbilities()
+        syncHealth()
+        syncExperience()
+
+        centerChunkX = x.toInt() shr 4
+        centerChunkZ = z.toInt() shr 4
+        viewRadius = target.settings.viewDistance
+        chunkTracker.reset()
+        val delta = chunkTracker.update(centerChunkX, centerChunkZ, viewRadius)
+        sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(centerChunkX, centerChunkZ).write(it) }
+        sendCompressed(SetChunkCacheRadiusPacket.ID) { SetChunkCacheRadiusPacket(viewRadius).write(it) }
+        sendCompressed(GameEventPacket.ID) { GameEventPacket(GameEventPacket.LEVEL_CHUNKS_LOAD_START, 0f).write(it) }
+        chunkStreamMutex.withLock {
+            pendingChunks.clear()
+            for (pos in delta.toLoad) pendingChunks.add(pos)
+        }
+        for (pos in delta.toLoad) generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
+        flushReadyChunks()
+
+        // Whoever is already there needs to start seeing them.
+        for (other in playersInSameWorld()) {
+            if (other.uuid == session.uuid) continue
+            other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
+                EntityTeleportPacket(
+                    session.entityId,
+                    x,
+                    y,
+                    z,
+                    angleToByte(session.yaw),
+                    angleToByte(session.pitch),
+                    false,
+                ).write(it)
+            }
+        }
+        logger.info { "${session.name} moved to world '${target.name}'." }
+        return true
     }
 
     internal fun teleportTo(
@@ -1320,6 +1445,12 @@ public class ClientSession(
     internal fun savePlayerState() {
         val session = playerSession ?: return
         val store = playerStore ?: return
+        if (!store.isOpen) {
+            // The server is shutting down and already saved everyone before disconnecting them.
+            // This connection's own thread is just catching up.
+            logger.debug { "Skipping ${session.name}'s save: the database is closed." }
+            return
+        }
         runCatching {
             store.players.save(
                 PlayerPersistence.toStored(session, worldName, firstSeenEpochSeconds, playTimeTicks),

@@ -7,7 +7,9 @@ import org.basaltmc.server.command.Coordinates
 import org.basaltmc.server.command.PermissionLevel
 import org.basaltmc.server.command.PlayersArgument
 import org.basaltmc.server.command.Vec3Argument
+import org.basaltmc.server.command.WorldArgument
 import org.basaltmc.server.player.PlayerSession
+import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.text.Component
 import kotlin.math.abs
 import kotlin.math.roundToLong
@@ -19,6 +21,11 @@ import kotlin.math.roundToLong
  * The three top-level forms are declared in vanilla's own order, which is load-bearing:
  * `<destination>` and `<targets>` both begin by parsing a player selector, so the dispatcher only
  * reaches `/tp Steve 10 64 10` by failing the first and backtracking into the second.
+ *
+ * The optional trailing `<world>` is Basalt's, not vanilla's: vanilla changes world with
+ * `/execute in <dimension> run tp ...`, which needs `/execute`. It is appended to the existing
+ * forms rather than inserted among them precisely so every vanilla form keeps meaning exactly what
+ * it means in vanilla: `/tp 10 64 10 lobby` and `/tp Steve 10 64 10 lobby`.
  */
 public class TeleportCommand :
     Command(
@@ -29,6 +36,11 @@ public class TeleportCommand :
     override fun build(root: CommandNodeBuilder) {
         root.argument("location", Vec3Argument) {
             executes { context -> toPosition(context, listOf(context.requireEntity()), context.get("location")) }
+            argument("world", WorldArgument) {
+                executes { context ->
+                    toPosition(context, listOf(context.requireEntity()), context.get("location"), context.get("world"))
+                }
+            }
         }
         root.argument("destination", PlayersArgument(single = true)) {
             executes { context ->
@@ -42,6 +54,11 @@ public class TeleportCommand :
         root.argument("targets", PlayersArgument(single = false)) {
             argument("location", Vec3Argument) {
                 executes { context -> toPosition(context, context.get("targets"), context.get("location")) }
+                argument("world", WorldArgument) {
+                    executes { context ->
+                        toPosition(context, context.get("targets"), context.get("location"), context.get("world"))
+                    }
+                }
             }
             argument("destination", PlayersArgument(single = true)) {
                 executes { context ->
@@ -55,13 +72,18 @@ public class TeleportCommand :
         context: CommandContext,
         targets: List<PlayerSession>,
         coordinates: Coordinates,
+        world: LoadedWorld? = null,
     ): Int {
         // Resolved per target, because `~` means "relative to the entity being moved", not to
         // whoever typed the command. The reported position uses the source's own frame, which is
         // what vanilla prints.
         for (target in targets) {
             val (x, y, z) = coordinates.resolve(Triple(target.x, target.y, target.z))
-            target.connection.teleportTo(x, y, z, target.yaw, target.pitch)
+            // The world change first: it re-sends the position itself, so teleporting afterwards
+            // would be a second, redundant move.
+            if (world == null || !target.connection.switchWorld(world, x, y, z)) {
+                target.connection.teleportTo(x, y, z, target.yaw, target.pitch)
+            }
         }
         val (x, y, z) = coordinates.resolve(context.source.position)
         val message =
@@ -82,7 +104,16 @@ public class TeleportCommand :
                     Component.text(formatCoordinate(z)),
                 )
             }
-        context.success(message, broadcastToAdmins = true)
+        context.success(
+            if (world ==
+                null
+            ) {
+                message
+            } else {
+                Component.text("").append(message).append(Component.text(" in ${world.name}"))
+            },
+            broadcastToAdmins = true,
+        )
         return targets.size
     }
 

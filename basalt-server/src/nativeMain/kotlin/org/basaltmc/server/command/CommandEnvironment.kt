@@ -3,6 +3,7 @@ package org.basaltmc.server.command
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.server.player.PlayerRegistry
+import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.storage.PlayerRepository
 import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
@@ -36,6 +37,8 @@ public class CommandEnvironment(
      * there is no database to administer, which is how the dispatcher's own tests run.
      */
     public val playerRepository: PlayerRepository? = null,
+    /** Every loaded world by name, for the commands that move players between them. */
+    public val worlds: Map<String, LoadedWorld> = emptyMap(),
 ) {
     public fun permissionLevelOf(playerName: String): Int = operators.levelOf(playerName)
 

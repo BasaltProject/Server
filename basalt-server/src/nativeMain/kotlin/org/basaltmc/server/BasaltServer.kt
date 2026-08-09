@@ -14,18 +14,17 @@ import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.command.OperatorList
 import org.basaltmc.server.command.registerVanillaCommands
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.config.rewriteOperators
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
-import org.basaltmc.server.world.ChunkGenerationQueue
-import org.basaltmc.server.world.RegionStore
+import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.WORLDS_ROOT
-import org.basaltmc.server.world.WorldState
+import org.basaltmc.server.world.WorldMetadata
 import org.basaltmc.storage.PlayerStore
 import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
 import org.basaltmc.text.TextColor
-import org.basaltmc.world.Chunk
 import org.basaltmc.world.GenerationMetrics
 import org.basaltmc.world.NoiseWorldGenerator
 import org.basaltmc.world.terrain.OverworldNoiseRouter
@@ -33,7 +32,6 @@ import org.basaltmc.world.terrain.RealTerrainGenerator
 import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.concurrent.AtomicInt
-import kotlin.math.abs
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -72,8 +70,14 @@ public class BasaltServer(
     private val overworldRouter: OverworldNoiseRouter? = null,
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
-    private val worldSeed: Long = 0L,
+    private val worldsConfig: WorldsConfig,
     private val lang: LangTable = LangTable.EMPTY,
+    /**
+     * The world's own metadata, already loaded. `Main` needs the seed before this class exists (it
+     * builds the terrain generator with it), so it loads it and hands it over rather than having it
+     * read, and warned about, twice.
+     */
+    defaultWorldMetadata: WorldMetadata? = null,
     playersDatabasePath: String = PLAYERS_DATABASE,
     worldsRoot: String = WORLDS_ROOT,
 ) {
@@ -98,17 +102,59 @@ public class BasaltServer(
      */
     private val playerStore = PlayerStore.open(playersDatabasePath)
 
-    private val regions = RegionStore(config.worldName, DIMENSION, worldsRoot)
-    private val world = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
+    /**
+     * Every world `worlds.toml` declares, each with its own chunks, region files, generation
+     * workers, settings and seed. Keyed by name, which is what a player's stored row refers to.
+     */
+    private val worlds: Map<String, LoadedWorld> =
+        worldsConfig.worlds.associate { declaration ->
+            val root = "$worldsRoot/${declaration.name}"
+            val metadata =
+                if (declaration.name == worldsConfig.default.name && defaultWorldMetadata != null) {
+                    // Already loaded by `Main` to build the terrain generator; reusing it avoids
+                    // reading the file, and warning about a seed mismatch, twice.
+                    defaultWorldMetadata
+                } else {
+                    WorldMetadata.loadOrCreate(root, declaration.seed, WorldMetadata.DEFAULT_SPAWN, logger)
+                }
+            declaration.name to
+                LoadedWorld(
+                    declaration = declaration,
+                    settings = worldsConfig.settingsFor(declaration),
+                    metadata = metadata,
+                    worldsRoot = worldsRoot,
+                    logger = logger,
+                    // One worker while measuring: GenerationMetrics counts without atomics on
+                    // purpose, so its numbers are only exact when a single thread is generating.
+                    generationWorkers = if (config.generationMetrics) 1 else 8,
+                    overworldRouter = overworldRouter,
+                    surfaceEnvironment = surfaceEnvironment,
+                    villageGenerator = villageGenerator,
+                )
+        }
 
-    // One worker while measuring: GenerationMetrics counts without atomics on purpose, so its
-    // numbers are only exact when a single thread is generating (see its own KDoc).
-    private val generationQueue =
-        ChunkGenerationQueue(world, DIMENSION, workerCount = if (config.generationMetrics) 1 else 8)
-    private val spawn = warmStartupChunksAndComputeSpawn()
+    private val defaultWorld: LoadedWorld = worlds.getValue(worldsConfig.default.name)
+
+    public val worldSeed: Long get() = defaultWorld.metadata.seed
+
+    init {
+        for (world in worlds.values) {
+            logger.info {
+                "Loading world '${world.name}' (${world.declaration.type.name.lowercase()}, " +
+                    "seed ${world.metadata.seed})."
+            }
+            world.warmSpawnArea(SPAWN_RADIUS_CHUNKS)
+            world.saveDirty()
+        }
+        if (GenerationMetrics.enabled) {
+            Logger("GenerationMetrics").info { "\n" + GenerationMetrics.report() }
+            GenerationMetrics.reset()
+        }
+    }
+
     private val tickLoop =
         TickLoop(
-            config.saveIntervalSeconds,
+            defaultWorld.settings.saveIntervalSeconds,
             onSaveInterval = ::persistAndUnload,
             onTick = ::shutdownIfSignalled,
         )
@@ -127,8 +173,9 @@ public class BasaltServer(
                 maxPlayers = config.maxPlayers,
                 stopServer = ::shutdown,
                 lang = lang,
-                defaultWorldName = config.worldName,
+                defaultWorldName = defaultWorld.name,
                 playerRepository = playerStore.players,
+                worlds = worlds,
             ),
         ).also(::registerVanillaCommands)
 
@@ -136,57 +183,24 @@ public class BasaltServer(
         Gamemode.entries.firstOrNull { it.name.equals(config.gamemode, ignoreCase = true) } ?: Gamemode.SURVIVAL
 
     private val difficulty =
-        Difficulty.entries.firstOrNull { it.name.equals(config.difficulty, ignoreCase = true) } ?: Difficulty.EASY
-
-    private fun generateChunk(
-        chunkX: Int,
-        chunkZ: Int,
-    ): Chunk {
-        val router = overworldRouter
-        val environment = surfaceEnvironment
-        return if (router != null && environment != null) {
-            RealTerrainGenerator.generate(router, environment, chunkX, chunkZ, villageGenerator = villageGenerator)
-        } else {
-            NoiseWorldGenerator.generate(chunkX, chunkZ)
-        }
-    }
-
-    /** A chunk off disk if it has ever been saved, so exploring back over old ground keeps player edits. */
-    private fun loadOrGenerateChunk(
-        chunkX: Int,
-        chunkZ: Int,
-    ): Chunk = regions.loadChunk(chunkX, chunkZ) ?: generateChunk(chunkX, chunkZ)
+        Difficulty.entries.firstOrNull { it.name.equals(defaultWorld.settings.difficulty, ignoreCase = true) }
+            ?: Difficulty.EASY
 
     /**
-     * Generates the small warm cache around spawn, then reads the spawn height out of it: a player
-     * who has not been here before lands on top of the terrain at the world's own (8, 8) column,
-     * not a fixed Y that assumed a flat world.
+     * What the last collection actually reclaimed. The chunk counts above only account for what the
+     * server means to hold; if memory climbs while they stay flat, the answer is here, in the gap
+     * between what is live and what has been allocated and not yet collected.
      */
-    private fun warmStartupChunksAndComputeSpawn(): Triple<Double, Double, Double> {
-        val positions =
-            (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).flatMap { x ->
-                (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).map { z -> x to z }
-            }
-        generationQueue.awaitAll(positions)
-        persistChangedChunks()
-        if (GenerationMetrics.enabled) {
-            Logger("GenerationMetrics").info { "\n" + GenerationMetrics.report() }
-            GenerationMetrics.reset()
-        }
-        val spawnChunk = world.getOrGenerateChunk(0, 0)
-        return Triple(8.5, spawnChunk.heightmap()[8 + 8 * 16].toDouble(), 8.5)
+    @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
+    private fun heapReport(): String {
+        val info = kotlin.native.runtime.GC.lastGCInfo ?: return "No collection has run yet."
+        val before = info.memoryUsageBefore["heap"]?.totalObjectsSizeBytes ?: 0L
+        val after = info.memoryUsageAfter["heap"]?.totalObjectsSizeBytes ?: 0L
+        return "Heap: ${after / 1_048_576} MB live after the last collection " +
+            "(${before / 1_048_576} MB before it, ${info.epoch} collections so far)."
     }
 
-    /**
-     * Writes out everything that changed since the last call: chunks generated by the queue and
-     * chunks a player edited alike, which is why it asks [WorldState] rather than the queue. Driven
-     * from [TickLoop] so a crash or a `kill` loses at most one flush interval.
-     */
-    private fun persistChangedChunks() {
-        saveWorld(world.dirtyChunks())
-    }
-
-    /** Writes every online player as one transaction, on the same interval the world saves on. */
+    /** Writes every online player as one transaction, on the same interval the worlds save on. */
     private fun persistPlayers() {
         val snapshots = playerRegistry.snapshot().mapNotNull { it.connection.storedSnapshot() }
         if (snapshots.isEmpty()) return
@@ -194,14 +208,31 @@ public class BasaltServer(
             .onFailure { logger.error(it) { "Failed to save ${snapshots.size} player(s)" } }
     }
 
-    /** One tick-loop hook for all three: unloading has to save what it drops, so they belong together. */
+    /** One tick-loop hook for all of it: unloading has to save what it drops, so they belong together. */
     private fun persistAndUnload() {
         // Emitted before the work, not after: if this method ever stops completing, the last thing
         // in the log is where it got to, instead of nothing at all.
-        logger.debug { "Sweep starting: ${world.loadedChunkCount} loaded, ${generationQueue.pendingCount()} pending." }
-        persistChangedChunks()
+        logger.debug { "Sweep starting across ${worlds.size} world(s)." }
+        for (world in worlds.values) world.saveDirty()
         persistPlayers()
-        unloadUnreachableChunks()
+
+        var loaded = 0
+        var unloaded = 0
+        for (world in worlds.values) {
+            // Only the players actually in this world keep its chunks resident.
+            val positions =
+                playerRegistry
+                    .snapshot()
+                    .filter { it.worldName == world.name }
+                    .map { (it.x.toInt() shr 4) to (it.z.toInt() shr 4) }
+            unloaded += world.unloadUnreachable(positions, SPAWN_RADIUS_CHUNKS, RETAIN_MARGIN_CHUNKS)
+            loaded += world.state.loadedChunkCount
+        }
+
+        // Reported every sweep, not only when something happens: when this server misbehaves it is
+        // because one of these numbers climbs without settling, and knowing which one is the whole
+        // diagnosis. At debug level because it is a diagnostic, not operator news.
+        logger.debug { "Chunks: $loaded loaded across ${worlds.size} world(s), $unloaded unloaded. " + heapReport() }
     }
 
     /**
@@ -218,18 +249,16 @@ public class BasaltServer(
      * Brings everything to a stop *before* saving, in that order and for that reason.
      *
      * Saving while the server is still live is not merely slow, it may never finish: connected
-     * players keep moving, so sessions keep requesting chunks, the queue keeps generating them, and
+     * players keep moving, so sessions keep requesting chunks, the queues keep generating them, and
      * the tick loop keeps launching its own saves alongside this one. Each concurrent region write
      * materializes the whole region, so the memory to finish grows faster than the work does.
      *
      * So: disconnect everyone first (nothing new can be requested), stop the tick loop (no
-     * competing save), let the queue drain (no chunk half-generated), and only then write, once.
+     * competing save), let the queues drain (no chunk half-generated), and only then write, once.
      */
-
     private fun shutdown() {
         // Once only. `/stop` and a signal can arrive together, and running this twice would mean two
-        // concurrent saves of the same regions, which is exactly the situation the ordering below
-        // exists to avoid.
+        // concurrent saves of the same regions, which is exactly what the ordering below avoids.
         if (!shuttingDown.compareAndSet(0, 1)) return
 
         // First of all, so nothing new can arrive while the rest is winding down. Without this a
@@ -240,6 +269,13 @@ public class BasaltServer(
 
         val players = playerRegistry.snapshot()
         if (players.isNotEmpty()) {
+            // Saved here, synchronously, *before* disconnecting them. Disconnecting only closes the
+            // socket; each session then saves itself on its own thread, which raced the database
+            // being closed a few lines below. Whoever lost that race was not saved at all, so a
+            // player who changed game mode and then stopped the server came back as they were.
+            logger.info { "Saving ${players.size} player(s)." }
+            persistPlayers()
+
             logger.info { "Disconnecting ${players.size} player(s)." }
             for (player in players) {
                 runCatching { player.connection.disconnect(Component.text("Server closed", TextColor.RED)) }
@@ -248,125 +284,18 @@ public class BasaltServer(
         }
 
         tickLoop.stop()
-        generationQueue.stop()
-        generationQueue.awaitIdle(SHUTDOWN_DRAIN_TIMEOUT_MILLIS)
+        for (world in worlds.values) world.stopGenerating(SHUTDOWN_DRAIN_TIMEOUT_MILLIS)
 
-        logger.info { "Saving the world." }
-        saveWorld(world.dirtyChunks())
-        regions.flush()
-        // After the players have been disconnected above, which already saved each of them: this is
-        // the checkpoint that leaves players.db as one self-contained file.
+        logger.info { "Saving ${worlds.size} world(s)." }
+        for (world in worlds.values) {
+            world.saveDirty()
+            world.flushRegions()
+        }
+        // The players were saved before being disconnected, above. This is the checkpoint that
+        // leaves players.db as one self-contained file.
         runCatching { playerStore.close() }.onFailure { logger.error(it) { "Failed to close players.db" } }
         logger.info { "Stopping the server." }
         exitProcess(0)
-    }
-
-    /**
-     * Drops chunks no player can reach from memory, after saving whatever changed in them.
-     *
-     * Without this the server keeps every chunk it has ever touched: the client is told to forget
-     * them as they leave its view, but nothing here ever did, so a session spent flying grew
-     * without bound. A chunk costs the same in memory whether it holds terrain or nothing but air,
-     * which is what makes the growth so steep.
-     *
-     * Kept regardless: the spawn area (vanilla keeps it resident too, and a joining player lands
-     * there), and anything the generation queue is still working on, since evicting a chunk
-     * mid-generation would strand the session waiting for it.
-     */
-    private fun unloadUnreachableChunks() {
-        val players = playerRegistry.snapshot()
-        // The retain radius has to cover more than the view distance: sessions prefetch beyond it,
-        // and a chunk already requested but not yet sent must still be there when it is.
-        val retainRadius = config.viewDistance + RETAIN_MARGIN_CHUNKS
-        // Taken once, before the scan: asking the queue per chunk meant holding the world's lock
-        // while repeatedly waiting for the queue's, which the generation workers never let go of
-        // for long. That is what stopped this sweep running at all, and with it saving,
-        // unloading and every line this method logs.
-        val pending = generationQueue.pendingKeys()
-        val candidates =
-            world.evictionCandidates { chunkX, chunkZ ->
-                if (abs(chunkX) <= SPAWN_RADIUS_CHUNKS &&
-                    abs(chunkZ) <= SPAWN_RADIUS_CHUNKS
-                ) {
-                    return@evictionCandidates true
-                }
-                if (ChunkGenerationQueue.pack(chunkX, chunkZ) in pending) return@evictionCandidates true
-                players.any { player ->
-                    abs(chunkX - (player.x.toInt() shr 4)) <= retainRadius &&
-                        abs(chunkZ - (player.z.toInt() shr 4)) <= retainRadius
-                }
-            }
-        // Requests for ground the player has already left are worth exactly as much as the chunks
-        // themselves: dropping them stops the queue doing work whose result is evicted on sight.
-        val dropped =
-            generationQueue.retainWhere { chunkX, chunkZ ->
-                players.any { player ->
-                    abs(chunkX - (player.x.toInt() shr 4)) <= retainRadius &&
-                        abs(chunkZ - (player.z.toInt() shr 4)) <= retainRadius
-                }
-            }
-
-        val evictStart = TimeSource.Monotonic.markNow()
-        val removed =
-            if (candidates.isEmpty()) {
-                0
-            } else {
-                saveWorld(candidates.filter { it.isDirty })
-                world.evictClean(candidates)
-            }
-        val evictMillis = evictStart.elapsedNow().inWholeMilliseconds
-
-        // Reported every sweep, not only when something happens: when this server misbehaves it is
-        // because one of these numbers climbs without settling, and knowing which one is the whole
-        // diagnosis. At debug level for exactly that reason: it is a diagnostic, and a line every
-        // sweep forever is noise in an operator's console, which is where `info` belongs.
-        logger.debug {
-            "Chunks: ${world.loadedChunkCount} loaded, ${generationQueue.pendingCount()} pending, " +
-                "$removed unloaded in ${evictMillis}ms, $dropped request(s) dropped, " +
-                "${world.dirtyChunks().size} unsaved. " + heapReport()
-        }
-    }
-
-    /**
-     * What the last collection actually reclaimed. The chunk counts above only account for what the
-     * server means to hold; if memory climbs while they stay flat, the answer is here, in the gap
-     * between what is live and what has been allocated and not yet collected.
-     */
-    @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
-    private fun heapReport(): String {
-        val info = kotlin.native.runtime.GC.lastGCInfo ?: return "No collection has run yet."
-        val before = info.memoryUsageBefore["heap"]?.totalObjectsSizeBytes ?: 0L
-        val after = info.memoryUsageAfter["heap"]?.totalObjectsSizeBytes ?: 0L
-        return "Heap: ${after / 1_048_576} MB live after the last collection " +
-            "(${before / 1_048_576} MB before it, ${info.epoch} collections so far)."
-    }
-
-    /**
-     * Saves [chunks] and reports what it cost. Only ever called with chunks that actually changed:
-     * rewriting a chunk identical to the one already on disk means reading, decompressing,
-     * re-serializing and recompressing its whole region for nothing, which is what made `stop` sit
-     * there for so long.
-     */
-    @OptIn(ExperimentalTime::class)
-    private fun saveWorld(chunks: List<Chunk>) {
-        if (chunks.isEmpty()) return
-        val startedAt = TimeSource.Monotonic.markNow()
-        val written =
-            regions.saveChunks(
-                chunks,
-                Clock.System
-                    .now()
-                    .epochSeconds
-                    .toInt(),
-            )
-        val elapsed = startedAt.elapsedNow().inWholeMilliseconds
-        // Debug, like the sweep report it usually sits next to: an autosave every save interval is
-        // routine, and its timing breakdown is for diagnosing a slow save, not for an operator.
-        logger.debug {
-            "Saved ${chunks.size} chunk(s) across $written region(s) in ${elapsed}ms " +
-                "(${regions.encodeMillis}ms encoding, ${regions.writeMillis}ms writing, " +
-                "${regions.cachedRegionCount} regions cached, ${world.loadedChunkCount} loaded)."
-        }
     }
 
     @OptIn(ExperimentalTime::class)
@@ -393,15 +322,12 @@ public class BasaltServer(
                     ::currentStatus,
                     onlineMode = onlineMode,
                     playerRegistry = playerRegistry,
-                    world = world,
-                    spawn = spawn,
-                    configuredViewDistance = config.viewDistance,
-                    generationQueue = generationQueue,
+                    worlds = worlds,
+                    defaultWorld = defaultWorld,
                     commands = commands,
                     defaultGamemode = defaultGamemode,
                     difficulty = difficulty,
                     playerStore = playerStore,
-                    worldName = config.worldName,
                 ).run()
             }
         }
