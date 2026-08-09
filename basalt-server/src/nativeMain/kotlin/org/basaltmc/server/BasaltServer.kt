@@ -11,11 +11,10 @@ import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.CommandEnvironment
 import org.basaltmc.server.command.ConsoleReader
-import org.basaltmc.server.command.OperatorList
 import org.basaltmc.server.command.registerVanillaCommands
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.config.WorldsConfig
-import org.basaltmc.server.config.rewriteOperators
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.world.LoadedWorld
@@ -71,6 +70,7 @@ public class BasaltServer(
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
     private val worldsConfig: WorldsConfig,
+    private val groupsConfig: GroupsConfig,
     private val lang: LangTable = LangTable.EMPTY,
     /**
      * The world's own metadata, already loaded. `Main` needs the seed before this class exists (it
@@ -159,16 +159,11 @@ public class BasaltServer(
             onTick = ::shutdownIfSignalled,
         )
 
-    // Names are matched case-insensitively, and a change writes straight back to basalt.toml so
-    // `op` at the console survives a restart the way vanilla's ops.json does.
-    private val operators =
-        OperatorList(config.operators, config.opPermissionLevel) { names -> rewriteOperators(names) }
-
     private val commands =
         CommandDispatcher(
             CommandEnvironment(
                 players = playerRegistry,
-                operators = operators,
+                groups = groupsConfig,
                 worldSeed = worldSeed,
                 maxPlayers = config.maxPlayers,
                 stopServer = ::shutdown,

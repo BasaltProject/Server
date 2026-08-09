@@ -12,6 +12,7 @@ import org.basaltmc.protocol.PacketFraming
 import org.basaltmc.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.server.command.testGroups
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
 import org.basaltmc.server.config.WorldDeclaration
@@ -49,8 +50,6 @@ internal fun startTestServer(
                 maxPlayers = 20,
                 onlineMode = onlineMode != null,
                 gamemode = "survival",
-                operators = emptyList(),
-                opPermissionLevel = 4,
                 logLevel = LogLevel.INFO,
                 logToFile = false,
                 logKeepDays = 0,
@@ -86,6 +85,7 @@ internal fun startTestServer(
                 config,
                 onlineMode,
                 worldsConfig = worldsConfig,
+                groupsConfig = testGroups(),
                 playersDatabasePath = playersDatabase,
                 worldsRoot = "$TEST_DATA_ROOT/worlds",
             ).start()

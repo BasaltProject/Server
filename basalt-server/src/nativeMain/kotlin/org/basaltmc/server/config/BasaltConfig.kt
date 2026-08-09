@@ -23,12 +23,6 @@ max-players = 20
 online-mode = true
 # Game mode new players join in: survival, creative, adventure or spectator.
 gamemode = "survival"
-# Player names with operator rights. Vanilla keeps these in ops.json; Basalt keeps
-# every setting in this one file. `op <name>` at the console adds a name here,
-# `deop <name>` removes it.
-operators = []
-# Permission level operators get, on vanilla's own 1-4 scale: 4 is full access.
-op-permission-level = 4
 
 [network]
 # Reserved for future network tuning (compression threshold, rate limits).
@@ -67,9 +61,9 @@ public enum class ColorMode {
  * Parsed `config/server.toml`. Only the fields Basalt currently reads are exposed; everything else
  * is a documented placeholder in the file itself.
  *
- * Some of these are on their way out of this file as their own domain grows one: `motd` to
- * `server_list.toml`, and `operators`/`opPermissionLevel` to `groups.toml` plus a column in
- * `players.db`. Everything about worlds already left, to `worlds.toml`.
+ * `motd` is still on its way out of here, to `server_list.toml`. Worlds already left, to
+ * `worlds.toml`, and so did operators: what a group is lives in `groups.toml`, and who is in it is
+ * a column in `players.db`.
  */
 public data class BasaltConfig(
     public val port: Int,
@@ -77,8 +71,6 @@ public data class BasaltConfig(
     public val maxPlayers: Int,
     public val onlineMode: Boolean,
     public val gamemode: String,
-    public val operators: List<String>,
-    public val opPermissionLevel: Int,
     public val logLevel: LogLevel,
     public val logToFile: Boolean,
     public val logKeepDays: Int,
@@ -93,8 +85,6 @@ public data class BasaltConfig(
                 maxPlayers = 20,
                 onlineMode = true,
                 gamemode = "survival",
-                operators = emptyList(),
-                opPermissionLevel = 4,
                 logLevel = LogLevel.INFO,
                 logToFile = true,
                 logKeepDays = 14,
@@ -151,9 +141,6 @@ public data class BasaltConfig(
                 maxPlayers = server?.intOrNull("max-players")?.toInt() ?: DEFAULT.maxPlayers,
                 onlineMode = server?.boolOrNull("online-mode") ?: DEFAULT.onlineMode,
                 gamemode = server?.stringOrNull("gamemode") ?: DEFAULT.gamemode,
-                operators = server?.stringListOrNull("operators") ?: DEFAULT.operators,
-                opPermissionLevel =
-                    server?.intOrNull("op-permission-level")?.toInt()?.coerceIn(0, 4) ?: DEFAULT.opPermissionLevel,
                 logLevel = logging?.stringOrNull("level")?.let(::parseLogLevel) ?: DEFAULT.logLevel,
                 logToFile = logging?.boolOrNull("file") ?: DEFAULT.logToFile,
                 logKeepDays = logging?.intOrNull("keep-days")?.toInt() ?: DEFAULT.logKeepDays,

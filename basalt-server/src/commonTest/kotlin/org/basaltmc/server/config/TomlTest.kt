@@ -99,3 +99,31 @@ class TomlTest {
         assertFailsWith<TomlFormatException> { Toml.parse("just some words") }
     }
 }
+
+class MultiLineArrayTest {
+    @Test
+    fun anArrayMaySpanSeveralLinesWithCommentsBetween() {
+        // The way anyone hand-edits a list: one entry per line, and a note next to one of them.
+        val root =
+            Toml.parse(
+                """
+                [groups.operator]
+                permissions = [
+                    "basalt.command.*",   # everything
+                    "-basalt.command.stop",
+                ]
+                level = 4
+                """.trimIndent(),
+            )
+        val group = root.tableOrNull("groups")?.tableOrNull("operator")
+
+        assertEquals(listOf("basalt.command.*", "-basalt.command.stop"), group?.stringListOrNull("permissions"))
+        // The key after the array still parses: the reader has to resume in the right place.
+        assertEquals(4L, group?.intOrNull("level"))
+    }
+
+    @Test
+    fun anArrayThatNeverClosesIsRejected() {
+        assertFailsWith<TomlFormatException> { Toml.parse("permissions = [\n  \"a\",\n") }
+    }
+}

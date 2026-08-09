@@ -1,13 +1,22 @@
 package org.basaltmc.server.command
 
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
 import org.basaltmc.text.TextColor
 import org.basaltmc.text.resolvePlainText
 
-/** Vanilla's own permission ladder (`Commands.LEVEL_*`), used verbatim by every command's requirement. */
+/**
+ * Vanilla's own permission ladder (`Commands.LEVEL_*`), recorded per command as the parity fact it
+ * is: it is what the real server demands for each of them, and what a client is eventually told
+ * about itself.
+ *
+ * It is **not** what authorises anything here. Authorisation is by named permission, because a
+ * number in a configuration file tells an operator nothing and cannot be referred to by
+ * `commands.toml` or by a plugin.
+ */
 public object PermissionLevel {
     public const val ALL: Int = 0
     public const val MODERATORS: Int = 1
@@ -37,8 +46,12 @@ public interface CommandSource {
 
     public fun sendSystemMessage(message: Component)
 
-    public fun hasPermission(level: Int): Boolean = permissionLevel >= level
+    /** Whether this source has been granted [node]. A node nobody granted is denied. */
+    public fun hasPermission(node: String?): Boolean
 }
+
+/** Whether [source] may use [node]. A node with no permission of its own is open to everyone. */
+public fun CommandSource.mayUse(node: CommandNode): Boolean = node.permission == null || hasPermission(node.permission)
 
 /**
  * The console. Permission [PermissionLevel.OWNERS], like vanilla's own `MinecraftServer` source:
@@ -48,6 +61,10 @@ public class ConsoleCommandSource(
     private val logger: Logger = Logger("Console"),
     private val lang: LangTable = LangTable.EMPTY,
 ) : CommandSource {
+    // Everything, unconditionally: whoever can type here can already stop the process, and making
+    // the console depend on a group would let a typo in groups.toml lock the operator out.
+    override fun hasPermission(node: String?): Boolean = true
+
     override val name: String = "Server"
     override val displayName: Component = Component.text("Server")
     override val permissionLevel: Int = PermissionLevel.OWNERS
@@ -62,11 +79,17 @@ public class ConsoleCommandSource(
 /** A player running a command in chat. Their feedback goes back to them as a system message, as vanilla's does. */
 public class PlayerCommandSource(
     override val player: PlayerSession,
-    override val permissionLevel: Int,
+    private val groups: GroupsConfig,
 ) : CommandSource {
     override val name: String get() = player.name
     override val displayName: Component get() = Component.text(player.name)
     override val position: Triple<Double, Double, Double> get() = Triple(player.x, player.y, player.z)
+
+    /** Only meaningful for the vanilla-facing bridge; nothing here authorises on it. */
+    override val permissionLevel: Int
+        get() = if (groups.resolve(player.group, ADMIN_PERMISSION)) PermissionLevel.OWNERS else PermissionLevel.ALL
+
+    override fun hasPermission(node: String?): Boolean = node != null && groups.resolve(player.group, node)
 
     override fun sendSystemMessage(message: Component) {
         player.sendSystemMessage(message)
@@ -99,7 +122,7 @@ public class CommandFeedback(
                 .italic()
         for (player in environment.players.snapshot()) {
             if (player.uuid == source.player?.uuid) continue
-            if (environment.permissionLevelOf(player.name) < PermissionLevel.MODERATORS) continue
+            if (!environment.groups.resolve(player.group, ADMIN_PERMISSION)) continue
             player.sendSystemMessage(broadcast)
         }
         if (source.player != null) environment.logger.info { broadcast.resolvePlainText(environment.lang) }
@@ -112,3 +135,11 @@ public class CommandFeedback(
         source.sendSystemMessage(message.color(TextColor.RED))
     }
 }
+
+/**
+ * Seeing other people's successful commands, vanilla's `chat.type.admin` broadcast.
+ *
+ * A permission rather than "level 2 or above", so that who receives them is decided in the same
+ * file and the same way as everything else. `*` covers it, so an operator gets them by default.
+ */
+public const val ADMIN_PERMISSION: String = "basalt.admin.broadcast"

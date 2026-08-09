@@ -66,6 +66,8 @@ public abstract class Command(
     public val name: String,
     public val permissionLevel: Int = PermissionLevel.ALL,
     public val aliases: List<String> = emptyList(),
+    /** Defaults to `basalt.command.<name>`, which is what `groups.toml` grants by wildcard. */
+    public val permission: String = "basalt.command.$name",
 ) {
     /** Builds this command's arguments and sub-commands onto its own (already named) root node. */
     public abstract fun build(root: CommandNodeBuilder)
@@ -88,6 +90,17 @@ public fun interface CommandExecutor {
 public sealed class CommandNode {
     public val children: MutableList<CommandNode> = mutableListOf()
     public var executor: CommandExecutor? = null
+
+    /**
+     * The permission this node needs, e.g. `basalt.command.gamemode`.
+     *
+     * Named, not numeric, because `commands.toml` has to be able to say which permission a command
+     * asks for and `groups.toml` has to be able to grant it, and a number cannot be referred to.
+     * Null means the node is open to anyone who reached it.
+     */
+    public var permission: String? = null
+
+    /** parity: what vanilla demands for this command. Recorded, not enforced; see [PermissionLevel]. */
     public var requiredLevel: Int = PermissionLevel.ALL
     public var redirect: CommandNode? = null
 
@@ -114,8 +127,9 @@ public class ArgumentNode(
 public class CommandNodeBuilder(
     private val node: CommandNode,
 ) {
-    public fun requires(level: Int) {
-        node.requiredLevel = level
+    /** Overrides the permission this node needs, for a sub-command that should be harder to reach. */
+    public fun permission(permission: String) {
+        node.permission = permission
     }
 
     public fun executes(executor: CommandExecutor) {
@@ -132,6 +146,7 @@ public class CommandNodeBuilder(
     ): LiteralNode {
         val child = LiteralNode(name)
         child.requiredLevel = node.requiredLevel
+        child.permission = node.permission
         CommandNodeBuilder(child).build()
         node.children.add(child)
         return child
@@ -144,6 +159,7 @@ public class CommandNodeBuilder(
     ): ArgumentNode {
         val child = ArgumentNode(name, type)
         child.requiredLevel = node.requiredLevel
+        child.permission = node.permission
         CommandNodeBuilder(child).build()
         node.children.add(child)
         return child
@@ -167,9 +183,10 @@ public class CommandDispatcher(
     /** Registers [command] and every alias it declares. The shape all real commands use. */
     public fun register(command: Command): LiteralNode {
         val node = LiteralNode(command.name)
-        // Before build(), so children inherit it: a sub-command is never easier to reach than the
+        // Before build(), so children inherit them: a sub-command is never easier to reach than the
         // command it belongs to.
         node.requiredLevel = command.permissionLevel
+        node.permission = command.permission
         command.build(CommandNodeBuilder(node))
         root.children.add(node)
         for (alias in command.aliases) registerAlias(alias, node)
@@ -194,6 +211,7 @@ public class CommandDispatcher(
     ): LiteralNode {
         val node = LiteralNode(name)
         node.requiredLevel = target.requiredLevel
+        node.permission = target.permission
         node.redirect = target
         node.executor = target.executor
         root.children.add(node)
@@ -255,7 +273,7 @@ public class CommandDispatcher(
         val start = reader.cursor
         var deepestError: CommandSyntaxException? = null
         for (child in target.sortedChildren) {
-            if (!source.hasPermission(child.requiredLevel)) continue
+            if (!source.mayUse(child)) continue
             reader.cursor = start
             val branchArguments = arguments.toMutableMap()
             try {
@@ -313,7 +331,7 @@ public class CommandDispatcher(
             ids[node] = ordered.size
             ordered.add(node)
             for (child in node.sortedChildren) {
-                if (source.hasPermission(child.requiredLevel)) enumerate(child)
+                if (source.mayUse(child)) enumerate(child)
             }
             node.redirect?.let { enumerate(it) }
         }
@@ -323,7 +341,7 @@ public class CommandDispatcher(
             ordered.map { node ->
                 val children =
                     node.sortedChildren
-                        .filter { source.hasPermission(it.requiredLevel) }
+                        .filter { source.mayUse(it) }
                         .mapNotNull { ids[it] }
                         .toIntArray()
                 when (node) {
@@ -354,7 +372,7 @@ public class CommandDispatcher(
 
     /** Every registered top-level command name, in registration order. Used by `/help`. */
     public fun usableCommands(source: CommandSource): List<LiteralNode> =
-        root.children.filterIsInstance<LiteralNode>().filter { source.hasPermission(it.requiredLevel) }
+        root.children.filterIsInstance<LiteralNode>().filter { source.mayUse(it) }
 
     private companion object {
         // Brigadier's own literals, which the client shows verbatim: they are not translation keys.

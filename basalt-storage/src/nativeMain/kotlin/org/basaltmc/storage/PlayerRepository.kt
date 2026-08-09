@@ -55,6 +55,7 @@ public class PlayerRepository(
             xp_progress = player.xpProgress.toDouble(),
             xp_total = player.xpTotal.toLong(),
             gamemode = player.gamemode.ordinal.toLong(),
+            group_name = player.group,
             inventory = InventoryNbt.encode(player.inventory),
             ender_chest = InventoryNbt.encode(player.enderChest),
             stats = null,
@@ -75,6 +76,29 @@ public class PlayerRepository(
             for (player in players) save(player)
         }
     }
+
+    /**
+     * Moves a player between groups without touching the rest of their row.
+     *
+     * A whole-player upsert would need every other column, which `op` on somebody who is offline
+     * does not have and should not have to invent. Returns false when there is no such player: this
+     * server can only administer people it has seen at least once, since it has no profile cache to
+     * resolve a name it has never met.
+     */
+    public fun setGroup(
+        uuid: String,
+        group: String?,
+    ): Boolean {
+        if (!exists(uuid)) return false
+        queries.setGroup(group, uuid)
+        return true
+    }
+
+    public fun findInGroup(group: String): List<PlayerSummary> =
+        queries
+            .findByGroup(group)
+            .executeAsList()
+            .map { PlayerSummary(it.uuid, it.name, 0L) }
 
     public fun delete(uuid: String) {
         queries.delete(uuid)
@@ -129,6 +153,7 @@ public class PlayerRepository(
             xpProgress = xp_progress.toFloat(),
             xpTotal = xp_total.toInt(),
             gamemode = StoredGamemode.byId(gamemode.toInt()),
+            group = group_name,
             inventory = inventory?.let(InventoryNbt::decode) ?: StoredInventory.empty(),
             enderChest =
                 ender_chest?.let(InventoryNbt::decode)

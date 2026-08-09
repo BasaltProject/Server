@@ -44,6 +44,7 @@ public object PlayerPersistence {
             xpProgress = session.experience.progress,
             xpTotal = session.experience.total,
             gamemode = StoredGamemode.entries[session.gamemode.ordinal],
+            group = session.group,
         )
 
     /** Puts a stored row back onto a freshly created session, in place. */
@@ -60,6 +61,7 @@ public object PlayerPersistence {
         session.food.restore(stored.food, stored.saturation, stored.exhaustion)
         session.experience.restore(stored.xpLevel, stored.xpProgress, stored.xpTotal)
         session.gamemode = Gamemode.entries[stored.gamemode.ordinal]
+        session.group = stored.group
         session.flying = session.gamemode == Gamemode.SPECTATOR
     }
 }

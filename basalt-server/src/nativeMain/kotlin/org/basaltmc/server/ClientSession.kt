@@ -1115,9 +1115,8 @@ public class ClientSession(
     private fun runCommand(command: String) {
         val session = playerSession ?: return
         val dispatcher = commands ?: return
-        val level = dispatcher.environment.permissionLevelOf(session.name)
         logger.info { "${session.name} issued server command: /$command" }
-        dispatcher.execute(PlayerCommandSource(session, level), command)
+        dispatcher.execute(PlayerCommandSource(session, dispatcher.environment.groups), command)
     }
 
     // --- Player state ---
@@ -1419,8 +1418,7 @@ public class ClientSession(
     internal fun sendCommandTree() {
         val session = playerSession ?: return
         val dispatcher = commands ?: return
-        val level = dispatcher.environment.permissionLevelOf(session.name)
-        val tree = dispatcher.treeFor(PlayerCommandSource(session, level))
+        val tree = dispatcher.treeFor(PlayerCommandSource(session, dispatcher.environment.groups))
         sendCompressed(CommandsPacket.ID) { tree.write(it) }
     }
 
