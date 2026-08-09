@@ -777,7 +777,15 @@ public class ClientSession(
                     ).write(it)
             }
             other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
-                EntityTeleportPacket(session.entityId, session.x, session.y, session.z, 0, 0, onGround = true).write(it)
+                EntityTeleportPacket(
+                    session.entityId,
+                    session.x,
+                    session.y,
+                    session.z,
+                    0f,
+                    0f,
+                    onGround = true,
+                ).write(it)
             }
             sendCompressed(EntityTeleportPacket.ID) {
                 EntityTeleportPacket(
@@ -785,8 +793,8 @@ public class ClientSession(
                     other.x,
                     other.y,
                     other.z,
-                    angleToByte(other.yaw),
-                    angleToByte(other.pitch),
+                    other.yaw,
+                    other.pitch,
                     other.onGround,
                 ).write(it)
             }
@@ -1054,8 +1062,8 @@ public class ClientSession(
                     x,
                     y,
                     z,
-                    angleToByte(yaw),
-                    angleToByte(pitch),
+                    yaw,
+                    pitch,
                     onGround,
                 ).write(it)
             }
@@ -1404,7 +1412,7 @@ public class ClientSession(
         for (other in playersInSameWorld()) {
             if (other.uuid == session.uuid) continue
             other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
-                EntityTeleportPacket(session.entityId, spawnX, spawnY, spawnZ, 0, 0, onGround = true).write(it)
+                EntityTeleportPacket(session.entityId, spawnX, spawnY, spawnZ, 0f, 0f, onGround = true).write(it)
             }
         }
     }
@@ -1500,8 +1508,8 @@ public class ClientSession(
                     x,
                     y,
                     z,
-                    angleToByte(session.yaw),
-                    angleToByte(session.pitch),
+                    session.yaw,
+                    session.pitch,
                     false,
                 ).write(it)
             }

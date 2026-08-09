@@ -12,17 +12,25 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
 import platform.posix.AF_INET
+import platform.posix.SIGPIPE
+import platform.posix.SIG_IGN
 import platform.posix.SOL_SOCKET
 import platform.posix.SO_REUSEADDR
 import platform.posix.close
 import platform.posix.getpeername
 import platform.posix.setsockopt
+import platform.posix.signal
 import platform.posix.sockaddr
 import platform.posix.sockaddr_in
 import platform.posix.socklen_tVar
 
 internal actual fun ensureSocketsInitialized() {
-    // no-op: POSIX sockets need no process-wide setup.
+    // Writing to a socket whose peer has gone raises SIGPIPE, and its default action is to kill the
+    // process **silently**: no message, no exit code anybody can read, nothing in the log. That is
+    // exactly what a server does all day, since a client that alt-F4s during a broadcast is normal.
+    // Ignored here so the write returns EPIPE instead and the SocketException path already in place
+    // handles it. Once, at the one point every socket in the process goes through.
+    signal(SIGPIPE, SIG_IGN)
 }
 
 internal actual fun closeSocket(fd: Long) {

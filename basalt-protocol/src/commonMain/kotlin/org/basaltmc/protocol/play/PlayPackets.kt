@@ -756,33 +756,66 @@ public data class EntityTeleportPacket(
     val x: Double,
     val y: Double,
     val z: Double,
-    val yaw: Byte,
-    val pitch: Byte,
+    val yaw: Float,
+    val pitch: Float,
     val onGround: Boolean,
+    val deltaX: Double = 0.0,
+    val deltaY: Double = 0.0,
+    val deltaZ: Double = 0.0,
+    /**
+     * Vanilla's `Relative` bitmask: which fields the client should add to what it already has
+     * instead of replacing. Zero means every value is absolute, which is what a server telling a
+     * client where somebody *is* always means.
+     */
+    val relatives: Int = 0,
 ) {
     public fun write(buffer: ByteBuffer) {
         buffer.writeVarInt(entityId)
+        // parity: `PositionMoveRotation` is position, then velocity, then two floats of rotation.
+        // The velocity is not optional and its absence is what broke this: a client read the three
+        // doubles it was owed, ran off the end of the packet and dropped the connection with
+        // "Failed to decode packet 'clientbound/minecraft:teleport_entity'".
         buffer.writeDouble(x)
         buffer.writeDouble(y)
         buffer.writeDouble(z)
-        buffer.writeByte(yaw)
-        buffer.writeByte(pitch)
+        buffer.writeDouble(deltaX)
+        buffer.writeDouble(deltaY)
+        buffer.writeDouble(deltaZ)
+        // Degrees as floats, not the packed angle bytes older protocols used here.
+        buffer.writeFloat(yaw)
+        buffer.writeFloat(pitch)
+        buffer.writeInt(relatives)
         buffer.writeBoolean(onGround)
     }
 
     public companion object {
         public const val ID: Int = 0x7d
 
-        public fun read(buffer: ByteBuffer): EntityTeleportPacket =
-            EntityTeleportPacket(
-                entityId = buffer.readVarInt(),
-                x = buffer.readDouble(),
-                y = buffer.readDouble(),
-                z = buffer.readDouble(),
-                yaw = buffer.readByte(),
-                pitch = buffer.readByte(),
+        public fun read(buffer: ByteBuffer): EntityTeleportPacket {
+            val entityId = buffer.readVarInt()
+            val x = buffer.readDouble()
+            val y = buffer.readDouble()
+            val z = buffer.readDouble()
+            val deltaX = buffer.readDouble()
+            val deltaY = buffer.readDouble()
+            val deltaZ = buffer.readDouble()
+            val yaw = buffer.readFloat()
+            val pitch = buffer.readFloat()
+            val relatives = buffer.readInt()
+            return EntityTeleportPacket(
+                entityId = entityId,
+                x = x,
+                y = y,
+                z = z,
+                yaw = yaw,
+                pitch = pitch,
                 onGround = buffer.readBoolean(),
+                deltaX = deltaX,
+                deltaY = deltaY,
+                deltaZ = deltaZ,
+                relatives = relatives,
             )
+        }
     }
 }
 
