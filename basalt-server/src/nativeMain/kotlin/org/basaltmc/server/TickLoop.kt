@@ -1,5 +1,6 @@
 package org.basaltmc.server
 
+import org.basaltmc.common.timings.TickDurations
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.sleepMillis
 import kotlin.concurrent.AtomicInt
@@ -21,6 +22,8 @@ import kotlin.time.TimeSource
 @OptIn(ExperimentalTime::class)
 public class TickLoop(
     saveIntervalSeconds: Int = DEFAULT_SAVE_INTERVAL_SECONDS,
+    /** Every tick's duration, for the distribution `/timings` reports. */
+    public val durations: TickDurations = TickDurations(),
     private val onSaveInterval: () -> Unit = {},
     /**
      * Runs every tick. Deliberately not a general extension point: it exists so something checks
@@ -42,18 +45,32 @@ public class TickLoop(
         NativeThread.start {
             val meter = TickMeter()
             var tick = 0L
+            val clock = TimeSource.Monotonic.markNow()
+            var nextTickMillis = 0L
             while (running.value == 1) {
                 val started = TimeSource.Monotonic.markNow()
                 tick++
                 onTick()
                 if (saveIntervalTicks > 0 && tick % saveIntervalTicks == 0L) onSaveInterval()
 
+                // Recorded before the sleep, so it is the work that is measured and not the wait.
+                durations.record(clock.elapsedNow().inWholeNanoseconds, started.elapsedNow().inWholeNanoseconds)
                 rates.value = meter.tick()
-                // Subtract the work, rather than always sleeping a whole tick. Without this the loop
-                // ran at 50ms *plus* however long the tick took, so it could never reach 20 and a
-                // measured rate would have been reporting the sleep instead of the server.
-                val spent = started.elapsedNow().inWholeMilliseconds
-                if (spent < TICK_MILLIS) sleepMillis(TICK_MILLIS - spent)
+
+                // Slept towards an absolute deadline rather than for "a tick minus the work".
+                // sleepMillis only promises *at least* what it is asked for, so a computed delta
+                // overshoots by a millisecond or two every tick and never gets it back: measured, that
+                // drift alone held an idle server at 17 TPS. Counting deadlines from the start makes
+                // an overshoot cost that tick and not the ones after it.
+                nextTickMillis += TICK_MILLIS
+                val remaining = nextTickMillis - clock.elapsedNow().inWholeMilliseconds
+                if (remaining > 0) {
+                    sleepMillis(remaining)
+                } else if (remaining < -TICK_MILLIS * CATCH_UP_LIMIT) {
+                    // Too far behind to catch up by running faster; skip the backlog rather than
+                    // spin through it, which is what turns a stall into a spiral.
+                    nextTickMillis = clock.elapsedNow().inWholeMilliseconds
+                }
             }
         }
     }
@@ -116,6 +133,9 @@ public class TickLoop(
     public companion object {
         public const val TICK_MILLIS: Long = 50L
         public const val TICKS_PER_SECOND: Long = 20L
+
+        /** How many ticks behind the loop tolerates before it stops trying to catch up. */
+        private const val CATCH_UP_LIMIT = 20
 
         /** Fifteen minutes, the longest window reported. */
         private const val WINDOW_SECONDS = 900

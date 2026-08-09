@@ -2,6 +2,7 @@ package org.basaltmc.server.command
 
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.common.placeholder.PlaceholderRegistry
+import org.basaltmc.common.timings.Timings
 import org.basaltmc.server.config.CommandsConfig
 import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.player.PlayerRegistry
@@ -47,6 +48,8 @@ public class CommandEnvironment(
     public val worlds: Map<String, LoadedWorld> = emptyMap(),
     /** Every placeholder this server answers, so commands can resolve text the same way files do. */
     public val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
+    /** Where a command's own cost is recorded, for `/timings`. Off unless it has been switched on. */
+    public val timings: Timings = Timings(),
     /** `commands.toml`: which permission each command asks for, which exist, and what they answer. */
     private val commandsProvider: () -> CommandsConfig = { CommandsConfig(emptyMap(), emptyList(), emptyMap()) },
 ) {

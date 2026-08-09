@@ -3,6 +3,9 @@ package org.basaltmc.server
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.common.placeholder.PlaceholderRegistry
+import org.basaltmc.common.timings.TickDurations
+import org.basaltmc.common.timings.Timings
+import org.basaltmc.common.timings.time
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.ShutdownSignal
 import org.basaltmc.io.TcpListener
@@ -12,6 +15,7 @@ import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.CommandEnvironment
 import org.basaltmc.server.command.commands.ReloadCommand
 import org.basaltmc.server.command.commands.RestartCommand
+import org.basaltmc.server.command.commands.TimingsCommand
 import org.basaltmc.server.command.registerVanillaCommands
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.LiveConfigs
@@ -22,6 +26,8 @@ import org.basaltmc.server.placeholder.ServerFacts
 import org.basaltmc.server.placeholder.ServerPlaceholders
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
+import org.basaltmc.server.timings.ReportSources
+import org.basaltmc.server.timings.TimingsReport
 import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.WORLDS_ROOT
 import org.basaltmc.server.world.WorldMetadata
@@ -92,6 +98,14 @@ public class BasaltServer(
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
     private val cpuMeter = CpuMeter()
+
+    /**
+     * What `/timings` measures. Off until asked for: a clock read per section per call is small but
+     * not free, and a server nobody is investigating should not pay it.
+     */
+    public val timings: Timings = Timings()
+    private val tickDurations = TickDurations()
+    private val serverClock = TimeSource.Monotonic.markNow()
     private val accepting = AtomicInt(1)
 
     /** Guards against running the shutdown twice: `/stop` and a signal can arrive together. */
@@ -143,6 +157,7 @@ public class BasaltServer(
                     metadata = metadata,
                     worldsRoot = worldsRoot,
                     logger = logger,
+                    timings = timings,
                     // One worker while measuring: GenerationMetrics counts without atomics on
                     // purpose, so its numbers are only exact when a single thread is generating.
                     generationWorkers = if (config.generationMetrics) 1 else 8,
@@ -174,7 +189,8 @@ public class BasaltServer(
     private val tickLoop =
         TickLoop(
             defaultWorld.settings.saveIntervalSeconds,
-            onSaveInterval = ::persistAndUnload,
+            durations = tickDurations,
+            onSaveInterval = { timings.of("tick.save").time { persistAndUnload() } },
             onTick = ::shutdownIfSignalled,
         )
 
@@ -228,10 +244,36 @@ public class BasaltServer(
                 worlds = worlds,
                 placeholders = placeholders,
                 commandsProvider = { live.current.commands },
+                timings = timings,
             ),
         ).also(::registerVanillaCommands)
             .also { it.register(ReloadCommand(live, ::onConfigsReloaded)) }
             .also { it.register(RestartCommand(::requestRestart)) }
+            .also {
+                it.register(
+                    TimingsCommand(
+                        timings = timings,
+                        tickDurations = tickDurations,
+                        report =
+                            TimingsReport(
+                                timings,
+                                tickDurations,
+                                ReportSources(
+                                    versionName = BuildInfo.MINECRAFT_VERSION,
+                                    protocolVersion = BuildInfo.PROTOCOL_VERSION,
+                                    uptimeSeconds = { serverClock.elapsedNow().inWholeSeconds },
+                                    onlinePlayers = { playerRegistry.snapshot().size },
+                                    maxPlayers = { config.maxPlayers },
+                                    loadedChunks = { worlds.values.sumOf { world -> world.state.loadedChunkCount } },
+                                    worldCount = { worlds.size },
+                                    cpuPercent = cpuMeter::percent,
+                                    liveHeapBytes = { liveHeapBytes() },
+                                ),
+                            ),
+                        nowNanos = { serverClock.elapsedNow().inWholeNanoseconds },
+                    ),
+                )
+            }
 
     /**
      * The server list, rebuilt per ping from `server_list.toml`.
@@ -439,6 +481,7 @@ public class BasaltServer(
                     rememberAddress = if (live.current.serverList.rememberIp) connection.remoteAddress else null,
                     ui = { live.current.ui },
                     placeholders = placeholders,
+                    timings = timings,
                 ).run()
             }
         }

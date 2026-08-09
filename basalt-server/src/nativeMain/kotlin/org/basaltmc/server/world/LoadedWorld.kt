@@ -1,6 +1,8 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.common.timings.Timings
+import org.basaltmc.common.timings.time
 import org.basaltmc.server.config.WorldDeclaration
 import org.basaltmc.server.config.WorldSettings
 import org.basaltmc.server.config.WorldType
@@ -37,6 +39,8 @@ public class LoadedWorld(
     worldsRoot: String,
     private val logger: Logger,
     generationWorkers: Int,
+    /** Where this world's generation and saving are recorded. Off unless `/timings` is on. */
+    private val timings: Timings = Timings(),
     private val overworldRouter: OverworldNoiseRouter? = null,
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
@@ -92,6 +96,11 @@ public class LoadedWorld(
      * about terrain fidelity passes a real one.
      */
     private fun generateChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk = timings.of("world.generate").time { generateChunkNow(chunkX, chunkZ) }
+
+    private fun generateChunkNow(
         chunkX: Int,
         chunkZ: Int,
     ): Chunk =
@@ -154,13 +163,15 @@ public class LoadedWorld(
         if (chunks.isEmpty()) return
         val startedAt = TimeSource.Monotonic.markNow()
         val written =
-            regions.saveChunks(
-                chunks,
-                Clock.System
-                    .now()
-                    .epochSeconds
-                    .toInt(),
-            )
+            timings.of("world.save").time {
+                regions.saveChunks(
+                    chunks,
+                    Clock.System
+                        .now()
+                        .epochSeconds
+                        .toInt(),
+                )
+            }
         logger.debug {
             "[$name] saved ${chunks.size} chunk(s) across $written region(s) in " +
                 "${startedAt.elapsedNow().inWholeMilliseconds}ms (${regions.encodeMillis}ms encoding, " +
