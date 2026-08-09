@@ -27,7 +27,7 @@ include(
     ":basalt-server",
     ":basalt-assets",
     ":basalt-auth",
-    ":basalt-translate",
+    ":basalt-multiversion",
     ":basalt-bedrock",
     ":basalt-lua",
     ":basalt-bsmod",
