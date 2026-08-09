@@ -36,7 +36,7 @@ import kotlin.uuid.Uuid
 
 /**
  * Runs the actual [BasaltServer] on a real socket and drives it with `basalt-io`'s own
- * client socket, exercising the whole stack (sockets, framing, compression, packets) together —
+ * client socket, exercising the whole stack (sockets, framing, compression, packets) together:
  * not just each module's isolated unit tests.
  */
 @OptIn(ExperimentalUuidApi::class)
