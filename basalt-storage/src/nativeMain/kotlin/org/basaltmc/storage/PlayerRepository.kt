@@ -58,7 +58,7 @@ public class PlayerRepository(
             group_name = player.group,
             inventory = InventoryNbt.encode(player.inventory),
             ender_chest = InventoryNbt.encode(player.enderChest),
-            stats = null,
+            stats = StatsNbt.encode(player.stats),
         )
     }
 
@@ -175,5 +175,6 @@ public class PlayerRepository(
             enderChest =
                 ender_chest?.let(InventoryNbt::decode)
                     ?: StoredInventory.empty(StoredPlayer.ENDER_CHEST_SLOTS),
+            stats = stats?.let(StatsNbt::decode) ?: StoredStats.EMPTY,
         )
 }

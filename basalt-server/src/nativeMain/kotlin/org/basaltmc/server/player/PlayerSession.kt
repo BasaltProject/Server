@@ -53,6 +53,12 @@ public class PlayerSession(
     public val food: FoodData = FoodData()
     public val experience: ExperienceData = ExperienceData()
 
+    /** Counters, incremented as this server notices things happening. See [PlayerStats]. */
+    public val stats: PlayerStats = PlayerStats()
+
+    /** The 41 slots this player carries. See [PlayerInventory] for what is and is not modelled. */
+    public val inventory: PlayerInventory = PlayerInventory()
+
     /** Set the moment health hits zero, cleared on respawn. A dead player stops being ticked. */
     public var dead: Boolean = false
 

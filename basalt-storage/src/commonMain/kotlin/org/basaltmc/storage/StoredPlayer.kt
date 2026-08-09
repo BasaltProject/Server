@@ -85,6 +85,7 @@ public data class StoredPlayer(
     val group: String? = null,
     val inventory: StoredInventory = StoredInventory.empty(),
     val enderChest: StoredInventory = StoredInventory.empty(ENDER_CHEST_SLOTS),
+    val stats: StoredStats = StoredStats.EMPTY,
 ) {
     public companion object {
         public const val ENDER_CHEST_SLOTS: Int = 27

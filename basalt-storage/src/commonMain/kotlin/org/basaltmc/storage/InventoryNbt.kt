@@ -54,7 +54,9 @@ public object InventoryNbt {
 
     public fun decode(bytes: ByteArray): StoredInventory {
         val root =
-            NbtIO.read(bytes).tag as? NbtCompound ?: throw StorageFormatException("inventory blob is not a compound")
+            runCatching { NbtIO.read(bytes).tag }
+                .getOrElse { throw StorageFormatException("inventory blob is not readable NBT: ${it.message}") }
+                as? NbtCompound ?: throw StorageFormatException("inventory blob is not a compound")
         val version = root.getInt(VERSION_KEY)
         if (version != FORMAT_VERSION) {
             throw StorageFormatException("inventory blob is format version $version, this build reads $FORMAT_VERSION")
