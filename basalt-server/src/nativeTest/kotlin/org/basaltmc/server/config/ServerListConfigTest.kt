@@ -1,12 +1,16 @@
 package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.common.placeholder.PlaceholderContext
+import org.basaltmc.common.placeholder.PlaceholderRegistry
 import org.basaltmc.io.FileIO
+import org.basaltmc.server.command.testGroups
+import org.basaltmc.server.placeholder.PlaceholderSlots
+import org.basaltmc.server.placeholder.PlayerPlaceholders
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** The profiles a test server advertises: enough to answer a ping, with no file behind it. */
@@ -15,7 +19,13 @@ internal fun testServerList(): ServerListConfig {
     return ServerListConfig(listOf(default), default, rememberIp = false)
 }
 
+/** Only the player side: nothing here asks the server about itself. */
+internal fun testPlaceholders(): PlaceholderRegistry =
+    PlaceholderRegistry().apply { register("basalt_player", PlayerPlaceholders(testGroups())) }
+
 class ServerListConfigTest {
+    private val placeholders = testPlaceholders()
+
     private fun directoryFor(name: String): ConfigDirectory =
         ConfigDirectory("build/test-data/config_$name", Logger("Test"))
 
@@ -34,7 +44,13 @@ class ServerListConfigTest {
         host: String = "example.com",
         address: String? = "203.0.113.7",
         knownPlayer: String? = null,
-    ) = PingRequest(protocol, host, address, knownPlayer)
+    ): PlaceholderContext =
+        PlaceholderContext.EMPTY.with(
+            PlaceholderSlots.PING,
+            PingRequest(protocol, host, address, knownPlayer),
+        )
+
+    private fun ServerListConfig.selected(context: PlaceholderContext) = select(placeholders, context, Logger("Test"))
 
     @Test
     fun theGeneratedFileGreetsModernClientsWithAGradientAndOlderOnesWithoutOne() {
@@ -42,18 +58,18 @@ class ServerListConfigTest {
 
         // 735 is 1.16, where RGB text arrived. Below it a gradient degrades to flat white, which is
         // the entire reason the shipped file has two profiles rather than one.
-        assertEquals("default", config.select(ping(protocol = 776)).name)
-        assertEquals("legacy", config.select(ping(protocol = 734)).name)
+        assertEquals("default", config.selected(ping(protocol = 776)).name)
+        assertEquals("legacy", config.selected(ping(protocol = 734)).name)
         assertTrue(
             config
-                .select(ping(protocol = 776))
+                .selected(ping(protocol = 776))
                 .motd!!
                 .first()
                 .contains("<gradient:"),
         )
         assertFalse(
             config
-                .select(ping(protocol = 47))
+                .selected(ping(protocol = 47))
                 .motd!!
                 .first()
                 .contains("<gradient:"),
@@ -78,12 +94,11 @@ class ServerListConfigTest {
                 [profiles.beta]
                 priority = 50
                 motd = "beta"
-                [profiles.beta.when]
-                host = "beta.example.com"
+                when = ["%basalt_player_host% = beta.example.com"]
                 """.trimIndent(),
             )
 
-        assertEquals("maintenance", config.select(ping(host = "beta.example.com")).name)
+        assertEquals("maintenance", config.selected(ping(host = "beta.example.com")).name)
     }
 
     @Test
@@ -99,19 +114,67 @@ class ServerListConfigTest {
                 [profiles.low]
                 priority = 1
                 motd = "low"
-                [profiles.low.when]
-                protocol = 776
+                when = ["%basalt_player_protocol% = 776"]
 
                 [profiles.high]
                 priority = 2
                 motd = "high"
-                [profiles.high.when]
-                host = "*.example.com"
+                when = ["%basalt_player_host% matches *.example.com"]
                 """.trimIndent(),
             )
 
-        assertEquals("high", config.select(ping(host = "mc.example.com")).name)
-        assertEquals("low", config.select(ping(host = "other.test")).name)
+        assertEquals("high", config.selected(ping(host = "mc.example.com")).name)
+        assertEquals("low", config.selected(ping(host = "other.test")).name)
+    }
+
+    @Test
+    fun everyConditionOfAProfileHasToHold() {
+        val config =
+            load(
+                "several",
+                """
+                [profiles.default]
+                default = true
+                motd = "normal"
+
+                [profiles.both]
+                motd = "both"
+                when = [
+                    "%basalt_player_protocol% >= 735",
+                    "%basalt_player_host% matches *.example.com",
+                ]
+                """.trimIndent(),
+            )
+
+        assertEquals("both", config.selected(ping(protocol = 776, host = "mc.example.com")).name)
+        assertEquals("default", config.selected(ping(protocol = 47, host = "mc.example.com")).name)
+        assertEquals("default", config.selected(ping(protocol = 776, host = "other.test")).name)
+    }
+
+    @Test
+    fun aConditionThisSituationCannotAnswerSkipsTheProfileInsteadOfMatchingIt() {
+        val config =
+            load(
+                "unanswerable",
+                """
+                [profiles.default]
+                default = true
+                motd = "normal"
+
+                [profiles.impossible]
+                priority = 99
+                motd = "impossible"
+                # A player's coordinates, asked before anyone has logged in.
+                when = ["%basalt_player_x% > 100"]
+
+                [profiles.nonsense]
+                priority = 98
+                motd = "nonsense"
+                when = ["%basalt_nope_at_all% = 1"]
+                """.trimIndent(),
+            )
+
+        assertEquals("default", config.selected(ping()).name)
     }
 
     @Test
@@ -132,7 +195,7 @@ class ServerListConfigTest {
                 """.trimIndent(),
             )
 
-        val selected = config.select(ping())
+        val selected = config.selected(ping())
         assertEquals(listOf("closed"), selected.motd)
         assertEquals("custom.png", selected.icon)
         assertEquals(100, selected.maxPlayers)
@@ -142,7 +205,7 @@ class ServerListConfigTest {
     fun aMotdWrittenAsOneStringSplitsIntoTheSameTwoLinesAsAList() {
         val config = load("motd_string", "[profiles.default]\ndefault = true\nmotd = \"first\\nsecond\"\n")
 
-        assertEquals(listOf("first", "second"), config.select(ping()).motd)
+        assertEquals(listOf("first", "second"), config.selected(ping()).motd)
     }
 
     @Test
@@ -157,18 +220,17 @@ class ServerListConfigTest {
 
                 [profiles.beta]
                 motd = "beta"
-                [profiles.beta.when]
-                host = "beta.*"
+                when = ["%basalt_player_host% matches beta.*"]
                 """.trimIndent(),
             )
 
-        assertEquals("beta", config.select(ping(host = "beta.example.com")).name)
-        assertEquals("beta", config.select(ping(host = "BETA.example.com")).name)
-        assertEquals("default", config.select(ping(host = "mc.example.com")).name)
+        assertEquals("beta", config.selected(ping(host = "beta.example.com")).name)
+        assertEquals("beta", config.selected(ping(host = "BETA.example.com")).name)
+        assertEquals("default", config.selected(ping(host = "mc.example.com")).name)
     }
 
     @Test
-    fun aKnownPlayerConditionNeedsSomebodyToHaveBeenRecognised() {
+    fun aConditionWithNoOperatorIsTrueWhenItReadsTrue() {
         val config =
             load(
                 "known",
@@ -178,26 +240,13 @@ class ServerListConfigTest {
                 motd = "hello"
 
                 [profiles.returning]
-                motd = "welcome back, <player>"
-                [profiles.returning.when]
-                known-player = true
+                motd = "welcome back, %basalt_player_name%"
+                when = ["%basalt_player_known%"]
                 """.trimIndent(),
             )
 
-        assertEquals("returning", config.select(ping(knownPlayer = "Whiron")).name)
-        assertEquals("default", config.select(ping(knownPlayer = null)).name)
-    }
-
-    @Test
-    fun lookingPlayersUpIsSkippedWhenNoProfileAsksForIt() {
-        val greeting = "\n[greeting]\nremember-ip = true\n"
-        val plain = "[profiles.default]\ndefault = true\nmotd = \"hello\"\n"
-        val greeter = "[profiles.default]\ndefault = true\nmotd = \"hello <player>\"\n"
-
-        assertFalse(load("lookup_off", plain + greeting).usesPlayerLookup)
-        assertTrue(load("lookup_on", greeter + greeting).usesPlayerLookup)
-        // The greeting being off is enough on its own: there is nothing to look up.
-        assertFalse(load("lookup_no_ip", greeter).usesPlayerLookup)
+        assertEquals("returning", config.selected(ping(knownPlayer = "Whiron")).name)
+        assertEquals("default", config.selected(ping(knownPlayer = null)).name)
     }
 
     @Test
@@ -212,7 +261,7 @@ class ServerListConfigTest {
     }
 
     @Test
-    fun afileWithoutExactlyOneDefaultProfileStopsTheServer() {
+    fun aFileWithoutExactlyOneDefaultProfileStopsTheServer() {
         assertFailsWith<TomlFormatException> {
             load("no_default", "[profiles.a]\nmotd = \"a\"\n")
         }
@@ -227,24 +276,11 @@ class ServerListConfigTest {
 
         assertFalse(generated.contains("Welcome to your new server"))
         // The maintenance profile keeps its own text: it is not a greeting.
-        assertTrue(generated.contains("Back shortly"))
+        assertTrue(generated.contains("The server is under maintenance"))
         assertTrue(generated.contains("""    "Imported \"quoted\" MOTD","""))
         assertTrue(generated.contains("""    "second line","""))
-        // Still a valid file, and both profiles ended up with the same text.
         val config = load("imported", generated)
-        assertEquals(config.select(ping(protocol = 776)).motd, config.select(ping(protocol = 47)).motd)
-    }
-
-    @Test
-    fun globsMatchTheWayTheFileSaysTheyDo() {
-        assertTrue(globMatches("*", "anything"))
-        assertTrue(globMatches("mc.example.com", "MC.example.com"))
-        assertTrue(globMatches("*.example.com", "beta.example.com"))
-        assertTrue(globMatches("192.168.*", "192.168.1.4"))
-        assertFalse(globMatches("192.168.*", "10.0.0.1"))
-        // "a*bc" must not satisfy itself twice out of the same characters.
-        assertFalse(globMatches("a*bc", "abc".dropLast(1)))
-        assertTrue(globMatches("a*bc", "abc"))
+        assertEquals(config.selected(ping(protocol = 776)).motd, config.selected(ping(protocol = 47)).motd)
     }
 
     @Test
@@ -254,11 +290,12 @@ class ServerListConfigTest {
         val contents = "[profiles.default]\ndefault = true\nmotd = \"a\"\n\n[profiles.orphan]\nmotd = \"b\"\n"
         val config = load("unreachable", contents)
 
-        assertEquals("default", config.select(ping()).name)
-        assertNull(
+        assertEquals("default", config.selected(ping()).name)
+        assertTrue(
             config.profiles
                 .first { it.name == "orphan" }
-                .condition.host,
+                .conditions
+                .isEmpty(),
         )
     }
 }

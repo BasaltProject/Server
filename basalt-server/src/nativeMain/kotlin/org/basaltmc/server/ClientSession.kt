@@ -180,6 +180,12 @@ public class ClientSession(
     /** Kept because the status response is built from it, several packets after it arrives. */
     private var handshake: HandshakePacket? = null
 
+    // Read by this connection's PlayerSession, so the same placeholders answer for a logged-in
+    // player and for a pending ping.
+    internal val handshakeProtocol: Int get() = handshake?.protocolVersion ?: 0
+    internal val handshakeHost: String get() = handshake?.hostName.orEmpty()
+    internal val remoteAddress: String? get() = connection.remoteAddress
+
     // Written once per session rather than on every flush: it only changes when someone logs in.
     private var addressRecorded = false
 
