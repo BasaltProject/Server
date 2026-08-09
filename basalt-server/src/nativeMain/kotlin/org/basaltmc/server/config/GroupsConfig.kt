@@ -2,39 +2,6 @@ package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.Logger
 
-internal const val GROUPS_DEFAULT_TOML = """# Permission groups.
-#
-# This file says what a group IS. Who belongs to it is player state, so it lives in
-# players.db and is set with `op`, `deop` or `group`, never by editing this file.
-#
-# A permission is a dotted name. A trailing `*` matches everything below it, and a
-# name prefixed with `-` denies instead of granting. The most specific rule wins, so
-# a denial of `basalt.command.stop` beats a grant of `basalt.command.*` regardless of
-# the order they are written in.
-#
-# A permission nobody grants is denied. There is no hidden ranking behind these
-# groups: what a group can do is exactly what is written here.
-
-[groups.default]
-# The group everyone starts in. Exactly one group must be marked as the default.
-default = true
-permissions = [
-    "basalt.command.help",
-    "basalt.command.list",
-    "basalt.command.me",
-]
-
-[groups.operator]
-# What `op` assigns. Exactly one group must be marked as the operator group.
-operator = true
-permissions = ["*"]
-
-# Groups can inherit from another, and add or take away from what they got:
-# [groups.moderator]
-# inherits = "default"
-# permissions = ["basalt.command.kick", "basalt.command.teleport", "-basalt.command.seed"]
-"""
-
 /**
  * One permission rule: a dotted name, possibly ending in `*`, granting or denying.
  *

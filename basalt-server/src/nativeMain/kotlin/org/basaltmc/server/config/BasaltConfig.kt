@@ -4,53 +4,6 @@ import org.basaltmc.common.logging.LogLevel
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 
-private const val DEFAULT_TOML = """# Basalt server configuration, generated once with vanilla-parity defaults.
-# Delete a value and restart to have it regenerated.
-#
-# This is one file of several under config/. Options move out of here as their own domain grows a
-# file of its own (worlds, permission groups, server list, commands); see the file each one lands
-# in for where an option went.
-
-[server]
-# Port the server listens on.
-port = 25565
-# How many players can be connected at once. Vanilla ships 20; this ships 80,
-# because 20 is a number from 2010 and nothing in the server cares. What the list
-# *shows* is a separate thing, in server_list.toml, since a profile can advertise
-# whatever it likes without changing who actually gets in.
-max-players = 80
-# Verify players against Mojang's session server. Disabling this accepts any
-# claimed username with no verification (vanilla's "cracked" mode).
-online-mode = true
-# Game mode new players join in: survival, creative, adventure or spectator.
-gamemode = "survival"
-
-[network]
-# Reserved for future network tuning (compression threshold, rate limits).
-
-[performance]
-# Count noise evaluations, biome lookups and per-phase timings while generating
-# chunks, then log a report once the startup chunks are ready. Diagnostics only:
-# it also forces startup generation onto a single thread so the counts are exact,
-# so leave it off unless you are measuring.
-generation-metrics = false
-
-[plugins]
-# Reserved for BSMod loader settings.
-
-[logging]
-# One of: trace, debug, info, warn, error.
-level = "info"
-# Mirror everything the console shows into .basalt/logs/latest.log, archiving the
-# previous run as .basalt/logs/archive/<date>-<n>.log.gz on every start.
-file = true
-# How many days of archived logs to keep. 0 keeps them forever.
-keep-days = 14
-# Colour the console output. One of: auto, always, never. "auto" colours only when
-# writing to a terminal, so redirected output and log files stay clean.
-color = "auto"
-"""
-
 /** When the console gets ANSI colour. [AUTO] means "only when stdout is a terminal". */
 public enum class ColorMode {
     AUTO,
@@ -118,7 +71,7 @@ public data class BasaltConfig(
                 val contents = initialContents(legacyPropertiesPath, logger)
                 FileIO.writeText(path, contents)
             }
-            val root = directory.load(FILE_NAME, DEFAULT_TOML)
+            val root = directory.load(FILE_NAME, SERVER_DEFAULT_TOML)
             if (announce) logger.info { "Loaded configuration from $path." }
             return fromToml(root)
         }
@@ -131,9 +84,9 @@ public data class BasaltConfig(
             val legacy = FileIO.readText(legacyPropertiesPath)
             if (legacy != null) {
                 logger.info { "Found $legacyPropertiesPath, importing recognized values once." }
-                return mergeLegacyProperties(DEFAULT_TOML, parseJavaProperties(legacy))
+                return mergeLegacyProperties(SERVER_DEFAULT_TOML, parseJavaProperties(legacy))
             }
-            return DEFAULT_TOML
+            return SERVER_DEFAULT_TOML
         }
 
         private fun fromToml(root: TomlValue.Table): BasaltConfig {
