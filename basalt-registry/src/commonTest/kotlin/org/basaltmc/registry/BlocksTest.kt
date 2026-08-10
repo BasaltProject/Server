@@ -74,6 +74,11 @@ class BlocksTest {
 
         assertEquals(mapOf("age" to "23"), Blocks.byStateId(Blocks.KELP.stateId + 23)?.properties)
         assertTrue(Blocks.hasWaterFluid(Blocks.KELP.stateId + 23))
+        for (path in listOf("weeping_vines", "twisting_vines")) {
+            val defaultStateId = stateId(path)
+            assertEquals(defaultStateId + 23, Blocks.growingVineHeadStateId(defaultStateId, 23))
+            assertEquals(mapOf("age" to "23"), Blocks.byStateId(defaultStateId + 23)?.properties)
+        }
         assertEquals(
             linkedMapOf("pickles" to "4", "waterlogged" to "true"),
             Blocks.byStateId(Blocks.SEA_PICKLE.stateId + 6)?.properties,

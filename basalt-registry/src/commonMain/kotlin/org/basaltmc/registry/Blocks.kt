@@ -153,6 +153,16 @@ public object Blocks {
     /** Whether [stateId] is one of kelp's 26 age states. */
     public fun isKelpState(stateId: Int): Boolean = stateId in KELP.stateId..KELP.stateId + 25
 
+    /** Returns a twisting/weeping vine head state with vanilla's requested age. */
+    public fun growingVineHeadStateId(
+        stateId: Int,
+        age: Int,
+    ): Int? {
+        require(age in 0..25)
+        val defaultStateId = GROWING_VINE_HEAD_DEFAULT_STATE_IDS.firstOrNull { stateId in it..it + 25 } ?: return null
+        return defaultStateId + age
+    }
+
     /** Whether [stateId] is one of sea pickle's count and water states. */
     public fun isSeaPickleState(stateId: Int): Boolean = stateId in SEA_PICKLE.stateId..SEA_PICKLE.stateId + 7
 
@@ -343,6 +353,11 @@ public object Blocks {
                 REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
             }.toIntArray()
     private val TALL_SEAGRASS_UPPER_STATE_ID: Int = TALL_SEAGRASS.stateId - 1
+    private val GROWING_VINE_HEAD_DEFAULT_STATE_IDS: IntArray =
+        listOf("weeping_vines", "twisting_vines")
+            .map { path ->
+                REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+            }.toIntArray()
     private val WILDFLOWERS_DEFAULT_STATE_ID: Int =
         REGISTRY.byIdentifier(Identifier.vanilla("wildflowers"))?.stateId ?: error("unknown block 'wildflowers'")
     private val PINK_PETALS_DEFAULT_STATE_ID: Int =
@@ -679,6 +694,13 @@ public object Blocks {
 
             for (age in 0..25) {
                 put(KELP.stateId + age, BlockState(KELP.block, KELP.stateId + age, mapOf("age" to age.toString())))
+            }
+
+            for (defaultStateId in GROWING_VINE_HEAD_DEFAULT_STATE_IDS) {
+                val block = REGISTRY.byId(defaultStateId)?.block ?: error("unknown vine head '$defaultStateId'")
+                for (age in 0..25) {
+                    put(defaultStateId + age, BlockState(block, defaultStateId + age, mapOf("age" to age.toString())))
+                }
             }
 
             var seaPickleStateId = SEA_PICKLE.stateId
