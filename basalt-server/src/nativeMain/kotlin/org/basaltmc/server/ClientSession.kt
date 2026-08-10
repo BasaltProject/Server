@@ -53,6 +53,7 @@ import org.basaltmc.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.protocol.play.ClientboundPlayerAbilitiesPacket
 import org.basaltmc.protocol.play.ClientboundTakeItemEntityPacket
 import org.basaltmc.protocol.play.CommandsPacket
+import org.basaltmc.protocol.play.ContainerClosePacket
 import org.basaltmc.protocol.play.ContainerSetContentPacket
 import org.basaltmc.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
@@ -64,6 +65,7 @@ import org.basaltmc.protocol.play.Heightmap
 import org.basaltmc.protocol.play.HeightmapType
 import org.basaltmc.protocol.play.LoginPlayPacket
 import org.basaltmc.protocol.play.MapChunkPacket
+import org.basaltmc.protocol.play.OpenScreenPacket
 import org.basaltmc.protocol.play.PlayDisconnectPacket
 import org.basaltmc.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.protocol.play.PlayerCombatKillPacket
@@ -113,6 +115,8 @@ import org.basaltmc.server.command.PlayerCommandSource
 import org.basaltmc.server.placeholder.PlaceholderSlots
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.FoodData
+import org.basaltmc.server.player.Menu
+import org.basaltmc.server.player.MenuSlot
 import org.basaltmc.server.player.PlayerInventory
 import org.basaltmc.server.player.PlayerPersistence
 import org.basaltmc.server.player.PlayerRegistry
@@ -125,6 +129,7 @@ import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.RealLootTables
+import org.basaltmc.server.world.RealRecipes
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.storage.PlayerStore
 import org.basaltmc.storage.StoredItemStack
@@ -138,6 +143,7 @@ import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkDataCodec
 import org.basaltmc.world.ChunkPos
 import org.basaltmc.world.ChunkTracker
+import org.basaltmc.world.crafting.CraftingInput
 import kotlin.concurrent.AtomicInt
 import kotlin.math.PI
 import kotlin.math.cos
@@ -147,6 +153,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import org.basaltmc.world.loot.ItemStack as LootItemStack
 
 /**
  * Drives one client connection through Handshake, (Status | Login), Configuration and Play.
@@ -201,6 +208,8 @@ public class ClientSession(
     private val timings: Timings = Timings(),
     /** Where a survival block break resolves its drops from. `null` means blocks never drop anything. */
     private val lootTables: RealLootTables? = null,
+    /** Every crafting recipe the server knows. `null` means nothing can be crafted. */
+    private val recipes: RealRecipes? = null,
 ) {
     private val logger = Logger("Session")
 
@@ -258,6 +267,18 @@ public class ClientSession(
     private val world: WorldState get() = requireNotNull(currentWorld).state
     private val generationQueue: ChunkGenerationQueue get() = requireNotNull(currentWorld).generationQueue
     private val worldName: String get() = currentWorld?.name ?: ""
+
+    /** The window this player has open. Their own inventory unless they opened a block's. */
+    private var openMenu: Menu = Menu.playerInventory()
+
+    /** The last container id handed out, so a freshly opened window never reuses the previous one. */
+    private var nextContainerId = FIRST_BLOCK_CONTAINER_ID
+
+    /** The crafting grid of [openMenu], indexed row-major. Sized for the largest grid any window has. */
+    private val craftingGrid = arrayOfNulls<StoredItemStack>(MAX_GRID_SIZE)
+
+    /** What [craftingGrid] currently makes, recomputed whenever it changes. */
+    private var craftingResult: StoredItemStack? = null
 
     /**
      * What this player is holding on the cursor inside their open window, kept server-side rather
@@ -1038,6 +1059,10 @@ public class ClientSession(
             ServerboundSetCreativeModeSlotPacket.ID ->
                 handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket.read(body))
             ServerboundContainerClickPacket.ID -> handleContainerClick(ServerboundContainerClickPacket.read(body))
+            ContainerClosePacket.SERVERBOUND_ID -> {
+                ContainerClosePacket.read(body)
+                playerSession?.let(::closeOpenMenu)
+            }
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
             ServerboundPickItemFromBlockPacket.ID ->
                 handlePickItemFromBlock(
@@ -1074,13 +1099,14 @@ public class ClientSession(
             AcceptTeleportationPacket.ID,
             PlayKeepAlivePacket.SERVERBOUND_ID,
             PlayerLoadedPacket.ID,
-            // `player_input`: the movement keys currently held, sent on every change. Sneaking
-            // lives here now (it left `player_command`), so this is where crouch exhaustion would
-            // come from if crouching cost anything in 26.2, which it does not. Named rather than
-            // left to fall off the end of this `when` because it is constant traffic, not an
-            // oddity: it arrives many times a second from every client.
-            SERVERBOUND_PLAYER_INPUT_ID,
             -> Unit
+            // `player_input`: the movement keys currently held, sent on every change. Sneaking
+            // lives here now (it left `player_command`), and it decides whether right-clicking a
+            // crafting table opens it or places against it.
+            SERVERBOUND_PLAYER_INPUT_ID -> {
+                val inputs = body.readByte().toInt()
+                playerSession?.sneaking = (inputs and SNEAK_INPUT_FLAG) != 0
+            }
         }
     }
 
@@ -1373,12 +1399,27 @@ public class ClientSession(
         if (session == null || useItemOn.hand != ServerboundUseItemOnPacket.Hand.MAIN_HAND) return ack()
         if (session.gamemode == Gamemode.SPECTATOR || session.gamemode == Gamemode.ADVENTURE) return ack()
 
+        val hit = useItemOn.blockHit
+        // Interacting with the block comes first, and has to: the usual way to open a crafting
+        // table is to right-click it with an empty hand, and the held-item checks below reject
+        // exactly that. parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it
+        // considers the item as something to place.
+        //
+        // Sneaking overrides it and places instead, which is how vanilla lets you put a block on
+        // top of a table rather than opening it.
+        if (!session.sneaking) {
+            val clicked = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)?.let(Blocks::byStateId)
+            if (clicked?.block == CRAFTING_TABLE) {
+                openCraftingTable(session)
+                return ack()
+            }
+        }
+
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot]
         val blockStateId = held?.let { Blocks.REGISTRY.idOf(Identifier.parse(it.id)) }
         if (held == null || blockStateId == null) return ack()
 
-        val hit = useItemOn.blockHit
         val placeAt = if (hit.inside) hit.pos else hit.pos.offset(hit.direction)
         val existing = world.getBlockState(placeAt.x, placeAt.y, placeAt.z)
         if (existing == null || !isAirLike(existing)) return ack()
@@ -1401,6 +1442,140 @@ public class ClientSession(
     }
 
     /**
+     * Opens a crafting table's 3x3 window.
+     *
+     * The container id has to change every time a window is opened: the client tags every click
+     * with it, and reusing one leaves clicks meant for a window that has already closed being
+     * applied to the next one.
+     */
+    private fun openCraftingTable(session: PlayerSession) {
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.craftingTable(nextContainerId)
+        recomputeCraftingResult()
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = OpenScreenPacket.CRAFTING_MENU,
+                title = Component.translatable("container.crafting"),
+            ).write(it)
+        }
+        sendInventory()
+    }
+
+    /** Back to the player's own window, giving them back whatever was on the grid or the cursor. */
+    private fun closeOpenMenu(session: PlayerSession) {
+        if (openMenu.containerId == 0) {
+            // Their own inventory closing still has a 2x2 grid to empty.
+            returnCraftingGrid(session)
+            sendInventory()
+            return
+        }
+        returnCraftingGrid(session)
+        openMenu = Menu.playerInventory()
+        recomputeCraftingResult()
+        sendInventory()
+    }
+
+    /** Reads one slot of the open window, whatever it refers to. */
+    private fun readSlot(
+        session: PlayerSession,
+        slot: MenuSlot,
+    ): StoredItemStack? =
+        when (slot) {
+            is MenuSlot.Inventory -> session.inventory[slot.index]
+            is MenuSlot.Grid -> craftingGrid.getOrNull(slot.index)
+            MenuSlot.Result -> craftingResult
+        }
+
+    /** Writes one slot of the open window. The result slot is computed, never assigned. */
+    private fun writeSlot(
+        session: PlayerSession,
+        slot: MenuSlot,
+        stack: StoredItemStack?,
+    ) {
+        when (slot) {
+            is MenuSlot.Inventory -> session.inventory[slot.index] = stack
+            is MenuSlot.Grid -> {
+                if (slot.index in craftingGrid.indices) craftingGrid[slot.index] = stack
+                recomputeCraftingResult()
+            }
+            MenuSlot.Result -> Unit
+        }
+    }
+
+    /** Whether a stack may be put into this slot at all. The result slot only ever gives. */
+    private fun canPlaceInto(slot: MenuSlot): Boolean = slot != MenuSlot.Result
+
+    /**
+     * Recomputes what the grid makes. Called after anything touches it, which is what makes the
+     * result appear and disappear as the player lays ingredients out.
+     */
+    private fun recomputeCraftingResult() {
+        val recipes = this.recipes
+        if (recipes == null) {
+            craftingResult = null
+            return
+        }
+        val width = openMenu.gridWidth
+        val height = openMenu.gridHeight
+        val cells =
+            List(width * height) { index ->
+                craftingGrid.getOrNull(index)?.let { LootItemStack(Identifier.parse(it.id), it.count) }
+            }
+        val result = recipes.resultFor(CraftingInput.of(width, height, cells))
+        craftingResult = result?.let { StoredItemStack(it.item.toString(), it.count) }
+    }
+
+    /**
+     * Taking the result: hands over one batch and consumes one item from every occupied grid cell.
+     *
+     * parity: `ResultSlot.onTake`. Crafting is only ever committed here, when the player actually
+     * takes it, so looking at a result costs nothing and closing the window mid-recipe loses no
+     * ingredients.
+     */
+    private fun takeCraftingResult(session: PlayerSession) {
+        val result = craftingResult ?: return
+        val carried = carriedItem
+        if (carried != null) {
+            // The cursor has to be empty or hold the same thing, and have room for a whole batch.
+            if (carried.id != result.id || carried.components != result.components) return
+            if (carried.count + result.count > PlayerInventory.MAX_STACK) return
+            carriedItem = carried.copy(count = carried.count + result.count)
+        } else {
+            carriedItem = result
+        }
+        for (index in 0 until openMenu.gridSize) {
+            val cell = craftingGrid.getOrNull(index) ?: continue
+            val left = cell.count - 1
+            craftingGrid[index] = if (left <= 0) null else cell.copy(count = left)
+        }
+        recomputeCraftingResult()
+    }
+
+    /**
+     * Empties the crafting grid back into the player, dropping whatever will not fit.
+     *
+     * parity: `AbstractContainerMenu.removed`/`clearContainer`. Ingredients left on the grid when a
+     * window closes are never destroyed, which is the whole reason this exists.
+     */
+    private fun returnCraftingGrid(session: PlayerSession) {
+        for (index in craftingGrid.indices) {
+            val cell = craftingGrid[index] ?: continue
+            craftingGrid[index] = null
+            val leftover = session.inventory.add(cell)
+            if (leftover > 0) dropStack(session, cell.copy(count = leftover))
+        }
+        // The cursor goes the same way: it is not part of the inventory either.
+        carriedItem?.let { held ->
+            carriedItem = null
+            val leftover = session.inventory.add(held)
+            if (leftover > 0) dropStack(session, held.copy(count = leftover))
+        }
+        craftingResult = null
+    }
+
+    /**
      * A click inside the player's own window: what actually lets someone rearrange their inventory.
      *
      * parity: `AbstractContainerMenu.doClick`, reduced to the modes that move items between slots.
@@ -1415,9 +1590,8 @@ public class ClientSession(
      */
     private fun handleContainerClick(packet: ServerboundContainerClickPacket) {
         val session = playerSession ?: return
-        if (packet.containerId != ContainerSetContentPacket.PLAYER_INVENTORY) return sendInventory()
+        if (packet.containerId != openMenu.containerId) return sendInventory()
 
-        val inventory = session.inventory
         when (packet.mode) {
             ServerboundContainerClickPacket.Mode.PICKUP -> {
                 // Slot -999 is the click outside the window: whatever is on the cursor is thrown.
@@ -1429,42 +1603,58 @@ public class ClientSession(
                     carriedItem = if (left <= 0) null else carried.copy(count = left)
                     return sendInventory()
                 }
-                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
-                pickupClick(inventory, slot, half = packet.button == RIGHT_BUTTON)
+                val slot = openMenu.slotAt(packet.slot) ?: return sendInventory()
+                if (slot == MenuSlot.Result) {
+                    takeCraftingResult(session)
+                } else {
+                    pickupClick(session, slot, half = packet.button == RIGHT_BUTTON)
+                }
             }
             ServerboundContainerClickPacket.Mode.SWAP -> {
-                // A number key: swap the clicked slot with that hotbar slot.
-                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
+                val slot = openMenu.slotAt(packet.slot) ?: return sendInventory()
+                if (!canPlaceInto(slot)) return sendInventory()
                 if (packet.button !in 0 until PlayerInventory.HOTBAR_SIZE) return sendInventory()
-                inventory.swap(slot, PlayerInventory.HOTBAR_START + packet.button)
+                val hotbar = MenuSlot.Inventory(PlayerInventory.HOTBAR_START + packet.button)
+                val fromSlot = readSlot(session, slot)
+                writeSlot(session, slot, readSlot(session, hotbar))
+                writeSlot(session, hotbar, fromSlot)
             }
             ServerboundContainerClickPacket.Mode.THROW -> {
-                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
-                val stack = inventory[slot] ?: return sendInventory()
-                // Button 0 is `Q`, button 1 is ctrl+`Q`: one item or the whole stack.
-                val thrown = if (packet.button == 0) 1 else stack.count
-                dropStack(session, stack.copy(count = thrown))
-                val left = stack.count - thrown
-                inventory[slot] = if (left <= 0) null else stack.copy(count = left)
+                val slot = openMenu.slotAt(packet.slot) ?: return sendInventory()
+                if (slot == MenuSlot.Result) {
+                    // Throwing the result still has to craft it, ingredients and all.
+                    val previouslyCarried = carriedItem
+                    carriedItem = null
+                    takeCraftingResult(session)
+                    carriedItem?.let { dropStack(session, it) }
+                    carriedItem = previouslyCarried
+                } else {
+                    val stack = readSlot(session, slot) ?: return sendInventory()
+                    // Button 0 is `Q`, button 1 is ctrl+`Q`: one item or the whole stack.
+                    val thrown = if (packet.button == 0) 1 else stack.count
+                    dropStack(session, stack.copy(count = thrown))
+                    val left = stack.count - thrown
+                    writeSlot(session, slot, if (left <= 0) null else stack.copy(count = left))
+                }
             }
             ServerboundContainerClickPacket.Mode.QUICK_MOVE -> {
-                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
-                quickMove(inventory, slot)
+                val slot = openMenu.slotAt(packet.slot) ?: return sendInventory()
+                quickMove(session, slot)
             }
             ServerboundContainerClickPacket.Mode.QUICK_CRAFT -> {
                 // Mid-gesture stages answer with nothing: resending the window while the player is
                 // still dragging is what makes the drag snap back under their cursor.
-                if (!handleQuickCraft(session, inventory, packet)) return
+                if (!handleQuickCraft(session, packet)) return
             }
             ServerboundContainerClickPacket.Mode.CLONE -> {
                 // parity: creative's own middle-click, and only with an empty cursor.
                 if (session.gamemode != Gamemode.CREATIVE || carriedItem != null) return sendInventory()
-                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
-                val stack = inventory[slot] ?: return sendInventory()
+                val slot = openMenu.slotAt(packet.slot) ?: return sendInventory()
+                val stack = readSlot(session, slot) ?: return sendInventory()
                 carriedItem = stack.copy(count = PlayerInventory.MAX_STACK)
             }
             ServerboundContainerClickPacket.Mode.PICKUP_ALL -> {
-                collectMatching(inventory, reversed = packet.button != 0)
+                collectMatching(session, reversed = packet.button != 0)
             }
         }
         sendInventory()
@@ -1479,24 +1669,32 @@ public class ClientSession(
      * around; the second pass takes whatever is still needed.
      */
     private fun collectMatching(
-        inventory: PlayerInventory,
+        session: PlayerSession,
         reversed: Boolean,
     ) {
         val carried = carriedItem ?: return
         var total = carried.count
         if (total >= PlayerInventory.MAX_STACK) return
 
-        val order = (0 until PlayerInventory.MAIN_SLOTS).let { if (reversed) it.reversed() else it.toList() }
+        // Every slot of the *open window*, not just the player's own inventory: a crafting table
+        // shows the grid too, and vanilla's own sweep gathers from everything the player can see.
+        // Sweeping the inventory alone is why this did nothing useful with a table open.
+        val slots =
+            (0 until openMenu.slotCount)
+                .mapNotNull(openMenu::slotAt)
+                .filter { it != MenuSlot.Result }
+                .let { if (reversed) it.reversed() else it }
+
         for (pass in 0..1) {
-            for (slot in order) {
+            for (slot in slots) {
                 if (total >= PlayerInventory.MAX_STACK) break
-                val existing = inventory[slot] ?: continue
+                val existing = readSlot(session, slot) ?: continue
                 if (existing.id != carried.id || existing.components != carried.components) continue
                 if (pass == 0 && existing.count >= PlayerInventory.MAX_STACK) continue
                 val taken = minOf(PlayerInventory.MAX_STACK - total, existing.count)
                 total += taken
                 val left = existing.count - taken
-                inventory[slot] = if (left <= 0) null else existing.copy(count = left)
+                writeSlot(session, slot, if (left <= 0) null else existing.copy(count = left))
             }
         }
         carriedItem = carried.copy(count = total)
@@ -1518,7 +1716,6 @@ public class ClientSession(
      */
     private fun handleQuickCraft(
         session: PlayerSession,
-        inventory: PlayerInventory,
         packet: ServerboundContainerClickPacket,
     ): Boolean {
         val stage = packet.button and 3
@@ -1533,16 +1730,17 @@ public class ClientSession(
                 return false
             }
             stage == QUICK_CRAFT_ADD && quickCraftActive -> {
-                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return false
-                val existing = inventory[slot]
+                val slot = openMenu.slotAt(packet.slot) ?: return false
+                if (!canPlaceInto(slot)) return false
+                val existing = readSlot(session, slot)
                 val stackable =
                     carried != null &&
                         (existing == null || (existing.id == carried.id && existing.components == carried.components))
-                if (stackable) quickCraftSlots += slot
+                if (stackable) quickCraftSlots += packet.slot
                 return false
             }
             stage == QUICK_CRAFT_END && quickCraftActive -> {
-                distributeQuickCraft(session, inventory)
+                distributeQuickCraft(session)
                 quickCraftActive = false
                 quickCraftSlots.clear()
                 return true
@@ -1557,17 +1755,14 @@ public class ClientSession(
     }
 
     /** Spreads the cursor stack over the slots the drag collected. See [handleQuickCraft]. */
-    private fun distributeQuickCraft(
-        session: PlayerSession,
-        inventory: PlayerInventory,
-    ) {
+    private fun distributeQuickCraft(session: PlayerSession) {
         val carried = carriedItem ?: return
-        val targets = quickCraftSlots.toList()
+        val targets = quickCraftSlots.mapNotNull(openMenu::slotAt).filter(::canPlaceInto)
         if (targets.isEmpty()) return
 
         // parity: a one-slot drag is just a click on that slot, cursor rules and all.
         if (targets.size == 1) {
-            pickupClick(inventory, targets.single(), half = quickCraftType == QUICK_CRAFT_TYPE_RIGHT)
+            pickupClick(session, targets.single(), half = quickCraftType == QUICK_CRAFT_TYPE_RIGHT)
             return
         }
 
@@ -1582,11 +1777,10 @@ public class ClientSession(
         var remaining = carried.count
         for (slot in targets) {
             if (remaining <= 0) break
-            val existing = inventory[slot]
-            val already = existing?.count ?: 0
+            val already = readSlot(session, slot)?.count ?: 0
             val give = minOf(perSlot, PlayerInventory.MAX_STACK - already, remaining)
             if (give <= 0) continue
-            inventory[slot] = carried.copy(count = already + give)
+            writeSlot(session, slot, carried.copy(count = already + give))
             remaining -= give
         }
         // A middle-button drag is creative's own "fill them all" and costs the player nothing.
@@ -1604,11 +1798,11 @@ public class ClientSession(
      * merges into a matching stack or swaps with a different one.
      */
     private fun pickupClick(
-        inventory: PlayerInventory,
-        slot: Int,
+        session: PlayerSession,
+        slot: MenuSlot,
         half: Boolean,
     ) {
-        val inSlot = inventory[slot]
+        val inSlot = readSlot(session, slot)
         val carried = carriedItem
         when {
             carried == null -> {
@@ -1616,11 +1810,12 @@ public class ClientSession(
                 val taken = if (half) (inSlot.count + 1) / 2 else inSlot.count
                 carriedItem = inSlot.copy(count = taken)
                 val left = inSlot.count - taken
-                inventory[slot] = if (left <= 0) null else inSlot.copy(count = left)
+                writeSlot(session, slot, if (left <= 0) null else inSlot.copy(count = left))
             }
+            !canPlaceInto(slot) -> Unit
             inSlot == null -> {
                 val placed = if (half) 1 else carried.count
-                inventory[slot] = carried.copy(count = placed)
+                writeSlot(session, slot, carried.copy(count = placed))
                 val left = carried.count - placed
                 carriedItem = if (left <= 0) null else carried.copy(count = left)
             }
@@ -1628,13 +1823,13 @@ public class ClientSession(
                 val room = PlayerInventory.MAX_STACK - inSlot.count
                 if (room <= 0) return
                 val moved = if (half) minOf(1, room, carried.count) else minOf(room, carried.count)
-                inventory[slot] = inSlot.copy(count = inSlot.count + moved)
+                writeSlot(session, slot, inSlot.copy(count = inSlot.count + moved))
                 val left = carried.count - moved
                 carriedItem = if (left <= 0) null else carried.copy(count = left)
             }
             else -> {
                 // Two different items: they trade places, cursor for slot.
-                inventory[slot] = carried
+                writeSlot(session, slot, carried)
                 carriedItem = inSlot
             }
         }
@@ -1645,36 +1840,59 @@ public class ClientSession(
      * storage rows and one in the rows comes down to the hotbar, merging into matching stacks first.
      */
     private fun quickMove(
-        inventory: PlayerInventory,
-        slot: Int,
+        session: PlayerSession,
+        slot: MenuSlot,
     ) {
-        val stack = inventory[slot] ?: return
-        val toHotbar = slot < PlayerInventory.HOTBAR_START
+        // Shift-clicking the result crafts as many times as the grid allows, which is what makes it
+        // the fast way to turn a stack of logs into planks.
+        if (slot == MenuSlot.Result) {
+            val previouslyCarried = carriedItem
+            carriedItem = null
+            while (craftingResult != null) {
+                val batch = craftingResult ?: break
+                if (session.inventory.add(batch) > 0) break
+                carriedItem = null
+                takeCraftingResult(session)
+                carriedItem = null
+            }
+            carriedItem = previouslyCarried
+            return
+        }
+
+        val stack = readSlot(session, slot) ?: return
+        // Anything outside the inventory proper (the grid) comes back into it; inside it, the two
+        // halves swap, hotbar to storage and storage to hotbar.
         val targets =
-            if (toHotbar) {
-                PlayerInventory.HOTBAR_START until PlayerInventory.MAIN_SLOTS
-            } else {
-                0 until PlayerInventory.HOTBAR_START
+            when {
+                slot !is MenuSlot.Inventory ->
+                    (PlayerInventory.HOTBAR_START until PlayerInventory.MAIN_SLOTS) +
+                        (0 until PlayerInventory.HOTBAR_START)
+                slot.index < PlayerInventory.HOTBAR_START ->
+                    (
+                        PlayerInventory.HOTBAR_START until
+                            PlayerInventory.MAIN_SLOTS
+                    ).toList()
+                else -> (0 until PlayerInventory.HOTBAR_START).toList()
             }
 
         var remaining = stack.count
         for (target in targets) {
             if (remaining <= 0) break
-            val existing = inventory[target] ?: continue
+            val existing = session.inventory[target] ?: continue
             if (existing.id != stack.id || existing.components != stack.components) continue
             val room = PlayerInventory.MAX_STACK - existing.count
             if (room <= 0) continue
             val moved = minOf(room, remaining)
-            inventory[target] = existing.copy(count = existing.count + moved)
+            session.inventory[target] = existing.copy(count = existing.count + moved)
             remaining -= moved
         }
         for (target in targets) {
             if (remaining <= 0) break
-            if (inventory[target] != null) continue
-            inventory[target] = stack.copy(count = remaining)
+            if (session.inventory[target] != null) continue
+            session.inventory[target] = stack.copy(count = remaining)
             remaining = 0
         }
-        inventory[slot] = if (remaining <= 0) null else stack.copy(count = remaining)
+        writeSlot(session, slot, if (remaining <= 0) null else stack.copy(count = remaining))
     }
 
     /** Throws a stack into the world from this player, the same arc `Q` uses. */
@@ -2010,9 +2228,12 @@ public class ClientSession(
         val state = ++containerStateId
         sendCompressed(ContainerSetContentPacket.ID) {
             ContainerSetContentPacket(
-                containerId = ContainerSetContentPacket.PLAYER_INVENTORY,
+                containerId = openMenu.containerId,
                 stateId = state,
-                items = session.inventory.toWire(),
+                items =
+                    List(openMenu.slotCount) { menuSlot ->
+                        openMenu.slotAt(menuSlot)?.let { session.inventory.toWire(readSlot(session, it)) }
+                    },
                 carriedItem = carriedItem?.let(session.inventory::toWire),
             ).write(it)
         }
@@ -2033,9 +2254,9 @@ public class ClientSession(
         val session = playerSession ?: return
         sendPlayPacket(ContainerSetSlotPacket.ID) {
             ContainerSetSlotPacket(
-                containerId = ContainerSetContentPacket.PLAYER_INVENTORY,
+                containerId = openMenu.containerId,
                 stateId = ++containerStateId,
-                slot = PlayerInventory.menuSlotOf(slot),
+                slot = openMenu.menuSlotOf(MenuSlot.Inventory(slot)) ?: PlayerInventory.menuSlotOf(slot),
                 item = session.inventory.toWire(slot),
             ).write(it)
         }
@@ -2504,6 +2725,17 @@ public class ClientSession(
         // parity: `DamageTypes.STARVE`'s message id, which the client renders as "<name> starved to death".
         const val DEATH_STARVE = "starve"
 
+        /** The largest crafting grid any window here has, so one array serves both. */
+        const val MAX_GRID_SIZE = 9
+
+        /** Container ids for opened blocks. 0 is the player's own window and is never reused. */
+        const val FIRST_BLOCK_CONTAINER_ID = 1
+
+        /** Wraps well before the varint gets long; vanilla wraps at 100 for the same reason. */
+        const val MAX_CONTAINER_ID = 100
+
+        val CRAFTING_TABLE: Identifier = Identifier.vanilla("crafting_table")
+
         /** How close (blocks) a player has to be to a dropped item to vacuum it up. Vanilla's own AABB-based range is close to this. */
         const val PICKUP_RADIUS = 1.5
 
@@ -2539,8 +2771,11 @@ private const val CONFIGURATION_KEEP_ALIVE_ID = 4
 /** `ServerboundClientInformationPacket` in Play: the same settings body Configuration carries. */
 private const val SERVERBOUND_CLIENT_INFORMATION_ID = 0x0e
 
-/** `ServerboundPlayerInputPacket`'s id, matched here just to no-op it explicitly. */
+/** `ServerboundPlayerInputPacket`'s id: one byte of held movement keys. */
 private const val SERVERBOUND_PLAYER_INPUT_ID = 0x2b
+
+/** Bit 5 of that byte, `shift` in vanilla's own flag order (forward, back, left, right, jump, shift, sprint). */
+private const val SNEAK_INPUT_FLAG = 1 shl 5
 
 /**
  * The 10 registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing sent elsewhere in

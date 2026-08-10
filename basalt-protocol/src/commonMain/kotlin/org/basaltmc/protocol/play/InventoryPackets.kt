@@ -2,9 +2,13 @@ package org.basaltmc.protocol.play
 
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.protocol.ProtocolException
+import org.basaltmc.protocol.readAnonymousNbt
 import org.basaltmc.protocol.readBoolean
 import org.basaltmc.protocol.readVarInt
+import org.basaltmc.protocol.writeAnonymousNbt
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.text.Component
+import org.basaltmc.text.ComponentNbt
 
 /**
  * One stack on the wire: how many, of what, plus whatever data components it carries.
@@ -281,5 +285,59 @@ public data class ServerboundSetCreativeModeSlotPacket(
 
         public fun read(buffer: ByteBuffer): ServerboundSetCreativeModeSlotPacket =
             ServerboundSetCreativeModeSlotPacket(buffer.readShort().toInt(), WireItemStack.readDelimited(buffer))
+    }
+}
+
+/**
+ * Clientbound, id 0x3b: opens a container's screen on the client. Mirrors
+ * `ClientboundOpenScreenPacket`.
+ *
+ * [menuType] is the numeric id in the `minecraft:menu` registry, not a name: `minecraft:crafting`
+ * is 12 in the real 26.2 jar. The client picks the screen *and the slot layout* from it, so the
+ * server's own idea of the layout has to agree with whatever is sent here.
+ */
+public data class OpenScreenPacket(
+    val containerId: Int,
+    val menuType: Int,
+    val title: Component,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(containerId)
+        buffer.writeVarInt(menuType)
+        buffer.writeAnonymousNbt(ComponentNbt.serialize(title))
+    }
+
+    public companion object {
+        public const val ID: Int = 0x3b
+
+        /** `minecraft:crafting`, the 3x3 crafting table screen. */
+        public const val CRAFTING_MENU: Int = 12
+
+        public fun read(buffer: ByteBuffer): OpenScreenPacket =
+            OpenScreenPacket(
+                containerId = buffer.readVarInt(),
+                menuType = buffer.readVarInt(),
+                title = ComponentNbt.deserialize(buffer.readAnonymousNbt()),
+            )
+    }
+}
+
+/**
+ * The container was closed. Both directions carry the same body, and both exist: the client says so
+ * when the player presses escape (id 0x13), and the server says so when it closes one on their
+ * behalf (id 0x11).
+ */
+public data class ContainerClosePacket(
+    val containerId: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(containerId)
+    }
+
+    public companion object {
+        public const val CLIENTBOUND_ID: Int = 0x11
+        public const val SERVERBOUND_ID: Int = 0x13
+
+        public fun read(buffer: ByteBuffer): ContainerClosePacket = ContainerClosePacket(buffer.readVarInt())
     }
 }

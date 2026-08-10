@@ -32,6 +32,7 @@ import org.basaltmc.server.timings.ReportSources
 import org.basaltmc.server.timings.TimingsReport
 import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.RealLootTables
+import org.basaltmc.server.world.RealRecipes
 import org.basaltmc.server.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.world.WORLDS_ROOT
 import org.basaltmc.server.world.WorldMetadata
@@ -102,6 +103,7 @@ public class BasaltServer(
     private val playerRegistry = PlayerRegistry()
     private val cpuMeter = CpuMeter()
     private val lootTables = RealLootTables(serverJar)
+    private val recipes = RealRecipes(serverJar)
 
     /**
      * What `/timings` measures. Off until asked for: a clock read per section per call is small but
@@ -509,6 +511,7 @@ public class BasaltServer(
                     placeholders = placeholders,
                     timings = timings,
                     lootTables = lootTables,
+                    recipes = recipes,
                 ).run()
             }
         }
