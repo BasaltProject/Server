@@ -14,9 +14,9 @@ import org.basaltmc.world.structure.TemplateLoader
 import org.basaltmc.world.structure.VillagePoolJson
 
 /**
- * Resolves village pool/piece names (`"minecraft:village/plains/town_centers"`,
- * `"minecraft:village/plains/town_centers/plains_fountain_01"`) the way vanilla's
- * `StructureTemplateManager`/registry lookups do: read the real
+ * Resolves structure pool/piece names (`"minecraft:village/plains/town_centers"`,
+ * `"minecraft:bastion/starts"`) the way vanilla's `StructureTemplateManager`/registry lookups do:
+ * read the real
  * `data/minecraft/worldgen/template_pool/<path>.json` and gzipped
  * `data/minecraft/structure/<path>.nbt` entries straight from the operator's own downloaded
  * [serverJar] (never embedded in this repo, see [ServerJarAssets]'s own KDoc), the same source

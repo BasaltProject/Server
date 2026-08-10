@@ -21,6 +21,7 @@ private fun jigsawBoxNbt(
     poolName: String,
     ownName: String,
     targetName: String,
+    finalState: String = "minecraft:air",
 ): NbtCompound {
     val root = NbtCompound()
     root["size"] = NbtList(NbtType.INT, listOf(NbtInt(2), NbtInt(1), NbtInt(1)))
@@ -48,7 +49,7 @@ private fun jigsawBoxNbt(
                     putString("name", ownName)
                     putString("target", targetName)
                     putString("pool", poolName)
-                    putString("final_state", "minecraft:air")
+                    putString("final_state", finalState)
                 },
             )
         }
@@ -56,7 +57,145 @@ private fun jigsawBoxNbt(
     return root
 }
 
+private fun singleJigsawNbt(
+    sizeX: Int,
+    jigsawX: Int,
+    orientation: String,
+    poolName: String,
+    ownName: String,
+    targetName: String,
+): NbtCompound {
+    val root = NbtCompound()
+    root["size"] = NbtList(NbtType.INT, listOf(NbtInt(sizeX), NbtInt(1), NbtInt(1)))
+    root["palette"] =
+        NbtList(
+            NbtType.COMPOUND,
+            listOf(
+                NbtCompound().apply {
+                    putString("Name", "minecraft:jigsaw")
+                    set("Properties", NbtCompound().apply { putString("orientation", orientation) })
+                },
+            ),
+        )
+    root["blocks"] =
+        NbtList(
+            NbtType.COMPOUND,
+            listOf(
+                NbtCompound().apply {
+                    set("pos", NbtList(NbtType.INT, listOf(NbtInt(jigsawX), NbtInt(0), NbtInt(0))))
+                    putInt("state", 0)
+                    set(
+                        "nbt",
+                        NbtCompound().apply {
+                            putString("name", ownName)
+                            putString("target", targetName)
+                            putString("pool", poolName)
+                            putString("final_state", "minecraft:air")
+                        },
+                    )
+                },
+            ),
+        )
+    return root
+}
+
 class JigsawAssemblyTest {
+    @Test
+    fun inwardFacingJigsawCanPlaceAChildInsideItsSourcePiece() {
+        val source =
+            StructureTemplate().apply {
+                load(singleJigsawNbt(3, 2, "west_up", "test:inside", "minecraft:start", "minecraft:inside"))
+            }
+        val inside =
+            StructureTemplate().apply {
+                load(singleJigsawNbt(1, 0, "east_up", "minecraft:empty", "minecraft:inside", "minecraft:unused"))
+            }
+        val templates = mapOf("test:source" to source, "test:inside" to inside)
+        val sourcePool =
+            StructureTemplatePool(
+                "minecraft:empty",
+                listOf(
+                    LegacySinglePoolElement(
+                        "test:source",
+                        StructureProcessorList.EMPTY,
+                        StructureProjection.RIGID,
+                    ) to 1,
+                ),
+            )
+        val insidePool =
+            StructureTemplatePool(
+                "minecraft:empty",
+                listOf(
+                    LegacySinglePoolElement(
+                        "test:inside",
+                        StructureProcessorList.EMPTY,
+                        StructureProjection.RIGID,
+                    ) to 1,
+                ),
+            )
+        val pools =
+            mapOf(
+                "test:start" to sourcePool,
+                "test:inside" to insidePool,
+                "minecraft:empty" to StructureTemplatePool("minecraft:empty", emptyList()),
+            )
+        val pieces =
+            JigsawAssembly({ pools[it] }, { templates[it] }, heightAt = { _, _ -> 64 }).assemble(
+                "test:start",
+                StructurePos(0, 64, 0),
+                maxDepth = 1,
+                WorldgenRandom(XoroshiroRandom(12L)),
+                projectStartToHeightmap = false,
+                maxDistanceFromCenter = 80,
+            )
+
+        assertEquals(2, pieces.size)
+        assertTrue(pieces.first().boundingBox.containsFully(pieces.last().boundingBox))
+    }
+
+    @Test
+    fun jigsawFinalStateAcceptsBracketedProperties() {
+        val template =
+            StructureTemplate().apply {
+                load(jigsawBoxNbt("test:next", "minecraft:start", "minecraft:bottom", "minecraft:stone[foo=bar]"))
+            }
+        val chunk = Chunk(0, 0)
+        template.placeInto(
+            chunk,
+            StructurePos(4, 64, 4),
+            StructureRotation.NONE,
+            StructureMirror.NONE,
+            StructurePos(0, 0, 0),
+            StructureBoundingBox(4, 64, 4, 5, 64, 4),
+        )
+
+        assertEquals(Blocks.STONE.stateId, chunk.getBlockStateId(5, 64, 4))
+    }
+
+    @Test
+    fun readsAlignedJointTopFacingAndPriorities() {
+        val template =
+            StructureTemplate().apply {
+                load(
+                    jigsawBoxNbt("test:next", "minecraft:start", "minecraft:bottom"),
+                )
+            }
+        val jigsaw =
+            template
+                .jigsawBlocks(
+                    StructurePos(0, 0, 0),
+                    StructureRotation.NONE,
+                    StructureMirror.NONE,
+                    StructurePos(0, 0, 0),
+                ).single()
+
+        assertEquals(StructureDirection.EAST, jigsaw.front)
+        assertEquals(StructureDirection.UP, jigsaw.top)
+        assertEquals(false, jigsaw.rollable)
+        assertEquals(0, jigsaw.placementPriority)
+        assertEquals(0, jigsaw.selectionPriority)
+    }
+
     @Test
     fun connectsTwoPiecesThroughAMatchingJigsawPair() {
         val startTemplate =

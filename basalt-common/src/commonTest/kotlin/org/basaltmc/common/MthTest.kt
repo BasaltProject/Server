@@ -36,4 +36,13 @@ class MthTest {
         assertEquals(0.0, Mth.smoothstep(0.0), 1.0E-12)
         assertEquals(1.0, Mth.smoothstep(1.0), 1.0E-12)
     }
+
+    @Test
+    fun fastInverseSquareRootMatchesVanillaBits() {
+        assertEquals(4613549875023816620L, Mth.fastInvSqrt(0.125).toRawBits())
+        assertEquals(4609046275396446124L, Mth.fastInvSqrt(0.5).toRawBits())
+        assertEquals(4607167179904312135L, Mth.fastInvSqrt(1.0).toRawBits())
+        assertEquals(4604542675769075628L, Mth.fastInvSqrt(2.0).toRawBits())
+        assertEquals(4597901004127826181L, Mth.fastInvSqrt(17.0).toRawBits())
+    }
 }

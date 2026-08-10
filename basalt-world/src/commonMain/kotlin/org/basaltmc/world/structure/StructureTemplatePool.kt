@@ -98,15 +98,15 @@ public object EmptyPoolElement : StructurePoolElement(StructureProjection.RIGID)
 }
 
 /**
- * // parity: net.minecraft.world.level.levelgen.structure.pools.LegacySinglePoolElement (and, since
- * this project doesn't model the block-state properties the two types otherwise differ on,
- * standing in for `single_pool_element` too: every real Plains village pool entry uses
- * `legacy_single_pool_element` anyway).
+ * // parity: SinglePoolElement and LegacySinglePoolElement. [ignoreAir] captures their meaningful
+ * placement difference: legacy pieces use STRUCTURE_AND_AIR while modern single pieces only ignore
+ * structure blocks. Every real Plains village piece is legacy; every Bastion piece is modern.
  */
 public class LegacySinglePoolElement(
     public val location: String,
     public val processors: StructureProcessorList,
     projection: StructureProjection,
+    public val ignoreAir: Boolean = true,
 ) : StructurePoolElement(projection) {
     override fun getBoundingBox(
         loader: TemplateLoader,
@@ -125,7 +125,7 @@ public class LegacySinglePoolElement(
     ): List<PlacedJigsaw> {
         val template = loader(location) ?: return emptyList()
         val jigsaws = template.jigsawBlocks(position, rotation, StructureMirror.NONE, StructurePos(0, 0, 0))
-        return shuffledCopy(jigsaws, random)
+        return shuffledCopy(jigsaws, random).sortedByDescending(PlacedJigsaw::selectionPriority)
     }
 
     override fun place(
@@ -146,6 +146,8 @@ public class LegacySinglePoolElement(
             clipTo,
             processors,
             random,
+            ignoreStructureBlocks = true,
+            ignoreAir = ignoreAir,
         )
     }
 }

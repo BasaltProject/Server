@@ -108,7 +108,7 @@ public object Blocks {
     }
 
     /** Whether this state exposes any non-empty fluid state. */
-    public fun hasFluid(stateId: Int): Boolean = stateId == LAVA.stateId || hasWaterFluid(stateId)
+    public fun hasFluid(stateId: Int): Boolean = stateId in LAVA.stateId..LAVA.stateId + 15 || hasWaterFluid(stateId)
 
     /** // parity: BlockState.isAir, including the two non-default air blocks used by worldgen. */
     public fun isAir(stateId: Int): Boolean =
@@ -396,6 +396,126 @@ public object Blocks {
                 put(default.stateId - 1, BlockState(default.block, default.stateId - 1, mapOf("axis" to "x")))
                 put(default.stateId, BlockState(default.block, default.stateId, mapOf("axis" to "y")))
                 put(default.stateId + 1, BlockState(default.block, default.stateId + 1, mapOf("axis" to "z")))
+            }
+
+            // parity: reports/blocks.json state order used by NetherFortressPieces.
+            val netherBrickFence =
+                REGISTRY.byIdentifier(Identifier.vanilla("nether_brick_fence"))
+                    ?: error("unknown block 'nether_brick_fence'")
+            var fenceStateId = netherBrickFence.stateId - 31
+            for (east in listOf("true", "false")) {
+                for (north in listOf("true", "false")) {
+                    for (south in listOf("true", "false")) {
+                        for (waterlogged in listOf("true", "false")) {
+                            for (west in listOf("true", "false")) {
+                                put(
+                                    fenceStateId,
+                                    BlockState(
+                                        netherBrickFence.block,
+                                        fenceStateId,
+                                        linkedMapOf(
+                                            "east" to east,
+                                            "north" to north,
+                                            "south" to south,
+                                            "waterlogged" to waterlogged,
+                                            "west" to west,
+                                        ),
+                                    ),
+                                )
+                                fenceStateId++
+                            }
+                        }
+                    }
+                }
+            }
+
+            val netherBrickStairs =
+                REGISTRY.byIdentifier(Identifier.vanilla("nether_brick_stairs"))
+                    ?: error("unknown block 'nether_brick_stairs'")
+            for ((facing, offset) in mapOf("north" to 0, "south" to 20, "west" to 40, "east" to 60)) {
+                val stairsStateId = netherBrickStairs.stateId + offset
+                put(
+                    stairsStateId,
+                    BlockState(
+                        netherBrickStairs.block,
+                        stairsStateId,
+                        linkedMapOf(
+                            "facing" to facing,
+                            "half" to "bottom",
+                            "shape" to "straight",
+                            "waterlogged" to "false",
+                        ),
+                    ),
+                )
+            }
+
+            // parity: reports/blocks.json states emitted by Nether ruined portal templates and
+            // BlackstoneReplaceProcessor after mirror/rotation and BlockAgeProcessor.
+            val polishedBlackstoneBrickStairs =
+                REGISTRY.byIdentifier(Identifier.vanilla("polished_blackstone_brick_stairs"))
+                    ?: error("unknown block 'polished_blackstone_brick_stairs'")
+            val portalStairIds =
+                mapOf(
+                    "north" to mapOf("top" to 22253, "bottom" to 22263),
+                    "south" to mapOf("top" to 22273, "bottom" to 22283),
+                    "west" to mapOf("top" to 22293, "bottom" to 22303),
+                    "east" to mapOf("top" to 22313, "bottom" to 22323),
+                )
+            for ((facing, halves) in portalStairIds) {
+                for ((half, stateId) in halves) {
+                    put(
+                        stateId,
+                        BlockState(
+                            polishedBlackstoneBrickStairs.block,
+                            stateId,
+                            linkedMapOf(
+                                "facing" to facing,
+                                "half" to half,
+                                "shape" to "straight",
+                                "waterlogged" to "false",
+                            ),
+                        ),
+                    )
+                }
+            }
+
+            for (
+            (path, states) in
+            mapOf(
+                "polished_blackstone_slab" to mapOf("top" to 22738, "bottom" to 22740, "double" to 22742),
+                "polished_blackstone_brick_slab" to mapOf("top" to 22247, "bottom" to 22249, "double" to 22251),
+            )
+            ) {
+                val slab = REGISTRY.byIdentifier(Identifier.vanilla(path)) ?: error("unknown block '$path'")
+                for ((type, stateId) in states) {
+                    put(
+                        stateId,
+                        BlockState(
+                            slab.block,
+                            stateId,
+                            linkedMapOf("type" to type, "waterlogged" to "false"),
+                        ),
+                    )
+                }
+            }
+
+            val chest = REGISTRY.byIdentifier(Identifier.vanilla("chest")) ?: error("unknown block 'chest'")
+            for ((facing, stateId) in mapOf("north" to 3988, "south" to 3994, "west" to 4000, "east" to 4006)) {
+                put(
+                    stateId,
+                    BlockState(
+                        chest.block,
+                        stateId,
+                        linkedMapOf("type" to "single", "facing" to facing, "waterlogged" to "false"),
+                    ),
+                )
+            }
+
+            // parity: reports/blocks.json, including the flowing lava levels stored by giant
+            // ruined portal templates rather than collapsing them to the source state.
+            for (level in 0..15) {
+                val stateId = LAVA.stateId + level
+                put(stateId, BlockState(LAVA.block, stateId, mapOf("level" to level.toString())))
             }
 
             val vine = REGISTRY.byIdentifier(Identifier.vanilla("vine")) ?: error("unknown block 'vine'")

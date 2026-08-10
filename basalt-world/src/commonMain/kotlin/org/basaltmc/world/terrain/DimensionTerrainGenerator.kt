@@ -10,6 +10,7 @@ import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.Marker
 import org.basaltmc.world.terrain.carver.NetherCaveCarver
+import org.basaltmc.world.terrain.decoration.end.EndRawDecoration
 import org.basaltmc.world.terrain.decoration.nether.NetherLocalDecoration
 import org.basaltmc.world.terrain.decoration.nether.NetherSurfaceStructuresDecoration
 import org.basaltmc.world.terrain.decoration.nether.NetherUndergroundDecoration
@@ -28,9 +29,10 @@ public object DimensionTerrainGenerator {
         chunkZ: Int,
         surfaceEnvironment: SurfaceRuleEnvironment? = null,
         seed: Long = 0L,
+        structureGenerator: NetherStructureGenerator? = null,
     ): Chunk =
         generate(
-            finalDensity = router.finalDensity,
+            finalDensity = structureGenerator?.finalDensityForChunk(chunkX, chunkZ, seed) ?: router.finalDensity,
             verticalBounds = ChunkHeight.NETHER,
             noiseMinY = 0,
             noiseHeight = 128,
@@ -54,6 +56,7 @@ public object DimensionTerrainGenerator {
                 }
             },
             carverPass = { chunk -> NetherCaveCarver.carve(chunk, seed) },
+            structurePass = { chunk -> structureGenerator?.generateInto(chunk, seed) },
             decorationPass = { chunk ->
                 NetherLocalDecoration.decorate(chunk, seed, biomeSource)
                 NetherSurfaceStructuresDecoration.decorate(chunk, seed, biomeSource)
@@ -68,6 +71,7 @@ public object DimensionTerrainGenerator {
         biomeSource: TheEndBiomeSource,
         chunkX: Int,
         chunkZ: Int,
+        seed: Long = 0L,
     ): Chunk =
         generate(
             finalDensity = router.finalDensity,
@@ -81,6 +85,7 @@ public object DimensionTerrainGenerator {
             fluidLevel = 0,
             chunkX = chunkX,
             chunkZ = chunkZ,
+            decorationPass = { chunk -> EndRawDecoration.decorate(chunk, seed, biomeSource) },
         ) { blockX, blockY, blockZ, _ -> biomeSource.biomeAtQuart(blockX shr 2, blockY shr 2, blockZ shr 2) }
 
     private fun generate(

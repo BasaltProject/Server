@@ -1,5 +1,7 @@
 package org.basaltmc.world.structure
 
+import org.basaltmc.random.LegacyRandom
+import org.basaltmc.random.PositionalHashing
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
@@ -86,6 +88,21 @@ public class StructureProcessorList(
         }
         return inputStateId
     }
+
+    /**
+     * // parity: RuleProcessor creates a fresh LegacyRandom from Mth.getSeed at the transformed
+     * world position for every block. Structure placement's shared random stream is not consumed.
+     */
+    public fun processAt(
+        inputStateId: Int,
+        worldStateId: Int,
+        position: StructurePos,
+    ): Int =
+        process(
+            inputStateId,
+            worldStateId,
+            WorldgenRandom(LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z))),
+        )
 
     public companion object {
         public val EMPTY: StructureProcessorList = StructureProcessorList(emptyList())
