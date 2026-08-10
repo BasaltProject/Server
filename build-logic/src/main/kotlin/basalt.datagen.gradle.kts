@@ -46,12 +46,23 @@ tasks.register("generate") {
         val reportsDir = File(workDir, "generated/reports")
         val blockStates = parseDefaultBlockStates(File(reportsDir, "blocks.json").readText())
         val items = parseRegistryEntries(File(reportsDir, "registries.json").readText(), "minecraft:item")
+        val blocks = parseRegistryEntries(File(reportsDir, "registries.json").readText(), "minecraft:block")
 
         val registryDir = project.rootProject.file("basalt-registry/src/commonMain/kotlin/org/basaltmc/registry")
         writeIdTable(File(registryDir, "VanillaBlockStates.kt"), "ALL_DEFAULT_BLOCK_STATES", BLOCK_STATES_KDOC, blockStates)
         writeIdTable(File(registryDir, "VanillaItems.kt"), "ALL_ITEMS", ITEMS_KDOC, items)
+        writeIdTable(File(registryDir, "VanillaBlockIds.kt"), "ALL_BLOCK_IDS", BLOCK_IDS_KDOC, blocks)
 
-        println("Regenerated ${blockStates.size} block default states and ${items.size} items from $jarPath.")
+        val hardness = extractBlockHardness(jarFile, workDir)
+        writeHardnessTable(File(registryDir, "VanillaBlockHardness.kt"), hardness)
+
+        val toolRules = parseToolComponents(File(reportsDir, "minecraft/components/item"))
+        writeToolTable(File(registryDir, "VanillaItemTools.kt"), toolRules)
+
+        println(
+            "Regenerated ${blockStates.size} block default states, ${items.size} items, " +
+                "${hardness.size} block hardness entries and ${toolRules.size} tool(s) from $jarPath.",
+        )
     }
 }
 
@@ -112,6 +123,18 @@ val BLOCK_STATES_KDOC =
      */
     """.trimIndent()
 
+val BLOCK_IDS_KDOC =
+    """
+    /**
+     * Every block's id in the ${'`'}minecraft:block${'`'} registry, which is **not** its block *state* id.
+     *
+     * Both exist and they are different numbers: chunk data and block updates carry state ids,
+     * while anything naming a block itself (a tag's members, most notably) carries these. Sending
+     * one where the other belongs is silently wrong rather than an error, which is why they are
+     * two tables and not one.
+     */
+    """.trimIndent()
+
 val ITEMS_KDOC =
     """
     /**
@@ -120,3 +143,193 @@ val ITEMS_KDOC =
      * authoritative, not decompiled/guessed.
      */
     """.trimIndent()
+
+
+/**
+ * Block destroy times, which the vanilla data generator does not report.
+ *
+ * Everything else here comes out of `--reports`, but hardness lives only in the block definitions
+ * themselves, so it is read by running a small harness against the real classes: bootstrap the
+ * registries, walk `BuiltInRegistries.BLOCK`, print each block's `defaultDestroyTime` and whether it
+ * needs the correct tool for drops. Same technique this project already uses to capture noise
+ * vectors from the real jar rather than trusting a transcription.
+ *
+ * Numbers, not content: what comes back is one float and one flag per block id, which is the same
+ * kind of fact as the numeric ids in the tables above.
+ */
+fun extractBlockHardness(
+    jarFile: File,
+    workDir: File,
+): List<Triple<String, Float, Boolean>> {
+    // The bundler unpacks the real server jar next to itself the first time it runs; the harness
+    // has to compile and run against that, not against the bundler.
+    val versionsDir = File(workDir, "versions")
+    val serverJar =
+        versionsDir.walkTopDown().firstOrNull { it.isFile && it.name.startsWith("server-") && it.extension == "jar" }
+            ?: error("Could not find the unpacked server jar under ${versionsDir.absolutePath}")
+    val librariesDir = File(workDir, "libraries")
+    val classpath =
+        (listOf(serverJar) + librariesDir.walkTopDown().filter { it.extension == "jar" })
+            .joinToString(File.pathSeparator) { it.absolutePath }
+
+    val harnessDir = File(workDir, "harness")
+    harnessDir.mkdirs()
+    File(harnessDir, "DumpHardness.java").writeText(
+        """
+        import net.minecraft.SharedConstants;
+        import net.minecraft.core.registries.BuiltInRegistries;
+        import net.minecraft.resources.Identifier;
+        import net.minecraft.server.Bootstrap;
+        import net.minecraft.world.level.block.Block;
+
+        public final class DumpHardness {
+            public static void main(String[] args) {
+                SharedConstants.tryDetectVersion();
+                Bootstrap.bootStrap();
+                for (Block block : BuiltInRegistries.BLOCK) {
+                    Identifier id = BuiltInRegistries.BLOCK.getKey(block);
+                    System.out.println(
+                        id + "\t"
+                            + block.defaultDestroyTime() + "\t"
+                            + block.defaultBlockState().requiresCorrectToolForDrops());
+                }
+            }
+        }
+        """.trimIndent(),
+    )
+
+    runHarness(listOf("javac", "-cp", classpath, "-d", harnessDir.absolutePath, File(harnessDir, "DumpHardness.java").absolutePath), workDir)
+    val output = File(harnessDir, "hardness.tsv")
+    runHarness(
+        listOf("java", "-cp", "${harnessDir.absolutePath}${File.pathSeparator}$classpath", "DumpHardness"),
+        workDir,
+        output,
+    )
+
+    // Minecraft installs its own logger over stdout, so every line the harness prints arrives
+    // wrapped in a timestamp and a `[STDOUT]:` marker. The id is whatever follows that.
+    return output
+        .readLines()
+        .filter { it.contains('\t') && it.contains("minecraft:") }
+        .map { line ->
+            val (rawId, destroyTime, needsTool) = line.split('\t')
+            val id = rawId.substring(rawId.indexOf("minecraft:"))
+            Triple(id, destroyTime.toFloat(), needsTool.toBoolean())
+        }.sortedBy { it.first }
+}
+
+fun runHarness(
+    command: List<String>,
+    workDir: File,
+    output: File? = null,
+) {
+    val builder =
+        ProcessBuilder(command)
+            .directory(workDir)
+            .redirectError(ProcessBuilder.Redirect.INHERIT)
+    if (output != null) builder.redirectOutput(output) else builder.redirectOutput(ProcessBuilder.Redirect.INHERIT)
+    val exitCode = builder.start().waitFor()
+    check(exitCode == 0) { "${command.first()} exited with code $exitCode" }
+}
+
+fun writeHardnessTable(
+    file: File,
+    entries: List<Triple<String, Float, Boolean>>,
+) {
+    val body =
+        entries.joinToString(",\n") { (id, destroyTime, needsTool) ->
+            "        Triple(\"${id.removePrefix("minecraft:")}\", ${destroyTime}f, $needsTool)"
+        }
+    file.writeText(
+        """
+        package org.basaltmc.registry
+
+        /**
+         * Every block's destroy time and whether it needs the correct tool to drop anything,
+         * extracted straight from the real server jar's own block definitions.
+         *
+         * The vanilla data generator does not report these, so unlike the id tables beside this one
+         * they come from a harness run against the real classes (see `basalt.datagen`). A destroy
+         * time of -1 means unbreakable, which is how bedrock and the portal frames are marked.
+         */
+        internal val ALL_BLOCK_HARDNESS: List<Triple<String, Float, Boolean>> =
+            listOf(
+        ${'$'}body,
+            )
+        """.trimIndent().replace("${'$'}body", body) + "\n",
+    )
+}
+
+
+/**
+ * Each tool item's `minecraft:tool` component: the rules deciding which blocks it mines properly
+ * and how fast. Straight out of the data generator's own per-item component reports.
+ *
+ * A rule names a block tag, whether the tool counts as correct for that tag's drops, and optionally
+ * a mining speed. Vanilla takes the first rule whose tag contains the block, which is why order is
+ * preserved here: a pickaxe lists `incorrect_for_<tier>_tool` before `mineable/pickaxe`, so the
+ * exclusion wins over the general case.
+ */
+fun parseToolComponents(componentsDir: File): List<Pair<String, List<Triple<String, Boolean, Float?>>>> {
+    if (!componentsDir.isDirectory) return emptyList()
+    val slurper = groovy.json.JsonSlurper()
+    return componentsDir
+        .listFiles { file -> file.extension == "json" }
+        .orEmpty()
+        .sortedBy { it.name }
+        .mapNotNull { file ->
+            @Suppress("UNCHECKED_CAST")
+            val root = slurper.parse(file) as Map<String, Any?>
+            @Suppress("UNCHECKED_CAST")
+            val components = root["components"] as? Map<String, Any?> ?: return@mapNotNull null
+            @Suppress("UNCHECKED_CAST")
+            val tool = components["minecraft:tool"] as? Map<String, Any?> ?: return@mapNotNull null
+            @Suppress("UNCHECKED_CAST")
+            val rules = tool["rules"] as? List<Map<String, Any?>> ?: return@mapNotNull null
+            val parsed =
+                rules.mapNotNull { rule ->
+                    // Only tag-shaped rules are taken. A rule can also name blocks directly, which
+                    // no vanilla tool does, so one appearing means this needs revisiting rather
+                    // than being silently half-read.
+                    val blocks = rule["blocks"] as? String ?: return@mapNotNull null
+                    if (!blocks.startsWith("#")) return@mapNotNull null
+                    val correct = rule["correct_for_drops"] as? Boolean ?: false
+                    val speed = (rule["speed"] as? Number)?.toFloat()
+                    Triple(blocks.removePrefix("#"), correct, speed)
+                }
+            if (parsed.isEmpty()) null else file.nameWithoutExtension to parsed
+        }
+}
+
+fun writeToolTable(
+    file: File,
+    tools: List<Pair<String, List<Triple<String, Boolean, Float?>>>>,
+) {
+    val body =
+        tools.joinToString(",\n") { (item, rules) ->
+            val ruleText =
+                rules.joinToString(", ") { (tag, correct, speed) ->
+                    "ToolRule(\"$tag\", $correct, ${speed?.let { "${it}f" } ?: "null"})"
+                }
+            "        \"$item\" to listOf($ruleText)"
+        }
+    file.writeText(
+        """
+        package org.basaltmc.registry
+
+        /**
+         * Every tool item's mining rules, from the real server jar's own item component reports
+         * (`minecraft:tool`). Each rule is a block tag, whether the tool is correct for that tag's
+         * drops, and how fast it mines it.
+         *
+         * Order matters and is preserved: vanilla applies the first rule whose tag contains the
+         * block, and every tool lists its `incorrect_for_<tier>_tool` exclusion before the general
+         * `mineable/<kind>` rule so the exclusion wins.
+         */
+        internal val ALL_ITEM_TOOLS: List<Pair<String, List<ToolRule>>> =
+            listOf(
+        BODY,
+            )
+        """.trimIndent().replace("BODY", body) + "\n",
+    )
+}

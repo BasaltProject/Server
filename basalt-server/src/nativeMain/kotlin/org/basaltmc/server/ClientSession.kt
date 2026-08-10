@@ -109,6 +109,7 @@ import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.random.LegacyRandom
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
+import org.basaltmc.registry.ItemTools
 import org.basaltmc.registry.Items
 import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.PlayerCommandSource
@@ -128,6 +129,8 @@ import org.basaltmc.server.ui.PlayerUi
 import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.LoadedWorld
+import org.basaltmc.server.world.RealBlockTags
+import org.basaltmc.server.world.RealItemTags
 import org.basaltmc.server.world.RealLootTables
 import org.basaltmc.server.world.RealRecipes
 import org.basaltmc.server.world.WorldState
@@ -210,6 +213,10 @@ public class ClientSession(
     private val lootTables: RealLootTables? = null,
     /** Every crafting recipe the server knows. `null` means nothing can be crafted. */
     private val recipes: RealRecipes? = null,
+    /** The real block tags, which decide whether the held tool is the right one. */
+    private val blockTags: RealBlockTags? = null,
+    /** The real item tags, sent to the client alongside the block ones. */
+    private val itemTags: RealItemTags? = null,
 ) {
     private val logger = Logger("Session")
 
@@ -655,15 +662,46 @@ public class ClientSession(
         // minecraft:damage_type's is_fire tag with no `tags` packet sent at all. Sending every tag
         // name the real 26.2 jar ships (see VanillaTagData), each with empty entries: the lookup
         // only needs the key to exist, not be populated yet.
+        //
+        // Members matter, and not only for correctness of anything server-side: a client evaluates
+        // its *own* tool rules against these. `Tool.getMiningSpeed` asks whether the block is in
+        // `minecraft:mineable/pickaxe`, and with the tag empty the answer is always no, no rule
+        // matches, and every tool mines at bare-hand speed. That is what made a stone pickaxe on
+        // stone take as long as a fist. Where real members are known they are sent; the rest keep
+        // the empty-but-present shape that unblocks the lookups above.
         sendCompressed(TagsPacket.ID) {
             TagsPacket(
                 VanillaTagData.tagsByRegistry.map { (registryId, tagNames) ->
-                    TagGroup(registryId, tagNames.map { TagEntry(it, emptyList()) })
+                    TagGroup(registryId, tagNames.map { TagEntry(it, tagMembers(registryId, it)) })
                 },
             ).write(it)
         }
         sendCompressed(FinishConfigurationPacket.ID) { }
     }
+
+    /**
+     * The numeric members of one tag, or empty when this build has no real data for that registry.
+     *
+     * Members are registry ids of the tagged thing: a block tag carries `minecraft:block` ids, not
+     * block *state* ids, which are a different numbering entirely.
+     */
+    private fun tagMembers(
+        registryId: String,
+        tagName: String,
+    ): List<Int> =
+        when (registryId) {
+            "minecraft:block" ->
+                blockTags
+                    ?.membersOf(tagName)
+                    .orEmpty()
+                    .mapNotNull(Blocks::blockIdOf)
+            "minecraft:item" ->
+                itemTags
+                    ?.membersOf(tagName)
+                    .orEmpty()
+                    .mapNotNull { Items.REGISTRY.byIdentifier(it)?.protocolId }
+            else -> emptyList()
+        }
 
     private fun sendRegistry(
         registryId: String,
@@ -1131,12 +1169,32 @@ public class ClientSession(
         }
 
         val gamemode = playerSession?.gamemode ?: defaultGamemode
+        val targetHardness =
+            world
+                .getBlockState(action.pos.x, action.pos.y, action.pos.z)
+                ?.let(Blocks::byStateId)
+                ?.let { Blocks.hardnessOf(it.block) }
         val breaksOn =
             when (gamemode) {
                 Gamemode.CREATIVE -> ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK
-                Gamemode.SURVIVAL -> ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK
+                Gamemode.SURVIVAL ->
+                    // A block that comes apart instantly is destroyed by the client the moment the
+                    // dig starts, and it never sends the end of one: waiting for `STOP` there is why
+                    // flowers, grass and leaves could not be broken in survival at all.
+                    if (targetHardness?.isInstant == true) {
+                        ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK
+                    } else {
+                        ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK
+                    }
                 Gamemode.ADVENTURE, Gamemode.SPECTATOR -> null
             }
+        // Bedrock and the portal frames stay put for anyone who is not in creative.
+        if (gamemode == Gamemode.SURVIVAL && targetHardness?.isUnbreakable == true) {
+            sendCompressed(ClientboundBlockChangedAckPacket.ID) {
+                ClientboundBlockChangedAckPacket(action.sequence).write(it)
+            }
+            return
+        }
         if (action.action != breaksOn) {
             sendCompressed(ClientboundBlockChangedAckPacket.ID) {
                 ClientboundBlockChangedAckPacket(action.sequence).write(it)
@@ -1159,7 +1217,23 @@ public class ClientSession(
             }
         }
 
-        if (gamemode == Gamemode.SURVIVAL && brokenBlock != null) dropLootFor(brokenBlock.block, action.pos)
+        if (gamemode == Gamemode.SURVIVAL && brokenBlock != null) {
+            // parity: `Player.hasCorrectToolForDrops`. A block marked as needing the right tool
+            // gives nothing to the wrong one, which is what makes punching stone a waste of time
+            // rather than a free cobblestone.
+            val heldItem =
+                playerSession
+                    ?.inventory
+                    ?.heldItem
+                    ?.let { runCatching { Identifier.parse(it.id) }.getOrNull() }
+            val needsTool = Blocks.hardnessOf(brokenBlock.block)?.requiresCorrectTool == true
+            val correctTool =
+                !needsTool ||
+                    ItemTools.isCorrectForDrops(heldItem, brokenBlock.block) { tag, block ->
+                        blockTags?.contains(tag, block) == true
+                    }
+            if (correctTool) dropLootFor(brokenBlock.block, action.pos)
+        }
     }
 
     /**
