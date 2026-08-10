@@ -1108,3 +1108,26 @@ public data class ServerboundUseItemOnPacket(
         }
     }
 }
+
+/**
+ * Serverbound, id 0x24: middle-click "pick block" on a targeted block. Mirrors
+ * `ServerboundPickItemFromBlockPacket`. [includeData] asks for the block's block-entity data
+ * (a sign's text, a container's contents) copied onto the picked stack; this build ignores it,
+ * since neither block entities nor item data components exist here yet.
+ */
+public data class ServerboundPickItemFromBlockPacket(
+    val pos: BlockPos,
+    val includeData: Boolean,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeLong(pos.pack())
+        buffer.writeBoolean(includeData)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x24
+
+        public fun read(buffer: ByteBuffer): ServerboundPickItemFromBlockPacket =
+            ServerboundPickItemFromBlockPacket(BlockPos.unpack(buffer.readLong()), buffer.readBoolean())
+    }
+}

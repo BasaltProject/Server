@@ -203,4 +203,84 @@ class LootTableTest {
             assertTrue(e.message!!.contains("minecraft:tag"))
         }
     }
+
+    @Test
+    fun survivesExplosionAlwaysPasses() {
+        val entry =
+            LootEntry(item = Identifier.vanilla("dirt"), conditions = listOf(LootCondition.SurvivesExplosion))
+        val table = LootTable(pools = listOf(LootPool(entries = listOf(entry))))
+
+        val result = table.generate(LegacyRandom(1L))
+
+        assertEquals(1, result.size)
+    }
+
+    @Test
+    fun matchToolNeverPassesSinceEnchantmentsAreNotWiredYet() {
+        val entry = LootEntry(item = Identifier.vanilla("stone"), conditions = listOf(LootCondition.MatchTool))
+        val table = LootTable(pools = listOf(LootPool(entries = listOf(entry))))
+
+        val result = table.generate(LegacyRandom(1L))
+
+        assertEquals(0, result.size)
+    }
+
+    @Test
+    fun alternativesEntryResolvesToTheFirstChildWhoseConditionsPass() {
+        // Mirrors a real "stone" style loot table: silk touch (never true here, see
+        // [matchToolNeverPassesSinceEnchantmentsAreNotWiredYet]) falls through to the plain drop.
+        val entry =
+            LootEntry(
+                alternatives =
+                    listOf(
+                        LootEntry(item = Identifier.vanilla("stone"), conditions = listOf(LootCondition.MatchTool)),
+                        LootEntry(
+                            item = Identifier.vanilla("cobblestone"),
+                            conditions = listOf(LootCondition.SurvivesExplosion),
+                        ),
+                    ),
+            )
+        val table = LootTable(pools = listOf(LootPool(entries = listOf(entry))))
+
+        val result = table.generate(LegacyRandom(1L))
+
+        assertEquals(1, result.size)
+        assertEquals(Identifier.vanilla("cobblestone"), result[0].item)
+    }
+
+    @Test
+    fun parsesAnAlternativesEntryFromJson() {
+        val json =
+            """
+            {
+                "pools": [
+                    {
+                        "entries": [
+                            {
+                                "type": "minecraft:alternatives",
+                                "children": [
+                                    {
+                                        "type": "minecraft:item",
+                                        "conditions": [{ "condition": "minecraft:match_tool" }],
+                                        "name": "minecraft:grass_block"
+                                    },
+                                    {
+                                        "type": "minecraft:item",
+                                        "conditions": [{ "condition": "minecraft:survives_explosion" }],
+                                        "name": "minecraft:dirt"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+            """.trimIndent()
+        val table = LootTableJson.parse(json)
+
+        val result = table.generate(LegacyRandom(1L))
+
+        assertEquals(1, result.size)
+        assertEquals(Identifier.vanilla("dirt"), result[0].item)
+    }
 }

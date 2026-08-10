@@ -72,8 +72,48 @@ public class PlayerInventory {
         slots.fill(null)
     }
 
-    /** Every slot as the container packet wants them, empty slots included. */
-    public fun toWire(): List<WireItemStack?> = slots.map(::toWire)
+    /**
+     * The first slot carrying [id], or `null` if this player has none: what "pick block" searches
+     * for. parity: `Inventory.findSlotMatchingItem`, which scans only the main inventory, so
+     * armour and the offhand deliberately do not answer here either.
+     */
+    public fun indexOf(id: String): Int? = (0 until MAIN_SLOTS).firstOrNull { slots[it]?.id == id }
+
+    /**
+     * The hotbar slot a picked item should go to, as a 0-8 index.
+     *
+     * parity: `Inventory.getSuitableHotbarSlot`. Scans from the currently held slot and wraps, so
+     * the first *empty* slot at or after the one in hand wins; only when every hotbar slot is full
+     * does it fall back. Vanilla's own fallback prefers an unenchanted slot before giving up on the
+     * held one, which collapses to the held one here because enchantments are not modelled yet.
+     */
+    public fun suitableHotbarSlot(): Int {
+        for (offset in 0 until HOTBAR_SIZE) {
+            val index = (heldSlot + offset) % HOTBAR_SIZE
+            if (slots[HOTBAR_START + index] == null) return index
+        }
+        return heldSlot
+    }
+
+    /** The first empty main-inventory slot, or `null` if there is none. parity: `Inventory.getFreeSlot`. */
+    public fun firstFreeSlot(): Int? = (0 until MAIN_SLOTS).firstOrNull { slots[it] == null }
+
+    /** Swaps the stacks at [a] and [b], slot indices both in range. */
+    public fun swap(
+        a: Int,
+        b: Int,
+    ) {
+        val temp = slots[a]
+        slots[a] = slots[b]
+        slots[b] = temp
+    }
+
+    /**
+     * Every slot as container 0 wants them: [MENU_SLOTS] entries in `InventoryMenu`'s own order,
+     * not this class's storage order. See [menuSlotOf] for why those differ.
+     */
+    public fun toWire(): List<WireItemStack?> =
+        List(MENU_SLOTS) { menuSlot -> storageSlotOf(menuSlot)?.let { toWire(slots.getOrNull(it)) } }
 
     public fun toWire(slot: Int): WireItemStack? = toWire(slots.getOrNull(slot))
 
@@ -95,12 +135,58 @@ public class PlayerInventory {
     }
 
     public companion object {
+        /**
+         * How many slots container 0 has on the wire, and the whole reason this class needs a
+         * mapping at all: the player's own window is `InventoryMenu`, which is **46** slots
+         * (result, 2x2 crafting grid, armour, storage, hotbar, offhand), not the 41 this class
+         * stores. Verified against the real 26.2 jar's own `InventoryMenu` constants
+         * (`RESULT_SLOT`/`CRAFT_SLOT_START`/`ARMOR_SLOT_START`/`INV_SLOT_START`/`USE_ROW_SLOT_START`/
+         * `SHIELD_SLOT`).
+         *
+         * Sending the raw 41 instead is not a cosmetic mismatch: a real client drops the whole
+         * window packet, so nothing the server changes ever appears, and it addresses its own
+         * clicks in menu numbering, so a hotbar edit lands on whatever the server keeps 9 slots
+         * earlier (armour, as it happens). Both directions have to go through here.
+         */
+        public const val MENU_SLOTS: Int = 46
+
+        private const val MENU_ARMOUR_START = 5
+        private const val MENU_STORAGE_START = 9
+        private const val MENU_OFFHAND = 45
+
+        private const val STORAGE_ARMOUR_START = 36
+        private const val STORAGE_OFFHAND = 40
+
+        /**
+         * This class's own slot index for a container-0 slot, or `null` for the five slots it does
+         * not model (the crafting result and the 2x2 grid, which this build has no crafting for).
+         */
+        public fun storageSlotOf(menuSlot: Int): Int? =
+            when (menuSlot) {
+                in MENU_ARMOUR_START until MENU_STORAGE_START -> menuSlot - MENU_ARMOUR_START + STORAGE_ARMOUR_START
+                in MENU_STORAGE_START until MENU_OFFHAND -> menuSlot - MENU_STORAGE_START
+                MENU_OFFHAND -> STORAGE_OFFHAND
+                else -> null
+            }
+
+        /** The container-0 slot this class's [storageSlot] appears in. The inverse of [storageSlotOf]. */
+        public fun menuSlotOf(storageSlot: Int): Int =
+            when (storageSlot) {
+                in 0 until STORAGE_ARMOUR_START -> storageSlot + MENU_STORAGE_START
+                in STORAGE_ARMOUR_START until STORAGE_OFFHAND -> storageSlot - STORAGE_ARMOUR_START + MENU_ARMOUR_START
+                else -> MENU_OFFHAND
+            }
+
+        /** Storage rows plus hotbar, the part `Inventory.findSlotMatchingItem`/`getFreeSlot` scan. Armour and offhand come after. */
+        public const val MAIN_SLOTS: Int = 36
+
         public const val HOTBAR_SIZE: Int = 9
 
         /** Where the hotbar starts in the network order: after the 27 storage rows. */
         public const val HOTBAR_START: Int = 36 - HOTBAR_SIZE
 
-        private const val MAX_STACK = 64
+        /** Every item stacks to this until per-item stack limits are modelled; see [add]'s own KDoc. */
+        public const val MAX_STACK: Int = 64
 
         /** Hotbar first, then the rest of the main inventory: where a picked-up item goes. */
         private val FILL_ORDER: List<Int> = (HOTBAR_START until 36) + (9 until HOTBAR_START) + (0 until 9)

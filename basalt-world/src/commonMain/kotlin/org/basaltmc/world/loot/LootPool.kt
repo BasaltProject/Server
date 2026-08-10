@@ -35,8 +35,8 @@ public data class LootPool(
     ) {
         val validEntries = mutableListOf<LootEntry>()
         var totalWeight = 0
-        for (entry in entries) {
-            if (!entry.canRun(random)) continue
+        for (rawEntry in entries) {
+            val entry = resolve(rawEntry, random) ?: continue
             val weight = entry.weightFor(luck)
             if (weight > 0) {
                 validEntries += entry
@@ -59,5 +59,24 @@ public data class LootPool(
         var stack = chosen.createItemStack(random)
         for (function in functions) stack = function.apply(stack, random)
         output(stack)
+    }
+
+    /**
+     * Flattens a composite `alternatives` entry down to the leaf entry the pool should actually
+     * weigh, mirroring vanilla's `LootPoolEntryContainer.expand`: the container's own conditions
+     * gate the whole thing, then its children are tried in order and the first one whose own
+     * conditions pass wins (short-circuit, not weighted among the alternatives). A plain leaf entry
+     * resolves to itself if its conditions pass, `null` otherwise.
+     */
+    private fun resolve(
+        entry: LootEntry,
+        random: BasaltRandom,
+    ): LootEntry? {
+        if (!entry.canRun(random)) return null
+        if (entry.alternatives.isEmpty()) return entry
+        for (child in entry.alternatives) {
+            resolve(child, random)?.let { return it }
+        }
+        return null
     }
 }

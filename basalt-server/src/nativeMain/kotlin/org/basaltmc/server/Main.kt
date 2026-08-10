@@ -159,6 +159,7 @@ private fun buildServer(attachedToTerminal: Boolean): BasaltServer {
         config = config,
         onlineMode = onlineMode,
         worldGeneratorFactory = VanillaWorldGeneratorFactory(serverJar),
+        serverJar = serverJar,
         worldsConfig = worldsConfig,
         live = live,
         lang = lang,

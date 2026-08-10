@@ -44,9 +44,9 @@ import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeBoolean
 import org.basaltmc.protocol.writeProtocolString
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.server.player.PlayerInventory
 import org.basaltmc.storage.PlayerStore
 import org.basaltmc.storage.StoredGamemode
-import org.basaltmc.storage.StoredInventory
 import org.basaltmc.storage.StoredPlayer
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -209,7 +209,9 @@ class PlayFlowIntegrationTest {
         val inventoryBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(ContainerSetContentPacket.ID, inventoryBody.readVarInt())
         val inventory = ContainerSetContentPacket.read(inventoryBody)
-        assertEquals(StoredInventory.PLAYER_SLOTS, inventory.items.size)
+        // Container 0 is `InventoryMenu`, 46 slots, not the 41 this server stores: see
+        // [PlayerInventory.MENU_SLOTS] for what a real client does when the count disagrees.
+        assertEquals(PlayerInventory.MENU_SLOTS, inventory.items.size)
         assertTrue(inventory.items.all { it == null })
 
         val heldSlotBody = readFrame(connection, incoming, compressionEnabled = true)

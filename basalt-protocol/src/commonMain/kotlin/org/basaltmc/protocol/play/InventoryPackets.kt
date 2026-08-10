@@ -53,6 +53,36 @@ public data class WireItemStack(
             }
             return WireItemStack(itemId, count)
         }
+
+        /**
+         * The same stack, in the "delimited" form `set_creative_slot` uses
+         * (`ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC` over
+         * `DataComponentPatch.DELIMITED_STREAM_CODEC`, verified against the real 26.2 jar).
+         *
+         * Every component there carries its own varint length prefix, and that prefix is the whole
+         * difference: [read] has to refuse a stack carrying components because a plain patch cannot
+         * be walked without each component's own codec, but this form can be walked and skipped
+         * blindly. Refusing here instead cost the player their connection the moment they dragged
+         * anything with components (a damaged tool, a written book, a shulker box) out of the
+         * creative menu, since an unhandled decode failure drops the session.
+         *
+         * The components themselves are still discarded, which is the same documented gap [read]
+         * describes: this build models a stack as an item plus a count and nothing else.
+         */
+        public fun readDelimited(buffer: ByteBuffer): WireItemStack? {
+            val count = buffer.readVarInt()
+            if (count <= 0) return null
+            val itemId = buffer.readVarInt()
+            val added = buffer.readVarInt()
+            val removed = buffer.readVarInt()
+            repeat(added) {
+                buffer.readVarInt() // component type id
+                buffer.readBytes(buffer.readVarInt()) // its length-prefixed payload
+            }
+            // Removals are just the type ids, with no payload to skip.
+            repeat(removed) { buffer.readVarInt() }
+            return WireItemStack(itemId, count)
+        }
     }
 }
 
@@ -151,5 +181,28 @@ public data class ServerboundSetCarriedItemPacket(
 
         public fun read(buffer: ByteBuffer): ServerboundSetCarriedItemPacket =
             ServerboundSetCarriedItemPacket(buffer.readShort().toInt())
+    }
+}
+
+/**
+ * Serverbound, id 0x38: creative-mode inventory editing. Mirrors
+ * `ServerboundSetCreativeModeSlotPacket`. This is the *only* way a creative client's dragged item
+ * (from the creative menu into a slot, or a slot into the void to discard it, which arrives as
+ * [slot] `-1`) reaches the server: creative item movement never goes through a window-click packet.
+ */
+public data class ServerboundSetCreativeModeSlotPacket(
+    val slot: Int,
+    val item: WireItemStack?,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeShort(slot.toShort())
+        WireItemStack.write(buffer, item)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x38
+
+        public fun read(buffer: ByteBuffer): ServerboundSetCreativeModeSlotPacket =
+            ServerboundSetCreativeModeSlotPacket(buffer.readShort().toInt(), WireItemStack.readDelimited(buffer))
     }
 }

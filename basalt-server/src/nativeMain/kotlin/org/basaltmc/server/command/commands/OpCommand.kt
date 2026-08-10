@@ -89,10 +89,17 @@ public class GroupCommand : Command(name = "group", permissionLevel = Permission
 /**
  * Writes the membership and applies it to the player if they happen to be online.
  *
- * Only players the server has seen before can be assigned: without a profile cache there is no way
- * to turn a name it has never met into a UUID, and inventing one would silently create a row that
- * the real player would never match. Vanilla resolves that through Mojang's API; this says so
- * instead of pretending.
+ * Whoever is **online** is resolved first, and deliberately so: a player's row is only written when
+ * they disconnect or when the save interval comes round, so someone who has just joined for the
+ * very first time is not in the database yet. Looking there first made `op <them>` fail with "has
+ * never joined this server" against a player standing in the world, and the workaround was to make
+ * them log out and back in so a row existed. The session is the live truth here; the database is
+ * where it is kept.
+ *
+ * Offline names still resolve through the database. One that is in neither is refused rather than
+ * invented: without a profile cache there is no way to turn a never-seen name into a UUID, and
+ * guessing one would write a row the real player never matches. Vanilla resolves that through
+ * Mojang's API; this says so instead of pretending.
  */
 private fun assign(
     context: CommandContext,
@@ -102,20 +109,27 @@ private fun assign(
     val repository =
         context.environment.playerRepository
             ?: throw CommandSyntaxException(Component.text("This server has no player database."))
-    val stored =
-        repository.loadByName(playerName)
+
+    val online =
+        context.environment.players
+            .snapshot()
+            .firstOrNull { it.name.equals(playerName, ignoreCase = true) }
+    val uuid =
+        online?.uuid?.toString()
+            ?: repository.loadByName(playerName)?.uuid
             ?: throw CommandSyntaxException(
-                Component.text("No player named '$playerName' has ever joined this server."),
+                Component.text("No player named '$playerName' is online or has ever joined this server."),
             )
-    repository.setGroup(stored.uuid, group)
+
+    // A no-op when the row does not exist yet, which is exactly the first-join case above: the
+    // session below carries the group instead, and it is written out with the rest of the player
+    // on the next save.
+    repository.setGroup(uuid, group)
 
     // Online players carry their group on the session, and their command tree is filtered by it, so
     // both have to be refreshed or the change would only take effect on their next login.
-    context.environment.players
-        .snapshot()
-        .firstOrNull { it.uuid.toString() == stored.uuid }
-        ?.let { session ->
-            session.group = group
-            session.connection.sendCommandTree()
-        }
+    online?.let { session ->
+        session.group = group
+        session.connection.sendCommandTree()
+    }
 }
