@@ -247,6 +247,9 @@ public class ClientSession(
     private var encryptCipher: Cfb8Cipher? = null
 
     private var pendingProfile: GameProfile? = null
+
+    /** The skin layer mask from client settings, which arrive in Configuration before the player exists. */
+    private var pendingSkinParts: Byte = PlayerSession.ALL_SKIN_PARTS
     private var playerSession: PlayerSession? = null
 
     /** Resolved in [enterPlay] from the player's stored world, falling back to the default. */
@@ -519,7 +522,12 @@ public class ClientSession(
         when (packetId) {
             SelectKnownPacksPacket.SERVERBOUND_ID -> sendRegistriesThenFinish()
             FinishConfigurationPacket.ID -> enterPlay()
-            ClientInformationPacket.ID, CONFIGURATION_KEEP_ALIVE_ID -> Unit
+            ClientInformationPacket.ID -> {
+                // Read even in Configuration, before the player exists: it is where the skin layer
+                // mask arrives, and it is the only thing this build takes from client settings.
+                pendingSkinParts = ClientInformationPacket.read(body).skinParts
+            }
+            CONFIGURATION_KEEP_ALIVE_ID -> Unit
         }
     }
 
@@ -778,14 +786,38 @@ public class ClientSession(
         val others = registry.snapshot()
         registry.add(session)
         logger.info { "${session.name} logged in with entity id $entityId at ($spawnX, $spawnY, $spawnZ)" }
+        session.profileProperties = pendingProfile?.properties.orEmpty()
+        session.skinParts = pendingSkinParts
         logger.info { "${session.name} joined the game" }
 
         sendCompressed(PlayerInfoUpdatePacket.ID) {
             PlayerInfoUpdatePacket
                 .initializing(
-                    others.map { PlayerInfoEntry(it.uuid, it.name, listed = true, gamemode = it.gamemode) } +
-                        PlayerInfoEntry(session.uuid, session.name, listed = true, gamemode = session.gamemode),
+                    others.map {
+                        PlayerInfoEntry(
+                            it.uuid,
+                            it.name,
+                            listed = true,
+                            gamemode = it.gamemode,
+                            properties = it.profileProperties,
+                        )
+                    } +
+                        PlayerInfoEntry(
+                            session.uuid,
+                            session.name,
+                            listed = true,
+                            gamemode = session.gamemode,
+                            properties = session.profileProperties,
+                        ),
                 ).write(it)
+        }
+
+        // Their own entity, not just everyone else's. A client reads its *own* skin layers from
+        // the synced metadata as well (`Avatar.isModelPartShown`), so without this the player sees
+        // themselves in third person with no hat, jacket or sleeves while everyone else sees them
+        // correctly.
+        sendCompressed(SetEntityDataPacket.ID) {
+            SetEntityDataPacket.skinParts(session.entityId, session.skinParts).write(it)
         }
 
         // The HUD draws no hearts and no experience bar until it has been told what to draw.
@@ -823,8 +855,22 @@ public class ClientSession(
             other.connection.sendPlayPacket(PlayerInfoUpdatePacket.ID) {
                 PlayerInfoUpdatePacket
                     .initializing(
-                        listOf(PlayerInfoEntry(session.uuid, session.name, listed = true, gamemode = session.gamemode)),
+                        listOf(
+                            PlayerInfoEntry(
+                                session.uuid,
+                                session.name,
+                                listed = true,
+                                gamemode = session.gamemode,
+                                properties = session.profileProperties,
+                            ),
+                        ),
                     ).write(it)
+            }
+            other.connection.sendPlayPacket(SpawnEntityPacket.ID) { buffer ->
+                spawnPlayerPacket(session).write(buffer)
+            }
+            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { buffer ->
+                SetEntityDataPacket.skinParts(session.entityId, session.skinParts).write(buffer)
             }
             other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
                 EntityTeleportPacket(
@@ -836,6 +882,10 @@ public class ClientSession(
                     0f,
                     onGround = true,
                 ).write(it)
+            }
+            sendCompressed(SpawnEntityPacket.ID) { buffer -> spawnPlayerPacket(other).write(buffer) }
+            sendCompressed(SetEntityDataPacket.ID) { buffer ->
+                SetEntityDataPacket.skinParts(other.entityId, other.skinParts).write(buffer)
             }
             sendCompressed(EntityTeleportPacket.ID) {
                 EntityTeleportPacket(
@@ -993,6 +1043,23 @@ public class ClientSession(
                 handlePickItemFromBlock(
                     ServerboundPickItemFromBlockPacket.read(body),
                 )
+            SERVERBOUND_CLIENT_INFORMATION_ID -> {
+                // parity: `ServerPlayer.updateOptions`, which re-reads this every time the player
+                // touches their video settings, not just once at login. Toggling a skin layer has
+                // to reach everyone who can see them, this player included.
+                val session = playerSession
+                val skinParts = ClientInformationPacket.read(body).skinParts
+                pendingSkinParts = skinParts
+                if (session != null && session.skinParts != skinParts) {
+                    session.skinParts = skinParts
+                    val metadata = SetEntityDataPacket.skinParts(session.entityId, skinParts)
+                    sendPlayPacket(SetEntityDataPacket.ID) { metadata.write(it) }
+                    for (player in playersInSameWorld()) {
+                        if (player.uuid == session.uuid) continue
+                        player.connection.sendPlayPacket(SetEntityDataPacket.ID) { metadata.write(it) }
+                    }
+                }
+            }
             ChunkBatchReceivedPacket.ID -> {
                 // The client's own answer to "how fast can you take chunks". Ignoring it meant
                 // sending at whatever rate the server could produce, which floods the client,
@@ -1207,7 +1274,7 @@ public class ClientSession(
                     ).write(it)
                 }
                 sendPlayPacket(SetEntityDataPacket.ID) {
-                    SetEntityDataPacket(item.entityId, WireItemStack(protocolId, item.count)).write(it)
+                    SetEntityDataPacket.item(item.entityId, WireItemStack(protocolId, item.count)).write(it)
                 }
             } else if (item.resting && settledItems.add(item.entityId)) {
                 // One correction when it stops, and nothing while it falls.
@@ -1269,7 +1336,7 @@ public class ClientSession(
                 if (protocolId != null) {
                     for (player in playersInSameWorld()) {
                         player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
-                            SetEntityDataPacket(removed.entityId, WireItemStack(protocolId, leftover)).write(it)
+                            SetEntityDataPacket.item(removed.entityId, WireItemStack(protocolId, leftover)).write(it)
                         }
                     }
                 }
@@ -1704,6 +1771,27 @@ public class ClientSession(
         sendCompressed(SetHeldSlotPacket.ID) { SetHeldSlotPacket(inventory.heldSlot).write(it) }
         sendInventoryAll()
     }
+
+    /**
+     * The `add_entity` that makes another player exist for a client at all.
+     *
+     * Without it there is a tab-list entry and nothing in the world: every movement packet after it
+     * refers to an entity the client was never told to create, so the player is simply invisible.
+     * The uuid has to be the real profile one, because that is what the client matches against the
+     * tab list to find the skin to draw.
+     */
+    private fun spawnPlayerPacket(target: PlayerSession): SpawnEntityPacket =
+        SpawnEntityPacket(
+            entityId = target.entityId,
+            uuid = target.uuid,
+            entityType = SpawnEntityPacket.PLAYER_ENTITY_TYPE,
+            x = target.x,
+            y = target.y,
+            z = target.z,
+            pitch = target.pitch,
+            yaw = target.yaw,
+            headYaw = target.yaw,
+        )
 
     /** Everyone who can actually see this player: the tab list is server-wide, entities are not. */
     private fun playersInSameWorld(): List<PlayerSession> {
@@ -2447,6 +2535,9 @@ public class ClientSession(
 
 /** [org.basaltmc.protocol.configuration.ConfigurationKeepAlivePacket]'s id, matched here just to no-op it explicitly. */
 private const val CONFIGURATION_KEEP_ALIVE_ID = 4
+
+/** `ServerboundClientInformationPacket` in Play: the same settings body Configuration carries. */
+private const val SERVERBOUND_CLIENT_INFORMATION_ID = 0x0e
 
 /** `ServerboundPlayerInputPacket`'s id, matched here just to no-op it explicitly. */
 private const val SERVERBOUND_PLAYER_INPUT_ID = 0x2b

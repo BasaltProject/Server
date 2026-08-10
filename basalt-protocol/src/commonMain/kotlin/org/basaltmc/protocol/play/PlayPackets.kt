@@ -3,6 +3,7 @@ package org.basaltmc.protocol.play
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtEnd
+import org.basaltmc.protocol.login.GameProfileProperty
 import org.basaltmc.protocol.readAnonymousNbt
 import org.basaltmc.protocol.readBoolean
 import org.basaltmc.protocol.readProtocolString
@@ -620,6 +621,13 @@ public data class PlayerInfoEntry(
     val listed: Boolean = false,
     val latencyMillis: Int = 0,
     val gamemode: Gamemode = Gamemode.SURVIVAL,
+    /**
+     * The signed profile properties from the session server, which is where a skin and cape live
+     * (the `textures` property). A client renders the default skin for a player it was told nothing
+     * about, so these travelling is the whole difference between everyone looking like Steve and
+     * everyone looking like themselves. Empty in offline mode, since nothing signs them there.
+     */
+    val properties: List<GameProfileProperty> = emptyList(),
 )
 
 /**
@@ -637,8 +645,7 @@ public data class PlayerInfoEntry(
  *
  * Not every action is implemented: [Action.INITIALIZE_CHAT], [Action.UPDATE_DISPLAY_NAME],
  * [Action.UPDATE_LIST_ORDER] and [Action.UPDATE_HAT] are declared here because their positions
- * define the bitset, but writing one throws rather than guessing a value. Skins and capes
- * (`add_player`'s profile properties) are the same documented gap they were.
+ * define the bitset, but writing one throws rather than guessing a value.
  */
 @OptIn(ExperimentalUuidApi::class)
 public data class PlayerInfoUpdatePacket(
@@ -666,7 +673,13 @@ public data class PlayerInfoUpdatePacket(
                 when (action) {
                     Action.ADD_PLAYER -> {
                         buffer.writeProtocolString(entry.name, 16)
-                        buffer.writeVarInt(0) // profile properties (skin, cape): none yet
+                        buffer.writeVarInt(entry.properties.size)
+                        for (property in entry.properties) {
+                            buffer.writeProtocolString(property.name)
+                            buffer.writeProtocolString(property.value)
+                            buffer.writeBoolean(property.signature != null)
+                            property.signature?.let { buffer.writeProtocolString(it) }
+                        }
                     }
                     Action.UPDATE_GAME_MODE -> buffer.writeVarInt(entry.gamemode.ordinal)
                     Action.UPDATE_LISTED -> buffer.writeBoolean(entry.listed)
@@ -713,9 +726,16 @@ public data class PlayerInfoUpdatePacket(
                             when (action) {
                                 Action.ADD_PLAYER -> {
                                     val name = buffer.readProtocolString(16)
-                                    val propertyCount = buffer.readVarInt()
-                                    repeat(propertyCount) { error("player properties are not supported yet") }
-                                    entry.copy(name = name)
+                                    val properties =
+                                        List(buffer.readVarInt()) {
+                                            GameProfileProperty(
+                                                name = buffer.readProtocolString(),
+                                                value = buffer.readProtocolString(),
+                                                signature =
+                                                    if (buffer.readBoolean()) buffer.readProtocolString() else null,
+                                            )
+                                        }
+                                    entry.copy(name = name, properties = properties)
                                 }
                                 Action.UPDATE_GAME_MODE -> entry.copy(gamemode = Gamemode.entries[buffer.readVarInt()])
                                 Action.UPDATE_LISTED -> entry.copy(listed = buffer.readBoolean())

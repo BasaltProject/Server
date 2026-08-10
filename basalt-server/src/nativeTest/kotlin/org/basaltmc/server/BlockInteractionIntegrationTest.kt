@@ -271,8 +271,9 @@ class BlockInteractionIntegrationTest {
 
         val metadata = SetEntityDataPacket.read(drainUntil(connection, incoming, SetEntityDataPacket.ID))
         assertEquals(spawn.entityId, metadata.entityId)
-        assertEquals(expectedItemProtocolId, metadata.item?.itemId)
-        assertEquals(1, metadata.item?.count)
+        val itemEntry = metadata.entries.single() as SetEntityDataPacket.Entry.Item
+        assertEquals(expectedItemProtocolId, itemEntry.stack?.itemId)
+        assertEquals(1, itemEntry.stack?.count)
 
         // Picking it back up is deliberately *not* asserted here. It now depends on item physics
         // and a 40-tick pickup delay, both of which are timing, and a socket-level test that waits
