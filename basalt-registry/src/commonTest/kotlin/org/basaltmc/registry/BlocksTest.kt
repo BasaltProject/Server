@@ -9,6 +9,12 @@ import kotlin.test.assertTrue
 
 class BlocksTest {
     @Test
+    fun lavaHasANonEmptyFluidState() {
+        assertTrue(Blocks.hasFluid(Blocks.LAVA.stateId))
+        assertFalse(Blocks.hasWaterFluid(Blocks.LAVA.stateId))
+    }
+
+    @Test
     fun exposesTheExpectedStateIds() {
         assertEquals(0, Blocks.AIR.stateId)
         assertEquals(1, Blocks.STONE.stateId)

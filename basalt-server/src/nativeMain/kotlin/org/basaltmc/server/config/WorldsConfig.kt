@@ -2,6 +2,7 @@ package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
+import org.basaltmc.world.ChunkHeight
 
 /** The settings that apply to one world, after inheritance has been resolved. */
 public data class WorldSettings(
@@ -50,10 +51,38 @@ public enum class WorldType {
     }
 }
 
+/** The vanilla dimension whose rules and generator a declared world uses. */
+public enum class WorldDimension(
+    public val configName: String,
+    public val registryPath: String,
+    public val registryIndex: Int,
+    public val seaLevel: Int,
+    public val chunkHeight: ChunkHeight,
+    public val hasSkylight: Boolean,
+) {
+    OVERWORLD("overworld", "overworld", 0, 63, ChunkHeight.OVERWORLD, true),
+    NETHER("nether", "the_nether", 1, 32, ChunkHeight.NETHER, false),
+    END("end", "the_end", 2, 0, ChunkHeight.END, true),
+    ;
+
+    public val registryKey: String get() = "minecraft:$registryPath"
+
+    override fun toString(): String = configName
+
+    public companion object {
+        public fun byName(name: String): WorldDimension? =
+            entries.firstOrNull {
+                it.configName.equals(name, ignoreCase = true) ||
+                    it.registryPath.equals(name, ignoreCase = true) ||
+                    it.registryKey.equals(name, ignoreCase = true)
+            }
+    }
+}
+
 /** One world as `worlds.toml` declares it. [seed] is null when the operator left it to chance. */
 public data class WorldDeclaration(
     public val name: String,
-    public val dimension: String,
+    public val dimension: WorldDimension,
     public val type: WorldType,
     public val seed: Long?,
     public val isDefault: Boolean,
@@ -125,9 +154,16 @@ public class WorldsConfig(
                                     "not port; use \"normal\" until it does.",
                             )
                         }
+                        val dimensionName = table.stringOrNull("dimension") ?: "overworld"
+                        val dimension =
+                            WorldDimension.byName(dimensionName)
+                                ?: throw TomlFormatException(
+                                    "World '$name' declares an unknown dimension '$dimensionName'. " +
+                                        "Known dimensions: ${WorldDimension.entries.joinToString { it.configName }}.",
+                                )
                         WorldDeclaration(
                             name = name,
-                            dimension = table.stringOrNull("dimension") ?: "overworld",
+                            dimension = dimension,
                             type = type,
                             seed = table.intOrNull("seed"),
                             isDefault = table.boolOrNull("default") ?: false,

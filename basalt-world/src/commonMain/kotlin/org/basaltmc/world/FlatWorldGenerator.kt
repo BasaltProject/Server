@@ -13,19 +13,19 @@ import org.basaltmc.registry.Blocks
  * (`generator-settings`), which this does not read yet; only the default preset is replicated.
  */
 public object FlatWorldGenerator {
-    private const val SURFACE_Y = WorldHeight.MIN_Y + 3
-
     public fun generate(
         chunkX: Int,
         chunkZ: Int,
+        verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
     ): Chunk {
-        val chunk = Chunk(chunkX, chunkZ)
+        val chunk = Chunk(chunkX, chunkZ, verticalBounds)
+        val minY = verticalBounds.minY
         for (x in 0 until 16) {
             for (z in 0 until 16) {
-                chunk.setBlockStateId(x, WorldHeight.MIN_Y, z, Blocks.BEDROCK.stateId)
-                chunk.setBlockStateId(x, WorldHeight.MIN_Y + 1, z, Blocks.DIRT.stateId)
-                chunk.setBlockStateId(x, WorldHeight.MIN_Y + 2, z, Blocks.DIRT.stateId)
-                chunk.setBlockStateId(x, SURFACE_Y, z, Blocks.GRASS_BLOCK.stateId)
+                chunk.setBlockStateId(x, minY, z, Blocks.BEDROCK.stateId)
+                chunk.setBlockStateId(x, minY + 1, z, Blocks.DIRT.stateId)
+                chunk.setBlockStateId(x, minY + 2, z, Blocks.DIRT.stateId)
+                chunk.setBlockStateId(x, minY + 3, z, Blocks.GRASS_BLOCK.stateId)
             }
         }
         return chunk

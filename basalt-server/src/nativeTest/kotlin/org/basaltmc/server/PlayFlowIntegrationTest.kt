@@ -115,12 +115,18 @@ class PlayFlowIntegrationTest {
         }
 
         val receivedRegistries = mutableListOf<String>()
+        var dimensionTypeEntries = emptyList<String>()
         repeat(registryCount) {
             val registryBody = readFrame(connection, incoming, compressionEnabled = true)
             assertEquals(RegistryDataPacket.ID, registryBody.readVarInt())
-            receivedRegistries += RegistryDataPacket.read(registryBody).registryId
+            val registry = RegistryDataPacket.read(registryBody)
+            receivedRegistries += registry.registryId
+            if (registry.registryId == "minecraft:dimension_type") {
+                dimensionTypeEntries = registry.entries.map { it.key }
+            }
         }
         assertTrue(receivedRegistries.contains("minecraft:dimension_type"))
+        assertTrue(receivedRegistries.contains("minecraft:world_clock"))
         assertTrue(receivedRegistries.contains("minecraft:worldgen/biome"))
         assertTrue(receivedRegistries.contains("minecraft:wolf_variant"))
         assertTrue(receivedRegistries.contains("minecraft:painting_variant"))
@@ -130,6 +136,15 @@ class PlayFlowIntegrationTest {
         assertTrue(receivedRegistries.contains("minecraft:instrument"))
         assertTrue(receivedRegistries.contains("minecraft:enchantment"))
         assertTrue(receivedRegistries.contains("minecraft:banner_pattern"))
+        assertEquals(
+            listOf(
+                "minecraft:overworld",
+                "minecraft:the_nether",
+                "minecraft:the_end",
+                "minecraft:overworld_caves",
+            ),
+            dimensionTypeEntries,
+        )
 
         val tagsBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(TagsPacket.ID, tagsBody.readVarInt())
@@ -143,6 +158,8 @@ class PlayFlowIntegrationTest {
         val loginPlayBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(LoginPlayPacket.ID, loginPlayBody.readVarInt())
         val loginPlay = LoginPlayPacket.read(loginPlayBody)
+        assertEquals(0, loginPlay.spawnInfo.dimension)
+        assertEquals("minecraft:overworld", loginPlay.spawnInfo.dimensionName)
 
         val abilitiesBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(ClientboundPlayerAbilitiesPacket.ID, abilitiesBody.readVarInt())

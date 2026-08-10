@@ -35,10 +35,10 @@ class HeightmapTypeTableTest {
             Chunk.HeightmapType.OCEAN_FLOOR ->
                 stateId != Blocks.AIR.stateId && stateId != Blocks.WATER.stateId && !nonColliding
             Chunk.HeightmapType.MOTION_BLOCKING ->
-                Blocks.hasWaterFluid(stateId) || (stateId != Blocks.AIR.stateId && !nonColliding)
+                Blocks.hasFluid(stateId) || (stateId != Blocks.AIR.stateId && !nonColliding)
             Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES ->
                 !Blocks.isLeavesState(stateId) &&
-                    (Blocks.hasWaterFluid(stateId) || (stateId != Blocks.AIR.stateId && !nonColliding))
+                    (Blocks.hasFluid(stateId) || (stateId != Blocks.AIR.stateId && !nonColliding))
         }
     }
 

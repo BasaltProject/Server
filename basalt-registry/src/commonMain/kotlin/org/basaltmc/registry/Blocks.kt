@@ -25,6 +25,7 @@ public object Blocks {
     public val PODZOL: BlockState = register(13, "podzol")
     public val BEDROCK: BlockState = register(85, "bedrock")
     public val WATER: BlockState = register(86, "water")
+    public val LAVA: BlockState = register(102, "lava")
     public val OAK_LOG: BlockState = register(137, "oak_log")
     public val OAK_LEAVES: BlockState = register(279, "oak_leaves")
     public val SEAGRASS: BlockState = register(2254, "seagrass")
@@ -41,6 +42,8 @@ public object Blocks {
     public val PUMPKIN: BlockState = register(8332, "pumpkin")
     public val SUGAR_CANE: BlockState = register(6947, "sugar_cane")
     public val FIREFLY_BUSH: BlockState = register(32365, "firefly_bush")
+    public val NETHERRACK: BlockState = register(6997, "netherrack")
+    public val END_STONE: BlockState = register(9477, "end_stone")
 
     init {
         for ((stateId, path) in ALL_DEFAULT_BLOCK_STATES) {
@@ -101,6 +104,9 @@ public object Blocks {
         val wallCoralStateStart = CORAL_WALL_FAN_DEFAULT_STATE_IDS.firstOrNull { stateId in it..it + 7 }
         return wallCoralStateStart != null && (stateId - wallCoralStateStart) and 1 == 0
     }
+
+    /** Whether this state exposes any non-empty fluid state. */
+    public fun hasFluid(stateId: Int): Boolean = stateId == LAVA.stateId || hasWaterFluid(stateId)
 
     /** Whether [stateId] is one of the 28 distance, persistence, and water states of a leaves block. */
     public fun isLeavesState(stateId: Int): Boolean = stateId in LEAVES_FIRST_STATE_ID..LEAVES_LAST_STATE_ID

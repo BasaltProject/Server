@@ -1,9 +1,11 @@
 package org.basaltmc.server.registry
 
 import org.basaltmc.nbt.NbtCompound
+import org.basaltmc.nbt.NbtList
+import org.basaltmc.nbt.NbtType
 
 /**
- * The 55 real Overworld biome definitions exactly as a vanilla 26.2 server syncs them in the
+ * Every real biome definition exactly as a vanilla 26.2 server syncs it in the
  * `minecraft:worldgen/biome` registry during Configuration, built from the real jar's own
  * `data/minecraft/worldgen/biome/` JSON files (only the fields the real `Biome.NETWORK_CODEC` carries:
  * climate settings, the environment attribute map and the special effects; spawners/features/
@@ -16,7 +18,7 @@ import org.basaltmc.nbt.NbtCompound
  * the earlier int-encoded `plainsBiome` worked, but a vanilla server sends the string form).
  */
 public object VanillaBiomes {
-    /** One environment attribute value, in the shapes the real Overworld biome data actually uses. */
+    /** One environment attribute value, in the shapes the real biome data actually uses. */
     public sealed interface BiomeAttribute {
         public data class Color(
             val hex: String,
@@ -40,12 +42,39 @@ public object VanillaBiomes {
         public data class Music(
             val tracks: Map<String, MusicTrack>,
         ) : BiomeAttribute
+
+        public data class Particles(
+            val particles: List<AmbientParticle>,
+        ) : BiomeAttribute
+
+        public data class Sounds(
+            val loop: String,
+            val mood: AmbientMood,
+            val addition: AmbientAddition,
+        ) : BiomeAttribute
     }
 
     public data class MusicTrack(
         val sound: String,
         val minDelay: Int,
         val maxDelay: Int,
+    )
+
+    public data class AmbientParticle(
+        val type: String,
+        val probability: Float,
+    )
+
+    public data class AmbientMood(
+        val sound: String,
+        val tickDelay: Int = 6000,
+        val blockSearchExtent: Int = 8,
+        val offset: Double = 2.0,
+    )
+
+    public data class AmbientAddition(
+        val sound: String,
+        val tickChance: Double = 0.0111,
     )
 
     public data class Entry(
@@ -62,7 +91,7 @@ public object VanillaBiomes {
         val attributes: Map<String, BiomeAttribute> = emptyMap(),
     )
 
-    /** All 55 Overworld biomes, in [org.basaltmc.registry.Biomes] registration order. */
+    /** Every registered biome, in [org.basaltmc.registry.Biomes] registration order. */
     public val ALL: List<Entry> =
         listOf(
             Entry(
@@ -937,6 +966,98 @@ public object VanillaBiomes {
                         "minecraft:visual/water_fog_color" to BiomeAttribute.Color("#17543c"),
                     ),
             ),
+            Entry(
+                "the_void",
+                temperature = 0.5f,
+                downfall = 0.5f,
+                hasPrecipitation = false,
+                waterColor = "#3f76e4",
+                attributes = mapOf("minecraft:visual/sky_color" to BiomeAttribute.Color("#7ba4ff")),
+            ),
+            netherBiome(
+                path = "nether_wastes",
+                fogColor = "#330808",
+                ambientPath = "nether_wastes",
+                musicPath = "nether_wastes",
+            ),
+            netherBiome(
+                path = "warped_forest",
+                fogColor = "#1a051a",
+                ambientPath = "warped_forest",
+                musicPath = "warped_forest",
+                particle = AmbientParticle("minecraft:warped_spore", 0.01428f),
+            ),
+            netherBiome(
+                path = "crimson_forest",
+                fogColor = "#330303",
+                ambientPath = "crimson_forest",
+                musicPath = "crimson_forest",
+                particle = AmbientParticle("minecraft:crimson_spore", 0.025f),
+            ),
+            netherBiome(
+                path = "soul_sand_valley",
+                fogColor = "#1b4745",
+                ambientPath = "soul_sand_valley",
+                musicPath = "soul_sand_valley",
+                particle = AmbientParticle("minecraft:ash", 0.00625f),
+            ),
+            netherBiome(
+                path = "basalt_deltas",
+                fogColor = "#685f70",
+                ambientPath = "basalt_deltas",
+                musicPath = "basalt_deltas",
+                particle = AmbientParticle("minecraft:white_ash", 0.118093334f),
+            ),
+            endBiome("the_end"),
+            endBiome("end_highlands"),
+            endBiome("end_midlands"),
+            endBiome("small_end_islands"),
+            endBiome("end_barrens"),
+        )
+
+    private fun netherBiome(
+        path: String,
+        fogColor: String,
+        ambientPath: String,
+        musicPath: String,
+        particle: AmbientParticle? = null,
+    ): Entry =
+        Entry(
+            path,
+            temperature = 2.0f,
+            downfall = 0.0f,
+            hasPrecipitation = false,
+            waterColor = "#3f76e4",
+            attributes =
+                buildMap {
+                    put(
+                        "minecraft:audio/ambient_sounds",
+                        BiomeAttribute.Sounds(
+                            loop = "minecraft:ambient.$ambientPath.loop",
+                            mood = AmbientMood("minecraft:ambient.$ambientPath.mood"),
+                            addition = AmbientAddition("minecraft:ambient.$ambientPath.additions"),
+                        ),
+                    )
+                    put(
+                        "minecraft:audio/background_music",
+                        BiomeAttribute.Music(
+                            mapOf("default" to MusicTrack("minecraft:music.nether.$musicPath", 12000, 24000)),
+                        ),
+                    )
+                    particle?.let {
+                        put("minecraft:visual/ambient_particles", BiomeAttribute.Particles(listOf(it)))
+                    }
+                    put("minecraft:visual/fog_color", BiomeAttribute.Color(fogColor))
+                },
+        )
+
+    private fun endBiome(path: String): Entry =
+        Entry(
+            path,
+            temperature = 0.5f,
+            downfall = 0.5f,
+            hasPrecipitation = false,
+            waterColor = "#3f76e4",
         )
 
     /** Serializes one entry to the exact NBT a vanilla server sends for it in `RegistryDataPacket`. */
@@ -971,6 +1092,37 @@ public object VanillaBiomes {
                                                         putInt("max_delay", track.maxDelay)
                                                     }
                                             }
+                                        }
+                                is BiomeAttribute.Particles ->
+                                    this[key] =
+                                        NbtList(
+                                            NbtType.COMPOUND,
+                                            value.particles.map { particle ->
+                                                NbtCompound().apply {
+                                                    this["particle"] =
+                                                        NbtCompound().apply {
+                                                            putString("type", particle.type)
+                                                        }
+                                                    putFloat("probability", particle.probability)
+                                                }
+                                            },
+                                        )
+                                is BiomeAttribute.Sounds ->
+                                    this[key] =
+                                        NbtCompound().apply {
+                                            putString("loop", value.loop)
+                                            this["mood"] =
+                                                NbtCompound().apply {
+                                                    putString("sound", value.mood.sound)
+                                                    putInt("tick_delay", value.mood.tickDelay)
+                                                    putInt("block_search_extent", value.mood.blockSearchExtent)
+                                                    putDouble("offset", value.mood.offset)
+                                                }
+                                            this["additions"] =
+                                                NbtCompound().apply {
+                                                    putString("sound", value.addition.sound)
+                                                    putDouble("tick_chance", value.addition.tickChance)
+                                                }
                                         }
                             }
                         }

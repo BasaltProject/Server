@@ -20,6 +20,7 @@ import org.basaltmc.server.config.CommandsConfig
 import org.basaltmc.server.config.ConfigSnapshot
 import org.basaltmc.server.config.LiveConfigs
 import org.basaltmc.server.config.WorldDeclaration
+import org.basaltmc.server.config.WorldDimension
 import org.basaltmc.server.config.WorldSettings
 import org.basaltmc.server.config.WorldType
 import org.basaltmc.server.config.WorldsConfig
@@ -76,7 +77,7 @@ internal fun startTestServer(
                     listOf(
                         WorldDeclaration(
                             "test_world_$port",
-                            "overworld",
+                            WorldDimension.OVERWORLD,
                             WorldType.NORMAL,
                             seed = 0L,
                             isDefault = true,

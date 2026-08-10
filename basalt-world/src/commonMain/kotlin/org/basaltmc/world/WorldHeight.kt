@@ -1,7 +1,7 @@
 package org.basaltmc.world
 
 /**
- * Overworld vertical bounds.
+ * Overworld vertical-bound compatibility constants. New dimension-aware code uses [ChunkHeight].
  *
  * // parity: net.minecraft.world.level.levelgen.NoiseSettings.OVERWORLD_NOISE_SETTINGS
  * (`create(-64, 384, 1, 2)`), confirmed directly against the real 26.2 jar, not just assumed

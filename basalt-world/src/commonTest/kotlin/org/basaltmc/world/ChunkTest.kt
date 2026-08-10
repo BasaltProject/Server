@@ -14,6 +14,17 @@ class ChunkTest {
     }
 
     @Test
+    fun netherAndEndChunksUseTheirOwnVerticalBounds() {
+        val nether = Chunk(0, 0, ChunkHeight.NETHER)
+        assertEquals(16, nether.sectionCount)
+        assertEquals(List(256) { 0 }, nether.heightmap().toList())
+        nether.setBlockStateId(0, 0, 0, Blocks.BEDROCK.stateId)
+        nether.setBlockStateId(0, 255, 0, Blocks.NETHERRACK.stateId)
+        assertFailsWith<IllegalArgumentException> { nether.getBlockStateId(0, -1, 0) }
+        assertFailsWith<IllegalArgumentException> { nether.getBlockStateId(0, 256, 0) }
+    }
+
+    @Test
     fun setAndGetAcrossTheFullHeightRange() {
         val chunk = Chunk(0, 0)
         chunk.setBlockStateId(0, WorldHeight.MIN_Y, 0, Blocks.BEDROCK.stateId)

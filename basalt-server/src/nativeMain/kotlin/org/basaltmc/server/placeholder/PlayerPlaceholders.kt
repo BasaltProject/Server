@@ -46,7 +46,7 @@ public class PlayerPlaceholders(
             "online" to { _ -> PlaceholderValue.of(true) },
             "world" to { it -> PlaceholderValue.of(it.worldName) },
             "dimension" to { it ->
-                PlaceholderValue.of(worlds()[it.worldName]?.declaration?.dimension)
+                PlaceholderValue.of(worlds()[it.worldName]?.declaration?.dimension?.configName)
             },
             "x" to { it -> PlaceholderValue.of(it.x) },
             "y" to { it -> PlaceholderValue.of(it.y) },

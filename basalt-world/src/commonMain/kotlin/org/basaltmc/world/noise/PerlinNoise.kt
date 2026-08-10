@@ -11,9 +11,9 @@ import kotlin.math.pow
  * reference uses) and [createLegacyForBlendedNoise] (octaves consumed sequentially off a single
  * shared [BasaltRandom], skipping 262 draws for a zero-amplitude octave to keep the sequence
  * aligned; needed by [org.basaltmc.world.densityfunction.BlendedNoise], vanilla's base 3D terrain
- * noise, which still uses this legacy path even in 26.2). `createLegacyForLegacyNetherBiome`
- * (pre-1.18 Nether biome noise, unrelated to `BlendedNoise`) is still not implemented: nothing in
- * this project generates pre-1.18-style Nether biomes.
+ * noise, which still uses this legacy path even in 26.2). [createLegacyForLegacyNetherBiome]
+ * consumes the same legacy sequence from an explicit first-octave/amplitude list for the two
+ * noises that still select Nether biomes.
  */
 public class PerlinNoise private constructor(
     random: BasaltRandom,
@@ -68,6 +68,10 @@ public class PerlinNoise private constructor(
                 random.consumeCount(SKIPPED_OCTAVE_RANDOM_CALLS)
             }
         }
+        check(levels.count { it != null } == amplitudes.count { it != 0.0 }) {
+            "Failed to create the requested legacy noise levels"
+        }
+        require(zeroOctaveIndex >= octaves - 1) { "Positive octaves are temporarily disabled" }
         return levels
     }
 
@@ -136,6 +140,13 @@ public class PerlinNoise private constructor(
             val (firstOctave, amplitudes) = makeAmplitudes(octaves)
             return PerlinNoise(random, firstOctave, amplitudes, useNewInitialization = false)
         }
+
+        /** // parity: `PerlinNoise.createLegacyForLegacyNetherBiome`. */
+        public fun createLegacyForLegacyNetherBiome(
+            random: BasaltRandom,
+            firstOctave: Int,
+            amplitudes: DoubleArray,
+        ): PerlinNoise = PerlinNoise(random, firstOctave, amplitudes, useNewInitialization = false)
 
         public fun wrap(x: Double): Double = x - Mth.lfloor(x / ROUND_OFF + 0.5) * ROUND_OFF
 

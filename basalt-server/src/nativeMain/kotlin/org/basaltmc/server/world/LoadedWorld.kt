@@ -44,24 +44,23 @@ public class LoadedWorld(
     private val overworldRouter: OverworldNoiseRouter? = null,
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
+    private val normalGenerator: ((chunkX: Int, chunkZ: Int) -> Chunk)? = null,
 ) {
     public val name: String get() = declaration.name
 
     /**
      * What the client calls this world: a `ResourceKey<Level>`, not a dimension type.
      *
-     * The distinction is what makes travelling between worlds work at all. Every world here is of
-     * the overworld dimension *type* (that is the `dimension` index in the spawn info), but each one
-     * is a separate *level*, and the client only rebuilds its chunk cache when the level key
-     * changes. Giving them all `minecraft:overworld` would leave a player who moved to another world
-     * looking at the chunks of the one they left.
+     * The distinction is what makes travelling between worlds work at all. The dimension type is
+     * selected separately by [WorldDeclaration.dimension], while the level key identifies this
+     * concrete world and tells the client when to rebuild its chunk cache.
      *
      * The default world keeps `minecraft:overworld` so an unmodified single-world setup looks
      * exactly as before, including in the client's own debug screen.
      */
     public val levelKey: String =
         if (declaration.isDefault) {
-            "minecraft:overworld"
+            declaration.dimension.registryKey
         } else {
             "basalt:" +
                 declaration.name
@@ -77,12 +76,18 @@ public class LoadedWorld(
                     }.joinToString("")
         }
 
-    public val regions: RegionStore = RegionStore(declaration.name, DIMENSION, worldsRoot)
+    public val regions: RegionStore =
+        RegionStore(
+            declaration.name,
+            declaration.dimension.registryPath,
+            worldsRoot,
+            declaration.dimension.chunkHeight,
+        )
 
     public val state: WorldState = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
 
     public val generationQueue: ChunkGenerationQueue =
-        ChunkGenerationQueue(state, DIMENSION, workerCount = generationWorkers)
+        ChunkGenerationQueue(state, declaration.dimension.registryPath, workerCount = generationWorkers)
 
     /** Where a player joining this world lands, resolved once the spawn column has been generated. */
     public var spawn: Triple<Double, Double, Double> = Triple(8.5, 64.0, 8.5)
@@ -105,7 +110,7 @@ public class LoadedWorld(
         chunkZ: Int,
     ): Chunk =
         when (declaration.type) {
-            WorldType.FLAT -> FlatWorldGenerator.generate(chunkX, chunkZ)
+            WorldType.FLAT -> FlatWorldGenerator.generate(chunkX, chunkZ, declaration.dimension.chunkHeight)
             WorldType.VOID ->
                 VoidWorldGenerator.generate(
                     chunkX,
@@ -113,11 +118,15 @@ public class LoadedWorld(
                     spawnX = metadata.spawnX,
                     spawnY = metadata.spawnY,
                     spawnZ = metadata.spawnZ,
+                    verticalBounds = declaration.dimension.chunkHeight,
                 )
             WorldType.NORMAL, WorldType.AMPLIFIED -> {
+                val generator = normalGenerator
                 val router = overworldRouter
                 val environment = surfaceEnvironment
-                if (router != null && environment != null) {
+                if (generator != null) {
+                    generator(chunkX, chunkZ)
+                } else if (router != null && environment != null) {
                     RealTerrainGenerator.generate(
                         router,
                         environment,
@@ -126,6 +135,9 @@ public class LoadedWorld(
                         villageGenerator = villageGenerator,
                     )
                 } else {
+                    check(declaration.dimension == org.basaltmc.server.config.WorldDimension.OVERWORLD) {
+                        "Normal ${declaration.dimension} generation needs a vanilla generator factory"
+                    }
                     NoiseWorldGenerator.generate(chunkX, chunkZ)
                 }
             }
@@ -218,10 +230,5 @@ public class LoadedWorld(
 
     public fun flushRegions() {
         regions.flush()
-    }
-
-    public companion object {
-        // Only the overworld exists as a dimension so far; a world's *type* is a different axis.
-        public const val DIMENSION: String = "overworld"
     }
 }

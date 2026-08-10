@@ -76,4 +76,30 @@ class NoiseRouterDataTest {
         val deepValue = router.finalDensity.compute(FunctionContext(0, -63, 0))
         assertTrue(deepValue > 0.0, "expected solid density near the world floor, got $deepValue")
     }
+
+    @Test
+    fun netherRouterWiresClimateAndSolidFloorAndRoof() {
+        val netherBase3d = BlendedNoise.createUnseeded(0.25, 0.375, 80.0, 60.0, 8.0)
+        val nether = NoiseRouterData.nether(::syntheticNoise, netherBase3d)
+
+        assertTrue(nether.temperature.maxValue() > nether.temperature.minValue())
+        assertTrue(nether.vegetation.maxValue() > nether.vegetation.minValue())
+        assertTrue(nether.finalDensity.compute(FunctionContext(0, 0, 0)) > 0.0)
+        assertTrue(nether.finalDensity.compute(FunctionContext(0, 127, 0)) > 0.0)
+    }
+
+    @Test
+    fun endRouterUsesSeededIslandsForErosionAndDensity() {
+        val endBase3d = BlendedNoise.createUnseeded(0.25, 0.25, 80.0, 160.0, 4.0)
+        val first = NoiseRouterData.end(endBase3d, 1234L)
+        val second = NoiseRouterData.end(endBase3d, 5678L)
+        val outer = FunctionContext(1200, 64, -900)
+
+        assertNotEquals(first.erosion.compute(outer), second.erosion.compute(outer))
+        assertNotEquals(
+            first.finalDensity.compute(FunctionContext(0, 32, 0)),
+            first.finalDensity.compute(FunctionContext(0, 64, 0)),
+        )
+        assertTrue(first.finalDensity.compute(FunctionContext(0, 4, 0)) < 0.0)
+    }
 }
