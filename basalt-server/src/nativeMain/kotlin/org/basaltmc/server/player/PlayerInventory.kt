@@ -126,7 +126,8 @@ public class PlayerInventory {
         }
     }
 
-    private fun toWire(stack: StoredItemStack?): WireItemStack? {
+    /** One arbitrary stack in wire form, for things held outside the slots (the cursor during a click). */
+    public fun toWire(stack: StoredItemStack?): WireItemStack? {
         if (stack == null) return null
         // An item this build's registry does not know is left out rather than sent as some other
         // item: a wrong id is a wrong item in someone's hand.

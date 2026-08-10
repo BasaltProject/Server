@@ -2,6 +2,7 @@ package org.basaltmc.protocol.play
 
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.protocol.ProtocolException
+import org.basaltmc.protocol.readBoolean
 import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeVarInt
 
@@ -181,6 +182,82 @@ public data class ServerboundSetCarriedItemPacket(
 
         public fun read(buffer: ByteBuffer): ServerboundSetCarriedItemPacket =
             ServerboundSetCarriedItemPacket(buffer.readShort().toInt())
+    }
+}
+
+/**
+ * Serverbound, id 0x12: a click inside an open container. Mirrors
+ * `ServerboundContainerClickPacket`.
+ *
+ * [changedSlots] and [carriedItem] are the client's own *prediction* of the result, sent as
+ * component **hashes** rather than real stacks (`HashedStack`), so a server can tell a stale
+ * prediction from a current one without shipping every component back. This build does not verify
+ * them: the click is re-derived from [slot]/[button]/[mode] against the server's own inventory,
+ * which is authoritative anyway. They are still parsed exactly, because a stack skipped wrong
+ * desynchronises every packet after it.
+ */
+public data class ServerboundContainerClickPacket(
+    val containerId: Int,
+    val stateId: Int,
+    val slot: Int,
+    val button: Int,
+    val mode: Mode,
+    /**
+     * Whether the client believes it is holding something on the cursor after this click. Its full
+     * predicted stack is hashed and not reconstructible here, but the presence flag alone is enough
+     * to notice that the two sides disagree about whether a stack is in hand at all, which is the
+     * shape a click desynchronisation takes.
+     */
+    val clientHasCarriedItem: Boolean,
+) {
+    /** parity: `ContainerInput`, by its own numeric ids. */
+    public enum class Mode {
+        PICKUP,
+        QUICK_MOVE,
+        SWAP,
+        CLONE,
+        THROW,
+        QUICK_CRAFT,
+        PICKUP_ALL,
+    }
+
+    public companion object {
+        public const val ID: Int = 0x12
+
+        public fun read(buffer: ByteBuffer): ServerboundContainerClickPacket {
+            val containerId = buffer.readVarInt()
+            val stateId = buffer.readVarInt()
+            val slot = buffer.readShort().toInt()
+            val button = buffer.readByte().toInt()
+            val modeId = buffer.readVarInt()
+            // parity: `ByIdMap.OutOfBoundsStrategy.ZERO`, which folds anything unknown to PICKUP
+            // rather than refusing the packet.
+            val mode = Mode.entries.getOrElse(modeId) { Mode.PICKUP }
+            repeat(buffer.readVarInt()) {
+                buffer.readShort()
+                skipHashedStack(buffer)
+            }
+            val clientHasCarriedItem = skipHashedStack(buffer)
+            return ServerboundContainerClickPacket(containerId, stateId, slot, button, mode, clientHasCarriedItem)
+        }
+
+        /**
+         * Walks one `HashedStack` without interpreting it: an optional flag, then item and count,
+         * then the added component hashes (a type id and a four-byte hash each) and the removed
+         * component type ids. Hashes are fixed width, so unlike a real component patch this can
+         * always be skipped.
+         */
+        private fun skipHashedStack(buffer: ByteBuffer): Boolean {
+            if (!buffer.readBoolean()) return false
+            buffer.readVarInt() // item id
+            buffer.readVarInt() // count
+            repeat(buffer.readVarInt()) {
+                buffer.readVarInt() // component type id
+                buffer.readInt() // its hash
+            }
+            repeat(buffer.readVarInt()) { buffer.readVarInt() } // removed component type ids
+            return true
+        }
     }
 }
 

@@ -201,7 +201,7 @@ public class BasaltServer(
             defaultWorld.settings.saveIntervalSeconds,
             durations = tickDurations,
             onSaveInterval = { timings.of("tick.save").time { persistAndUnload() } },
-            onTick = ::shutdownIfSignalled,
+            onTick = ::tickWorlds,
         )
 
     /**
@@ -383,6 +383,22 @@ public class BasaltServer(
         // because one of these numbers climbs without settling, and knowing which one is the whole
         // diagnosis. At debug level because it is a diagnostic, not operator news.
         logger.debug { "Chunks: $loaded loaded across ${worlds.size} world(s), $unloaded unloaded. " + heapReport() }
+    }
+
+    /**
+     * Everything the world itself owes per tick, plus the termination check.
+     *
+     * Dropped-item physics lives here rather than on a connection thread so an item falls at one
+     * speed regardless of how many players are watching it, and so it keeps falling when nobody is.
+     * Nothing here touches a socket, which is the rule this thread lives by (see [TickLoop]):
+     * telling clients what moved is each [ClientSession]'s own job.
+     */
+    private fun tickWorlds() {
+        for (world in worlds.values) {
+            runCatching { world.state.tickItems() }
+                .onFailure { logger.error(it) { "Item tick failed in world '${world.name}'" } }
+        }
+        shutdownIfSignalled()
     }
 
     /**
