@@ -18,6 +18,16 @@ public object LogOutput {
     public var useColor: Boolean = false
 
     /**
+     * Wraps every console line, for whoever else is drawing on the same terminal.
+     *
+     * The console command editor keeps a prompt on the bottom line and redraws it in place. A log
+     * line written straight over that leaves the prompt smeared across the output and the operator
+     * typing into wreckage, so the editor installs itself here to wipe its line first and put it
+     * back afterwards. Left alone when nothing is editing, which is every non-interactive run.
+     */
+    public var aroundConsoleLine: ((write: () -> Unit) -> Unit)? = null
+
+    /**
      * Registers an extra destination. Not synchronised: sinks are installed once during startup,
      * before anything else is logging, and the list is only read afterwards.
      */
@@ -37,7 +47,9 @@ public object LogOutput {
         message: String,
     ) {
         val plain = "[$timestamp] [${level.label}] [$name]: $message"
-        println(if (useColor) colored(level, timestamp, name, message) else plain)
+        val line = if (useColor) colored(level, timestamp, name, message) else plain
+        val write = { println(line) }
+        aroundConsoleLine?.invoke(write) ?: write()
         for (sink in sinks) sink(plain)
     }
 
