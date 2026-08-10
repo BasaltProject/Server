@@ -25,8 +25,8 @@ public class ChunkSection {
         val at = index(x, y, z)
         val previous = blockStateIds[at]
         if (!blockStateIds.set(at, stateId)) return false
-        if (previous != Blocks.AIR.stateId) trackedNonAirBlockCount--
-        if (stateId != Blocks.AIR.stateId) trackedNonAirBlockCount++
+        if (!Blocks.isAir(previous)) trackedNonAirBlockCount--
+        if (!Blocks.isAir(stateId)) trackedNonAirBlockCount++
         if (Blocks.hasFluid(previous)) trackedNonEmptyFluidCount--
         if (Blocks.hasFluid(stateId)) trackedNonEmptyFluidCount++
         return true
@@ -74,7 +74,7 @@ public class ChunkSection {
     /** Overwrites every state ID at once, in the same `(y * 16 + z) * 16 + x` order [blockStateIds] returns. */
     public fun setBlockStateIds(ids: IntArray) {
         blockStateIds.setAll(ids)
-        trackedNonAirBlockCount = ids.count { it != Blocks.AIR.stateId }
+        trackedNonAirBlockCount = ids.count { !Blocks.isAir(it) }
         trackedNonEmptyFluidCount = ids.count(Blocks::hasFluid)
     }
 

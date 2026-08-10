@@ -24,7 +24,8 @@ public object JungleVineDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         origin: DecorationPos,
     ): Boolean {
-        if (state(chunk, origin) != Blocks.AIR.stateId) return false
+        val originState = state(chunk, origin) ?: return false
+        if (!Blocks.isAir(originState)) return false
         for (direction in DIRECTIONS) {
             val neighbour = state(chunk, origin.relative(direction)) ?: continue
             if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(neighbour)) continue

@@ -108,7 +108,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         z: Int,
     ): Boolean =
         y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-            chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
 
     /** HashMap bucket iteration used by vanilla's HashSet<BlockPos>. */
     private fun javaHashSetOrder(positions: List<DecorationPos>): Sequence<DecorationPos> {

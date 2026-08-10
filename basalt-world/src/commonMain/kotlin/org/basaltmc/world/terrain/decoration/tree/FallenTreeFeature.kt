@@ -147,7 +147,8 @@ public object FallenTreeFeature {
         y: Int,
         z: Int,
     ): Boolean =
-        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y && chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
+            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
 
     private fun isAir(
         chunk: Chunk,
@@ -155,7 +156,8 @@ public object FallenTreeFeature {
         y: Int,
         z: Int,
     ): Boolean =
-        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y && chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
+            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
 
     private fun set(
         chunk: Chunk,

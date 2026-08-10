@@ -2,7 +2,6 @@ package org.basaltmc.world.terrain.surface
 
 import org.basaltmc.registry.Blocks
 import org.basaltmc.world.Chunk
-import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.terrain.BiomeTemperature
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -24,13 +23,17 @@ public object SurfaceBuilder {
         environment: SurfaceRuleEnvironment,
         ruleSource: RuleSource,
         defaultBlockStateId: Int = Blocks.STONE.stateId,
+        generationMinY: Int = chunk.verticalBounds.minY,
+        generationHeight: Int = chunk.verticalBounds.height,
     ) {
-        val worldGenContext = WorldGenerationContext(WorldHeight.MIN_Y, WorldHeight.HEIGHT)
+        // parity: WorldGenerationContext intersects the dimension height with the chunk
+        // generator's noise settings. Nether chunks are 256 blocks tall but generate only 128.
+        val worldGenContext = WorldGenerationContext(generationMinY, generationHeight)
         val context = SurfaceRuleContext(environment, worldGenContext)
         val rule = ruleSource.apply(context)
         val minBlockX = chunk.chunkX * 16
         val minBlockZ = chunk.chunkZ * 16
-        val endY = WorldHeight.MIN_Y
+        val endY = chunk.verticalBounds.minY
 
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -62,7 +65,7 @@ public object SurfaceBuilder {
                 while (y >= endY) {
                     val old = blockAt(chunk, x, y, z)
                     when {
-                        old == Blocks.AIR.stateId -> {
+                        Blocks.isAir(old) -> {
                             stoneAboveDepth = 0
                             waterHeight = Int.MIN_VALUE
                         }
@@ -131,13 +134,13 @@ public object SurfaceBuilder {
         val startY = kotlin.math.floor(extensionTop).toInt()
         if (height > startY) return
 
-        for (y in startY downTo WorldHeight.MIN_Y) {
+        for (y in startY downTo chunk.verticalBounds.minY) {
             val stateId = blockAt(chunk, localX, y, localZ)
             if (stateId == defaultBlockStateId) break
             if (stateId == Blocks.WATER.stateId) return
         }
         var y = startY
-        while (y >= WorldHeight.MIN_Y && blockAt(chunk, localX, y, localZ) == Blocks.AIR.stateId) {
+        while (y >= chunk.verticalBounds.minY && Blocks.isAir(blockAt(chunk, localX, y, localZ))) {
             setBlock(chunk, localX, y, localZ, defaultBlockStateId)
             y--
         }
@@ -185,7 +188,7 @@ public object SurfaceBuilder {
 
         for (y in maxOf(height, top.toInt() + 1) downTo minSurfaceLevel) {
             val stateId = blockAt(chunk, localX, y, localZ)
-            val fillAir = stateId == Blocks.AIR.stateId && y < top.toInt() && random.nextDouble() > 0.01
+            val fillAir = Blocks.isAir(stateId) && y < top.toInt() && random.nextDouble() > 0.01
             val fillWater =
                 stateId == Blocks.WATER.stateId &&
                     y > extensionBottom.toInt() &&
@@ -208,7 +211,12 @@ public object SurfaceBuilder {
         x: Int,
         y: Int,
         z: Int,
-    ): Int = if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) chunk.getBlockStateId(x, y, z) else Blocks.AIR.stateId
+    ): Int =
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            chunk.getBlockStateId(x, y, z)
+        } else {
+            Blocks.AIR.stateId
+        }
 
     private fun setBlock(
         chunk: Chunk,
@@ -217,14 +225,12 @@ public object SurfaceBuilder {
         z: Int,
         stateId: Int,
     ) {
-        if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) chunk.setBlockStateId(x, y, z, stateId)
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) chunk.setBlockStateId(x, y, z, stateId)
     }
 
-    // Every fluid this project models is water for now (no lava placement yet): matches this
-    // generator's own documented "no aquifers/lava" gap elsewhere.
-    private fun isFluid(stateId: Int): Boolean = stateId == Blocks.WATER.stateId
+    private fun isFluid(stateId: Int): Boolean = Blocks.hasFluid(stateId)
 
-    private fun isStone(stateId: Int): Boolean = stateId != Blocks.AIR.stateId && !isFluid(stateId)
+    private fun isStone(stateId: Int): Boolean = !Blocks.isAir(stateId) && !isFluid(stateId)
 
     // A sentinel far enough below any real Y that `stoneBelowDepth` computed from it reads as
     // "solid all the way down, no ceiling found": matches vanilla's own `DimensionType.WAY_BELOW_MIN_Y`

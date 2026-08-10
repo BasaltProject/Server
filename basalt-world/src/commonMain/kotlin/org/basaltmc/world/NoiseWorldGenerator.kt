@@ -178,7 +178,7 @@ public object NoiseWorldGenerator {
                     // there: see the class KDoc's note on this generator's tree-placement gaps.
                     if (px !in 0..15 || pz !in 0..15) continue
                     val py = trunkTopY + dy
-                    if (chunk.getBlockStateId(px, py, pz) == Blocks.AIR.stateId) {
+                    if (Blocks.isAir(chunk.getBlockStateId(px, py, pz))) {
                         chunk.setBlockStateId(px, py, pz, Blocks.OAK_LEAVES.stateId)
                     }
                 }

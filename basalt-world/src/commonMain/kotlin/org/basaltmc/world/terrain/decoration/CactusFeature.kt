@@ -23,9 +23,9 @@ public object CactusFeature {
         if (origin.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
         val localX = origin.x and 15
         val localZ = origin.z and 15
-        if (chunk.getBlockStateId(localX, origin.y, localZ) != Blocks.AIR.stateId) return false
+        if (!Blocks.isAir(chunk.getBlockStateId(localX, origin.y, localZ))) return false
         if (origin.y - 1 < WorldHeight.MIN_Y ||
-            chunk.getBlockStateId(localX, origin.y - 1, localZ) == Blocks.AIR.stateId
+            Blocks.isAir(chunk.getBlockStateId(localX, origin.y - 1, localZ))
         ) {
             return false
         }
@@ -40,7 +40,7 @@ public object CactusFeature {
         var newHeight = totalHeight
         for (dy in 1..totalHeight) {
             val y = origin.y + dy
-            if (y > WorldHeight.MAX_Y || chunk.getBlockStateId(localX, y, localZ) != Blocks.AIR.stateId) {
+            if (y > WorldHeight.MAX_Y || !Blocks.isAir(chunk.getBlockStateId(localX, y, localZ))) {
                 newHeight = dy - 1
                 break
             }

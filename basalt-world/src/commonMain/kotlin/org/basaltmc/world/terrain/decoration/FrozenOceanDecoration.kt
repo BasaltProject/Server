@@ -115,7 +115,7 @@ internal object BlueIceFeature {
                         random.nextInt(horizontalRange) - random.nextInt(horizontalRange),
                     )
                 val stateId = region.get(target)
-                if (stateId == Blocks.AIR.stateId ||
+                if (Blocks.isAir(stateId) ||
                     stateId == Blocks.WATER.stateId ||
                     stateId == Blocks.PACKED_ICE.stateId ||
                     stateId == Blocks.ICE.stateId

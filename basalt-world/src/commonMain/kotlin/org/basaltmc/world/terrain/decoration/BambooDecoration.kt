@@ -43,7 +43,7 @@ public object BambooDecoration {
         origin: DecorationPos,
         podzolProbability: Float,
     ) {
-        if (!origin.inWorld() || chunk.blockAt(origin) != Blocks.AIR.stateId || !canBambooSurvive(chunk, origin)) return
+        if (!origin.inWorld() || !Blocks.isAir(chunk.blockAt(origin)) || !canBambooSurvive(chunk, origin)) return
 
         val height = random.nextInt(12) + 5
         if (random.nextFloat() < podzolProbability) {
@@ -65,7 +65,7 @@ public object BambooDecoration {
 
         var pos = origin
         var placed = 0
-        while (placed < height && pos.inWorld() && chunk.blockAt(pos) == Blocks.AIR.stateId) {
+        while (placed < height && pos.inWorld() && Blocks.isAir(chunk.blockAt(pos))) {
             chunk.setBlock(pos, Blocks.BAMBOO.stateId)
             pos = pos.up()
             placed++

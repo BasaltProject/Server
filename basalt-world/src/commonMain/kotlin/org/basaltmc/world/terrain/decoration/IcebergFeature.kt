@@ -219,7 +219,7 @@ internal object IcebergFeature {
         mainStateId: Int,
     ) {
         val stateId = region.get(pos)
-        if (stateId != Blocks.AIR.stateId &&
+        if (!Blocks.isAir(stateId) &&
             stateId != Blocks.SNOW_BLOCK.stateId &&
             stateId != Blocks.ICE.stateId &&
             stateId != Blocks.WATER.stateId
@@ -254,7 +254,7 @@ internal object IcebergFeature {
                     val pos = origin.offset(xOffset, yOffset, zOffset)
                     val stateId = region.get(pos)
                     if (isIcebergState(stateId) || stateId == Blocks.SNOW.stateId) {
-                        if (region.get(pos.down()) == Blocks.AIR.stateId) {
+                        if (Blocks.isAir(region.get(pos.down()))) {
                             region.set(pos, Blocks.AIR.stateId)
                             region.set(pos.up(), Blocks.AIR.stateId)
                         } else if (isIcebergState(stateId)) {

@@ -72,7 +72,7 @@ public object SurfaceFreezingDecoration {
         val climate = BiomeClimateData.forBiomeId(biomeId)
         if (!climate.hasPrecipitation || !BiomeTemperature.coldEnoughToSnow(biomeId, worldX, y, worldZ)) return false
         val stateId = chunk.getBlockStateId(localX, y, localZ)
-        if (stateId != Blocks.AIR.stateId && stateId != Blocks.SNOW.stateId) return false
+        if (!Blocks.isAir(stateId) && stateId != Blocks.SNOW.stateId) return false
         val belowStateId = chunk.getBlockStateId(localX, y - 1, localZ)
         return belowStateId !in cannotSupportSnowStateIds &&
             Chunk.HeightmapType.OCEAN_FLOOR.matches(belowStateId)

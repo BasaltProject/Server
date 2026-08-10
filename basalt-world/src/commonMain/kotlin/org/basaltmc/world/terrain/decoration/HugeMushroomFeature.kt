@@ -63,7 +63,7 @@ public object HugeMushroomFeature {
                     val y = originY + dy
                     if (y > WorldHeight.MAX_Y) return false
                     val id = chunk.getBlockStateId((originX + dx) and 15, y, (originZ + dz) and 15)
-                    if (id != Blocks.AIR.stateId && !Blocks.isLeavesState(id)) return false
+                    if (!Blocks.isAir(id) && !Blocks.isLeavesState(id)) return false
                 }
             }
         }
@@ -149,7 +149,7 @@ public object HugeMushroomFeature {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return
         val current = chunk.getBlockStateId(x and 15, y, z and 15)
         val currentBlock = Blocks.byStateId(current)?.block
-        if (current == Blocks.AIR.stateId || currentBlock != null && currentBlock in replaceableBlocks) {
+        if (Blocks.isAir(current) || currentBlock != null && currentBlock in replaceableBlocks) {
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
         }
     }

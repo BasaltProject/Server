@@ -183,7 +183,7 @@ public object ExtraVegetationDecoration {
         if (get(chunk, pos.x, pos.y - 1, pos.z) !in cactusSupportStateIds) return false
         return listOf(pos.x + 1 to pos.z, pos.x - 1 to pos.z, pos.x to pos.z + 1, pos.x to pos.z - 1).all { (x, z) ->
             val stateId = get(chunk, x, pos.y, z)
-            stateId == Blocks.AIR.stateId || !Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId)
+            Blocks.isAir(stateId) || !Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId)
         }
     }
 
@@ -202,7 +202,7 @@ public object ExtraVegetationDecoration {
     private fun isAir(
         chunk: Chunk,
         pos: DecorationPos,
-    ): Boolean = get(chunk, pos.x, pos.y, pos.z) == Blocks.AIR.stateId
+    ): Boolean = Blocks.isAir(get(chunk, pos.x, pos.y, pos.z))
 
     private fun get(
         chunk: Chunk,
