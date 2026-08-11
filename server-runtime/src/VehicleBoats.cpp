@@ -5,6 +5,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/VehicleSystem.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -37,6 +38,10 @@ constexpr std::int8_t kPushUpEvent = 72;
 void VehicleSystem::tickBoatBubbles(world::LoadedWorld& world, ServerEntity& boat, bool driverIsPlayer) {
     entity::boats::BoatState& state = *boat.boat;
     const bool simulated = !driverIsPlayer;
+    // Purpur's boat landing: whoever rides a boat that grounds is put out of it.
+    if (state.status == entity::boats::Status::OnLand && world.state().gameplay().mechanics.boatEjectPlayersOnLand) {
+        ejectPassengers(world, boat);
+    }
     // parity: `applyEffectsFromBlocks`.
     // open water it is `onAboveBubbleColumn`, the boat's own; under something it is the default push.
     const Aabb box = boxOf(boat).inflate(-static_cast<double>(1.0E-5F));

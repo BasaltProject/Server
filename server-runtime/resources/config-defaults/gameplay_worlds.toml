@@ -115,6 +115,36 @@ cactus-affected-by-bonemeal = false
 sugar-cane-affected-by-bonemeal = false
 # NOT VANILLA when true. Bone meal ages nether wart by one stage.
 nether-wart-affected-by-bonemeal = false
+# "default" follows the mob_griefing game rule, "true" or "false" forces whether mobs trample farmland.
+farmland-mob-griefing-override = "default"
+# "default" follows the mob_griefing game rule, "true" or "false" forces whether a large fireball sets fire where it lands.
+fireballs-mob-griefing-override = "default"
+# NOT VANILLA when true. Two observers facing each other no longer set one another off, which ends observer clocks.
+observer-disable-clock = false
+# NOT VANILLA when above 0. End crystals packed more than this many into one another explode.
+end-crystal-cramming-amount = 0
+# NOT VANILLA when true. A bed that explodes for players outside the overworld also explodes under a sleeping villager.
+bed-explode-on-villager-sleep = false
+# NOT VANILLA when true. Sneaking while breaking a double slab breaks only the half you are looking at.
+slab-break-individual-slabs-when-sneaking = false
+# NOT VANILLA when true. A pickaxe (iron or better) with Silk Touch drops the spawner with its mob.
+silk-touch-spawner-enabled = false
+# Silk Touch level the pickaxe needs to take a spawner.
+silk-touch-minimal-level = 1
+# NOT VANILLA when true. A ripe wheat, carrot, potato or beetroot crop broken with a hoe is replanted for one of its seeds.
+hoe-replant-crops = false
+# NOT VANILLA when true. Ripe nether wart broken with a hoe is replanted for one of its seeds.
+hoe-replant-nether-warts = false
+# NOT VANILLA when true. `&` colour codes (and `&#rrggbb`) typed on a sign colour its text.
+sign-allow-colors = false
+# NOT VANILLA when true. `&` colour codes typed into an anvil rename colour the item name.
+anvil-allow-colors = false
+# NOT VANILLA when true, with anvil-allow-colors. The typed name is read as MiniMessage instead of `&` codes.
+anvil-use-mini-message = false
+# Chance per random tick that a turtle egg on sand cracks or hatches (the 26.3 turtle_egg_hatch_chance attribute, vanilla 0.002).
+turtle-egg-hatch-chance = 0.002
+# "default" follows mob_griefing, "true" or "false" forces whether mobs landing on turtle eggs break them. Players always can.
+turtle-egg-mob-griefing-override = "default"
 
 [defaults.gameplay.mechanics]
 # Rules of the world that are not one block or item.
@@ -152,6 +182,10 @@ daylight-daytime-ticks = 12000
 daylight-nighttime-ticks = 12000
 # Ticks after a player hit a mob during which its death counts as a player kill for drops and experience (vanilla 100). Melee only.
 mob-last-hurt-by-player-time = 100
+# Mobs and other non-player entities can travel through portals (vanilla true).
+entities-can-use-portals = true
+# NOT VANILLA when true. Riders are put out of a boat as soon as it runs aground.
+boat-eject-players-on-land = false
 
 [defaults.gameplay.player]
 # Player rules.
@@ -202,3 +236,7 @@ minecart-max-speed = 0.4
 minecart-place-anywhere = false
 # Speed a powered rail adds to a minecart, when minecart_improvements is off (vanilla 0.06).
 powered-rail-boost-modifier = 0.06
+# NOT VANILLA when below 0. A loyal trident that sinks under this height flies home instead of being lost.
+trident-loyalty-void-return-height = 0.0
+# A shulker box item that burns, blows up or is pricked away spills its contents (vanilla true).
+shulker-box-drop-contents-when-destroyed = true

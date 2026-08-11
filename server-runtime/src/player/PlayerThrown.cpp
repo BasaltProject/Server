@@ -1,5 +1,5 @@
 #include <basalt/server/registry/Registries.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -92,7 +92,7 @@ struct Throwable {
     return found == kThrowables.end() ? nullptr : &*found;
 }
 
-[[nodiscard]] float uncertaintyOf(const config::GameplayRules::Items& items, std::string_view item) {
+[[nodiscard]] float uncertaintyOf(const config::PurpurRules::Items& items, std::string_view item) {
     if (item == "ender_pearl") {
         return items.projectileOffsetEnderPearl;
     }

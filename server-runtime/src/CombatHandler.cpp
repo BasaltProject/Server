@@ -9,7 +9,7 @@
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -34,6 +34,7 @@
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
+#include <basalt/server/runtime/world/TurtleEggs.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
@@ -229,6 +230,18 @@ void CombatHandler::applyFallDamage(PlayerSession& session, const double landing
         const Identifier* soilBlock =
             soilState.has_value() ? server::registry::blockStateDefinitions::blockOf(*soilState) : nullptr;
         const auto& protectedAt = owner_->options().spawnProtected;
+        if (soilBlock != nullptr && soilBlock->path() == "turtle_egg" &&
+            config::PurpurRules::resolve(world->state().gameplay().blocks.turtleEggMobGriefingOverride, true) &&
+            !(protectedAt && protectedAt(session, *world, soil.x, soil.z))) {
+            // parity: `TurtleEggBlock.fallOn`, one in three.
+            random::RandomSource eggRandom = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+            if (const std::optional<world::BlockChange> cracked =
+                    world::turtleEggs::trample(world->state(), soil.x, soil.y, soil.z, 3, eggRandom);
+                cracked.has_value()) {
+                owner_->blockInteraction().broadcastBlockUpdate(soil, cracked->stateId);
+                owner_->blockInteraction().notifyNeighbours(soil);
+            }
+        }
         if (soilBlock != nullptr && soilBlock->path() == "farmland" &&
             !(protectedAt && protectedAt(session, *world, soil.x, soil.z))) {
             const std::optional<storage::StoredItemStack> boots =

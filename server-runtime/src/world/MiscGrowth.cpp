@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
@@ -22,9 +23,6 @@ constexpr std::int32_t kBerryOdds = 5;
 constexpr std::int32_t kBerryMaxAge = 3;
 constexpr std::int32_t kAmethystOdds = 5;
 constexpr std::int32_t kTurtleHatch = 2;
-
-/// parity: `EnvironmentAttributes.TURTLE_EGG_HATCH_CHANCE`'s default.
-constexpr float kTurtleHatchChance = 0.002F;
 
 /// parity: `DriedGhastBlock.randomTick`'s own delay.
 constexpr std::int32_t kDriedGhastDelay = 5000;
@@ -170,7 +168,7 @@ void buddingAmethyst(WorldState& world, std::int32_t x, std::int32_t y, std::int
 void turtleEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                random::RandomSource& random, std::vector<BlockChange>& changes) {
     // parity: `TurtleEggBlock.shouldUpdateHatchLevel` over the `turtle_egg_hatch_chance` environment.
-    if (random.nextFloat() >= kTurtleHatchChance) {
+    if (random.nextFloat() >= world.gameplay().blocks.turtleEggHatchChance) {
         return;
     }
     const std::string_view below = pathOf(world.blockState(x, y - 1, z).value_or(0));

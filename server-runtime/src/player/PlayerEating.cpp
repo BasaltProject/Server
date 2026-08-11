@@ -1,5 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
@@ -205,7 +205,7 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
             player.connection().sendEffect(omen);
         }
     }
-    const config::GameplayRules::Mechanics& rules = world.state().gameplay().mechanics;
+    const config::PurpurRules::Mechanics& rules = world.state().gameplay().mechanics;
     const bool milk = id->path() == "milk_bucket";
     applyConsumeEffectsFor(player, food->effects, nextFloat,
                            ClearScope{.keepBeneficial = milk && !rules.milkClearsBeneficialEffects,

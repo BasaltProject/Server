@@ -8,7 +8,7 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>

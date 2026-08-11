@@ -1,4 +1,4 @@
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 
 #include <algorithm>
 
@@ -16,17 +16,27 @@ using wire::common::toml::TomlTable;
     return static_cast<float>(std::max(table.real(key).value_or(fallback), least));
 }
 
+[[nodiscard]] std::int32_t tristate(const TomlTable& table, std::string_view key, std::int32_t fallback) {
+    if (const std::optional<bool> truth = table.boolean(key); truth.has_value()) {
+        return *truth ? 1 : 2;
+    }
+    if (const std::optional<std::string_view> word = table.string(key); word.has_value()) {
+        return *word == "true" ? 1 : (*word == "false" ? 2 : 0);
+    }
+    return fallback;
+}
+
 [[nodiscard]] bool flag(const TomlTable& table, std::string_view key, bool fallback) {
     return table.boolean(key).value_or(fallback);
 }
 
 } // namespace
 
-GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules& inherited) {
+PurpurRules PurpurRules::from(const TomlTable* gameplay, const PurpurRules& inherited) {
     if (gameplay == nullptr) {
         return inherited;
     }
-    GameplayRules rules = inherited;
+    PurpurRules rules = inherited;
     if (const TomlTable* table = gameplay->table("blocks"); table != nullptr) {
         rules.blocks.waterInfiniteRequiredSources =
             whole(*table, "water-infinite-required-sources", rules.blocks.waterInfiniteRequiredSources, 1);
@@ -127,6 +137,31 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
             flag(*table, "sugar-cane-affected-by-bonemeal", rules.blocks.sugarCaneAffectedByBonemeal);
         rules.blocks.netherWartAffectedByBonemeal =
             flag(*table, "nether-wart-affected-by-bonemeal", rules.blocks.netherWartAffectedByBonemeal);
+        rules.blocks.farmlandMobGriefingOverride =
+            tristate(*table, "farmland-mob-griefing-override", rules.blocks.farmlandMobGriefingOverride);
+        rules.blocks.fireballsMobGriefingOverride =
+            tristate(*table, "fireballs-mob-griefing-override", rules.blocks.fireballsMobGriefingOverride);
+        rules.blocks.observerDisableClock = flag(*table, "observer-disable-clock", rules.blocks.observerDisableClock);
+        rules.blocks.endCrystalCrammingAmount =
+            whole(*table, "end-crystal-cramming-amount", rules.blocks.endCrystalCrammingAmount, 0);
+        rules.blocks.bedExplodeOnVillagerSleep =
+            flag(*table, "bed-explode-on-villager-sleep", rules.blocks.bedExplodeOnVillagerSleep);
+        rules.blocks.slabBreakIndividualSlabsWhenSneaking = flag(*table, "slab-break-individual-slabs-when-sneaking",
+                                                                 rules.blocks.slabBreakIndividualSlabsWhenSneaking);
+        rules.blocks.silkTouchSpawnerEnabled =
+            flag(*table, "silk-touch-spawner-enabled", rules.blocks.silkTouchSpawnerEnabled);
+        rules.blocks.silkTouchMinimalLevel =
+            whole(*table, "silk-touch-minimal-level", rules.blocks.silkTouchMinimalLevel, 1);
+        rules.blocks.hoeReplantCrops = flag(*table, "hoe-replant-crops", rules.blocks.hoeReplantCrops);
+        rules.blocks.hoeReplantNetherWarts =
+            flag(*table, "hoe-replant-nether-warts", rules.blocks.hoeReplantNetherWarts);
+        rules.blocks.signAllowColors = flag(*table, "sign-allow-colors", rules.blocks.signAllowColors);
+        rules.blocks.anvilAllowColors = flag(*table, "anvil-allow-colors", rules.blocks.anvilAllowColors);
+        rules.blocks.anvilUseMiniMessage = flag(*table, "anvil-use-mini-message", rules.blocks.anvilUseMiniMessage);
+        rules.blocks.turtleEggHatchChance =
+            decimal(*table, "turtle-egg-hatch-chance", rules.blocks.turtleEggHatchChance, 0);
+        rules.blocks.turtleEggMobGriefingOverride =
+            tristate(*table, "turtle-egg-mob-griefing-override", rules.blocks.turtleEggMobGriefingOverride);
     }
     if (const TomlTable* table = gameplay->table("mechanics"); table != nullptr) {
         rules.mechanics.drowningTicksPerDamage =
@@ -161,6 +196,10 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
             whole(*table, "daylight-nighttime-ticks", rules.mechanics.daylightNighttimeTicks, 1);
         rules.mechanics.mobLastHurtByPlayerTime =
             whole(*table, "mob-last-hurt-by-player-time", rules.mechanics.mobLastHurtByPlayerTime, 0);
+        rules.mechanics.entitiesCanUsePortals =
+            flag(*table, "entities-can-use-portals", rules.mechanics.entitiesCanUsePortals);
+        rules.mechanics.boatEjectPlayersOnLand =
+            flag(*table, "boat-eject-players-on-land", rules.mechanics.boatEjectPlayersOnLand);
     }
     if (const TomlTable* table = gameplay->table("player"); table != nullptr) {
         rules.player.criticalDamageMultiplier =
@@ -199,6 +238,10 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
         rules.items.minecartPlaceAnywhere = flag(*table, "minecart-place-anywhere", rules.items.minecartPlaceAnywhere);
         rules.items.poweredRailBoostModifier =
             decimal(*table, "powered-rail-boost-modifier", rules.items.poweredRailBoostModifier, 0);
+        rules.items.tridentLoyaltyVoidReturnHeight =
+            decimal(*table, "trident-loyalty-void-return-height", rules.items.tridentLoyaltyVoidReturnHeight, -1000000);
+        rules.items.shulkerBoxDropContentsWhenDestroyed =
+            flag(*table, "shulker-box-drop-contents-when-destroyed", rules.items.shulkerBoxDropContentsWhenDestroyed);
     }
     return rules;
 }

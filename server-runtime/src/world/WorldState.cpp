@@ -5,8 +5,8 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/config/WorldRules.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/plugins/HookEvents.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
@@ -43,8 +43,8 @@ const config::WorldRules& WorldState::rules() const noexcept {
 using server::world::Chunk;
 using server::world::ChunkScheduledTick;
 
-const config::GameplayRules& WorldState::gameplay() const noexcept {
-    static const config::GameplayRules kVanilla;
+const config::PurpurRules& WorldState::gameplay() const noexcept {
+    static const config::PurpurRules kVanilla;
     return gameplay_ != nullptr ? *gameplay_ : kVanilla;
 }
 

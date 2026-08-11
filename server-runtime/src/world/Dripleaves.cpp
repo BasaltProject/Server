@@ -1,5 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -26,7 +26,7 @@ namespace {
 
 /// parity: `DELAY_UNTIL_NEXT_TILT_STATE`, with `none` booking nothing.
 [[nodiscard]] std::int32_t delayFor(const WorldState& world, std::string_view tilt) {
-    const config::GameplayRules::Blocks& rules = world.gameplay().blocks;
+    const config::PurpurRules::Blocks& rules = world.gameplay().blocks;
     if (tilt == "unstable") {
         return rules.bigDripleafTiltDelayUnstable;
     }

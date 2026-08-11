@@ -17,7 +17,7 @@
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBeehives.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
@@ -223,7 +223,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             const auto charge = properties.find("charges");
             if (here != nullptr && charge != properties.end() && charge->second != "0" &&
                 here->declaration().dimension != config::WorldDimension::Nether) {
-                const config::GameplayRules::Blocks& rules = here->state().gameplay().blocks;
+                const config::PurpurRules::Blocks& rules = here->state().gameplay().blocks;
                 if (rules.respawnAnchorExplode) {
                     const std::int32_t air = server::registry::blocks::air().stateId;
                     static_cast<void>(here->state().setBlockState(hit.pos.x, hit.pos.y, hit.pos.z, air));

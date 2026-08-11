@@ -8,7 +8,7 @@
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
@@ -228,7 +228,7 @@ void CombatSystem::hitCrystal(world::LoadedWorld& world, const std::vector<Playe
         return;
     }
     if (hit == world::endCrystals::Hit::Explodes) {
-        const config::GameplayRules::Blocks& rules = world.state().gameplay().blocks;
+        const config::PurpurRules::Blocks& rules = world.state().gameplay().blocks;
         const bool based = world::endCrystals::showsBottom(crystal);
         if (based ? rules.endCrystalBaseExplode : rules.endCrystalBaselessExplode) {
             explosions_.blowUp(world, watchers, crystal.x, crystal.y, crystal.z,

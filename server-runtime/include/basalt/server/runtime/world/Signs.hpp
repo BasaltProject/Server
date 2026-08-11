@@ -27,6 +27,10 @@ inline constexpr std::size_t kMaxLineLength = 384;
 [[nodiscard]] wire::nbt::NbtCompound withText(const wire::nbt::NbtCompound& data, bool isFront,
                                               const std::vector<std::string>& lines);
 
+/// The same with lines that may carry `&` colour codes, which turn them into styled text.
+[[nodiscard]] wire::nbt::NbtCompound withColouredText(const wire::nbt::NbtCompound& data, bool isFront,
+                                                      const std::vector<std::string>& lines);
+
 /// What is stored is four json components; anything outside the protocol wants the words.
 [[nodiscard]] std::string plainText(const wire::nbt::NbtCompound& data, bool front);
 

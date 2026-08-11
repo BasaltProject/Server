@@ -1,5 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/world/Chunk.hpp>

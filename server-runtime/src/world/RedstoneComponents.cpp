@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
@@ -765,6 +766,17 @@ void watchFor(WorldState& world, std::int32_t changedX, std::int32_t changedY, s
         // parity: `ObserverBlock.updateShape` only books a turn while the observer is off.
         if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
             continue;
+        }
+        // Purpur's observer clocks: two observers watching each other no longer set one another off.
+        if (world.gameplay().blocks.observerDisableClock) {
+            const std::optional<std::int32_t> changed = world.blockState(changedX, changedY, changedZ);
+            if (changed.has_value() && pathOf(*changed) == "observer") {
+                const std::optional<BlockFace> theirs =
+                    faceNamed(valueOf(registry::blockStateDefinitions::propertiesOf(*changed), "facing"));
+                if (theirs.has_value() && registry::opposite(*theirs) == *watching) {
+                    continue;
+                }
+            }
         }
         world.scheduleBlockTick(x, y, z, observer(), kObserverDelay);
     }

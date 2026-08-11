@@ -6,7 +6,7 @@
 
 namespace basalt::server::runtime::config {
 
-struct GameplayRules {
+struct PurpurRules {
     struct Blocks {
         std::int32_t waterInfiniteRequiredSources = 2;
         std::int32_t lavaInfiniteRequiredSources = -1;
@@ -64,6 +64,21 @@ struct GameplayRules {
         bool cactusAffectedByBonemeal = false;
         bool sugarCaneAffectedByBonemeal = false;
         bool netherWartAffectedByBonemeal = false;
+        std::int32_t farmlandMobGriefingOverride = 0;
+        std::int32_t fireballsMobGriefingOverride = 0;
+        bool observerDisableClock = false;
+        std::int32_t endCrystalCrammingAmount = 0;
+        bool bedExplodeOnVillagerSleep = false;
+        bool slabBreakIndividualSlabsWhenSneaking = false;
+        bool silkTouchSpawnerEnabled = false;
+        std::int32_t silkTouchMinimalLevel = 1;
+        bool hoeReplantCrops = false;
+        bool hoeReplantNetherWarts = false;
+        bool signAllowColors = false;
+        bool anvilAllowColors = false;
+        bool anvilUseMiniMessage = false;
+        float turtleEggHatchChance = 0.002F;
+        std::int32_t turtleEggMobGriefingOverride = 0;
         friend bool operator==(const Blocks&, const Blocks&) = default;
     };
 
@@ -85,6 +100,8 @@ struct GameplayRules {
         std::int32_t daylightDaytimeTicks = 12000;
         std::int32_t daylightNighttimeTicks = 12000;
         std::int32_t mobLastHurtByPlayerTime = 100;
+        bool entitiesCanUsePortals = true;
+        bool boatEjectPlayersOnLand = false;
         friend bool operator==(const Mechanics&, const Mechanics&) = default;
     };
 
@@ -115,6 +132,8 @@ struct GameplayRules {
         float minecartMaxSpeed = 0.4F;
         bool minecartPlaceAnywhere = false;
         float poweredRailBoostModifier = 0.06F;
+        float tridentLoyaltyVoidReturnHeight = 0.0F;
+        bool shulkerBoxDropContentsWhenDestroyed = true;
         friend bool operator==(const Items&, const Items&) = default;
     };
 
@@ -123,10 +142,14 @@ struct GameplayRules {
     Player player;
     Items items;
 
-    [[nodiscard]] static GameplayRules from(const wire::common::toml::TomlTable* gameplay,
-                                            const GameplayRules& inherited);
+    /// A tri-state override: 0 follows the game rule, 1 forces it on, 2 forces it off.
+    [[nodiscard]] static bool resolve(std::int32_t forced, bool rule) noexcept {
+        return forced == 0 ? rule : forced == 1;
+    }
 
-    friend bool operator==(const GameplayRules&, const GameplayRules&) = default;
+    [[nodiscard]] static PurpurRules from(const wire::common::toml::TomlTable* gameplay, const PurpurRules& inherited);
+
+    friend bool operator==(const PurpurRules&, const PurpurRules&) = default;
 };
 
 } // namespace basalt::server::runtime::config

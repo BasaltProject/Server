@@ -247,6 +247,8 @@ bool WorldState::shiftItem(std::int32_t entityId, double dx, double dy, double d
     return itemPhysics_.shiftItem(entityId, dx, dy, dz);
 }
 
+std::vector<DroppedItem> WorldState::takeDestroyedItems() { return itemPhysics_.takeDestroyed(); }
+
 bool WorldState::hurtItem(const std::int32_t entityId, const std::int32_t amount) {
     return itemPhysics_.hurtItem(entityId, amount);
 }

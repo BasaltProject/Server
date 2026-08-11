@@ -7,7 +7,7 @@
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/PurpurRules.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
@@ -138,7 +138,7 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
             return;
         }
     }
-    const config::GameplayRules& rules = world.state().gameplay();
+    const config::PurpurRules& rules = world.state().gameplay();
     if (!rules.player.canSkipNight) {
         return;
     }
@@ -350,6 +350,9 @@ constexpr std::int32_t kEntityPortalCooldown = 300;
 } // namespace
 
 void EnvironmentTickSystem::tickEntityPortals(world::LoadedWorld& world) {
+    if (!world.state().gameplay().mechanics.entitiesCanUsePortals) {
+        return;
+    }
     world::LoadedWorld* target = nullptr;
     for (entity::ServerEntity* mob : world.state().entities()) {
         std::optional<PortalAxis> axis;

@@ -58,6 +58,21 @@
 # cactus-affected-by-bonemeal = false
 # sugar-cane-affected-by-bonemeal = false
 # nether-wart-affected-by-bonemeal = false
+# farmland-mob-griefing-override = "default"
+# fireballs-mob-griefing-override = "default"
+# observer-disable-clock = false
+# end-crystal-cramming-amount = 0
+# bed-explode-on-villager-sleep = false
+# slab-break-individual-slabs-when-sneaking = false
+# silk-touch-spawner-enabled = false
+# silk-touch-minimal-level = 1
+# hoe-replant-crops = false
+# hoe-replant-nether-warts = false
+# sign-allow-colors = false
+# anvil-allow-colors = false
+# anvil-use-mini-message = false
+# turtle-egg-hatch-chance = 0.002
+# turtle-egg-mob-griefing-override = "default"
 
 # [gameplay.mechanics]
 # drowning-ticks-per-damage = 20
@@ -77,6 +92,8 @@
 # daylight-daytime-ticks = 12000
 # daylight-nighttime-ticks = 12000
 # mob-last-hurt-by-player-time = 100
+# entities-can-use-portals = true
+# boat-eject-players-on-land = false
 
 # [gameplay.player]
 # critical-damage-multiplier = 1.5
@@ -103,3 +120,5 @@
 # minecart-max-speed = 0.4
 # minecart-place-anywhere = false
 # powered-rail-boost-modifier = 0.06
+# trident-loyalty-void-return-height = 0.0
+# shulker-box-drop-contents-when-destroyed = true
