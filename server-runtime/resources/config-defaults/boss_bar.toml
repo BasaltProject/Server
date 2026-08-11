@@ -36,3 +36,12 @@ progress = "1.0"
 # color = "yellow"
 # overlay = "progress"
 # progress = "%basalt_server_online%"
+
+# A tick-rate gauge, in the spirit of Purpur's /tpsbar: a bar over the game that shows how the server is keeping up.
+# Uncomment it and set `enabled = true` above. The bar stays full and the coloured figure carries the reading.
+# [profiles.tps]
+# priority = 20
+# text = "<gray>TPS</gray> %basalt_server_tps_1_colored%"
+# color = "green"
+# overlay = "notched_20"
+# progress = "1.0"

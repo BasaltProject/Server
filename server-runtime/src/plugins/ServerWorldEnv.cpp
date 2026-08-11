@@ -381,7 +381,7 @@ bool ServerWorldEnv::breakBlock(const std::int32_t x, const std::int32_t y, cons
 
 bool ServerWorldEnv::boneMeal(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
     const std::optional<std::int32_t> existing = world_->state().blockState(x, y, z);
-    if (!existing.has_value() || !world::boneMeal::grows(*existing)) {
+    if (!existing.has_value() || !world::boneMeal::grows(world_->state(), *existing)) {
         return false;
     }
     random::RandomSource random = random::RandomSource::legacy(world_->gameTime() ^ (x * 31 + z));

@@ -272,7 +272,8 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
     // monster after whoever swung, the other sends an animal running.
     target->hurtBy = session->entityId();
-    entity::entityCombat::rememberPlayer(*target, session->uuid());
+    entity::entityCombat::rememberPlayer(*target, session->uuid(),
+                                         world->state().gameplay().mechanics.mobLastHurtByPlayerTime);
     // parity: `Warden.hurtServer`.
     if (entity::wardens::isWarden(target->type())) {
         entity::wardens::anger(*target, session->entityId(), entity::wardens::kHurt);

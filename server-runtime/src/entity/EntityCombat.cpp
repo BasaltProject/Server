@@ -260,9 +260,9 @@ std::string deathSound(const ServerEntity& entity) {
                                          : deathSound(entity.type());
 }
 
-void rememberPlayer(ServerEntity& entity, const wire::common::Uuid& player) {
+void rememberPlayer(ServerEntity& entity, const wire::common::Uuid& player, const std::int32_t ticks) {
     entity.lastHurtByPlayer = player;
-    entity.lastHurtByPlayerTime = kPlayerHitMemoryTicks;
+    entity.lastHurtByPlayerTime = ticks;
 }
 
 void tick(ServerEntity& entity) {

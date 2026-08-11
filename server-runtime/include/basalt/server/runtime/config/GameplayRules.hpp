@@ -61,6 +61,9 @@ struct GameplayRules {
         bool soulSandReverseBubbleColumnFlow = false;
         bool anvilCumulativeCost = true;
         std::int32_t beehiveMaxBeesInside = 3;
+        bool cactusAffectedByBonemeal = false;
+        bool sugarCaneAffectedByBonemeal = false;
+        bool netherWartAffectedByBonemeal = false;
         friend bool operator==(const Blocks&, const Blocks&) = default;
     };
 
@@ -81,6 +84,7 @@ struct GameplayRules {
         bool thunderStopsAfterSleep = true;
         std::int32_t daylightDaytimeTicks = 12000;
         std::int32_t daylightNighttimeTicks = 12000;
+        std::int32_t mobLastHurtByPlayerTime = 100;
         friend bool operator==(const Mechanics&, const Mechanics&) = default;
     };
 

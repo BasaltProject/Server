@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/sched/OnOwner.hpp>
+#include <basalt/server/runtime/world/AntiXray.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
@@ -71,8 +72,16 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       biomeZoomSeed_(obfuscateBiomeSeed(metadata_.seed)), biomeZoomer_(biomeZoomSeed_), gameTime_(metadata_.gameTime),
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
       hardcore_(metadata_.hardcore.value_or(settings_.hardcore)), defaultGamemode_(metadata_.defaultGamemode) {
+    tunables_.simulationDistance = settings_.simulationDistance;
     tunables_.lootRefill = settings_.lootRefill;
     tunables_.lootRelootSeconds = settings_.lootRelootSeconds;
+    state_.setMobSettings(&settings_.mobs);
+    state_.setRules(&settings_.rules);
+    if (settings_.rules.antiXray.enabled) {
+        antiXray_ = std::make_shared<const AntiXray>(settings_.rules.antiXray, declaration_.dimension);
+    }
+    tunables_.simulationDistance = settings_.rules.simulationDistance;
+    tunables_.voidDamage = settings_.rules.environment.voidDamage;
     if (hardcore_) {
         difficulty_ = "hard";
     }
@@ -264,8 +273,17 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
             metadata_.dragonFight.has_value() ? DragonFight::decode(*metadata_.dragonFight) : DragonFight{});
         dragonFight_->shuffleGateways(metadata_.seed);
     }
+    border_.absoluteMaxSize = settings_.rules.maxWorldSize;
     if (metadata_.worldBorder.has_value()) {
         border_.restore(*metadata_.worldBorder);
+    } else {
+        const config::BorderRules& start = settings_.rules.border;
+        border_.center(start.centerX, start.centerZ);
+        border_.setSize(start.size);
+        border_.damagePerBlock = start.damagePerBlock;
+        border_.damageBuffer = start.damageBuffer;
+        border_.warningBlocks = start.warningDistance;
+        border_.warningSeconds = start.warningSeconds;
     }
     weather_.raining = metadata_.raining;
     weather_.rainTime = metadata_.rainTime;

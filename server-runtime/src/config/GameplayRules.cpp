@@ -121,6 +121,12 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
         rules.blocks.anvilCumulativeCost = flag(*table, "anvil-cumulative-cost", rules.blocks.anvilCumulativeCost);
         rules.blocks.beehiveMaxBeesInside =
             whole(*table, "beehive-max-bees-inside", rules.blocks.beehiveMaxBeesInside, 1);
+        rules.blocks.cactusAffectedByBonemeal =
+            flag(*table, "cactus-affected-by-bonemeal", rules.blocks.cactusAffectedByBonemeal);
+        rules.blocks.sugarCaneAffectedByBonemeal =
+            flag(*table, "sugar-cane-affected-by-bonemeal", rules.blocks.sugarCaneAffectedByBonemeal);
+        rules.blocks.netherWartAffectedByBonemeal =
+            flag(*table, "nether-wart-affected-by-bonemeal", rules.blocks.netherWartAffectedByBonemeal);
     }
     if (const TomlTable* table = gameplay->table("mechanics"); table != nullptr) {
         rules.mechanics.drowningTicksPerDamage =
@@ -153,6 +159,8 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
             whole(*table, "daylight-daytime-ticks", rules.mechanics.daylightDaytimeTicks, 1);
         rules.mechanics.daylightNighttimeTicks =
             whole(*table, "daylight-nighttime-ticks", rules.mechanics.daylightNighttimeTicks, 1);
+        rules.mechanics.mobLastHurtByPlayerTime =
+            whole(*table, "mob-last-hurt-by-player-time", rules.mechanics.mobLastHurtByPlayerTime, 0);
     }
     if (const TomlTable* table = gameplay->table("player"); table != nullptr) {
         rules.player.criticalDamageMultiplier =

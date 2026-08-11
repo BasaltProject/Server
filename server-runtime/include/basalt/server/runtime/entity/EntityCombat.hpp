@@ -69,7 +69,7 @@ void knockback(ServerEntity& entity, double power, double towardsX, double towar
 /// parity: `LivingEntity.resolvePlayerResponsibleForDamage`.
 inline constexpr std::int32_t kPlayerHitMemoryTicks = 100;
 
-void rememberPlayer(ServerEntity& entity, const wire::common::Uuid& player);
+void rememberPlayer(ServerEntity& entity, const wire::common::Uuid& player, std::int32_t ticks = kPlayerHitMemoryTicks);
 
 void tick(ServerEntity& entity);
 

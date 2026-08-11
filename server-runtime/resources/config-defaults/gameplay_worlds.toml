@@ -109,6 +109,12 @@ soul-sand-reverse-bubble-column-flow = false
 anvil-cumulative-cost = true
 # Bees a hive can hold (vanilla 3). A hive with its own MaxBees keeps that.
 beehive-max-bees-inside = 3
+# NOT VANILLA when true. Bone meal grows a cactus one block taller, up to three.
+cactus-affected-by-bonemeal = false
+# NOT VANILLA when true. Bone meal grows sugar cane one block taller, up to three.
+sugar-cane-affected-by-bonemeal = false
+# NOT VANILLA when true. Bone meal ages nether wart by one stage.
+nether-wart-affected-by-bonemeal = false
 
 [defaults.gameplay.mechanics]
 # Rules of the world that are not one block or item.
@@ -144,6 +150,8 @@ thunder-stops-after-sleep = true
 daylight-daytime-ticks = 12000
 # Ticks the dark half of the day lasts (vanilla 12000). NOT VANILLA if changed.
 daylight-nighttime-ticks = 12000
+# Ticks after a player hit a mob during which its death counts as a player kill for drops and experience (vanilla 100). Melee only.
+mob-last-hurt-by-player-time = 100
 
 [defaults.gameplay.player]
 # Player rules.

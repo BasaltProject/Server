@@ -949,7 +949,8 @@ void BasaltServer::startBedrockListener() {
                 }
                 // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
                 target->hurtBy = session->entityId();
-                entity::entityCombat::rememberPlayer(*target, session->uuid());
+                entity::entityCombat::rememberPlayer(*target, session->uuid(),
+                                                     world.state().gameplay().mechanics.mobLastHurtByPlayerTime);
                 // parity: `itemAttackInteraction`.
                 player::pvp::itemAttackInteraction(melee, world, *session, nullptr, target, held,
                                                    player::PlayerInventory::kHotbarStart +

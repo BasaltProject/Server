@@ -55,6 +55,9 @@
 # soul-sand-reverse-bubble-column-flow = false
 # anvil-cumulative-cost = true
 # beehive-max-bees-inside = 3
+# cactus-affected-by-bonemeal = false
+# sugar-cane-affected-by-bonemeal = false
+# nether-wart-affected-by-bonemeal = false
 
 # [gameplay.mechanics]
 # drowning-ticks-per-damage = 20
@@ -73,6 +76,7 @@
 # thunder-stops-after-sleep = true
 # daylight-daytime-ticks = 12000
 # daylight-nighttime-ticks = 12000
+# mob-last-hurt-by-player-time = 100
 
 # [gameplay.player]
 # critical-damage-multiplier = 1.5

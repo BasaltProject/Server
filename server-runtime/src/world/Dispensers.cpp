@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -617,7 +618,7 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
     // parity: `DispenseItemBehavior`'s bone meal entry.
     if (stack.item == boneMealItem()) {
         const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
-        if (!target.has_value() || !boneMeal::grows(*target)) {
+        if (!target.has_value() || !boneMeal::grows(context.world, *target)) {
             return Special{.refused = true};
         }
         std::optional<BlockChange> grown = boneMeal::apply(context.world, tx, ty, tz, context.random);

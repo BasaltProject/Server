@@ -1,4 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 
 #include <algorithm>
@@ -44,7 +46,25 @@ constexpr std::string_view kShelfMushroom = "shelf_mushroom";
     return definition == nullptr ? 0 : static_cast<std::int32_t>(definition->valuesOf("age").size()) - 1;
 }
 
+[[nodiscard]] bool ruleAllows(const WorldState& world, const std::string& path) {
+    const config::GameplayRules::Blocks& rules = world.gameplay().blocks;
+    return (path == "cactus" && rules.cactusAffectedByBonemeal) ||
+           (path == "sugar_cane" && rules.sugarCaneAffectedByBonemeal) ||
+           (path == "nether_wart" && rules.netherWartAffectedByBonemeal);
+}
+
 } // namespace
+
+bool grows(const WorldState& world, const std::int32_t stateId) {
+    if (grows(stateId)) {
+        return true;
+    }
+    const std::string path = pathOf(stateId);
+    if (!ruleAllows(world, path)) {
+        return false;
+    }
+    return path == "nether_wart" ? ageOf(stateId).value_or(3) < 3 : true;
+}
 
 bool grows(const std::int32_t stateId) {
     const std::string path = pathOf(stateId);
@@ -64,8 +84,25 @@ bool grows(const std::int32_t stateId) {
 std::optional<BlockChange> apply(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                                  random::RandomSource& random) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (!stateId.has_value() || !grows(*stateId)) {
+    if (!stateId.has_value() || !grows(world, *stateId)) {
         return std::nullopt;
+    }
+    if (const std::string path = pathOf(*stateId); path == "cactus" || path == "sugar_cane") {
+        // parity: Purpur's bone meal reaches the top of the column and adds one block, up to three tall.
+        std::int32_t top = y;
+        while (pathOf(world.blockState(x, top + 1, z).value_or(0)) == path) {
+            ++top;
+        }
+        std::int32_t bottom = y;
+        while (pathOf(world.blockState(x, bottom - 1, z).value_or(0)) == path) {
+            --bottom;
+        }
+        const std::optional<std::int32_t> above = world.blockState(x, top + 1, z);
+        if (top - bottom + 1 >= 3 || !above.has_value() || *above != registry::blocks::air().stateId ||
+            !world.setBlockState(x, top + 1, z, *stateId)) {
+            return std::nullopt;
+        }
+        return BlockChange{.x = x, .y = top + 1, .z = z, .stateId = *stateId};
     }
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     const std::optional<std::int32_t> age = ageOf(*stateId);
@@ -74,7 +111,7 @@ std::optional<BlockChange> apply(WorldState& world, const std::int32_t x, const 
     }
     // parity: `ShelfMushroomBlock.performBonemeal` always succeeds and grows one age.
     const std::int32_t grown =
-        block->path() == kShelfMushroom
+        block->path() == kShelfMushroom || block->path() == "nether_wart"
             ? *age + 1
             : std::min(maxAgeOf(*block), *age + random.nextIntBetweenInclusive(kLeastAges, kMostAges));
     const std::optional<std::int32_t> turned =
