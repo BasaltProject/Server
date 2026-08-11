@@ -24,11 +24,10 @@ import kotlin.math.abs
  *
  * // parity, narrowed: vanilla caches the assembled pieces in the placement chunk's saved data.
  * Chunks here are stateless, so [generateInto] recomputes the [JigsawAssembly] per nearby candidate
- * and keeps what lands in this one; [assemblyCache] makes that affordable, one measuring ~735ms.
+ * and keeps what lands here; [assemblyCache] makes that affordable, one measuring ~735ms.
  *
- * Starts are rebuilt with the same independent Legacy structure seed as vanilla. During step four
- * placement, each village variant owns its dynamic-registry index and every referenced start and
- * piece consumes one shared xoroshiro decoration stream.
+ * Starts are rebuilt with vanilla's independent Legacy structure seed. In step four each variant
+ * owns its dynamic-registry index, and every start and piece draws one shared xoroshiro stream.
  */
 public class VillageStructureGenerator(
     private val router: OverworldNoiseRouter,
@@ -239,10 +238,10 @@ public class VillageStructureGenerator(
     }
 
     /**
-     * Scans a [DensityChunkSampler] rather than calling `finalDensity.compute` per `y`, which is
-     * the per-block evaluation [DensityChunkSampler]'s own KDoc rules out, and which hung the
-     * generator here. The chunk's heightmap is not an option: the column is often outside the
-     * chunk being generated.
+     * Scans a [DensityChunkSampler] rather than calling `finalDensity.compute` without a chunk
+     * cache. The sampler supplies exact marker-scoped interpolation and reuses every noise-cell
+     * corner; the uncached graph made repeated jigsaw height queries prohibitively expensive. The
+     * chunk's heightmap is not an option because the column is often outside the generated chunk.
      *
      * [samplerCache] keeps one sampler per chunk across calls: the Plains pools have 36
      * `terrain_matching` entries, each asking once per attempted connection, not once per

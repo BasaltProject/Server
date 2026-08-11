@@ -26,15 +26,14 @@ public class ChunkNbtException(
 
 /**
  * // parity: net.minecraft.world.level.chunk.storage.SerializableChunkData, the on-disk chunk NBT.
- * Sections carry the same palette-plus-optional-`data`-longs shape as the wire format, NBT-framed
- * rather than varint-framed, with no explicit bits-per-entry: both sides recompute it from the
- * palette size (`Strategy.getConfigurationForPaletteSize`), blocks single-value / 4-8 bit indirect
- * / direct, biomes single-value / 1-3 bit / direct.
+ * Sections carry the wire format's palette-plus-optional-`data`-longs shape, NBT-framed, with no
+ * explicit bits-per-entry: both sides recompute it from the palette size
+ * (`Strategy.getConfigurationForPaletteSize`), blocks 4-8 bit indirect, biomes 1-3.
  *
  * Block states keep their `Properties` compound and resolve back to the same network state ID,
  * block entities keep their custom NBT, and ticks keep the SavedTick shape and insertion order.
- * Worldgen entity descriptors use a Basalt-owned list until the server grows vanilla's separate
- * entity-region storage. Light data, heightmaps and structures remain out of scope.
+ * Worldgen entities use a Basalt-owned list until vanilla's separate entity-region storage exists.
+ * Light data, heightmaps and structures stay out of scope.
  */
 public object ChunkNbt {
     // world_version for Minecraft 26.2, per the project's own protocol constants.

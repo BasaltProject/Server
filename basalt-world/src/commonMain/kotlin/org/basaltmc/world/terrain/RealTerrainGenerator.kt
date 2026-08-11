@@ -10,7 +10,9 @@ import org.basaltmc.world.GenerationMetrics
 import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.Marker
+import org.basaltmc.world.terrain.carver.OverworldCarvers
 import org.basaltmc.world.terrain.decoration.BiomeDecoration
+import org.basaltmc.world.terrain.decoration.OverworldOreDecoration
 import org.basaltmc.world.terrain.decoration.SurfaceFreezingDecoration
 import org.basaltmc.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.world.terrain.surface.SurfaceRuleData
@@ -24,12 +26,11 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * Build the router once per world: it is dozens of nested nodes. [environment] gets the chunk's
  * heightmap so surface rules read an array instead of re-sampling density, 80x fewer evaluations.
  *
- * Gaps: no caves, aquifers or ore veins; decoration only for the biomes ported so far.
+ * Gap: decoration only for the biomes ported so far.
  */
 public object RealTerrainGenerator {
     private const val CELL_WIDTH = 4
     private const val CELL_HEIGHT = 8
-    private const val SEA_LEVEL = 63
 
     public fun generate(
         router: OverworldNoiseRouter,
@@ -54,6 +55,8 @@ public object RealTerrainGenerator {
                 CELL_HEIGHT,
                 cache,
             )
+        val aquifer = OverworldAquifer(router, seed, chunkX, chunkZ, WorldHeight.MIN_Y, WorldHeight.HEIGHT, cache)
+        val oreVeins = OverworldOreVeinifier(router, seed, cache)
         GenerationMetrics.measure(GenerationMetrics.Phase.DENSITY_GRID) { sampler.prepare() }
         GenerationMetrics.measure(GenerationMetrics.Phase.TERRAIN_FILL) {
             // Cell by cell rather than column by column, so a cell of open sky (all eight corners
@@ -69,14 +72,24 @@ public object RealTerrainGenerator {
                         for (y in cellMinY..cellMaxY) {
                             for (z in cellZ * CELL_WIDTH until (cellZ + 1) * CELL_WIDTH) {
                                 for (x in cellX * CELL_WIDTH until (cellX + 1) * CELL_WIDTH) {
-                                    if (sampler.sample(x, y, z) > 0.0) {
-                                        chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
-                                    } else if (y < SEA_LEVEL) {
-                                        // parity: NoiseGeneratorSettings' global Overworld
-                                        // FluidPicker. Full aquifers are still absent, but outside
-                                        // caves their fallback is exactly water below sea level and
-                                        // air at or above it.
-                                        chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
+                                    val density = sampler.sample(x, y, z)
+                                    val material =
+                                        aquifer.computeSubstance(
+                                            chunkX * 16 + x,
+                                            y,
+                                            chunkZ * 16 + z,
+                                            density,
+                                        )
+                                    if (material == null) {
+                                        chunk.setBlockStateId(
+                                            x,
+                                            y,
+                                            z,
+                                            oreVeins.compute(chunkX * 16 + x, y, chunkZ * 16 + z)?.stateId
+                                                ?: Blocks.STONE.stateId,
+                                        )
+                                    } else if (material != Blocks.AIR) {
+                                        chunk.setBlockStateId(x, y, z, material.stateId)
                                     }
                                 }
                             }
@@ -87,17 +100,22 @@ public object RealTerrainGenerator {
         }
         val heightmap = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
         val chunkEnvironment = ChunkScopedSurfaceEnvironment(environment, heightmap, cache)
+        val surfaceRule = SurfaceRuleData.overworld()
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_RULES) {
             SurfaceBuilder.buildSurface(
                 chunk,
                 chunkEnvironment,
-                SurfaceRuleData.overworld(),
+                surfaceRule,
             )
+        }
+        GenerationMetrics.measure(GenerationMetrics.Phase.CARVERS) {
+            OverworldCarvers.carve(chunk, seed, aquifer, chunkEnvironment, surfaceRule)
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) {
             villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.DECORATION) {
+            OverworldOreDecoration.decorate(chunk, seed, chunkEnvironment)
             val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
             decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
             val centerY = heightmap[8 + 8 * 16]

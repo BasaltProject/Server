@@ -2,6 +2,7 @@ package org.basaltmc.world.terrain.surface
 
 import org.basaltmc.registry.Blocks
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.terrain.BiomeTemperature
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -18,6 +19,28 @@ import kotlin.math.ceil
  * earlier column iteration already replaced) with whatever the rule tree returns, if anything.
  */
 public object SurfaceBuilder {
+    /**
+     * // parity: `SurfaceSystem.topMaterial`, used by carvers to repair dirt immediately below a
+     * grass or mycelium surface they opened. Vanilla evaluates the normal surface rule with both
+     * stone depths fixed to one and only exposes the carved fluid as the synthetic water height.
+     */
+    public fun topMaterial(
+        environment: SurfaceRuleEnvironment,
+        ruleSource: RuleSource,
+        x: Int,
+        y: Int,
+        z: Int,
+        underFluid: Boolean,
+        generationMinY: Int = WorldHeight.MIN_Y,
+        generationHeight: Int = WorldHeight.HEIGHT,
+    ): Int? {
+        val context = SurfaceRuleContext(environment, WorldGenerationContext(generationMinY, generationHeight))
+        val rule = ruleSource.apply(context)
+        context.updateXZ(x, z)
+        context.updateY(1, 1, if (underFluid) y + 1 else Int.MIN_VALUE, y)
+        return rule.tryApply(x, y, z)
+    }
+
     public fun buildSurface(
         chunk: Chunk,
         environment: SurfaceRuleEnvironment,

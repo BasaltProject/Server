@@ -117,17 +117,19 @@ class GenerationCostTest {
         val report = GenerationMetrics.report()
         println(report)
 
-        // fillBiomes alone walks every quart cell of the column: 96 vertical quarts times 4x4.
+        // fillBiomes walks 96 vertical quarts times 4x4. Ore biome filters sample 48 additional
+        // quart positions for this fixture; ChunkScopedSurfaceEnvironment deduplicates the rest.
         assertTrue(
-            "Biome lookups            1536" in report,
-            "expected 1536 biome lookups per chunk, got:\n$report",
+            "Biome lookups            1584" in report,
+            "expected 1584 biome lookups per chunk, got:\n$report",
         )
-        // A ceiling, not a target: this was 105786 before Marker honored FLAT_CACHE/CACHE_2D, and
-        // regressing past it means a cache stopped being reached, not that generation got slower.
+        // A ceiling, not a target: the complete cave graph evaluates many more independent noise
+        // nodes than the old cave-free router. This is still far below the 105786 measured before
+        // Marker honored FLAT_CACHE/CACHE_2D; regressing past it means a cache stopped being reached.
         val noiseEvaluations = valueAfter(report, "NormalNoise evaluations")
         assertTrue(
-            noiseEvaluations in 1..8000,
-            "expected the flat caches to hold noise evaluations well under 8000, got $noiseEvaluations:\n$report",
+            noiseEvaluations in 1..35_000,
+            "expected the marker caches to hold cave-router noise evaluations below 35000, got $noiseEvaluations:\n$report",
         )
     }
 
