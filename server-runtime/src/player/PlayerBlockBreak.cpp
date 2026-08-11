@@ -237,10 +237,13 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
         if (((nether && rules.hoeReplantNetherWarts) || (field && rules.hoeReplantCrops)) && definition != nullptr &&
             age != properties.end() &&
             std::stoi(age->second) == static_cast<std::int32_t>(definition->valuesOf("age").size()) - 1) {
-            const auto seed = std::ranges::find_if(generated, [&block](const server::world::loot::ItemStack& stack) {
-                return stack.count > 0 && (stack.item == block || stack.item.path().ends_with("_seeds") ||
-                                           (stack.item.path() == "carrot" && block.path() == "carrots") ||
-                                           (stack.item.path() == "potato" && block.path() == "potatoes"));
+            const std::string_view seedItem = crop == "wheat"       ? "wheat_seeds"
+                                              : crop == "beetroots" ? "beetroot_seeds"
+                                              : crop == "carrots"   ? "carrot"
+                                              : crop == "potatoes"  ? "potato"
+                                                                    : "nether_wart";
+            const auto seed = std::ranges::find_if(generated, [seedItem](const server::world::loot::ItemStack& stack) {
+                return stack.count > 0 && stack.item.path() == seedItem;
             });
             const std::optional<std::int32_t> young =
                 reg::blockStateDefinitions::stateIdOf(block, {{"age", "0"}}, stateId);
