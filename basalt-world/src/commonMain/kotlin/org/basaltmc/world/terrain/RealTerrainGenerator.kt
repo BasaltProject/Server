@@ -24,8 +24,7 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * Build the router once per world: it is dozens of nested nodes. [environment] gets the chunk's
  * heightmap so surface rules read an array instead of re-sampling density, 80x fewer evaluations.
  *
- * Gaps: no caves, aquifers or ore veins; decoration only for the biomes ported so far; villages
- * without terrain adaptation, block rotation or entities.
+ * Gaps: no caves, aquifers or ore veins; decoration only for the biomes ported so far.
  */
 public object RealTerrainGenerator {
     private const val CELL_WIDTH = 4
@@ -46,7 +45,7 @@ public object RealTerrainGenerator {
         val cache = DensityCache(chunkX, chunkZ, Marker.slotCount)
         val sampler =
             DensityChunkSampler(
-                router.finalDensity,
+                villageGenerator?.finalDensityForChunk(chunkX, chunkZ, seed) ?: router.finalDensity,
                 chunkX,
                 chunkZ,
                 WorldHeight.MIN_Y,
@@ -67,7 +66,6 @@ public object RealTerrainGenerator {
                 val cellMaxY = cellMinY + CELL_HEIGHT - 1
                 for (cellX in 0 until sampler.horizontalCells) {
                     for (cellZ in 0 until sampler.horizontalCells) {
-                        if (cellMinY >= SEA_LEVEL && sampler.cellIsAllNonPositive(cellX, cellY, cellZ)) continue
                         for (y in cellMinY..cellMaxY) {
                             for (z in cellZ * CELL_WIDTH until (cellZ + 1) * CELL_WIDTH) {
                                 for (x in cellX * CELL_WIDTH until (cellX + 1) * CELL_WIDTH) {

@@ -209,6 +209,48 @@ class BlocksTest {
         assertEquals("true", state.properties["west"])
     }
 
+    @Test
+    fun villagePaletteStatesCoverExactProcessorAndRotationVariants() {
+        assertEquals(
+            8319,
+            Blocks.stateIdOf(
+                Identifier.vanilla("glass_pane"),
+                linkedMapOf(
+                    "east" to "false",
+                    "north" to "true",
+                    "south" to "true",
+                    "waterlogged" to "false",
+                    "west" to "false",
+                ),
+            ),
+        )
+        assertEquals(
+            11858,
+            Blocks.stateIdOf(
+                Identifier.vanilla("brown_stained_glass_pane"),
+                linkedMapOf(
+                    "east" to "true",
+                    "north" to "false",
+                    "south" to "false",
+                    "waterlogged" to "false",
+                    "west" to "true",
+                ),
+            ),
+        )
+        assertEquals(
+            20884,
+            Blocks.stateIdOf(
+                Identifier.vanilla("campfire"),
+                linkedMapOf(
+                    "facing" to "north",
+                    "lit" to "false",
+                    "signal_fire" to "false",
+                    "waterlogged" to "false",
+                ),
+            ),
+        )
+    }
+
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 

@@ -1,6 +1,7 @@
 package org.basaltmc.world.terrain
 
 import org.basaltmc.world.densityfunction.DensityFunction
+import org.basaltmc.world.densityfunction.DensityFunctions
 import org.basaltmc.world.densityfunction.FunctionContext
 import org.basaltmc.world.densityfunction.YClampedGradient
 import kotlin.test.Test
@@ -70,9 +71,9 @@ class DensityChunkSamplerTest {
     }
 
     @Test
-    fun cachesTheGridAcrossRepeatedSamples() {
+    fun cachesInterpolationMarkerCornersAcrossRepeatedSamples() {
         var evaluations = 0
-        val density =
+        val raw =
             object : DensityFunction {
                 override fun compute(context: FunctionContext): Double {
                     evaluations++
@@ -83,6 +84,7 @@ class DensityChunkSamplerTest {
 
                 override fun maxValue(): Double = Double.POSITIVE_INFINITY
             }
+        val density = DensityFunctions.interpolated(raw)
         val sampler =
             DensityChunkSampler(
                 density,
@@ -94,13 +96,30 @@ class DensityChunkSamplerTest {
                 cellHeight = 8,
             )
 
-        sampler.sample(0, 0, 0)
+        sampler.sample(1, 1, 1)
         val afterFirst = evaluations
-        sampler.sample(5, 10, 3)
-        sampler.sample(15, 300, 15)
-        assertEquals(afterFirst, evaluations, "the grid should be computed once, not per sample() call")
-        // 5 x 49 x 5 grid points for a 16-wide/384-tall chunk at cellWidth=4/cellHeight=8.
-        assertEquals(5 * 49 * 5, afterFirst)
+        sampler.sample(2, 2, 2)
+        sampler.sample(3, 7, 3)
+        assertEquals(afterFirst, evaluations, "one cell's eight marker corners should be reused")
+        assertEquals(8, afterFirst)
+    }
+
+    @Test
+    fun appliesNonlinearNodesAfterMarkerInterpolation() {
+        val xAtCellScale =
+            object : DensityFunction {
+                override fun compute(context: FunctionContext): Double = context.blockX / 4.0
+
+                override fun minValue(): Double = Double.NEGATIVE_INFINITY
+
+                override fun maxValue(): Double = Double.POSITIVE_INFINITY
+            }
+        val density = DensityFunctions.square(DensityFunctions.interpolated(xAtCellScale))
+        val sampler = DensityChunkSampler(density, 0, 0, 0, 16, 4, 8)
+
+        // parity: interpolate raw 0..1 to 0.25, then square. Interpolating the already-squared
+        // final density would incorrectly produce 0.25 here.
+        assertEquals(0.0625, sampler.sample(1, 0, 0), 0.0)
     }
 
     @Test

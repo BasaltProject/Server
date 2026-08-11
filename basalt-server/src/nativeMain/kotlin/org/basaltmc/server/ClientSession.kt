@@ -89,6 +89,7 @@ import org.basaltmc.protocol.play.ServerboundUseItemOnPacket
 import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
 import org.basaltmc.protocol.play.SetEntityDataPacket
+import org.basaltmc.protocol.play.SetEquipmentPacket
 import org.basaltmc.protocol.play.SetExperiencePacket
 import org.basaltmc.protocol.play.SetHealthPacket
 import org.basaltmc.protocol.play.SetHeldSlotPacket
@@ -1385,7 +1386,7 @@ public class ClientSession(
         sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
     }
 
-    /** Spawns immutable End crystals, shulkers and Elytra frames emitted by loaded generated chunks. */
+    /** Spawns immutable entities emitted by loaded generated chunks and village templates. */
     private fun syncGeneratedEntities() {
         val session = playerSession ?: return
         val registry = playerRegistry ?: return
@@ -1417,6 +1418,22 @@ public class ClientSession(
                 val elytra = Items.REGISTRY.byIdentifier(Identifier.vanilla("elytra")) ?: continue
                 sendPlayPacket(SetEntityDataPacket.ID) {
                     SetEntityDataPacket.itemFrame(entity.entityId, WireItemStack(elytra.protocolId, 1)).write(it)
+                }
+            }
+            val metadata = generatedEntityMetadata(descriptor.type.path, descriptor.data)
+            if (metadata.isNotEmpty()) {
+                sendPlayPacket(SetEntityDataPacket.ID) {
+                    SetEntityDataPacket(entity.entityId, metadata).write(it)
+                }
+            }
+            val equipment =
+                generatedEntityEquipment(descriptor.data).mapNotNull { slot ->
+                    val item = Items.REGISTRY.byIdentifier(Identifier.parse(slot.item)) ?: return@mapNotNull null
+                    SetEquipmentPacket.Slot(slot.slot, WireItemStack(item.protocolId, slot.count))
+                }
+            if (equipment.isNotEmpty()) {
+                sendPlayPacket(SetEquipmentPacket.ID) {
+                    SetEquipmentPacket(entity.entityId, equipment).write(it)
                 }
             }
         }
@@ -2855,8 +2872,18 @@ public class ClientSession(
         val GENERATED_ENTITY_TYPE_IDS =
             mapOf(
                 "end_crystal" to 45,
+                "armor_stand" to 5,
+                "camel" to 19,
+                "cat" to 21,
+                "cow" to 30,
+                "horse" to 66,
+                "iron_golem" to 70,
                 "item_frame" to 73,
+                "pig" to 100,
+                "sheep" to 111,
                 "shulker" to 112,
+                "villager" to 140,
+                "zombie_villager" to 154,
             )
     }
 }

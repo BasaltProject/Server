@@ -9,8 +9,8 @@ import org.basaltmc.registry.Identifier
 /**
  * // parity: net.minecraft.world.level.levelgen.structure.templatesystem.RuleTest, narrowed to
  * the predicate kinds the real village processor lists actually use: `random_block_match` (a fixed
- * block, accepted with [probability] chance), `block_match`/`blockstate_match` (a fixed block,
- * always accepted; the state variant matches on the block alone, properties unmodeled) and
+ * block, accepted with [probability] chance), `block_match` (any state of a fixed block),
+ * `blockstate_match` (one exact property-bearing state) and
  * `tag_match` (any block of a named tag, e.g. zombie villages' `minecraft:doors` rule).
  * `minecraft:always_true` is the null/no-op predicate: this project represents it as `null` rather
  * than a dedicated object.
@@ -24,30 +24,45 @@ public sealed class StructureRuleTest {
     public class BlockMatch(
         public val blockStateId: Int,
     ) : StructureRuleTest() {
+        private val block = Blocks.byStateId(blockStateId)?.block
+
         override fun test(
             stateId: Int,
             random: WorldgenRandom,
-        ): Boolean = stateId == blockStateId
+        ): Boolean = block != null && Blocks.byStateId(stateId)?.block == block
     }
 
     public class RandomBlockMatch(
         public val blockStateId: Int,
         public val probability: Float,
     ) : StructureRuleTest() {
+        private val block = Blocks.byStateId(blockStateId)?.block
+
         override fun test(
             stateId: Int,
             random: WorldgenRandom,
-        ): Boolean = stateId == blockStateId && random.nextFloat() < probability
+        ): Boolean = block != null && Blocks.byStateId(stateId)?.block == block && random.nextFloat() < probability
+    }
+
+    public class BlockStateMatch(
+        public val stateId: Int,
+    ) : StructureRuleTest() {
+        override fun test(
+            stateId: Int,
+            random: WorldgenRandom,
+        ): Boolean = stateId == this.stateId
     }
 
     /** // parity: net.minecraft.world.level.levelgen.structure.templatesystem.TagMatchTest (zombie village pools' `minecraft:doors` rule). */
     public class TagMatch(
         public val stateIds: Set<Int>,
     ) : StructureRuleTest() {
+        private val blocks = stateIds.mapNotNull { Blocks.byStateId(it)?.block }.toSet()
+
         override fun test(
             stateId: Int,
             random: WorldgenRandom,
-        ): Boolean = stateId in stateIds
+        ): Boolean = Blocks.byStateId(stateId)?.block in blocks
     }
 }
 

@@ -54,8 +54,13 @@ public object VillageFeatures {
                     }
                 }
             "minecraft:acacia" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.ACACIA)
+            "minecraft:oak" ->
+                if (supportsVegetation(chunk, x, y - 1, z)) {
+                    TreeFeature.place(chunk, random, x, y, z, TreeConfigs.OAK)
+                }
             "minecraft:spruce" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.SPRUCE)
             "minecraft:pine" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.PINE)
+            "minecraft:flower_plain" -> PlainsDecoration.placeFlowerPlainAt(chunk, random, x, y, z)
             "minecraft:patch_cactus" ->
                 placePatch(
                     chunk,
@@ -82,9 +87,21 @@ public object VillageFeatures {
                 placePatch(chunk, random, x, y, z, 96, requireGrassBelow = true) { c, r, pos ->
                     SimpleBlockFeature({ _, _ -> state("sweet_berry_bush") }).place(c, r, pos)
                 }
-            // Pools only reference the features above; an unknown name places nothing.
+            // Village pools only reference the features above; an unknown name places nothing.
             else -> Unit
         }
+    }
+
+    /** // parity: oak's placed-feature would_survive oak_sapling predicate. */
+    private fun supportsVegetation(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
+        val path = Blocks.byStateId(chunk.getBlockStateId(x and 15, y, z and 15))?.block?.path
+        return path in SUPPORTS_VEGETATION_PATHS
     }
 
     // parity: BlockPileFeature.place.
@@ -168,4 +185,19 @@ public object VillageFeatures {
 
     private fun state(name: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
+
+    private val SUPPORTS_VEGETATION_PATHS =
+        setOf(
+            "dirt",
+            "coarse_dirt",
+            "rooted_dirt",
+            "grass_block",
+            "podzol",
+            "mycelium",
+            "mud",
+            "muddy_mangrove_roots",
+            "moss_block",
+            "pale_moss_block",
+            "farmland",
+        )
 }

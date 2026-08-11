@@ -106,6 +106,26 @@ public object PlainsDecoration : BiomeVegetalDecoration {
             )
         }
 
+    /** // parity: the feature-pool-element use of placed_feature/flower_plain at one jigsaw origin. */
+    internal fun placeFlowerPlainAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        val context = PlacementContext(chunk)
+        val feature = SimpleBlockFeature(::flowerStateId)
+        var positions: Sequence<DecorationPos> =
+            CountPlacement(
+                64,
+            ).getPositions(context, random, DecorationPos(x, y, z))
+        positions =
+            positions.flatMap { RandomOffsetPlacement(xzSpread = 6, ySpread = 2).getPositions(context, random, it) }
+        positions = positions.flatMap { AirTargetFilter().getPositions(context, random, it) }
+        positions.forEach { feature.place(chunk, random, it) }
+    }
+
     /**
      * // parity: NoiseThresholdBlockStateProvider's real behavior for `flower_plain`: a dedicated
      * single-octave [SimplexNoise] (fixed legacy seed `2345`, same real construction as

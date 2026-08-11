@@ -19,7 +19,8 @@ public class VillagePoolParseException(
 /**
  * Parses the real 26.2 `worldgen/template_pool` and `worldgen/processor_list` JSON formats used by
  * villages and Bastion. Supported elements are single, legacy single, list, feature and empty;
- * processor lists currently retain rule processors, matching every Bastion degradation list.
+ * processor lists retain rule processors and every rule predicate used by the 26.2 village and
+ * Bastion processor corpus.
  */
 public object VillagePoolJson {
     /** [resolveProcessors] resolves a named processor list reference (`"minecraft:mossify_20_percent"`) to its real JSON text; only called for string-form `processors` fields. [resolveTag] resolves a block tag name (`"minecraft:doors"`) to its member block state ids; only called for `tag_match` rule predicates. */
@@ -127,16 +128,11 @@ public object VillagePoolJson {
     ): StructureProcessorRule {
         val input = parseRuleTest(json["input_predicate"]?.jsonObject, resolveTag)
         val location = parseRuleTest(json["location_predicate"]?.jsonObject, resolveTag)
-        val outputName =
-            json["output_state"]
-                ?.jsonObject
-                ?.get("Name")
-                ?.jsonPrimitive
-                ?.content ?: "minecraft:air"
+        val output = json["output_state"]?.jsonObject
         return StructureProcessorRule(
             input ?: StructureRuleTest.BlockMatch(Blocks.AIR.stateId),
             location,
-            Blocks.REGISTRY.byIdentifier(Identifier.parse(outputName))?.stateId ?: Blocks.AIR.stateId,
+            output?.let(::blockStateIdOf) ?: Blocks.AIR.stateId,
         )
     }
 
@@ -151,20 +147,11 @@ public object VillagePoolJson {
                 StructureRuleTest.RandomBlockMatch(blockStateIdOf(json), probability)
             }
             "minecraft:block_match" -> StructureRuleTest.BlockMatch(blockStateIdOf(json))
-            // parity note: blockstate_match carries `state: {Name, Properties}`; block-state
-            // properties aren't modeled anywhere in this project, so it matches the block alone.
             "minecraft:blockstate_match" ->
-                StructureRuleTest.BlockMatch(
-                    Blocks.REGISTRY
-                        .byIdentifier(
-                            Identifier.parse(
-                                json["state"]
-                                    ?.jsonObject
-                                    ?.get("Name")
-                                    ?.jsonPrimitive
-                                    ?.content ?: "minecraft:air",
-                            ),
-                        )?.stateId ?: Blocks.AIR.stateId,
+                StructureRuleTest.BlockStateMatch(
+                    (json["block_state"] ?: json["state"])
+                        ?.jsonObject
+                        ?.let(::blockStateIdOf) ?: Blocks.AIR.stateId,
                 )
             "minecraft:tag_match" -> {
                 val tag = json["tag"]?.jsonPrimitive?.content ?: return null
@@ -175,6 +162,17 @@ public object VillagePoolJson {
     }
 
     private fun blockStateIdOf(json: JsonObject): Int {
+        if ("Name" in json) {
+            val block = Identifier.parse(json["Name"]?.jsonPrimitive?.content ?: "minecraft:air")
+            val properties =
+                json["Properties"]
+                    ?.jsonObject
+                    ?.mapValues { (_, value) -> value.jsonPrimitive.content }
+                    .orEmpty()
+            return Blocks.stateIdOf(block, properties)
+                ?: Blocks.REGISTRY.byIdentifier(block)?.stateId
+                ?: Blocks.AIR.stateId
+        }
         val blockName = json["block"]?.jsonPrimitive?.content
         return blockName?.let { Blocks.REGISTRY.byIdentifier(Identifier.parse(it))?.stateId } ?: Blocks.AIR.stateId
     }

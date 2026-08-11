@@ -136,12 +136,6 @@ public object DimensionTerrainGenerator {
                 val cellMaxY = cellMinY + cellHeight - 1
                 for (cellX in 0 until sampler.horizontalCells) {
                     for (cellZ in 0 until sampler.horizontalCells) {
-                        if (
-                            cellMinY >= fluidLevel &&
-                            sampler.cellIsAllNonPositive(cellX, cellY, cellZ)
-                        ) {
-                            continue
-                        }
                         for (y in cellMinY..cellMaxY) {
                             for (z in cellZ * cellWidth until (cellZ + 1) * cellWidth) {
                                 for (x in cellX * cellWidth until (cellX + 1) * cellWidth) {

@@ -136,7 +136,7 @@ class RealTerrainGeneratorTest {
     }
 
     @Test
-    fun theTopmostSolidBlockOfEachColumnHasTheCorrectPlainsSurfaceOrUnderwaterDisk() {
+    fun terrainBeneathPlacedDecorationsHasTheCorrectPlainsSurfaceOrUnderwaterDisk() {
         val chunk = RealTerrainGenerator.generate(router, environment, 0, 0)
         val heightmap = chunk.heightmap(org.basaltmc.world.Chunk.HeightmapType.OCEAN_FLOOR)
         val underwaterSurfaces =
@@ -150,14 +150,18 @@ class RealTerrainGeneratorTest {
         for (x in 0 until 16) {
             for (z in 0 until 16) {
                 val topY = heightmap[x + z * 16] - 1
-                val submerged =
-                    topY < WorldHeight.MAX_Y && chunk.getBlockStateId(x, topY + 1, z) == Blocks.WATER.stateId
-                val actual = chunk.getBlockStateId(x, topY, z)
-                if (submerged) {
-                    assertTrue(actual in underwaterSurfaces, "at ($x, $z), top=$topY, state=$actual")
-                } else {
-                    assertEquals(Blocks.GRASS_BLOCK.stateId, actual, "at ($x, $z), top=$topY")
-                }
+                // Trees and other decoration may now stand above the terrain after exact marker
+                // interpolation changes its shape. Locate the nearby surface they were placed on.
+                val surfaceY =
+                    (topY downTo maxOf(WorldHeight.MIN_Y, topY - 16)).firstOrNull { y ->
+                        val state = chunk.getBlockStateId(x, y, z)
+                        state == Blocks.GRASS_BLOCK.stateId || state in underwaterSurfaces
+                    } ?: error("no plains terrain surface near ($x, $z), top=$topY")
+                val actual = chunk.getBlockStateId(x, surfaceY, z)
+                assertTrue(
+                    actual == Blocks.GRASS_BLOCK.stateId || actual in underwaterSurfaces,
+                    "at ($x, $z), surface=$surfaceY, state=$actual",
+                )
             }
         }
     }

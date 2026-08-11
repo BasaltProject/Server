@@ -8,6 +8,17 @@ public data class PlacedStructurePiece(
     public val position: StructurePos,
     public val rotation: StructureRotation,
     public val boundingBox: StructureBoundingBox,
+    public val groundLevelDelta: Int = element.groundLevelDelta,
+    public val junctions: MutableList<PlacedJigsawJunction> = mutableListOf(),
+)
+
+/** // parity: net.minecraft.world.level.levelgen.structure.pools.JigsawJunction. */
+public data class PlacedJigsawJunction(
+    public val sourceX: Int,
+    public val sourceGroundY: Int,
+    public val sourceZ: Int,
+    public val deltaY: Int,
+    public val destinationProjection: StructureProjection,
 )
 
 /**
@@ -18,8 +29,8 @@ public data class PlacedStructurePiece(
  * subtraction for the only query it makes. [maxDistanceFromCenter] is checked before collision, as
  * vanilla does: without it an assembly sprawls to `maxDepth` and hangs the generator.
  *
- * The pool expansion hack is absent, and Bastion disables it anyway. Plains pools are all `rigid`,
- * so the `terrain_matching` path through [heightAt] is untested against real data.
+ * [useExpansionHack] reproduces the legacy village-only collision-box height expansion. Bastion
+ * disables it. The `terrain_matching` path through [heightAt] follows WORLD_SURFACE_WG.
  */
 public class JigsawAssembly(
     private val poolLookup: (String) -> StructureTemplatePool?,
@@ -34,6 +45,7 @@ public class JigsawAssembly(
         projectStartToHeightmap: Boolean,
         maxDistanceFromCenter: Int,
         maxVerticalDistanceFromCenter: Int = Int.MAX_VALUE,
+        useExpansionHack: Boolean = false,
     ): List<PlacedStructurePiece> {
         val startPool = poolLookup(startPoolName) ?: return emptyList()
         val centerRotation = StructureRotations.random(random)
@@ -93,6 +105,7 @@ public class JigsawAssembly(
                     sourceFree,
                     queue,
                     insertionOrder,
+                    useExpansionHack,
                 )
         }
         return pieces
@@ -107,6 +120,7 @@ public class JigsawAssembly(
         contextFree: CollisionSpace,
         queue: MutableList<QueuedPiece>,
         insertionOrder: Int,
+        useExpansionHack: Boolean,
     ): Int {
         var nextInsertionOrder = insertionOrder
         val sourceElement = sourcePiece.element
@@ -152,6 +166,30 @@ public class JigsawAssembly(
                             random,
                         )
                     val targetRigid = targetElement.projection == StructureProjection.RIGID
+                    val unexpandedBox =
+                        targetElement.getBoundingBox(
+                            templateLoader,
+                            StructurePos(0, 0, 0),
+                            targetRotation,
+                        )
+                    val expandTo =
+                        if (useExpansionHack && unexpandedBox.maxY - unexpandedBox.minY + 1 <= 16) {
+                            targetJigsaws.maxOfOrNull { childJigsaw ->
+                                val childTarget = childJigsaw.front.offset(childJigsaw.pos)
+                                if (!unexpandedBox.isInside(childTarget)) {
+                                    0
+                                } else {
+                                    val childPool = poolLookup(childJigsaw.pool)
+                                    val childFallback = childPool?.let { poolLookup(it.fallback) }
+                                    maxOf(
+                                        childPool?.maxHeight(templateLoader) ?: 0,
+                                        childFallback?.maxHeight(templateLoader) ?: 0,
+                                    )
+                                }
+                            } ?: 0
+                        } else {
+                            0
+                        }
 
                     for (targetJigsaw in targetJigsaws) {
                         if (!canAttach(sourceJigsaw, targetJigsaw)) continue
@@ -167,13 +205,55 @@ public class JigsawAssembly(
                                 heightAt(sourceJigsaw.pos.x, sourceJigsaw.pos.z) - targetJigsawLocalY
                             }
                         val yOffset = targetBoxY - rawTargetBB.minY
-                        val targetBB = rawTargetBB.move(StructurePos(0, yOffset, 0))
+                        val movedTargetBB = rawTargetBB.move(StructurePos(0, yOffset, 0))
+                        val targetBB =
+                            if (expandTo > 0) {
+                                val newSize = maxOf(expandTo + 1, movedTargetBB.maxY - movedTargetBB.minY)
+                                movedTargetBB.copy(maxY = movedTargetBB.minY + newSize)
+                            } else {
+                                movedTargetBB
+                            }
                         val targetBoxPosition = rawTargetBoxPos + StructurePos(0, yOffset, 0)
 
                         if (childrenFree.canFit(targetBB)) {
                             childrenFree.occupy(targetBB)
+                            val sourceGroundLevelDelta = sourcePiece.groundLevelDelta
+                            val targetGroundLevelDelta =
+                                if (targetRigid) {
+                                    sourceGroundLevelDelta - deltaY
+                                } else {
+                                    targetElement.groundLevelDelta
+                                }
                             val targetPiece =
-                                PlacedStructurePiece(targetElement, targetBoxPosition, targetRotation, targetBB)
+                                PlacedStructurePiece(
+                                    targetElement,
+                                    targetBoxPosition,
+                                    targetRotation,
+                                    targetBB,
+                                    targetGroundLevelDelta,
+                                )
+                            val junctionY =
+                                when {
+                                    sourceRigid -> sourceBB.minY + sourceJigsawLocalY
+                                    targetRigid -> targetBoxY + targetJigsawLocalY
+                                    else -> heightAt(sourceJigsaw.pos.x, sourceJigsaw.pos.z) + deltaY / 2
+                                }
+                            sourcePiece.junctions +=
+                                PlacedJigsawJunction(
+                                    targetJigsawPos.x,
+                                    junctionY - sourceJigsawLocalY + sourceGroundLevelDelta,
+                                    targetJigsawPos.z,
+                                    deltaY,
+                                    targetElement.projection,
+                                )
+                            targetPiece.junctions +=
+                                PlacedJigsawJunction(
+                                    sourceJigsaw.pos.x,
+                                    junctionY - targetJigsawLocalY + targetGroundLevelDelta,
+                                    sourceJigsaw.pos.z,
+                                    -deltaY,
+                                    sourceElement.projection,
+                                )
                             pieces.add(targetPiece)
                             if (depth + 1 <= maxDepth) {
                                 queue +=

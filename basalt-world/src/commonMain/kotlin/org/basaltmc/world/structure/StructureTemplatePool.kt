@@ -148,6 +148,7 @@ public class LegacySinglePoolElement(
             random,
             ignoreStructureBlocks = true,
             ignoreAir = ignoreAir,
+            gravityOffset = if (projection == StructureProjection.TERRAIN_MATCHING) -1 else null,
         )
     }
 }
@@ -196,7 +197,7 @@ public class ListPoolElement(
  * // parity: net.minecraft.world.level.levelgen.structure.pools.FeaturePoolElement: a placed
  * worldgen feature (a tree, a block pile, a small patch) as a village piece, used by the real
  * desert/savanna/snowy/taiga `decor`/`trees` pools. Zero-sized like the real one
- * (`getSize` returns `Vec3i.ZERO`), with no jigsaw blocks of its own.
+ * (`getSize` returns `Vec3i.ZERO`) and exposes its one synthetic downward connector.
  */
 public class FeaturePoolElement(
     public val feature: String,
@@ -214,7 +215,23 @@ public class FeaturePoolElement(
         position: StructurePos,
         rotation: StructureRotation,
         random: WorldgenRandom,
-    ): List<PlacedJigsaw> = emptyList()
+    ): List<PlacedJigsaw> =
+        listOf(
+            // parity: FeaturePoolElement.fillDefaultJigsawNBT/getShuffledJigsawBlocks. The
+            // synthetic connector is DOWN_SOUTH at the requested position and ignores rotation.
+            PlacedJigsaw(
+                position,
+                StructureDirection.DOWN,
+                StructureDirection.SOUTH,
+                rollable = true,
+                name = "minecraft:bottom",
+                pool = "minecraft:empty",
+                target = "minecraft:empty",
+                finalStateName = "minecraft:air",
+                placementPriority = 0,
+                selectionPriority = 0,
+            ),
+        )
 
     override fun place(
         loader: TemplateLoader,
@@ -250,4 +267,14 @@ public class StructureTemplatePool(
         shuffledCopy(templates, random)
 
     public fun size(): Int = templates.size
+
+    /** // parity: StructureTemplatePool.getMaxSize, used by the village pool expansion hack. */
+    public fun maxHeight(loader: TemplateLoader): Int =
+        templates
+            .asSequence()
+            .filter { it !== EmptyPoolElement }
+            .maxOfOrNull {
+                val box = it.getBoundingBox(loader, StructurePos(0, 0, 0), StructureRotation.NONE)
+                box.maxY - box.minY + 1
+            } ?: 0
 }
