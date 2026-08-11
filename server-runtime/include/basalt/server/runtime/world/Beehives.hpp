@@ -28,11 +28,11 @@ using Pos = std::array<std::int32_t, 3>;
 
 [[nodiscard]] bool isHive(std::string_view blockPath);
 
-[[nodiscard]] std::size_t maxOccupants(const wire::nbt::NbtCompound& data);
+[[nodiscard]] std::size_t maxOccupants(const wire::nbt::NbtCompound& data, std::size_t fallback = 3);
 
 [[nodiscard]] std::size_t occupantCount(const wire::nbt::NbtCompound& data);
 
-[[nodiscard]] bool isFull(const wire::nbt::NbtCompound& data);
+[[nodiscard]] bool isFull(const wire::nbt::NbtCompound& data, std::size_t fallback = 3);
 
 /// parity: `storeBee(Occupant.of(bee))`.
 void addOccupant(wire::nbt::NbtCompound& data, wire::nbt::NbtCompound bee);

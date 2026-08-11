@@ -38,7 +38,7 @@ using MergeEnchantments =
 [[nodiscard]] Result combine(const storage::StoredItemStack* input, const storage::StoredItemStack* addition,
                              const std::optional<std::string>& newName = std::nullopt,
                              const IsRepairMaterial& isRepairMaterial = {},
-                             const MergeEnchantments& mergeEnchantments = {});
+                             const MergeEnchantments& mergeEnchantments = {}, bool cumulativeCost = true);
 
 [[nodiscard]] std::int32_t increasedRepairCost(std::int32_t cost);
 

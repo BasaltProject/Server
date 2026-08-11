@@ -14,7 +14,7 @@
 
 namespace basalt::server::runtime::world {
 
-enum class BedProblem : std::uint8_t { NotPossibleNow, TooFarAway, Obstructed, Occupied, NotHere };
+enum class BedProblem : std::uint8_t { NotPossibleNow, TooFarAway, Obstructed, Occupied, NotHere, NotSafe };
 
 [[nodiscard]] std::string_view translationKeyOf(BedProblem problem);
 

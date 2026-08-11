@@ -12,11 +12,11 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 4> kTimeMarkers{
 
 } // namespace
 
-bool WorldClock::tick(bool advanceTime) {
+bool WorldClock::tick(bool advanceTime, float stepScale) {
     if (paused_ || !advanceTime) {
         return false;
     }
-    partialTick_ += rate_;
+    partialTick_ += rate_ * stepScale;
     const std::int32_t whole = static_cast<std::int32_t>(std::floor(partialTick_));
     if (whole == 0) {
         return false;

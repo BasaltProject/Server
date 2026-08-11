@@ -50,6 +50,17 @@ struct GameplayRules {
         bool farmlandOnlyPlayersTrample = false;
         bool farmlandFeatherFallDistanceAffectsTrampling = false;
         float farmlandTrampleHeight = -1.0F;
+        std::int32_t kelpMaxGrowthAge = 25;
+        std::int32_t caveVinesMaxGrowthAge = 25;
+        std::int32_t twistingVinesMaxGrowthAge = 25;
+        std::int32_t weepingVinesMaxGrowthAge = 25;
+        std::int32_t bigDripleafTiltDelayUnstable = 10;
+        std::int32_t bigDripleafTiltDelayPartial = 10;
+        std::int32_t bigDripleafTiltDelayFull = 100;
+        bool magmaBlockReverseBubbleColumnFlow = false;
+        bool soulSandReverseBubbleColumnFlow = false;
+        bool anvilCumulativeCost = true;
+        std::int32_t beehiveMaxBeesInside = 3;
         friend bool operator==(const Blocks&, const Blocks&) = default;
     };
 
@@ -66,6 +77,10 @@ struct GameplayRules {
         bool milkClearsBeneficialEffects = true;
         std::int32_t raidCooldownSeconds = 0;
         std::int32_t animalBreedingCooldownSeconds = 0;
+        bool rainStopsAfterSleep = true;
+        bool thunderStopsAfterSleep = true;
+        std::int32_t daylightDaytimeTicks = 12000;
+        std::int32_t daylightNighttimeTicks = 12000;
         friend bool operator==(const Mechanics&, const Mechanics&) = default;
     };
 
@@ -73,6 +88,9 @@ struct GameplayRules {
         float criticalDamageMultiplier = 1.5F;
         bool totemOfUndyingWorksInInventory = false;
         std::int32_t expPickupDelayTicks = 2;
+        bool canSkipNight = true;
+        bool sleepIgnoreNearbyMobs = false;
+        bool creativeOnePunch = false;
         friend bool operator==(const Player&, const Player&) = default;
     };
 

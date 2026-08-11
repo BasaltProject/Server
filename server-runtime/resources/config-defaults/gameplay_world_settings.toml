@@ -44,6 +44,17 @@
 # farmland-only-players-trample = false
 # farmland-feather-fall-distance-affects-trampling = false
 # farmland-trample-height = -1.0
+# kelp-max-growth-age = 25
+# cave-vines-max-growth-age = 25
+# twisting-vines-max-growth-age = 25
+# weeping-vines-max-growth-age = 25
+# big-dripleaf-tilt-delay-unstable = 10
+# big-dripleaf-tilt-delay-partial = 10
+# big-dripleaf-tilt-delay-full = 100
+# magma-block-reverse-bubble-column-flow = false
+# soul-sand-reverse-bubble-column-flow = false
+# anvil-cumulative-cost = true
+# beehive-max-bees-inside = 3
 
 # [gameplay.mechanics]
 # drowning-ticks-per-damage = 20
@@ -58,11 +69,18 @@
 # milk-clears-beneficial-effects = true
 # raid-cooldown-seconds = 0
 # animal-breeding-cooldown-seconds = 0
+# rain-stops-after-sleep = true
+# thunder-stops-after-sleep = true
+# daylight-daytime-ticks = 12000
+# daylight-nighttime-ticks = 12000
 
 # [gameplay.player]
 # critical-damage-multiplier = 1.5
 # totem-of-undying-works-in-inventory = false
 # exp-pickup-delay-ticks = 2
+# can-skip-night = true
+# sleep-ignore-nearby-mobs = false
+# creative-one-punch = false
 
 # [gameplay.items]
 # ender-pearl-damage = 5.0

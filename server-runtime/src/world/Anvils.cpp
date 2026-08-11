@@ -77,7 +77,7 @@ bool isRepairMaterialFor(const storage::StoredItemStack& input, const storage::S
 
 Result combine(const storage::StoredItemStack* input, const storage::StoredItemStack* addition,
                const std::optional<std::string>& newName, const IsRepairMaterial& isRepairMaterial,
-               const MergeEnchantments& mergeEnchantments) {
+               const MergeEnchantments& mergeEnchantments, const bool cumulativeCost) {
     if (input == nullptr) {
         return Result{};
     }
@@ -87,7 +87,8 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
     };
 
     std::int32_t price = 0;
-    const std::int32_t tax = repairCost(*input) + (addition == nullptr ? 0 : repairCost(*addition));
+    const std::int32_t tax =
+        cumulativeCost ? repairCost(*input) + (addition == nullptr ? 0 : repairCost(*addition)) : 0;
     storage::StoredItemStack result = *input;
     std::int32_t materials = 0;
 
@@ -170,8 +171,9 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
         return Result{.output = std::nullopt, .cost = cost, .onlyRenaming = onlyRenaming};
     }
 
-    std::int32_t priorWork = std::max(repairCost(result), addition == nullptr ? 0 : repairCost(*addition));
-    if (namingCost != price || namingCost == 0) {
+    std::int32_t priorWork =
+        cumulativeCost ? std::max(repairCost(result), addition == nullptr ? 0 : repairCost(*addition)) : 0;
+    if (cumulativeCost && (namingCost != price || namingCost == 0)) {
         priorWork = increasedRepairCost(priorWork);
     }
     return Result{.output = withRepairCost(std::move(result), priorWork),

@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -24,14 +25,15 @@ namespace {
 [[nodiscard]] bool causesVibration(std::string_view tilt) { return tilt != "unstable"; }
 
 /// parity: `DELAY_UNTIL_NEXT_TILT_STATE`, with `none` booking nothing.
-[[nodiscard]] std::int32_t delayFor(std::string_view tilt) {
+[[nodiscard]] std::int32_t delayFor(const WorldState& world, std::string_view tilt) {
+    const config::GameplayRules::Blocks& rules = world.gameplay().blocks;
     if (tilt == "unstable") {
-        return kUnstableTicks;
+        return rules.bigDripleafTiltDelayUnstable;
     }
     if (tilt == "partial") {
-        return kPartialTicks;
+        return rules.bigDripleafTiltDelayPartial;
     }
-    return tilt == "full" ? kFullTicks : 0;
+    return tilt == "full" ? rules.bigDripleafTiltDelayFull : 0;
 }
 
 } // namespace
@@ -53,7 +55,7 @@ std::optional<BlockChange> setTilt(WorldState& world, std::int32_t x, std::int32
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    if (const std::int32_t delay = delayFor(tilt); delay > 0) {
+    if (const std::int32_t delay = delayFor(world, tilt); delay > 0) {
         world.scheduleBlockTick(x, y, z, block(), delay);
     }
     if (was == tilt) {

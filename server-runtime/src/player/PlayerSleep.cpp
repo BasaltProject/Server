@@ -1,11 +1,13 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
@@ -119,6 +121,18 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
             refuse(player, rule.errorKey);
         }
         return world::BedProblem::NotPossibleNow;
+    }
+    // parity: `Player.startSleepInBed`, a monster within eight by five by eight blocks of the bed keeps you up.
+    if (!force && player.gamemode != wire::protocol::play::Gamemode::Creative &&
+        !world.state().gameplay().player.sleepIgnoreNearbyMobs) {
+        for (const entity::ServerEntity* other : world.state().entities()) {
+            if (!other->removed && entity::mobs::categoryOf(other->type()) == "monster" &&
+                std::abs(other->x - (head[0] + 0.5)) < 8.0 && std::abs(other->y - head[1]) < 5.0 &&
+                std::abs(other->z - (head[2] + 0.5)) < 8.0) {
+                refuse(player, world::translationKeyOf(world::BedProblem::NotSafe));
+                return world::BedProblem::NotSafe;
+            }
+        }
     }
 
     const std::int32_t occupied = world::beds::withOccupied(*headState, true);

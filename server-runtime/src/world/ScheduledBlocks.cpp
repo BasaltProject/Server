@@ -840,9 +840,9 @@ void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
     if (below == "bubble_column") {
         column = belowState;
     } else if (below == "soul_sand") {
-        column = columnState(false);
+        column = columnState(world.gameplay().blocks.soulSandReverseBubbleColumnFlow);
     } else if (below == "magma_block") {
-        column = columnState(true);
+        column = columnState(!world.gameplay().blocks.magmaBlockReverseBubbleColumnFlow);
     } else if (pathOf(*here) == "bubble_column") {
         column = waterState();
     } else {

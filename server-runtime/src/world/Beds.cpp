@@ -29,6 +29,8 @@ std::string_view translationKeyOf(BedProblem problem) {
         return "block.minecraft.bed.obstructed";
     case BedProblem::Occupied:
         return "block.minecraft.bed.occupied";
+    case BedProblem::NotSafe:
+        return "block.minecraft.bed.not_safe";
     case BedProblem::NotHere:
         break;
     }

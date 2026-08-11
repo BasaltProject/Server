@@ -12,11 +12,6 @@ namespace basalt::server::runtime::world {
 /// parity: `BigDripleafBlock`.
 namespace dripleaves {
 
-/// parity: `DELAY_UNTIL_NEXT_TILT_STATE`.
-inline constexpr std::int32_t kUnstableTicks = 10;
-inline constexpr std::int32_t kPartialTicks = 10;
-inline constexpr std::int32_t kFullTicks = 100;
-
 [[nodiscard]] bool isDripleaf(std::int32_t stateId);
 
 /// parity: `setTilt` writes with `UPDATE_CLIENTS` alone.

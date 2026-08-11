@@ -87,6 +87,28 @@ farmland-only-players-trample = false
 farmland-feather-fall-distance-affects-trampling = false
 # NOT VANILLA when 0 or more. Trample whenever the fall is at least this far, with no random roll. -1 keeps vanilla.
 farmland-trample-height = -1.0
+# Age at which kelp stops growing taller, 0 to 25 (vanilla 25).
+kelp-max-growth-age = 25
+# Age at which cave vines stop growing, 0 to 25 (vanilla 25).
+cave-vines-max-growth-age = 25
+# Age at which twisting vines stop growing, 0 to 25 (vanilla 25).
+twisting-vines-max-growth-age = 25
+# Age at which weeping vines stop growing, 0 to 25 (vanilla 25).
+weeping-vines-max-growth-age = 25
+# Ticks a big dripleaf stays unstable before it tilts (vanilla 10).
+big-dripleaf-tilt-delay-unstable = 10
+# Ticks a big dripleaf stays partly tilted (vanilla 10).
+big-dripleaf-tilt-delay-partial = 10
+# Ticks a big dripleaf stays fully tilted before it rights itself (vanilla 100).
+big-dripleaf-tilt-delay-full = 100
+# NOT VANILLA when true. A bubble column over magma pushes up instead of pulling down.
+magma-block-reverse-bubble-column-flow = false
+# NOT VANILLA when true. A bubble column over soul sand pulls down instead of pushing up.
+soul-sand-reverse-bubble-column-flow = false
+# Each repair makes the next one dearer (vanilla true). False keeps repairs at their base cost.
+anvil-cumulative-cost = true
+# Bees a hive can hold (vanilla 3). A hive with its own MaxBees keeps that.
+beehive-max-bees-inside = 3
 
 [defaults.gameplay.mechanics]
 # Rules of the world that are not one block or item.
@@ -114,6 +136,14 @@ milk-clears-beneficial-effects = true
 raid-cooldown-seconds = 0
 # NOT VANILLA when above 0. Seconds a player must wait before feeding the same kind of animal into love again.
 animal-breeding-cooldown-seconds = 0
+# Skipping the night by sleeping clears rain (vanilla true).
+rain-stops-after-sleep = true
+# Skipping the night by sleeping clears thunder (vanilla true).
+thunder-stops-after-sleep = true
+# Ticks the bright half of the day lasts (vanilla 12000). NOT VANILLA if changed.
+daylight-daytime-ticks = 12000
+# Ticks the dark half of the day lasts (vanilla 12000). NOT VANILLA if changed.
+daylight-nighttime-ticks = 12000
 
 [defaults.gameplay.player]
 # Player rules.
@@ -123,6 +153,12 @@ critical-damage-multiplier = 1.5
 totem-of-undying-works-in-inventory = false
 # Ticks a player waits between picking up experience orbs (vanilla 2).
 exp-pickup-delay-ticks = 2
+# Sleeping through the night can skip it (vanilla true). False keeps the night whatever the sleepers.
+can-skip-night = true
+# NOT VANILLA when true. Monsters near a bed no longer stop a player sleeping.
+sleep-ignore-nearby-mobs = false
+# NOT VANILLA when true. A creative player kills whatever they hit in one blow.
+creative-one-punch = false
 
 [defaults.gameplay.items]
 # Item and projectile rules.
