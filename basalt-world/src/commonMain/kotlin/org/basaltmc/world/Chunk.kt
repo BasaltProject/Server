@@ -11,6 +11,7 @@ public class Chunk(
 ) {
     private val sections = Array(verticalBounds.sectionCount) { ChunkSection() }
     private val blockEntitiesByPosition = LinkedHashMap<Int, ChunkBlockEntity>()
+    private val generatedEntitiesBacking = mutableListOf<ChunkGeneratedEntity>()
     private val scheduledBlockTicksBacking = mutableListOf<ChunkScheduledTick>()
     private val scheduledFluidTicksBacking = mutableListOf<ChunkScheduledTick>()
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
@@ -77,6 +78,13 @@ public class Chunk(
     ): ChunkBlockEntity? = blockEntitiesByPosition[blockEntityKey(localX, y, localZ)]
 
     public fun blockEntities(): Collection<ChunkBlockEntity> = blockEntitiesByPosition.values
+
+    public fun addGeneratedEntity(entity: ChunkGeneratedEntity) {
+        generatedEntitiesBacking += entity
+        isDirty = true
+    }
+
+    public fun generatedEntities(): List<ChunkGeneratedEntity> = generatedEntitiesBacking.toList()
 
     public fun scheduleBlockTick(tick: ChunkScheduledTick) {
         scheduleTick(scheduledBlockTicksBacking, tick)

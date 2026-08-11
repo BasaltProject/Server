@@ -4,9 +4,8 @@ import org.basaltmc.random.LegacyRandom
 import org.basaltmc.random.WorldgenRandom
 
 /**
- * // parity: RandomSpreadStructurePlacement, the `linear` [spreadType] only, which is what
- * `villages.json` uses; `triangular` is not ported. One candidate chunk per [spacing]-wide cell,
- * drawn inside a [separation]-margined square so neighbouring candidates stay that far apart.
+ * // parity: RandomSpreadStructurePlacement. One candidate chunk per [spacing]-wide cell, drawn
+ * inside a [separation]-margined square so neighbouring candidates stay that far apart.
  *
  * The per-cell random is a fresh [WorldgenRandom] over [LegacyRandom], not the xoroshiro source
  * decoration uses, reseeded with `setLargeFeatureWithSalt`.
@@ -15,6 +14,7 @@ public class StructurePlacementGrid(
     public val spacing: Int,
     public val separation: Int,
     public val salt: Int,
+    public val spreadType: SpreadType = SpreadType.LINEAR,
 ) {
     init {
         require(spacing > separation) { "spacing must be larger than separation" }
@@ -31,8 +31,8 @@ public class StructurePlacementGrid(
         val random = WorldgenRandom(LegacyRandom(0L))
         random.setLargeFeatureWithSalt(seed, cellX, cellZ, salt)
         val limit = spacing - separation
-        val spreadX = random.nextInt(limit)
-        val spreadZ = random.nextInt(limit)
+        val spreadX = spreadType.evaluate(random, limit)
+        val spreadZ = spreadType.evaluate(random, limit)
         return (cellX * spacing + spreadX) to (cellZ * spacing + spreadZ)
     }
 
@@ -44,5 +44,20 @@ public class StructurePlacementGrid(
     ): Boolean {
         val (candidateX, candidateZ) = candidateChunk(seed, chunkX, chunkZ)
         return candidateX == chunkX && candidateZ == chunkZ
+    }
+
+    public enum class SpreadType {
+        LINEAR,
+        TRIANGULAR,
+        ;
+
+        internal fun evaluate(
+            random: WorldgenRandom,
+            limit: Int,
+        ): Int =
+            when (this) {
+                LINEAR -> random.nextInt(limit)
+                TRIANGULAR -> (random.nextInt(limit) + random.nextInt(limit)) / 2
+            }
     }
 }

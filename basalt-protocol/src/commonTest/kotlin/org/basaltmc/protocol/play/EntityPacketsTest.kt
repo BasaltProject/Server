@@ -62,6 +62,20 @@ class EntityPacketsTest {
     }
 
     @Test
+    fun itemFrameUsesItsHierarchySpecificStackIndex() {
+        val buffer = ByteBuffer()
+        val packet = SetEntityDataPacket.itemFrame(entityId = 9, stack = WireItemStack(itemId = 890, count = 1))
+        packet.write(buffer)
+
+        val decoded = SetEntityDataPacket.read(buffer)
+        assertEquals(packet, decoded)
+        assertEquals(
+            SetEntityDataPacket.ITEM_FRAME_STACK_INDEX,
+            (decoded.entries.single() as SetEntityDataPacket.Entry.Item).index,
+        )
+    }
+
+    @Test
     fun clientboundTakeItemEntityRoundTrips() {
         val buffer = ByteBuffer()
         val packet = ClientboundTakeItemEntityPacket(collectedEntityId = 9, collectorEntityId = 1, pickupItemCount = 16)

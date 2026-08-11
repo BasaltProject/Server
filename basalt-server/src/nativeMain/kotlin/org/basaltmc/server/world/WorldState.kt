@@ -4,6 +4,7 @@ import org.basaltmc.io.NativeMutex
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.ChunkGeneratedEntity
 import org.basaltmc.world.NoiseWorldGenerator
 import kotlin.math.floor
 import kotlin.uuid.ExperimentalUuidApi
@@ -34,6 +35,8 @@ public class WorldState(
         HashMap<Long, Chunk>().apply {
             for (chunk in initialChunks) this[key(chunk.chunkX, chunk.chunkZ)] = chunk
         }
+
+    private val generatedEntitiesByKey = mutableMapOf<GeneratedEntityKey, GeneratedWorldEntity>()
 
     public val chunks: List<Chunk> get() = mutex.withLock { chunksByPos.values.toList() }
 
@@ -68,7 +71,11 @@ public class WorldState(
             var removed = 0
             for (chunk in chunks) {
                 if (chunk.isDirty) continue
-                if (chunksByPos.remove(key(chunk.chunkX, chunk.chunkZ)) != null) removed++
+                val chunkKey = key(chunk.chunkX, chunk.chunkZ)
+                if (chunksByPos.remove(chunkKey) != null) {
+                    generatedEntitiesByKey.keys.removeAll { it.chunkKey == chunkKey }
+                    removed++
+                }
             }
             removed
         }
@@ -118,6 +125,38 @@ public class WorldState(
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
             true
         }
+
+    /** Runtime identities for immutable entities emitted by every currently loaded generated chunk. */
+    public fun generatedEntities(allocateEntityId: () -> Int): List<GeneratedWorldEntity> =
+        mutex.withLock {
+            val visibleKeys = mutableSetOf<GeneratedEntityKey>()
+            val result = mutableListOf<GeneratedWorldEntity>()
+            val chunks = chunksByPos.values.sortedWith(compareBy(Chunk::chunkX, Chunk::chunkZ))
+            for (chunk in chunks) {
+                val chunkKey = key(chunk.chunkX, chunk.chunkZ)
+                for ((index, descriptor) in chunk.generatedEntities().withIndex()) {
+                    val entityKey = GeneratedEntityKey(chunkKey, index)
+                    visibleKeys += entityKey
+                    result +=
+                        generatedEntitiesByKey.getOrPut(entityKey) {
+                            GeneratedWorldEntity(allocateEntityId(), Uuid.random(), descriptor)
+                        }
+                }
+            }
+            generatedEntitiesByKey.keys.removeAll { it !in visibleKeys }
+            result
+        }
+
+    public data class GeneratedWorldEntity(
+        val entityId: Int,
+        val uuid: Uuid,
+        val descriptor: ChunkGeneratedEntity,
+    )
+
+    private data class GeneratedEntityKey(
+        val chunkKey: Long,
+        val index: Int,
+    )
 
     // Dropped items in this world. Behind the same lock as blocks: a break spawning one and a
     // nearby player picking one up are exactly the same kind of race two players editing blocks

@@ -169,6 +169,46 @@ class BlocksTest {
         assertTrue(Blocks.isHugeMushroomState(generatedStem))
     }
 
+    @Test
+    fun chorusStatesExposeConnectionsAndFlowerAge() {
+        val connected =
+            Blocks.chorusPlantStateId(
+                down = true,
+                east = false,
+                north = true,
+                south = false,
+                up = true,
+                west = false,
+            )
+
+        assertEquals(14663, connected)
+        assertEquals(
+            linkedMapOf(
+                "down" to "true",
+                "east" to "false",
+                "north" to "true",
+                "south" to "false",
+                "up" to "true",
+                "west" to "false",
+            ),
+            Blocks.byStateId(connected)?.properties,
+        )
+        assertEquals(14711, Blocks.chorusFlowerStateId(5))
+        assertEquals(mapOf("age" to "5"), Blocks.byStateId(14711)?.properties)
+    }
+
+    @Test
+    fun ironBarsStatesExposeExactConnections() {
+        assertEquals(7989, Blocks.ironBarsStateId(north = false, east = false, south = false, west = false))
+        assertEquals(7960, Blocks.ironBarsStateId(north = true, east = true, south = true, west = true))
+        val state = assertNotNull(Blocks.byStateId(7972))
+        assertEquals("true", state.properties["east"])
+        assertEquals("false", state.properties["north"])
+        assertEquals("false", state.properties["south"])
+        assertEquals("false", state.properties["waterlogged"])
+        assertEquals("true", state.properties["west"])
+    }
+
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 

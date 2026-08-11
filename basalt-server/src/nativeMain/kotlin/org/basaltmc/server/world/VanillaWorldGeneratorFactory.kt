@@ -11,6 +11,7 @@ import org.basaltmc.world.noise.NoiseParametersJson
 import org.basaltmc.world.noise.NormalNoise
 import org.basaltmc.world.structure.StructurePlacementGrid
 import org.basaltmc.world.terrain.DimensionTerrainGenerator
+import org.basaltmc.world.terrain.EndCityStructureGenerator
 import org.basaltmc.world.terrain.NetherBiomeSource
 import org.basaltmc.world.terrain.NetherStructureGenerator
 import org.basaltmc.world.terrain.NoiseRouterData
@@ -91,7 +92,11 @@ public class VanillaWorldGeneratorFactory(
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.25, 80.0, 160.0, 4.0)
         val router = NoiseRouterData.end(base3d, seed)
         val biomes = TheEndBiomeSource(router.erosion)
-        return { chunkX, chunkZ -> DimensionTerrainGenerator.end(router, biomes, chunkX, chunkZ, seed) }
+        val structureLoader = VillageDataLoader(serverJar)
+        val structures = EndCityStructureGenerator(router, biomes, structureLoader.templateLoader)
+        return { chunkX, chunkZ ->
+            DimensionTerrainGenerator.end(router, biomes, chunkX, chunkZ, seed, structures)
+        }
     }
 
     private fun legacyNetherNoise(

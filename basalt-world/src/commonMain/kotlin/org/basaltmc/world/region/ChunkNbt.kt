@@ -1,16 +1,20 @@
 package org.basaltmc.world.region
 
 import org.basaltmc.nbt.NbtCompound
+import org.basaltmc.nbt.NbtDouble
+import org.basaltmc.nbt.NbtFloat
 import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtString
 import org.basaltmc.nbt.NbtTag
 import org.basaltmc.nbt.NbtType
+import org.basaltmc.nbt.deepCopy
 import org.basaltmc.protocol.play.BitStorage
 import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
+import org.basaltmc.world.ChunkGeneratedEntity
 import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.ChunkScheduledTick
 import org.basaltmc.world.ChunkSection
@@ -29,7 +33,8 @@ public class ChunkNbtException(
  *
  * Block states keep their `Properties` compound and resolve back to the same network state ID,
  * block entities keep their custom NBT, and ticks keep the SavedTick shape and insertion order.
- * Out of scope: light data, entities, heightmaps and structures.
+ * Worldgen entity descriptors use a Basalt-owned list until the server grows vanilla's separate
+ * entity-region storage. Light data, heightmaps and structures remain out of scope.
  */
 public object ChunkNbt {
     // world_version for Minecraft 26.2, per the project's own protocol constants.
@@ -67,6 +72,7 @@ public object ChunkNbt {
         tag["block_entities"] = NbtList(if (blockEntities.isEmpty()) NbtType.END else NbtType.COMPOUND, blockEntities)
         tag["block_ticks"] = encodeTicks(chunk, chunk.scheduledBlockTicks())
         tag["fluid_ticks"] = encodeTicks(chunk, chunk.scheduledFluidTicks())
+        tag[GENERATED_ENTITIES_KEY] = encodeGeneratedEntities(chunk)
         return tag
     }
 
@@ -92,8 +98,53 @@ public object ChunkNbt {
         }
         decodeTicks(chunk, tag.getList("block_ticks")).forEach(chunk::scheduleBlockTick)
         decodeTicks(chunk, tag.getList("fluid_ticks")).forEach(chunk::scheduleFluidTick)
+        decodeGeneratedEntities(tag.getList(GENERATED_ENTITIES_KEY)).forEach(chunk::addGeneratedEntity)
         return chunk
     }
+
+    private fun encodeGeneratedEntities(chunk: Chunk): NbtList =
+        NbtList(
+            if (chunk.generatedEntities().isEmpty()) NbtType.END else NbtType.COMPOUND,
+            chunk.generatedEntities().map { entity ->
+                NbtCompound().apply {
+                    putString("id", entity.type.toString())
+                    this["Pos"] =
+                        NbtList(
+                            NbtType.DOUBLE,
+                            listOf(NbtDouble(entity.x), NbtDouble(entity.y), NbtDouble(entity.z)),
+                        )
+                    this["Rotation"] = NbtList(NbtType.FLOAT, listOf(NbtFloat(entity.yaw), NbtFloat(entity.pitch)))
+                    this["BasaltData"] = entity.data.deepCopy()
+                }
+            },
+        )
+
+    private fun decodeGeneratedEntities(entries: NbtList?): List<ChunkGeneratedEntity> =
+        entries?.map { entry ->
+            val tag = entry as? NbtCompound ?: throw ChunkNbtException("generated entity entry is not a compound")
+            val type =
+                tag.getString("id").takeIf(String::isNotEmpty) ?: throw ChunkNbtException("generated entity has no id")
+            val pos = tag.getList("Pos") ?: throw ChunkNbtException("generated entity $type has no Pos")
+            val rotation = tag.getList("Rotation") ?: throw ChunkNbtException("generated entity $type has no Rotation")
+            if (pos.size != 3 ||
+                rotation.size != 2
+            ) {
+                throw ChunkNbtException("generated entity $type has invalid vectors")
+            }
+            ChunkGeneratedEntity(
+                type = Identifier.parse(type),
+                x = (pos[0] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
+                y = (pos[1] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
+                z = (pos[2] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
+                yaw =
+                    (rotation[0] as? NbtFloat)?.value
+                        ?: throw ChunkNbtException("generated entity $type has invalid Rotation"),
+                pitch =
+                    (rotation[1] as? NbtFloat)?.value
+                        ?: throw ChunkNbtException("generated entity $type has invalid Rotation"),
+                data = (tag["BasaltData"] as? NbtCompound)?.deepCopy() ?: NbtCompound(),
+            )
+        } ?: emptyList()
 
     private fun encodeTicks(
         chunk: Chunk,
@@ -310,4 +361,6 @@ public object ChunkNbt {
         while ((1 shl bits) < distinctCount) bits++
         return bits
     }
+
+    private const val GENERATED_ENTITIES_KEY = "basalt_generated_entities"
 }

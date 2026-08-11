@@ -41,11 +41,15 @@ public object Blocks {
     public val BLUE_ICE: BlockState = register(15275, "blue_ice")
     public val PUMPKIN: BlockState = register(8332, "pumpkin")
     public val SUGAR_CANE: BlockState = register(6947, "sugar_cane")
+    public val OBSIDIAN: BlockState = register(3369, "obsidian")
+    public val FIRE: BlockState = register(3406, "fire")
+    public val IRON_BARS: BlockState = register(7989, "iron_bars")
     public val FIREFLY_BUSH: BlockState = register(32365, "firefly_bush")
     public val VOID_AIR: BlockState = register(15292, "void_air")
     public val CAVE_AIR: BlockState = register(15293, "cave_air")
     public val NETHERRACK: BlockState = register(6997, "netherrack")
     public val END_STONE: BlockState = register(9477, "end_stone")
+    public val END_GATEWAY: BlockState = register(14816, "end_gateway")
 
     init {
         for ((stateId, path) in ALL_DEFAULT_BLOCK_STATES) {
@@ -277,6 +281,46 @@ public object Blocks {
     /** Whether [stateId] is one of bee nest's facing and honey-level combinations. */
     public fun isBeeNestState(stateId: Int): Boolean = stateId in BEE_NEST_DEFAULT_STATE_ID..BEE_NEST_LAST_STATE_ID
 
+    /** Returns a chorus plant state with the six exact vanilla connection properties. */
+    public fun chorusPlantStateId(
+        down: Boolean,
+        east: Boolean,
+        north: Boolean,
+        south: Boolean,
+        up: Boolean,
+        west: Boolean,
+    ): Int {
+        var enabledBits = 0
+        if (down) enabledBits += 32
+        if (east) enabledBits += 16
+        if (north) enabledBits += 8
+        if (south) enabledBits += 4
+        if (up) enabledBits += 2
+        if (west) enabledBits++
+        return CHORUS_PLANT_DEFAULT_STATE_ID - enabledBits
+    }
+
+    /** Returns the chorus flower state for vanilla age 0 through 5. */
+    public fun chorusFlowerStateId(age: Int): Int {
+        require(age in 0..5)
+        return CHORUS_FLOWER_DEFAULT_STATE_ID + age
+    }
+
+    /** Returns a dry iron-bars state with the exact vanilla horizontal connections. */
+    public fun ironBarsStateId(
+        north: Boolean,
+        east: Boolean,
+        south: Boolean,
+        west: Boolean,
+    ): Int {
+        var enabledBits = 0
+        if (east) enabledBits += 16
+        if (north) enabledBits += 8
+        if (south) enabledBits += 4
+        if (west) enabledBits++
+        return IRON_BARS.stateId - enabledBits
+    }
+
     private fun register(
         stateId: Int,
         path: String,
@@ -339,6 +383,11 @@ public object Blocks {
     private val BEE_NEST_DEFAULT_STATE_ID: Int =
         REGISTRY.byIdentifier(Identifier.vanilla("bee_nest"))?.stateId ?: error("unknown block 'bee_nest'")
     private val BEE_NEST_LAST_STATE_ID: Int = BEE_NEST_DEFAULT_STATE_ID + 23
+    private val CHORUS_PLANT_DEFAULT_STATE_ID: Int =
+        REGISTRY.byIdentifier(Identifier.vanilla("chorus_plant"))?.stateId ?: error("unknown block 'chorus_plant'")
+    private val CHORUS_PLANT_FIRST_STATE_ID: Int = CHORUS_PLANT_DEFAULT_STATE_ID - 63
+    private val CHORUS_FLOWER_DEFAULT_STATE_ID: Int =
+        REGISTRY.byIdentifier(Identifier.vanilla("chorus_flower"))?.stateId ?: error("unknown block 'chorus_flower'")
     private val DOUBLE_PLANT_BLOCKS: List<String> =
         listOf("sunflower", "lilac", "rose_bush", "peony", "tall_grass", "large_fern", "tall_seagrass")
     private val DOUBLE_PLANT_DEFAULT_STATE_IDS: IntArray =
@@ -726,6 +775,58 @@ public object Blocks {
                     )
                     beeNestStateId++
                 }
+            }
+
+            val chorusPlant =
+                REGISTRY.byIdentifier(Identifier.vanilla("chorus_plant")) ?: error("unknown block 'chorus_plant'")
+            for (stateId in CHORUS_PLANT_FIRST_STATE_ID..CHORUS_PLANT_DEFAULT_STATE_ID) {
+                val falseBits = stateId - CHORUS_PLANT_FIRST_STATE_ID
+                put(
+                    stateId,
+                    BlockState(
+                        chorusPlant.block,
+                        stateId,
+                        linkedMapOf(
+                            "down" to booleanProperty(falseBits and 32 == 0),
+                            "east" to booleanProperty(falseBits and 16 == 0),
+                            "north" to booleanProperty(falseBits and 8 == 0),
+                            "south" to booleanProperty(falseBits and 4 == 0),
+                            "up" to booleanProperty(falseBits and 2 == 0),
+                            "west" to booleanProperty(falseBits and 1 == 0),
+                        ),
+                    ),
+                )
+            }
+
+            val chorusFlower =
+                REGISTRY.byIdentifier(Identifier.vanilla("chorus_flower")) ?: error("unknown block 'chorus_flower'")
+            for (age in 0..5) {
+                put(
+                    CHORUS_FLOWER_DEFAULT_STATE_ID + age,
+                    BlockState(
+                        chorusFlower.block,
+                        CHORUS_FLOWER_DEFAULT_STATE_ID + age,
+                        mapOf("age" to age.toString()),
+                    ),
+                )
+            }
+
+            for (stateId in IRON_BARS.stateId - 31..IRON_BARS.stateId) {
+                val falseBits = stateId - (IRON_BARS.stateId - 31)
+                put(
+                    stateId,
+                    BlockState(
+                        IRON_BARS.block,
+                        stateId,
+                        linkedMapOf(
+                            "east" to booleanProperty(falseBits and 16 == 0),
+                            "north" to booleanProperty(falseBits and 8 == 0),
+                            "south" to booleanProperty(falseBits and 4 == 0),
+                            "waterlogged" to booleanProperty(falseBits and 2 == 0),
+                            "west" to booleanProperty(falseBits and 1 == 0),
+                        ),
+                    ),
+                )
             }
 
             for (path in LEAF_BLOCKS) {
