@@ -1,10 +1,10 @@
 package org.basaltmc.world.terrain
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.common.Mth
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.registry.BlockState
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.FunctionContext
 import kotlin.math.abs

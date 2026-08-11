@@ -5,6 +5,7 @@ import org.basaltmc.auth.MinecraftCrypt
 import org.basaltmc.auth.OfflineUuid
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionProfileProperty
+import org.basaltmc.common.Identifier
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.common.placeholder.PlaceholderContext
 import org.basaltmc.common.placeholder.PlaceholderRegistry
@@ -109,7 +110,6 @@ import org.basaltmc.protocol.status.StatusResponsePacket
 import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.random.LegacyRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.registry.ItemTools
 import org.basaltmc.registry.Items
 import org.basaltmc.server.command.CommandDispatcher

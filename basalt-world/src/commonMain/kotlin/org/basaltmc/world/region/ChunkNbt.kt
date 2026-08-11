@@ -1,5 +1,6 @@
 package org.basaltmc.world.region
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtDouble
 import org.basaltmc.nbt.NbtFloat
@@ -11,7 +12,6 @@ import org.basaltmc.nbt.deepCopy
 import org.basaltmc.protocol.play.BitStorage
 import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.ChunkGeneratedEntity

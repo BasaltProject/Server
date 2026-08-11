@@ -8,8 +8,8 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.basaltmc.common.Identifier
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 
 /** Thrown for a `worldgen/template_pool`/`processor_list` JSON shape this parser doesn't understand. */
 public class VillagePoolParseException(

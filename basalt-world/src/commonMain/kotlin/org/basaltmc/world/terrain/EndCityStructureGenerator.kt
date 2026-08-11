@@ -1,10 +1,10 @@
 package org.basaltmc.world.terrain
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.random.LegacyRandom
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.random.XoroshiroRandom
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkGeneratedEntity
 import org.basaltmc.world.structure.StructureBoundingBox

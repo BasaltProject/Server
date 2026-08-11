@@ -1,6 +1,6 @@
 package org.basaltmc.registry.tags
 
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 
 /**
  * One entry in a tag file's `values` list: either a concrete element or a reference to another

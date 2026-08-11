@@ -1,6 +1,6 @@
 package org.basaltmc.world.crafting
 
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 import org.basaltmc.world.loot.ItemStack
 
 /**

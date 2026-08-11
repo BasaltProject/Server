@@ -1,5 +1,7 @@
 package org.basaltmc.registry
 
+import org.basaltmc.common.Identifier
+
 /**
  * Two-way mapping between an [Identifier], a numeric protocol/network ID, and a value, matching
  * vanilla's own registry model (`net.minecraft.core.Registry`). IDs are assigned explicitly at

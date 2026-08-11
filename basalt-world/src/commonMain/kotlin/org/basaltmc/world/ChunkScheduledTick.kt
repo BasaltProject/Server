@@ -1,6 +1,6 @@
 package org.basaltmc.world
 
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 
 /** // parity: SavedTick, owned by one chunk; X/Z are local until disk serialization. */
 public data class ChunkScheduledTick(

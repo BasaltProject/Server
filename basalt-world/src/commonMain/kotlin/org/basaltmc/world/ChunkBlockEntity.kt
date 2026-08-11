@@ -1,7 +1,7 @@
 package org.basaltmc.world
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
-import org.basaltmc.registry.Identifier
 
 /** A block entity owned by one [Chunk], with chunk-local X/Z and custom update/save NBT. */
 public data class ChunkBlockEntity(

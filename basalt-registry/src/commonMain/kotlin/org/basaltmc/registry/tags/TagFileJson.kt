@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 
 /** Thrown for tag file JSON this parser doesn't understand: an unsupported shape, not malformed JSON. */
 public class TagParseException(

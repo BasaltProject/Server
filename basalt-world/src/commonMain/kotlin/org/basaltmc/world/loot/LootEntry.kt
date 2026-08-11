@@ -1,7 +1,7 @@
 package org.basaltmc.world.loot
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.BasaltRandom
-import org.basaltmc.registry.Identifier
 import kotlin.math.floor
 import kotlin.math.max
 

@@ -1,5 +1,6 @@
 package org.basaltmc.registry
 
+import org.basaltmc.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

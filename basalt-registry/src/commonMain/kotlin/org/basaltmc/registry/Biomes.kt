@@ -1,5 +1,7 @@
 package org.basaltmc.registry
 
+import org.basaltmc.common.Identifier
+
 /** A single biome, identified by its vanilla network ID. */
 public data class Biome(
     public val id: Identifier,

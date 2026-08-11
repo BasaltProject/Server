@@ -1,8 +1,8 @@
 package org.basaltmc.world.terrain.decoration
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 
 /** The two `forest_flowers` simple-random-selector placed-feature variants. */

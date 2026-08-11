@@ -1,5 +1,7 @@
 package org.basaltmc.registry
 
+import org.basaltmc.common.Identifier
+
 /**
  * One rule of an item's `minecraft:tool` component: a block tag, whether the tool counts as the
  * correct one for that tag's drops, and how fast it mines it (`null` when the rule only excludes).

@@ -93,7 +93,7 @@ class SurfaceFreezingDecorationTest {
     private fun stateId(path: String): Int =
         Blocks.REGISTRY
             .byIdentifier(
-                org.basaltmc.registry.Identifier
+                org.basaltmc.common.Identifier
                     .vanilla(path),
             )?.stateId
             ?: error("unknown block '$path'")

@@ -484,7 +484,7 @@ class TreeFeatureTest {
 
         val blockEntity = decoratedChunk!!.blockEntities().single()
         assertEquals(
-            org.basaltmc.registry.Identifier
+            org.basaltmc.common.Identifier
                 .vanilla("beehive"),
             blockEntity.type,
         )
@@ -530,93 +530,93 @@ class TreeFeatureTest {
         val oakLogState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("oak_log"),
                 )?.stateId ?: error("unknown block")
         val oakLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("oak_leaves"),
                 )?.stateId ?: error("unknown block")
         val spruceLogState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("spruce_log"),
                 )?.stateId ?: error("unknown block")
         val spruceLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("spruce_leaves"),
                 )?.stateId ?: error("unknown block")
         val darkOakLogState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("dark_oak_log"),
                 )?.stateId ?: error("unknown block")
         val darkOakLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("dark_oak_leaves"),
                 )?.stateId ?: error("unknown block")
         val mangroveLogState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("mangrove_log"),
                 )?.stateId ?: error("unknown block")
         val mangroveLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("mangrove_leaves"),
                 )?.stateId ?: error("unknown block")
         val cherryLogState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("cherry_log"),
                 )?.stateId ?: error("unknown block")
         val cherryLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("cherry_leaves"),
                 )?.stateId ?: error("unknown block")
         val jungleLogState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("jungle_log"),
                 )?.stateId ?: error("unknown block")
         val jungleLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("jungle_leaves"),
                 )?.stateId ?: error("unknown block")
         val mangroveRootsState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("mangrove_roots"),
                 )?.stateId ?: error("unknown block")
         val podzolState = org.basaltmc.registry.Blocks.PODZOL.stateId
         val paleMossBlockState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("pale_moss_block"),
                 )?.stateId ?: error("unknown block")
         val naturalDormantCreakingHeartState =
             (
                 org.basaltmc.registry.Blocks.REGISTRY
                     .byIdentifier(
-                        org.basaltmc.registry.Identifier
+                        org.basaltmc.common.Identifier
                             .vanilla("creaking_heart"),
                     )?.stateId ?: error("unknown block")
             ) + 1

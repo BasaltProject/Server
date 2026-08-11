@@ -1,5 +1,7 @@
 package org.basaltmc.registry
 
+import org.basaltmc.common.Identifier
+
 /** A single item, identified by its vanilla network protocol ID. */
 public data class Item(
     public val id: Identifier,

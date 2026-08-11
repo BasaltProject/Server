@@ -1,7 +1,7 @@
 package org.basaltmc.world
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 
 /** A 16-wide column of blocks at ([chunkX], [chunkZ]) in chunk coordinates. */
 public class Chunk(

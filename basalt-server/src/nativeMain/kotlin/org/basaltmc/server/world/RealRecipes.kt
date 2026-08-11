@@ -1,8 +1,8 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.assets.ServerJarAssets
+import org.basaltmc.common.Identifier
 import org.basaltmc.common.logging.Logger
-import org.basaltmc.registry.Identifier
 import org.basaltmc.registry.Items
 import org.basaltmc.registry.tags.TagFile
 import org.basaltmc.registry.tags.TagFileJson

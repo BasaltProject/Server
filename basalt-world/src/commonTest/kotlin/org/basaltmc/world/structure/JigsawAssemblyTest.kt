@@ -1,5 +1,6 @@
 package org.basaltmc.world.structure
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtInt
 import org.basaltmc.nbt.NbtList
@@ -7,7 +8,6 @@ import org.basaltmc.nbt.NbtType
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import kotlin.test.Test
 import kotlin.test.assertEquals

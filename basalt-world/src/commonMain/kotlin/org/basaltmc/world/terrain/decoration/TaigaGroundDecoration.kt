@@ -1,8 +1,8 @@
 package org.basaltmc.world.terrain.decoration
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 
 /** Taiga large ferns and the two taiga-specific grass/fern ground-cover variants. */

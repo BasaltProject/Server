@@ -58,7 +58,7 @@ class HeightmapTypeTableTest {
             NON_COLLIDING_NAMES.any {
                 Blocks.REGISTRY
                     .byIdentifier(
-                        org.basaltmc.registry.Identifier
+                        org.basaltmc.common.Identifier
                             .vanilla(it),
                     )?.stateId ==
                     stateId

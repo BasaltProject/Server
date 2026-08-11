@@ -1,6 +1,6 @@
 package org.basaltmc.server.world
 
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertNull
 

@@ -1,6 +1,7 @@
 package org.basaltmc.server
 
 import org.basaltmc.auth.OfflineUuid
+import org.basaltmc.common.Identifier
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.protocol.configuration.FinishConfigurationPacket
@@ -33,7 +34,6 @@ import org.basaltmc.protocol.play.SetHeldSlotPacket
 import org.basaltmc.protocol.play.SpawnEntityPacket
 import org.basaltmc.protocol.readVarInt
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.registry.Items
 import org.basaltmc.server.player.PlayerInventory
 import org.basaltmc.storage.PlayerStore
