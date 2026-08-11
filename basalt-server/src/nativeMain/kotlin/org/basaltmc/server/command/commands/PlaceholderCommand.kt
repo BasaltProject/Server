@@ -17,16 +17,12 @@ import org.basaltmc.text.MiniMessage
 import org.basaltmc.text.TextColor
 
 /**
- * `/placeholder`: what the placeholder registry knows, and what a piece of text turns into.
+ * `/placeholder`: what the registry knows and what a piece of text turns into, modelled on
+ * PlaceholderAPI's debugging commands, which operators already know.
  *
- * Modelled on PlaceholderAPI's own debugging commands, because operators already know them and
- * because the questions are the same ones: what is registered, what does this name mean, and what
- * would this line actually say for that player.
- *
- * Two deliberate differences from PAPI. `cmdparse` runs the command **as whoever typed it**, not as
- * the console: running arbitrary text as the console turns any permission to debug placeholders
- * into a permission to do everything. And the subject has to be an online player, since a stored
- * row is not a player and cannot answer where they are standing.
+ * Two deliberate differences: `cmdparse` runs the command as whoever typed it, since running text
+ * as the console turns permission to debug placeholders into permission to do everything, and the
+ * subject must be online, a stored row not being able to answer where it is standing.
  */
 public class PlaceholderCommand :
     Command(

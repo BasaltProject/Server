@@ -30,26 +30,15 @@ import kotlin.concurrent.AtomicInt
 import kotlin.time.TimeSource
 
 /**
- * Starts a real [BasaltServer] on its own [NativeThread], waits for it to accept connections, and
- * returns the port it ended up on: callers must use that one, not the one they asked for. Each
- * retry moves to the next candidate port, because a bind failure is usually about the port itself
- * (see [candidatePorts]) and retrying the same one just fails again. A bind failure on the spawned
- * thread no longer crashes the process (see [NativeThread]'s KDoc), so a retry is safe.
+ * Starts a real [BasaltServer] on its own [NativeThread] and returns the port it ended up on:
+ * callers must use that one, since a bind failure moves to the next of [candidatePorts].
  *
- * Ports live well outside Minecraft's own 25565-range on purpose. Fixed ports in that range
- * collide with any real server the developer happens to have running, and the failure is deeply
- * confusing: the test reaches that server instead of its own and fails on a protocol assertion
- * that has nothing to do with the change under test.
+ * Ports stay away from 25565, so a server the developer is running cannot answer instead, and
+ * below 32768, under Linux's ephemeral range, where a loopback `connect` can pick the same port as
+ * its own source and succeed against itself before anything is listening.
  *
- * They also stay below 32768, under Linux's ephemeral range: a `connect` to a loopback port inside
- * it can pick that very port as its own source and succeed against itself, which made the readiness
- * probe below return before the server was listening.
- *
- * [worldName] is a distinctly-scoped scratch name, not `"world"`: [BasaltServer] now really
- * generates and saves chunks (`NoiseWorldGenerator`/`RegionStore`), a real relative path a
- * production run could plausibly also use, so tests need their own name to never collide with (or
- * be mistaken for) an actual world directory. Not cleaned up automatically, same as
- * `AssetCacheTest`'s own scratch directory: harmless small files, left for local inspection.
+ * The world name is scoped to the test, since the server really writes chunks, and left behind
+ * afterwards like `AssetCacheTest`'s scratch directory.
  */
 internal fun startTestServer(
     preferredPort: Int,

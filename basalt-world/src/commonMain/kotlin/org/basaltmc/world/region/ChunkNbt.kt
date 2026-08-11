@@ -21,27 +21,15 @@ public class ChunkNbtException(
 ) : Exception(message)
 
 /**
- * Maps a [Chunk] to and from vanilla's real on-disk chunk NBT (`net.minecraft.world.level.chunk
- * .storage.SerializableChunkData`, decompiled, not guessed): `DataVersion`/`xPos`/`yPos`/`zPos`/
- * `Status`/`sections`, each section a `Y` byte plus `block_states`/`biomes`, both the same
- * palette-plus-optional-`data`-longs shape `net.minecraft.world.level.chunk.PalettedContainer`
- * uses on the wire (`basalt-protocol`'s own `PalettedContainer`), just NBT-framed instead of
- * varint-framed: a `"palette"` list (one entry per distinct value, `{"Name": "minecraft:stone"}`
- * for blocks, a bare string for biomes) and an optional `"data"` `LongArray` holding
- * [BitStorage]-packed indices into that palette (single-entry palettes have no `data` tag at all,
- * matching vanilla's zero-bit `SingleValuePalette`). Bits per entry is never stored explicitly:
- * both sides recompute it from the palette's own size
- * (`net.minecraft.world.level.chunk.Strategy.getConfigurationForPaletteSize`), decompiled for the
- * exact thresholds: blocks go single-value / 4-8 bit indirect (floored to 4) / direct beyond that,
- * biomes go single-value / 1-3 bit indirect / direct beyond that.
+ * // parity: net.minecraft.world.level.chunk.storage.SerializableChunkData, the on-disk chunk NBT.
+ * Sections carry the same palette-plus-optional-`data`-longs shape as the wire format, NBT-framed
+ * rather than varint-framed, with no explicit bits-per-entry: both sides recompute it from the
+ * palette size (`Strategy.getConfigurationForPaletteSize`), blocks single-value / 4-8 bit indirect
+ * / direct, biomes single-value / 1-3 bit / direct.
  *
- * Non-default states emitted by worldgen preserve their vanilla `Properties` compound in the
- * palette and resolve it back to the same network state ID when loaded. Block and fluid ticks use
- * the vanilla SavedTick shape and preserve insertion order; executing due ticks remains a runtime
- * concern outside this codec. Deliberately out of scope for now: block/light data
- * (`BlockLight`/`SkyLight`), entities, heightmaps, and structures. Block entities preserve full
- * custom NBT plus vanilla id/x/y/z metadata. Section biome palettes preserve the actual
- * quart-resolution IDs generated for every dimension.
+ * Block states keep their `Properties` compound and resolve back to the same network state ID,
+ * block entities keep their custom NBT, and ticks keep the SavedTick shape and insertion order.
+ * Out of scope: light data, entities, heightmaps and structures.
  */
 public object ChunkNbt {
     // world_version for Minecraft 26.2, per the project's own protocol constants.

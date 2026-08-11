@@ -4,16 +4,13 @@ import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.world.Chunk
 
 /**
- * Real Mushroom Fields `vegetal_decoration` entries, in the real jar's own
- * `BiomeDefaultFeatures.addMushroomFieldVegetation` order (decompiled):
- * `mushroom_island_vegetation` (one position per chunk, a real `RANDOM_BOOLEAN_SELECTOR` between
- * `huge_red_mushroom` on true and `huge_brown_mushroom` on false), `brown_mushroom_taiga`
- * (rarity 4) and `red_mushroom_taiga` (rarity 256), both over the real `getMushroomPlacement`
- * modifier list.
+ * Mushroom Fields `vegetal_decoration`, in `BiomeDefaultFeatures.addMushroomFieldVegetation` order:
+ * `mushroom_island_vegetation` (one position per chunk, a `RANDOM_BOOLEAN_SELECTOR` between the
+ * huge red and brown mushrooms), then `brown_mushroom_taiga` and `red_mushroom_taiga` over
+ * `getMushroomPlacement`.
  *
- * [ExtraVegetationDecoration.NEAR_WATER] supplies the later shared sugar-cane and firefly-bush
- * features. **Not ported**: the small mushrooms' real light-level survival rule (no light engine; the shared
- * [SimpleBlockFeature] air-and-solid-ground approximation stands in, as everywhere else here).
+ * [ExtraVegetationDecoration.NEAR_WATER] adds the shared sugar-cane and firefly-bush features. The
+ * small mushrooms' light-level survival rule is not ported: no light engine yet.
  */
 public object MushroomFieldsDecoration : BiomeVegetalDecoration {
     override fun decorate(

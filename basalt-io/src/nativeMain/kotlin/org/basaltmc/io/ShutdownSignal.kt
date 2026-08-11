@@ -10,17 +10,13 @@ import platform.posix.signal
 import kotlin.concurrent.AtomicInt
 
 /**
- * Turns `Ctrl+C` and `kill` into an orderly shutdown instead of an abrupt death.
+ * Turns `Ctrl+C` and `kill` into an orderly shutdown instead of an abrupt death, saving up to a
+ * whole save interval of every player. `SIGINT` is the operator, `SIGTERM` is what `systemd`,
+ * Docker and every supervisor send before `SIGKILL`.
  *
- * A signal handler may only call async-signal-safe functions: allocating, taking a lock or writing
- * to a file from inside one can deadlock against whatever the interrupted thread was doing. So the
- * handler does exactly one thing, set a flag, and the real work happens on a normal thread that
- * notices it. [requested] is created when this object is first touched, which [install] forces
- * before any signal can arrive, so the handler itself never triggers initialization.
- *
- * Both signals matter and for different reasons: `SIGINT` is an operator pressing Ctrl+C, `SIGTERM`
- * is what `systemd`, Docker and every process supervisor send first before resorting to `SIGKILL`.
- * Without this the server lost up to one save interval of every player on any of those.
+ * The handler only sets a flag, since anything else it could do risks deadlocking against the
+ * interrupted thread. [install] touches [requested] first, so the handler never has to initialize
+ * it.
  */
 public object ShutdownSignal {
     private val requested = AtomicInt(0)

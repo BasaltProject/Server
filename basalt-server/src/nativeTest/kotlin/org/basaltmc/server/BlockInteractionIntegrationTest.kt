@@ -49,27 +49,16 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Drives one real survival player through Login/Configuration/Play over a real socket (same
- * harness as [PlayFlowIntegrationTest]), seeded straight into `players.db` with a stack of dirt in
- * hand so the whole thing works without depending on the creative-slot path.
+ * One survival player over a real socket (same harness as [PlayFlowIntegrationTest]), seeded into
+ * `players.db` holding dirt so this does not depend on the creative-slot path. Covers placing,
+ * breaking, dropping (`Q`) and picking an item back up.
  *
- * Covers placing a block, breaking it, dropping the held item (`Q`), and picking a dropped item
- * back up. Does **not** cover a survival break's loot-table drop: that needs [RealLootTables] to
- * resolve a real block loot table, which needs a real downloaded `server.jar`
- * ([org.basaltmc.assets.ServerJarAssets]), which this lightweight test server does not have (and
- * never will, since that content is never committed). [RealLootTablesTest]
- * already covers the "no jar" path returning no drop, and [org.basaltmc.world.loot.LootTableTest]
- * covers the engine itself; an end-to-end loot-table drop is out of reach for a socket-level test
- * without embedding real datapack content, which is exactly what is not allowed here.
+ * A survival break's loot drop needs a downloaded `server.jar` this test server has not got, so
+ * [RealLootTablesTest] and `LootTableTest` cover those halves instead.
  *
- * The target y is 300, close to [org.basaltmc.world.WorldHeight.MAX_Y] (319): high enough that no
- * plausible surface height plus noise variance reaches it (an earlier version of this test used
- * y=100, reasoning from [org.basaltmc.world.NoiseWorldGenerator]'s *documented* `HEIGHT_VARIATION`
- * of 6 around sea level 63; a live run showed that bound does not actually hold, since
- * `NormalNoise` combining several octaves is not itself clamped to the range its amplitude
- * argument suggests, and (8, 100, 8) came back solid dirt for seed 0). Sending
- * [BlockHitResult.inside] `true` places directly at the target position instead of offsetting from
- * a clicked neighbour, so no solid block has to be found nearby either.
+ * The target y is 300: noise reaches higher than the documented height variation suggests, and
+ * y=100 came back solid dirt for seed 0. [BlockHitResult.inside] places at the target rather than
+ * offsetting from a neighbour, so no solid block has to be found.
  */
 @OptIn(ExperimentalUuidApi::class)
 class BlockInteractionIntegrationTest {

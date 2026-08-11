@@ -17,21 +17,15 @@ plugins {
 }
 
 /**
- * Compiles SQLite's official amalgamation into every native target this host builds, and hands the
- * resulting static library to a cinterop so it ends up inside the final binary.
+ * Compiles SQLite's official amalgamation for every native target this host builds and hands the
+ * static library to a cinterop, so it ends up inside the binary.
  *
- * The alternative, which is what SQLDelight's driver does by default, is to link `-lsqlite3` against
- * whatever SQLite the machine happens to have. That does not work here, and not as a matter of
- * taste: Kotlin/Native links Linux and Windows binaries against its own bundled sysroots, and
- * neither ships a SQLite (checked: `~/.konan/dependencies/x86_64-unknown-linux-gnu-*` and
- * `msys2-mingw-w64-x86_64-*` contain none), so the link simply fails there. Compiling the
- * amalgamation is the only option that produces one binary that runs anywhere, which is the whole
- * point of shipping native executables.
+ * Linking `-lsqlite3` instead, as SQLDelight's driver does, fails outright: Kotlin/Native links
+ * Linux and Windows against its own bundled sysroots and neither ships a SQLite.
  *
- * Every toolchain detail comes out of `konan.properties`, the same file the Kotlin/Native compiler
- * reads, rather than being hardcoded: the target triple, the sysroot, and the variable indirections
- * (`$gccToolchain.linux_x64`) it resolves them through. A hardcoded path would be a guess about a
- * platform this host cannot even build for.
+ * The triple, the sysroot and the `$variable` indirections all come from `konan.properties`, the
+ * file the compiler itself reads: a hardcoded path would be a guess about a platform this host
+ * cannot even build for.
  */
 @CacheableTask
 abstract class DownloadSqliteAmalgamation : DefaultTask() {

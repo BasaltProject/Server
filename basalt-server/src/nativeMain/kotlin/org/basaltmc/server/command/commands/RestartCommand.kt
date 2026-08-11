@@ -7,21 +7,13 @@ import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 
 /**
- * `/restart`: stops this server and starts a fresh one **in the same process**.
+ * `/restart`: winds this server down exactly as `/stop` does, then builds another one from the
+ * configuration files as they stand, **in the same process**. Nothing carries over, which is the
+ * point: everything `/reload` has to refuse because it was decided at startup is decided again.
  *
- * Not a re-exec and not a new process. The running instance winds itself down exactly as `/stop`
- * winds it down (players saved and disconnected, worlds flushed, database checkpointed and closed,
- * port released) and then another one is built from the configuration files as they stand. Nothing
- * is carried over, which is the point: the port is bound again, the worlds are loaded again, and
- * everything `/reload` has to refuse because it was decided at startup is decided again.
- *
- * Staying in the same process is what makes this work at all here: Kotlin/Native does not hand a
- * program its own `argv[0]`, and the calls that would reveal the executable's path are not in the
- * platform bindings on every target, so re-launching the binary would have been the fragile option
- * rather than the obvious one.
- *
- * Players are disconnected. There is no way around that: their connection belongs to the instance
- * being replaced, and a restart that kept it would be a reload wearing a different name.
+ * Same process because Kotlin/Native does not hand a program its own `argv[0]`, and the calls that
+ * would reveal the executable's path are missing from some targets, so re-exec is the fragile
+ * option here. Players are disconnected: their connection belongs to the instance being replaced.
  */
 public class RestartCommand(
     private val requestRestart: () -> Unit,

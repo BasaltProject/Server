@@ -22,22 +22,12 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
- * // parity: net.minecraft.world.level.levelgen.feature.TreeFeature plus the real trunk/foliage
- * placer and `FeatureSize` types it drives (`TrunkPlacer`/`StraightTrunkPlacer`/`ForkingTrunkPlacer`/
- * `FancyTrunkPlacer`/`DarkOakTrunkPlacer`/`GiantTrunkPlacer`/`MegaJungleTrunkPlacer`/
- * `UpwardsBranchingTrunkPlacer`/`CherryTrunkPlacer`, `FoliagePlacer`/`BlobFoliagePlacer`/
- * `BushFoliagePlacer`/`MegaJungleFoliagePlacer`/`FancyFoliagePlacer`/`AcaciaFoliagePlacer`/`SpruceFoliagePlacer`/`PineFoliagePlacer`/
- * `DarkOakFoliagePlacer`/`MegaPineFoliagePlacer`/`RandomSpreadFoliagePlacer`/`CherryFoliagePlacer`,
- * `TwoLayersFeatureSize`/`ThreeLayersFeatureSize`), all decompiled from the real jar. Coordinates are world block
- * coordinates throughout, matching [org.basaltmc.world.terrain.decoration.DecorationPos]'s own
- * convention; only [Chunk] reads/writes mask X/Z down to chunk-local `and 15`, the same established
- * simplification [org.basaltmc.world.terrain.decoration.PlainsDecoration]'s own pipeline already
- * uses (this project generates one chunk at a time with no cross-chunk write support yet, so a
- * canopy that would reach a neighboring chunk wraps back into this one instead of spilling over,
- * exactly like every other decoration feature here already does).
+ * // parity: net.minecraft.world.level.levelgen.feature.TreeFeature and every trunk placer,
+ * foliage placer and `FeatureSize` the Overworld trees drive, decompiled from the jar.
  *
- * **Documented gaps**, narrowing real vanilla's own `TreeFeature.place`:
- * - All configured tree-decorator algorithms used by current Overworld trees are implemented.
+ * Coordinates are world block coordinates, as [DecorationPos] has them; only [Chunk] access masks
+ * X/Z to `and 15`, so a canopy reaching the next chunk wraps back into this one instead of
+ * spilling over. Every decoration feature here does that until cross-chunk writes exist.
  */
 public data class FoliageAttachment(
     val x: Int,

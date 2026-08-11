@@ -10,17 +10,12 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * Structural/self-consistency checks for [NoiseRouterData.overworld]: the graph *assembly* only,
- * not a byte-exact real-jar comparison. [TerrainProvider], the piece with the most literal
- * constants and the highest risk of a transcription error, is already verified bit-exact
- * elsewhere ([TerrainProviderTest]) against a real jar harness; this class is comparatively
- * mechanical glue over already-verified pieces (the individual [org.basaltmc.world.densityfunction]
- * node types have their own `// parity:` provenance and this project's own established review).
+ * Structural checks for [NoiseRouterData.overworld], the graph assembly only: the literal constants
+ * with real transcription risk live in [TerrainProvider], already verified bit-exact against the
+ * jar, and the node types carry their own `// parity:` provenance.
  *
- * A real end-to-end bit-exact check against the jar needs the same per-world-seed resolution real
- * vanilla applies via `NoiseRouter.withNewRandom` (not built yet: [overworldRouter]'s `noise`
- * parameter is exactly the extension point that will plug into once it exists), so it is deferred
- * to that point rather than faked here with a mismatched, ad hoc seeding scheme.
+ * An end-to-end comparison needs the per-world-seed resolution `NoiseRouter.withNewRandom` applies,
+ * which does not exist yet, so it waits rather than being faked with an ad hoc seeding scheme.
  */
 class NoiseRouterDataTest {
     private fun syntheticNoise(name: String): NormalNoise {

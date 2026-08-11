@@ -4,18 +4,13 @@ import org.basaltmc.registry.Biome
 import org.basaltmc.registry.Biomes
 
 /**
- * // parity: net.minecraft.world.level.biome.OverworldBiomeBuilder. The real vanilla biome
- * transitioner: rather than placing biome borders by hand, every Overworld biome is expressed as a
- * region (a [ParameterPoint]) in the six-axis climate space [Parameter.Sampler] samples per
- * column, and [ParameterList.findValue] then just picks whichever registered region is closest to
- * the sampled point. Adjacent regions naturally produce the same soft, curved borders vanilla has,
- * with zero explicit boundary logic. Ported mechanically from the real jar's own decompiled
- * `addBiomes`/`add*Slice`/`pick*Biome` methods: every threshold, table and branch below is theirs,
- * not an approximation.
+ * // parity: net.minecraft.world.level.biome.OverworldBiomeBuilder, ported mechanically: every
+ * threshold, table and branch below is vanilla's, not an approximation.
  *
- * Debug-only members (`spawnTarget`, `getDebugStringFor*`, `getPeaksAndValleysThresholds`,
- * `addDebugBiomes`) are not ported: none of them affect biome selection, only `F3` overlays and a
- * debug world type this project does not have.
+ * Biomes are regions in the six-axis climate space rather than hand-placed borders, and
+ * [ParameterList.findValue] picks the closest one to the sampled point, which is where vanilla's
+ * soft curved borders come from. The debug-only members are not ported: they feed `F3` overlays
+ * and a debug world type this project has not got.
  */
 public class OverworldBiomeBuilder {
     private val fullRange = Parameter.span(-1.0f, 1.0f)

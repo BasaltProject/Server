@@ -1,16 +1,13 @@
 package org.basaltmc.world.densityfunction
 
 /**
- * // parity: net.minecraft.world.level.levelgen.NoiseChunk's own `FlatCache` and `Cache2D`, the
- * caches its visitor wraps [Marker] subtrees in. Vanilla builds a fresh `NoiseChunk` per chunk and
- * rewrites the router tree into it; this project's router is an immutable tree shared by every
- * generation worker, so the mutable state lives here instead and travels down the tree inside
- * [FunctionContext.cache]. One instance belongs to exactly one chunk on exactly one thread, so
- * nothing here needs a lock.
+ * // parity: NoiseChunk's `FlatCache` and `Cache2D`. Vanilla rewrites the router tree into a fresh
+ * `NoiseChunk` per chunk; the router here is immutable and shared, so the mutable state lives in
+ * this object and travels down inside [FunctionContext.cache]. One instance, one chunk, one
+ * thread, so no lock.
  *
- * [flatCache] is not a memoization of what the wrapped function would otherwise return: vanilla
- * quantizes the query to the quart grid and samples at `y = 0`, and every position inside that
- * quart gets that one value. Reproducing that quantization is the point, not a shortcut around it.
+ * [flatCache] is not memoization: vanilla quantizes to the quart grid and samples at `y = 0`, and
+ * reproducing that quantization is the point.
  */
 public class DensityCache(
     chunkX: Int,

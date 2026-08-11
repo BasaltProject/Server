@@ -20,17 +20,10 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 
 /**
- * One world, and everything that belongs to exactly one world.
+ * One world, and everything that belongs to exactly one world: its chunks, region files,
+ * generation workers, settings and seed, none of them reachable without saying which world.
  *
- * Before this existed the server had a single [WorldState], a single [RegionStore] and a single
- * generation queue held directly as fields, which is what made "several worlds" impossible rather
- * than merely unwritten. Bundling them here is the whole change: a world is now a thing you can
- * have more than one of, and the pieces that are genuinely per world (its chunks, its region files,
- * its generation workers, its settings, its seed) can no longer be reached without saying which
- * world you mean.
- *
- * What is still shared, correctly, is everything that is not per world: the player list, the
- * database, the command dispatcher.
+ * The player list, the database and the command dispatcher stay shared, being not per world.
  */
 public class LoadedWorld(
     public val declaration: WorldDeclaration,

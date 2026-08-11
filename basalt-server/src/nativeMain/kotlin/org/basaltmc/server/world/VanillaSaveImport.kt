@@ -20,16 +20,12 @@ public data class ImportReport(
 )
 
 /**
- * Imports the players of an existing vanilla save into `players.db`.
+ * Imports the players of an existing vanilla save into `players.db`, starting from
+ * `usercache.json` rather than a listing of `playerdata/`: a `.dat` file holds the data but not
+ * the name, so walking the directory would import everyone nameless.
  *
- * The entry point is `usercache.json`, not a listing of `playerdata/`, and that is a design choice
- * rather than a shortcut: a `.dat` file does not contain the player's *name*, only their data, so
- * walking the directory would import everyone as nameless. `usercache.json` is vanilla's own
- * name-to-UUID index, which is exactly the missing half. It also means this needs no directory
- * listing, which `basalt-io` does not have.
- *
- * One-way and idempotent: running it twice overwrites the same rows rather than duplicating them,
- * and it never writes back into the save it read.
+ * One-way and idempotent: a second run overwrites the same rows and never writes back into the
+ * save it read.
  */
 public object VanillaSaveImport {
     @OptIn(ExperimentalTime::class)

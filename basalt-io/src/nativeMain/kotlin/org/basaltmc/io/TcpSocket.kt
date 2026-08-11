@@ -89,18 +89,12 @@ internal expect fun socketErrorIsPeerGone(error: Int): Boolean
 internal expect fun peerAddress(fd: Long): UInt?
 
 /**
- * Blocking IPv4 TCP sockets. This is a thread-per-connection building block, not an event loop:
- * `epoll`/`kqueue`/IOCP-based async I/O is deliberately out of scope for this pass and is a
- * tracked follow-up.
+ * Blocking IPv4 TCP sockets, a thread-per-connection building block rather than an event loop.
+ * Literal IPv4 only, no DNS, and little-endian hosts only, which every target here is.
  *
- * Only literal IPv4 addresses are supported (no DNS resolution) and only little-endian hosts
- * (true of every target Basalt builds for: ARM64 and x64).
- *
- * The file descriptor is stored as [Long] rather than [Int] specifically so this class can be
- * shared across POSIX (where it's a small non-negative `int`) and Winsock (where `SOCKET` is a
- * 64-bit unsigned handle): the two are bit-reinterpreted into the same 64-bit signed [Long], which
- * keeps every existing `< 0` failure check correct on both, since Winsock's all-ones
- * `INVALID_SOCKET`/`SOCKET_ERROR` reinterprets to `-1L` exactly like POSIX's `-1` already does.
+ * The descriptor is a [Long] so POSIX's `int` and Winsock's 64-bit `SOCKET` share this class:
+ * bit-reinterpreted, Winsock's all-ones `INVALID_SOCKET` lands on `-1L` like POSIX's `-1`, so the
+ * `< 0` checks stay correct on both.
  */
 public class TcpListener private constructor(
     private val fd: Long,

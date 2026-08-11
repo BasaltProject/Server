@@ -19,18 +19,13 @@ public fun combine(vararg steps: BiomeVegetalDecoration): BiomeVegetalDecoration
     BiomeVegetalDecoration { chunk, random -> steps.forEach { it.decorate(chunk, random) } }
 
 /**
- * Dispatches a biome identifier to its real decoration, matching real vanilla's own
- * `ChunkGenerator.applyBiomeDecoration` (which looks up the actual biome at each decorated
- * position, not a single fixed one). [org.basaltmc.world.terrain.RealTerrainGenerator] resolves
- * only the chunk's own center column and decorates the whole chunk with that one result: real
- * vanilla's decoration is chunk-scoped in practice too (everything placed by one chunk's
- * `applyBiomeDecoration` call shares that chunk's carved region), and this project's own decoration
- * pipeline is already chunk-scoped ([PlacementContext][org.basaltmc.world.terrain.decoration.PlacementContext]
- * has no cross-chunk state), so per-column dispatch is not meaningfully different except at biome
- * borders, an accepted, documented approximation.
+ * Dispatches a biome identifier to its decoration, as `ChunkGenerator.applyBiomeDecoration` does.
+ * [RealTerrainGenerator] resolves the chunk's centre column only and decorates the whole chunk
+ * with it: decoration here is chunk-scoped anyway, so this differs from per-column dispatch only
+ * at biome borders, an accepted approximation.
  *
- * All 55 current Overworld biome identifiers are listed. Unknown biome identifiers resolve to
- * `null` rather than borrowing another biome's feature list.
+ * All 55 Overworld biomes are listed; an unknown one resolves to `null` rather than borrowing
+ * another biome's features.
  */
 public object BiomeDecoration {
     private val noVegetalDecoration = BiomeVegetalDecoration { _, _ -> }

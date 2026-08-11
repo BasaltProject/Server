@@ -7,18 +7,13 @@ import org.basaltmc.world.spline.CubicSplineBuilder
 import kotlin.math.abs
 
 /**
- * // parity: net.minecraft.data.worldgen.TerrainProvider. Builds the real Overworld terrain
- * splines (offset/factor/jaggedness over continentalness/erosion/ridges/weirdness): the literal
- * control points below are Mojang's own algorithm constants, hardcoded directly in this class in
- * the real jar (not loaded from any `data/` datapack JSON at runtime), the same category of
- * material this project already committed directly for [org.basaltmc.world.densityfunction.BlendedNoise].
+ * // parity: net.minecraft.data.worldgen.TerrainProvider, the Overworld offset, factor and
+ * jaggedness splines. The control points are hardcoded in that class in the jar, not datapack
+ * JSON, the same category of material as [BlendedNoise].
  *
- * **Deliberately narrowed scope**: only the non-amplified path is ported. Real vanilla threads an
- * `amplified: Boolean` flag through every one of these methods to pick an alternate value
- * transformer (`AMPLIFIED_OFFSET`/`AMPLIFIED_FACTOR`/`AMPLIFIED_JAGGEDNESS`) for the "Amplified"
- * world preset; the default Overworld (and every biome parity work in this project targets so
- * far) always uses the identity transformer, so the transformer parameter is dropped entirely
- * here rather than threaded through unused. Amplified-preset support is a documented gap.
+ * Only the non-amplified path is ported: the Amplified preset's alternate value transformers are
+ * a documented gap, so the flag vanilla threads through every method is dropped rather than
+ * carried unused.
  */
 public object TerrainProvider {
     public fun <C, I : BoundedFloatFunction<C>> overworldOffset(

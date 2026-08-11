@@ -15,17 +15,14 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
- * parity: `TeleportCommand`, minus its `facing`, rotation and cross-dimension branches (declared
- * gaps: the first two need a rotation argument, the third needs more than one dimension).
+ * // parity: TeleportCommand, minus its `facing`, rotation and cross-dimension branches.
  *
- * The three top-level forms are declared in vanilla's own order, which is load-bearing:
- * `<destination>` and `<targets>` both begin by parsing a player selector, so the dispatcher only
- * reaches `/tp Steve 10 64 10` by failing the first and backtracking into the second.
+ * The three forms keep vanilla's order, which is load-bearing: `<destination>` and `<targets>`
+ * both start by parsing a selector, so `/tp Steve 10 64 10` is only reached by failing the first
+ * and backtracking.
  *
- * The optional trailing `<world>` is Basalt's, not vanilla's: vanilla changes world with
- * `/execute in <dimension> run tp ...`, which needs `/execute`. It is appended to the existing
- * forms rather than inserted among them precisely so every vanilla form keeps meaning exactly what
- * it means in vanilla: `/tp 10 64 10 lobby` and `/tp Steve 10 64 10 lobby`.
+ * The trailing `<world>` is Basalt's, since vanilla changes world through `/execute`. It is
+ * appended rather than inserted so every vanilla form still means what it means in vanilla.
  */
 public class TeleportCommand :
     Command(

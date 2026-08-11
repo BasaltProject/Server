@@ -7,17 +7,12 @@ import org.basaltmc.nbt.NbtIO
 import kotlin.random.Random
 
 /**
- * What a world remembers about itself between restarts: `worlds/<name>/level.nbt`.
+ * What a world remembers about itself between restarts: `worlds/<name>/level.nbt`. The seed a world
+ * was generated with is state, not configuration: left in a config file, editing it regenerates
+ * different terrain next to the terrain already on disk.
  *
- * Until this existed the server persisted a world's chunks and nothing else, so the seed was a
- * constant in `Main.kt`. That is fine only while the seed can never change: the moment it becomes
- * configurable, a world whose seed lives in a configuration file regenerates *different terrain*
- * next to the terrain already on disk the first time someone edits it. The seed a world was
- * generated with is state, and state belongs with the world.
- *
- * NBT rather than TOML because nobody hand-edits it, and `level.nbt` rather than vanilla's
- * `level.dat` for the same reason regions are `.linear` and not `.mca`: it is not vanilla's format
- * and should not claim to be.
+ * NBT because nobody hand-edits it, and `level.nbt` rather than `level.dat` for the same reason
+ * regions are `.linear`: it is not vanilla's format and should not claim to be.
  */
 public data class WorldMetadata(
     val seed: Long,

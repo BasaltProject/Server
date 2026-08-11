@@ -40,17 +40,14 @@ kotlin {
 }
 
 /**
- * Turns every `.toml` under `src/nativeMain/resources/config-defaults` into one file of constants.
+ * Turns every `.toml` under `src/nativeMain/resources/config-defaults` into one file of constants,
+ * so `tab_list.toml` becomes `TAB_LIST_DEFAULT_TOML` and adding a template is adding a file.
  *
- * (Do not write a glob with a slash and a star in this comment: Kotlin nests block comments, so it
- * opens one and silently swallows the rest of this script. That cost an hour.)
+ * (Do not write a glob with a slash and a star in this comment: Kotlin nests block comments and
+ * swallows the rest of the script.)
  *
- * The templates are real TOML files: edited as TOML, highlighted as TOML, with no Kotlin escaping to
- * remember. They are compiled *in* rather than read from disk at runtime because Kotlin/Native has
- * no resource loading at all, and a server that needed a folder beside it to write its own first
- * configuration would stop being the single self-contained binary this project ships.
- *
- * `tab_list.toml` becomes `TAB_LIST_DEFAULT_TOML`, so adding a template is adding a file.
+ * They are compiled in rather than read at runtime because Kotlin/Native has no resource loading,
+ * and needing a folder beside the binary would cost the single self-contained binary.
  */
 tasks.register("generateConfigDefaults") {
     val input = file("src/nativeMain/resources/config-defaults")

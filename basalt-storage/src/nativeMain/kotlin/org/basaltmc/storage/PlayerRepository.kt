@@ -13,14 +13,11 @@ public data class PlayerSummary(
 /**
  * Reading and writing players, and the handful of questions an operator asks about them.
  *
- * Every write is one statement against one row, which SQLite runs in its own implicit transaction:
- * a player is either saved or not, never half-saved, and a crash mid-write cannot leave the
- * position updated with the inventory from before it. That is the property this whole layer exists
- * for, and the one that `playerdata/<uuid>.dat` cannot offer, since a truncated file is a lost
- * player.
+ * Every write is one statement against one row, so SQLite's implicit transaction means a player is
+ * saved or not, never a new position with the old inventory. That is what this layer is for, and
+ * what `playerdata/<uuid>.dat` cannot offer, a truncated file being a lost player.
  *
- * The admin queries deliberately select only columns, never blobs: counting players by game mode
- * should not deserialize a single inventory.
+ * The admin queries select columns, never blobs: counting by game mode deserializes no inventory.
  */
 public class PlayerRepository(
     private val database: PlayerDatabase,

@@ -7,16 +7,12 @@ import org.basaltmc.storage.StoredInventory
 import org.basaltmc.storage.StoredItemStack
 
 /**
- * The 41 slots of one player: 36 main (hotbar included), 4 armour, 1 offhand.
+ * The 41 slots of one player: 36 main including the hotbar, 4 armour, 1 offhand, in the vanilla
+ * network order, which is what container packets index and what a client clicks in. The stored
+ * order is the same, so persistence is a straight copy.
  *
- * Held in the vanilla *network* order, because that is the order the container packets index and
- * the order a client clicks in; the stored order is the same, which is why persistence is a
- * straight copy either way.
- *
- * This is deliberately only the container: it holds stacks, hands them out and puts them back. What
- * a player can *do* with them (clicking, dropping, placing, crafting) is a separate system that
- * does not exist yet, and is why [org.basaltmc.server.ClientSession] answers a click by re-sending
- * the whole window rather than by half-applying it.
+ * Only the container: it holds stacks and hands them back. What a player can do with them is a
+ * separate system, which is why a click is answered by re-sending the whole window.
  */
 public class PlayerInventory {
     private val slots = arrayOfNulls<StoredItemStack>(StoredInventory.PLAYER_SLOTS)
@@ -137,17 +133,12 @@ public class PlayerInventory {
 
     public companion object {
         /**
-         * How many slots container 0 has on the wire, and the whole reason this class needs a
-         * mapping at all: the player's own window is `InventoryMenu`, which is **46** slots
-         * (result, 2x2 crafting grid, armour, storage, hotbar, offhand), not the 41 this class
-         * stores. Verified against the real 26.2 jar's own `InventoryMenu` constants
-         * (`RESULT_SLOT`/`CRAFT_SLOT_START`/`ARMOR_SLOT_START`/`INV_SLOT_START`/`USE_ROW_SLOT_START`/
-         * `SHIELD_SLOT`).
+         * How many slots container 0 has on the wire, and why this class maps at all: the player's
+         * window is `InventoryMenu`'s 46 slots (result, 2x2 grid, armour, storage, hotbar,
+         * offhand), not the 41 stored here.
          *
-         * Sending the raw 41 instead is not a cosmetic mismatch: a real client drops the whole
-         * window packet, so nothing the server changes ever appears, and it addresses its own
-         * clicks in menu numbering, so a hotbar edit lands on whatever the server keeps 9 slots
-         * earlier (armour, as it happens). Both directions have to go through here.
+         * Sending 41 is not a cosmetic mismatch: the client drops the window packet outright, and
+         * it numbers its own clicks in menu slots, so a hotbar edit lands on armour instead.
          */
         public const val MENU_SLOTS: Int = 46
 

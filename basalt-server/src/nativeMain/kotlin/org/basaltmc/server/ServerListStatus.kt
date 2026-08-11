@@ -22,17 +22,14 @@ public data class ListedPlayer(
 )
 
 /**
- * Turns a ping into the status the client draws, by picking a profile out of `server_list.toml` and
- * rendering it.
+ * Turns a ping into the status the client draws, by picking a profile out of `server_list.toml`
+ * and rendering it. [ServerListConfig] knows what the operator wrote and which profile applies;
+ * this knows how to draw it, and neither resolves placeholders, which is what lets the same text
+ * work in a chat format too.
  *
- * Kept apart from [ServerListConfig] because they answer different questions: the config knows what
- * the operator wrote and which profile applies, and this knows how to draw it. Neither knows what a
- * `%basalt_player_protocol%` is worth, which is the placeholder registry's job, and that is what
- * lets the same text work here, in a chat format, or anywhere else text is written by an operator.
- *
- * Everything here runs on a connection thread, before login, for a request anyone on the internet
- * can send as fast as they like. So: icons are read once and cached, and a database lookup only
- * happens if the file asked a question that needs one.
+ * This runs on a connection thread, before login, for a request anyone can send as fast as they
+ * like: icons are cached, and the database is only touched if the file asked something that needs
+ * it.
  */
 public class ServerListStatus(
     private val config: () -> ServerListConfig,
@@ -153,16 +150,10 @@ public class ServerListStatus(
      * Placeholders are filled in before MiniMessage parses, so `%...%` and `<...>` never have to
      * agree about anything.
      *
-     * The two failures are treated differently on purpose, and the difference is what the MOTD is:
-     * a line strangers read.
-     *
-     * A name nobody registered is the operator's mistake. It stays visible and is warned about, so
-     * that a typo is found rather than silently eating a word.
-     *
-     * A real name this ping cannot answer is *ordinary*. `%basalt_player_name%` is unanswerable for
-     * everyone who has never connected before, which is most of the people who will ever ping. It
-     * resolves to nothing and is only noted in the debug log: showing `%basalt_player_name%` to a
-     * stranger, or warning once per server about something working as designed, are both wrong.
+     * The two failures differ because the MOTD is a line strangers read. An unregistered name is
+     * the operator's typo: it stays visible and is warned about. A registered name this ping
+     * cannot answer, like `%basalt_player_name%` for someone who never connected, is ordinary: it
+     * resolves to nothing and only reaches the debug log.
      */
     private fun substitute(
         text: String,

@@ -6,18 +6,13 @@ import org.basaltmc.protocol.play.NibbleArray
 import org.basaltmc.protocol.play.PalettedContainer
 
 /**
- * Turns a [Chunk] into the wire bytes `basalt-protocol`'s `MapChunkPacket.chunkData` and
- * `UpdateLightPacket` need. Biomes come from each section's own quart-resolution biome palette
- * (filled by [org.basaltmc.world.terrain.RealTerrainGenerator] from the real climate sampler;
- * the flat-world generator leaves them all 0, plains). Light is a uniform value per section, not
- * real propagation: sections entirely below the chunk's own tallest column get no skylight,
- * everything at or above it gets full skylight. This
- * is the basic lighting a flat world needs, not a general light engine (that belongs to a later
- * pass with real terrain to propagate light across); using the chunk's tallest column rather than
- * a single fixed one (`heightmap()[0]`, correct only when every column in the chunk is the same
- * height, as in a flat world) matters once terrain actually varies within a chunk: real hills
- * were being marked skyless above ground, the sky rendering solid black even directly over lit
- * terrain, confirmed live once `NoiseWorldGenerator` replaced the flat world.
+ * Turns a [Chunk] into the wire bytes `MapChunkPacket.chunkData` and `UpdateLightPacket` need.
+ * Biomes come from each section's quart-resolution palette.
+ *
+ * Light is uniform per section rather than propagated: no skylight below the chunk's tallest
+ * column, full skylight at or above it. A real light engine belongs to a later pass. The tallest
+ * column, not `heightmap()[0]`, because that only holds for a flat world: with real terrain it
+ * marked hills skyless and rendered the sky black over lit ground.
  */
 public object ChunkDataCodec {
     private const val BLOCK_DIRECT_BITS = 8

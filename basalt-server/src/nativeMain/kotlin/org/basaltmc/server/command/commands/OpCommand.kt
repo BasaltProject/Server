@@ -87,19 +87,12 @@ public class GroupCommand : Command(name = "group", permissionLevel = Permission
 }
 
 /**
- * Writes the membership and applies it to the player if they happen to be online.
+ * Writes the membership and applies it to the player if they are online.
  *
- * Whoever is **online** is resolved first, and deliberately so: a player's row is only written when
- * they disconnect or when the save interval comes round, so someone who has just joined for the
- * very first time is not in the database yet. Looking there first made `op <them>` fail with "has
- * never joined this server" against a player standing in the world, and the workaround was to make
- * them log out and back in so a row existed. The session is the live truth here; the database is
- * where it is kept.
- *
- * Offline names still resolve through the database. One that is in neither is refused rather than
- * invented: without a profile cache there is no way to turn a never-seen name into a UUID, and
- * guessing one would write a row the real player never matches. Vanilla resolves that through
- * Mojang's API; this says so instead of pretending.
+ * Online players resolve first: a row is only written on disconnect or on the save interval, so
+ * `op` against someone who just joined used to fail with "has never joined this server". Offline
+ * names resolve through the database, and a name in neither is refused rather than invented, since
+ * without a profile cache a guessed UUID would never match the real player.
  */
 private fun assign(
     context: CommandContext,

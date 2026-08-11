@@ -19,16 +19,12 @@ public sealed interface ConditionResult {
 }
 
 /**
- * One line of an operator-written condition, e.g. `%basalt_player_protocol% < 735`.
+ * One line of an operator-written condition, e.g. `%basalt_player_protocol% < 735`. Nothing here
+ * knows what a protocol version or a player is: it compares whatever the placeholders resolve to,
+ * so a new thing to condition on is a registered placeholder, not a parser edit.
  *
- * The whole point is that nothing here knows what a protocol version, a host or a player is: it
- * compares whatever the placeholders resolve to. Adding a new thing to condition on is registering a
- * placeholder, not editing a parser, which is what stops every new condition being a new hardcoded
- * key in a configuration file.
- *
- * Comparisons are numeric when both sides are numbers and case-insensitive text otherwise, so
- * `= 735`, `= true` and `= Whiron` all read the way they look. A condition with no operator at all
- * is true when it resolves to `true`, which is how a plain `%basalt_player_known%` reads.
+ * Comparisons are numeric when both sides are numbers and case-insensitive text otherwise, and a
+ * condition with no operator is true when it resolves to `true`.
  */
 public class PlaceholderCondition(
     public val raw: String,

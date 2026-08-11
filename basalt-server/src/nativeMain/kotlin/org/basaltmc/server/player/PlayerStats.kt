@@ -5,16 +5,12 @@ import org.basaltmc.storage.StoredStats
 import kotlin.math.roundToLong
 
 /**
- * The counters of one logged-in player, incremented as the server notices things happening.
+ * The counters of one logged-in player. Behind a lock because two threads touch them, this
+ * connection's loop and whatever thread ran a command: a statistic that loses increments to a race
+ * is worse than useless, and the lock is uncontended anyway.
  *
- * Behind a lock because they are touched from two threads: this connection's own loop (walking,
- * hunger) and whatever thread ran a command. The lock is uncontended in practice, and a counter
- * that occasionally loses an increment to a race would be worse than useless, since the whole point
- * of a statistic is that it adds up.
- *
- * What is counted is exactly what this build can observe. Vanilla has around a hundred more, and
- * each one needs a place in the code that notices: they arrive with the systems that make them
- * observable, not before.
+ * Only what this build can observe is counted. Vanilla's other hundred arrive with the systems
+ * that make them observable.
  */
 public class PlayerStats {
     private val lock = NativeMutex()

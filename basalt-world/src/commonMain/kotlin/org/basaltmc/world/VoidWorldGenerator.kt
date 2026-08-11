@@ -3,16 +3,12 @@ package org.basaltmc.world
 import org.basaltmc.registry.Blocks
 
 /**
- * Nothing at all: every chunk is air.
+ * Nothing at all: every chunk is air. A Basalt world type rather than a parity one, since vanilla's
+ * closest is a superflat preset with an empty layer stack. It exists because a lobby wants an empty
+ * canvas and no generation cost, which today means installing a plugin.
  *
- * There is no vanilla level type that is exactly this (its closest, the "The Void" superflat
- * preset, is a flat world with an empty layer stack plus a small platform at spawn), so this is a
- * Basalt type rather than a parity one. It exists because a lobby or a minigame hub wants an empty
- * canvas and no terrain generation cost at all, which today means installing a plugin.
- *
- * [platformRadius] blocks of stone are placed under the world spawn so that whoever joins a fresh
- * void world does not fall out of it before they can build anything. Set it to 0 for a truly empty
- * world, which is what you want once the lobby is built and pasted in.
+ * [platformRadius] blocks of stone go under the world spawn so nobody falls out of a fresh void
+ * world before building anything; 0 gives a truly empty one.
  */
 public object VoidWorldGenerator {
     public const val DEFAULT_PLATFORM_RADIUS: Int = 4

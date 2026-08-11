@@ -11,20 +11,14 @@ import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 
 /**
- * `/timings`: what the server is spending its time on.
+ * `/timings`: what the server is spending its time on, modelled on spark minus its sampling
+ * profiler, which needs other threads' call stacks and Kotlin/Native cannot read them.
  *
- * Modelled on spark rather than on Bukkit's own timings, and with one deliberate omission: spark's
- * heart is a sampling profiler that reads other threads' call stacks, and Kotlin/Native offers no
- * way to do that. What is here instead is the half that does not need it, and which is most of what
- * anyone actually reads: the distribution of tick durations, and named sections of the server
- * measured directly.
+ * What is left is the half most people read anyway: tick duration distribution and directly
+ * measured sections. The distribution is the point, since a server pinned at 20 TPS with one tick
+ * in fifty taking 80ms stutters while its TPS reads perfect.
  *
- * The distribution matters more than the rate, which is why it is here at all. A server pinned at 20
- * TPS with one tick in fifty taking 80ms is stuttering, and its TPS reads perfect; min/median/95th/max
- * says so immediately.
- *
- * Measuring is off until `/timings start`, because a clock read per section per call is small but
- * not free, and a server nobody is investigating should not pay it.
+ * Off until `/timings start`: a clock read per section is small but not free.
  */
 public class TimingsCommand(
     private val timings: Timings,

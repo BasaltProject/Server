@@ -60,19 +60,13 @@ public data class WireItemStack(
         }
 
         /**
-         * The same stack, in the "delimited" form `set_creative_slot` uses
-         * (`ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC` over
-         * `DataComponentPatch.DELIMITED_STREAM_CODEC`, verified against the real 26.2 jar).
+         * The same stack in the delimited form `set_creative_slot` uses
+         * (`ItemStack.OPTIONAL_UNTRUSTED_STREAM_CODEC` over `DataComponentPatch.DELIMITED_STREAM_CODEC`).
          *
-         * Every component there carries its own varint length prefix, and that prefix is the whole
-         * difference: [read] has to refuse a stack carrying components because a plain patch cannot
-         * be walked without each component's own codec, but this form can be walked and skipped
-         * blindly. Refusing here instead cost the player their connection the moment they dragged
-         * anything with components (a damaged tool, a written book, a shulker box) out of the
-         * creative menu, since an unhandled decode failure drops the session.
-         *
-         * The components themselves are still discarded, which is the same documented gap [read]
-         * describes: this build models a stack as an item plus a count and nothing else.
+         * Each component carries its own length prefix here, so unlike [read] this can skip them
+         * blindly instead of refusing the stack: refusing dropped the session whenever a player
+         * dragged a damaged tool or a written book out of the creative menu. The components are
+         * still discarded, the same gap [read] documents.
          */
         public fun readDelimited(buffer: ByteBuffer): WireItemStack? {
             val count = buffer.readVarInt()

@@ -5,14 +5,11 @@ import org.basaltmc.nbt.NbtCompound
 /**
  * One item in a slot: what it is, how many, and whatever else the game hung off it.
  *
- * [components] is the open-ended part (enchantments, a custom name, damage, anything a datapack or
- * a plugin attaches) and is kept as an NBT compound rather than being modelled field by field. That
- * is not laziness: the set of things an item can carry changes every version, and a persistence
- * layer that enumerates them has to be edited every version to avoid silently dropping what it does
- * not recognise. Round-tripping the compound whole cannot lose anything.
+ * [components] stays an NBT compound rather than field-by-field: what an item can carry changes
+ * every version, and a persistence layer that enumerates them silently drops what it has not been
+ * taught. Round-tripping the compound whole cannot lose anything.
  *
- * This type lives here rather than in a gameplay module because there is no inventory system yet;
- * when one exists it moves there and this layer keeps only the codec.
+ * It lives here only until an inventory system exists to own it.
  */
 public data class StoredItemStack(
     val id: String,

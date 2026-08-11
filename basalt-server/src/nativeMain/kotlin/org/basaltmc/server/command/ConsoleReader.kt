@@ -9,36 +9,23 @@ import org.basaltmc.io.restoreTerminalMode
 import org.basaltmc.io.sleepMillis
 
 /**
- * Reads operator commands from stdin on their own thread and runs them through [dispatcher], for
- * as long as the process keeps running.
+ * Reads operator commands from stdin on their own thread and runs them through [dispatcher] for as
+ * long as the process lives. Same commands players get, at [PermissionLevel.OWNERS], as in
+ * vanilla; a leading slash is accepted and ignored because operators type it anyway.
  *
- * The console runs the same commands players do, at [PermissionLevel.OWNERS], which is how vanilla
- * works too: there is no second, console-only command set. A leading slash is accepted and ignored,
- * because operators type it out of habit and vanilla accepts it as well.
- *
- * This is a separate concern from the EULA prompt this project deliberately avoids at boot
- * (`Main.kt`'s own note, `basalt-assets`' `EulaFile`): that rule is about never blocking startup on
- * interactive input, not about never reading stdin at all. A real vanilla server reads console
- * commands the same way, after it has already started. `readlnOrNull` returns `null` on EOF (piped
- * stdin, redirected from `/dev/null`, a detached process): the loop just stops reading rather than
- * busy-spinning.
+ * Reading stdin here does not contradict the no-prompt EULA rule: that one is about never blocking
+ * startup on input. On EOF the loop stops reading rather than spinning.
  */
 public object ConsoleReader {
     /**
-     * Started once for the life of the process, not once per server.
+     * Started once for the life of the process, not once per server: this thread parks in a
+     * blocking stdin read nothing can interrupt, so a second reader would take alternate lines
+     * from the same terminal. [current] is therefore asked for the dispatcher per line, or
+     * `/restart` would leave it running commands against a closed database.
      *
-     * [current] is asked for the dispatcher on every line rather than given one, because `/restart`
-     * replaces the whole server inside this process: a reader holding the old dispatcher would keep
-     * running commands against a server that has already closed its database. And it cannot simply
-     * be started again for the new one, since this thread is parked inside a blocking read of stdin
-     * that nothing can interrupt: two readers would take alternate lines from the same terminal.
-     *
-     * A line that arrives while no server is up **waits** for one rather than being discarded. That
-     * window is real at both ends: this thread is started before the first server has finished
-     * building, and it stays alive across a restart while the next one is built. Dropping the line
-     * there loses a command the operator typed, and piped input makes it certain rather than
-     * unlikely: `printf 'stop\n' | basalt-server` delivered `stop` before the server existed and it
-     * went nowhere.
+     * A line arriving while no server is up waits for one. That window is real at both ends, and
+     * piped input makes it certain: `printf 'stop\n' | basalt-server` arrives before the server
+     * exists.
      */
     public fun start(current: () -> CommandDispatcher?) {
         NativeThread.start {

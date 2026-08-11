@@ -1,16 +1,12 @@
 package org.basaltmc.auth
 
 /**
- * Formats a raw SHA-1 digest the way vanilla's `new BigInteger(digest).toString(16)` does:
- * the big-endian bytes are read as a signed two's-complement integer, then rendered as lowercase
- * hex with no leading zero digits (a `-` prefix if negative, none otherwise). This is the
- * "server hash" sent to Mojang's session server for online-mode join verification.
+ * The server hash Mojang's session server expects, formatted as vanilla's
+ * `new BigInteger(digest).toString(16)`: big-endian bytes read as a signed two's-complement
+ * integer, lowercase hex, no leading zeros, `-` when negative.
  *
- * // parity: `net.minecraft.server.network.ServerLoginPacketListenerImpl.handleKey`, which
- * computes `new BigInteger(Crypt.digestData(serverId, publicKey, secretKey)).toString(16)`.
- * Verified against real `java.math.BigInteger` output for both signs and both leading-zero-byte
- * and leading-zero-nibble edge cases (see [SessionHashTest]); this is not derived from memory of
- * the wiki.vg algorithm description.
+ * // parity: ServerLoginPacketListenerImpl.handleKey. Checked against real `BigInteger` output for
+ * both signs and the leading-zero byte and nibble cases (see [SessionHashTest]).
  */
 public object SessionHash {
     public fun format(digest: ByteArray): String {
