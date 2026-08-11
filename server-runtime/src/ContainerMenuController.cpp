@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -141,6 +142,19 @@ void ContainerMenuController::openEnderChest(PlayerSession& session, const Block
 }
 
 void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& pos, const std::string& block) {
+    if (world::LoadedWorld* here = owner_->currentWorld();
+        here != nullptr && block.ends_with("chest") && !here->state().gameplay().blocks.chestOpenWithSolidBlockOnTop) {
+        // parity: `ChestBlock.isChestBlockedAt` over `isBlockedChestByBlock`, for either half.
+        const auto blocked = [&here](const BlockPos& at) {
+            const std::optional<std::int32_t> above = here->state().blockState(at.x, at.y + 1, at.z);
+            return above.has_value() && server::registry::blockSupport::conductsRedstone(*above);
+        };
+        const auto pair = world::doubleChests::halves(here->state(), pos.x, pos.y, pos.z);
+        if (blocked(pos) || (pair.has_value() && (blocked({pair->first[0], pair->first[1], pair->first[2]}) ||
+                                                  blocked({pair->second[0], pair->second[1], pair->second[2]})))) {
+            return;
+        }
+    }
     if (!mayOpen(block.ends_with("shulker_box") ? "shulker_box" : block, pos)) {
         return;
     }

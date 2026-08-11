@@ -11,11 +11,13 @@
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/EndFightSystem.hpp>
+#include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBeehives.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
@@ -211,6 +213,34 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (path == "respawn_anchor" && held.has_value() &&
             parsedOrNothing(held->id) == Identifier::vanilla("glowstone") &&
             chargeAnchor(*session, hit.pos, heldSlot, *held)) {
+            blockUsed();
+            return;
+        }
+        // parity: `RespawnAnchorBlock.useWithoutItem`, which blows up a charged anchor outside the Nether.
+        if (path == "respawn_anchor" && clickedState.has_value() && owner_->options().explosions != nullptr) {
+            world::LoadedWorld* here = owner_->currentWorld();
+            const auto properties = reg::blockStateDefinitions::propertiesOf(*clickedState);
+            const auto charge = properties.find("charge");
+            if (here != nullptr && charge != properties.end() && charge->second != "0" &&
+                here->declaration().dimension != config::WorldDimension::Nether) {
+                const config::GameplayRules::Blocks& rules = here->state().gameplay().blocks;
+                if (rules.respawnAnchorExplode) {
+                    const std::int32_t air = server::registry::blocks::air().stateId;
+                    static_cast<void>(here->state().setBlockState(hit.pos.x, hit.pos.y, hit.pos.z, air));
+                    broadcastBlockUpdate(hit.pos, air);
+                    notifyNeighbours(hit.pos);
+                    owner_->options().explosions->blowUp(*here, owner_->playersInSameWorld(), hit.pos.x + 0.5,
+                                                         hit.pos.y + 0.5, hit.pos.z + 0.5,
+                                                         rules.respawnAnchorExplosionPower, "respawn_anchor", 0, {}, {},
+                                                         rules.respawnAnchorExplosionFire);
+                }
+                blockUsed();
+                return;
+            }
+        }
+        // parity: `DragonEggBlock.useWithoutItem`.
+        if (path == "dragon_egg") {
+            teleportDragonEgg(hit.pos);
             blockUsed();
             return;
         }

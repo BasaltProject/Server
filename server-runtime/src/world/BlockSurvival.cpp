@@ -4,6 +4,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 
@@ -94,7 +95,7 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
 [[nodiscard]] bool cactusSurvives(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     for (const std::int32_t beside : {stateAt(world, x, y, z - 1), stateAt(world, x, y, z + 1),
                                       stateAt(world, x - 1, y, z), stateAt(world, x + 1, y, z)}) {
-        if (registry::blockShapes::isSolidState(beside)) {
+        if (world.gameplay().blocks.cactusBreaksFromSolidNeighbors && registry::blockShapes::isSolidState(beside)) {
             return false;
         }
     }

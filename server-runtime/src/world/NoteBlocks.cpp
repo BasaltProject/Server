@@ -1,6 +1,7 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/plugins/EventSink.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 
@@ -86,7 +87,8 @@ std::vector<BlockEffect> playNote(const WorldState& world, std::int32_t x, std::
     if (!above.has_value()) {
         return {};
     }
-    if (!instrument.worksAbove() && *above != registry::blocks::air().stateId) {
+    if (!world.gameplay().blocks.noteBlockIgnoreAbove && !instrument.worksAbove() &&
+        *above != registry::blocks::air().stateId) {
         return {};
     }
     if (!world.events().allowed(&server::plugins::pluginEventTypes::blockNotePlay,

@@ -1,9 +1,11 @@
 #include <basalt/server/runtime/MobSpawnerSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/Redstone.hpp>
 
 #include <utility>
 
@@ -34,6 +36,10 @@ bool MobSpawnerSystem::tick(world::LoadedWorld& world, wire::nbt::NbtCompound& d
     world::BaseSpawnerState state = world::baseSpawnerData::load(data);
     if (!isNearPlayer(world, pos, state.requiredPlayerRange) ||
         !world.gameRules().get(world::gameRules::kSpawnerBlocksWork)) {
+        return false;
+    }
+    if (world.state().gameplay().blocks.spawnerDeactivateByRedstone &&
+        world::redstone::bestNeighbourSignal(world.state(), world.name(), pos[0], pos[1], pos[2]) > 0) {
         return false;
     }
     // parity: `BaseSpawner.serverTick` draws from `level.getRandom()`.

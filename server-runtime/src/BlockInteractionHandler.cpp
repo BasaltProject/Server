@@ -508,6 +508,10 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
                 striker != nullptr && struckBlock != nullptr && struckBlock->path() == "note_block") {
                 player::statAwards::award(*striker, "play_noteblock");
             }
+            // parity: `DragonEggBlock.attack`.
+            if (struckBlock != nullptr && struckBlock->path() == "dragon_egg") {
+                teleportDragonEgg(action.pos);
+            }
             // parity: `RedStoneOreBlock.attack`.
             if (const std::optional<world::BlockChange> glow =
                     world::miscGrowth::lightRedstoneOre(loaded->state(), action.pos.x, action.pos.y, action.pos.z);

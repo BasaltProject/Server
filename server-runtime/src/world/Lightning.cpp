@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/world/Chunk.hpp>
@@ -54,7 +55,8 @@ void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                                  std::int32_t z) {
     std::optional<std::array<std::int32_t, 3>> best;
     std::int32_t bestDistance = std::numeric_limits<std::int32_t>::max();
-    const std::int32_t radius = kRodRange >> 4;
+    const std::int32_t range = world.gameplay().blocks.lightningRodRange;
+    const std::int32_t radius = range >> 4;
     for (std::int32_t chunkX = (x >> 4) - radius; chunkX <= (x >> 4) + radius; ++chunkX) {
         for (std::int32_t chunkZ = (z >> 4) - radius; chunkZ <= (z >> 4) + radius; ++chunkZ) {
             const server::world::Chunk* chunk = world.chunkIfLoaded(chunkX, chunkZ);
@@ -73,7 +75,7 @@ void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                     }
                     const std::int32_t distance =
                         ((rodX - x) * (rodX - x)) + ((top - y) * (top - y)) + ((rodZ - z) * (rodZ - z));
-                    if (distance > kRodRange * kRodRange || distance >= bestDistance) {
+                    if (distance > range * range || distance >= bestDistance) {
                         continue;
                     }
                     bestDistance = distance;

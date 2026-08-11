@@ -1,12 +1,15 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/World.hpp>
+#include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -23,6 +26,7 @@
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
 #include <basalt/server/runtime/world/FallLanding.hpp>
+#include <basalt/server/runtime/world/FarmlandTrample.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -216,6 +220,36 @@ void CombatHandler::bounceOn(PlayerSession& session, world::LoadedWorld& world, 
 
 void CombatHandler::applyFallDamage(PlayerSession& session, const double landingY) {
     world::LoadedWorld* world = owner_->currentWorld();
+    if (world != nullptr && fallDistance > 0.0) {
+        const wire::protocol::play::BlockPos soil{
+            static_cast<std::int32_t>(std::floor(session.x)),
+            static_cast<std::int32_t>(std::floor(landingY - world::fallLanding::kProbeDepth)),
+            static_cast<std::int32_t>(std::floor(session.z))};
+        const std::optional<std::int32_t> soilState = world->state().blockState(soil.x, soil.y, soil.z);
+        const Identifier* soilBlock =
+            soilState.has_value() ? server::registry::blockStateDefinitions::blockOf(*soilState) : nullptr;
+        const auto& protectedAt = owner_->options().spawnProtected;
+        if (soilBlock != nullptr && soilBlock->path() == "farmland" &&
+            !(protectedAt && protectedAt(session, *world, soil.x, soil.z))) {
+            const std::optional<storage::StoredItemStack> boots =
+                session.inventory.at(player::PlayerInventory::kArmourStart);
+            random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+            const world::farmlandTrample::Faller faller{
+                .fallDistance = fallDistance,
+                .width = 0.6F,
+                .height = 1.8F,
+                .isPlayer = true,
+                .featherFalling =
+                    boots.has_value() ? player::enchantmentLevel(*boots, Identifier::vanilla("feather_falling")) : 0};
+            if (world::farmlandTrample::tramples(world->state().gameplay(), faller, random)) {
+                const std::int32_t dirt = server::registry::blocks::named("dirt")->stateId;
+                if (world->state().setBlockState(soil.x, soil.y, soil.z, dirt)) {
+                    owner_->blockInteraction().broadcastBlockUpdate(soil, dirt);
+                    owner_->blockInteraction().notifyNeighbours(soil);
+                }
+            }
+        }
+    }
     if (world != nullptr && !world->gameRules().get(world::gameRules::kFallDamage)) {
         return;
     }

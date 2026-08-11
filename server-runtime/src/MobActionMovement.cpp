@@ -1,9 +1,12 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/World.hpp>
+#include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/MobSteps.hpp>
@@ -13,7 +16,9 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/FallLanding.hpp>
+#include <basalt/server/runtime/world/FarmlandTrample.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -105,6 +110,22 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
             player::playSoundFor(*watcher, "minecraft:block.shelf_mushroom.bounce",
                                  wire::protocol::play::SoundSource::Blocks, bounceAt[0] + 0.5, bounceAt[1] + 0.5,
                                  bounceAt[2] + 0.5, 1.0F, 1.0F, seed);
+        }
+    }
+    // parity: `FarmlandBlock.fallOn`, for any living body heavy enough to break the soil.
+    if (const wire::common::Identifier* soil = server::registry::blockStateDefinitions::blockOf(onState);
+        soil != nullptr && soil->path() == "farmland" && world.gameRules().get(world::gameRules::kMobGriefing) &&
+        server::registry::entityAttributes::isLiving(mob.type())) {
+        random::RandomSource random = freshRandom();
+        const world::farmlandTrample::Faller faller{.fallDistance = fallen,
+                                                    .width = static_cast<float>(mob.width()),
+                                                    .height = static_cast<float>(mob.height())};
+        if (world::farmlandTrample::tramples(world.state().gameplay(), faller, random)) {
+            const std::int32_t dirt = server::registry::blocks::named("dirt")->stateId;
+            if (world.state().setBlockState(at[0], at[1], at[2], dirt)) {
+                broadcaster_->announceBlock(watchersOf(world),
+                                            world::BlockChange{.x = at[0], .y = at[1], .z = at[2], .stateId = dirt});
+            }
         }
     }
     // parity: `Block.fallOn` then `causeFallDamage`, which the fall-immune skip whole.

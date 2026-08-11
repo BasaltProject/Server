@@ -423,7 +423,8 @@ void EnvironmentTickSystem::tickSubmersion(world::LoadedWorld& world) {
                     player->connection().hurt(amount, deathMessageId, type, std::nullopt);
                 }
             },
-            world.state().gameplay().blocks.magmaBlockDamageWhenSneaking);
+            world.state().gameplay().blocks.magmaBlockDamageWhenSneaking,
+            world.state().gameplay().blocks.stonecutterDamage);
         const double eyeY = player->y + world::fluids::eyeHeight(player->sneaking);
         const auto blockX = static_cast<std::int32_t>(std::floor(player->x));
         const auto blockZ = static_cast<std::int32_t>(std::floor(player->z));

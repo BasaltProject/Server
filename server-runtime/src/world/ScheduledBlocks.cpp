@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
@@ -316,7 +317,8 @@ std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::
         !path.ends_with("coral_wall_fan")) {
         return false;
     }
-    return !path.starts_with("dead_") && !waterAbout(world, x, y, z, stateId);
+    return world.gameplay().blocks.coralDieOutsideWater && !path.starts_with("dead_") &&
+           !waterAbout(world, x, y, z, stateId);
 }
 
 void scheduleCoralDeath(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed) {
