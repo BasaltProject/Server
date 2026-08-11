@@ -220,7 +220,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (path == "respawn_anchor" && clickedState.has_value() && owner_->options().explosions != nullptr) {
             world::LoadedWorld* here = owner_->currentWorld();
             const auto properties = reg::blockStateDefinitions::propertiesOf(*clickedState);
-            const auto charge = properties.find("charge");
+            const auto charge = properties.find("charges");
             if (here != nullptr && charge != properties.end() && charge->second != "0" &&
                 here->declaration().dimension != config::WorldDimension::Nether) {
                 const config::GameplayRules::Blocks& rules = here->state().gameplay().blocks;
