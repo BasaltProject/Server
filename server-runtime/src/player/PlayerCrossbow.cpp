@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/FireworkSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -379,7 +380,8 @@ void shoot(const BreakContext& context, FireworkSystem* fireworks, PlayerSession
                 entity::ServerEntity& arrow = entity::projectiles::spawn(
                     world.state(), kind, context.registry->allocateEntityId(), entry->protocolId, player.x,
                     player.y + kEyeHeight - kArrowDrop, player.z, static_cast<double>(aim[0]),
-                    static_cast<double>(aim[1]), static_cast<double>(aim[2]), power, 1.0F, random);
+                    static_cast<double>(aim[1]), static_cast<double>(aim[2]), power,
+                    world.state().gameplay().items.projectileOffsetCrossbow, random);
                 arrow.ownerId = player.entityId();
                 arrow.ownerUuid = player.uuid();
                 arrow.critical = true;

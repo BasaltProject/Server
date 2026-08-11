@@ -973,6 +973,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                             .numbers = {{"signal_strength", signal}}});
                 },
             .advancementTriggers = advancementTriggers_.get(),
+            .spawnMob =
+                [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y, double z,
+                       float yaw) {
+                    if (spawning_ != nullptr) {
+                        static_cast<void>(spawning_->spawnMob(world, type, x, y, z, yaw, "triggered"));
+                    }
+                },
             .crystalDestroyed =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {

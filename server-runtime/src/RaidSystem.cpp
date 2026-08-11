@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginHookEventTypes.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -12,6 +13,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -315,6 +319,17 @@ Raid* RaidSystem::createOrExtendRaid(world::LoadedWorld& world, PlayerSession& p
                                   : world.declaration().dimension == config::WorldDimension::Nether)) {
         return nullptr;
     }
+    static std::unordered_map<std::string, std::int64_t> cooldownEnds;
+    static std::mutex cooldownLock;
+    const std::int32_t cooldownSeconds = world.state().gameplay().mechanics.raidCooldownSeconds;
+    const std::string cooldownKey = player.uuid().toString();
+    if (cooldownSeconds > 0) {
+        const std::scoped_lock guard{cooldownLock};
+        const auto waiting = cooldownEnds.find(cooldownKey);
+        if (waiting != cooldownEnds.end() && waiting->second > world.gameTime()) {
+            return nullptr;
+        }
+    }
     std::vector<world::poi::PoiRecord> points;
     world.state().poi().inRange(world::poi::poiTypes::kVillage,
                                 world::poi::BlockPos{position[0], position[1], position[2]}, kVillageSearch,
@@ -355,6 +370,10 @@ Raid* RaidSystem::createOrExtendRaid(world::LoadedWorld& world, PlayerSession& p
         }
     }
     manager.dirty = true;
+    if (cooldownSeconds > 0) {
+        const std::scoped_lock guard{cooldownLock};
+        cooldownEnds[cooldownKey] = world.gameTime() + (static_cast<std::int64_t>(cooldownSeconds) * 20);
+    }
     logger_.debug([&] {
         return "Raid at " + std::to_string(raid->center[0]) + ", " + std::to_string(raid->center[1]) + ", " +
                std::to_string(raid->center[2]) + " in world '" + world.name() + "', omen level " +

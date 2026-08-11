@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
@@ -399,7 +400,12 @@ void UiStateSync::sendStats() {
 void UiStateSync::applyConsumeEffects(PlayerSession& session,
                                       const std::vector<server::registry::ConsumeEffect>& effects,
                                       const std::function<float()>& nextFloat) {
-    player::applyConsumeEffectsFor(session, effects, nextFloat);
+    const world::LoadedWorld* world = owner_->currentWorld();
+    const config::GameplayRules::Mechanics rules =
+        world == nullptr ? config::GameplayRules::Mechanics{} : world->state().gameplay().mechanics;
+    player::applyConsumeEffectsFor(
+        session, effects, nextFloat,
+        player::ClearScope{.keepBeneficial = !rules.milkClearsBeneficialEffects, .keepOmens = !rules.milkCuresBadOmen});
 }
 
 } // namespace basalt::server::runtime

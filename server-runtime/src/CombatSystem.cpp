@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
@@ -280,7 +281,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     }
     if (path == "ender_pearl") {
         if (hit.has_value() || targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
-            landEnderPearl(watchers, entity, world.state().gameplay().items.enderPearlDamage);
+            landEnderPearl(world, watchers, entity);
         }
         return;
     }
@@ -319,6 +320,39 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             options_.awardExperience(world, entity.x, entity.y, entity.z, amount);
         }
         return;
+    }
+    // parity: `Snowball.onHitEntity`, which hurts for nothing but still shoves and wakes what it meets.
+    if (path == "snowball") {
+        const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
+        if (target.has_value()) {
+            entity.removed = true;
+            const std::int32_t configured = world.state().gameplay().items.snowballDamage;
+            const bool blaze = target->mob != nullptr && target->mob->type().path() == "blaze";
+            const auto damage = static_cast<float>(configured >= 0 ? configured : (blaze ? 3 : 0));
+            if (target->mob != nullptr && !world::endCrystals::isCrystal(target->mob->type())) {
+                entity::entityCombat::blame(*target->mob, entity.ownerId, entity.entityId(), entity.type());
+                const entity::entityCombat::Result result =
+                    entity::entityCombat::hurt(*target->mob, damage, fromX, fromZ, hooks_, "thrown", std::nullopt,
+                                               firedByPlayer(watchers, entity));
+                if (result.landed) {
+                    rememberShooter(watchers, entity, *target->mob);
+                    announceEntityHit(watchers, *target->mob, world::damageTypes::kThrown, entity.entityId(),
+                                      result.died);
+                }
+            }
+            if (target->player != nullptr && target->player->connection().hurt) {
+                target->player->connection().hurt(damage, "thrown", world::damageTypes::kThrown,
+                                                  entity::DamageSource{.entityId = entity.entityId(),
+                                                                       .x = fromX,
+                                                                       .z = fromZ,
+                                                                       .name = shooterName(watchers, living, entity),
+                                                                       .ownerId = entity.ownerId});
+            }
+            return;
+        }
+        if (!hit.has_value()) {
+            return;
+        }
     }
     if (path == "splash_potion" || path == "lingering_potion") {
         if (!entity.forcedLand && !hit.has_value() &&

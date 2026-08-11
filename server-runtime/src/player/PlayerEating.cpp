@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
@@ -106,6 +107,16 @@ void teleportRandomly(const BreakContext& context, PlayerSession& player, world:
     }
 }
 
+/// parity: the `MobEffectCategory.BENEFICIAL` ones.
+[[nodiscard]] bool isBeneficial(std::string_view path) {
+    static constexpr std::array<std::string_view, 19> kBeneficial{
+        "speed",        "haste",         "strength",        "instant_health",     "jump_boost",
+        "regeneration", "resistance",    "fire_resistance", "water_breathing",    "invisibility",
+        "night_vision", "health_boost",  "absorption",      "saturation",         "luck",
+        "slow_falling", "conduit_power", "dolphins_grace",  "hero_of_the_village"};
+    return std::ranges::find(kBeneficial, path) != kBeneficial.end();
+}
+
 [[nodiscard]] std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const auto parsed = Identifier::parse(id);
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
@@ -114,12 +125,16 @@ void teleportRandomly(const BreakContext& context, PlayerSession& player, world:
 } // namespace
 
 void applyConsumeEffectsFor(PlayerSession& player, const std::vector<reg::ConsumeEffect>& effects,
-                            const std::function<float()>& nextFloat) {
+                            const std::function<float()>& nextFloat, const ClearScope scope) {
     for (const reg::ConsumeEffect& effect : effects) {
         if (effect.as<reg::ConsumeEffect::ClearAll>() != nullptr) {
             std::vector<Identifier> held;
             held.reserve(player.effects.size());
             for (const auto& [id, active] : player.effects) {
+                const bool omen = id.path() == "bad_omen" || id.path() == "raid_omen" || id.path() == "trial_omen";
+                if ((scope.keepOmens && omen) || (scope.keepBeneficial && isBeneficial(id.path()))) {
+                    continue;
+                }
                 held.push_back(id);
             }
             for (const Identifier& id : held) {
@@ -190,7 +205,11 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
             player.connection().sendEffect(omen);
         }
     }
-    applyConsumeEffectsFor(player, food->effects, nextFloat);
+    const config::GameplayRules::Mechanics& rules = world.state().gameplay().mechanics;
+    const bool milk = id->path() == "milk_bucket";
+    applyConsumeEffectsFor(player, food->effects, nextFloat,
+                           ClearScope{.keepBeneficial = milk && !rules.milkClearsBeneficialEffects,
+                                      .keepOmens = milk && !rules.milkCuresBadOmen});
     for (const reg::ConsumeEffect& effect : food->effects) {
         if (const auto* teleport = effect.as<reg::ConsumeEffect::TeleportRandomly>(); teleport != nullptr) {
             teleportRandomly(context, player, world, teleport->diameter);

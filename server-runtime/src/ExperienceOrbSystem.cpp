@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/EntityPhysics.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -37,7 +38,6 @@ constexpr double kAirDrag = static_cast<double>(0.98F);
 constexpr double kBounce = 0.4;
 constexpr std::int16_t kDefaultHealth = 5;
 constexpr double kPlayerEyeHeight = 1.62;
-constexpr std::int32_t kPickupDelay = 2;
 /// parity: `ExperienceOrb.getExperienceValue`'s steps, largest first.
 constexpr std::array<std::int32_t, 10> kSizes{2477, 1237, 617, 307, 149, 73, 37, 17, 7, 3};
 
@@ -328,7 +328,9 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
         }
         {
             const std::scoped_lock guard{lock_};
-            takeDelays_[player->entityId()] = kPickupDelay;
+            if (const std::int32_t delay = world.state().gameplay().player.expPickupDelayTicks; delay > 0) {
+                takeDelays_[player->entityId()] = delay;
+            }
         }
         for (PlayerSession* watcher : watchers) {
             if (watcher->connection().sendPickupAnimation) {

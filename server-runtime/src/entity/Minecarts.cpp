@@ -33,8 +33,7 @@ constexpr double kRiderPush = 0.001;
 constexpr double kRiderPushLimit = 0.01;
 /// parity: the `slideSpeed` a slope is worth.
 constexpr double kSlopePush = static_cast<double>(0.0078125F);
-/// parity: what a powered rail adds, and the nudge it gives a cart standing still.
-constexpr double kBoost = 0.06;
+/// parity: the nudge a powered rail gives a cart standing still.
 constexpr double kNudge = 0.02;
 /// parity: `getPos`'s sixteenth of a block.
 constexpr double kRailLift = static_cast<double>(0.0625F);
@@ -200,8 +199,8 @@ void oldMoveAlongTrack(world::WorldState& world, ServerEntity& cart, const Env& 
     }
     const double moving = horizontal(cart.velocityX, cart.velocityZ);
     if (moving > 0.01) {
-        cart.velocityX += cart.velocityX / moving * kBoost;
-        cart.velocityZ += cart.velocityZ / moving * kBoost;
+        cart.velocityX += cart.velocityX / moving * env.poweredRailBoost;
+        cart.velocityZ += cart.velocityZ / moving * env.poweredRailBoost;
         return;
     }
     if (*shape == "east_west") {
@@ -487,7 +486,7 @@ double maxSpeed(const ServerEntity& cart, const Env& env) {
     }
     const bool inWater = cart.cart != nullptr && cart.cart->inWater;
     double speed = env.experimental ? static_cast<double>(env.maxMinecartSpeed) * (inWater ? 0.5 : 1.0) / 20.0
-                                    : (inWater ? kMaxSpeedInWater : kMaxSpeed);
+                                    : (inWater ? env.legacyMaxSpeed * 0.5 : env.legacyMaxSpeed);
     // parity: `MinecartFurnace.getMaxSpeed`, three quarters of it in water and half on land.
     if (isFurnace(cart)) {
         speed *= inWater ? static_cast<double>(0.75F) : 0.5;

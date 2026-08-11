@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/VehicleSystem.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
@@ -84,6 +85,8 @@ void VehicleSystem::tickMinecart(world::LoadedWorld& world, ServerEntity& cart) 
     carts::Env env;
     env.experimental = experimental;
     env.maxMinecartSpeed = world.gameRules().get(world::gameRules::kMaxMinecartSpeed);
+    env.legacyMaxSpeed = world.state().gameplay().items.minecartMaxSpeed;
+    env.poweredRailBoost = world.state().gameplay().items.poweredRailBoostModifier;
     if (!cart.passengerIds.empty()) {
         for (const PlayerSession* player : watchersOf(world)) {
             if (player->entityId() == cart.passengerIds.front()) {

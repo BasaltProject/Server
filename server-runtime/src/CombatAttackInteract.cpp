@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
@@ -45,6 +46,7 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/BreedingCooldowns.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerDrops.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
@@ -399,7 +401,10 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     }
     // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster.
     const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
-    if (entity::breeding::canFallInLove(*entity)) {
+    const world::LoadedWorld* herd = owner_->currentWorld();
+    const bool waiting = herd != nullptr && herd->state().gameplay().mechanics.animalBreedingCooldownSeconds > 0 &&
+                         world::breedingCooldowns::active(session->uuid().toString(), entity->type(), herd->gameTime());
+    if (entity::breeding::canFallInLove(*entity) && !waiting) {
         entity::breeding::feed(*entity, session->uuid().toString());
     } else if (entity::breeding::canAgeUp(*entity)) {
         entity::breeding::feedBaby(*entity);
