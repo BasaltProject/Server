@@ -6,11 +6,14 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import platform.posix.RUSAGE_SELF
-import platform.posix.getrusage
-import platform.posix.rusage
+import platform.linux.RUSAGE_SELF
+import platform.linux.getrusage
+import platform.linux.rusage
 
-/** User plus system time, which together are what the process actually cost the machine. */
+/**
+ * User plus system time, which together are what the process actually cost the machine.
+ * glibc binds `getrusage` under `platform.linux`, not `platform.posix` as the Apple headers do.
+ */
 public actual fun processCpuMicros(): Long? =
     memScoped {
         val usage = alloc<rusage>()

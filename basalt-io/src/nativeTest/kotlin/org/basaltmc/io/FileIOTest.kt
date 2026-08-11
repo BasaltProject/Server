@@ -73,6 +73,21 @@ class FileIOTest {
         platform.posix.remove("basalt_fileio_test_dir")
     }
 
+    /** Windows' `fopen` refuses a directory, so [FileIO.exists] answers this one differently per platform. */
+    @Test
+    fun directoryExistsTellsDirectoriesFromFilesAndMissingPaths() {
+        val dir = "basalt_fileio_test_dir_probe"
+        assertFalse(FileIO.directoryExists(dir))
+        FileIO.createDirectories(dir)
+        assertTrue(FileIO.directoryExists(dir))
+
+        val path = "$dir/file.txt"
+        FileIO.writeText(path, "x")
+        assertFalse(FileIO.directoryExists(path))
+        removeTestFile(path)
+        platform.posix.remove(dir)
+    }
+
     @Test
     fun createDirectoriesIsIdempotent() {
         val dir = "basalt_fileio_test_dir_repeat"

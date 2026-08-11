@@ -88,26 +88,39 @@ private class KonanToolchain(
 
     val dependencies: File = File(System.getProperty("user.home"), ".konan/dependencies")
 
+    /** Values chain: `targetSysRoot` points at `$gccToolchain`, which points at `$toolchainDependency`. */
     fun resolve(
         key: String,
         target: String,
     ): String? {
-        val raw = properties.getProperty("$key.$target") ?: return null
-        return VARIABLE.replace(raw) { match ->
-            val name = match.groupValues[1]
-            properties.getProperty("$name.$target") ?: match.value
+        var value = properties.getProperty("$key.$target") ?: return null
+        repeat(RESOLVE_DEPTH) {
+            if (!value.contains('$')) return value
+            value =
+                VARIABLE.replace(value) { match ->
+                    properties.getProperty("${match.groupValues[1]}.$target") ?: match.value
+                }
         }
+        check(!value.contains('$')) { "Unresolved variable in $key.$target: $value" }
+        return value
     }
 
     val clang: File
         get() =
             dependencies
                 .listFiles()
-                ?.firstOrNull { it.name.startsWith("llvm-") && File(it, "bin/clang").exists() }
-                ?.let { File(it, "bin/clang") }
+                ?.filter { it.name.startsWith("llvm-") }
+                ?.firstNotNullOfOrNull { tool(it, "clang") }
                 ?: error("No Kotlin/Native LLVM toolchain under $dependencies. Build once so it is downloaded.")
 
+    /** Windows carries the `.exe` suffix, so the name alone never locates the binary there. */
+    fun tool(
+        llvm: File,
+        name: String,
+    ): File? = sequenceOf(name, "$name.exe").map { File(llvm, "bin/$it") }.firstOrNull { it.exists() }
+
     companion object {
+        private const val RESOLVE_DEPTH = 4
         private val VARIABLE = Regex("""\$([A-Za-z0-9_.]+?)\.[a-z0-9_]+""")
 
         fun locate(): KonanToolchain {
@@ -144,6 +157,7 @@ abstract class CompileSqliteAmalgamation : DefaultTask() {
     @TaskAction
     fun run() {
         val toolchain = KonanToolchain.locate()
+        val clang = toolchain.clang
         val target = konanTarget.get()
         val triple = toolchain.resolve("targetTriple", target) ?: error("No target triple for $target")
         val sysRoot = toolchain.resolve("targetSysRoot", target)?.let { File(toolchain.dependencies, it) }
@@ -155,7 +169,7 @@ abstract class CompileSqliteAmalgamation : DefaultTask() {
 
         val command =
             buildList {
-                add(toolchain.clang.absolutePath)
+                add(clang.absolutePath)
                 add("-c")
                 add("-O2")
                 add("-target")
@@ -166,7 +180,10 @@ abstract class CompileSqliteAmalgamation : DefaultTask() {
                     // that is not materialised as a directory here.
                     add("-isysroot")
                     add(xcodeSdkPath())
-                } else if (sysRoot != null && sysRoot.exists()) {
+                } else {
+                    // Never fall back to the host headers: that silently builds against the wrong libc.
+                    checkNotNull(sysRoot) { "No sysroot for $target in konan.properties" }
+                    check(sysRoot.exists()) { "Kotlin/Native sysroot for $target is missing: $sysRoot" }
                     add("--sysroot")
                     add(sysRoot.absolutePath)
                 }
@@ -178,7 +195,9 @@ abstract class CompileSqliteAmalgamation : DefaultTask() {
         execute(command)
         // `ar` from the same LLVM distribution, so the archive format always matches the linker
         // that is going to read it.
-        val ar = File(toolchain.clang.parentFile, "llvm-ar")
+        val ar =
+            toolchain.tool(clang.parentFile.parentFile, "llvm-ar")
+                ?: error("No llvm-ar next to ${clang.absolutePath}")
         execute(listOf(ar.absolutePath, "rcs", archive.absolutePath, objectFile.absolutePath))
     }
 
@@ -219,6 +238,8 @@ kotlin {
             ) {
                 description = "Compiles SQLite into a static library for $targetName."
                 dependsOn(downloadSqlite)
+                // Downloads the LLVM this task shells out to; without it, the two race on a clean machine.
+                dependsOn(tasks.matching { it.name == "downloadKotlinNativeDistribution" })
                 sources.set(downloadSqlite.flatMap { it.outputDirectory })
                 konanTarget.set(targetName)
                 outputDirectory.set(sqliteRoot.map { it.dir("lib/$targetName") })

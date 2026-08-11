@@ -12,17 +12,11 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.usePinned
 import platform.posix.AF_INET
-import platform.posix.ECONNRESET
-import platform.posix.EINTR
-import platform.posix.ENOTCONN
-import platform.posix.EPIPE
-import platform.posix.ETIMEDOUT
 import platform.posix.INADDR_ANY
 import platform.posix.SOCK_STREAM
 import platform.posix.accept
 import platform.posix.bind
 import platform.posix.connect
-import platform.posix.errno
 import platform.posix.listen
 import platform.posix.recv
 import platform.posix.send
@@ -75,6 +69,15 @@ internal expect fun enableAddressReuse(fd: Long)
  * Windows exposes it through a nested union (`S_un.S_addr`) rather than the `s_addr` macro cinterop
  * doesn't see, unlike POSIX/BSD's direct `in_addr.s_addr` field. */
 internal expect fun sockaddr_in.setAddress(value: UInt)
+
+/** `errno` on POSIX, `WSAGetLastError()` on Windows: Winsock keeps its own error state and never sets `errno`. */
+internal expect fun lastSocketError(): Int
+
+/** A signal interrupted the call, which says nothing about the connection. */
+internal expect fun socketErrorIsInterrupt(error: Int): Boolean
+
+/** The peer is gone, which [TcpConnection.read] and [TcpConnection.write] treat as end of stream, not failure. */
+internal expect fun socketErrorIsPeerGone(error: Int): Boolean
 
 /**
  * The raw 32-bit address at the other end of a connected socket, or null if it cannot be read.
@@ -183,10 +186,11 @@ public class TcpConnection internal constructor(
                     recv(fd.convert(), pinned.addressOf(offset), length.convert(), 0)
                 }
             if (received >= 0) return received.toInt()
-            when (errno) {
-                EINTR -> continue
-                ECONNRESET, ENOTCONN, ETIMEDOUT, EPIPE -> return 0
-                else -> throw SocketException("recv() failed with errno $errno")
+            val error = lastSocketError()
+            when {
+                socketErrorIsInterrupt(error) -> continue
+                socketErrorIsPeerGone(error) -> return 0
+                else -> throw SocketException("recv() failed with error $error")
             }
         }
     }
@@ -204,10 +208,11 @@ public class TcpConnection internal constructor(
                     send(fd.convert(), pinned.addressOf(offset + written), (length - written).convert(), 0)
                 }
             if (sent < 0) {
-                when (errno) {
-                    EINTR -> continue
-                    ECONNRESET, ENOTCONN, ETIMEDOUT, EPIPE -> return
-                    else -> throw SocketException("send() failed with errno $errno")
+                val error = lastSocketError()
+                when {
+                    socketErrorIsInterrupt(error) -> continue
+                    socketErrorIsPeerGone(error) -> return
+                    else -> throw SocketException("send() failed with error $error")
                 }
             }
             written += sent.toInt()

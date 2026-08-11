@@ -27,6 +27,7 @@ import org.basaltmc.protocol.play.GameEventPacket
 import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.protocol.play.LoginPlayPacket
 import org.basaltmc.protocol.play.MapChunkPacket
+import org.basaltmc.protocol.play.PlayerInfoRemovePacket
 import org.basaltmc.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
 import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
@@ -64,10 +65,11 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class PlayFlowIntegrationTest {
-    private val port = 39570
+    /** Assigned by [startTestServer]: the server may land on a fallback port, and everything must follow it. */
+    private var port = 0
 
     /** Its own server, so seeding a player row here cannot disturb the other test. */
-    private val restorePort = 39574
+    private var restorePort = 0
 
     // BasaltServer generates a fixed 7x7 chunk grid (radius 3) around spawn at startup.
     private val chunkCount = 49
@@ -258,7 +260,7 @@ class PlayFlowIntegrationTest {
 
     @Test
     fun aPlayerJoinsSeesTerrainMovesAndChats() {
-        startTestServer(port)
+        port = startTestServer(18570)
         val alice = joinAsPlayer("Alice")
 
         // "ve terreno": the fixed chunk grid was received and parsed above (chunkCount pairs).
@@ -483,8 +485,16 @@ class PlayFlowIntegrationTest {
         sendCompressed(alice.connection, ChatCommandPacket.ID, alice.threshold) {
             it.writeProtocolString("me is still here", 256)
         }
-        val survivorBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
-        assertEquals(SystemChatPacket.ID, survivorBody.readVarInt())
+        // Dropping Bob takes him off Alice's tab list, sent from his own session thread the moment
+        // the decoder gives up on him. That can land either side of her next answer, so it is
+        // skipped here rather than ordered, same as keep-alives are in [readFrame].
+        var survivorBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        var survivorId = survivorBody.readVarInt()
+        if (survivorId == PlayerInfoRemovePacket.ID) {
+            survivorBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+            survivorId = survivorBody.readVarInt()
+        }
+        assertEquals(SystemChatPacket.ID, survivorId)
         assertTrue(
             SystemChatPacket
                 .read(survivorBody)
@@ -503,7 +513,7 @@ class PlayFlowIntegrationTest {
         // than the restored one, so someone who logged out in creative came back to a survival HUD
         // while their abilities and block breaking still followed creative. The mismatch is only
         // visible in this packet, which is why it is asserted here and not on the session.
-        startTestServer(restorePort)
+        restorePort = startTestServer(18574)
 
         val name = "Zoe"
         val uuid = OfflineUuid.forUsername(name)

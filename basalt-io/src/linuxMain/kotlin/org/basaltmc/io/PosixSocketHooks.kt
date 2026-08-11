@@ -12,11 +12,17 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
 import platform.posix.AF_INET
+import platform.posix.ECONNRESET
+import platform.posix.EINTR
+import platform.posix.ENOTCONN
+import platform.posix.EPIPE
+import platform.posix.ETIMEDOUT
 import platform.posix.SIGPIPE
 import platform.posix.SIG_IGN
 import platform.posix.SOL_SOCKET
 import platform.posix.SO_REUSEADDR
 import platform.posix.close
+import platform.posix.errno
 import platform.posix.getpeername
 import platform.posix.setsockopt
 import platform.posix.signal
@@ -49,7 +55,6 @@ internal actual fun sockaddr_in.setAddress(value: UInt) {
     sin_addr.s_addr = value
 }
 
-
 /**
  * `getpeername` into a [sockaddr_in], which is all this server ever accepts: the listener binds
  * AF_INET, so anything reporting another family is left unanswered rather than misreported.
@@ -65,3 +70,10 @@ internal actual fun peerAddress(fd: Long): UInt? =
         if (address.sin_family.toInt() != AF_INET) return@memScoped null
         address.sin_addr.s_addr
     }
+
+internal actual fun lastSocketError(): Int = errno
+
+internal actual fun socketErrorIsInterrupt(error: Int): Boolean = error == EINTR
+
+internal actual fun socketErrorIsPeerGone(error: Int): Boolean =
+    error == ECONNRESET || error == ENOTCONN || error == ETIMEDOUT || error == EPIPE
