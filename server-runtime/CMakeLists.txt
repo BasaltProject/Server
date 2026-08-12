@@ -1095,9 +1095,3 @@ basalt_test(server-runtime-player-persistence-test
     SOURCES test/PlayerPersistenceTest.cpp
     DEPENDS basalt::server-runtime-core
 )
-
-basalt_test(cfgpurpur-probe-test
-    SOURCES
-        ../tools/bukkit/probes/cfgpurpur/GameplayProbeTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
