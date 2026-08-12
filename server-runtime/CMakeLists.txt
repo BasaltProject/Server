@@ -36,7 +36,7 @@ basalt_module(server-runtime-core
         src/remote/BasaltServerRemote.cpp
         src/remote/RemoteHostImpl.cpp
         src/config/MobsConfig.cpp
-        src/config/PurpurRules.cpp
+        src/config/GameplayRules.cpp
         src/config/GroupsConfig.cpp
         src/config/LimitsConfig.cpp
         src/config/LiveConfigs.cpp

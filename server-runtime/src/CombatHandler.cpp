@@ -9,7 +9,7 @@
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -231,7 +231,7 @@ void CombatHandler::applyFallDamage(PlayerSession& session, const double landing
             soilState.has_value() ? server::registry::blockStateDefinitions::blockOf(*soilState) : nullptr;
         const auto& protectedAt = owner_->options().spawnProtected;
         if (soilBlock != nullptr && soilBlock->path() == "turtle_egg" &&
-            config::PurpurRules::resolve(world->state().gameplay().blocks.turtleEggMobGriefingOverride, true) &&
+            config::GameplayRules::resolve(world->state().gameplay().blocks.turtleEggMobGriefingOverride, true) &&
             !(protectedAt && protectedAt(session, *world, soil.x, soil.z))) {
             // parity: `TurtleEggBlock.fallOn`, one in three.
             random::RandomSource eggRandom = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);

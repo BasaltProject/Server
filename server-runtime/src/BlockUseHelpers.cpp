@@ -11,7 +11,7 @@
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockSlots.hpp>
@@ -630,7 +630,7 @@ player::SleepContext BlockInteractionHandler::sleepContext() {
     context.explode = [this](world::LoadedWorld& world, const double x, const double y, const double z,
                              const std::int32_t byEntityId) {
         if (ExplosionSystem* explosions = owner_->options().explosions; explosions != nullptr) {
-            const config::PurpurRules::Blocks& blocks = world.state().gameplay().blocks;
+            const config::GameplayRules::Blocks& blocks = world.state().gameplay().blocks;
             explosions->blowUp(world, owner_->playersInSameWorld(), x, y, z, blocks.bedExplosionPower, "bed",
                                byEntityId, {}, {}, blocks.bedExplosionFire);
         }

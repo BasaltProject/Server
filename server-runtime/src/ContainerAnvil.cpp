@@ -2,7 +2,7 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/player/PlayerAnvil.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>

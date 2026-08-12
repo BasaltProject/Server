@@ -32,7 +32,7 @@
 
 namespace basalt::server::runtime::config {
 struct WorldRules;
-struct PurpurRules;
+struct GameplayRules;
 } // namespace basalt::server::runtime::config
 
 namespace basalt::server::runtime::plugins {
@@ -89,9 +89,9 @@ public:
 
     void setHasSkylight(bool hasSkylight) noexcept { hasSkylight_ = hasSkylight; }
 
-    void setGameplay(std::shared_ptr<const config::PurpurRules> gameplay) { gameplay_ = std::move(gameplay); }
+    void setGameplay(std::shared_ptr<const config::GameplayRules> gameplay) { gameplay_ = std::move(gameplay); }
 
-    [[nodiscard]] const config::PurpurRules& gameplay() const noexcept;
+    [[nodiscard]] const config::GameplayRules& gameplay() const noexcept;
 
     void setSettlesGeneration(bool settles) noexcept { settlesGeneration_ = settles; }
 
@@ -436,7 +436,7 @@ public:
 
 private:
     bool hasSkylight_ = true;
-    std::shared_ptr<const config::PurpurRules> gameplay_;
+    std::shared_ptr<const config::GameplayRules> gameplay_;
     bool settlesGeneration_ = true;
     void mine(std::string_view what) const;
 

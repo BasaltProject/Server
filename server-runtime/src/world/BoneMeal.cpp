@@ -1,6 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 
 #include <algorithm>
@@ -47,7 +47,7 @@ constexpr std::string_view kShelfMushroom = "shelf_mushroom";
 }
 
 [[nodiscard]] bool ruleAllows(const WorldState& world, const std::string& path) {
-    const config::PurpurRules::Blocks& rules = world.gameplay().blocks;
+    const config::GameplayRules::Blocks& rules = world.gameplay().blocks;
     return (path == "cactus" && rules.cactusAffectedByBonemeal) ||
            (path == "sugar_cane" && rules.sugarCaneAffectedByBonemeal) ||
            (path == "nether_wart" && rules.netherWartAffectedByBonemeal);

@@ -1,10 +1,10 @@
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/world/FarmlandTrample.hpp>
 
 namespace basalt::server::runtime::world::farmlandTrample {
 
-bool tramples(const config::PurpurRules& rules, const Faller& faller, random::RandomSource& random) {
-    const config::PurpurRules::Blocks& blocks = rules.blocks;
+bool tramples(const config::GameplayRules& rules, const Faller& faller, random::RandomSource& random) {
+    const config::GameplayRules::Blocks& blocks = rules.blocks;
     if (blocks.farmlandTrampleHeight >= 0.0F) {
         if (!(faller.fallDistance >= static_cast<double>(blocks.farmlandTrampleHeight))) {
             return false;

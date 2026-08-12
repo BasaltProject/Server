@@ -8,7 +8,7 @@
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
@@ -204,7 +204,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             // parity: `LargeFireball.onHit` sets fire wherever it explodes when mobs may grief.
             explosions_.blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower, "tnt",
                                entity.entityId(), {}, {},
-                               entity.incendiary.value_or(config::PurpurRules::resolve(
+                               entity.incendiary.value_or(config::GameplayRules::resolve(
                                    world.state().gameplay().blocks.fireballsMobGriefingOverride,
                                    world.gameRules().get(world::gameRules::kMobGriefing))));
             return;

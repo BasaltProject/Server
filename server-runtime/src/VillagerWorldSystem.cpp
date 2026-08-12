@@ -5,7 +5,7 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/VillagerWorldSystem.hpp>
-#include <basalt/server/runtime/config/PurpurRules.hpp>
+#include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
@@ -386,7 +386,7 @@ void VillagerWorldSystem::setSleeping(ServerEntity& mob, std::optional<BlockPos>
         for (const world::BlockChange& change : world::beds::destroy(world_->state(), bed->x, bed->y, bed->z)) {
             announce(change.x, change.y, change.z, change.stateId, true);
         }
-        const config::PurpurRules::Blocks& rules = world_->state().gameplay().blocks;
+        const config::GameplayRules::Blocks& rules = world_->state().gameplay().blocks;
         explode_(*world_, bed->x + 0.5, bed->y + 0.5, bed->z + 0.5, rules.bedExplosionPower, rules.bedExplosionFire);
         return;
     }
