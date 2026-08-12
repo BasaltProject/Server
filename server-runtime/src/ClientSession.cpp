@@ -430,8 +430,8 @@ void ClientSession::sendEnvelopeControl(std::span<const std::uint8_t> control) {
 
 void ClientSession::appendFrame(wire::io::ByteBuffer& frame, std::span<const std::uint8_t> packetIdAndData) {
     if (compressionEnabled_) {
-        static_cast<void>(
-            wire::protocol::packetFraming::writeCompressed(frame, packetIdAndData, options_.compressionThreshold));
+        static_cast<void>(wire::protocol::packetFraming::writeCompressed(
+            frame, packetIdAndData, options_.compressionThreshold, options_.tuning.compressionLevel));
     } else {
         static_cast<void>(wire::protocol::packetFraming::writeUncompressed(frame, packetIdAndData));
     }

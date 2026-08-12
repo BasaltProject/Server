@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/net/ConnectionGate.hpp>
 
 #include <optional>
+#include <thread>
 #include <utility>
 
 namespace basalt::server::runtime::net {
@@ -40,6 +41,28 @@ void ConnectionGate::release(const std::string& address) {
     const auto found = open_.find(address);
     if (found != open_.end() && --found->second <= 0) {
         open_.erase(found);
+    }
+}
+
+// parity: Paper `max-joins-per-tick`, a tick being fifty milliseconds here.
+void ConnectionGate::awaitJoinSlot(std::int32_t perTick) {
+    constexpr std::chrono::milliseconds kWindow{50};
+    while (perTick > 0) {
+        std::chrono::steady_clock::time_point wakeAt;
+        {
+            const std::lock_guard<std::mutex> lock{mutex_};
+            const auto now = std::chrono::steady_clock::now();
+            if (now - joinWindow_ >= kWindow) {
+                joinWindow_ = now;
+                joinsInWindow_ = 0;
+            }
+            if (joinsInWindow_ < perTick) {
+                ++joinsInWindow_;
+                return;
+            }
+            wakeAt = joinWindow_ + kWindow;
+        }
+        std::this_thread::sleep_until(wakeAt);
     }
 }
 

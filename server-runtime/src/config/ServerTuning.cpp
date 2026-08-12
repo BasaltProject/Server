@@ -37,6 +37,16 @@ std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable&
                                        ": username-pattern is not a valid regular expression: " + error.what());
             }
         }
+        tuning.broadcastConsoleToOps =
+            server->boolean("broadcast-console-to-ops").value_or(tuning.broadcastConsoleToOps);
+        tuning.broadcastRconToOps = server->boolean("broadcast-rcon-to-ops").value_or(tuning.broadcastRconToOps);
+        const auto opLevel = ranged(*server, "op-permission-level", tuning.opPermissionLevel, 1, 4, path);
+        const auto joins = ranged(*server, "max-joins-per-tick", tuning.maxJoinsPerTick, 0, 1 << 16, path);
+        if (!opLevel.has_value() || !joins.has_value()) {
+            return std::unexpected(!opLevel.has_value() ? opLevel.error() : joins.error());
+        }
+        tuning.opPermissionLevel = *opLevel;
+        tuning.maxJoinsPerTick = *joins;
         tuning.forceGamemode = server->boolean("force-gamemode").value_or(tuning.forceGamemode);
         tuning.acceptsTransfers = server->boolean("accepts-transfers").value_or(tuning.acceptsTransfers);
         tuning.allowFlight = server->boolean("allow-flight").value_or(tuning.allowFlight);
@@ -80,6 +90,11 @@ std::expected<ServerTuning, std::string> ServerTuning::fromToml(const TomlTable&
                 return std::unexpected(threshold.error());
             }
             tuning.compressionThreshold = *threshold;
+            const auto level = ranged(*java, "compression-level", tuning.compressionLevel, -1, 9, path);
+            if (!level.has_value()) {
+                return std::unexpected(level.error());
+            }
+            tuning.compressionLevel = *level;
             tuning.statusReplies = java->boolean("status-replies").value_or(tuning.statusReplies);
             tuning.proxyProtocol = java->boolean("proxy-protocol").value_or(tuning.proxyProtocol);
             tuning.tcpNoDelay = java->boolean("tcp-no-delay").value_or(tuning.tcpNoDelay);

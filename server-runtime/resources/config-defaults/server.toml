@@ -57,6 +57,20 @@ whitelist = false
 # it, as vanilla's enforce-whitelist does. Off lets them stay until they leave on their own.
 enforce-whitelist = false
 
+# Permission level (1 to 4) every operator gets, as vanilla's op-permission-level does. Below 2 an operator
+# cannot use entity selectors in commands; below 2 command blocks cannot be used either. Who is an operator is
+# decided by the operator group in groups.toml.
+op-permission-level = 4
+
+# Show operators what a command run from the console, or over RCON, did, as vanilla's broadcast-console-to-ops
+# and broadcast-rcon-to-ops do.
+broadcast-console-to-ops = true
+broadcast-rcon-to-ops = true
+
+# Most players let through the final step of logging in each tick; the rest wait for the next one. Paper's
+# max-joins-per-tick (which ships as 5). 0 means no limit. NO VANILLA.
+max-joins-per-tick = 0
+
 # Seconds between saves of the players alone (inventory, position, stats), on top of the world save interval in
 # worlds.toml that saves them together with the world. 0 saves them only with the world, as vanilla does.
 player-autosave-seconds = 0
@@ -163,6 +177,10 @@ name-substitutes = true
 # Packets of at least this many bytes are compressed, as vanilla's network-compression-threshold does. -1
 # turns compression off, 0 compresses everything. Lower it on a slow link, raise it on a fast local network.
 compression-threshold = 256
+
+# zlib level of compressed packets, 0 (no work) to 9 (smallest), -1 for zlib's default of 6. Paper's
+# compression-level. Lower trades bandwidth for CPU.
+compression-level = -1
 
 # Answer server list pings, as vanilla's enable-status does. Off makes the server invisible in the list
 # (clients show it as unreachable) while still letting players join by address.
