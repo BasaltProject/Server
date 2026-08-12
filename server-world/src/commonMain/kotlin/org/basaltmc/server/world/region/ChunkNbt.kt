@@ -91,6 +91,8 @@ public object ChunkNbt {
             val biomes = sectionTag.getCompound("biomes")
             chunk.section(index).setBiomeIds(decodeBiomes(biomes))
         }
+        // The sections were filled behind the chunk's back, so its heightmaps mean nothing yet.
+        chunk.invalidateHeightmaps()
         val blockEntities = tag.getList("block_entities")
         if (blockEntities != null) {
             for (entry in blockEntities) chunk.setBlockEntity(decodeBlockEntity(chunk, entry))

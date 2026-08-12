@@ -16,7 +16,6 @@ import kotlin.time.TimeSource
 public object GenerationMetrics {
     /** One measured step of [org.basaltmc.server.world.terrain.RealTerrainGenerator.generate]. */
     public enum class Phase {
-        DENSITY_GRID,
         TERRAIN_FILL,
         SURFACE_RULES,
         CARVERS,

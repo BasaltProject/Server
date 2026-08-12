@@ -129,7 +129,6 @@ public object DimensionTerrainGenerator {
                 cellHeight,
                 cache,
             )
-        GenerationMetrics.measure(GenerationMetrics.Phase.DENSITY_GRID) { sampler.prepare() }
         GenerationMetrics.measure(GenerationMetrics.Phase.TERRAIN_FILL) {
             for (cellY in 0 until sampler.verticalCells) {
                 val cellMinY = noiseMinY + cellY * cellHeight

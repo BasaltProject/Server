@@ -35,6 +35,11 @@ public class OverworldOreVeinifier(
         y: Int,
         z: Int,
     ): BlockState? {
+        // Both vein types are Y-bounded, and the checks below reject anything outside both bands
+        // whatever the noise says. Testing Y first skips the veininess walk for five sixths of a
+        // column, and reaches neither the density functions (pure) nor the positional random.
+        if (y !in IRON.minY..IRON.maxY && y !in COPPER.minY..COPPER.maxY) return null
+
         val context = FunctionContext(x, y, z, densityCache)
         val veininess = router.veinToggle.compute(context)
         val type = if (veininess > 0.0) COPPER else IRON

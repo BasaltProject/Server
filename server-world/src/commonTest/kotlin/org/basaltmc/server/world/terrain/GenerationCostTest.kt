@@ -123,14 +123,17 @@ class GenerationCostTest {
             "Biome lookups            1584" in report,
             "expected 1584 biome lookups per chunk, got:\n$report",
         )
-        // A ceiling, not a target: the complete cave graph evaluates many more independent noise
-        // nodes than the old cave-free router. This is still far below the 105786 measured before
-        // Marker honored FLAT_CACHE/CACHE_2D; regressing past it means a cache stopped being reached.
+        // A ceiling, not a target. It was 105786 before Marker honored FLAT_CACHE/CACHE_2D and
+        // 31600 while a prewarm evaluated corners the fill never asked for; past it means a cache
+        // stopped being reached.
         val noiseEvaluations = valueAfter(report, "NormalNoise evaluations")
         assertTrue(
-            noiseEvaluations in 1..35_000,
-            "expected the marker caches to hold cave-router noise evaluations below 35000, got $noiseEvaluations:\n$report",
+            noiseEvaluations in 1..22_000,
+            "expected the marker caches to hold cave-router noise evaluations below 22000, got $noiseEvaluations:\n$report",
         )
+
+        // Rebuilt on write, so nothing rescans a column. It was 2668792 steps a chunk.
+        assertTrue("Heightmap scan steps     0" in report, "something rescanned a heightmap:\n$report")
     }
 
     private fun valueAfter(

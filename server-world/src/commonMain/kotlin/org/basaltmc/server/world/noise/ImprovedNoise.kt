@@ -92,11 +92,18 @@ public class ImprovedNoise(
     private companion object {
         val SHIFT_UP_EPSILON = 1.0E-7F.toDouble()
 
+        // The same sixteen gradients as SimplexNoise.GRADIENT, flattened. Eight of these run per
+        // octave per sample, and a row deref plus three int-to-double conversions is most of them.
+        val GRADIENTS = DoubleArray(16 * 3) { SimplexNoise.GRADIENT[it / 3][it % 3].toDouble() }
+
         fun gradDot(
             hash: Int,
             x: Double,
             y: Double,
             z: Double,
-        ): Double = SimplexNoise.dot(SimplexNoise.GRADIENT[hash and 15], x, y, z)
+        ): Double {
+            val base = (hash and 15) * 3
+            return GRADIENTS[base] * x + GRADIENTS[base + 1] * y + GRADIENTS[base + 2] * z
+        }
     }
 }

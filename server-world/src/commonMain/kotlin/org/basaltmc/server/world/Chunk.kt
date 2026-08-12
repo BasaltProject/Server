@@ -10,6 +10,12 @@ public class Chunk(
     public val verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
 ) {
     private val sections = Array(verticalBounds.sectionCount) { ChunkSection() }
+
+    // parity: Heightmap, maintained as blocks are written rather than rescanned on demand. Scanning
+    // cost 2.6 million block reads per generated chunk, decoration alone asking for 10000 columns.
+    private val heights = Array(HEIGHTMAP_TYPES.size) { IntArray(16 * 16) { verticalBounds.minY } }
+    private var heightsValid = true
+
     private val blockEntitiesByPosition = LinkedHashMap<Int, ChunkBlockEntity>()
     private val generatedEntitiesBacking = mutableListOf<ChunkGeneratedEntity>()
     private val scheduledBlockTicksBacking = mutableListOf<ChunkScheduledTick>()
@@ -51,16 +57,29 @@ public class Chunk(
             if (blockEntitiesByPosition.isNotEmpty() && section.getBlockStateId(x, y and 15, z) != stateId) {
                 blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
             }
-            if (section.setBlockStateId(x, y and 15, z, stateId)) isDirty = true
+            if (section.setBlockStateId(x, y and 15, z, stateId)) {
+                isDirty = true
+                updateHeights(x, y, z, stateId)
+            }
         } else {
             val oldStateId = section.getBlockStateId(x, y and 15, z)
             section.setBlockStateId(x, y and 15, z, stateId)
             if (oldStateId != stateId) {
                 isDirty = true
+                updateHeights(x, y, z, stateId)
                 blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
                 observer(x, y, z, oldStateId, stateId)
             }
         }
+    }
+
+    /**
+     * Tells the chunk its blocks changed behind its back, which writing through [section] does.
+     * The heightmaps are rebuilt on the next read rather than here, so loading a chunk section by
+     * section rebuilds once and not once per section.
+     */
+    public fun invalidateHeightmaps() {
+        heightsValid = false
     }
 
     public fun setBlockEntity(blockEntity: ChunkBlockEntity) {
@@ -156,12 +175,10 @@ public class Chunk(
     }
 
     /** Topmost matching Y plus one per column, matching vanilla's heightmap convention. */
-    public fun heightmap(type: HeightmapType = HeightmapType.MOTION_BLOCKING): IntArray =
-        IntArray(16 * 16) { i ->
-            val x = i and 15
-            val z = i shr 4
-            heightAt(x, z, type)
-        }
+    public fun heightmap(type: HeightmapType = HeightmapType.MOTION_BLOCKING): IntArray {
+        if (!heightsValid) rebuildHeights()
+        return heights[type.ordinal].copyOf()
+    }
 
     /** The heightmap value for one local column, without allocating/scanning the other 255. */
     public fun heightAt(
@@ -169,10 +186,71 @@ public class Chunk(
         z: Int,
         type: HeightmapType = HeightmapType.MOTION_BLOCKING,
     ): Int {
-        var y = verticalBounds.maxY
-        while (y >= verticalBounds.minY && !type.matches(getBlockStateId(x, y, z))) y--
-        if (GenerationMetrics.enabled) GenerationMetrics.countHeightmapScan(verticalBounds.maxY - y)
-        return y + 1
+        if (!heightsValid) rebuildHeights()
+        return heights[type.ordinal][x + z * 16]
+    }
+
+    /**
+     * // parity: Heightmap.update. A block at or above the recorded height raises it; removing the
+     * one *at* it is the only case that has to look downwards, and only within that column.
+     */
+    private fun updateHeights(
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+    ) {
+        if (!heightsValid) return
+        val column = (x and 15) + (z and 15) * 16
+        for (i in HEIGHTMAP_TYPES.indices) {
+            val type = HEIGHTMAP_TYPES[i]
+            val map = heights[i]
+            val current = map[column]
+            if (type.matches(stateId)) {
+                if (y >= current) map[column] = y + 1
+            } else if (y == current - 1) {
+                var scan = y - 1
+                while (scan >= verticalBounds.minY && !type.matches(getBlockStateId(x, scan, z))) scan--
+                map[column] = scan + 1
+            }
+        }
+    }
+
+    /** All four heightmaps in one downward pass per column, skipping the sections that hold only air. */
+    private fun rebuildHeights() {
+        val allPending = (1 shl HEIGHTMAP_TYPES.size) - 1
+        for (i in HEIGHTMAP_TYPES.indices) heights[i].fill(verticalBounds.minY)
+        for (z in 0..15) {
+            for (x in 0..15) {
+                val column = x + z * 16
+                var pending = allPending
+                var y = verticalBounds.maxY
+                var steps = 0
+                while (y >= verticalBounds.minY && pending != 0) {
+                    val section = sections[(y shr 4) - verticalBounds.minSection]
+                    if (section.nonAirBlockCount == 0) {
+                        y = (y and 15.inv()) - 1
+                        continue
+                    }
+                    val stateId = section.getBlockStateId(x, y and 15, z)
+                    steps++
+                    for (i in HEIGHTMAP_TYPES.indices) {
+                        if (pending and (1 shl i) == 0) continue
+                        if (!HEIGHTMAP_TYPES[i].matches(stateId)) continue
+                        heights[i][column] = y + 1
+                        pending = pending and (1 shl i).inv()
+                    }
+                    y--
+                }
+                if (GenerationMetrics.enabled) GenerationMetrics.countHeightmapScan(steps)
+            }
+        }
+        heightsValid = true
+    }
+
+    private companion object {
+        /** Indexed by ordinal, so the write path walks an array instead of an enum iterator. */
+        val HEIGHTMAP_TYPES: Array<HeightmapType> = HeightmapType.entries.toTypedArray()
     }
 
     public enum class HeightmapType {
