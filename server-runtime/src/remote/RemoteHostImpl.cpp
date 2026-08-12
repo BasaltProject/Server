@@ -163,6 +163,18 @@ public:
             entry.set("commands", JsonValue::ofArray(std::move(commands)));
             list.push_back(JsonValue::ofObject(std::move(entry)));
         }
+        for (const bukkit::JavaPluginJar& jar :
+             s_.javaPlugins ? s_.javaPlugins() : std::vector<bukkit::JavaPluginJar>{}) {
+            JsonObject entry;
+            entry.set("id", JsonValue::of(jar.name));
+            entry.set("name", JsonValue::of(jar.name));
+            entry.set("version", JsonValue::of(jar.version));
+            entry.set("origin", JsonValue::of(std::string{"bukkit"}));
+            entry.set("disabled", JsonValue::of(!jar.loaded));
+            entry.set("errors", JsonValue::of(static_cast<std::int64_t>(0)));
+            entry.set("commands", JsonValue::ofArray(std::vector<JsonValue>{}));
+            list.push_back(JsonValue::ofObject(std::move(entry)));
+        }
         JsonObject object;
         object.set("plugins", JsonValue::ofArray(std::move(list)));
         return wire::common::writeJson(JsonValue::ofObject(std::move(object)));

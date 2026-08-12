@@ -71,6 +71,7 @@ void BasaltServer::startRemote(const std::chrono::steady_clock::time_point start
                                                          .tick = tickLoop_.get(),
                                                          .players = &playerRegistry_,
                                                          .maxPlayers = config_->maxPlayers,
+                                                         .javaPlugins = [this] { return javaPlugins_; },
                                                          .startedAt = startedAt});
     auto service = std::make_shared<server::remote::RemoteService>(settings, *remoteHost_, log);
     if (std::expected<void, std::string> started = service->start(); !started.has_value()) {
