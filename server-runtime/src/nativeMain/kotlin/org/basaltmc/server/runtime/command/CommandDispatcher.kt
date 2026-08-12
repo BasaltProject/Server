@@ -18,7 +18,7 @@ import org.basaltmc.wire.text.TextColor
  *
  * This is the whole surface a command is written against, which is why reporting and the two
  * "there has to be a player here" checks live on it rather than being passed around: a [Command]
- * implementation needs nothing else, including the ones BSMod will eventually contribute.
+ * implementation needs nothing else, including the ones plugins will eventually contribute.
  */
 public class CommandContext(
     public val source: CommandSource,
@@ -58,7 +58,7 @@ public class CommandContext(
  *
  * Vanilla gives every command its own class under `net.minecraft.server.commands` and this follows
  * that split, one file each, for the same reason: a command is a self-contained unit of behaviour
- * and reads better next to nothing else. It is also the shape BSMod needs later, since a plugin
+ * and reads better next to nothing else. It is also the shape plugins need later, since a plugin
  * contributing a command should have exactly this to fill in and nothing more.
  *
  * [aliases] are registered as brigadier redirects onto this command's own node, not as copies, so

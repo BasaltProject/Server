@@ -215,7 +215,7 @@ class CommandDispatcherTest {
 
     @Test
     fun registeringACommandObjectCarriesItsNamePermissionAndAliases() {
-        // The contract a BSMod command will be written against: declare the three, fill in build().
+        // The contract a plugin command will be written against: declare the three, fill in build().
         val dispatcher = CommandDispatcher(testEnvironment())
         var ran = 0
         dispatcher.register(

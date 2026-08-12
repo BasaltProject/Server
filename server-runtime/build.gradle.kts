@@ -21,7 +21,7 @@ kotlin {
             api(project(":wire-protocol"))
             api(project(":server-assets"))
             api(project(":wire-auth"))
-            api(project(":server-bsmod"))
+            api(project(":server-plugins"))
         }
         nativeTest.dependencies {
             // Only to play the client side of the online-mode handshake in ServerIntegrationTest.

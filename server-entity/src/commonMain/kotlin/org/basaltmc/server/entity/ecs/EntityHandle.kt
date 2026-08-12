@@ -1,7 +1,7 @@
 package org.basaltmc.server.entity.ecs
 
 /**
- * A lightweight object-oriented view over one entity: the shape a future BSMod binding (or any
+ * A lightweight object-oriented view over one entity: the shape a future plugin binding (or any
  * other object-style consumer) would see, sitting on top of the struct-of-arrays storage
  * everything else here uses internally (the "fachada orientada a objetos" this project's own
  * roadmap calls for over the ECS prototype). Owns no state itself beyond a `(World, EntityId)`

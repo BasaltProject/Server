@@ -41,8 +41,8 @@ Two goals drive every decision:
   the official one. Same seed, same world. Same drops, same damage, same redstone,
   same mobs, bugs included. Parity is the acceptance criterion for every system,
   not a long-term aspiration.
-- **A plugin platform worth switching to.** **BSMod** is Basalt's native plugin
-  API, written in Lua, with first-class tooling: a CLI, a VS Code extension and an
+- **A plugin platform worth switching to.** Basalt's plugin API is native and
+  written in Lua, with first-class tooling: a CLI, a VS Code extension and an
   IntelliJ IDEA plugin.
 
 | | |
@@ -50,7 +50,7 @@ Two goals drive every decision:
 | Language | Kotlin/Native, 100 %. No Java, no JVM at runtime |
 | Target version | Minecraft 26.2 (protocol 776) |
 | Distribution | Native binaries per platform |
-| Plugin API | BSMod: Lua, `.bsmod` packages |
+| Plugin API | Lua, `.bspkg` packages |
 | Message model | Adventure-style immutable components; no legacy `§` formatting |
 | Configuration | A single `basalt.toml` |
 | License | GPL-3.0 |
@@ -73,15 +73,15 @@ ticking a world, and waiting. None of that needs a virtual machine.
 |---|---|
 | **Vanilla parity** | Bit-exact RNG, identical tick ordering, seed-identical world generation, vanilla datapack execution |
 | **World storage** | Linear region format by default (smaller, fewer disk I/O ops than Anvil); existing Anvil (`.mca`) worlds are detected and converted automatically on load |
-| **BSMod plugins** | Lua API, `.bsmod` package format, hot reload, sandboxed execution, dependency resolution |
+| **Plugins** | Lua API, `.bspkg` package format, hot reload, sandboxed execution, dependency resolution |
 | **Tooling** | Official CLI, VS Code extension, IntelliJ IDEA plugin, generated API docs and type definitions |
 | **Legacy clients** | Multi-version support so older Java clients can connect, translated at the edge |
 | **Bedrock clients** | Bedrock protocol translation, so Bedrock players join the same server |
 | **Bukkit migration** | A compatibility path for the existing ecosystem. Post-1.0, and never at the cost of the no-JVM rule |
 
-## Plugins: BSMod
+## Plugins
 
-BSMod is the API. Plugins are written in Lua, packaged as `.bsmod` files
+Plugins are written in Lua, packaged as `.bspkg` files
 containing a manifest, code, resources and metadata, and run inside a sandbox with
 a per-tick instruction budget, so a broken plugin cannot take the server down.
 
@@ -224,11 +224,11 @@ Use the included wrapper rather than a system Gradle installation.
 | Entities | Skeleton only: an ECS store and a movement system |
 | Gameplay parity (redstone, mobs, combat, inventories) | Not started |
 | Datapack execution (loot tables, recipes, advancements) | Not started |
-| BSMod and the Lua runtime | Not started |
+| Plugins and the Lua runtime | Not started |
 | Tooling (CLI, VS Code, IntelliJ) | Not started |
 | Older Java clients (`wire-multiversion`) | Not started |
 | Bedrock clients (`wire-bedrock`) | Not started |
-| Bukkit compatibility | Out of scope until BSMod is stable |
+| Bukkit compatibility | Out of scope until the plugin API is stable |
 
 What that adds up to today: a real client connects, authenticates, spawns in a
 generated world, flies around while chunks stream in, breaks blocks, chats, and
