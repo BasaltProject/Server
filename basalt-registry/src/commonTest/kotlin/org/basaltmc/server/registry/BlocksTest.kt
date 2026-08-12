@@ -1,0 +1,270 @@
+package org.basaltmc.server.registry
+
+import org.basaltmc.wire.common.Identifier
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class BlocksTest {
+    @Test
+    fun lavaHasANonEmptyFluidState() {
+        assertTrue(Blocks.hasFluid(Blocks.LAVA.stateId))
+        assertTrue(Blocks.hasFluid(Blocks.LAVA.stateId + 15))
+        assertFalse(Blocks.hasWaterFluid(Blocks.LAVA.stateId))
+    }
+
+    @Test
+    fun ruinedPortalStatesResolveFromOfficialProperties() {
+        assertEquals(
+            22313,
+            Blocks.stateIdOf(
+                Identifier.vanilla("polished_blackstone_brick_stairs"),
+                linkedMapOf(
+                    "facing" to "east",
+                    "half" to "top",
+                    "shape" to "straight",
+                    "waterlogged" to "false",
+                ),
+            ),
+        )
+        assertEquals(
+            22251,
+            Blocks.stateIdOf(
+                Identifier.vanilla("polished_blackstone_brick_slab"),
+                linkedMapOf("type" to "double", "waterlogged" to "false"),
+            ),
+        )
+        assertEquals(
+            4006,
+            Blocks.stateIdOf(
+                Identifier.vanilla("chest"),
+                linkedMapOf("type" to "single", "facing" to "east", "waterlogged" to "false"),
+            ),
+        )
+        assertEquals(110, Blocks.stateIdOf(Identifier.vanilla("lava"), mapOf("level" to "8")))
+    }
+
+    @Test
+    fun allThreeVanillaAirBlocksAreAir() {
+        assertTrue(Blocks.isAir(Blocks.AIR.stateId))
+        assertTrue(Blocks.isAir(Blocks.VOID_AIR.stateId))
+        assertTrue(Blocks.isAir(Blocks.CAVE_AIR.stateId))
+        assertFalse(Blocks.isAir(Blocks.STONE.stateId))
+        assertEquals(15292, Blocks.VOID_AIR.stateId)
+        assertEquals(15293, Blocks.CAVE_AIR.stateId)
+    }
+
+    @Test
+    fun exposesTheExpectedStateIds() {
+        assertEquals(0, Blocks.AIR.stateId)
+        assertEquals(1, Blocks.STONE.stateId)
+        assertEquals(9, Blocks.GRASS_BLOCK.stateId)
+        assertEquals(10, Blocks.DIRT.stateId)
+        assertEquals(85, Blocks.BEDROCK.stateId)
+    }
+
+    @Test
+    fun blocksAreFoundByIdentifierInTheSharedRegistry() {
+        assertEquals(Blocks.STONE, Blocks.REGISTRY.byIdentifier(Identifier.vanilla("stone")))
+        assertEquals(Blocks.STONE, Blocks.REGISTRY.byId(1))
+    }
+
+    @Test
+    fun leafStatesExposeExactPropertiesAndDistanceUpdates() {
+        val defaultOakLeaves = Blocks.OAK_LEAVES.stateId
+        val distanceOneWaterlogged = defaultOakLeaves - 27
+        val distanceThreeNaturalDry = defaultOakLeaves - 16
+
+        assertTrue(Blocks.isLeavesState(distanceOneWaterlogged))
+        assertEquals(1, Blocks.leafDistance(distanceOneWaterlogged))
+        assertTrue(Blocks.hasWaterFluid(distanceOneWaterlogged))
+        assertEquals(
+            linkedMapOf("distance" to "3", "persistent" to "false", "waterlogged" to "false"),
+            Blocks.byStateId(distanceThreeNaturalDry)?.properties,
+        )
+        assertEquals(distanceThreeNaturalDry, Blocks.withLeafDistance(defaultOakLeaves, 3))
+        assertFalse(Blocks.hasWaterFluid(distanceThreeNaturalDry))
+        assertEquals(null, Blocks.leafDistance(Blocks.STONE.stateId))
+    }
+
+    @Test
+    fun worldgenPlantStatesExposeTheirExactProperties() {
+        val sunflower = stateId("sunflower")
+        assertEquals(mapOf("half" to "lower"), Blocks.byStateId(sunflower)?.properties)
+        assertEquals(mapOf("half" to "upper"), Blocks.byStateId(sunflower - 1)?.properties)
+        assertEquals(sunflower - 1, Blocks.upperDoublePlantStateId(sunflower))
+
+        val wildflowers = stateId("wildflowers")
+        assertEquals(
+            linkedMapOf("facing" to "east", "flower_amount" to "4"),
+            Blocks.byStateId(wildflowers + 15)?.properties,
+        )
+        val pinkPetals = stateId("pink_petals")
+        assertTrue(Blocks.isPinkPetalsState(pinkPetals + 9))
+
+        assertEquals(mapOf("age" to "23"), Blocks.byStateId(Blocks.KELP.stateId + 23)?.properties)
+        assertTrue(Blocks.hasWaterFluid(Blocks.KELP.stateId + 23))
+        for (path in listOf("weeping_vines", "twisting_vines")) {
+            val defaultStateId = stateId(path)
+            assertEquals(defaultStateId + 23, Blocks.growingVineHeadStateId(defaultStateId, 23))
+            assertEquals(mapOf("age" to "23"), Blocks.byStateId(defaultStateId + 23)?.properties)
+        }
+        assertEquals(
+            linkedMapOf("pickles" to "4", "waterlogged" to "true"),
+            Blocks.byStateId(Blocks.SEA_PICKLE.stateId + 6)?.properties,
+        )
+        assertTrue(Blocks.hasWaterFluid(Blocks.SEA_PICKLE.stateId + 6))
+        assertFalse(Blocks.hasWaterFluid(Blocks.SEA_PICKLE.stateId + 7))
+    }
+
+    @Test
+    fun snowySurfaceBlocksExposeBothExactStates() {
+        for (path in listOf("grass_block", "podzol", "mycelium")) {
+            val bareStateId = stateId(path)
+            val snowyStateId = bareStateId - 1
+
+            assertEquals(mapOf("snowy" to "false"), Blocks.byStateId(bareStateId)?.properties)
+            assertEquals(mapOf("snowy" to "true"), Blocks.byStateId(snowyStateId)?.properties)
+            assertEquals(snowyStateId, Blocks.withSnowy(bareStateId, true))
+            assertEquals(bareStateId, Blocks.withSnowy(snowyStateId, false))
+        }
+        assertEquals(null, Blocks.withSnowy(Blocks.DIRT.stateId, true))
+    }
+
+    @Test
+    fun coralAndHugeMushroomStatesExposeExactProperties() {
+        val tubeCoral = stateId("tube_coral")
+        assertEquals(mapOf("waterlogged" to "true"), Blocks.byStateId(tubeCoral)?.properties)
+        assertEquals(mapOf("waterlogged" to "false"), Blocks.byStateId(tubeCoral + 1)?.properties)
+        assertTrue(Blocks.hasWaterFluid(tubeCoral))
+        assertFalse(Blocks.hasWaterFluid(tubeCoral + 1))
+
+        val wallCoral = stateId("tube_coral_wall_fan")
+        val eastDryWallCoral = assertNotNull(Blocks.coralWallFanStateId(wallCoral, "east", waterlogged = false))
+        assertEquals(wallCoral + 7, eastDryWallCoral)
+        assertEquals(
+            linkedMapOf("facing" to "east", "waterlogged" to "false"),
+            Blocks.byStateId(eastDryWallCoral)?.properties,
+        )
+        assertFalse(Blocks.hasWaterFluid(eastDryWallCoral))
+
+        val mushroomStem = stateId("mushroom_stem")
+        val generatedStem =
+            assertNotNull(
+                Blocks.hugeMushroomStateId(
+                    mushroomStem,
+                    down = false,
+                    east = true,
+                    north = true,
+                    south = true,
+                    up = false,
+                    west = true,
+                ),
+            )
+        assertEquals(mushroomStem + 34, generatedStem)
+        assertEquals("false", Blocks.byStateId(generatedStem)?.properties?.get("down"))
+        assertEquals("false", Blocks.byStateId(generatedStem)?.properties?.get("up"))
+        assertTrue(Blocks.isHugeMushroomState(generatedStem))
+    }
+
+    @Test
+    fun chorusStatesExposeConnectionsAndFlowerAge() {
+        val connected =
+            Blocks.chorusPlantStateId(
+                down = true,
+                east = false,
+                north = true,
+                south = false,
+                up = true,
+                west = false,
+            )
+
+        assertEquals(14663, connected)
+        assertEquals(
+            linkedMapOf(
+                "down" to "true",
+                "east" to "false",
+                "north" to "true",
+                "south" to "false",
+                "up" to "true",
+                "west" to "false",
+            ),
+            Blocks.byStateId(connected)?.properties,
+        )
+        assertEquals(14711, Blocks.chorusFlowerStateId(5))
+        assertEquals(mapOf("age" to "5"), Blocks.byStateId(14711)?.properties)
+    }
+
+    @Test
+    fun ironBarsStatesExposeExactConnections() {
+        assertEquals(7989, Blocks.ironBarsStateId(north = false, east = false, south = false, west = false))
+        assertEquals(7960, Blocks.ironBarsStateId(north = true, east = true, south = true, west = true))
+        val state = assertNotNull(Blocks.byStateId(7972))
+        assertEquals("true", state.properties["east"])
+        assertEquals("false", state.properties["north"])
+        assertEquals("false", state.properties["south"])
+        assertEquals("false", state.properties["waterlogged"])
+        assertEquals("true", state.properties["west"])
+    }
+
+    @Test
+    fun villagePaletteStatesCoverExactProcessorAndRotationVariants() {
+        assertEquals(
+            8319,
+            Blocks.stateIdOf(
+                Identifier.vanilla("glass_pane"),
+                linkedMapOf(
+                    "east" to "false",
+                    "north" to "true",
+                    "south" to "true",
+                    "waterlogged" to "false",
+                    "west" to "false",
+                ),
+            ),
+        )
+        assertEquals(
+            11858,
+            Blocks.stateIdOf(
+                Identifier.vanilla("brown_stained_glass_pane"),
+                linkedMapOf(
+                    "east" to "true",
+                    "north" to "false",
+                    "south" to "false",
+                    "waterlogged" to "false",
+                    "west" to "true",
+                ),
+            ),
+        )
+        assertEquals(
+            20884,
+            Blocks.stateIdOf(
+                Identifier.vanilla("campfire"),
+                linkedMapOf(
+                    "facing" to "north",
+                    "lit" to "false",
+                    "signal_fire" to "false",
+                    "waterlogged" to "false",
+                ),
+            ),
+        )
+    }
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    @Test
+    fun stateCountIsStableAcrossReads() {
+        assertEquals(Blocks.stateCount, Blocks.stateCount)
+    }
+
+    @Test
+    fun stateCountCoversEveryRegisteredAndDerivedState() {
+        val count = Blocks.stateCount
+        assertTrue(count > 0, "expected a non-empty block state palette")
+        for (stateId in 0 until count) Blocks.byStateId(stateId)
+        assertNull(Blocks.byStateId(count), "state ids are expected to stop below stateCount")
+    }
+}

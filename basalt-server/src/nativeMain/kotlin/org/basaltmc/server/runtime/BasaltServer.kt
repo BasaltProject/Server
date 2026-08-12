@@ -1,0 +1,559 @@
+package org.basaltmc.server.runtime
+
+import org.basaltmc.server.assets.ServerJarAssets
+import org.basaltmc.server.runtime.command.CommandDispatcher
+import org.basaltmc.server.runtime.command.CommandEnvironment
+import org.basaltmc.server.runtime.command.commands.ReloadCommand
+import org.basaltmc.server.runtime.command.commands.RestartCommand
+import org.basaltmc.server.runtime.command.commands.TimingsCommand
+import org.basaltmc.server.runtime.command.registerVanillaCommands
+import org.basaltmc.server.runtime.config.BasaltConfig
+import org.basaltmc.server.runtime.config.LiveConfigs
+import org.basaltmc.server.runtime.config.WorldType
+import org.basaltmc.server.runtime.config.WorldsConfig
+import org.basaltmc.server.runtime.placeholder.AnimationPlaceholders
+import org.basaltmc.server.runtime.placeholder.PlayerPlaceholders
+import org.basaltmc.server.runtime.placeholder.ServerFacts
+import org.basaltmc.server.runtime.placeholder.ServerPlaceholders
+import org.basaltmc.server.runtime.player.Difficulty
+import org.basaltmc.server.runtime.player.PlayerRegistry
+import org.basaltmc.server.runtime.timings.ReportSources
+import org.basaltmc.server.runtime.timings.TimingsReport
+import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.RealBlockTags
+import org.basaltmc.server.runtime.world.RealItemTags
+import org.basaltmc.server.runtime.world.RealLootTables
+import org.basaltmc.server.runtime.world.RealRecipes
+import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
+import org.basaltmc.server.runtime.world.WORLDS_ROOT
+import org.basaltmc.server.runtime.world.WorldMetadata
+import org.basaltmc.server.storage.PlayerStore
+import org.basaltmc.server.world.GenerationMetrics
+import org.basaltmc.server.world.terrain.OverworldNoiseRouter
+import org.basaltmc.server.world.terrain.VillageStructureGenerator
+import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
+import org.basaltmc.wire.auth.OnlineMode
+import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
+import org.basaltmc.wire.common.timings.TickDurations
+import org.basaltmc.wire.common.timings.Timings
+import org.basaltmc.wire.common.timings.time
+import org.basaltmc.wire.io.NativeThread
+import org.basaltmc.wire.io.ShutdownSignal
+import org.basaltmc.wire.io.TcpListener
+import org.basaltmc.wire.io.sleepMillis
+import org.basaltmc.wire.protocol.play.Gamemode
+import org.basaltmc.wire.text.Component
+import org.basaltmc.wire.text.LangTable
+import org.basaltmc.wire.text.TextColor
+import kotlin.concurrent.AtomicInt
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.TimeSource
+
+/**
+ * A thread-per-connection server, per `basalt-io`'s current scope (no event loop yet), covering
+ * Handshake, Status, Login, Configuration and Play for a single world.
+ *
+ * [SPAWN_RADIUS_CHUNKS] chunks generate eagerly so it starts listening fast and the rest stream as
+ * players move, through the one [ChunkGenerationQueue]. New chunks are written on [TickLoop]'s
+ * save interval, so a crash costs that interval rather than everything since boot.
+ *
+ * [worldGeneratorFactory] and the [overworldRouter]/[surfaceEnvironment] injection stay optional,
+ * so protocol tests need no `server.jar`.
+ */
+public class BasaltServer(
+    private val config: BasaltConfig,
+    private val onlineMode: OnlineMode? = null,
+    private val overworldRouter: OverworldNoiseRouter? = null,
+    private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
+    private val villageGenerator: VillageStructureGenerator? = null,
+    private val worldGeneratorFactory: VanillaWorldGeneratorFactory? = null,
+    /** Where block-break drops are read from (see [RealLootTables]); `null` in tests that never break a block in survival. */
+    private val serverJar: ServerJarAssets? = null,
+    private val worldsConfig: WorldsConfig,
+    /**
+     * Everything `/reload` can swap under a running server, read through this rather than copied:
+     * see [LiveConfigs] for where the line between reloadable and not is drawn and why.
+     */
+    public val live: LiveConfigs,
+    private val lang: LangTable = LangTable.EMPTY,
+    /**
+     * The world's own metadata, already loaded. `Main` needs the seed before this class exists (it
+     * builds the terrain generator with it), so it loads it and hands it over rather than having it
+     * read, and warned about, twice.
+     */
+    defaultWorldMetadata: WorldMetadata? = null,
+    playersDatabasePath: String = PLAYERS_DATABASE,
+    worldsRoot: String = WORLDS_ROOT,
+) {
+    private val logger = Logger("Server")
+    private val playerRegistry = PlayerRegistry()
+    private val cpuMeter = CpuMeter()
+    private val lootTables = RealLootTables(serverJar)
+    private val recipes = RealRecipes(serverJar)
+    private val blockTags = RealBlockTags(serverJar)
+    private val itemTags = RealItemTags(serverJar)
+
+    /**
+     * What `/timings` measures. Off until asked for: a clock read per section per call is small but
+     * not free, and a server nobody is investigating should not pay it.
+     */
+    public val timings: Timings = Timings()
+    private val tickDurations = TickDurations()
+    private val serverClock = TimeSource.Monotonic.markNow()
+    private val accepting = AtomicInt(1)
+
+    /** Guards against running the shutdown twice: `/stop` and a signal can arrive together. */
+    private val shuttingDown = AtomicInt(0)
+
+    /** Set once the shutdown has finished its last write, so the caller knows it is safe to proceed. */
+    private val shutdownComplete = AtomicInt(0)
+
+    /** Whether this instance stopped in order to be replaced by a fresh one in the same process. */
+    private val restarting = AtomicInt(0)
+
+    public val shouldRestart: Boolean get() = restarting.value == 1
+    private var listener: TcpListener? = null
+
+    // Before `world`, which generates the startup chunks: declaration order is what makes the flag
+    // visible to that generation at all, and GenerationMetrics is only exact single-threaded.
+    init {
+        GenerationMetrics.enabled = config.generationMetrics
+        // A percentage needs two readings; this is the first, so nobody asking later gets nothing.
+        cpuMeter.prime()
+    }
+
+    /**
+     * Player state, deliberately outside every world directory: `players.db` sits beside `worlds/`,
+     * so a world can be deleted, copied or reset without touching a single row. That is the whole
+     * reason it is not where vanilla puts it.
+     */
+    private val playerStore = PlayerStore.open(playersDatabasePath)
+
+    /**
+     * Every world `worlds.toml` declares, each with its own chunks, region files, generation
+     * workers, settings and seed. Keyed by name, which is what a player's stored row refers to.
+     */
+    private val worlds: Map<String, LoadedWorld> =
+        worldsConfig.worlds.associate { declaration ->
+            val root = "$worldsRoot/${declaration.name}"
+            val metadata =
+                if (declaration.name == worldsConfig.default.name && defaultWorldMetadata != null) {
+                    // Already loaded by `Main` to build the terrain generator; reusing it avoids
+                    // reading the file, and warning about a seed mismatch, twice.
+                    defaultWorldMetadata
+                } else {
+                    WorldMetadata.loadOrCreate(root, declaration.seed, WorldMetadata.DEFAULT_SPAWN, logger)
+                }
+            declaration.name to
+                LoadedWorld(
+                    declaration = declaration,
+                    settings = worldsConfig.settingsFor(declaration),
+                    metadata = metadata,
+                    worldsRoot = worldsRoot,
+                    logger = logger,
+                    timings = timings,
+                    // One worker while measuring: GenerationMetrics counts without atomics on
+                    // purpose, so its numbers are only exact when a single thread is generating.
+                    generationWorkers = if (config.generationMetrics) 1 else 8,
+                    overworldRouter = overworldRouter,
+                    surfaceEnvironment = surfaceEnvironment,
+                    villageGenerator = villageGenerator,
+                    normalGenerator =
+                        if (declaration.type == WorldType.NORMAL || declaration.type == WorldType.AMPLIFIED) {
+                            worldGeneratorFactory?.create(declaration, metadata)
+                        } else {
+                            null
+                        },
+                )
+        }
+
+    private val defaultWorld: LoadedWorld = worlds.getValue(worldsConfig.default.name)
+
+    public val worldSeed: Long get() = defaultWorld.metadata.seed
+
+    init {
+        for (world in worlds.values) {
+            logger.info {
+                "Loading world '${world.name}' (${world.declaration.type.name.lowercase()}, " +
+                    "seed ${world.metadata.seed})."
+            }
+            world.warmSpawnArea(SPAWN_RADIUS_CHUNKS)
+            world.saveDirty()
+        }
+        if (GenerationMetrics.enabled) {
+            Logger("GenerationMetrics").info { "\n" + GenerationMetrics.report() }
+            GenerationMetrics.reset()
+        }
+    }
+
+    private val tickLoop =
+        TickLoop(
+            defaultWorld.settings.saveIntervalSeconds,
+            durations = tickDurations,
+            onSaveInterval = { timings.of("tick.save").time { persistAndUnload() } },
+            onTick = ::tickWorlds,
+        )
+
+    /**
+     * Every placeholder this server answers, in one registry shared by everything that renders
+     * operator-written text. The server list is the first user; chat formats and the tab list will
+     * be the next, and a plugin registering its own identifier is the point of it being a registry
+     * rather than a `when` inside the server list.
+     */
+    public val placeholders: PlaceholderRegistry =
+        PlaceholderRegistry().apply {
+            register("basalt_player", PlayerPlaceholders({ live.current.groups }) { worlds })
+            register(
+                AnimationPlaceholders.IDENTIFIER,
+                AnimationPlaceholders({ live.current.animations }) { placeholders },
+            )
+            register(
+                "basalt_server",
+                ServerPlaceholders(
+                    ServerFacts(
+                        versionName = BuildInfo.MINECRAFT_VERSION,
+                        protocolVersion = BuildInfo.PROTOCOL_VERSION,
+                        startedAt = Clock.System.now(),
+                        maxPlayers = { config.maxPlayers },
+                        onlineByWorld = {
+                            playerRegistry.snapshot().groupingBy { it.worldName }.eachCount()
+                        },
+                        uniqueJoins = { playerStore.players.count() },
+                        loadedChunks = { worlds.values.sumOf { it.state.loadedChunkCount } },
+                        liveHeapBytes = { liveHeapBytes() },
+                        tickRates = {
+                            tickLoop.tickRates.let { Triple(it.oneMinute, it.fiveMinutes, it.fifteenMinutes) }
+                        },
+                        cpuPercent = cpuMeter::percent,
+                    ),
+                ),
+            )
+        }
+
+    public val commands: CommandDispatcher =
+        CommandDispatcher(
+            CommandEnvironment(
+                players = playerRegistry,
+                groupsProvider = { live.current.groups },
+                worldSeed = worldSeed,
+                maxPlayers = config.maxPlayers,
+                stopServer = ::shutdown,
+                lang = lang,
+                defaultWorldName = defaultWorld.name,
+                playerRepository = playerStore.players,
+                worlds = worlds,
+                placeholders = placeholders,
+                commandsProvider = { live.current.commands },
+                timings = timings,
+            ),
+        ).also(::registerVanillaCommands)
+            .also { it.register(ReloadCommand(live, ::onConfigsReloaded)) }
+            .also { it.register(RestartCommand(::requestRestart)) }
+            .also {
+                it.register(
+                    TimingsCommand(
+                        timings = timings,
+                        tickDurations = tickDurations,
+                        report =
+                            TimingsReport(
+                                timings,
+                                tickDurations,
+                                ReportSources(
+                                    versionName = BuildInfo.MINECRAFT_VERSION,
+                                    protocolVersion = BuildInfo.PROTOCOL_VERSION,
+                                    uptimeSeconds = { serverClock.elapsedNow().inWholeSeconds },
+                                    onlinePlayers = { playerRegistry.snapshot().size },
+                                    maxPlayers = { config.maxPlayers },
+                                    loadedChunks = { worlds.values.sumOf { world -> world.state.loadedChunkCount } },
+                                    worldCount = { worlds.size },
+                                    cpuPercent = cpuMeter::percent,
+                                    liveHeapBytes = { liveHeapBytes() },
+                                ),
+                            ),
+                        nowNanos = { serverClock.elapsedNow().inWholeNanoseconds },
+                    ),
+                )
+            }
+
+    /**
+     * The server list, rebuilt per ping from `server_list.toml`.
+     *
+     * The online count comes from the registry rather than from a counter kept alongside it: a
+     * second source of truth for "how many players are connected" is how a server ends up
+     * advertising numbers that never come back down.
+     */
+    private val serverList =
+        ServerListStatus(
+            config = { live.current.serverList },
+            placeholders = placeholders,
+            slots = config.maxPlayers,
+            versionName = BuildInfo.MINECRAFT_VERSION,
+            protocolVersion = BuildInfo.PROTOCOL_VERSION,
+            onlinePlayers = {
+                playerRegistry.snapshot().map { ListedPlayer(it.name, it.uuid.toString()) }
+            },
+            lookupPlayerByAddress = playerStore.players::findNameByAddress,
+        )
+
+    /**
+     * What has to be told that the configuration changed.
+     *
+     * The tab list, scoreboard, boss bar and server list all read their file on every use, so they
+     * need nothing. The command tree does not: a command's permission and aliases are baked in when
+     * it is registered, and the client holds its own copy for autocompletion, so both have to be
+     * built again and sent out.
+     */
+    private fun onConfigsReloaded() {
+        commands.rebuild()
+        for (player in playerRegistry.snapshot()) {
+            runCatching { player.connection.sendCommandTree() }
+        }
+    }
+
+    private val defaultGamemode =
+        Gamemode.entries.firstOrNull { it.name.equals(config.gamemode, ignoreCase = true) } ?: Gamemode.SURVIVAL
+
+    private val difficulty =
+        Difficulty.entries.firstOrNull { it.name.equals(defaultWorld.settings.difficulty, ignoreCase = true) }
+            ?: Difficulty.EASY
+
+    /**
+     * Live bytes after the last collection, or null if nothing has been collected yet.
+     *
+     * The chunk counts elsewhere only account for what the server means to hold; if memory climbs
+     * while they stay flat, the answer is here, in the gap between what is live and what has been
+     * allocated and not yet collected.
+     */
+    @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
+    private fun liveHeapBytes(): Long? =
+        kotlin.native.runtime.GC.lastGCInfo
+            ?.memoryUsageAfter
+            ?.get("heap")
+            ?.totalObjectsSizeBytes
+
+    @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
+    private fun heapReport(): String {
+        val info = kotlin.native.runtime.GC.lastGCInfo ?: return "No collection has run yet."
+        val before = info.memoryUsageBefore["heap"]?.totalObjectsSizeBytes ?: 0L
+        val after = info.memoryUsageAfter["heap"]?.totalObjectsSizeBytes ?: 0L
+        return "Heap: ${after / 1_048_576} MB live after the last collection " +
+            "(${before / 1_048_576} MB before it, ${info.epoch} collections so far)."
+    }
+
+    /** Writes every online player as one transaction, on the same interval the worlds save on. */
+    private fun persistPlayers() {
+        val snapshots = playerRegistry.snapshot().mapNotNull { it.connection.storedSnapshot() }
+        if (snapshots.isEmpty()) return
+        runCatching { playerStore.players.saveAll(snapshots) }
+            .onFailure { logger.error(it) { "Failed to save ${snapshots.size} player(s)" } }
+    }
+
+    /** One tick-loop hook for all of it: unloading has to save what it drops, so they belong together. */
+    private fun persistAndUnload() {
+        // Emitted before the work, not after: if this method ever stops completing, the last thing
+        // in the log is where it got to, instead of nothing at all.
+        logger.debug { "Sweep starting across ${worlds.size} world(s)." }
+        for (world in worlds.values) world.saveDirty()
+        persistPlayers()
+
+        var loaded = 0
+        var unloaded = 0
+        for (world in worlds.values) {
+            // Only the players actually in this world keep its chunks resident.
+            val positions =
+                playerRegistry
+                    .snapshot()
+                    .filter { it.worldName == world.name }
+                    .map { (it.x.toInt() shr 4) to (it.z.toInt() shr 4) }
+            unloaded += world.unloadUnreachable(positions, SPAWN_RADIUS_CHUNKS, RETAIN_MARGIN_CHUNKS)
+            loaded += world.state.loadedChunkCount
+        }
+
+        // Reported every sweep, not only when something happens: when this server misbehaves it is
+        // because one of these numbers climbs without settling, and knowing which one is the whole
+        // diagnosis. At debug level because it is a diagnostic, not operator news.
+        logger.debug { "Chunks: $loaded loaded across ${worlds.size} world(s), $unloaded unloaded. " + heapReport() }
+    }
+
+    /**
+     * Everything the world itself owes per tick, plus the termination check.
+     *
+     * Dropped-item physics lives here rather than on a connection thread so an item falls at one
+     * speed regardless of how many players are watching it, and so it keeps falling when nobody is.
+     * Nothing here touches a socket, which is the rule this thread lives by (see [TickLoop]):
+     * telling clients what moved is each [ClientSession]'s own job.
+     */
+    private fun tickWorlds() {
+        for (world in worlds.values) {
+            runCatching { world.state.tickItems() }
+                .onFailure { logger.error(it) { "Item tick failed in world '${world.name}'" } }
+        }
+        shutdownIfSignalled()
+    }
+
+    /**
+     * The bridge between a signal and an orderly stop: the handler only sets a flag (it may not do
+     * anything else safely), and this is what notices, once per tick.
+     */
+    private fun shutdownIfSignalled() {
+        if (!ShutdownSignal.isRequested) return
+        logger.info { "Termination signal received, shutting down." }
+        shutdown()
+    }
+
+    /**
+     * Brings everything to a stop *before* saving, in that order and for that reason.
+     *
+     * Saving while the server is still live is not merely slow, it may never finish: connected
+     * players keep moving, so sessions keep requesting chunks, the queues keep generating them, and
+     * the tick loop keeps launching its own saves alongside this one. Each concurrent region write
+     * materializes the whole region, so the memory to finish grows faster than the work does.
+     *
+     * So: disconnect everyone first (nothing new can be requested), stop the tick loop (no
+     * competing save), let the queues drain (no chunk half-generated), and only then write, once.
+     */
+    private fun shutdown() {
+        // Once only. `/stop` and a signal can arrive together, and running this twice would mean two
+        // concurrent saves of the same regions, which is exactly what the ordering below avoids.
+        if (!shuttingDown.compareAndSet(0, 1)) return
+
+        // First of all, so nothing new can arrive while the rest is winding down. Without this a
+        // client with auto-reconnect walks straight back in mid-save and starts requesting chunks
+        // again, which is exactly the work shutting down is trying to finish.
+        accepting.value = 0
+        runCatching { listener?.close() }
+
+        val players = playerRegistry.snapshot()
+        if (players.isNotEmpty()) {
+            // Saved here, synchronously, *before* disconnecting them. Disconnecting only closes the
+            // socket; each session then saves itself on its own thread, which raced the database
+            // being closed a few lines below. Whoever lost that race was not saved at all, so a
+            // player who changed game mode and then stopped the server came back as they were.
+            logger.info { "Saving ${players.size} player(s)." }
+            persistPlayers()
+
+            logger.info { "Disconnecting ${players.size} player(s)." }
+            for (player in players) {
+                runCatching { player.connection.disconnect(Component.text("Server closed", TextColor.RED)) }
+                playerRegistry.remove(player.uuid)
+            }
+        }
+
+        tickLoop.stop()
+        for (world in worlds.values) world.stopGenerating(SHUTDOWN_DRAIN_TIMEOUT_MILLIS)
+
+        logger.info { "Saving ${worlds.size} world(s)." }
+        for (world in worlds.values) {
+            world.saveDirty()
+            world.flushRegions()
+        }
+        // The players were saved before being disconnected, above. This is the checkpoint that
+        // leaves players.db as one self-contained file.
+        runCatching { playerStore.close() }.onFailure { logger.error(it) { "Failed to close players.db" } }
+        logger.info { if (shouldRestart) "Restarting the server." else "Stopping the server." }
+        shutdownComplete.value = 1
+    }
+
+    /**
+     * Stops this instance so that a fresh one can take its place **in the same process**.
+     *
+     * Nothing is re-executed and no new process is spawned: everything this instance owns is wound
+     * down exactly as `/stop` winds it down, and the caller then builds another one. That is what
+     * makes `server.toml` and `worlds.toml` applicable, which `/reload` cannot do: the port is
+     * rebound and the worlds are loaded again from scratch, because they really are new.
+     */
+    internal fun requestRestart() {
+        restarting.value = 1
+        shutdown()
+    }
+
+    @OptIn(ExperimentalTime::class)
+    public fun start(startedAt: Instant = Clock.System.now()) {
+        // The driver opens lazily, so without a query here a bad path or an unreadable database
+        // would not be discovered until the first player joined, which is the worst possible moment
+        // to find out. It also creates the file, so the layout is complete before anyone connects.
+        logger.info { "Player database ready: ${playerStore.players.count()} player(s) known." }
+        val listener = TcpListener.bind(config.port).also { this.listener = it }
+        tickLoop.start()
+        val elapsedSeconds = (Clock.System.now() - startedAt).inWholeMilliseconds / 1000.0
+        logger.info {
+            "Done (${elapsedSeconds}s)! Listening on port ${config.port} " +
+                "(${if (onlineMode != null) "online" else "offline"}-mode)."
+        }
+        while (accepting.value == 1) {
+            val connection = runCatching { listener.accept() }.getOrNull() ?: break
+            NativeThread.start {
+                ClientSession(
+                    connection,
+                    serverList::statusFor,
+                    onlineMode = onlineMode,
+                    playerRegistry = playerRegistry,
+                    worlds = worlds,
+                    defaultWorld = defaultWorld,
+                    commands = commands,
+                    defaultGamemode = defaultGamemode,
+                    difficulty = difficulty,
+                    playerStore = playerStore,
+                    rememberAddress = if (live.current.serverList.rememberIp) connection.remoteAddress else null,
+                    ui = { live.current.ui },
+                    placeholders = placeholders,
+                    timings = timings,
+                    lootTables = lootTables,
+                    recipes = recipes,
+                    blockTags = blockTags,
+                    itemTags = itemTags,
+                ).run()
+            }
+        }
+
+        awaitShutdown()
+    }
+
+    /**
+     * Keeps `main` alive while a shutdown finishes on another thread.
+     *
+     * [shutdown] runs on whoever asked for it (the console thread, or the tick loop on a signal).
+     * Its very first act is to close the listener, which unblocks the `accept()` above and drops out
+     * of the loop, so without this wait the caller carries on *while the save is still running*.
+     * That is not hypothetical: it silently truncated the shutdown after "Saving the world.", which
+     * is how `players.db` was being left with all of its rows still in the write-ahead log. On a
+     * restart it matters twice over, since the next instance would otherwise open the database and
+     * bind the port while this one is still closing them.
+     */
+    private fun awaitShutdown() {
+        if (shuttingDown.value == 0) return
+        val deadline = TimeSource.Monotonic.markNow()
+        while (deadline.elapsedNow().inWholeMilliseconds < SHUTDOWN_WAIT_TIMEOUT_MILLIS) {
+            if (shutdownComplete.value == 1) return
+            sleepMillis(20)
+        }
+        logger.error { "Shutdown did not finish within ${SHUTDOWN_WAIT_TIMEOUT_MILLIS}ms, carrying on anyway." }
+    }
+
+    private companion object {
+        // 1 declared a view/simulation distance of 1 chunk to the client, below what a real
+        // client expects and handles well (vanilla's own slider does not even go that low): it
+        // looked like "only one chunk renders" even though every chunk actually had real terrain
+        // (confirmed directly by reading the saved region files back). 3 keeps startup bounded
+        // while staying in the range a real client behaves normally at.
+        const val SPAWN_RADIUS_CHUNKS = 3
+
+        // Beside worlds/, never inside one.
+        const val PLAYERS_DATABASE = "players.db"
+
+        // Beyond the view distance, so a chunk already requested or prefetched by a session is
+        // still there when that session gets round to sending it.
+        const val RETAIN_MARGIN_CHUNKS = 4
+
+        // Long enough for an in-flight chunk to land, short enough that a wedged worker cannot
+        // hold the shutdown open indefinitely.
+        const val SHUTDOWN_DRAIN_TIMEOUT_MILLIS = 5_000L
+
+        // Generous on purpose: saving a large world legitimately takes a while, and cutting a save
+        // short is far worse than waiting for one.
+        const val SHUTDOWN_WAIT_TIMEOUT_MILLIS = 120_000L
+    }
+}
