@@ -112,6 +112,8 @@ TEST_CASE("an override naming an unknown field is refused with the file") {
         MobSettings::from(*parsed, MobSettings::vanilla(), "mobs.toml");
     REQUIRE_FALSE(settings.has_value());
     CHECK(settings.error().starts_with("mobs.toml: overrides.zombie.max-helth"));
+}
+
 TEST_CASE("the generated world rules read back as vanilla's") {
     const std::string text = std::string{kWorldsDefaultToml} + worldRulesTemplate(true);
     const auto parsed = toml::parse(text);
