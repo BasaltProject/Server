@@ -1,8 +1,10 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.io.NativeMutex
 import org.basaltmc.wire.io.NativeThread
+import org.basaltmc.wire.io.cpuCoreCount
 import org.basaltmc.wire.io.sleepMillis
 import kotlin.concurrent.AtomicInt
 
@@ -21,6 +23,7 @@ public class ChunkGenerationQueue(
     public val dimension: String,
     workerCount: Int = DEFAULT_WORKERS,
 ) {
+    private val logger = Logger("ChunkGen")
     private val mutex = NativeMutex()
     private val queued = HashMap<Long, Int>()
     private val inProgress = HashSet<Long>()
@@ -50,7 +53,10 @@ public class ChunkGenerationQueue(
                         continue
                     }
                     idleSpins = 0
-                    generate(next)
+                    // Caught, or one bad chunk ends this worker and the pool silently shrinks.
+                    runCatching { generate(next) }.onFailure {
+                        logger.error(it) { "Chunk ${unpackX(next)}, ${unpackZ(next)} failed to generate" }
+                    }
                     // A deliberate breath between chunks. These eight threads otherwise hold the
                     // world's lock in a tight loop, and the single thread that saves, unloads and
                     // sends keep-alives never wins against them.
@@ -184,9 +190,15 @@ public class ChunkGenerationQueue(
     }
 
     public companion object {
-        // Fixed rather than queried: there is still no portable core count in this project, and
-        // oversubscribing a little is cheap now that these threads are created once, not per batch.
-        public const val DEFAULT_WORKERS: Int = 8
+        /** Cores minus one for the tick loop and one for the connection threads. */
+        public val DEFAULT_WORKERS: Int =
+            (cpuCoreCount() ?: FALLBACK_CORES).let { (it - RESERVED_CORES).coerceIn(1, MAX_WORKERS) }
+
+        private const val FALLBACK_CORES = 4
+        private const val RESERVED_CORES = 2
+
+        // Past this, region writes and the send budget limit exploration, not the pool.
+        private const val MAX_WORKERS = 8
 
         // Comfortably more than one player's view plus prefetch, and small enough that scanning it
         // to pick the next chunk stays cheap.
