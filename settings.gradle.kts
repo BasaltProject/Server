@@ -23,37 +23,37 @@ dependencyResolutionManagement {
 }
 
 include(
-    ":basalt-common",
-    ":basalt-nbt",
-    ":basalt-text",
-    ":basalt-random",
-    ":basalt-io",
-    ":basalt-protocol",
-    ":basalt-registry",
-    ":basalt-world",
-    ":basalt-storage",
-    ":basalt-entity",
-    ":basalt-server",
-    ":basalt-assets",
-    ":basalt-auth",
-    ":basalt-multiversion",
-    ":basalt-bedrock",
-    ":basalt-lua",
-    ":basalt-bsmod",
-    ":basalt-datagen",
+    ":wire-common",
+    ":wire-nbt",
+    ":wire-text",
+    ":server-random",
+    ":wire-io",
+    ":wire-protocol",
+    ":server-registry",
+    ":server-world",
+    ":server-storage",
+    ":server-entity",
+    ":server-runtime",
+    ":server-assets",
+    ":wire-auth",
+    ":wire-multiversion",
+    ":wire-bedrock",
+    ":server-lua",
+    ":server-bsmod",
+    ":server-datagen",
 )
 
 // The network layer is shared with the proxy and lives in the Wire submodule. It is composed in
 // rather than depended on as a published artifact: both repositories move together for now.
 for (name in listOf(
-    "basalt-common",
-    "basalt-nbt",
-    "basalt-text",
-    "basalt-io",
-    "basalt-protocol",
-    "basalt-auth",
-    "basalt-multiversion",
-    "basalt-bedrock",
+    "wire-common",
+    "wire-nbt",
+    "wire-text",
+    "wire-io",
+    "wire-protocol",
+    "wire-auth",
+    "wire-multiversion",
+    "wire-bedrock",
 )) {
     project(":$name").projectDir = file("wire/$name")
 }
