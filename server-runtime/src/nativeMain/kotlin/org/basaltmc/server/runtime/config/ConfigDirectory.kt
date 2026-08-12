@@ -33,7 +33,7 @@ public class ConfigDirectory(
         if (!FileIO.exists(path)) {
             FileIO.createDirectories(root)
             FileIO.writeText(path, defaultContents)
-            logger.info { "$path not found, generating one with vanilla-parity defaults." }
+            logger.info { "$path not found, generating one with default values." }
         }
         val text = FileIO.readText(path) ?: throw TomlFormatException("Failed to read $path")
         return try {
