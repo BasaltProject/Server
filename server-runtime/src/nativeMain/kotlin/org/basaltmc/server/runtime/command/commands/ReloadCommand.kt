@@ -22,6 +22,8 @@ import org.basaltmc.wire.text.TextColor
 public class ReloadCommand(
     private val live: LiveConfigs,
     private val onReloaded: () -> Unit,
+    /** Datapack functions, which vanilla's own `/reload` re-reads. Returns how many were loaded. */
+    private val reloadFunctions: () -> Int = { 0 },
 ) : Command(name = "reload", permissionLevel = PermissionLevel.ADMINS) {
     override fun build(root: CommandNodeBuilder) {
         root.executes { context -> reload(context) }
@@ -46,9 +48,13 @@ public class ReloadCommand(
 
         live.replace(next)
         onReloaded()
+        val functionCount = reloadFunctions()
 
         context.success(
-            Component.text("Reloaded ${LiveConfigs.RELOADABLE_FILES.size} configuration file(s)."),
+            Component.text(
+                "Reloaded ${LiveConfigs.RELOADABLE_FILES.size} configuration file(s) and " +
+                    "$functionCount function(s).",
+            ),
             broadcastToAdmins = true,
         )
         context.source.sendSystemMessage(
