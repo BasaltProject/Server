@@ -3,25 +3,31 @@ package org.basaltmc.server.runtime.command.commands
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
+import org.basaltmc.server.runtime.command.CommandTarget
+import org.basaltmc.server.runtime.command.EntitiesArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.PlayersArgument
-import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.wire.text.Component
 
 /** parity: `KillCommand`. Vanilla's `Entity.kill` is unblockable damage, so creative mode does not save you. */
 public class KillCommand : Command(name = "kill", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
-        root.executes { context -> kill(context, listOf(context.requireEntity())) }
-        root.argument("targets", PlayersArgument(single = false)) {
+        root.executes { context -> kill(context, listOf(CommandTarget.Player(context.requireEntity()))) }
+        root.argument("targets", EntitiesArgument(single = false)) {
             executes { context -> kill(context, context.get("targets")) }
         }
     }
 
     private fun kill(
         context: CommandContext,
-        targets: List<PlayerSession>,
+        targets: List<CommandTarget>,
     ): Int {
-        for (target in targets) target.connection.killPlayer(DEATH_GENERIC_KILL)
+        for (target in targets) {
+            when (target) {
+                is CommandTarget.Player -> target.session.connection.killPlayer(DEATH_GENERIC_KILL)
+                // A summoned entity has no death animation to play, so it simply stops existing.
+                is CommandTarget.Entity -> target.entity.removed = true
+            }
+        }
         val message =
             if (targets.size == 1) {
                 Component.translatable("commands.kill.success.single", Component.text(targets.single().name))
