@@ -56,6 +56,9 @@ public class PlayerRepository(
             inventory = InventoryNbt.encode(player.inventory),
             ender_chest = InventoryNbt.encode(player.enderChest),
             stats = StatsNbt.encode(player.stats),
+            // Comma-separated, because a tag cannot contain one: vanilla's own tag argument is a
+            // single word.
+            tags = player.tags.takeIf { it.isNotEmpty() }?.joinToString(","),
         )
     }
 
@@ -173,5 +176,11 @@ public class PlayerRepository(
                 ender_chest?.let(InventoryNbt::decode)
                     ?: StoredInventory.empty(StoredPlayer.ENDER_CHEST_SLOTS),
             stats = stats?.let(StatsNbt::decode) ?: StoredStats.EMPTY,
+            tags =
+                tags
+                    ?.split(',')
+                    ?.filter { it.isNotEmpty() }
+                    ?.toSet()
+                    .orEmpty(),
         )
 }
