@@ -397,12 +397,14 @@ private fun drainUntil(
     incoming: ByteBuffer,
     packetId: Int,
 ): ByteBuffer {
+    var seen = 0
     repeat(400) {
         val body = readFrame(connection, incoming, compressionEnabled = true)
+        seen++
         val id = body.readVarInt()
         if (id == packetId) return body
     }
-    error("packet 0x${packetId.toString(16)} never arrived after 200 other frames")
+    error("packet 0x${packetId.toString(16)} never arrived after $seen other frames")
 }
 
 /** The Login+Configuration handshake, stripped to just what is needed to reach Play. */

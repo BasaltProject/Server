@@ -19,6 +19,7 @@ import org.basaltmc.wire.auth.OnlineMode
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.io.NativeThread
+import org.basaltmc.wire.io.SocketException
 import org.basaltmc.wire.io.TcpConnection
 import org.basaltmc.wire.io.Zlib
 import org.basaltmc.wire.io.sleepMillis
@@ -27,6 +28,8 @@ import org.basaltmc.wire.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.wire.protocol.readVarInt
 import org.basaltmc.wire.protocol.writeVarInt
 import kotlin.concurrent.AtomicInt
+import kotlin.concurrent.AtomicLong
+import kotlin.concurrent.AtomicReference
 import kotlin.time.TimeSource
 
 /**
@@ -172,16 +175,42 @@ internal fun readFrame(
     compressionEnabled: Boolean,
 ): ByteBuffer {
     val chunk = ByteArray(4096)
-    while (true) {
-        PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
-            incoming.discardReadBytes()
-            if (!isKeepAlive(frame)) return ByteBuffer(frame.size).also { it.writeBytes(frame) }
+    ReadStallWatchdog.enter(connection)
+    try {
+        while (true) {
+            PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
+                incoming.discardReadBytes()
+                if (!isKeepAlive(frame)) return ByteBuffer(frame.size).also { it.writeBytes(frame) }
+            }
+            incoming.writeBytes(chunk, length = readOrStall(connection, chunk))
         }
-        val n = connection.read(chunk)
-        check(n > 0) { "connection closed while waiting for a frame" }
-        incoming.writeBytes(chunk, length = n)
+    } finally {
+        ReadStallWatchdog.leave()
     }
 }
+
+/**
+ * One read, with the watchdog's verdict attached. Closing a socket out from under a blocked `recv`
+ * surfaces as a `SocketException` on a bad descriptor rather than as end of stream, so both endings
+ * have to be translated or the real reason is lost behind an errno.
+ */
+private fun readOrStall(
+    connection: TcpConnection,
+    chunk: ByteArray,
+): Int {
+    val read =
+        try {
+            connection.read(chunk)
+        } catch (e: SocketException) {
+            if (ReadStallWatchdog.fired.value == 1) error(STALL_MESSAGE) else throw e
+        }
+    check(read > 0) {
+        if (ReadStallWatchdog.fired.value == 1) STALL_MESSAGE else "connection closed while waiting for a frame"
+    }
+    return read
+}
+
+private const val STALL_MESSAGE = "no frame arrived within the read deadline, so the watchdog closed the socket"
 
 internal fun sendUncompressedEncrypted(
     connection: TcpConnection,
@@ -219,14 +248,18 @@ internal fun readFrameEncrypted(
     cipher: Cfb8Cipher,
 ): ByteBuffer {
     val chunk = ByteArray(4096)
-    while (true) {
-        PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
-            incoming.discardReadBytes()
-            return ByteBuffer(frame.size).also { it.writeBytes(frame) }
+    ReadStallWatchdog.enter(connection)
+    try {
+        while (true) {
+            PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
+                incoming.discardReadBytes()
+                return ByteBuffer(frame.size).also { it.writeBytes(frame) }
+            }
+            val n = readOrStall(connection, chunk)
+            incoming.writeBytes(cipher.update(chunk, length = n, encrypting = false))
         }
-        val n = connection.read(chunk)
-        check(n > 0) { "connection closed while waiting for a frame" }
-        incoming.writeBytes(cipher.update(chunk, length = n, encrypting = false))
+    } finally {
+        ReadStallWatchdog.leave()
     }
 }
 
@@ -235,3 +268,50 @@ private fun isKeepAlive(frame: ByteArray): Boolean =
 
 /** Where every test artefact goes: inside build/, never in the module directory. */
 internal const val TEST_DATA_ROOT: String = "build/test-data"
+
+/**
+ * Closes whichever socket a [readFrame] has been parked on for [deadlineMillis], so a
+ * packet that will never arrive fails the test with a message instead of parking the whole run on
+ * `recv`. It has cost hours: a blocked read looks exactly like a slow one.
+ *
+ * One thread for the process, not one per read: tests run sequentially here, so at most one read
+ * is ever in flight. A socket timeout would be the real fix, but it belongs in `wire-io` and this
+ * only has to stop a test from hanging.
+ */
+internal object ReadStallWatchdog {
+    private val started = AtomicInt(0)
+    private val clock = TimeSource.Monotonic.markNow()
+    private val blockedOn = AtomicReference<TcpConnection?>(null)
+    private val blockedSince = AtomicLong(0)
+
+    /** Set when the watchdog has closed a socket, so the read that fails can say why it failed. */
+    val fired: AtomicInt = AtomicInt(0)
+
+    fun enter(connection: TcpConnection) {
+        if (started.compareAndSet(0, 1)) start()
+        blockedSince.value = clock.elapsedNow().inWholeMilliseconds
+        blockedOn.value = connection
+    }
+
+    fun leave() {
+        blockedOn.value = null
+    }
+
+    private fun start() {
+        NativeThread.start {
+            while (true) {
+                sleepMillis(POLL_MILLIS)
+                val connection = blockedOn.value ?: continue
+                if (clock.elapsedNow().inWholeMilliseconds - blockedSince.value < deadlineMillis) continue
+                fired.value = 1
+                blockedOn.value = null
+                runCatching { connection.close() }
+            }
+        }
+    }
+
+    /** A var only so the watchdog's own test can reach the deadline in a second instead of a minute. */
+    var deadlineMillis: Long = 60_000L
+
+    private const val POLL_MILLIS = 250L
+}
