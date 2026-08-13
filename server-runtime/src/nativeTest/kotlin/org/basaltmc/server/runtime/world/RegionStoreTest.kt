@@ -10,10 +10,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class RegionStoreTest {
     private val worldName = "region_store_test_world"
     private val dimension = "overworld"
+
+    /** Under build/, because a test that writes anywhere else leaves it behind in the repository. */
+    private val worldsRoot = "build/test-worlds"
 
     @BeforeTest
     fun setUp() = cleanUp()
@@ -22,18 +26,19 @@ class RegionStoreTest {
     fun tearDown() = cleanUp()
 
     private fun cleanUp() {
+        val root = "$worldsRoot/$worldName"
         for (path in listOf(dimension, "the_nether")) {
-            val dir = "$worldName/dimensions/minecraft/$path/region"
+            val dir = "$root/dimensions/minecraft/$path/region"
             for (name in FileIO.list(dir)) FileIO.delete("$dir/$name")
             FileIO.delete(dir)
-            FileIO.delete("$worldName/dimensions/minecraft/$path")
+            FileIO.delete("$root/dimensions/minecraft/$path")
         }
-        FileIO.delete("$worldName/dimensions/minecraft")
-        FileIO.delete("$worldName/dimensions")
-        FileIO.delete(worldName)
+        FileIO.delete("$root/dimensions/minecraft")
+        FileIO.delete("$root/dimensions")
+        FileIO.delete(root)
     }
 
-    private fun store() = RegionStore(worldName, dimension)
+    private fun store() = RegionStore(worldName, dimension, worldsRoot)
 
     private fun chunkWith(
         x: Int,
@@ -53,12 +58,13 @@ class RegionStoreTest {
 
     @Test
     fun roundTripsDimensionSpecificBoundsAndPath() {
-        val store = RegionStore(worldName, "the_nether", verticalBounds = ChunkHeight.NETHER)
+        val store = RegionStore(worldName, "the_nether", worldsRoot, verticalBounds = ChunkHeight.NETHER)
         val chunk = Chunk(0, 0, ChunkHeight.NETHER)
         chunk.setBlockStateId(1, 255, 1, Blocks.NETHERRACK.stateId)
         store.saveChunks(listOf(chunk), timestamp = 1)
 
-        val loaded = RegionStore(worldName, "the_nether", verticalBounds = ChunkHeight.NETHER).loadChunk(0, 0)
+        val loaded =
+            RegionStore(worldName, "the_nether", worldsRoot, verticalBounds = ChunkHeight.NETHER).loadChunk(0, 0)
 
         assertNotNull(loaded)
         assertEquals(ChunkHeight.NETHER, loaded.verticalBounds)
@@ -130,6 +136,28 @@ class RegionStoreTest {
                 Blocks.STONE.stateId,
                 fresh.loadChunk(i * 32, 0)?.getBlockStateId(1, 70, 1),
                 "region $i was lost when it fell out of the cache",
+            )
+        }
+    }
+
+    /**
+     * A region holds 1024 decompressed chunk blobs, so bounding the cache by region count bounds
+     * nothing: the process grew with the distance flown, not with the chunks kept resident.
+     */
+    @Test
+    fun theCacheIsBoundedByBytesAndNotOnlyByRegionCount() {
+        val store = RegionStore(worldName, dimension, worldsRoot, byteBudget = 1L)
+        for (i in 0..3) store.saveChunks(listOf(chunkWith(i * 32, 0, Blocks.STONE.stateId)), timestamp = 1)
+
+        assertEquals(1, store.cachedRegionCount, "the byte budget did not evict anything")
+        assertTrue(store.cachedRegionBytes > 0, "a cached region reported no resident bytes")
+
+        val fresh = store()
+        for (i in 0..3) {
+            assertEquals(
+                Blocks.STONE.stateId,
+                fresh.loadChunk(i * 32, 0)?.getBlockStateId(1, 70, 1),
+                "region $i was lost when the byte budget evicted it",
             )
         }
     }

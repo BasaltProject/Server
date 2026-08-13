@@ -43,6 +43,10 @@ public class DensityChunkSampler(
 
     public val verticalCells: Int get() = cellsVertical
 
+    // One context for the whole chunk. Building one per block was 98304 allocations a chunk on the
+    // one path that runs for every block there is.
+    private val context = FunctionContext(0, 0, 0, evaluationCache)
+
     /** [localX]/[localZ] are chunk-local (`0..15`); [y] is a world Y within `[minY, minY + height)`. */
     public fun sample(
         localX: Int,
@@ -54,8 +58,7 @@ public class DensityChunkSampler(
         require(localZ in 0..15) { "localZ must be within a chunk: $localZ" }
         require(relativeY in 0 until height) { "y must be within [$minY, ${minY + height}): $y" }
 
-        val worldX = chunkX * 16 + localX
-        val worldZ = chunkZ * 16 + localZ
-        return density.compute(FunctionContext(worldX, y, worldZ, evaluationCache))
+        context.moveTo(chunkX * 16 + localX, y, chunkZ * 16 + localZ)
+        return density.compute(context)
     }
 }

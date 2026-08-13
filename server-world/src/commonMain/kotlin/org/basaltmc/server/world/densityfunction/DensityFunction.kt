@@ -6,11 +6,26 @@ package org.basaltmc.server.world.densityfunction
  * [DensityCache]. Null means "no chunk scope", and every [Marker] then evaluates straight through.
  */
 public class FunctionContext(
-    public val blockX: Int,
-    public val blockY: Int,
-    public val blockZ: Int,
+    public var blockX: Int,
+    public var blockY: Int,
+    public var blockZ: Int,
     public val cache: DensityCache? = null,
-)
+) {
+    /**
+     * Moves this context to another block, so a caller sampling a whole chunk reuses one instead of
+     * allocating one per block. Safe only because no node keeps a context past its own [compute]:
+     * they read the three coordinates and pass the same instance down.
+     */
+    internal fun moveTo(
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        blockX = x
+        blockY = y
+        blockZ = z
+    }
+}
 
 /**
  * // parity: net.minecraft.world.level.levelgen.DensityFunction. The expression tree vanilla's

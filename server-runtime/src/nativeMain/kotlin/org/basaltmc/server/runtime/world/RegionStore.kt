@@ -24,6 +24,9 @@ public class RegionStore(
     private val dimension: String,
     worldsRoot: String = WORLDS_ROOT,
     private val verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
+    private val capacity: Int = CAPACITY,
+    /** Injectable so a test can reach the ceiling without writing a hundred megabytes. */
+    private val byteBudget: Long = BYTE_BUDGET,
 ) {
     /**
      * Where this world's files live: `worlds/<name>/`, and nothing outside it belongs to this world.
@@ -41,6 +44,10 @@ public class RegionStore(
     private val cached = LinkedHashMap<Long, LinearRegion>()
     private val dirtyRegions = HashSet<Long>()
 
+    // Summed on demand, not tracked: a dozen entries is nothing to add up, and a counter would
+    // drift the moment a save wrote through a region already cached.
+    private fun cachedBytes(): Long = cached.values.sumOf { it.residentBytes }
+
     /** What the last save spent where, so a slow one can be attributed instead of guessed at. */
     public var encodeMillis: Long = 0
         private set
@@ -49,6 +56,8 @@ public class RegionStore(
         private set
 
     public val cachedRegionCount: Int get() = mutex.withLock { cached.size }
+
+    public val cachedRegionBytes: Long get() = mutex.withLock { cachedBytes() }
 
     public fun regionPath(
         regionX: Int,
@@ -153,13 +162,13 @@ public class RegionStore(
         return LinearRegion.read(bytes).also { store(key, it) }
     }
 
-    /** Caller must hold [mutex]. Evicts the least recently used region, writing it first if it changed. */
+    /** Caller must hold [mutex]. Evicts least recently used regions, writing each one first if it changed. */
     private fun store(
         key: Long,
         region: LinearRegion,
     ) {
         cached[key] = region
-        while (cached.size > CAPACITY) {
+        while (cached.size > capacity || cachedBytes() > byteBudget) {
             val oldest = cached.keys.first()
             if (oldest == key) break
             if (dirtyRegions.remove(oldest)) {
@@ -175,6 +184,12 @@ public class RegionStore(
         // A player near a region corner works across four at once, and prefetch reaches past them,
         // so four meant constant thrashing: every miss is a full region decompressed again.
         const val CAPACITY = 12
+
+        // The count on its own bounds nothing: a region holds 1024 decompressed chunk blobs, so
+        // twelve full ones are hundreds of megabytes, and the process grew with distance flown.
+        // Whichever limit bites first wins, which keeps many sparse regions cheap and few full ones
+        // bounded.
+        const val BYTE_BUDGET = 96L * 1024 * 1024
 
         fun key(
             regionX: Int,

@@ -52,7 +52,30 @@ public class PalettedContainer(
     }
 
     /** Every value, expanded. Allocates: for the save and network paths, which need a flat view once. */
-    public fun toIntArray(): IntArray = IntArray(size) { get(it) }
+    public fun toIntArray(): IntArray = IntArray(size).also { copyInto(it) }
+
+    /**
+     * Expands into [dest], which must hold at least [size] values.
+     *
+     * Takes the storage snapshot once rather than once per value: [get] reads a volatile field, and
+     * a save expanding every section of every chunk did that four thousand times a section.
+     */
+    public fun copyInto(dest: IntArray) {
+        require(dest.size >= size) { "expected room for $size values, got ${dest.size}" }
+        val current = storage
+        val words = current.words
+        if (words == null) {
+            dest.fill(current.palette[0], 0, size)
+            return
+        }
+        val bits = current.bits
+        val palette = current.palette
+        val paletteSize = current.paletteSize
+        for (i in 0 until size) {
+            val raw = readRaw(words, bits, i)
+            dest[i] = if (raw < paletteSize) palette[raw] else palette[0]
+        }
+    }
 
     /** Replaces the whole contents, re-deriving the palette from [values]. */
     public fun setAll(values: IntArray) {

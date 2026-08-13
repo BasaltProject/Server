@@ -71,6 +71,15 @@ public class ChunkSection {
     /** A copy of the raw state IDs, in `(y * 16 + z) * 16 + x` order: the layout `PalettedContainer` expects. */
     public fun blockStateIds(): IntArray = blockStateIds.toIntArray()
 
+    /** The same values into a caller-owned buffer, so a save reuses one across a chunk's sections. */
+    public fun copyBlockStateIdsInto(dest: IntArray) {
+        blockStateIds.copyInto(dest)
+    }
+
+    public fun copyBiomeIdsInto(dest: IntArray) {
+        biomeIds.copyInto(dest)
+    }
+
     /** Overwrites every state ID at once, in the same `(y * 16 + z) * 16 + x` order [blockStateIds] returns. */
     public fun setBlockStateIds(ids: IntArray) {
         blockStateIds.setAll(ids)
