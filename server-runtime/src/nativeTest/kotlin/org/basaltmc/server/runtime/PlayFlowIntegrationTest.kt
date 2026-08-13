@@ -7,6 +7,7 @@ import org.basaltmc.server.storage.StoredPlayer
 import org.basaltmc.wire.auth.OfflineUuid
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.io.TcpConnection
+import org.basaltmc.wire.protocol.configuration.BrandPacket
 import org.basaltmc.wire.protocol.configuration.FinishConfigurationPacket
 import org.basaltmc.wire.protocol.configuration.RegistryDataPacket
 import org.basaltmc.wire.protocol.configuration.SelectKnownPacksPacket
@@ -25,6 +26,7 @@ import org.basaltmc.wire.protocol.play.ChunkBatchStartPacket
 import org.basaltmc.wire.protocol.play.ClientboundPlayerAbilitiesPacket
 import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
+import org.basaltmc.wire.protocol.play.EntityEventPacket
 import org.basaltmc.wire.protocol.play.EntityTeleportPacket
 import org.basaltmc.wire.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.wire.protocol.play.GameEventPacket
@@ -43,6 +45,7 @@ import org.basaltmc.wire.protocol.play.SetExperiencePacket
 import org.basaltmc.wire.protocol.play.SetHealthPacket
 import org.basaltmc.wire.protocol.play.SetHeldSlotPacket
 import org.basaltmc.wire.protocol.play.SetSimulationDistancePacket
+import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.SpawnPositionPacket
 import org.basaltmc.wire.protocol.play.SystemChatPacket
@@ -111,6 +114,11 @@ class PlayFlowIntegrationTest {
 
         sendCompressed(connection, LoginAcknowledgedPacket.ID, threshold) { }
 
+        // parity: Configuration opens with the brand, which is the name F3 shows for the server.
+        val brandBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(BrandPacket.ID, brandBody.readVarInt())
+        assertEquals("Basalt ${BuildInfo.MINECRAFT_VERSION}", BrandPacket.read(brandBody).brand)
+
         val selectKnownPacksBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(SelectKnownPacksPacket.CLIENTBOUND_ID, selectKnownPacksBody.readVarInt())
 
@@ -169,6 +177,16 @@ class PlayFlowIntegrationTest {
         assertEquals(ClientboundPlayerAbilitiesPacket.ID, abilitiesBody.readVarInt())
         ClientboundPlayerAbilitiesPacket.read(abilitiesBody)
 
+        // parity: the permission level goes right before the tree, and the client needs it to allow
+        // selectors in its own parser.
+        val permissionBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(EntityEventPacket.ID, permissionBody.readVarInt())
+        val permission = EntityEventPacket.read(permissionBody)
+        assertTrue(
+            permission.eventId.toInt() in
+                EntityEventPacket.PERMISSION_LEVEL_BASE..(EntityEventPacket.PERMISSION_LEVEL_BASE + 4),
+        )
+
         val commandsBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(CommandsPacket.ID, commandsBody.readVarInt())
         val commandTree = CommandsPacket.read(commandsBody)
@@ -187,6 +205,11 @@ class PlayFlowIntegrationTest {
         val simulationDistanceBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(SetSimulationDistancePacket.ID, simulationDistanceBody.readVarInt())
         SetSimulationDistancePacket.read(simulationDistanceBody)
+
+        // The one clock update the join itself sends, so this asserts its position rather than
+        // catching one of the periodic ones.
+        val setTimeBody = readFrame(connection, incoming, compressionEnabled = true, skipClockUpdates = false)
+        assertEquals(SetTimePacket.ID, setTimeBody.readVarInt())
 
         val spawnPositionBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(SpawnPositionPacket.ID, spawnPositionBody.readVarInt())

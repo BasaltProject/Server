@@ -64,7 +64,7 @@ internal fun testGroups(
     return GroupsConfig(mapOf("default" to default, "operator" to operator), default, operator)
 }
 
-private fun testEnvironment(): CommandEnvironment =
+internal fun testEnvironment(): CommandEnvironment =
     CommandEnvironment(
         players = PlayerRegistry(),
         groupsProvider = { testGroups() },

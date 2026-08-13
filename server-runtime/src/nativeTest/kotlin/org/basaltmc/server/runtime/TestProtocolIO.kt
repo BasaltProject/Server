@@ -18,6 +18,7 @@ import org.basaltmc.wire.auth.Cfb8Cipher
 import org.basaltmc.wire.auth.OnlineMode
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.io.ByteBuffer
+import org.basaltmc.wire.io.FileIO
 import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.SocketException
 import org.basaltmc.wire.io.TcpConnection
@@ -25,6 +26,7 @@ import org.basaltmc.wire.io.Zlib
 import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.protocol.PacketFraming
 import org.basaltmc.wire.protocol.play.PlayKeepAlivePacket
+import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.protocol.readVarInt
 import org.basaltmc.wire.protocol.writeVarInt
 import kotlin.concurrent.AtomicInt
@@ -54,6 +56,7 @@ internal fun startTestServer(
                 maxPlayers = 20,
                 onlineMode = onlineMode != null,
                 gamemode = "survival",
+                whitelist = false,
                 logLevel = LogLevel.INFO,
                 logToFile = false,
                 logKeepDays = 0,
@@ -65,6 +68,11 @@ internal fun startTestServer(
         // committed to the repository once already.
         val playersDatabase = "$TEST_DATA_ROOT/players_$port.db"
         for (suffix in listOf("", "-wal", "-shm")) platform.posix.remove("$playersDatabase$suffix")
+        // The world goes with it, whole. A test world that survives its run carries the blocks that
+        // run placed, its clock and its weather into the next one, and every test here asserts on a
+        // world that has just been generated: that is how one run leaving dirt behind made the next
+        // one refuse to place a block there and fail somewhere else entirely.
+        deleteDirectory("$TEST_DATA_ROOT/worlds/test_world_$port")
         // One world per port. Every server here owns its own RegionStore, and two of them reading
         // and writing the same region files at once is a genuine race: a worker that reads a
         // half-written region dies, and the startup that was waiting on its chunks never finishes
@@ -173,6 +181,12 @@ internal fun readFrame(
     connection: TcpConnection,
     incoming: ByteBuffer,
     compressionEnabled: Boolean,
+    /**
+     * Clock updates go out once a second to everyone, so they land in the middle of whatever else a
+     * test is reading. Skipped for the same reason keep-alives are; the join sequence turns this off
+     * where the clock is the packet under test.
+     */
+    skipClockUpdates: Boolean = true,
 ): ByteBuffer {
     val chunk = ByteArray(4096)
     ReadStallWatchdog.enter(connection)
@@ -180,7 +194,9 @@ internal fun readFrame(
         while (true) {
             PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
                 incoming.discardReadBytes()
-                if (!isKeepAlive(frame)) return ByteBuffer(frame.size).also { it.writeBytes(frame) }
+                if (!isPeriodic(frame, skipClockUpdates)) {
+                    return ByteBuffer(frame.size).also { it.writeBytes(frame) }
+                }
             }
             incoming.writeBytes(chunk, length = readOrStall(connection, chunk))
         }
@@ -263,8 +279,23 @@ internal fun readFrameEncrypted(
     }
 }
 
-private fun isKeepAlive(frame: ByteArray): Boolean =
-    ByteBuffer(frame.size).also { it.writeBytes(frame) }.readVarInt() == PlayKeepAlivePacket.CLIENTBOUND_ID
+private fun isPeriodic(
+    frame: ByteArray,
+    skipClockUpdates: Boolean,
+): Boolean {
+    val id = ByteBuffer(frame.size).also { it.writeBytes(frame) }.readVarInt()
+    return id == PlayKeepAlivePacket.CLIENTBOUND_ID || (skipClockUpdates && id == SetTimePacket.ID)
+}
+
+/** Removes a directory and everything under it, so a test world cannot outlive its run. */
+private fun deleteDirectory(path: String) {
+    if (!FileIO.directoryExists(path)) return
+    for (entry in FileIO.list(path)) {
+        val child = "$path/$entry"
+        if (FileIO.directoryExists(child)) deleteDirectory(child) else FileIO.delete(child)
+    }
+    platform.posix.rmdir(path)
+}
 
 /** Where every test artefact goes: inside build/, never in the module directory. */
 internal const val TEST_DATA_ROOT: String = "build/test-data"
