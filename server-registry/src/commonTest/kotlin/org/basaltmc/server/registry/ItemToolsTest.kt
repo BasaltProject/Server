@@ -52,4 +52,46 @@ class ItemToolsTest {
         assertEquals(2.0f, ItemTools.miningSpeed(Identifier.vanilla("wooden_pickaxe"), stone, ::tagContains))
         assertEquals(1.0f, ItemTools.miningSpeed(null, stone, ::tagContains))
     }
+
+    @Test
+    fun efficiencyIsWhatMakesAPickaxeBreakStoneInOneTick() {
+        val diamondPickaxe = Identifier.vanilla("diamond_pickaxe")
+
+        // Plain: stone is hardness 1.5, so 8 / 1.5 / 30 is nowhere near a whole tick.
+        val plain =
+            ItemTools.destroyProgressPerTick(
+                diamondPickaxe,
+                stone,
+                hardness = 1.5f,
+                requiresCorrectTool = true,
+                efficiencyLevel = 0,
+                tagContains = ::tagContains,
+            )
+        assertTrue(plain < 1f)
+
+        // Efficiency 50 adds 2501, which is what makes it instant and what the server has to agree
+        // with: the client stops sending the end of a dig it finished in one tick.
+        val enchanted =
+            ItemTools.destroyProgressPerTick(
+                diamondPickaxe,
+                stone,
+                hardness = 1.5f,
+                requiresCorrectTool = true,
+                efficiencyLevel = 50,
+                tagContains = ::tagContains,
+            )
+        assertTrue(enchanted >= 1f)
+
+        // parity: the enchantment does nothing for a bare hand, whose speed is never above one.
+        val barehand =
+            ItemTools.destroyProgressPerTick(
+                null,
+                stone,
+                hardness = 1.5f,
+                requiresCorrectTool = true,
+                efficiencyLevel = 50,
+                tagContains = ::tagContains,
+            )
+        assertTrue(barehand < 1f)
+    }
 }

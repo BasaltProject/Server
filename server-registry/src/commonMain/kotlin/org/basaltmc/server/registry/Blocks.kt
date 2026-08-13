@@ -139,7 +139,8 @@ public object Blocks {
         val coralStateStart = CORAL_WATERLOGGED_DEFAULT_STATE_IDS.firstOrNull { stateId in it..it + 1 }
         if (coralStateStart != null) return (stateId - coralStateStart) and 1 == 0
         val wallCoralStateStart = CORAL_WALL_FAN_DEFAULT_STATE_IDS.firstOrNull { stateId in it..it + 7 }
-        return wallCoralStateStart != null && (stateId - wallCoralStateStart) and 1 == 0
+        if (wallCoralStateStart != null) return (stateId - wallCoralStateStart) and 1 == 0
+        return derivedStatesById[stateId]?.properties?.get("waterlogged") == "true"
     }
 
     /** Whether this state exposes any non-empty fluid state. */
@@ -478,6 +479,48 @@ public object Blocks {
                 put(default.stateId + 1, BlockState(default.block, default.stateId + 1, mapOf("axis" to "z")))
             }
 
+            for (path in AMETHYST_CLUSTER_BLOCKS) {
+                val default = REGISTRY.byIdentifier(Identifier.vanilla(path)) ?: continue
+                var stateId = default.stateId - 9
+                for (facing in listOf("north", "east", "south", "west", "up", "down")) {
+                    for (waterlogged in listOf("true", "false")) {
+                        put(
+                            stateId,
+                            BlockState(
+                                default.block,
+                                stateId,
+                                linkedMapOf("facing" to facing, "waterlogged" to waterlogged),
+                            ),
+                        )
+                        stateId++
+                    }
+                }
+            }
+
+            for (path in SPELEOTHEM_BLOCKS) {
+                val default = REGISTRY.byIdentifier(Identifier.vanilla(path)) ?: continue
+                var stateId = default.stateId - 5
+                for (thickness in listOf("tip_merge", "tip", "frustum", "middle", "base")) {
+                    for (verticalDirection in listOf("up", "down")) {
+                        for (waterlogged in listOf("true", "false")) {
+                            put(
+                                stateId,
+                                BlockState(
+                                    default.block,
+                                    stateId,
+                                    linkedMapOf(
+                                        "thickness" to thickness,
+                                        "vertical_direction" to verticalDirection,
+                                        "waterlogged" to waterlogged,
+                                    ),
+                                ),
+                            )
+                            stateId++
+                        }
+                    }
+                }
+            }
+
             // parity: reports/blocks.json state order used by NetherFortressPieces.
             val netherBrickFence =
                 REGISTRY.byIdentifier(Identifier.vanilla("nether_brick_fence"))
@@ -639,6 +682,80 @@ public object Blocks {
                 )
             }
 
+            val sculkVein =
+                REGISTRY.byIdentifier(Identifier.vanilla("sculk_vein")) ?: error("unknown block 'sculk_vein'")
+            for (stateId in sculkVein.stateId - 127..sculkVein.stateId) {
+                val falseBits = stateId - (sculkVein.stateId - 127)
+                put(
+                    stateId,
+                    BlockState(
+                        sculkVein.block,
+                        stateId,
+                        linkedMapOf(
+                            "down" to booleanProperty(falseBits and 64 == 0),
+                            "east" to booleanProperty(falseBits and 32 == 0),
+                            "north" to booleanProperty(falseBits and 16 == 0),
+                            "south" to booleanProperty(falseBits and 8 == 0),
+                            "up" to booleanProperty(falseBits and 4 == 0),
+                            "waterlogged" to booleanProperty(falseBits and 2 == 0),
+                            "west" to booleanProperty(falseBits and 1 == 0),
+                        ),
+                    ),
+                )
+            }
+
+            val sculkSensor =
+                REGISTRY.byIdentifier(Identifier.vanilla("sculk_sensor")) ?: error("unknown block 'sculk_sensor'")
+            var sculkSensorStateId = sculkSensor.stateId - 1
+            for (power in 0..15) {
+                for (phase in listOf("inactive", "active", "cooldown")) {
+                    for (waterlogged in listOf("true", "false")) {
+                        put(
+                            sculkSensorStateId,
+                            BlockState(
+                                sculkSensor.block,
+                                sculkSensorStateId,
+                                linkedMapOf(
+                                    "power" to power.toString(),
+                                    "sculk_sensor_phase" to phase,
+                                    "waterlogged" to waterlogged,
+                                ),
+                            ),
+                        )
+                        sculkSensorStateId++
+                    }
+                }
+            }
+
+            val sculkCatalyst =
+                REGISTRY.byIdentifier(Identifier.vanilla("sculk_catalyst")) ?: error("unknown block 'sculk_catalyst'")
+            for ((bloom, stateId) in listOf("true", "false").zip(sculkCatalyst.stateId - 1..sculkCatalyst.stateId)) {
+                put(stateId, BlockState(sculkCatalyst.block, stateId, mapOf("bloom" to bloom)))
+            }
+
+            val sculkShrieker =
+                REGISTRY.byIdentifier(Identifier.vanilla("sculk_shrieker")) ?: error("unknown block 'sculk_shrieker'")
+            var sculkShriekerStateId = sculkShrieker.stateId - 7
+            for (canSummon in listOf("true", "false")) {
+                for (shrieking in listOf("true", "false")) {
+                    for (waterlogged in listOf("true", "false")) {
+                        put(
+                            sculkShriekerStateId,
+                            BlockState(
+                                sculkShrieker.block,
+                                sculkShriekerStateId,
+                                linkedMapOf(
+                                    "can_summon" to canSummon,
+                                    "shrieking" to shrieking,
+                                    "waterlogged" to waterlogged,
+                                ),
+                            ),
+                        )
+                        sculkShriekerStateId++
+                    }
+                }
+            }
+
             val sweetBerry =
                 REGISTRY.byIdentifier(Identifier.vanilla("sweet_berry_bush"))
                     ?: error("unknown block 'sweet_berry_bush'")
@@ -653,6 +770,28 @@ public object Blocks {
                         ),
                     ),
                 )
+            }
+
+            val bamboo = REGISTRY.byIdentifier(Identifier.vanilla("bamboo")) ?: error("unknown block 'bamboo'")
+            var bambooStateId = bamboo.stateId
+            for (age in 0..1) {
+                for (leaves in listOf("none", "small", "large")) {
+                    for (stage in 0..1) {
+                        put(
+                            bambooStateId,
+                            BlockState(
+                                bamboo.block,
+                                bambooStateId,
+                                linkedMapOf(
+                                    "age" to age.toString(),
+                                    "leaves" to leaves,
+                                    "stage" to stage.toString(),
+                                ),
+                            ),
+                        )
+                        bambooStateId++
+                    }
+                }
             }
 
             val cocoa = REGISTRY.byIdentifier(Identifier.vanilla("cocoa")) ?: error("unknown block 'cocoa'")
@@ -1027,4 +1166,7 @@ public object Blocks {
             "pale_oak_log",
             "mangrove_log",
         )
+    private val AMETHYST_CLUSTER_BLOCKS: List<String> =
+        listOf("amethyst_cluster", "large_amethyst_bud", "medium_amethyst_bud", "small_amethyst_bud")
+    private val SPELEOTHEM_BLOCKS: List<String> = listOf("pointed_dripstone", "sulfur_spike")
 }

@@ -252,6 +252,149 @@ class BlocksTest {
         )
     }
 
+    @Test
+    fun amethystClusterStatesExposeExactFacingAndWaterlogging() {
+        val block = Identifier.vanilla("amethyst_cluster")
+        assertEquals(
+            23404,
+            Blocks.stateIdOf(block, linkedMapOf("facing" to "north", "waterlogged" to "true")),
+        )
+        assertEquals(
+            23413,
+            Blocks.stateIdOf(block, linkedMapOf("facing" to "up", "waterlogged" to "false")),
+        )
+        assertEquals(
+            23415,
+            Blocks.stateIdOf(block, linkedMapOf("facing" to "down", "waterlogged" to "false")),
+        )
+    }
+
+    @Test
+    fun speleothemStatesExposeExactThicknessDirectionAndWaterlogging() {
+        val pointedDripstone = Identifier.vanilla("pointed_dripstone")
+        assertEquals(
+            30209,
+            Blocks.stateIdOf(
+                pointedDripstone,
+                linkedMapOf(
+                    "thickness" to "tip_merge",
+                    "vertical_direction" to "up",
+                    "waterlogged" to "true",
+                ),
+            ),
+        )
+        assertEquals(
+            30214,
+            Blocks.stateIdOf(
+                pointedDripstone,
+                linkedMapOf(
+                    "thickness" to "tip",
+                    "vertical_direction" to "up",
+                    "waterlogged" to "false",
+                ),
+            ),
+        )
+        assertEquals(
+            30228,
+            Blocks.stateIdOf(
+                pointedDripstone,
+                linkedMapOf(
+                    "thickness" to "base",
+                    "vertical_direction" to "down",
+                    "waterlogged" to "false",
+                ),
+            ),
+        )
+        assertEquals(
+            30248,
+            Blocks.stateIdOf(
+                Identifier.vanilla("sulfur_spike"),
+                linkedMapOf(
+                    "thickness" to "base",
+                    "vertical_direction" to "down",
+                    "waterlogged" to "false",
+                ),
+            ),
+        )
+        assertTrue(Blocks.hasWaterFluid(30209))
+        assertFalse(Blocks.hasWaterFluid(30210))
+    }
+
+    @Test
+    fun sculkVeinStatesExposeExactFacesAndWaterlogging() {
+        val block = Identifier.vanilla("sculk_vein")
+        assertEquals(
+            27644,
+            Blocks.stateIdOf(
+                block,
+                linkedMapOf(
+                    "down" to "true",
+                    "east" to "true",
+                    "north" to "true",
+                    "south" to "true",
+                    "up" to "true",
+                    "waterlogged" to "true",
+                    "west" to "true",
+                ),
+            ),
+        )
+        assertEquals(
+            27771,
+            Blocks.stateIdOf(
+                block,
+                linkedMapOf(
+                    "down" to "false",
+                    "east" to "false",
+                    "north" to "false",
+                    "south" to "false",
+                    "up" to "false",
+                    "waterlogged" to "false",
+                    "west" to "false",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun sculkGrowthStatesExposeExactProperties() {
+        assertEquals(
+            27163,
+            Blocks.stateIdOf(
+                Identifier.vanilla("sculk_sensor"),
+                linkedMapOf("power" to "0", "sculk_sensor_phase" to "inactive", "waterlogged" to "true"),
+            ),
+        )
+        assertEquals(
+            27773,
+            Blocks.stateIdOf(Identifier.vanilla("sculk_catalyst"), mapOf("bloom" to "false")),
+        )
+        assertEquals(
+            27777,
+            Blocks.stateIdOf(
+                Identifier.vanilla("sculk_shrieker"),
+                linkedMapOf("can_summon" to "true", "shrieking" to "false", "waterlogged" to "false"),
+            ),
+        )
+    }
+
+    @Test
+    fun bambooStatesExposeExactAgeLeavesAndStage() {
+        assertEquals(
+            15285,
+            Blocks.stateIdOf(
+                Identifier.vanilla("bamboo"),
+                linkedMapOf("age" to "1", "leaves" to "none", "stage" to "0"),
+            ),
+        )
+        assertEquals(
+            15290,
+            Blocks.stateIdOf(
+                Identifier.vanilla("bamboo"),
+                linkedMapOf("age" to "1", "leaves" to "large", "stage" to "1"),
+            ),
+        )
+    }
+
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
