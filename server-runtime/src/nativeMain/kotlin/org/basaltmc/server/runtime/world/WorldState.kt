@@ -126,24 +126,40 @@ public class WorldState(
             true
         }
 
-    /** Runtime identities for immutable entities emitted by every currently loaded generated chunk. */
-    public fun generatedEntities(allocateEntityId: () -> Int): List<GeneratedWorldEntity> =
+    /**
+     * Runtime identities for the immutable entities emitted by generated chunks within
+     * [radiusChunks] of ([centerChunkX], [centerChunkZ]).
+     *
+     * Bounded because the caller throws away everything farther than its own view radius anyway,
+     * and this runs once per player per tick holding [mutex]: over every loaded chunk it was a copy
+     * of the chunk map, a sort of it, and a copy of each chunk's own list, twenty times a second,
+     * against the lock the generation workers need.
+     *
+     * Walked in coordinate order rather than sorted, so a new entity's id still depends only on
+     * position. Identities are not pruned here: a chunk that falls outside the radius keeps its
+     * entities' ids, and [evictClean] is what forgets them, when the chunk itself goes.
+     */
+    public fun generatedEntities(
+        allocateEntityId: () -> Int,
+        centerChunkX: Int,
+        centerChunkZ: Int,
+        radiusChunks: Int,
+    ): List<GeneratedWorldEntity> =
         mutex.withLock {
-            val visibleKeys = mutableSetOf<GeneratedEntityKey>()
             val result = mutableListOf<GeneratedWorldEntity>()
-            val chunks = chunksByPos.values.sortedWith(compareBy(Chunk::chunkX, Chunk::chunkZ))
-            for (chunk in chunks) {
-                val chunkKey = key(chunk.chunkX, chunk.chunkZ)
-                for ((index, descriptor) in chunk.generatedEntities().withIndex()) {
-                    val entityKey = GeneratedEntityKey(chunkKey, index)
-                    visibleKeys += entityKey
-                    result +=
-                        generatedEntitiesByKey.getOrPut(entityKey) {
-                            GeneratedWorldEntity(allocateEntityId(), Uuid.random(), descriptor)
-                        }
+            for (chunkX in centerChunkX - radiusChunks..centerChunkX + radiusChunks) {
+                for (chunkZ in centerChunkZ - radiusChunks..centerChunkZ + radiusChunks) {
+                    val chunkKey = key(chunkX, chunkZ)
+                    val chunk = chunksByPos[chunkKey] ?: continue
+                    for (index in 0 until chunk.generatedEntityCount) {
+                        val entityKey = GeneratedEntityKey(chunkKey, index)
+                        result +=
+                            generatedEntitiesByKey.getOrPut(entityKey) {
+                                GeneratedWorldEntity(allocateEntityId(), Uuid.random(), chunk.generatedEntityAt(index))
+                            }
+                    }
                 }
             }
-            generatedEntitiesByKey.keys.removeAll { it !in visibleKeys }
             result
         }
 

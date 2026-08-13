@@ -27,12 +27,38 @@ class WorldStateGeneratedEntityTest {
         var nextId = 20
         val world = WorldState(listOf(generatedChunk())) { _, _ -> generatedChunk() }
 
-        assertEquals(20, world.generatedEntities { nextId++ }.single().entityId)
-        assertEquals(20, world.generatedEntities { nextId++ }.single().entityId)
+        fun around(): List<WorldState.GeneratedWorldEntity> =
+            world.generatedEntities({ nextId++ }, centerChunkX = 2, centerChunkZ = 3, radiusChunks = 1)
+
+        assertEquals(20, around().single().entityId)
+        assertEquals(20, around().single().entityId)
         assertEquals(21, nextId, "reading the same loaded descriptor must not allocate twice")
 
         assertEquals(1, world.evictClean(world.evictionCandidates { _, _ -> false }))
         world.getOrGenerateChunk(2, 3)
-        assertEquals(21, world.generatedEntities { nextId++ }.single().entityId)
+        assertEquals(21, around().single().entityId)
     }
+
+    /** The scan is bounded, so a chunk outside the radius contributes nothing and costs nothing. */
+    @Test
+    fun onlyChunksWithinTheRadiusAreWalked() {
+        val world = WorldState(listOf(chunkWithCrystal(2, 3), chunkWithCrystal(40, 40)))
+        var nextId = 0
+
+        val near = world.generatedEntities({ nextId++ }, centerChunkX = 2, centerChunkZ = 3, radiusChunks = 2)
+
+        assertEquals(1, near.size, "a chunk 38 chunks away should not have been walked")
+        assertEquals(1, nextId, "an entity outside the radius must not be given an id yet")
+    }
+
+    private fun chunkWithCrystal(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk =
+        Chunk(chunkX, chunkZ).apply {
+            addGeneratedEntity(
+                ChunkGeneratedEntity(Identifier.vanilla("end_crystal"), 0.5, 95.0, 0.5, 0f, 0f),
+            )
+            markClean()
+        }
 }

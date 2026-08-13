@@ -150,9 +150,11 @@ import org.basaltmc.wire.text.TextColor
 import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
 import kotlin.math.PI
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
@@ -1391,7 +1393,14 @@ public class ClientSession(
         val session = playerSession ?: return
         val registry = playerRegistry ?: return
         val visible = HashSet<Int>()
-        for (entity in world.generatedEntities(registry::allocateEntityId)) {
+        val entities =
+            world.generatedEntities(
+                registry::allocateEntityId,
+                centerChunkX = floor(session.x).toInt() shr 4,
+                centerChunkZ = floor(session.z).toInt() shr 4,
+                radiusChunks = GENERATED_ENTITY_VIEW_RADIUS_CHUNKS,
+            )
+        for (entity in entities) {
             val descriptor = entity.descriptor
             val dx = descriptor.x - session.x
             val dz = descriptor.z - session.z
@@ -2868,6 +2877,10 @@ public class ClientSession(
 
         /** All generated End entity types use vanilla's 10-chunk client tracking range. */
         const val GENERATED_ENTITY_VIEW_RADIUS_SQUARED = 160.0 * 160.0
+
+        /** The same radius in chunks, so the world scan and the distance filter cannot drift apart. */
+        val GENERATED_ENTITY_VIEW_RADIUS_CHUNKS: Int =
+            ceil(sqrt(GENERATED_ENTITY_VIEW_RADIUS_SQUARED) / 16.0).toInt()
 
         val GENERATED_ENTITY_TYPE_IDS =
             mapOf(
