@@ -56,7 +56,7 @@ class PlainsDecorationTest {
         var found = false
         for (cx in 0 until 6) {
             val chunk = flatGrassChunk(cx, 0)
-            PlainsDecoration.decorate(chunk, WorldgenRandom(XoroshiroRandom(cx.toLong() * 7919L)))
+            PlainsDecoration.GRASS.decorate(chunk, WorldgenRandom(XoroshiroRandom(cx.toLong() * 7919L)))
             for (x in 0 until 16) {
                 for (z in 0 until 16) {
                     if (chunk.getBlockStateId(x, 65, z) == shortGrass) found = true

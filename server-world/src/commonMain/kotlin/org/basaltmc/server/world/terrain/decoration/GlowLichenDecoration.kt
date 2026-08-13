@@ -4,15 +4,40 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
+import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.Identifier
 
 /** Shared 26.2 `glow_lichen` placed feature. */
 public object GlowLichenDecoration : BiomeVegetalDecoration {
+    public fun decorate(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
+    ) {
+        val random =
+            WorldgenRandom(
+                org.basaltmc.server.random
+                    .XoroshiroRandom(seed),
+            )
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        random.setFeatureSeed(decorationSeed, GLOW_LICHEN_INDEX, VEGETAL_DECORATION_STEP)
+        decoratePlaced(chunk, random, environment, externalBlockState)
+    }
+
     override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
+    ): Unit = decoratePlaced(chunk, random, environment = null, externalBlockState = null)
+
+    private fun decoratePlaced(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        environment: SurfaceRuleEnvironment?,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)?,
     ) {
         val context = PlacementContext(chunk)
+        val region = GlowLichenRegion(chunk, externalBlockState)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
         for (
         modifier in
@@ -25,52 +50,55 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }
-        positions.forEach { placeGrowth(chunk, random, it) }
+        positions.forEach { position ->
+            val biome = environment?.biomeAt(position.x, position.y, position.z)?.substringAfter(':')
+            if (biome == null || biome != "the_void") placeGrowth(region, random, position)
+        }
     }
 
     private fun placeGrowth(
-        chunk: Chunk,
+        region: GlowLichenRegion,
         random: WorldgenRandom,
         origin: DecorationPos,
     ): Boolean {
-        val oldState = state(chunk, origin) ?: return false
+        val oldState = region.get(origin) ?: return false
         if (!isAirWaterOrLichen(oldState)) return false
 
         val directions = VALID_DIRECTIONS.shuffled(random)
-        if (placeOnFirstSupport(chunk, random, origin, oldState, directions)) return true
+        if (placeOnFirstSupport(region, random, origin, oldState, directions)) return true
 
         for (searchDirection in directions) {
             val placementDirections = VALID_DIRECTIONS.filter { it != searchDirection.opposite }.shuffled(random)
             val target = origin.relative(searchDirection)
-            val targetState = state(chunk, target) ?: continue
+            val targetState = region.get(target) ?: continue
             if (!isAirWaterOrLichen(targetState)) continue
             // parity: 26.2 repeats this same one-block target searchRange times. Failed attempts
             // consume no RNG, so one evaluation is equivalent while preserving the vanilla bug.
-            if (placeOnFirstSupport(chunk, random, target, targetState, placementDirections)) return true
+            if (placeOnFirstSupport(region, random, target, targetState, placementDirections)) return true
         }
         return false
     }
 
     private fun placeOnFirstSupport(
-        chunk: Chunk,
+        region: GlowLichenRegion,
         random: WorldgenRandom,
         position: DecorationPos,
         oldState: Int,
         directions: List<Direction>,
     ): Boolean {
         for (direction in directions) {
-            val neighbour = state(chunk, position.relative(direction)) ?: continue
+            val neighbour = region.get(position.relative(direction)) ?: continue
             if (neighbour !in canBePlacedOnStateIds) continue
             val newState = withFace(oldState, direction) ?: return false
-            setState(chunk, position, newState)
-            if (random.nextFloat() < SPREAD_CHANCE) spread(chunk, random, position, newState, direction)
+            region.set(position, newState)
+            if (random.nextFloat() < SPREAD_CHANCE) spread(region, random, position, newState, direction)
             return true
         }
         return false
     }
 
     private fun spread(
-        chunk: Chunk,
+        region: GlowLichenRegion,
         random: WorldgenRandom,
         source: DecorationPos,
         sourceState: Int,
@@ -85,14 +113,14 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
                     SpreadPos(source.relative(spreadDirection).relative(startingFace), spreadDirection.opposite),
                 )
             for (candidate in candidates) {
-                val oldState = state(chunk, candidate.position) ?: continue
+                val oldState = region.get(candidate.position) ?: continue
                 if (!isAirWaterOrLichen(oldState)) continue
-                val neighbour = state(chunk, candidate.position.relative(candidate.face)) ?: continue
+                val neighbourPosition = candidate.position.relative(candidate.face)
                 // MultifaceSpreader uses generic sturdy-face attachment after initial placement,
                 // not the feature configuration's narrower can_be_placed_on list.
-                if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(neighbour)) continue
+                if (!region.hasSturdyFace(neighbourPosition, candidate.face.opposite)) continue
                 val newState = withFace(oldState, candidate.face) ?: continue
-                setState(chunk, candidate.position, newState)
+                region.set(candidate.position, newState)
                 return
             }
         }
@@ -119,26 +147,45 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         direction: Direction,
     ): Boolean = Blocks.isGlowLichenState(stateId) && (stateId - firstGlowLichenStateId) and direction.falseBit == 0
 
-    private fun state(
-        chunk: Chunk,
-        position: DecorationPos,
-    ): Int? =
-        if (position.y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-            chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
-        } else {
-            null
-        }
-
-    private fun setState(
-        chunk: Chunk,
-        position: DecorationPos,
-        stateId: Int,
-    ) {
-        chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
-    }
-
     private fun isAirWaterOrLichen(stateId: Int): Boolean =
         Blocks.isAir(stateId) || stateId == Blocks.WATER.stateId || Blocks.isGlowLichenState(stateId)
+
+    private class GlowLichenRegion(
+        private val chunk: Chunk,
+        private val externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)?,
+    ) {
+        private val externalWrites = HashMap<DecorationPos, Int>()
+
+        fun get(position: DecorationPos): Int? =
+            when {
+                position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y -> Blocks.AIR.stateId
+                position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ ->
+                    chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
+                else -> externalWrites[position] ?: externalBlockState?.invoke(position.x, position.y, position.z)
+            }
+
+        fun set(
+            position: DecorationPos,
+            stateId: Int,
+        ) {
+            if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
+            if (position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ) {
+                chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
+            } else {
+                externalWrites[position] = stateId
+            }
+        }
+
+        fun hasSturdyFace(
+            position: DecorationPos,
+            face: Direction,
+        ): Boolean =
+            when (get(position)?.let(Blocks::byStateId)?.block?.path) {
+                "sculk_sensor", "sculk_shrieker" -> face == Direction.DOWN
+                in NON_STURDY_BLOCKS -> false
+                else -> get(position)?.let(Chunk.HeightmapType.OCEAN_FLOOR::matches) == true
+            }
+    }
 
     private fun <T> List<T>.shuffled(random: WorldgenRandom): List<T> {
         val copy = toMutableList()
@@ -194,6 +241,8 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
     private const val WATERLOGGED_FALSE_BIT = 2
     private const val ALL_FACE_FALSE_BITS = 64 + 32 + 16 + 8 + 4 + 1
     private const val SPREAD_CHANCE = 0.5f
+    private const val GLOW_LICHEN_INDEX = 0
+    private const val VEGETAL_DECORATION_STEP = 9
 
     private val defaultGlowLichenStateId = stateId("glow_lichen")
     private val firstGlowLichenStateId = defaultGlowLichenStateId - 127
@@ -214,4 +263,6 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
     private val VALID_DIRECTIONS =
         listOf(Direction.UP, Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST)
     private val ALL_DIRECTIONS = Direction.entries
+    private val NON_STURDY_BLOCKS =
+        setOf("glow_lichen", "sculk_vein", "pointed_dripstone", "sulfur_spike", "snow")
 }

@@ -1,32 +1,56 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
+import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.Identifier
 import kotlin.math.abs
 import kotlin.math.ceil
 
-/** Ice-spikes biome `SURFACE_STRUCTURES`: three spikes followed by two packed-ice disks. */
-public object IceSpikesDecoration : BiomeVegetalDecoration {
-    override fun decorate(
+/** // parity: ice-spikes biome `SURFACE_STRUCTURES`, global feature indexes 0 and 1. */
+public object IceSpikesDecoration {
+    public fun decorate(
         chunk: Chunk,
-        random: WorldgenRandom,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
     ) {
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        random.setFeatureSeed(decorationSeed, ICE_SPIKE_GLOBAL_INDEX, SURFACE_STRUCTURES_STEP)
         repeat(3) {
             val x = random.nextInt(16)
             val z = random.nextInt(16)
             val y = chunk.heightAt(x, z, Chunk.HeightmapType.WORLD_SURFACE)
+            if (!isIceSpikesBiome(chunk, environment, x, y, z)) return@repeat
             placeSpike(chunk, random, DecorationPos(x, y, z))
         }
+
+        random.setFeatureSeed(decorationSeed, ICE_PATCH_GLOBAL_INDEX, SURFACE_STRUCTURES_STEP)
         repeat(2) {
             val x = random.nextInt(16)
             val z = random.nextInt(16)
             val y = chunk.heightAt(x, z, Chunk.HeightmapType.WORLD_SURFACE) - 1
-            if (get(chunk, x, y, z) == Blocks.SNOW_BLOCK.stateId) placeIcePatch(chunk, random, DecorationPos(x, y, z))
+            if (get(chunk, x, y, z) == Blocks.SNOW_BLOCK.stateId &&
+                isIceSpikesBiome(chunk, environment, x, y, z)
+            ) {
+                placeIcePatch(chunk, random, DecorationPos(x, y, z))
+            }
         }
     }
+
+    private fun isIceSpikesBiome(
+        chunk: Chunk,
+        environment: SurfaceRuleEnvironment,
+        localX: Int,
+        y: Int,
+        localZ: Int,
+    ): Boolean =
+        environment
+            .biomeAt(chunk.chunkX * 16 + localX, y, chunk.chunkZ * 16 + localZ)
+            .substringAfter(':') == "ice_spikes"
 
     private fun placeSpike(
         chunk: Chunk,
@@ -172,4 +196,8 @@ public object IceSpikesDecoration : BiomeVegetalDecoration {
 
     private fun stateIds(vararg names: String): Set<Int> =
         names.mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
+
+    private const val SURFACE_STRUCTURES_STEP = 4
+    private const val ICE_SPIKE_GLOBAL_INDEX = 0
+    private const val ICE_PATCH_GLOBAL_INDEX = 1
 }

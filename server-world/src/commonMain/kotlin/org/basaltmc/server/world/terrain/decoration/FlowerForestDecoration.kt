@@ -26,7 +26,6 @@ public object FlowerForestDecoration : BiomeVegetalDecoration {
     ) {
         TREES.decorate(chunk, random)
         placeFlowers(chunk, random)
-        DefaultVegetationDecoration.GRASS.decorate(chunk, random)
     }
 
     // parity: VegetationFeatures.TREES_FLOWER_FOREST, VegetationPlacements.treePlacement(countExtra(6, 0.1, 1)).

@@ -17,6 +17,10 @@ public enum class StructureRotation {
     CLOCKWISE_90,
     CLOCKWISE_180,
     COUNTERCLOCKWISE_90,
+    ;
+
+    /** What `/place template` takes, which is `Rotation.getSerializedName`. */
+    public val serializedName: String get() = name.lowercase()
 }
 
 /** // parity: net.minecraft.world.level.block.Mirror. */
@@ -24,6 +28,10 @@ public enum class StructureMirror {
     NONE,
     LEFT_RIGHT,
     FRONT_BACK,
+    ;
+
+    /** What `/place template` takes, which is `Mirror.getSerializedName`. */
+    public val serializedName: String get() = name.lowercase()
 }
 
 /**

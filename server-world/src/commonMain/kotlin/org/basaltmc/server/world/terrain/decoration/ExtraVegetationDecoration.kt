@@ -17,6 +17,13 @@ public object ExtraVegetationDecoration {
             placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
         }
 
+    /** Default sugar-cane/firefly tail after pumpkin moved to its independent feature seed. */
+    public val DEFAULT_WITHOUT_PUMPKIN: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeSugarCane(chunk, random, rarity = 6)
+            placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
+        }
+
     public val NEAR_WATER: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             placeSugarCane(chunk, random, rarity = 6)
@@ -30,6 +37,12 @@ public object ExtraVegetationDecoration {
             placeCactus(chunk, random, rarity = 6)
         }
 
+    public val DESERT_WITHOUT_PUMPKIN: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeSugarCane(chunk, random, rarity = null)
+            placeCactus(chunk, random, rarity = 6)
+        }
+
     public val BADLANDS: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             placeSugarCane(chunk, random, rarity = 5)
@@ -38,10 +51,24 @@ public object ExtraVegetationDecoration {
             placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
         }
 
+    public val BADLANDS_WITHOUT_PUMPKIN: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeSugarCane(chunk, random, rarity = 5)
+            placeCactus(chunk, random, rarity = 13)
+            placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
+        }
+
     public val SWAMP: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             placeSugarCane(chunk, random, rarity = 3)
             placePumpkins(chunk, random)
+            placeGeneralFireflies(chunk, random, rarity = 8)
+            placeNearWaterFireflies(chunk, random, outerCount = 3, noLeavesHeightmap = false)
+        }
+
+    public val SWAMP_WITHOUT_PUMPKIN: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeSugarCane(chunk, random, rarity = 3)
             placeGeneralFireflies(chunk, random, rarity = 8)
             placeNearWaterFireflies(chunk, random, outerCount = 3, noLeavesHeightmap = false)
         }

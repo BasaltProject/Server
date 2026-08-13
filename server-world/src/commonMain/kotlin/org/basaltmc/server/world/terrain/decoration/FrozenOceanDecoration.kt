@@ -1,24 +1,42 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
+import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 
 /**
  * Frozen-ocean `LOCAL_MODIFICATIONS` and `SURFACE_STRUCTURES`: packed icebergs (1/16), blue
- * icebergs (1/200), then 0..19 blue-ice attempts between Y 30 and 61. The feature bodies are
- * direct translations of the 26.2 `IcebergFeature` and `BlueIceFeature` implementations.
+ * icebergs (1/200), then 0..19 blue-ice attempts between Y 30 and 61. Each public entry point
+ * resets the exact global feature seed before running the direct 26.2 feature translation.
  */
-public object FrozenOceanDecoration : BiomeVegetalDecoration {
-    override fun decorate(
+public object FrozenOceanDecoration {
+    public fun decorateLocalModifications(
         chunk: Chunk,
-        random: WorldgenRandom,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
     ) {
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
         val region = ChunkFeatureRegion(chunk)
-        placeIcebergWithRarity(region, random, 16, Blocks.PACKED_ICE.stateId)
-        placeIcebergWithRarity(region, random, 200, Blocks.BLUE_ICE.stateId)
+        random.setFeatureSeed(decorationSeed, PACKED_ICEBERG_INDEX, LOCAL_MODIFICATIONS_STEP)
+        placeIcebergWithRarity(region, random, environment, 16, Blocks.PACKED_ICE.stateId)
+        random.setFeatureSeed(decorationSeed, BLUE_ICEBERG_INDEX, LOCAL_MODIFICATIONS_STEP)
+        placeIcebergWithRarity(region, random, environment, 200, Blocks.BLUE_ICE.stateId)
+        region.flush()
+    }
 
+    public fun decorateSurfaceStructures(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        random.setFeatureSeed(decorationSeed, BLUE_ICE_INDEX, SURFACE_STRUCTURES_STEP)
+        val region = ChunkFeatureRegion(chunk)
         repeat(random.nextInt(20)) {
             val x = chunk.chunkX * 16 + random.nextInt(16)
             val z = chunk.chunkZ * 16 + random.nextInt(16)
@@ -28,6 +46,7 @@ public object FrozenOceanDecoration : BiomeVegetalDecoration {
                     30 + random.nextInt(32),
                     z,
                 )
+            if (!isFrozenOcean(environment, origin)) return@repeat
             BlueIceFeature.place(region, random, origin)
         }
         region.flush()
@@ -36,6 +55,7 @@ public object FrozenOceanDecoration : BiomeVegetalDecoration {
     private fun placeIcebergWithRarity(
         region: ChunkFeatureRegion,
         random: WorldgenRandom,
+        environment: SurfaceRuleEnvironment,
         chance: Int,
         stateId: Int,
     ) {
@@ -47,10 +67,22 @@ public object FrozenOceanDecoration : BiomeVegetalDecoration {
                 SEA_LEVEL,
                 chunk.chunkZ * 16 + random.nextInt(16),
             )
+        if (!isFrozenOcean(environment, origin.copy(y = WorldHeight.MIN_Y))) return
         IcebergFeature.place(region, random, origin, stateId)
     }
 
+    private fun isFrozenOcean(
+        environment: SurfaceRuleEnvironment,
+        position: DecorationPos,
+    ): Boolean = environment.biomeAt(position.x, position.y, position.z).substringAfter(':') in FROZEN_OCEAN_BIOMES
+
     private const val SEA_LEVEL = 63
+    private const val LOCAL_MODIFICATIONS_STEP = 2
+    private const val SURFACE_STRUCTURES_STEP = 4
+    private const val PACKED_ICEBERG_INDEX = 0
+    private const val BLUE_ICEBERG_INDEX = 1
+    private const val BLUE_ICE_INDEX = 3
+    private val FROZEN_OCEAN_BIOMES = setOf("frozen_ocean", "deep_frozen_ocean")
 }
 
 /**

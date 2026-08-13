@@ -22,10 +22,8 @@ public object PlainsDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        TALL_GRASS.decorate(chunk, random)
         ForestGroundDecoration.BUSH.decorate(chunk, random)
         FLOWERS.decorate(chunk, random)
-        GRASS.decorate(chunk, random)
     }
 
     /** // parity: placed_feature/patch_grass_plain.json + configured_feature/grass.json, standalone: cherry_grove's own vegetation reuses exactly this real feature. */

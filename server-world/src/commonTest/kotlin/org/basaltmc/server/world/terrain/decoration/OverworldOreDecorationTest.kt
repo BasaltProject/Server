@@ -8,6 +8,7 @@ import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class OverworldOreDecorationTest {
     @Test
@@ -231,6 +232,98 @@ class OverworldOreDecorationTest {
     }
 
     @Test
+    fun underwaterMagmaAndDiskFeaturesMatchOfficialRegionVectors() {
+        val vectors =
+            listOf(
+                LocalFeatureVector(
+                    "plains",
+                    -796757617744748969L,
+                    intArrayOf(13234, 147, 18944, 78, 73, 0, 13, 23, 0, 0),
+                ),
+                LocalFeatureVector(
+                    "swamp",
+                    -1908437634749644452L,
+                    intArrayOf(13234, 243, 18944, 78, 0, 0, 13, 0, 0, 0),
+                ),
+                LocalFeatureVector(
+                    "mangrove_swamp",
+                    -8970619606409398779L,
+                    intArrayOf(13234, 73, 18944, 78, 0, 0, 0, 0, 0, 183),
+                ),
+            )
+
+        for (vector in vectors) {
+            val mangrove = vector.biome == "mangrove_swamp"
+            val chunk = localFeatureChunk(mangrove)
+            OverworldOreDecoration.decorateFeatures(
+                chunk,
+                1234L,
+                environment(vector.biome),
+                listOf(26, 29, 30, 31, 32),
+                externalSurfaceHeight = { _, _ -> 41 },
+                externalBlockState = { _, y, _ -> localFeatureState(y, mangrove) },
+            )
+            val (hash, counts) = localFeatureVector(chunk)
+            assertContentEquals(vector.counts, counts, vector.biome)
+            assertEquals(vector.hash, hash, vector.biome)
+        }
+    }
+
+    @Test
+    fun waterDiskPredicateAcceptsBlocksContainingWater() {
+        val chunk =
+            Chunk(0, 0).also { chunk ->
+                for (z in 0 until 16) {
+                    for (x in 0 until 16) {
+                        chunk.setBlockStateId(x, 40, z, Blocks.DIRT.stateId)
+                        chunk.setBlockStateId(x, 41, z, Blocks.SEAGRASS.stateId)
+                    }
+                }
+            }
+        OverworldOreDecoration.decorateFeatures(
+            chunk,
+            1234L,
+            plainsEnvironment,
+            listOf(31),
+            externalSurfaceHeight = { _, _ -> 41 },
+            externalBlockState = { _, y, _ ->
+                when (y) {
+                    40 -> Blocks.DIRT.stateId
+                    41 -> Blocks.SEAGRASS.stateId
+                    else -> Blocks.AIR.stateId
+                }
+            },
+        )
+
+        assertTrue(
+            (0 until 16).any { z -> (0 until 16).any { x -> chunk.getBlockStateId(x, 40, z) == stateId("clay") } },
+        )
+    }
+
+    @Test
+    fun infestedOreMatchesOfficialUndergroundDecorationVectors() {
+        val stone = solidChunk(Blocks.STONE.stateId)
+        OverworldOreDecoration.decorateInfested(stone, 1234L, environment("windswept_hills")) { _, y, _ ->
+            if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) Blocks.STONE.stateId else Blocks.AIR.stateId
+        }
+        val (stoneHash, stoneCounts) = infestedVector(stone, "stone")
+        assertContentEquals(intArrayOf(98210, 94, 0), stoneCounts)
+        assertEquals(3505126642845752643L, stoneHash)
+
+        val deepslate = solidChunk(stateId("deepslate"))
+        OverworldOreDecoration.decorateInfested(deepslate, 1234L, environment("windswept_hills")) { _, y, _ ->
+            if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) stateId("deepslate") else Blocks.AIR.stateId
+        }
+        val (deepslateHash, deepslateCounts) = infestedVector(deepslate, "deepslate")
+        assertContentEquals(intArrayOf(98210, 0, 94), deepslateCounts)
+        assertEquals(8683730351028714117L, deepslateHash)
+
+        val plains = solidChunk(Blocks.STONE.stateId)
+        OverworldOreDecoration.decorateInfested(plains, 1234L, plainsEnvironment)
+        assertContentEquals(intArrayOf(98304, 0, 0), infestedVector(plains, "stone").second)
+    }
+
+    @Test
     fun sameSeedAndChunkAreDeterministic() {
         val first = solidStoneChunk()
         val second = solidStoneChunk()
@@ -243,6 +336,30 @@ class OverworldOreDecorationTest {
     }
 
     private fun solidStoneChunk(): Chunk = solidChunk(Blocks.STONE.stateId)
+
+    private fun localFeatureChunk(mangrove: Boolean): Chunk =
+        Chunk(0, 0).also { chunk ->
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                        val stateId = localFeatureState(y, mangrove)
+                        if (!Blocks.isAir(stateId)) chunk.setBlockStateId(x, y, z, stateId)
+                    }
+                }
+            }
+        }
+
+    private fun localFeatureState(
+        y: Int,
+        mangrove: Boolean,
+    ): Int =
+        when {
+            y == 40 -> if (mangrove) stateId("mud") else Blocks.DIRT.stateId
+            y in 41..62 -> Blocks.WATER.stateId
+            y < 40 && (y + 60).mod(8) >= 4 -> Blocks.WATER.stateId
+            y < 41 -> Blocks.STONE.stateId
+            else -> Blocks.AIR.stateId
+        }
 
     private fun solidChunk(stateId: Int): Chunk =
         Chunk(0, 0).also { chunk ->
@@ -286,6 +403,47 @@ class OverworldOreDecorationTest {
             )
         val categories = paths.map(::stateId).withIndex().associate { it.value to it.index }
         val counts = IntArray(paths.size)
+        var hash = 1L
+        for (z in 0 until 16) {
+            for (x in 0 until 16) {
+                for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                    val category = categories[chunk.getBlockStateId(x, y, z)] ?: -1
+                    hash = 31L * hash + category
+                    if (category >= 0) counts[category]++
+                }
+            }
+        }
+        return hash to counts
+    }
+
+    private fun localFeatureVector(chunk: Chunk): Pair<Long, IntArray> {
+        val paths =
+            listOf("stone", "dirt", "water", "magma_block", "sand", "sandstone", "clay", "gravel", "grass_block", "mud")
+        val categories = paths.map(::stateId).withIndex().associate { it.value to it.index }
+        val counts = IntArray(paths.size)
+        var hash = 1L
+        for (z in 0 until 16) {
+            for (x in 0 until 16) {
+                for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                    val category = categories[chunk.getBlockStateId(x, y, z)] ?: -1
+                    hash = 31L * hash + category
+                    if (category >= 0) counts[category]++
+                }
+            }
+        }
+        return hash to counts
+    }
+
+    private fun infestedVector(
+        chunk: Chunk,
+        baseBlock: String,
+    ): Pair<Long, IntArray> {
+        val categories =
+            listOf(baseBlock, "infested_stone", "infested_deepslate")
+                .map(::stateId)
+                .withIndex()
+                .associate { it.value to it.index }
+        val counts = IntArray(categories.size)
         var hash = 1L
         for (z in 0 until 16) {
             for (x in 0 until 16) {
@@ -355,6 +513,12 @@ class OverworldOreDecorationTest {
         }
 
     private data class BiomeVector(
+        val biome: String,
+        val hash: Long,
+        val counts: IntArray,
+    )
+
+    private data class LocalFeatureVector(
         val biome: String,
         val hash: Long,
         val counts: IntArray,

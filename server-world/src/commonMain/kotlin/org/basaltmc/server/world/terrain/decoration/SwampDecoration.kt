@@ -16,12 +16,30 @@ import org.basaltmc.wire.common.Identifier
  * see [SimpleBlockFeature]'s own KDoc).
  */
 public object SwampDecoration : BiomeVegetalDecoration {
-    /** `patch_grass_normal`+`patch_dead_bush`+`patch_waterlily`, without the blue-orchid flower: real `mangrove_swamp` shares exactly this ground cover, not the flower. */
+    /** `patch_waterlily` only, for the exact world pipeline after dead-bush seeding. */
+    public val WATERLILY: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeWaterlily(chunk, random)
+        }
+
+    /** `flower_swamp` only, after dead bushes and waterlilies moved to independent seeds. */
+    public val FLOWER_ONLY: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeFlower(chunk, random)
+        }
+
+    /** `flower_swamp` and `patch_waterlily`, without the independently seeded dead-bush patch. */
+    public val WITHOUT_DEAD_BUSH: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeFlower(chunk, random)
+            WATERLILY.decorate(chunk, random)
+        }
+
+    /** Legacy direct component for `patch_dead_bush` plus `patch_waterlily`, without the flower. */
     public val GROUND_COVER: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
-            placeGrass(chunk, random)
             placeDeadBush(chunk, random)
-            placeWaterlily(chunk, random)
+            WATERLILY.decorate(chunk, random)
         }
 
     override fun decorate(
@@ -47,27 +65,6 @@ public object SwampDecoration : BiomeVegetalDecoration {
                 HeightmapPlacement,
                 CountPlacement(64),
                 RandomOffsetPlacement(xzSpread = 6, ySpread = 2),
-                AirTargetFilter(),
-            ),
-            feature,
-        )
-    }
-
-    // parity: placed_feature/patch_grass_normal.json.
-    private fun placeGrass(
-        chunk: Chunk,
-        random: WorldgenRandom,
-    ) {
-        val feature = SimpleBlockFeature({ _, _ -> shortGrassStateId })
-        runPipeline(
-            chunk,
-            random,
-            listOf(
-                CountPlacement(5),
-                InSquarePlacement,
-                HeightmapPlacement,
-                CountPlacement(32),
-                RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
                 AirTargetFilter(),
             ),
             feature,
@@ -129,8 +126,6 @@ public object SwampDecoration : BiomeVegetalDecoration {
 
     private val blueOrchidStateId =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla("blue_orchid"))?.stateId ?: error("unknown block 'blue_orchid'")
-    private val shortGrassStateId =
-        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_grass"))?.stateId ?: error("unknown block 'short_grass'")
     private val deadBushStateId =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dead_bush"))?.stateId ?: error("unknown block 'dead_bush'")
     private val lilyPadStateId =

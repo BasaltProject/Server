@@ -1,28 +1,49 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
+import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.Identifier
 
 /** // parity: BambooFeature and the bamboo/bamboo_light placed features. */
 public object BambooDecoration {
+    private val LIGHT_MODIFIERS = listOf(RarityFilter(4), InSquarePlacement, HeightmapPlacement)
+    private val DENSE_MODIFIERS =
+        listOf(
+            NoiseBasedCountPlacement(noiseToCountRatio = 160, noiseFactor = 80.0, noiseOffset = 0.3),
+            InSquarePlacement,
+            HeightmapPlacement(Chunk.HeightmapType.WORLD_SURFACE),
+        )
+
+    public fun decorate(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
+        blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)? = null,
+    ) {
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        val region = BambooRegion(chunk, externalBlockState, blockWriteObserver)
+        random.setFeatureSeed(decorationSeed, BAMBOO_INDEX, VEGETAL_DECORATION_STEP)
+        decorateFeature(chunk, region, random, DENSE_MODIFIERS, 0.2f, environment, "bamboo_jungle")
+        random.setFeatureSeed(decorationSeed, BAMBOO_LIGHT_INDEX, VEGETAL_DECORATION_STEP)
+        decorateFeature(chunk, region, random, LIGHT_MODIFIERS, 0.0f, environment, "jungle")
+    }
+
     public val LIGHT: BiomeVegetalDecoration =
         feature(
             podzolProbability = 0.0f,
-            modifiers = listOf(RarityFilter(4), InSquarePlacement, HeightmapPlacement),
+            modifiers = LIGHT_MODIFIERS,
         )
 
     public val DENSE: BiomeVegetalDecoration =
         feature(
             podzolProbability = 0.2f,
-            modifiers =
-                listOf(
-                    NoiseBasedCountPlacement(noiseToCountRatio = 160, noiseFactor = 80.0, noiseOffset = 0.3),
-                    InSquarePlacement,
-                    HeightmapPlacement(Chunk.HeightmapType.WORLD_SURFACE),
-                ),
+            modifiers = DENSE_MODIFIERS,
         )
 
     private fun feature(
@@ -30,20 +51,51 @@ public object BambooDecoration {
         modifiers: List<PlacementModifier>,
     ): BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
-            val context = PlacementContext(chunk)
-            var positions: Sequence<DecorationPos> =
-                sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-            for (modifier in modifiers) positions = positions.flatMap { modifier.getPositions(context, random, it) }
-            positions.forEach { origin -> place(chunk, random, origin, podzolProbability) }
+            decorateFeature(
+                chunk,
+                BambooRegion(chunk, null, null),
+                random,
+                modifiers,
+                podzolProbability,
+                environment = null,
+                requiredBiome = null,
+            )
         }
 
-    private fun place(
+    private fun decorateFeature(
         chunk: Chunk,
+        region: BambooRegion,
+        random: WorldgenRandom,
+        modifiers: List<PlacementModifier>,
+        podzolProbability: Float,
+        environment: SurfaceRuleEnvironment?,
+        requiredBiome: String?,
+    ) {
+        val context = PlacementContext(chunk)
+        var positions: Sequence<DecorationPos> =
+            sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
+        for (modifier in modifiers) positions = positions.flatMap { modifier.getPositions(context, random, it) }
+        positions.forEach { origin ->
+            if (requiredBiome == null ||
+                environment?.biomeAt(origin.x, origin.y, origin.z)?.substringAfter(':') == requiredBiome
+            ) {
+                place(region, random, origin, podzolProbability)
+            }
+        }
+    }
+
+    private fun place(
+        region: BambooRegion,
         random: WorldgenRandom,
         origin: DecorationPos,
         podzolProbability: Float,
     ) {
-        if (!origin.inWorld() || !Blocks.isAir(chunk.blockAt(origin)) || !canBambooSurvive(chunk, origin)) return
+        if (!origin.inWorld() ||
+            !Blocks.isAir(region.get(origin) ?: return) ||
+            !canBambooSurvive(region, origin)
+        ) {
+            return
+        }
 
         val height = random.nextInt(12) + 5
         if (random.nextFloat() < podzolProbability) {
@@ -53,10 +105,10 @@ public object BambooDecoration {
                     val dx = x - origin.x
                     val dz = z - origin.z
                     if (dx * dx + dz * dz <= radius * radius) {
-                        val surfaceY = chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.WORLD_SURFACE) - 1
+                        val surfaceY = region.worldSurfaceHeight(x, z) - 1
                         val surface = DecorationPos(x, surfaceY, z)
-                        if (surface.inWorld() && chunk.blockAt(surface) in PODZOL_REPLACEABLE) {
-                            chunk.setBlock(surface, Blocks.PODZOL.stateId)
+                        if (surface.inWorld() && region.get(surface)?.let { it in PODZOL_REPLACEABLE } == true) {
+                            region.set(surface, Blocks.PODZOL.stateId)
                         }
                     }
                 }
@@ -65,22 +117,26 @@ public object BambooDecoration {
 
         var pos = origin
         var placed = 0
-        while (placed < height && pos.inWorld() && Blocks.isAir(chunk.blockAt(pos))) {
-            chunk.setBlock(pos, Blocks.BAMBOO.stateId)
+        while (placed < height && pos.inWorld() && region.get(pos)?.let(Blocks::isAir) == true) {
+            region.set(pos, BAMBOO_TRUNK_STATE_ID)
             pos = pos.up()
             placed++
         }
         if (placed >= 3 && pos.inWorld()) {
-            chunk.setBlock(pos, Blocks.BAMBOO.stateId)
-            chunk.setBlock(pos.down(), Blocks.BAMBOO.stateId)
-            chunk.setBlock(pos.down(2), Blocks.BAMBOO.stateId)
+            region.set(pos, BAMBOO_FINAL_LARGE_STATE_ID)
+            region.set(pos.down(), BAMBOO_TOP_LARGE_STATE_ID)
+            region.set(pos.down(2), BAMBOO_TOP_SMALL_STATE_ID)
         }
     }
 
     private fun canBambooSurvive(
-        chunk: Chunk,
+        region: BambooRegion,
         origin: DecorationPos,
-    ): Boolean = origin.y > WorldHeight.MIN_Y && chunk.blockAt(origin.down()) in SUPPORTS_BAMBOO
+    ): Boolean =
+        origin.y > WorldHeight.MIN_Y &&
+            region.get(origin.down())?.let { stateId ->
+                stateId in SUPPORTS_BAMBOO || Blocks.byStateId(stateId)?.block == Blocks.BAMBOO.block
+            } == true
 
     private fun DecorationPos.inWorld(): Boolean = y in WorldHeight.MIN_Y..WorldHeight.MAX_Y
 
@@ -88,13 +144,75 @@ public object BambooDecoration {
 
     private fun DecorationPos.down(distance: Int = 1): DecorationPos = DecorationPos(x, y - distance, z)
 
-    private fun Chunk.blockAt(pos: DecorationPos): Int = getBlockStateId(pos.x and 15, pos.y, pos.z and 15)
-
-    private fun Chunk.setBlock(
-        pos: DecorationPos,
-        stateId: Int,
+    private class BambooRegion(
+        private val chunk: Chunk,
+        private val externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)?,
+        private val blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)?,
     ) {
-        setBlockStateId(pos.x and 15, pos.y, pos.z and 15, stateId)
+        private val externalWrites = HashMap<DecorationPos, Int>()
+        private val externalWorldSurfaceHeights = HashMap<Pair<Int, Int>, Int>()
+        private val localWorldSurfaceHeights = chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)
+
+        fun get(position: DecorationPos): Int? =
+            when {
+                position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y -> Blocks.AIR.stateId
+                position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ ->
+                    chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
+                else ->
+                    externalWrites[position] ?: externalBlockState?.invoke(position.x, position.y, position.z)
+                        ?: Blocks.AIR.stateId
+            }
+
+        fun set(
+            position: DecorationPos,
+            stateId: Int,
+        ) {
+            if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
+            if (position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ) {
+                chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
+                val column = (position.x and 15) + (position.z and 15) * 16
+                if (!Blocks.isAir(stateId) && position.y + 1 > localWorldSurfaceHeights[column]) {
+                    localWorldSurfaceHeights[column] = position.y + 1
+                }
+            } else {
+                externalWrites[position] = stateId
+                val column = position.x to position.z
+                val currentHeight =
+                    externalWorldSurfaceHeights[column] ?: scanExternalWorldSurface(position.x, position.z)
+                externalWorldSurfaceHeights[column] =
+                    when {
+                        !Blocks.isAir(stateId) && position.y + 1 > currentHeight -> position.y + 1
+                        position.y + 1 == currentHeight && Blocks.isAir(stateId) ->
+                            scanExternalWorldSurface(position.x, position.z)
+                        else -> currentHeight
+                    }
+            }
+            blockWriteObserver?.invoke(position.x, position.y, position.z, stateId)
+        }
+
+        fun worldSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int {
+            if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
+                return localWorldSurfaceHeights[(x and 15) + (z and 15) * 16]
+            }
+            return externalWorldSurfaceHeights[x to z] ?: scanExternalWorldSurface(x, z).also {
+                externalWorldSurfaceHeights[x to z] = it
+            }
+        }
+
+        private fun scanExternalWorldSurface(
+            x: Int,
+            z: Int,
+        ): Int {
+            for (y in WorldHeight.MAX_Y downTo WorldHeight.MIN_Y) {
+                val position = DecorationPos(x, y, z)
+                val stateId = externalWrites[position] ?: externalBlockState?.invoke(x, y, z) ?: Blocks.AIR.stateId
+                if (!Blocks.isAir(stateId)) return y + 1
+            }
+            return WorldHeight.MIN_Y
+        }
     }
 
     private val PODZOL_REPLACEABLE =
@@ -128,4 +246,12 @@ public object BambooDecoration {
             .map { name ->
                 Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
             }.toSet()
+
+    private const val BAMBOO_INDEX = 2
+    private const val BAMBOO_LIGHT_INDEX = 6
+    private const val VEGETAL_DECORATION_STEP = 9
+    private val BAMBOO_TRUNK_STATE_ID = Blocks.BAMBOO.stateId + 6
+    private val BAMBOO_TOP_SMALL_STATE_ID = Blocks.BAMBOO.stateId + 8
+    private val BAMBOO_TOP_LARGE_STATE_ID = Blocks.BAMBOO.stateId + 10
+    private val BAMBOO_FINAL_LARGE_STATE_ID = Blocks.BAMBOO.stateId + 11
 }
