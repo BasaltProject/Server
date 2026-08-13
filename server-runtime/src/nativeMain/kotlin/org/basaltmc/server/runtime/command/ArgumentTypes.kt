@@ -16,6 +16,159 @@ public object WordArgument : ArgumentType<String> {
     ): String = reader.readString()
 }
 
+/** `brigadier:bool`, which accepts exactly `true` and `false`. */
+public object BoolArgument : ArgumentType<Boolean> {
+    override val wire: ArgumentParser = ArgumentParser.BrigadierBool
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Boolean {
+        val start = reader.cursor
+        val word = reader.readUnquotedString()
+        return word.toBooleanStrictOrNull() ?: run {
+            reader.cursor = start
+            throw reader.syntaxError(
+                if (word.isEmpty()) "Expected bool" else "Invalid boolean, expected true or false but found '$word'",
+            )
+        }
+    }
+}
+
+/** `brigadier:double`, bounded the way the command that declares it needs. */
+public class DoubleArgument(
+    private val min: Double = -Double.MAX_VALUE,
+    private val max: Double = Double.MAX_VALUE,
+) : ArgumentType<Double> {
+    override val wire: ArgumentParser = ArgumentParser.BrigadierDouble(min, max)
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Double {
+        val start = reader.cursor
+        val value = reader.readDouble()
+        if (value < min) {
+            reader.cursor = start
+            throw reader.syntaxError("Double must not be less than $min, found $value")
+        }
+        if (value > max) {
+            reader.cursor = start
+            throw reader.syntaxError("Double must not be more than $max, found $value")
+        }
+        return value
+    }
+}
+
+/** `brigadier:float`, bounded the way the command that declares it needs. */
+public class FloatArgument(
+    private val min: Float = -Float.MAX_VALUE,
+    private val max: Float = Float.MAX_VALUE,
+) : ArgumentType<Float> {
+    override val wire: ArgumentParser = ArgumentParser.BrigadierDouble(min.toDouble(), max.toDouble())
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Float {
+        val start = reader.cursor
+        val value = reader.readDouble().toFloat()
+        if (value < min) {
+            reader.cursor = start
+            throw reader.syntaxError("Float must not be less than $min, found $value")
+        }
+        if (value > max) {
+            reader.cursor = start
+            throw reader.syntaxError("Float must not be more than $max, found $value")
+        }
+        return value
+    }
+}
+
+/** `minecraft:angle`: one yaw in degrees, absolute or relative to whoever is being pointed. */
+public object AngleArgument : ArgumentType<Float> {
+    override val wire: ArgumentParser = ArgumentParser.Angle
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Float {
+        if (!reader.canRead()) throw reader.syntaxError("Expected angle")
+        val relative = reader.peek() == '~'
+        if (relative) reader.skip()
+        val value = if (reader.canRead() && reader.peek() != ' ') reader.readDouble().toFloat() else 0f
+        // parity: `AngleArgument` wraps into -180..180 rather than rejecting 540.
+        return value.mod(360f).let { if (it >= 180f) it - 360f else it }
+    }
+}
+
+/** `minecraft:rotation`: a `yaw pitch` pair, each absolute or relative. */
+public object RotationArgument : ArgumentType<Pair<Float, Float>> {
+    override val wire: ArgumentParser = ArgumentParser.Rotation
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Pair<Float, Float> {
+        val start = reader.cursor
+        val yaw = AngleArgument.parse(reader, source, environment)
+        if (!reader.canRead() || reader.peek() != ' ') {
+            reader.cursor = start
+            throw CommandSyntaxException(Component.translatable("argument.rotation.incomplete"), reader.string, start)
+        }
+        reader.skip()
+        val pitch = AngleArgument.parse(reader, source, environment)
+        return yaw to pitch
+    }
+}
+
+/**
+ * `minecraft:time`: a tick count, or a number with a unit (`10s`, `2d`, `40t`).
+ *
+ * parity: `TimeArgument`, whose units are ticks, seconds (20) and days (24000), and which rounds
+ * the product down rather than to nearest.
+ */
+public class TimeArgument(
+    private val min: Int = 0,
+) : ArgumentType<Int> {
+    override val wire: ArgumentParser = ArgumentParser.Time(min)
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Int {
+        val start = reader.cursor
+        val value = reader.readDouble()
+        val unit = if (reader.canRead() && reader.peek() in "dst") reader.read() else 't'
+        val multiplier =
+            when (unit) {
+                'd' -> 24000
+                's' -> 20
+                else -> 1
+            }
+        val ticks = (value * multiplier).toInt()
+        if (ticks < min) {
+            reader.cursor = start
+            throw CommandSyntaxException(
+                Component.translatable(
+                    "argument.time.tick_count_too_low",
+                    Component.text(min.toString()),
+                    Component.text(ticks.toString()),
+                ),
+                reader.string,
+                reader.cursor,
+            )
+        }
+        return ticks
+    }
+}
+
 /** Everything left on the line, `brigadier:string` in its `GREEDY_PHRASE` form. */
 public object GreedyStringArgument : ArgumentType<String> {
     override val wire: ArgumentParser =
