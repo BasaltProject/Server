@@ -4,6 +4,7 @@ import org.basaltmc.wire.common.timings.TickDurations
 import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.sleepMillis
 import kotlin.concurrent.AtomicInt
+import kotlin.concurrent.AtomicLong
 import kotlin.concurrent.AtomicReference
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
@@ -48,6 +49,54 @@ public class TickLoop(
     /** How many ticks a second the loop is actually managing, over one, five and fifteen minutes. */
     public val tickRates: TickRates get() = rates.value
 
+    /**
+     * `/tick` state: the rate asked for, whether the loop is frozen, and how many ticks a frozen
+     * loop still owes. parity: `ServerTickRateManager`.
+     *
+     * Frozen means the loop keeps running at its own pace but does no work, so connections and
+     * chunk streaming carry on: that is what vanilla's freeze does too, and it is why a frozen
+     * server still answers a `/tick unfreeze`.
+     */
+    private val targetRate = AtomicReference(TICKS_PER_SECOND.toFloat())
+    private val frozen = AtomicInt(0)
+    private val stepsOwed = AtomicInt(0)
+    private val ticksCounted = AtomicLong(0L)
+    private val sprintTicksLeft = AtomicInt(0)
+
+    public val tickRate: Float get() = targetRate.value
+    public val isFrozen: Boolean get() = frozen.value == 1
+    public val isSprinting: Boolean get() = sprintTicksLeft.value > 0
+
+    public fun setTickRate(rate: Float) {
+        targetRate.value = rate.coerceIn(MIN_TICK_RATE, MAX_TICK_RATE)
+    }
+
+    public fun setFrozen(value: Boolean) {
+        frozen.value = if (value) 1 else 0
+        if (!value) stepsOwed.value = 0
+    }
+
+    /** Ticks run since the loop started, which is what `/debug stop` reports over its window. */
+    public val ticksRun: Long get() = ticksCounted.value
+
+    /** Runs [ticks] ticks while frozen. Returns false when the loop is not frozen, as vanilla does. */
+    public fun step(ticks: Int): Boolean {
+        if (frozen.value != 1) return false
+        stepsOwed.value = ticks
+        return true
+    }
+
+    /** Runs [ticks] ticks as fast as they will go, ignoring the rate. Returns the ticks left to run. */
+    public fun sprint(ticks: Int) {
+        sprintTicksLeft.value = ticks
+    }
+
+    public fun stopSprinting(): Boolean {
+        if (sprintTicksLeft.value <= 0) return false
+        sprintTicksLeft.value = 0
+        return true
+    }
+
     public fun start() {
         running.value = 1
         if (saveIntervalTicks > 0) startSweeper()
@@ -58,8 +107,14 @@ public class TickLoop(
             var nextTickMillis = 0L
             while (running.value == 1) {
                 val started = TimeSource.Monotonic.markNow()
+                val sprinting = sprintTicksLeft.value > 0
+                val stepping = stepsOwed.value > 0
+                val skip = frozen.value == 1 && !stepping
+                if (stepping) stepsOwed.value = stepsOwed.value - 1
+                if (sprinting) sprintTicksLeft.value = sprintTicksLeft.value - 1
                 tick++
-                onTick()
+                ticksCounted.value = tick
+                if (!skip) onTick()
                 if (saveIntervalTicks > 0 && tick % saveIntervalTicks == 0L) sweepRequested.value = 1
 
                 // Recorded before the sleep, so it is the work that is measured and not the wait.
@@ -71,7 +126,12 @@ public class TickLoop(
                 // overshoots by a millisecond or two every tick and never gets it back: measured, that
                 // drift alone held an idle server at 17 TPS. Counting deadlines from the start makes
                 // an overshoot cost that tick and not the ones after it.
-                nextTickMillis += TICK_MILLIS
+                // A sprint runs flat out, so the deadline follows the work rather than the clock.
+                if (sprinting) {
+                    nextTickMillis = clock.elapsedNow().inWholeMilliseconds
+                    continue
+                }
+                nextTickMillis += (MILLIS_PER_SECOND / targetRate.value).toLong().coerceAtLeast(1L)
                 val remaining = nextTickMillis - clock.elapsedNow().inWholeMilliseconds
                 if (remaining > 0) {
                     sleepMillis(remaining)
@@ -164,6 +224,11 @@ public class TickLoop(
 
     public companion object {
         public const val TICK_MILLIS: Long = 50L
+
+        /** parity: the bounds `/tick rate` accepts. */
+        public const val MIN_TICK_RATE: Float = 1f
+        public const val MAX_TICK_RATE: Float = 10000f
+        private const val MILLIS_PER_SECOND = 1000f
         public const val TICKS_PER_SECOND: Long = 20L
 
         /** How many ticks behind the loop tolerates before it stops trying to catch up. */

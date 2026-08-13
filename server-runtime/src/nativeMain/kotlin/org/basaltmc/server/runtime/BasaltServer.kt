@@ -3,28 +3,96 @@ package org.basaltmc.server.runtime
 import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.CommandEnvironment
+import org.basaltmc.server.runtime.command.ConsoleCommandSource
+import org.basaltmc.server.runtime.command.commands.AdvancementCommand
+import org.basaltmc.server.runtime.command.commands.AttributeCommand
+import org.basaltmc.server.runtime.command.commands.BanCommand
+import org.basaltmc.server.runtime.command.commands.BanIpCommand
+import org.basaltmc.server.runtime.command.commands.BanListCommand
+import org.basaltmc.server.runtime.command.commands.BossBarCommand
+import org.basaltmc.server.runtime.command.commands.BossBarRegistry
+import org.basaltmc.server.runtime.command.commands.CommandStorage
+import org.basaltmc.server.runtime.command.commands.DamageCommand
+import org.basaltmc.server.runtime.command.commands.DataAccess
+import org.basaltmc.server.runtime.command.commands.DataCommand
+import org.basaltmc.server.runtime.command.commands.DataPackCommand
+import org.basaltmc.server.runtime.command.commands.DebugCommand
+import org.basaltmc.server.runtime.command.commands.DialogCommand
+import org.basaltmc.server.runtime.command.commands.EnchantCommand
+import org.basaltmc.server.runtime.command.commands.ExecuteCommand
+import org.basaltmc.server.runtime.command.commands.FetchProfileCommand
+import org.basaltmc.server.runtime.command.commands.FillBiomeCommand
+import org.basaltmc.server.runtime.command.commands.ForceLoadCommand
+import org.basaltmc.server.runtime.command.commands.FunctionCommand
+import org.basaltmc.server.runtime.command.commands.FunctionRunner
+import org.basaltmc.server.runtime.command.commands.FunctionSchedule
+import org.basaltmc.server.runtime.command.commands.ItemCommand
+import org.basaltmc.server.runtime.command.commands.JfrCommand
+import org.basaltmc.server.runtime.command.commands.LocateCommand
+import org.basaltmc.server.runtime.command.commands.LootCommand
+import org.basaltmc.server.runtime.command.commands.PardonCommand
+import org.basaltmc.server.runtime.command.commands.ParticleCommand
+import org.basaltmc.server.runtime.command.commands.PerfCommand
+import org.basaltmc.server.runtime.command.commands.PlaceCommand
+import org.basaltmc.server.runtime.command.commands.PublishCommand
+import org.basaltmc.server.runtime.command.commands.RandomCommand
+import org.basaltmc.server.runtime.command.commands.RecipeCommand
 import org.basaltmc.server.runtime.command.commands.ReloadCommand
 import org.basaltmc.server.runtime.command.commands.RestartCommand
+import org.basaltmc.server.runtime.command.commands.ReturnCommand
+import org.basaltmc.server.runtime.command.commands.RideCommand
+import org.basaltmc.server.runtime.command.commands.RotateCommand
+import org.basaltmc.server.runtime.command.commands.SaveAllCommand
+import org.basaltmc.server.runtime.command.commands.SaveControl
+import org.basaltmc.server.runtime.command.commands.SaveOffCommand
+import org.basaltmc.server.runtime.command.commands.SaveOnCommand
+import org.basaltmc.server.runtime.command.commands.ScheduleCommand
+import org.basaltmc.server.runtime.command.commands.ScoreboardCommand
+import org.basaltmc.server.runtime.command.commands.SetIdleTimeoutCommand
+import org.basaltmc.server.runtime.command.commands.SpawnPointCommand
+import org.basaltmc.server.runtime.command.commands.SpectateCommand
+import org.basaltmc.server.runtime.command.commands.SpreadPlayersCommand
+import org.basaltmc.server.runtime.command.commands.SummonCommand
+import org.basaltmc.server.runtime.command.commands.SwingCommand
+import org.basaltmc.server.runtime.command.commands.TeamCommand
+import org.basaltmc.server.runtime.command.commands.TeamMsgCommand
+import org.basaltmc.server.runtime.command.commands.TestCommand
+import org.basaltmc.server.runtime.command.commands.TickCommand
 import org.basaltmc.server.runtime.command.commands.TimingsCommand
+import org.basaltmc.server.runtime.command.commands.TransferCommand
+import org.basaltmc.server.runtime.command.commands.TriggerCommand
+import org.basaltmc.server.runtime.command.commands.WaypointCommand
+import org.basaltmc.server.runtime.command.commands.WhitelistCommand
+import org.basaltmc.server.runtime.command.commands.WorldBorderCommand
 import org.basaltmc.server.runtime.command.registerVanillaCommands
 import org.basaltmc.server.runtime.config.BasaltConfig
 import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
+import org.basaltmc.server.runtime.function.FunctionLibrary
 import org.basaltmc.server.runtime.placeholder.AnimationPlaceholders
 import org.basaltmc.server.runtime.placeholder.PlayerPlaceholders
 import org.basaltmc.server.runtime.placeholder.ServerFacts
 import org.basaltmc.server.runtime.placeholder.ServerPlaceholders
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.PlayerRegistry
+import org.basaltmc.server.runtime.scoreboard.Scoreboard
+import org.basaltmc.server.runtime.scoreboard.Teams
 import org.basaltmc.server.runtime.timings.ReportSources
 import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.PlayerProgress
+import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealBlockTags
+import org.basaltmc.server.runtime.world.RealDialogs
+import org.basaltmc.server.runtime.world.RealEnchantments
 import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
+import org.basaltmc.server.runtime.world.RealTestInstances
+import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
 import org.basaltmc.server.runtime.world.WorldMetadata
@@ -96,6 +164,17 @@ public class BasaltServer(
     private val recipes = RealRecipes(serverJar)
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
+    private val advancements = RealAdvancements(serverJar)
+    private val enchantments = RealEnchantments(serverJar)
+    private val dialogs = RealDialogs(serverJar)
+    private val timelines = RealTimelines(serverJar)
+    private val testInstances = RealTestInstances(serverJar)
+
+    /** Structure files, loaded on demand: what `/place template` puts down. */
+    private val structureTemplates = StructureTemplates(serverJar)
+
+    /** What each player has been granted or taught, for the run. See [PlayerProgress]. */
+    private val playerProgress = PlayerProgress()
 
     /**
      * What `/timings` measures. Off until asked for: a clock read per section per call is small but
@@ -194,7 +273,7 @@ public class BasaltServer(
         TickLoop(
             defaultWorld.settings.saveIntervalSeconds,
             durations = tickDurations,
-            onSaveInterval = { timings.of("tick.save").time { persistAndUnload() } },
+            onSaveInterval = { timings.of("tick.save").time { if (saveControl.enabled) persistAndUnload() } },
             onTick = ::tickWorlds,
         )
 
@@ -234,6 +313,59 @@ public class BasaltServer(
             )
         }
 
+    /** Objectives and scores, shared by `/scoreboard` and `/trigger`. */
+    public val scoreboard: Scoreboard = Scoreboard()
+
+    /** The one report `/timings`, `/debug` and `/perf` all write, so they cannot disagree. */
+    private val timingsReport: TimingsReport by lazy {
+        TimingsReport(
+            timings,
+            tickDurations,
+            ReportSources(
+                versionName = BuildInfo.MINECRAFT_VERSION,
+                protocolVersion = BuildInfo.PROTOCOL_VERSION,
+                uptimeSeconds = { serverClock.elapsedNow().inWholeSeconds },
+                onlinePlayers = { playerRegistry.snapshot().size },
+                maxPlayers = { config.maxPlayers },
+                loadedChunks = { worlds.values.sumOf { world -> world.state.loadedChunkCount } },
+                regionCacheBytes = { worlds.values.sumOf { it.regions.cachedRegionBytes } },
+                worldCount = { worlds.size },
+                cpuPercent = cpuMeter::percent,
+                liveHeapBytes = { liveHeapBytes() },
+            ),
+        )
+    }
+
+    /** Functions from `datapacks/`, reloaded by `/reload` along with the configuration files. */
+    public val functions: FunctionLibrary = FunctionLibrary().also { it.reload() }
+
+    private val functionRunner = FunctionRunner(functions)
+    private val functionSchedule = FunctionSchedule()
+
+    /** Who a scheduled function runs as: the console, which is what vanilla uses for the same job. */
+    private val consoleSource = ConsoleCommandSource(logger, lang)
+
+    /** Named NBT compounds `/data ... storage` keeps, read back from disk at startup. */
+    public val commandStorage: CommandStorage = CommandStorage().also { it.load() }
+
+    /** Teams, shared by `/team` and `/teammsg`. */
+    public val teams: Teams = Teams()
+
+    /** The `/bossbar` bars this server knows, shown to whoever joins and is named by one. */
+    public val bossBars: BossBarRegistry = BossBarRegistry()
+
+    /** `/save-off` stops the periodic sweep; `/save-all` runs one on demand. */
+    private val saveControl: SaveControl = SaveControl(::persistAndUnload)
+
+    /** What `/setidletimeout` last set. Recorded and reported; nothing disconnects on it yet. */
+    private var idleTimeoutMinutes: Int = 0
+
+    /**
+     * Whether the whitelist is enforced right now. `/whitelist on` moves it for this run;
+     * `server.toml` decides what it starts as, so a restart follows the file again.
+     */
+    private var whitelistEnforced: Boolean = config.whitelist
+
     public val commands: CommandDispatcher =
         CommandDispatcher(
             CommandEnvironment(
@@ -245,36 +377,89 @@ public class BasaltServer(
                 lang = lang,
                 defaultWorldName = defaultWorld.name,
                 playerRepository = playerStore.players,
+                access = playerStore.access,
                 worlds = worlds,
                 placeholders = placeholders,
                 commandsProvider = { live.current.commands },
                 timings = timings,
+                blockTagMembers = { tag -> blockTags.membersOf(tag.toString()).ifEmpty { null } },
+                itemTagMembers = { tag -> itemTags.membersOf(tag.toString()).ifEmpty { null } },
             ),
         ).also(::registerVanillaCommands)
-            .also { it.register(ReloadCommand(live, ::onConfigsReloaded)) }
+            .also { it.register(ReloadCommand(live, ::onConfigsReloaded, functions::reload)) }
             .also { it.register(RestartCommand(::requestRestart)) }
+            .also { it.register(BossBarCommand(bossBars)) }
+            .also { it.register(ScoreboardCommand(scoreboard)) }
+            .also { it.register(TriggerCommand(scoreboard)) }
+            .also { it.register(ExecuteCommand(scoreboard, bossBars, DataAccess(commandStorage))) }
+            .also {
+                it.register(
+                    DebugCommand(
+                        timings,
+                        timingsReport,
+                        nowNanos = { serverClock.elapsedNow().inWholeNanoseconds },
+                        ticksRun = { tickLoop.ticksRun },
+                    ),
+                )
+            }.also { it.register(PerfCommand(timings, timingsReport) { serverClock.elapsedNow().inWholeNanoseconds }) }
+            .also { it.register(JfrCommand(timings)) }
+            .also { it.register(PublishCommand { config.port }) }
+            .also { it.register(FetchProfileCommand(::fetchMojangUuid)) }
+            .also { it.register(FunctionCommand(functions, functionRunner)) }
+            .also { it.register(ReturnCommand(functionRunner)) }
+            .also { it.register(ScheduleCommand(functionSchedule)) }
+            .also { it.register(DataPackCommand(functions)) }
+            .also { it.register(SummonCommand(playerRegistry)) }
+            .also { it.register(DamageCommand()) }
+            .also { it.register(RideCommand()) }
+            .also { it.register(RotateCommand()) }
+            .also { it.register(SwingCommand()) }
+            .also { it.register(AttributeCommand()) }
+            .also { it.register(ParticleCommand()) }
+            .also { it.register(AdvancementCommand(advancements, playerProgress)) }
+            .also { it.register(RecipeCommand(playerProgress, recipes)) }
+            .also { it.register(LocateCommand()) }
+            .also { it.register(WaypointCommand()) }
+            .also { it.register(PlaceCommand(structureTemplates)) }
+            .also { it.register(EnchantCommand(enchantments)) }
+            .also { it.register(DialogCommand(dialogs)) }
+            .also { it.register(TestCommand(testInstances, functionRunner)) }
+            .also { it.register(ItemCommand()) }
+            .also { it.register(LootCommand(lootTables) { worldSeed }) }
+            .also { it.register(FillBiomeCommand()) }
+            .also { it.register(DataCommand(commandStorage)) }
+            .also { it.register(SpawnPointCommand()) }
+            .also { it.register(RandomCommand { worldSeed }) }
+            .also { it.register(TransferCommand()) }
+            .also { it.register(BanCommand()) }
+            .also { it.register(BanIpCommand()) }
+            .also { it.register(BanListCommand()) }
+            .also { it.register(PardonCommand(ip = false)) }
+            .also { it.register(PardonCommand(ip = true)) }
+            .also {
+                it.register(
+                    WhitelistCommand(
+                        enforced = { whitelistEnforced },
+                        setEnforced = { value -> whitelistEnforced = value },
+                    ),
+                )
+            }.also { it.register(WorldBorderCommand()) }
+            .also { it.register(ForceLoadCommand()) }
+            .also { it.register(SpreadPlayersCommand()) }
+            .also { it.register(SpectateCommand()) }
+            .also { it.register(TickCommand(tickLoop, tickDurations) { serverClock.elapsedNow().inWholeNanoseconds }) }
+            .also { it.register(TeamCommand(teams)) }
+            .also { it.register(TeamMsgCommand(teams)) }
+            .also { it.register(SaveAllCommand(saveControl)) }
+            .also { it.register(SaveOffCommand(saveControl)) }
+            .also { it.register(SaveOnCommand(saveControl)) }
+            .also { it.register(SetIdleTimeoutCommand { minutes -> idleTimeoutMinutes = minutes }) }
             .also {
                 it.register(
                     TimingsCommand(
                         timings = timings,
                         tickDurations = tickDurations,
-                        report =
-                            TimingsReport(
-                                timings,
-                                tickDurations,
-                                ReportSources(
-                                    versionName = BuildInfo.MINECRAFT_VERSION,
-                                    protocolVersion = BuildInfo.PROTOCOL_VERSION,
-                                    uptimeSeconds = { serverClock.elapsedNow().inWholeSeconds },
-                                    onlinePlayers = { playerRegistry.snapshot().size },
-                                    maxPlayers = { config.maxPlayers },
-                                    loadedChunks = { worlds.values.sumOf { world -> world.state.loadedChunkCount } },
-                                    regionCacheBytes = { worlds.values.sumOf { it.regions.cachedRegionBytes } },
-                                    worldCount = { worlds.size },
-                                    cpuPercent = cpuMeter::percent,
-                                    liveHeapBytes = { liveHeapBytes() },
-                                ),
-                            ),
+                        report = timingsReport,
                         nowNanos = { serverClock.elapsedNow().inWholeNanoseconds },
                     ),
                 )
@@ -358,7 +543,15 @@ public class BasaltServer(
         // Emitted before the work, not after: if this method ever stops completing, the last thing
         // in the log is where it got to, instead of nothing at all.
         logger.debug { "Sweep starting across ${worlds.size} world(s)." }
-        for (world in worlds.values) world.saveDirty()
+        for (world in worlds.values) {
+            world.saveDirty()
+            // Clock, weather and game rules, which no chunk carries: cheap enough to write on every
+            // sweep, and losing an hour of world time to a crash is worse than one small file write.
+            runCatching { commandStorage.save() }
+                .onFailure { logger.error(it) { "Could not save command storage" } }
+            runCatching { world.saveMetadata() }
+                .onFailure { logger.error(it) { "Could not save level.nbt for world '${world.name}'" } }
+        }
         persistPlayers()
 
         var loaded = 0
@@ -381,6 +574,17 @@ public class BasaltServer(
     }
 
     /**
+     * The UUID Mojang has for a name, or null when there is none or the lookup failed.
+     *
+     * Online mode is not required for this: `/fetchprofile` is how an operator finds out who a name
+     * belongs to before letting them in, which matters most on a server that is not checking.
+     */
+    private fun fetchMojangUuid(name: String): String? =
+        runCatching { MojangProfileLookup.uuidOf(name) }
+            .onFailure { logger.debug { "Profile lookup for '$name' failed: ${it.message}" } }
+            .getOrNull()
+
+    /**
      * Everything the world itself owes per tick, plus the termination check.
      *
      * Dropped-item physics lives here rather than on a connection thread so an item falls at one
@@ -389,11 +593,54 @@ public class BasaltServer(
      * telling clients what moved is each [ClientSession]'s own job.
      */
     private fun tickWorlds() {
+        // Scheduled functions first, so one that changes the world does it before this tick's own
+        // work reads it. parity: vanilla ticks its function timer before the levels.
+        for (id in functionSchedule.tick()) {
+            runCatching { functionRunner.run(commands, consoleSource, id) }
+                .onFailure { logger.error(it) { "Scheduled function '$id' failed" } }
+        }
         for (world in worlds.values) {
             runCatching { world.state.tickItems() }
                 .onFailure { logger.error(it) { "Item tick failed in world '${world.name}'" } }
+            runCatching { tickTime(world) }
+                .onFailure { logger.error(it) { "Time tick failed in world '${world.name}'" } }
+            runCatching { tickBorderDamage(world) }
+                .onFailure { logger.error(it) { "Border damage failed in world '${world.name}'" } }
         }
         shutdownIfSignalled()
+    }
+
+    /**
+     * Hurts whoever has walked outside the border. parity: `ServerPlayer.tick`, which checks every
+     * ten ticks rather than every one, so the damage arrives in visible steps.
+     */
+    private fun tickBorderDamage(world: LoadedWorld) {
+        if (world.gameTime % BORDER_DAMAGE_INTERVAL_TICKS != 0L) return
+        val border = world.border
+        if (border.damagePerBlock <= 0.0) return
+        for (player in playerRegistry.snapshot()) {
+            if (player.worldName != world.name) continue
+            if (player.gamemode == Gamemode.CREATIVE || player.gamemode == Gamemode.SPECTATOR) continue
+            val damage = border.damageAt(player.x, player.z)
+            if (damage <= 0f) continue
+            player.connection.hurt(damage, "outOfWorldBorder")
+        }
+    }
+
+    /**
+     * Advances one world's clock and weather, and tells its players about it once a second.
+     *
+     * parity: vanilla resyncs the clock every 20 ticks rather than every tick, because the client
+     * runs its own between updates; sending 20 packets a second per player would be pure noise.
+     */
+    private fun tickTime(world: LoadedWorld) {
+        val wasRaining = world.weather.raining
+        val wasThundering = world.weather.thundering
+        world.tickTime()
+        if (world.weather.raining != wasRaining || world.weather.thundering != wasThundering) {
+            commands.environment.syncWeather(world)
+        }
+        if (world.gameTime % TIME_SYNC_INTERVAL_TICKS == 0L) commands.environment.syncTime(world)
     }
 
     /**
@@ -505,6 +752,12 @@ public class BasaltServer(
                     timings = timings,
                     lootTables = lootTables,
                     recipes = recipes,
+                    bossBars = bossBars,
+                    whitelistEnforced = { whitelistEnforced },
+                    enchantments = enchantments,
+                    dialogs = dialogs,
+                    timelines = timelines,
+                    progress = playerProgress,
                     blockTags = blockTags,
                     itemTags = itemTags,
                 ).run()
@@ -545,6 +798,12 @@ public class BasaltServer(
 
         // Beside worlds/, never inside one.
         const val PLAYERS_DATABASE = "players.db"
+
+        // parity: vanilla's own clock resync interval, once a second.
+        const val TIME_SYNC_INTERVAL_TICKS = 20L
+
+        // parity: `ServerPlayer.tick` checks the border every ten ticks, not every one.
+        const val BORDER_DAMAGE_INTERVAL_TICKS = 10L
 
         // Beyond the view distance, so a chunk already requested or prefetched by a session is
         // still there when that session gets round to sending it.

@@ -18,6 +18,10 @@ max-players = 80
 online-mode = true
 # Game mode new players join in: survival, creative, adventure or spectator.
 gamemode = "survival"
+# Only let players on the whitelist in. Who is on it is state, not configuration:
+# it lives in players.db and is edited with /whitelist add and /whitelist remove.
+# /whitelist on and off move this for the run; a restart follows this file again.
+whitelist = false
 
 [network]
 # Reserved for future network tuning (compression threshold, rate limits).

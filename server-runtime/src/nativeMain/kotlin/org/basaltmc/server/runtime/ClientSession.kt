@@ -7,6 +7,8 @@ import org.basaltmc.server.registry.ItemTools
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.PlayerCommandSource
+import org.basaltmc.server.runtime.command.commands.BossBarRegistry
+import org.basaltmc.server.runtime.command.timePacket
 import org.basaltmc.server.runtime.placeholder.PlaceholderSlots
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.FoodData
@@ -22,12 +24,19 @@ import org.basaltmc.server.runtime.registry.VanillaTagData
 import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealBlockTags
+import org.basaltmc.server.runtime.world.RealDialogs
+import org.basaltmc.server.runtime.world.RealEnchantments
 import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
+import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.WorldState
+import org.basaltmc.server.runtime.world.WorldWeather
+import org.basaltmc.server.storage.BanKind
 import org.basaltmc.server.storage.PlayerStore
 import org.basaltmc.server.storage.StoredItemStack
 import org.basaltmc.server.storage.StoredPlayer
@@ -58,6 +67,7 @@ import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.protocol.PacketFraming
 import org.basaltmc.wire.protocol.ProtocolState
+import org.basaltmc.wire.protocol.configuration.BrandPacket
 import org.basaltmc.wire.protocol.configuration.ClientInformationPacket
 import org.basaltmc.wire.protocol.configuration.FinishConfigurationPacket
 import org.basaltmc.wire.protocol.configuration.KnownPack
@@ -75,10 +85,12 @@ import org.basaltmc.wire.protocol.login.HelloPacket
 import org.basaltmc.wire.protocol.login.KeyPacket
 import org.basaltmc.wire.protocol.login.LoginAcknowledgedPacket
 import org.basaltmc.wire.protocol.login.LoginCompressionPacket
+import org.basaltmc.wire.protocol.login.LoginDisconnectPacket
 import org.basaltmc.wire.protocol.login.LoginFinishedPacket
 import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
 import org.basaltmc.wire.protocol.play.BlockPos
+import org.basaltmc.wire.protocol.play.BossEventPacket
 import org.basaltmc.wire.protocol.play.ChatCommandPacket
 import org.basaltmc.wire.protocol.play.ChatMessagePacket
 import org.basaltmc.wire.protocol.play.ChunkBatchFinishedPacket
@@ -94,6 +106,7 @@ import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.protocol.play.ContainerClosePacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
+import org.basaltmc.wire.protocol.play.EntityEventPacket
 import org.basaltmc.wire.protocol.play.EntityTeleportPacket
 import org.basaltmc.wire.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.wire.protocol.play.GameEventPacket
@@ -132,6 +145,7 @@ import org.basaltmc.wire.protocol.play.SetExperiencePacket
 import org.basaltmc.wire.protocol.play.SetHealthPacket
 import org.basaltmc.wire.protocol.play.SetHeldSlotPacket
 import org.basaltmc.wire.protocol.play.SetSimulationDistancePacket
+import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.protocol.play.SignedChatCommandPacket
 import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.SpawnInfo
@@ -204,6 +218,14 @@ public class ClientSession(
     /** Every crafting recipe the server knows. `null` means nothing can be crafted. */
     private val recipes: RealRecipes? = null,
     /** The real block tags, which decide whether the held tool is the right one. */
+    private val bossBars: BossBarRegistry? = null,
+    /** Whether the whitelist is being enforced right now, which `/whitelist on` can change. */
+    private val whitelistEnforced: () -> Boolean = { false },
+    private val enchantments: RealEnchantments? = null,
+    private val dialogs: RealDialogs? = null,
+    private val timelines: RealTimelines? = null,
+    /** What each player has been taught, which `limited_crafting` consults. */
+    private val progress: PlayerProgress? = null,
     private val blockTags: RealBlockTags? = null,
     /** The real item tags, sent to the client alongside the block ones. */
     private val itemTags: RealItemTags? = null,
@@ -220,6 +242,13 @@ public class ClientSession(
 
     /** Kept because the status response is built from it, several packets after it arrives. */
     private var handshake: HandshakePacket? = null
+
+    /** How an enchanted stack resolves its ids, or null when no enchantment registry went out. */
+    internal val enchantmentIds: ((Identifier) -> Int?)?
+        get() = enchantments?.takeIf { it.size > 0 }?.let { registry -> { id -> registry.protocolIdOf(id) } }
+
+    /** The same lookup backwards, for a stack coming *from* the client. */
+    private fun enchantmentNameOf(protocolId: Int): Identifier? = enchantments?.entries?.getOrNull(protocolId)?.first
 
     // Read by this connection's PlayerSession, so the same placeholders answer for a logged-in
     // player and for a pending ping.
@@ -291,6 +320,9 @@ public class ClientSession(
     /** Which dropped items this client has been told about. See [syncItemEntities]. */
     private val trackedItems = HashSet<Int>()
 
+    /** Summoned entities this client has been told about, so each is spawned once. */
+    private val trackedEntities = HashSet<Int>()
+
     /** Static entities emitted by world generation that this client has been told about. */
     private val trackedGeneratedEntities = HashSet<Int>()
 
@@ -340,6 +372,7 @@ public class ClientSession(
                         }
                         timings.of("player.tick").time { tickPlayer() }
                         timings.of("player.items").time { syncItemEntities() }
+                        timings.of("player.entities").time { syncSummonedEntities() }
                         timings.of("player.generated_entities").time { syncGeneratedEntities() }
                         timings.of("player.ui").time { tickUi() }
                         sendKeepAliveIfDue()
@@ -515,6 +548,13 @@ public class ClientSession(
         name: String,
         properties: List<SessionProfileProperty>,
     ) {
+        // parity: `PlayerList.canPlayerLogin`, which checks the bans and the whitelist before the
+        // connection is allowed to go any further.
+        refuseLogin(id, name)?.let { reason ->
+            sendUncompressed(LoginDisconnectPacket.ID) { LoginDisconnectPacket(reason).write(it) }
+            connection.close()
+            return
+        }
         sendUncompressed(LoginCompressionPacket.ID) { LoginCompressionPacket(compressionThreshold).write(it) }
         compressionEnabled = true
 
@@ -524,10 +564,35 @@ public class ClientSession(
         sendCompressed(LoginFinishedPacket.ID) { LoginFinishedPacket(profile, sessionId).write(it) }
     }
 
+    /** Why this login may not proceed, or null when it may. */
+    private fun refuseLogin(
+        id: Uuid,
+        name: String,
+    ): Component? {
+        val access = playerStore?.takeIf { it.isOpen }?.access ?: return null
+        access.banOf(id.toString(), BanKind.PLAYER)?.let { ban ->
+            return Component.translatable("multiplayer.disconnect.banned.reason", Component.text(ban.reason))
+        }
+        connection.remoteAddress?.let { address ->
+            access.banOf(address, BanKind.IP)?.let { ban ->
+                return Component.translatable("multiplayer.disconnect.banned_ip.reason", Component.text(ban.reason))
+            }
+        }
+        if (whitelistEnforced() && !access.isWhitelisted(id.toString())) {
+            logger.info { "Refused $name: not on the whitelist." }
+            return Component.translatable("multiplayer.disconnect.not_whitelisted")
+        }
+        return null
+    }
+
     // --- Configuration ---
 
     private fun enterConfiguration() {
         state = ProtocolState.CONFIGURATION
+        // parity: `ServerConfigurationPacketListenerImpl` opens with the brand, which is what F3
+        // prints as `"<brand>" server`. Without it the client has nothing to name us with.
+        val brand = BrandPacket("Basalt ${BuildInfo.MINECRAFT_VERSION}")
+        sendCompressed(BrandPacket.ID) { brand.write(it) }
         // Claims the client's own vanilla data pack rather than an empty list: the more correct
         // default for a server with no datapacks of its own, though tested live against a real
         // 26.2 client and confirmed this alone does not fill in registries Basalt never sends
@@ -647,7 +712,42 @@ public class ClientSession(
         // item bootstrap needs populated yet: sent empty so the client's RegistryAccess has an
         // entry for them at all (a registry that was never sent doesn't exist client-side, which
         // breaks resolving tags scoped to it: confirmed live, see VanillaTagData's KDoc).
+        // The enchantment registry, when this build could convert every file the jar ships. A
+        // partial one disconnects clients at login (see RealEnchantments), so it is all or nothing
+        // and the empty entry below covers the "nothing" case.
+        val enchantmentEntries = enchantments?.entries.orEmpty()
+        if (enchantmentEntries.isNotEmpty()) {
+            sendCompressed(RegistryDataPacket.ID) {
+                RegistryDataPacket(
+                    "minecraft:enchantment",
+                    enchantmentEntries.map { (id, value) -> RegistryEntry(id.toString(), value) },
+                ).write(it)
+            }
+        }
+        val dialogEntries = dialogs?.entries.orEmpty()
+        if (dialogEntries.isNotEmpty()) {
+            sendCompressed(RegistryDataPacket.ID) {
+                RegistryDataPacket(
+                    "minecraft:dialog",
+                    dialogEntries.map { (id, value) -> RegistryEntry(id.toString(), value) },
+                ).write(it)
+            }
+        }
+        // Without these the client has a clock that ticks and nothing that reads it: the sky never
+        // moves however much `/time` reports success.
+        val timelineEntries = timelines?.entries.orEmpty()
+        if (timelineEntries.isNotEmpty()) {
+            sendCompressed(RegistryDataPacket.ID) {
+                RegistryDataPacket(
+                    "minecraft:timeline",
+                    timelineEntries.map { (id, value) -> RegistryEntry(id.toString(), value) },
+                ).write(it)
+            }
+        }
         for (emptyRegistryId in EMPTY_SYNCHRONIZED_REGISTRIES) {
+            if (emptyRegistryId == "minecraft:enchantment" && enchantmentEntries.isNotEmpty()) continue
+            if (emptyRegistryId == "minecraft:dialog" && dialogEntries.isNotEmpty()) continue
+            if (emptyRegistryId == "minecraft:timeline" && timelineEntries.isNotEmpty()) continue
             sendCompressed(RegistryDataPacket.ID) { RegistryDataPacket(emptyRegistryId, emptyList()).write(it) }
         }
         // Client bootstrap looks tags up by key whether or not the tagged registry is loaded: a
@@ -808,6 +908,16 @@ public class ClientSession(
         // level_chunks_load_start game event comes right before chunks, not after. Sending chunks
         // first (as an earlier version of this code did) left a real client stuck on "loading
         // terrain" forever, even with correct chunk data and a correct batch wrapper.
+        // parity: `PlayerList.sendLevelInfo` sends the clocks just before the spawn position, and
+        // the weather events only when it is actually raining. A client never told the time draws a
+        // sun frozen wherever its last server left it.
+        sendTime(world)
+        if (world.weather.raining) sendWeather(world.weather)
+        // parity: `CustomBossEvents.onPlayerConnect`, which shows a joining player every bar that
+        // names them. Without it a `/bossbar` set before they joined is invisible until it changes.
+        for (bar in bossBars?.barsFor(session).orEmpty()) {
+            sendCompressed(BossEventPacket.ID) { BossEventPacket(bar.uuid, bar.addOperation()).write(it) }
+        }
         sendCompressed(SpawnPositionPacket.ID) {
             SpawnPositionPacket(
                 GlobalPos(world.levelKey, BlockPos(spawnX.toInt(), spawnY.toInt(), spawnZ.toInt())),
@@ -974,6 +1084,22 @@ public class ClientSession(
             portalCooldown = 0,
             seaLevel = currentWorld?.declaration?.dimension?.seaLevel ?: 63,
         )
+
+    /**
+     * Sends one chunk again, for a change too large to express as block updates.
+     *
+     * `/place template` writes a whole structure at once: hundreds of blocks across several chunks,
+     * where one packet per chunk is both smaller and simpler than the section updates would be.
+     */
+    internal fun resendChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ) {
+        val chunk = currentWorld?.state?.chunkIfLoaded(chunkX, chunkZ) ?: return
+        sendPlayPacket(ChunkBatchStartPacket.ID) { }
+        sendChunk(chunk)
+        sendPlayPacket(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(1).write(it) }
+    }
 
     private fun sendChunk(chunk: Chunk) {
         val chunkData = ChunkDataCodec.encodeSections(chunk)
@@ -1149,6 +1275,31 @@ public class ClientSession(
     }
 
     /**
+     * Whether the block in front of this player comes apart in a single tick, tool and enchantments
+     * included. parity: `ServerPlayerGameMode.handleBlockBreakAction`, which asks the same question
+     * before deciding that a dig is over the moment it starts.
+     */
+    private fun breaksInOneTick(
+        block: Identifier?,
+        hardness: Blocks.BlockHardness?,
+    ): Boolean {
+        if (block == null || hardness == null) return false
+        if (hardness.isUnbreakable) return false
+        if (hardness.isInstant) return true
+        val held = playerSession?.inventory?.heldItem
+        val heldItem = held?.let { runCatching { Identifier.parse(it.id) }.getOrNull() }
+        val progress =
+            ItemTools.destroyProgressPerTick(
+                item = heldItem,
+                block = block,
+                hardness = hardness.destroyTime,
+                requiresCorrectTool = hardness.requiresCorrectTool,
+                efficiencyLevel = held?.let { PlayerInventory.enchantmentLevel(it, EFFICIENCY) } ?: 0,
+            ) { tag, tagged -> blockTags?.contains(tag, tagged) == true }
+        return progress >= 1f
+    }
+
+    /**
      * Breaking a block, on whichever packet the player's game mode breaks on.
      *
      * // parity: ServerPlayerGameMode. Creative destroys on `START_DESTROY_BLOCK`, survival times
@@ -1158,6 +1309,7 @@ public class ClientSession(
      * Survival's timing is trusted rather than re-derived from hardness and tool, so a client that
      * finishes early is believed.
      */
+
     private fun handlePlayerAction(action: ServerboundPlayerActionPacket) {
         when (action.action) {
             ServerboundPlayerActionPacket.Action.DROP_ITEM -> dropHeldItem(all = false)
@@ -1171,14 +1323,20 @@ public class ClientSession(
                 .getBlockState(action.pos.x, action.pos.y, action.pos.z)
                 ?.let(Blocks::byStateId)
                 ?.let { Blocks.hardnessOf(it.block) }
+        val targetBlock =
+            world
+                .getBlockState(action.pos.x, action.pos.y, action.pos.z)
+                ?.let(Blocks::byStateId)
+                ?.block
         val breaksOn =
             when (gamemode) {
                 Gamemode.CREATIVE -> ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK
                 Gamemode.SURVIVAL ->
-                    // A block that comes apart instantly is destroyed by the client the moment the
+                    // A block that comes apart in one tick is destroyed by the client the moment the
                     // dig starts, and it never sends the end of one: waiting for `STOP` there is why
-                    // flowers, grass and leaves could not be broken in survival at all.
-                    if (targetHardness?.isInstant == true) {
+                    // flowers, grass and leaves could not be broken in survival at all, and why an
+                    // efficiency pickaxe felt like a bare one.
+                    if (breaksInOneTick(targetBlock, targetHardness)) {
                         ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK
                     } else {
                         ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK
@@ -1333,6 +1491,51 @@ public class ClientSession(
                 pickupDelay = pickupDelay,
             ),
         )
+    }
+
+    /**
+     * Brings this client's view of summoned entities up to date: spawns what it has not seen,
+     * moves what has been moved by a command, and removes what was killed.
+     *
+     * Same shape as [syncItemEntities] and for the same reason: the world owns the entity, each
+     * connection reports it on its own thread.
+     */
+    private fun syncSummonedEntities() {
+        val session = playerSession ?: return
+        for (entity in world.entities()) {
+            if (entity.removed) continue
+            if (trackedEntities.add(entity.entityId)) {
+                sendPlayPacket(SpawnEntityPacket.ID) {
+                    SpawnEntityPacket(
+                        entityId = entity.entityId,
+                        uuid = entity.uuid,
+                        entityType = entity.protocolType,
+                        x = entity.x,
+                        y = entity.y,
+                        z = entity.z,
+                        pitch = entity.pitch,
+                        yaw = entity.yaw,
+                        headYaw = entity.yaw,
+                    ).write(it)
+                }
+                continue
+            }
+            sendPlayPacket(EntityTeleportPacket.ID) {
+                EntityTeleportPacket(
+                    entity.entityId,
+                    entity.x,
+                    entity.y,
+                    entity.z,
+                    entity.yaw,
+                    entity.pitch,
+                    false,
+                ).write(it)
+            }
+        }
+        val gone = world.collectRemovedEntities().filter { trackedEntities.remove(it) }
+        if (gone.isNotEmpty()) {
+            sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
+        }
     }
 
     /**
@@ -1665,8 +1868,19 @@ public class ClientSession(
             List(width * height) { index ->
                 craftingGrid.getOrNull(index)?.let { LootItemStack(Identifier.parse(it.id), it.count) }
             }
-        val result = recipes.resultFor(CraftingInput.of(width, height, cells))
-        craftingResult = result?.let { StoredItemStack(it.item.toString(), it.count) }
+        val match = recipes.matchFor(CraftingInput.of(width, height, cells))
+        // parity: the `limited_crafting` game rule, which is what makes `/recipe give` and
+        // `/recipe take` mean something: with it on, a player crafts only what they have been
+        // taught.
+        val limited = currentWorld?.gameRules?.get(GameRuleRegistry.LIMITED_CRAFTING) == true
+        val known =
+            !limited ||
+                match?.first?.let { progress?.knownRecipes(playerSession?.name.orEmpty())?.contains(it) } == true
+        craftingResult =
+            match
+                ?.takeIf { known }
+                ?.second
+                ?.let { StoredItemStack(it.item.toString(), it.count) }
     }
 
     /**
@@ -2050,15 +2264,30 @@ public class ClientSession(
     }
 
     /**
-     * Serverbound, id 0x38: creative inventory editing, and the only path a creative client's
-     * dragged item takes, including discarding it as slot `-1`. Never the window-click packet, so
-     * without this the server keeps tracking the stack the player dragged away and every place or
-     * drop acts on it.
+     * The components of a stack the client sent back, as this build stores them.
      *
-     * Ignored outside creative, as `ServerPlayerGameMode.handleCreativeModeItemAdd` does. A stack
-     * carrying data components fails [WireItemStack.read] and costs the connection, the same
-     * boundary as anywhere else a stack is read off the wire.
+     * Only the ones it can also write: a creative client echoes a slot whenever the inventory
+     * screen opens, so anything not rebuilt here is stripped off an item its owner merely looked at.
      */
+    private fun componentsOf(wire: WireItemStack): NbtCompound {
+        val components = NbtCompound()
+        if (wire.enchantments.isEmpty()) return components
+        val stored = NbtCompound()
+        for ((protocolId, level) in wire.enchantments) {
+            val name = enchantmentNameOf(protocolId) ?: continue
+            stored.putInt(name.toString(), level)
+        }
+        if (stored.keys.isNotEmpty()) components[PlayerInventory.ENCHANTMENTS_COMPONENT] = stored
+        return components
+    }
+
+    /**
+     * Serverbound, id 0x38: creative inventory editing, and the only path a dragged item takes,
+     * discarding it as slot `-1` included. Never the window-click packet.
+     *
+     * Ignored outside creative, as `ServerPlayerGameMode.handleCreativeModeItemAdd` does.
+     */
+
     private fun handleSetCreativeModeSlot(packet: ServerboundSetCreativeModeSlotPacket) {
         val session = playerSession ?: return
         if (session.gamemode != Gamemode.CREATIVE) return
@@ -2070,7 +2299,7 @@ public class ClientSession(
         val stack =
             packet.item?.let { wire ->
                 val id = Items.REGISTRY.identifierOf(wire.itemId) ?: return@let null
-                StoredItemStack(id.toString(), wire.count)
+                StoredItemStack(id.toString(), wire.count, componentsOf(wire))
             }
         session.inventory[slot] = stack
         sendInventorySlot(slot)
@@ -2485,7 +2714,12 @@ public class ClientSession(
         // parity: `handleClientCommand` returns without doing anything if the player is still
         // alive, so a client that sends this spuriously cannot teleport itself to spawn.
         if (session.health > 0f) return
-        val (spawnX, spawnY, spawnZ) = requireNotNull(currentWorld).spawn
+        // parity: `ServerPlayer.findRespawnPositionAndUseSpawnBlock`, minus the bed and anchor
+        // checks: what `/spawnpoint` set wins, and the world spawn is the fallback.
+        val stored = playerStore?.takeIf { it.isOpen }?.access?.spawnPointOf(session.uuid.toString())
+        val respawnWorld = stored?.world?.let { worlds[it] } ?: requireNotNull(currentWorld)
+        val (spawnX, spawnY, spawnZ) =
+            if (stored != null) Triple(stored.x, stored.y, stored.z) else respawnWorld.spawn
         session.resetForRespawn()
         session.x = spawnX
         session.y = spawnY
@@ -2505,6 +2739,11 @@ public class ClientSession(
                 session.pitch,
                 relativeFlags = 0,
             ).write(it)
+        }
+        // parity: `PlayerList.sendLevelInfo` again, which is what a respawn goes through too.
+        currentWorld?.let { respawnWorld ->
+            sendTime(respawnWorld)
+            if (respawnWorld.weather.raining) sendWeather(respawnWorld.weather)
         }
         sendCompressed(SpawnPositionPacket.ID) {
             SpawnPositionPacket(
@@ -2664,6 +2903,32 @@ public class ClientSession(
         }
     }
 
+    /** This world's clocks, as the join sequence and every `/time` send them. */
+    internal fun sendTime(world: LoadedWorld) {
+        val packet = world.timePacket()
+        sendPlayPacket(SetTimePacket.ID) { packet.write(it) }
+    }
+
+    /**
+     * parity: `ServerPlayer.setPlayerWeather`/`PlayerList.sendLevelInfo`, which announces rain as a
+     * start/stop event *and* the two levels: the events swap the client's weather renderer, the
+     * levels set how heavy it is, and a client sent only one of the two shows the wrong thing.
+     */
+    internal fun sendWeather(weather: WorldWeather) {
+        sendPlayPacket(GameEventPacket.ID) {
+            GameEventPacket(
+                if (weather.raining) GameEventPacket.START_RAINING else GameEventPacket.STOP_RAINING,
+                0f,
+            ).write(it)
+        }
+        sendPlayPacket(GameEventPacket.ID) {
+            GameEventPacket(GameEventPacket.RAIN_LEVEL_CHANGE, weather.rainLevel).write(it)
+        }
+        sendPlayPacket(GameEventPacket.ID) {
+            GameEventPacket(GameEventPacket.THUNDER_LEVEL_CHANGE, weather.thunderLevel).write(it)
+        }
+    }
+
     internal fun syncExperience() {
         val session = playerSession ?: return
         sendCompressed(SetExperiencePacket.ID) {
@@ -2696,8 +2961,23 @@ public class ClientSession(
     internal fun sendCommandTree() {
         val session = playerSession ?: return
         val dispatcher = commands ?: return
+        sendPermissionLevel()
         val tree = dispatcher.treeFor(PlayerCommandSource(session, dispatcher.environment.groups))
         sendCompressed(CommandsPacket.ID) { tree.write(it) }
+    }
+
+    /**
+     * parity: `PlayerList.sendPlayerPermissionLevel`, which goes right before the command tree.
+     *
+     * The client parses commands locally against this: below gamemaster it refuses selectors, so
+     * without it `/tellraw @a ...` is underlined in red even though the server runs it fine.
+     */
+    private fun sendPermissionLevel() {
+        val session = playerSession ?: return
+        val dispatcher = commands ?: return
+        val level = PlayerCommandSource(session, dispatcher.environment.groups).permissionLevel
+        val packet = EntityEventPacket.permissionLevel(session.entityId, level)
+        sendPlayPacket(EntityEventPacket.ID) { packet.write(it) }
     }
 
     private fun leavePlayIfPresent() {
@@ -2827,6 +3107,9 @@ public class ClientSession(
     }
 
     private companion object {
+        /** The one enchantment that changes how fast a block comes apart. */
+        val EFFICIENCY = Identifier.vanilla("efficiency")
+
         // How far past the view distance to generate ahead of a moving player, in chunks.
         const val PREFETCH_MARGIN_CHUNKS = 2
 
