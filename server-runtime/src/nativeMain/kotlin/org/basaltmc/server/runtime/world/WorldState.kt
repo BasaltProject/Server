@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.NoiseWorldGenerator
@@ -219,6 +220,29 @@ public class WorldState(
 
     /** Every dropped item in this world, as a snapshot safe to iterate outside the lock. */
     public fun items(): List<DroppedItem> = mutex.withLock { droppedItems.toList() }
+
+    // --- Summoned entities ---
+
+    private val entities = LinkedHashMap<Int, ServerEntity>()
+
+    /** Everything `/summon` put here, alive or just removed and not yet forgotten by clients. */
+    public fun entities(): List<ServerEntity> = mutex.withLock { entities.values.toList() }
+
+    public fun entity(entityId: Int): ServerEntity? = mutex.withLock { entities[entityId] }
+
+    public fun spawnEntity(entity: ServerEntity): ServerEntity =
+        mutex.withLock {
+            entities[entity.entityId] = entity
+            entity
+        }
+
+    /** Drops everything marked removed, and returns their ids so clients can be told once. */
+    public fun collectRemovedEntities(): List<Int> =
+        mutex.withLock {
+            val gone = entities.values.filter { it.removed }.map { it.entityId }
+            for (id in gone) entities.remove(id)
+            gone
+        }
 
     /** A snapshot of every dropped item within [radius] blocks of a point, nearest first. */
     public fun nearbyItems(

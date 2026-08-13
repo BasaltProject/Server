@@ -20,6 +20,28 @@ public data class WorldMetadata(
     val spawnY: Int,
     val spawnZ: Int,
     val timeOfDay: Long = 0L,
+    /** Ticks since the world was created, which is what `/time query gametime` answers with. */
+    val gameTime: Long = 0L,
+    /** The clock's rate and paused flag, as `/time rate` and `/time pause` leave them. */
+    val clockRate: Float = 1f,
+    val clockPaused: Boolean = false,
+    val raining: Boolean = false,
+    val rainTime: Int = 0,
+    val thundering: Boolean = false,
+    val thunderTime: Int = 0,
+    val clearWeatherTime: Int = 0,
+    val gameRules: GameRuleValues = GameRuleValues(),
+    /**
+     * What `/difficulty` and `/defaultgamemode` last set, or null while nobody has: the world file
+     * then follows `worlds.toml` and `server.toml`.
+     *
+     * parity: vanilla stores both in `level.dat`, and that file wins over `server.properties` for
+     * exactly this reason: an in-game change has to outlive a restart without editing configuration
+     * the operator owns.
+     */
+    val difficulty: String? = null,
+    val difficultyLocked: Boolean = false,
+    val defaultGamemode: String? = null,
 ) {
     public fun writeTo(worldRoot: String) {
         val root =
@@ -30,6 +52,18 @@ public data class WorldMetadata(
                 putInt("SpawnY", spawnY)
                 putInt("SpawnZ", spawnZ)
                 putLong("Time", timeOfDay)
+                putLong("GameTime", gameTime)
+                putFloat("ClockRate", clockRate)
+                putBoolean("ClockPaused", clockPaused)
+                putBoolean("Raining", raining)
+                putInt("RainTime", rainTime)
+                putBoolean("Thundering", thundering)
+                putInt("ThunderTime", thunderTime)
+                putInt("ClearWeatherTime", clearWeatherTime)
+                difficulty?.let { putString("Difficulty", it) }
+                putBoolean("DifficultyLocked", difficultyLocked)
+                defaultGamemode?.let { putString("DefaultGamemode", it) }
+                gameRules.writeTo(this)
             }
         FileIO.createDirectories(worldRoot)
         FileIO.writeBytes(pathFor(worldRoot), NbtIO.write(root))
@@ -57,6 +91,18 @@ public data class WorldMetadata(
                 spawnY = root.getInt("SpawnY"),
                 spawnZ = root.getInt("SpawnZ"),
                 timeOfDay = root.getLong("Time"),
+                gameTime = root.getLong("GameTime"),
+                clockRate = if ("ClockRate" in root.keys) root.getFloat("ClockRate") else 1f,
+                clockPaused = root.getBoolean("ClockPaused"),
+                raining = root.getBoolean("Raining"),
+                rainTime = root.getInt("RainTime"),
+                thundering = root.getBoolean("Thundering"),
+                thunderTime = root.getInt("ThunderTime"),
+                clearWeatherTime = root.getInt("ClearWeatherTime"),
+                gameRules = GameRuleValues.readFrom(root),
+                difficulty = if ("Difficulty" in root.keys) root.getString("Difficulty") else null,
+                difficultyLocked = root.getBoolean("DifficultyLocked"),
+                defaultGamemode = if ("DefaultGamemode" in root.keys) root.getString("DefaultGamemode") else null,
             )
         }
 

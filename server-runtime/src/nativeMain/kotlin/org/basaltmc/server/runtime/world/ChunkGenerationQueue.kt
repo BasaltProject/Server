@@ -215,8 +215,8 @@ public class ChunkGenerationQueue(
             chunkZ: Int,
         ): Long = (chunkX.toLong() and 0xFFFFFFFFL) or (chunkZ.toLong() shl 32)
 
-        private fun unpackX(key: Long): Int = key.toInt()
+        public fun unpackX(key: Long): Int = key.toInt()
 
-        private fun unpackZ(key: Long): Int = (key shr 32).toInt()
+        public fun unpackZ(key: Long): Int = (key shr 32).toInt()
     }
 }
