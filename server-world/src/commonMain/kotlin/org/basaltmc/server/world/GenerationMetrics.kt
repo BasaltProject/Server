@@ -106,7 +106,7 @@ public object GenerationMetrics {
         lines += "  Climate comparisons      ${biomeCandidatesScanned / chunks}"
         lines += "  Heightmap column scans   ${heightmapScans / chunks}"
         lines += "  Heightmap scan steps     ${heightmapScanSteps / chunks}"
-        lines += "  Cache markers reached (each one is a cache vanilla hits and this does not yet):"
+        lines += "  Cache markers reached:"
         for (type in MarkerType.entries) {
             val hits = markerHits[type.ordinal]
             if (hits != 0L) lines += "    ${type.name.padEnd(18)} ${hits / chunks}"

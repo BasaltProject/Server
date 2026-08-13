@@ -8,10 +8,10 @@ import org.basaltmc.server.world.GenerationMetrics
  * [FunctionContext.cache]; the rest evaluate straight through.
  *
  * [FLAT_CACHE] is not just an optimization: vanilla quantizes the query to the quart grid and
- * samples at `y = 0`, so honoring it changes values toward vanilla. [CACHE_2D] is exact
- * memoization. [CACHE_ONCE] and [CACHE_ALL_IN_CELL] are defined against `NoiseChunk`'s own
- * iteration counters and remain performance-only here. [BLEND_DENSITY] only marks where Anvil
- * blending would apply.
+ * samples at `y = 0`, so honoring it changes values toward vanilla. [CACHE_2D] and [CACHE_ONCE]
+ * are exact memoization, the latter keyed on the position vanilla identifies with an interpolation
+ * counter. [CACHE_ALL_IN_CELL] is defined against `NoiseChunk`'s own cell iteration and remains
+ * performance-only here. [BLEND_DENSITY] only marks where Anvil blending would apply.
  */
 public enum class MarkerType {
     INTERPOLATED,
@@ -44,6 +44,7 @@ public class Marker(
             MarkerType.INTERPOLATED -> cache.interpolated(slot, context, wrapped)
             MarkerType.FLAT_CACHE -> cache.flatCache(slot, context, wrapped)
             MarkerType.CACHE_2D -> cache.cache2d(slot, context, wrapped)
+            MarkerType.CACHE_ONCE -> cache.cacheOnce(slot, context, wrapped)
             else -> wrapped.compute(context)
         }
     }
