@@ -19,9 +19,18 @@ public class ReportSources(
     public val loadedChunks: () -> Int,
     /** Bytes of decompressed region files held in memory, which chunk counts do not account for. */
     public val regionCacheBytes: () -> Long,
+    /** What the loaded chunks themselves keep resident, so heap growth can be attributed or ruled out. */
+    public val chunkBytes: () -> Long,
+    public val chunkBlockEntities: () -> Int,
+    public val chunkScheduledTicks: () -> Int,
+    public val chunkGeneratedEntities: () -> Int,
+    /** Worldgen structure caches: (templates, template blocks, assemblies, assembly pieces). */
+    public val worldgenCaches: () -> List<Long>,
     public val worldCount: () -> Int,
     public val cpuPercent: () -> Double?,
     public val liveHeapBytes: () -> Long?,
+    /** What the OS says this process occupies, the figure operators compare servers by. */
+    public val residentBytes: () -> Long?,
 )
 
 /**
@@ -74,8 +83,18 @@ public class TimingsReport(
         builder.append("""    "worlds": ${sources.worldCount()},""").append('\n')
         builder.append("""    "chunks_loaded": ${sources.loadedChunks()},""").append('\n')
         builder.append("""    "region_cache_bytes": ${sources.regionCacheBytes()},""").append('\n')
+        builder.append("""    "chunk_bytes": ${sources.chunkBytes()},""").append('\n')
+        builder.append("""    "chunk_block_entities": ${sources.chunkBlockEntities()},""").append('\n')
+        builder.append("""    "chunk_scheduled_ticks": ${sources.chunkScheduledTicks()},""").append('\n')
+        builder.append("""    "chunk_generated_entities": ${sources.chunkGeneratedEntities()},""").append('\n')
+        val worldgen = sources.worldgenCaches()
+        builder.append("""    "worldgen_templates": ${worldgen.getOrElse(0) { 0L }},""").append('\n')
+        builder.append("""    "worldgen_template_blocks": ${worldgen.getOrElse(1) { 0L }},""").append('\n')
+        builder.append("""    "worldgen_assemblies": ${worldgen.getOrElse(2) { 0L }},""").append('\n')
+        builder.append("""    "worldgen_assembly_pieces": ${worldgen.getOrElse(3) { 0L }},""").append('\n')
         builder.append("""    "cpu_percent_of_one_core": ${number(sources.cpuPercent())},""").append('\n')
-        builder.append("""    "heap_bytes_live": ${sources.liveHeapBytes() ?: "null"}""").append('\n')
+        builder.append("""    "heap_bytes_live": ${sources.liveHeapBytes() ?: "null"},""").append('\n')
+        builder.append("""    "process_resident_bytes": ${sources.residentBytes() ?: "null"}""").append('\n')
         builder.append("  },\n")
 
         builder.append("""  "ticks": {""").append('\n')

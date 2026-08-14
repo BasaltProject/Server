@@ -329,9 +329,27 @@ public class BasaltServer(
                 maxPlayers = { config.maxPlayers },
                 loadedChunks = { worlds.values.sumOf { world -> world.state.loadedChunkCount } },
                 regionCacheBytes = { worlds.values.sumOf { it.regions.cachedRegionBytes } },
+                chunkBytes = { worlds.values.sumOf { it.state.chunkMemory().bytes } },
+                chunkBlockEntities = { worlds.values.sumOf { it.state.chunkMemory().blockEntities } },
+                chunkScheduledTicks = { worlds.values.sumOf { it.state.chunkMemory().scheduledTicks } },
+                chunkGeneratedEntities = { worlds.values.sumOf { it.state.chunkMemory().generatedEntities } },
+                worldgenCaches = {
+                    val stats = worldGeneratorFactory?.cacheStats()
+                    if (stats == null) {
+                        emptyList()
+                    } else {
+                        listOf(
+                            stats.templates.toLong(),
+                            stats.templateBlocks,
+                            stats.assemblies.toLong(),
+                            stats.assemblyPieces,
+                        )
+                    }
+                },
                 worldCount = { worlds.size },
                 cpuPercent = cpuMeter::percent,
-                liveHeapBytes = { liveHeapBytes() },
+                liveHeapBytes = { collectedLiveHeapBytes() },
+                residentBytes = { org.basaltmc.wire.io.processResidentBytes() },
             ),
         )
     }
@@ -520,6 +538,21 @@ public class BasaltServer(
             ?.memoryUsageAfter
             ?.get("heap")
             ?.totalObjectsSizeBytes
+
+    /**
+     * Forces a collection first, so the figure is what is reachable *now* rather than whatever the
+     * last scheduled GC saw mid-generation, transient worker state included. Only for the explicit
+     * `/timings` report: a forced collection pauses the world and has no place on a placeholder path.
+     */
+    @OptIn(kotlin.native.runtime.NativeRuntimeApi::class)
+    private fun collectedLiveHeapBytes(): Long? {
+        // Twice, not once: measured in isolation, a single collection leaves tens of KB per
+        // recently generated chunk unswept, and the second pass reclaims it. Only worth paying on
+        // the explicit report path.
+        kotlin.native.runtime.GC.collect()
+        kotlin.native.runtime.GC.collect()
+        return liveHeapBytes()
+    }
 
     @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
     private fun heapReport(): String {

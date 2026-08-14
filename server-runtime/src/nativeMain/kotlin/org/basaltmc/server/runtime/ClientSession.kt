@@ -170,6 +170,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.native.concurrent.ThreadLocal
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
@@ -426,7 +427,9 @@ public class ClientSession(
                 PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)
                     ?: break
             incoming.discardReadBytes()
-            handleFrame(ByteBuffer(frame.size).also { it.writeBytes(frame) })
+            // The frame array is freshly ours (tryReadFrame copies or decompresses), so it can back
+            // the buffer directly instead of being copied a second time.
+            handleFrame(ByteBuffer.wrap(frame))
         }
     }
 
@@ -655,7 +658,18 @@ public class ClientSession(
         sendRegistry("minecraft:pig_variant", "minecraft:temperate", VanillaRegistryData.pigVariant())
         sendRegistry("minecraft:pig_sound_variant", "minecraft:classic", VanillaRegistryData.pigSoundVariant())
         sendRegistry("minecraft:frog_variant", "minecraft:cold", VanillaRegistryData.frogVariant())
-        sendRegistry("minecraft:cat_variant", "minecraft:black", VanillaRegistryData.catVariant())
+        // All eleven, not just one: structure cats send their variant id in set_entity_data, and a
+        // registry with fewer entries than the id makes the client drop the connection on decode.
+        // The numeric id of each variant is its index in this packet, which is what
+        // GeneratedEntityPresentation's CAT_VARIANT_IDS must agree with.
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:cat_variant",
+                VanillaRegistryData.catVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.catVariant(id))
+                },
+            ).write(it)
+        }
         sendRegistry("minecraft:cat_sound_variant", "minecraft:classic", VanillaRegistryData.catSoundVariant())
         sendRegistry("minecraft:cow_sound_variant", "minecraft:classic", VanillaRegistryData.cowSoundVariant())
         sendRegistry("minecraft:cow_variant", "minecraft:temperate", VanillaRegistryData.cowVariant())
@@ -2453,7 +2467,8 @@ public class ClientSession(
         for (pos in delta.toUnload) {
             sendCompressed(ForgetLevelChunkPacket.ID) { ForgetLevelChunkPacket(pos.x, pos.z).write(it) }
         }
-        flushReadyChunks()
+        // No flush here: the outbound loop is the only drainer, so the client's requested rate is
+        // honored, and the read thread never stalls on a burst of chunk encoding and zlib.
     }
 
     /**
@@ -2490,10 +2505,10 @@ public class ClientSession(
      * Sends whichever requested chunks have finished generating, nearest first, leaving the rest
      * pending and never blocking on generation.
      *
-     * Driven from [TickLoop] as well as this connection's read loop: pushing only when the client
-     * sends something stalls the moment it goes quiet, and calling it from both means a client
-     * streaming input gets chunks at input rate. Capped per call so one flush cannot monopolize
-     * the socket.
+     * Driven from this connection's outbound loop and nowhere else. It used to run from the read
+     * loop too, on every movement packet: that bypassed the client's own requested chunks-per-tick
+     * budget and parked the read thread behind bursts of chunk encoding and zlib. Capped per call
+     * so one flush cannot monopolize the socket.
      */
     internal fun flushReadyChunks(limit: Int = MAX_BURST_CHUNKS.toInt()): Int {
         if (state != ProtocolState.PLAY) return 0
@@ -2769,7 +2784,6 @@ public class ClientSession(
         }
         chunkStreamMutex.withLock { for (pos in delta.toLoad) pendingChunks.add(pos) }
         for (pos in delta.toLoad) generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
-        flushReadyChunks()
 
         for (other in playersInSameWorld()) {
             if (other.uuid == session.uuid) continue
@@ -2859,7 +2873,6 @@ public class ClientSession(
             for (pos in delta.toLoad) pendingChunks.add(pos)
         }
         for (pos in delta.toLoad) generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
-        flushReadyChunks()
 
         // Whoever is already there needs to start seeing them.
         for (other in playersInSameWorld()) {
@@ -3071,24 +3084,26 @@ public class ClientSession(
         id: Int,
         writeBody: (ByteBuffer) -> Unit,
     ) {
-        val body = ByteBuffer()
+        PacketScratch.reset()
+        val body = PacketScratch.body
         body.writeVarInt(id)
         writeBody(body)
-        val wire = ByteBuffer()
-        PacketFraming.writeUncompressed(wire, body.toByteArray())
-        writeToSocket(wire.toByteArray())
+        val frame = PacketScratch.frame
+        PacketFraming.writeUncompressed(frame, body.toByteArray())
+        writeToSocket(frame)
     }
 
     private fun sendCompressed(
         id: Int,
         writeBody: (ByteBuffer) -> Unit,
     ) {
-        val body = ByteBuffer()
+        PacketScratch.reset()
+        val body = PacketScratch.body
         body.writeVarInt(id)
         writeBody(body)
-        val wire = ByteBuffer()
-        PacketFraming.writeCompressed(wire, body.toByteArray(), compressionThreshold, Zlib::compress)
-        writeToSocket(wire.toByteArray())
+        val frame = PacketScratch.frame
+        PacketFraming.writeCompressed(frame, body.toByteArray(), compressionThreshold, Zlib::compress)
+        writeToSocket(frame)
     }
 
     /**
@@ -3098,11 +3113,20 @@ public class ClientSession(
      * the client desynchronizes on the very next frame length. The cipher is inside the lock
      * because CFB8 is stateful: encrypting two packets concurrently corrupts both even if the
      * writes themselves were ordered.
+     *
+     * The frame goes to the socket straight from its buffer: it is this thread's own scratch, and
+     * the send mutex means nobody grows it mid-write.
      */
-    private fun writeToSocket(bytes: ByteArray) {
+    private fun writeToSocket(frame: ByteBuffer) {
         sendMutex.withLock {
             val cipher = encryptCipher
-            connection.write(if (cipher != null) cipher.update(bytes, encrypting = true) else bytes)
+            frame.withReadable { array, offset, length ->
+                if (cipher != null) {
+                    connection.write(cipher.update(array, offset, length, encrypting = true))
+                } else {
+                    connection.write(array, offset, length)
+                }
+            }
         }
     }
 
@@ -3229,3 +3253,26 @@ private val EMPTY_SYNCHRONIZED_REGISTRIES =
     )
 
 private fun angleToByte(degrees: Float): Byte = ((degrees / 360f) * 256f).toInt().toByte()
+
+/**
+ * Per-thread scratch for building outbound packets, so the thousands of small sends a second stop
+ * allocating two buffers each. Thread-local because broadcasts write into a session from other
+ * players' threads; safe because nothing sends a packet while serializing another.
+ */
+@ThreadLocal
+private object PacketScratch {
+    /** Buffers grown past this by a chunk packet are dropped, not retained per thread forever. */
+    private const val RETAIN_CAPACITY = 64 * 1024
+
+    var body: ByteBuffer = ByteBuffer()
+        private set
+
+    var frame: ByteBuffer = ByteBuffer()
+        private set
+
+    /** Fresh cursors for the next packet, shedding oversized backing arrays. */
+    fun reset() {
+        if (body.capacity > RETAIN_CAPACITY) body = ByteBuffer() else body.clear()
+        if (frame.capacity > RETAIN_CAPACITY) frame = ByteBuffer() else frame.clear()
+    }
+}

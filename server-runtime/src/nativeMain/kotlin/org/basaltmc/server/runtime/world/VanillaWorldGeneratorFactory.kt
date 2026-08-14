@@ -23,6 +23,36 @@ import org.basaltmc.server.world.terrain.VillageStructureGenerator
 public class VanillaWorldGeneratorFactory(
     private val serverJar: ServerJarAssets,
 ) {
+    // Tracked so the timings report can put a size on the worldgen caches, which live inside the
+    // per-world closures and would otherwise be unreachable from any diagnostic.
+    private val loaders = mutableListOf<VillageDataLoader>()
+    private val villages = mutableListOf<VillageStructureGenerator>()
+
+    /** What the structure caches hold across every world built by this factory. */
+    public data class WorldgenCacheStats(
+        val templates: Int,
+        val templateBlocks: Long,
+        val assemblies: Int,
+        val assemblyPieces: Long,
+    )
+
+    public fun cacheStats(): WorldgenCacheStats {
+        var templates = 0
+        var templateBlocks = 0L
+        var assemblies = 0
+        var assemblyPieces = 0L
+        for (loader in loaders) {
+            val (count, blocks) = loader.templateStats()
+            templates += count
+            templateBlocks += blocks
+        }
+        for (village in villages) {
+            val (count, pieces) = village.assemblyStats()
+            assemblies += count
+            assemblyPieces += pieces
+        }
+        return WorldgenCacheStats(templates, templateBlocks, assemblies, assemblyPieces)
+    }
     public fun create(
         declaration: WorldDeclaration,
         metadata: WorldMetadata,
@@ -40,7 +70,7 @@ public class VanillaWorldGeneratorFactory(
         val base3d = BlendedNoise(positional.fromHashOf("minecraft:terrain"), 0.25, 0.125, 80.0, 160.0, 8.0)
         val router = NoiseRouterData.overworld(noises::get, base3d)
         val surface = RealSurfaceEnvironment(serverJar, positional, router)
-        val villageLoader = VillageDataLoader(serverJar)
+        val villageLoader = VillageDataLoader(serverJar).also(loaders::add)
         val village =
             VillageStructureGenerator(
                 router,
@@ -50,7 +80,7 @@ public class VanillaWorldGeneratorFactory(
                 maxDistanceFromCenter = 80,
                 poolLookup = villageLoader.poolLookup,
                 templateLoader = villageLoader.templateLoader,
-            )
+            ).also(villages::add)
         return { chunkX, chunkZ ->
             RealTerrainGenerator.generate(router, surface, chunkX, chunkZ, seed, village)
         }
@@ -66,7 +96,7 @@ public class VanillaWorldGeneratorFactory(
             )
         val biomes = NetherBiomeSource(router.temperature, router.vegetation)
         val surface = NetherSurfaceEnvironment(serverJar, LegacyRandom(seed).forkPositional(), router, biomes)
-        val structureLoader = VillageDataLoader(serverJar)
+        val structureLoader = VillageDataLoader(serverJar).also(loaders::add)
         val structures =
             NetherStructureGenerator(
                 router,
@@ -92,7 +122,7 @@ public class VanillaWorldGeneratorFactory(
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.25, 80.0, 160.0, 4.0)
         val router = NoiseRouterData.end(base3d, seed)
         val biomes = TheEndBiomeSource(router.erosion)
-        val structureLoader = VillageDataLoader(serverJar)
+        val structureLoader = VillageDataLoader(serverJar).also(loaders::add)
         val structures = EndCityStructureGenerator(router, biomes, structureLoader.templateLoader)
         return { chunkX, chunkZ ->
             DimensionTerrainGenerator.end(router, biomes, chunkX, chunkZ, seed, structures)

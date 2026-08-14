@@ -18,6 +18,11 @@ import kotlin.time.TimeSource
  *
  * Decompression happens outside the lock. Holding it across a region of zstd starved the
  * save/unload sweep, which needs the same lock, until the server quietly stopped saving at all.
+ *
+ * Compression is outside it too: [mutex] only ever guards the cache map and region staging, while
+ * disk writes run under [writeMutex] alone. A sweep compressing a dozen regions used to hold the
+ * map lock for the whole 700ms, and every generation worker needing [loadChunk] stood in line
+ * behind it. Lock order is [writeMutex] then [mutex], never the reverse.
  */
 public class RegionStore(
     worldName: String,
@@ -39,6 +44,9 @@ public class RegionStore(
      */
     private val worldRoot: String = "$worldsRoot/$worldName"
     private val mutex = NativeMutex()
+
+    /** Serializes region staging and file writes; see the class KDoc for the lock order. */
+    private val writeMutex = NativeMutex()
 
     /** Insertion-ordered, used as an LRU: re-inserting on access moves an entry to the back. */
     private val cached = LinkedHashMap<Long, LinearRegion>()
@@ -105,46 +113,58 @@ public class RegionStore(
         timestamp: Int,
     ): Int {
         if (chunks.isEmpty()) return 0
-        // Serializing outside the lock keeps the per-chunk NBT work off everyone else's path.
-        val encodeStart = TimeSource.Monotonic.markNow()
-        val encoded = chunks.map { it to NbtIO.write(ChunkNbt.write(it)) }
-        encodeMillis = encodeStart.elapsedNow().inWholeMilliseconds
-
-        // Grouped by region first, so each region is fetched once however many of its chunks
-        // changed. Fetching per chunk could evict and reload the same region repeatedly, and every
-        // eviction writes, so one save could rewrite the same file many times over.
-        val byRegion = encoded.groupBy { (chunk, _) -> key(chunk.chunkX shr 5, chunk.chunkZ shr 5) }
-        val writeStart = TimeSource.Monotonic.markNow()
-        val touched =
-            mutex.withLock {
-                for ((key, entries) in byRegion) {
+        return writeMutex.withLock {
+            // Grouped by region and encoded one region at a time, outside the map lock. Encoding
+            // the whole sweep up front held every chunk's NBT blob at once, and a thousand-chunk
+            // sweep left a ~50 MB high-water mark in the sweeper thread's allocator pools for good;
+            // region by region the transient peak is one region's worth.
+            val byRegion = chunks.groupBy { key(it.chunkX shr 5, it.chunkZ shr 5) }
+            val start = TimeSource.Monotonic.markNow()
+            var encodeTotal = 0L
+            for ((key, regionChunks) in byRegion) {
+                val encodeStart = TimeSource.Monotonic.markNow()
+                val encoded = regionChunks.map { it to NbtIO.write(ChunkNbt.write(it)) }
+                encodeTotal += encodeStart.elapsedNow().inWholeMilliseconds
+                mutex.withLock {
                     val region = region(regionX(key), regionZ(key)) ?: LinearRegion().also { store(key, it) }
-                    for ((chunk, bytes) in entries) {
+                    for ((chunk, bytes) in encoded) {
                         region.setChunk(chunk.chunkX and 31, chunk.chunkZ and 31, bytes, timestamp)
                     }
                     dirtyRegions.add(key)
                 }
-                flushLocked()
             }
-        writeMillis = writeStart.elapsedNow().inWholeMilliseconds
-        for ((chunk, _) in encoded) chunk.markClean()
-        return touched
+            encodeMillis = encodeTotal
+            val touched = flushDirty()
+            writeMillis = start.elapsedNow().inWholeMilliseconds - encodeTotal
+            for (chunk in chunks) chunk.markClean()
+            touched
+        }
     }
 
     /** Writes out any region held with unsaved changes. */
-    public fun flush(): Int = mutex.withLock { flushLocked() }
+    public fun flush(): Int = writeMutex.withLock { flushDirty() }
 
-    private fun flushLocked(): Int {
-        if (dirtyRegions.isEmpty()) return 0
+    /**
+     * Caller must hold [writeMutex] and must not hold [mutex]. The snapshot is what lets the zstd
+     * and the file writes run without the map lock: a dirty region is never evicted (see [store]),
+     * so the reference stays valid, and [writeMutex] keeps [LinearRegion.setChunk] out of the file
+     * write.
+     */
+    private fun flushDirty(): Int {
+        val toWrite =
+            mutex.withLock {
+                if (dirtyRegions.isEmpty()) return@withLock emptyList()
+                val snapshot = dirtyRegions.mapNotNull { key -> cached[key]?.let { key to it } }
+                dirtyRegions.clear()
+                snapshot
+            }
         var written = 0
-        for (key in dirtyRegions) {
-            val region = cached[key] ?: continue
+        for ((key, region) in toWrite) {
             val path = regionPath(regionX(key), regionZ(key))
             FileIO.createDirectories(path.substringBeforeLast('/'))
             region.writeTo(path)
             written++
         }
-        dirtyRegions.clear()
         return written
     }
 
@@ -162,21 +182,24 @@ public class RegionStore(
         return LinearRegion.read(bytes).also { store(key, it) }
     }
 
-    /** Caller must hold [mutex]. Evicts least recently used regions, writing each one first if it changed. */
+    /**
+     * Caller must hold [mutex]. Evicts least recently used *clean* regions. A dirty one stays
+     * cached until [flushDirty] writes it: evicting it here would mean compressing a region file
+     * while holding the map lock, which is exactly the stall this store exists to avoid, and it is
+     * what [flushDirty]'s snapshot relies on. Between flushes the cache can therefore run past its
+     * budget by the dirty regions; the sweep flushes every interval, so the excursion is bounded.
+     */
     private fun store(
         key: Long,
         region: LinearRegion,
     ) {
         cached[key] = region
-        while (cached.size > capacity || cachedBytes() > byteBudget) {
-            val oldest = cached.keys.first()
-            if (oldest == key) break
-            if (dirtyRegions.remove(oldest)) {
-                val path = regionPath(regionX(oldest), regionZ(oldest))
-                FileIO.createDirectories(path.substringBeforeLast('/'))
-                cached[oldest]?.writeTo(path)
-            }
-            cached.remove(oldest)
+        if (cached.size <= capacity && cachedBytes() <= byteBudget) return
+        val iterator = cached.keys.iterator()
+        while (iterator.hasNext() && (cached.size > capacity || cachedBytes() > byteBudget)) {
+            val oldest = iterator.next()
+            if (oldest == key || oldest in dirtyRegions) continue
+            iterator.remove()
         }
     }
 

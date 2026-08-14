@@ -68,6 +68,9 @@ public class ChunkSection {
     public val nonEmptyFluidCount: Int
         get() = trackedNonEmptyFluidCount
 
+    /** Approximate bytes both palettes keep resident, for the timings report's memory breakdown. */
+    public val residentBytes: Int get() = blockStateIds.residentBytes + biomeIds.residentBytes
+
     /** A copy of the raw state IDs, in `(y * 16 + z) * 16 + x` order: the layout `PalettedContainer` expects. */
     public fun blockStateIds(): IntArray = blockStateIds.toIntArray()
 

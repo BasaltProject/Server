@@ -3,6 +3,7 @@ package org.basaltmc.server.world.region
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.io.FileIO
 import org.basaltmc.wire.io.Zstd
+import org.basaltmc.wire.io.ZstdStreamReader
 
 /** Thrown for a corrupt or unsupported Linear region file: bad signature, size mismatch, wrong version. */
 public class LinearFormatException(
@@ -202,38 +203,43 @@ public class LinearRegion(
             if (HEADER_SIZE + compressedLength + FOOTER_SIZE != bytes.size) {
                 throw LinearFormatException("file size does not match the declared compressed length")
             }
-            val compressed = bytes.copyOfRange(HEADER_SIZE, HEADER_SIZE + compressedLength)
-            val decompressed = Zstd.decompress(compressed)
-            if (decompressed.size < INNER_HEADER_SIZE) {
-                throw LinearFormatException("decompressed region smaller than its own chunk table")
-            }
 
-            val table = ByteBuffer(INNER_HEADER_SIZE).apply { writeBytes(decompressed, 0, INNER_HEADER_SIZE) }
-            val sizes = IntArray(DIMENSION * DIMENSION)
-            val timestamps = IntArray(DIMENSION * DIMENSION)
-            for (i in 0 until DIMENSION * DIMENSION) {
-                sizes[i] = table.readInt()
-                timestamps[i] = table.readInt()
-            }
+            // Streamed straight into the table and then each chunk's own blob: the whole region
+            // decompressed at once was megabytes of transient per read, and every worker thread's
+            // allocator kept its high-water mark. Mirrors writeTo, which streams the other way.
+            ZstdStreamReader(bytes, HEADER_SIZE, HEADER_SIZE + compressedLength).use { reader ->
+                val tableBytes = ByteArray(INNER_HEADER_SIZE)
+                runCatching { reader.readFully(tableBytes) }
+                    .getOrElse { throw LinearFormatException("decompressed region smaller than its own chunk table") }
 
-            val chunks = arrayOfNulls<ByteArray>(DIMENSION * DIMENSION)
-            var offset = INNER_HEADER_SIZE
-            var realChunkCount = 0
-            for (i in 0 until DIMENSION * DIMENSION) {
-                if (sizes[i] > 0) {
-                    chunks[i] = decompressed.copyOfRange(offset, offset + sizes[i])
+                val table = ByteBuffer(INNER_HEADER_SIZE).apply { writeBytes(tableBytes) }
+                val sizes = IntArray(DIMENSION * DIMENSION)
+                val timestamps = IntArray(DIMENSION * DIMENSION)
+                for (i in 0 until DIMENSION * DIMENSION) {
+                    sizes[i] = table.readInt()
+                    timestamps[i] = table.readInt()
+                }
+
+                val chunks = arrayOfNulls<ByteArray>(DIMENSION * DIMENSION)
+                var realChunkCount = 0
+                for (i in 0 until DIMENSION * DIMENSION) {
+                    if (sizes[i] <= 0) continue
+                    val blob = ByteArray(sizes[i])
+                    runCatching { reader.readFully(blob) }
+                        .getOrElse { throw LinearFormatException("decompressed size does not match the chunk table") }
+                    chunks[i] = blob
                     realChunkCount++
                 }
-                offset += sizes[i]
+                if (!reader.frameComplete) {
+                    throw LinearFormatException("decompressed size does not match the chunk table")
+                }
+                if (realChunkCount != declaredChunkCount) {
+                    throw LinearFormatException(
+                        "chunk count mismatch: header says $declaredChunkCount, found $realChunkCount",
+                    )
+                }
+                return LinearRegion(chunks, timestamps)
             }
-            val sizeMismatch = offset != decompressed.size
-            if (sizeMismatch) throw LinearFormatException("decompressed size does not match the chunk table")
-            if (realChunkCount != declaredChunkCount) {
-                throw LinearFormatException(
-                    "chunk count mismatch: header says $declaredChunkCount, found $realChunkCount",
-                )
-            }
-            return LinearRegion(chunks, timestamps)
         }
     }
 }

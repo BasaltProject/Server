@@ -43,6 +43,30 @@ public class WorldState(
 
     public val loadedChunkCount: Int get() = mutex.withLock { chunksByPos.size }
 
+    /** What every loaded chunk keeps resident, for the timings report's memory breakdown. */
+    public data class ChunkMemory(
+        val bytes: Long,
+        val blockEntities: Int,
+        val scheduledTicks: Int,
+        val generatedEntities: Int,
+    )
+
+    /** One pass under the lock; a /timings call walking ~1500 chunks costs well under a millisecond. */
+    public fun chunkMemory(): ChunkMemory =
+        mutex.withLock {
+            var bytes = 0L
+            var blockEntities = 0
+            var ticks = 0
+            var generated = 0
+            for (chunk in chunksByPos.values) {
+                bytes += chunk.residentBytes()
+                blockEntities += chunk.blockEntityCount
+                ticks += chunk.scheduledTickCount
+                generated += chunk.generatedEntityCount
+            }
+            ChunkMemory(bytes, blockEntities, ticks, generated)
+        }
+
     /**
      * Only the chunks holding something the region files do not, which is all a save has to write.
      *

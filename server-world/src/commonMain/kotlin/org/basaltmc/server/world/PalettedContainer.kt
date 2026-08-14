@@ -87,6 +87,13 @@ public class PalettedContainer(
     /** How many distinct values are stored, which is what decides the entry width. */
     public val distinctValueCount: Int get() = storage.paletteSize
 
+    /** Approximate bytes this container keeps resident: palette plus packed words, headers ignored. */
+    public val residentBytes: Int
+        get() {
+            val current = storage
+            return current.palette.size * Int.SIZE_BYTES + (current.words?.size ?: 0) * Long.SIZE_BYTES
+        }
+
     /** Bits each entry occupies; 0 while every entry is identical and no data array exists. */
     public val bitsPerValue: Int get() = storage.bits
 

@@ -66,9 +66,8 @@ private fun MutableList<SetEntityDataPacket.Entry>.addArmorStandMetadata(data: N
 
 private fun MutableList<SetEntityDataPacket.Entry>.addCatMetadata(data: NbtCompound) {
     val variant = CAT_VARIANT_IDS[data.getString("variant")]
-    // Black and red are the exact 26.2 defaults, so they are absent from vanilla's initial
-    // non-default metadata packet.
-    if (variant != null && variant != 1) add(SetEntityDataPacket.Entry.RegistryId(20, variant))
+    // Black is the defineSynchedData default, so vanilla's initial packet never carries it.
+    if (variant != null && variant != CAT_VARIANT_BLACK) add(SetEntityDataPacket.Entry.RegistryId(20, variant))
     val collarColor = data.getByte("CollarColor", 14).toInt() and 0xFF
     if (collarColor != 14) add(SetEntityDataPacket.Entry.Ints(23, collarColor))
 }
@@ -134,19 +133,26 @@ private val EQUIPMENT_SLOTS =
         "saddle" to SetEquipmentPacket.Type.SADDLE,
     )
 
+/**
+ * Indices into the `minecraft:cat_variant` registry exactly as this server syncs it (see
+ * `ClientSession.sendRegistriesThenFinish` and `VanillaRegistryData.catVariants`): the client
+ * resolves the id against that packet's entry order, nothing else.
+ */
+private const val CAT_VARIANT_BLACK = 1
+
 private val CAT_VARIANT_IDS =
     mapOf(
-        "minecraft:jellie" to 0,
-        "minecraft:black" to 1,
-        "minecraft:tabby" to 2,
-        "minecraft:british_shorthair" to 3,
-        "minecraft:all_black" to 4,
-        "minecraft:ragdoll" to 5,
-        "minecraft:white" to 6,
-        "minecraft:siamese" to 7,
-        "minecraft:calico" to 8,
-        "minecraft:persian" to 9,
-        "minecraft:red" to 10,
+        "minecraft:tabby" to 0,
+        "minecraft:black" to CAT_VARIANT_BLACK,
+        "minecraft:red" to 2,
+        "minecraft:siamese" to 3,
+        "minecraft:british_shorthair" to 4,
+        "minecraft:calico" to 5,
+        "minecraft:persian" to 6,
+        "minecraft:ragdoll" to 7,
+        "minecraft:white" to 8,
+        "minecraft:jellie" to 9,
+        "minecraft:all_black" to 10,
     )
 
 private val VILLAGER_TYPE_IDS =
