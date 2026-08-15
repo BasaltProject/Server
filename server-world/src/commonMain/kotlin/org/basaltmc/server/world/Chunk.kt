@@ -80,7 +80,24 @@ public class Chunk(
      */
     public fun invalidateHeightmaps() {
         heightsValid = false
+        skyLightSections = null
+        blockLightSections = null
     }
+
+    /**
+     * This chunk's sky light, packed one nibble array per section, computed once and kept until a
+     * block moves. Vanilla keeps light the same way, and for the same reason: recomputing it per
+     * player who is sent the chunk is the same work several times over.
+     */
+    public fun skyLight(compute: () -> Array<ByteArray>): Array<ByteArray> =
+        skyLightSections ?: compute().also { skyLightSections = it }
+
+    /** The same for the light the blocks themselves give off. */
+    public fun blockLight(compute: () -> Array<ByteArray>): Array<ByteArray> =
+        blockLightSections ?: compute().also { blockLightSections = it }
+
+    private var skyLightSections: Array<ByteArray>? = null
+    private var blockLightSections: Array<ByteArray>? = null
 
     public fun setBlockEntity(blockEntity: ChunkBlockEntity) {
         require(blockEntity.y in verticalBounds.minY..verticalBounds.maxY) {
@@ -228,6 +245,8 @@ public class Chunk(
         z: Int,
         stateId: Int,
     ) {
+        skyLightSections = null
+        blockLightSections = null
         if (!heightsValid) return
         val column = (x and 15) + (z and 15) * 16
         for (i in HEIGHTMAP_TYPES.indices) {

@@ -1,5 +1,7 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.server.world.light.BlockLight
+import org.basaltmc.server.world.light.SkyLight
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.protocol.play.BitStorage
 import org.basaltmc.wire.protocol.play.NibbleArray
@@ -9,10 +11,7 @@ import org.basaltmc.wire.protocol.play.PalettedContainer
  * Turns a [Chunk] into the wire bytes `MapChunkPacket.chunkData` and `UpdateLightPacket` need.
  * Biomes come from each section's quart-resolution palette.
  *
- * Light is uniform per section rather than propagated: no skylight below the chunk's tallest
- * column, full skylight at or above it. A real light engine belongs to a later pass. The tallest
- * column, not `heightmap()[0]`, because that only holds for a flat world: with real terrain it
- * marked hills skyless and rendered the sky black over lit ground.
+ * Sky light comes from [SkyLight], which lights each column and spreads sideways from there.
  */
 public object ChunkDataCodec {
     private const val BLOCK_DIRECT_BITS = 8
@@ -99,26 +98,60 @@ public object ChunkDataCodec {
         val skyLightMask: LongArray,
         val emptySkyLightMask: LongArray,
         val skyLight: List<ByteArray>,
+        val blockLightMask: LongArray = longArrayOf(0L),
+        val emptyBlockLightMask: LongArray = longArrayOf(0L),
+        val blockLight: List<ByteArray> = emptyList(),
     )
 
+    /**
+     * The sky light of one chunk, section by section.
+     *
+     * [blockAt] reads world coordinates outside the chunk, for the light that comes in from next
+     * door; see [SkyLight] for what it does with a neighbour that is not loaded.
+     */
     public fun encodeLight(
         chunk: Chunk,
         hasSkylight: Boolean = true,
+        blockAt: (x: Int, y: Int, z: Int) -> Int? = { _, _, _ -> null },
     ): LightData {
-        if (!hasSkylight) return LightData(longArrayOf(), longArrayOf(), emptyList())
-        val surfaceY = chunk.heightmap().max()
+        val sky =
+            if (!hasSkylight) {
+                null
+            } else {
+                chunk.skyLight {
+                    val computed = SkyLight.compute(chunk, blockAt)
+                    Array(computed.size) { NibbleArray.pack(computed[it]) }
+                }
+            }
+        val block =
+            chunk.blockLight {
+                if (!BlockLight.hasEmitters(chunk)) {
+                    emptyArray()
+                } else {
+                    val computed = BlockLight.compute(chunk, blockAt)
+                    Array(computed.size) { NibbleArray.pack(computed[it]) }
+                }
+            }
+        val (skyMask, emptySkyMask, skyArrays) = masked(sky)
+        val (blockMask, emptyBlockMask, blockArrays) = masked(block)
+        return LightData(skyMask, emptySkyMask, skyArrays, blockMask, emptyBlockMask, blockArrays)
+    }
+
+    /** Splits packed sections into the two masks and the arrays the packet carries. */
+    private fun masked(sections: Array<ByteArray>?): Triple<LongArray, LongArray, List<ByteArray>> {
+        if (sections == null || sections.isEmpty()) return Triple(longArrayOf(0L), longArrayOf(0L), emptyList())
         var maskBits = 0L
         var emptyMaskBits = 0L
         val arrays = mutableListOf<ByteArray>()
-        for (i in 0 until chunk.sectionCount) {
-            val sectionMinY = chunk.verticalBounds.minY + i * 16
-            if (sectionMinY + 16 <= surfaceY) {
+        for (i in sections.indices) {
+            val packed = sections[i]
+            if (packed.all { it == 0.toByte() }) {
                 emptyMaskBits = emptyMaskBits or (1L shl i)
             } else {
                 maskBits = maskBits or (1L shl i)
-                arrays.add(NibbleArray.uniform(15))
+                arrays.add(packed)
             }
         }
-        return LightData(longArrayOf(maskBits), longArrayOf(emptyMaskBits), arrays)
+        return Triple(longArrayOf(maskBits), longArrayOf(emptyMaskBits), arrays)
     }
 }
