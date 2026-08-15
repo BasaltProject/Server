@@ -8,6 +8,8 @@ import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.ComponentArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.ScoreHolderArgument
+import org.basaltmc.server.runtime.command.TeamArgument
+import org.basaltmc.server.runtime.command.TeamColorArgument
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.scoreboard.Team
 import org.basaltmc.server.runtime.scoreboard.Teams
@@ -27,7 +29,7 @@ public class TeamCommand(
     override fun build(root: CommandNodeBuilder) {
         root.literal("list") {
             executes { context -> listTeams(context) }
-            argument("team", WordArgument) { executes { context -> listMembers(context) } }
+            team { executes { context -> listMembers(context) } }
         }
         root.literal("add") {
             argument("team", WordArgument) {
@@ -38,13 +40,13 @@ public class TeamCommand(
             }
         }
         root.literal("remove") {
-            argument("team", WordArgument) { executes { context -> remove(context) } }
+            team { executes { context -> remove(context) } }
         }
         root.literal("empty") {
-            argument("team", WordArgument) { executes { context -> empty(context) } }
+            team { executes { context -> empty(context) } }
         }
         root.literal("join") {
-            argument("team", WordArgument) {
+            team {
                 executes { context -> join(context, listOf(context.requirePlayer().name)) }
                 argument("members", ScoreHolderArgument) {
                     executes { context -> join(context, context.get("members")) }
@@ -55,7 +57,7 @@ public class TeamCommand(
             argument("members", ScoreHolderArgument) { executes { context -> leave(context) } }
         }
         root.literal("modify") {
-            argument("team", WordArgument) {
+            team {
                 literal("displayName") {
                     argument("displayName", ComponentArgument) {
                         executes { context -> modifyName(context) }
@@ -68,10 +70,9 @@ public class TeamCommand(
                     argument("suffix", ComponentArgument) { executes { context -> modifySuffix(context) } }
                 }
                 literal("color") {
-                    for (color in TeamColor.entries + listOf(null)) {
-                        literal(color?.name?.lowercase() ?: "reset") {
-                            executes { context -> modifyColor(context, color) }
-                        }
+                    literal("reset") { executes { context -> modifyColor(context, null) } }
+                    argument("value", TeamColorArgument) {
+                        executes { context -> modifyColor(context, context.get("value")) }
                     }
                 }
                 literal("friendlyFire") {
@@ -94,6 +95,11 @@ public class TeamCommand(
                 }
             }
         }
+    }
+
+    /** An argument naming a team that already exists, so it completes with the ones that do. */
+    private fun CommandNodeBuilder.team(build: CommandNodeBuilder.() -> Unit) {
+        argument("team", TeamArgument) { build() }
     }
 
     private fun teamOf(context: CommandContext): Team {

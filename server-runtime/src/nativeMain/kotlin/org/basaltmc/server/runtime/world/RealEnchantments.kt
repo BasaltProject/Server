@@ -28,8 +28,14 @@ public class RealEnchantments(
 
     public val size: Int get() = entries.size
 
+    /** Every name this registry holds, for the completions a command offers. */
+    public val ids: List<Identifier> get() = entries.map { it.first }
+
     /** The registry index of an enchantment, which is what an item component references. */
     public fun protocolIdOf(id: Identifier): Int? = indices[id]
+
+    /** Its definition as the jar wrote it, for the effects this server reads rather than forwards. */
+    public fun definitionOf(id: Identifier): NbtCompound? = indices[id]?.let { entries[it].second }
 
     public operator fun contains(id: Identifier): Boolean = id in indices
 

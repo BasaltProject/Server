@@ -87,6 +87,19 @@ public class PalettedContainer(
     /** How many distinct values are stored, which is what decides the entry width. */
     public val distinctValueCount: Int get() = storage.paletteSize
 
+    /**
+     * Whether any stored value satisfies [predicate], answered from the palette alone.
+     *
+     * This is what makes a whole-world search affordable: a section keeps one entry per *distinct*
+     * value, so asking it is a handful of comparisons rather than four thousand, and a section that
+     * cannot hold what is being looked for is skipped without reading a single packed word.
+     */
+    public fun anyValue(predicate: (Int) -> Boolean): Boolean {
+        val current = storage
+        for (i in 0 until current.paletteSize) if (predicate(current.palette[i])) return true
+        return false
+    }
+
     /** Approximate bytes this container keeps resident: palette plus packed words, headers ignored. */
     public val residentBytes: Int
         get() {

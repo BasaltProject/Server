@@ -67,7 +67,7 @@ public class FloatArgument(
     private val min: Float = -Float.MAX_VALUE,
     private val max: Float = Float.MAX_VALUE,
 ) : ArgumentType<Float> {
-    override val wire: ArgumentParser = ArgumentParser.BrigadierDouble(min.toDouble(), max.toDouble())
+    override val wire: ArgumentParser = ArgumentParser.BrigadierFloat(min, max)
 
     override fun parse(
         reader: StringReader,
@@ -231,6 +231,11 @@ public object GameProfileArgument : ArgumentType<String> {
 public object WorldArgument : ArgumentType<org.basaltmc.server.runtime.world.LoadedWorld> {
     override val wire: ArgumentParser = ArgumentParser.BrigadierString(ArgumentParser.BrigadierString.Kind.SINGLE_WORD)
 
+    override val suggestions: SuggestionProvider = SuggestionProvider { it.matching(it.environment.worlds.keys) }
+
+    // A plain string carries nothing to complete from, so the client has to be told to ask.
+    override val clientSuggestions: String = SuggestionProviders.ASK_SERVER
+
     override fun parse(
         reader: StringReader,
         source: CommandSource,
@@ -300,12 +305,11 @@ public object GameModeArgument : ArgumentType<Gamemode> {
 }
 
 /**
- * `minecraft:entity` restricted to players, which is every selector this server can answer: there
- * are no other entities yet.
+ * `minecraft:entity` restricted to players, vanilla's `EntityArgument.players`.
  *
- * Understands `@s`, `@p`, `@a`, `@r` and a plain player name. Selector *filters* (`@a[distance=..5]`
- * and the rest of the bracket syntax) are a documented gap: they parse as an error rather than
- * being silently ignored, so nobody gets a wrong set of targets back.
+ * The same grammar as [EntitiesArgument] ([EntitySelector] parses it), so `@e[tag=admin]` here
+ * means the players among them rather than a syntax error: vanilla's own `findPlayers` answers the
+ * same selector the same way.
  */
 public class PlayersArgument(
     private val single: Boolean,
@@ -318,29 +322,12 @@ public class PlayersArgument(
         environment: CommandEnvironment,
     ): List<PlayerSession> {
         val start = reader.cursor
-        val online = environment.players.snapshot()
         val matched =
-            if (reader.canRead() && reader.peek() == '@') {
-                reader.skip()
-                val selector = if (reader.canRead()) reader.read() else ' '
-                if (reader.canRead() && reader.peek() == '[') {
-                    reader.cursor = start
-                    throw reader.syntaxError("Selector filters are not supported yet")
-                }
-                when (selector) {
-                    's' -> listOfNotNull(source.player)
-                    'p' -> nearestTo(source, online).let(::listOfNotNull)
-                    'r' -> online.randomOrNull()?.let(::listOf).orEmpty()
-                    'a', 'e' -> online
-                    else -> {
-                        reader.cursor = start
-                        throw reader.syntaxError("Unknown selector type '@$selector'")
-                    }
-                }
-            } else {
-                val name = reader.readString()
-                online.filter { it.name.equals(name, ignoreCase = true) }
-            }
+            EntitySelector
+                .parse(reader, source, environment)
+                .select(source, environment, playersOnly = true)
+                .filterIsInstance<CommandTarget.Player>()
+                .map { it.session }
 
         if (matched.isEmpty()) {
             reader.cursor = start
@@ -359,19 +346,6 @@ public class PlayersArgument(
             )
         }
         return matched
-    }
-
-    private fun nearestTo(
-        source: CommandSource,
-        online: List<PlayerSession>,
-    ): PlayerSession? {
-        val (x, y, z) = source.position
-        return online.minByOrNull { player ->
-            val dx = player.x - x
-            val dy = player.y - y
-            val dz = player.z - z
-            dx * dx + dy * dy + dz * dz
-        }
     }
 }
 

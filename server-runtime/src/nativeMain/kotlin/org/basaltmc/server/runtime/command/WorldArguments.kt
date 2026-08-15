@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.command
 import kotlinx.serialization.json.Json
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.Items
+import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtTag
@@ -274,14 +275,12 @@ public data class ParsedItem(
 /**
  * `minecraft:item_stack`: an item id and, optionally, `[component=value, ...]`.
  *
- * Only the components this build can actually put on the wire are accepted; the rest are refused by
- * name, because a stack that arrived without what was asked for is worse than a clear no.
+ * Every component the registry knows is accepted, because every one of them is stored and
+ * persisted. The ones this build has no network codec for do not reach the client, and the command
+ * says which by name rather than leaving the writer to notice a missing tooltip.
  */
 public object ItemArgument : ArgumentType<ParsedItem> {
     override val wire: ArgumentParser = ArgumentParser.ItemStack
-
-    /** What [PlayerInventory] knows how to write. Grows as components get a codec. */
-    private val SUPPORTED = setOf("minecraft:enchantments")
 
     override fun parse(
         reader: StringReader,
@@ -299,15 +298,12 @@ public object ItemArgument : ArgumentType<ParsedItem> {
                     reader.cursor,
                 )
             }
-        return ParsedItem(id, parseComponents(reader, SUPPORTED))
+        return ParsedItem(id, parseComponents(reader))
     }
 }
 
 /** `[a=1, b={c:2}]`, each value SNBT. Keys are normalised to their full id, as the wire writes them. */
-internal fun parseComponents(
-    reader: StringReader,
-    supported: Set<String>,
-): NbtCompound {
+internal fun parseComponents(reader: StringReader): NbtCompound {
     val components = NbtCompound()
     if (!reader.canRead() || reader.peek() != '[') return components
     val start = reader.cursor
@@ -319,13 +315,10 @@ internal fun parseComponents(
         reader.skipWhitespace()
         reader.expect('=')
         reader.skipWhitespace()
-        if (key !in supported) {
+        if (!ItemComponentCodecs.exists(key)) {
             reader.cursor = start
             throw CommandSyntaxException(
-                Component.text(
-                    "Component '$key' cannot be written yet, so the item would arrive without it. " +
-                        "Supported here: ${supported.joinToString(", ")}.",
-                ),
+                Component.text("Unknown item component '$key'."),
                 reader.string,
                 reader.cursor,
             )
@@ -401,6 +394,19 @@ public object ResourceLocationArgument : ArgumentType<Identifier> {
  */
 public object ScoreHolderArgument : ArgumentType<List<String>> {
     override val wire: ArgumentParser = ArgumentParser.ScoreHolder(multiple = true)
+
+    /** parity: `ScoreHolderArgument.SUGGEST_SCORE_HOLDERS`, which is where fake players come from. */
+    override val suggestions: SuggestionProvider =
+        SuggestionProvider {
+            it.matching(
+                it.environment.scoreboard
+                    ?.holders()
+                    .orEmpty(),
+            )
+        }
+
+    /** Vanilla flags every node that takes one of these, so the client asks rather than guessing. */
+    override val clientSuggestions: String = SuggestionProviders.ASK_SERVER
 
     override fun parse(
         reader: StringReader,

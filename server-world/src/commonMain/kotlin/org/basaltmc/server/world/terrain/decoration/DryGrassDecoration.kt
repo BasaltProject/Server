@@ -10,6 +10,27 @@ public object DryGrassDecoration {
     public val DESERT: BiomeVegetalDecoration = placed(rarity = 3)
     public val BADLANDS: BiomeVegetalDecoration = placed(rarity = 6)
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("patch_dry_grass_desert", "patch_dry_grass_badlands")
+
+    /** The patch at one origin, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature =
+            SimpleBlockFeature({ providerRandom, _ ->
+                if (providerRandom.nextInt(2) == 0) shortDryGrassStateId else tallDryGrassStateId
+            })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(64), RandomOffsetPlacement(xzSpread = 7, ySpread = 3), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     private fun placed(rarity: Int): BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             val feature =

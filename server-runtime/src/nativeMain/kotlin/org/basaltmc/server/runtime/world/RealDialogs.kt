@@ -24,6 +24,9 @@ public class RealDialogs(
 
     public val size: Int get() = entries.size
 
+    /** Every name this registry holds, for the completions a command offers. */
+    public val ids: List<Identifier> get() = entries.map { it.first }
+
     public fun protocolIdOf(id: Identifier): Int? = indices[id]
 
     public operator fun contains(id: Identifier): Boolean = id in indices

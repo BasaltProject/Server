@@ -52,6 +52,27 @@ public object FrozenOceanDecoration {
         region.flush()
     }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("iceberg_packed", "iceberg_blue", "blue_ice")
+
+    /** One of them at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        val region = ChunkFeatureRegion(chunk)
+        when (placedFeature) {
+            "iceberg_packed" -> IcebergFeature.place(region, random, origin, Blocks.PACKED_ICE.stateId)
+            "iceberg_blue" -> IcebergFeature.place(region, random, origin, Blocks.BLUE_ICE.stateId)
+            "blue_ice" -> BlueIceFeature.place(region, random, origin)
+            else -> return false
+        }
+        region.flush()
+        return true
+    }
+
     private fun placeIcebergWithRarity(
         region: ChunkFeatureRegion,
         random: WorldgenRandom,

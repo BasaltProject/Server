@@ -5,6 +5,7 @@ import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.wire.common.timings.time
 import org.basaltmc.wire.protocol.play.ArgumentParser
 import org.basaltmc.wire.protocol.play.CommandNodeData
+import org.basaltmc.wire.protocol.play.CommandSuggestion
 import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.TextColor
@@ -123,7 +124,25 @@ public class LiteralNode(
 public class ArgumentNode(
     override val name: String,
     public val type: ArgumentType<*>,
-) : CommandNode()
+) : CommandNode() {
+    /** Set by `suggests {}` or `suggestsFromServer {}`: a list that belongs to this command. */
+    public var suggestions: SuggestionProvider? = null
+
+    /** The provider name the client is given, if any. Set by the two `suggestsFrom*` builders. */
+    public var suggestionProviderId: String? = null
+
+    internal val suggestionId: String? get() = suggestionProviderId ?: type.clientSuggestions
+
+    internal val provider: SuggestionProvider? get() = suggestions ?: type.suggestions
+
+    /**
+     * Whether the client will ask about this argument at all, which needs the tree to name a
+     * provider for it. Leaving that to the parser is not enough: the client only falls back to the
+     * server for a registry it knows about and has not got, and a wrong guess is invisible from
+     * here (the player just sees the syntax and no list).
+     */
+    internal val answersOnItsOwn: Boolean get() = suggestionId != null
+}
 
 /** Builder for one node's children, executor and permission requirement. */
 public class CommandNodeBuilder(
@@ -136,6 +155,30 @@ public class CommandNodeBuilder(
 
     public fun executes(executor: CommandExecutor) {
         node.executor = executor
+    }
+
+    /**
+     * What this argument completes to when the client asks about it.
+     *
+     * No provider name travels in the tree, which is what vanilla does for an argument whose own
+     * parser names a registry: the client completes from its copy when it has one and asks the
+     * server when it has not. Use [suggestsFromServer] for an argument whose parser carries nothing
+     * to complete from, since the client never asks about one of those on its own.
+     */
+    public fun suggests(provider: SuggestionProvider) {
+        (node as? ArgumentNode)?.suggestions = provider
+    }
+
+    /** Same, but the tree tells the client to ask. parity: an argument vanilla calls `.suggests` on. */
+    public fun suggestsFromServer(provider: SuggestionProvider) {
+        val argument = node as? ArgumentNode ?: return
+        argument.suggestions = provider
+        argument.suggestionProviderId = SuggestionProviders.ASK_SERVER
+    }
+
+    /** Hands the completions to the client's own provider by name, so it never asks the server. */
+    public fun suggestsFromClient(provider: String) {
+        (node as? ArgumentNode)?.suggestionProviderId = provider
     }
 
     public fun redirectTo(target: CommandNode) {
@@ -349,6 +392,83 @@ public class CommandDispatcher(
         throw deepestError ?: reader.syntaxError(UNKNOWN_COMMAND)
     }
 
+    /**
+     * What [input] could be completed with, [input] ending where the client's cursor is.
+     *
+     * The line is walked the way [parse] walks it, but a branch that fails no longer ends the walk:
+     * the last token is the one being typed, so a node that consumes text up to the end of the line
+     * is the one asked for completions, and every branch that reaches it contributes.
+     *
+     * Literals are answered too, not only the arguments the client asked about: brigadier collects
+     * from every child of the node the cursor sits in, and the client merges the answer with what it
+     * worked out itself.
+     */
+    public fun suggest(
+        source: CommandSource,
+        input: String,
+    ): SuggestionResult {
+        val line = input.removePrefix("/")
+        val offset = input.length - line.length
+        val collected = mutableListOf<Pair<Int, CommandSuggestion>>()
+        collect(StringReader(line), root, source, emptyMap(), collected)
+        if (collected.isEmpty()) return SuggestionResult.EMPTY
+        // The deepest token wins: a branch that got further is completing a more specific word than
+        // one that stopped earlier, and a single reply carries a single range.
+        val start = collected.maxOf { it.first }
+        val suggestions =
+            collected
+                .filter { it.first == start }
+                .map { it.second }
+                .distinctBy { it.text }
+                .sortedBy { it.text }
+        return SuggestionResult(start + offset, line.length - start, suggestions)
+    }
+
+    private fun collect(
+        reader: StringReader,
+        node: CommandNode,
+        source: CommandSource,
+        arguments: Map<String, Any>,
+        out: MutableList<Pair<Int, CommandSuggestion>>,
+    ) {
+        val target = node.redirect ?: node
+        if (node !is RootNode) {
+            if (!reader.canRead() || reader.peek() != ' ') return
+            reader.skip()
+        }
+        val start = reader.cursor
+        val rest = reader.string.substring(start)
+        // A word still being typed has nothing after it: anything with a space is already settled,
+        // and the cursor is further along the line.
+        val typing = ' ' !in rest
+
+        for (child in target.sortedChildren) {
+            if (!source.mayUse(child)) continue
+            reader.cursor = start
+            when (child) {
+                is RootNode -> continue
+                is LiteralNode -> {
+                    if (typing && child.name.lowercase().startsWith(rest.lowercase())) {
+                        out += start to CommandSuggestion(child.name)
+                    }
+                    if (runCatching { reader.readUnquotedString() }.getOrNull() != child.name) continue
+                    collect(reader, child, source, arguments, out)
+                }
+                is ArgumentNode -> {
+                    if (typing) {
+                        child.provider
+                            ?.suggest(SuggestionContext(source, this, rest, arguments))
+                            ?.forEach { out += start to it }
+                    }
+                    reader.cursor = start
+                    val value = runCatching { child.type.parse(reader, source, environment) }.getOrNull() ?: continue
+                    if (reader.canRead() && reader.peek() != ' ') continue
+                    collect(reader, child, source, arguments + (child.name to value), out)
+                }
+            }
+        }
+    }
+
     private fun reportSyntaxError(
         source: CommandSource,
         e: CommandSyntaxException,
@@ -417,11 +537,37 @@ public class CommandDispatcher(
                             redirect = node.redirect?.let { ids[it] },
                             name = node.name,
                             parser = node.type.wire,
-                            suggestionId = node.type.suggestionId,
+                            suggestionId = node.suggestionId,
                         )
                 }
             }
         return CommandsPacket(nodes, rootIndex = 0)
+    }
+
+    /**
+     * Arguments that can answer a completion nobody will ever ask them for: no provider name in the
+     * tree, and a parser the client cannot complete from either. Empty is the invariant; a test
+     * keeps it that way.
+     */
+    public fun unreachableSuggestions(): List<Pair<String, String>> {
+        val found = mutableListOf<Pair<String, String>>()
+
+        fun walk(
+            node: CommandNode,
+            path: String,
+            seen: MutableSet<CommandNode>,
+        ) {
+            if (!seen.add(node)) return
+            for (child in node.children) {
+                val name = if (path.isEmpty()) child.name else "$path ${child.name}"
+                if (child is ArgumentNode && child.provider != null && !child.answersOnItsOwn) {
+                    found += name to child.type.wire.toString()
+                }
+                walk(child, name, seen)
+            }
+        }
+        walk(root, "", mutableSetOf())
+        return found
     }
 
     /** Every registered top-level command name, in registration order. Used by `/help`. */
@@ -448,6 +594,12 @@ public interface ArgumentType<T> {
 
     public val wire: ArgumentParser
 
-    /** A `minecraft:ask_server`-style suggestion provider, or null for the parser's built-in suggestions. */
-    public val suggestionId: String? get() = null
+    /**
+     * Completions every use of this type gets, for a type whose values are the same wherever it
+     * appears. A list that belongs to one command goes on the node instead, with `suggests {}`.
+     */
+    public val suggestions: SuggestionProvider? get() = null
+
+    /** A vanilla provider the client resolves itself, for types whose values it already has. */
+    public val clientSuggestions: String? get() = null
 }

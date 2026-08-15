@@ -4,9 +4,9 @@ import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.ComponentArgument
-import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
+import org.basaltmc.server.runtime.command.TimeArgument
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.wire.protocol.play.ClearTitlesPacket
 import org.basaltmc.wire.protocol.play.SetActionBarTextPacket
@@ -34,9 +34,9 @@ public class TitleCommand : Command(name = "title", permissionLevel = Permission
                 }
             }
             literal("times") {
-                argument("fadeIn", IntegerArgument(min = 0)) {
-                    argument("stay", IntegerArgument(min = 0)) {
-                        argument("fadeOut", IntegerArgument(min = 0)) {
+                argument("fadeIn", TimeArgument(min = 0)) {
+                    argument("stay", TimeArgument(min = 0)) {
+                        argument("fadeOut", TimeArgument(min = 0)) {
                             executes { context -> times(context) }
                         }
                     }

@@ -67,6 +67,15 @@ public object TallGrassDecoration {
         return DecorationPos(x, y, z)
     }
 
+    /** The patch at one origin, which is what `/place feature` runs for `patch_tall_grass`. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        placePatch(TallGrassRegion(chunk, null, null), random, origin)
+    }
+
     private fun placePatch(
         region: TallGrassRegion,
         random: WorldgenRandom,

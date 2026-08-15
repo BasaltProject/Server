@@ -55,6 +55,65 @@ public object NetherVegetalDecoration {
         }
     }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> =
+        setOf(
+            "crimson_fungi",
+            "warped_fungi",
+            "crimson_forest_vegetation",
+            "warped_forest_vegetation",
+            "nether_sprouts",
+            "twisting_vines",
+            "weeping_vines",
+            "spring_lava_nether",
+        )
+
+    /**
+     * One of them at one position, which is the feature without the modifiers that scatter it over
+     * a chunk: what `/place feature` runs.
+     */
+    public fun placeAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        val origin = Pos(x, y, z)
+        when (placedFeature) {
+            "crimson_fungi" -> placeHugeFungus(chunk, random, origin, HugeFungus.CRIMSON)
+            "warped_fungi" -> placeHugeFungus(chunk, random, origin, HugeFungus.WARPED)
+            "crimson_forest_vegetation" -> placeVegetationAt(chunk, random, origin, ForestVegetation.CRIMSON)
+            "warped_forest_vegetation" -> placeVegetationAt(chunk, random, origin, ForestVegetation.WARPED)
+            "nether_sprouts" -> placeVegetationAt(chunk, random, origin, ForestVegetation.SPROUTS)
+            "twisting_vines" -> placeTwistingVinesFeature(chunk, random, origin)
+            "weeping_vines" -> placeWeepingVinesFeature(chunk, random, origin)
+            "spring_lava_nether" -> placeLavaSpring(chunk, x, y, z)
+            else -> return false
+        }
+        return true
+    }
+
+    /** The vegetation patch itself, without the layer scan that chooses where the step puts one. */
+    private fun placeVegetationAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        origin: Pos,
+        config: ForestVegetation,
+    ) {
+        repeat(64) {
+            val x = origin.x + random.nextInt(8) - random.nextInt(8)
+            val y = origin.y + random.nextInt(4) - random.nextInt(4)
+            val z = origin.z + random.nextInt(8) - random.nextInt(8)
+            val state = config.sample(random)
+            val support = blockPathAt(chunk, x, y - 1, z)
+            if (isAir(chunk, x, y, z) && y > chunk.verticalBounds.minY && support in VEGETATION_SUPPORT) {
+                setBlock(chunk, x, y, z, stateId(state))
+            }
+        }
+    }
+
     private fun placeLavaSprings(
         chunk: Chunk,
         random: BasaltRandom,

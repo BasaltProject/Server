@@ -104,8 +104,11 @@ public object PlainsDecoration : BiomeVegetalDecoration {
             )
         }
 
-    /** // parity: the feature-pool-element use of placed_feature/flower_plain at one jigsaw origin. */
-    internal fun placeFlowerPlainAt(
+    /**
+     * parity: `flower_plain` at one origin, which is both what a jigsaw feature-pool element uses
+     * and what `/place feature` runs.
+     */
+    public fun placeFlowerPlainAt(
         chunk: Chunk,
         random: WorldgenRandom,
         x: Int,

@@ -57,6 +57,101 @@ public object OverworldOreDecoration {
         }
     }
 
+    /** parity: `underwater_magma`, one block at one position rather than scattered over the chunk. */
+    public fun placeUnderwaterMagmaAt(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val region = PlacementRegion(chunk, null, null)
+        if (region.getBlockStateId(x, y, z) != Blocks.WATER.stateId) return false
+        region.setBlockStateId(x, y, z, magmaStateId)
+        return true
+    }
+
+    /** The vanilla placed feature names of the disks this step runs. */
+    public val PLACED_DISK_IDS: Set<String> = setOf("disk_sand", "disk_clay", "disk_gravel", "disk_grass")
+
+    /** One disk at one position, which is the feature without its scatter. */
+    public fun placeDiskAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        val disk =
+            when (placedFeature) {
+                "disk_sand" -> SAND_DISK
+                "disk_clay" -> CLAY_DISK
+                "disk_gravel" -> GRAVEL_DISK
+                "disk_grass" -> GRASS_DISK
+                else -> return false
+            }
+        placeDisk(PlacementRegion(chunk, null, null), random, x, y, z, disk)
+        return true
+    }
+
+    /**
+     * The vanilla placed feature names of the ore features this step runs, by their global index.
+     *
+     * The index is how the decoration step addresses them (it is what seeds each feature's own
+     * random); the name is what `/place feature` says. Both exist because they answer different
+     * questions, and pairing them here keeps the pairing next to the table it refers to.
+     */
+    public val PLACED_ORE_IDS: Map<String, Int> =
+        mapOf(
+            "ore_dirt" to 0,
+            "ore_gravel" to 1,
+            "ore_granite_upper" to 2,
+            "ore_granite_lower" to 3,
+            "ore_diorite_upper" to 4,
+            "ore_diorite_lower" to 5,
+            "ore_andesite_upper" to 6,
+            "ore_andesite_lower" to 7,
+            "ore_tuff" to 8,
+            "ore_coal_upper" to 9,
+            "ore_coal_lower" to 10,
+            "ore_iron_upper" to 11,
+            "ore_iron_middle" to 12,
+            "ore_iron_small" to 13,
+            "ore_gold" to 14,
+            "ore_gold_lower" to 15,
+            "ore_redstone" to 16,
+            "ore_redstone_lower" to 17,
+            "ore_diamond" to 18,
+            "ore_diamond_medium" to 19,
+            "ore_diamond_large" to 20,
+            "ore_diamond_buried" to 21,
+            "ore_lapis" to 22,
+            "ore_lapis_buried" to 23,
+            "ore_copper_large" to 24,
+            "ore_copper" to 25,
+            "ore_clay" to 27,
+            "ore_gold_extra" to 28,
+            "ore_emerald" to 33,
+            "ore_infested" to INFESTED_GLOBAL_INDEX,
+        )
+
+    /**
+     * One ore vein at one position, which is the feature itself without the placement modifiers
+     * that decide where generation puts it: what `/place feature` runs.
+     */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        val index = PLACED_ORE_IDS[placedFeature] ?: return false
+        val ore = if (index == INFESTED_GLOBAL_INDEX) INFESTED_ORE else FEATURES_BY_INDEX[index] ?: return false
+        return placeVein(PlacementRegion(chunk, null, null), random, x, y, z, ore.feature)
+    }
+
     /** // parity: `ore_infested`, global feature index 6 in `UNDERGROUND_DECORATION`. */
     public fun decorateInfested(
         chunk: Chunk,

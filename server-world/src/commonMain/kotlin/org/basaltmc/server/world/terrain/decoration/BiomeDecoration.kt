@@ -30,283 +30,108 @@ public fun combine(vararg steps: BiomeVegetalDecoration): BiomeVegetalDecoration
 public object BiomeDecoration {
     private val noVegetalDecoration = BiomeVegetalDecoration { _, _ -> }
     private val oakTree = TreeDecoration.tree(TreeConfigs.OAK)
-    private val birchTree = TreeDecoration.tree(TreeConfigs.BIRCH)
-    private val superBirchTree = TreeDecoration.tree(TreeConfigs.SUPER_BIRCH)
-    private val spruceTree = TreeDecoration.tree(TreeConfigs.SPRUCE)
-    private val pineTree = TreeDecoration.tree(TreeConfigs.PINE)
     private val fancyOakTree = TreeDecoration.tree(TreeConfigs.FANCY_OAK)
-    private val oakBees005Tree = TreeDecoration.tree(TreeConfigs.OAK_BEES_005)
-    private val fancyOakBees005Tree = TreeDecoration.tree(TreeConfigs.FANCY_OAK_BEES_005)
-    private val birchBees0002Tree = TreeDecoration.tree(TreeConfigs.BIRCH_BEES_0002)
-    private val superBirchBees0002Tree = TreeDecoration.tree(TreeConfigs.SUPER_BIRCH_BEES_0002)
-    private val oakLeafLitterTree = TreeDecoration.tree(TreeConfigs.OAK_LEAF_LITTER)
-    private val oakBees0002LeafLitterTree = TreeDecoration.tree(TreeConfigs.OAK_BEES_0002_LEAF_LITTER)
-    private val birchBees0002LeafLitterTree = TreeDecoration.tree(TreeConfigs.BIRCH_BEES_0002_LEAF_LITTER)
-    private val fancyOakBees0002LeafLitterTree = TreeDecoration.tree(TreeConfigs.FANCY_OAK_BEES_0002_LEAF_LITTER)
-    private val birchLeafLitterTree = TreeDecoration.tree(TreeConfigs.BIRCH_LEAF_LITTER)
-    private val fancyOakLeafLitterTree = TreeDecoration.tree(TreeConfigs.FANCY_OAK_LEAF_LITTER)
-    private val darkOakLeafLitterTree = TreeDecoration.tree(TreeConfigs.DARK_OAK_LEAF_LITTER)
     private val fallenOakTree = TreeDecoration.fallen(FallenTreeConfigs.OAK)
-    private val fallenBirchTree = TreeDecoration.fallen(FallenTreeConfigs.BIRCH)
-    private val fallenSuperBirchTree = TreeDecoration.fallen(FallenTreeConfigs.SUPER_BIRCH)
-    private val fallenSpruceTree = TreeDecoration.fallen(FallenTreeConfigs.SPRUCE)
-    private val fallenJungleTree = TreeDecoration.fallen(FallenTreeConfigs.JUNGLE)
 
     private val byBiome: Map<Identifier, BiomeVegetalDecoration> =
         mapOf(
             // parity: TREES_PLAINS, fancy oak 33.3%, fallen oak 1.25%, oak default.
             Identifier.vanilla("plains") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.33333334f to fancyOakBees005Tree, 0.0125f to fallenOakTree),
-                    oakBees005Tree,
-                    0,
-                    0.05f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("trees_plains"), 0, 0.05f, 1),
             Identifier.vanilla("sunflower_plains") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.33333334f to fancyOakBees005Tree, 0.0125f to fallenOakTree),
-                    oakBees005Tree,
-                    0,
-                    0.05f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("trees_plains"), 0, 0.05f, 1),
             // parity: TREES_BIRCH_AND_OAK_LEAF_LITTER.
             Identifier.vanilla("forest") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(
-                        0.0025f to fallenBirchTree,
-                        0.2f to birchBees0002LeafLitterTree,
-                        0.1f to fancyOakBees0002LeafLitterTree,
-                        0.0125f to fallenOakTree,
-                    ),
-                    oakBees0002LeafLitterTree,
-                    10,
-                    0.1f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("trees_birch_and_oak_leaf_litter"), 10, 0.1f, 1),
             // parity: OverworldBiomes.forest(flower=true): trees_flower_forest, flower_flower_forest,
             // and default grass. Fallen birch and tree decorators remain shared gaps.
             Identifier.vanilla("flower_forest") to FlowerForestDecoration,
             // parity: OverworldBiomes.forest(birch=true, tall=false)/addBirchTrees: TREES_BIRCH, birch default.
             Identifier.vanilla("birch_forest") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.0125f to fallenBirchTree),
-                    birchBees0002Tree,
-                    10,
-                    0.1f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("trees_birch"), 10, 0.1f, 1),
             // parity: OverworldBiomes.forest(birch=true, tall=true)/addTallBirchTrees: BIRCH_TALL, super_birch default.
             Identifier.vanilla("old_growth_birch_forest") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(
-                        0.00625f to fallenSuperBirchTree,
-                        0.5f to superBirchBees0002Tree,
-                        0.0125f to fallenBirchTree,
-                    ),
-                    birchBees0002Tree,
-                    10,
-                    0.1f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("birch_tall"), 10, 0.1f, 1),
             // parity: OverworldBiomes.taiga/addTaigaTrees+addDefaultFlowers: TREES_TAIGA (33.3% pine else spruce,
             // fallen_spruce 1.25%) plus the real default flower patch. Shared ground cover and the
             // taiga mushroom tail are appended by forBiome.
             Identifier.vanilla("taiga") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.33333334f to pineTree, 0.0125f to fallenSpruceTree),
-                        spruceTree,
-                        10,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_taiga"), 10, 0.1f, 1),
                     DefaultVegetationDecoration.FLOWERS,
                 ),
             // parity: OverworldBiomes.taiga(snowy=true)/addSnowyTrees+addDefaultFlowers: TREES_SNOWY, spruce default.
             Identifier.vanilla("snowy_taiga") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.0125f to fallenSpruceTree),
-                        spruceTree,
-                        0,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_snowy"), 0, 0.1f, 1),
                     DefaultVegetationDecoration.FLOWERS,
                 ),
             // parity: OverworldBiomes.oldGrowthTaiga(spruce=true)/TREES_OLD_GROWTH_SPRUCE_TAIGA: 33.3% mega_spruce,
             // 33.3% pine, fallen_spruce 1.25%, spruce default. countExtra(10, 0.1, 1).
             Identifier.vanilla("old_growth_spruce_taiga") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(
-                            0.33333334f to TreeDecoration.tree(TreeConfigs.MEGA_SPRUCE),
-                            0.33333334f to pineTree,
-                            0.0125f to fallenSpruceTree,
-                        ),
-                        spruceTree,
-                        10,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_old_growth_spruce_taiga"), 10, 0.1f, 1),
                     DefaultVegetationDecoration.FLOWERS,
                 ),
             // parity: OverworldBiomes.oldGrowthTaiga(spruce=false)/TREES_OLD_GROWTH_PINE_TAIGA: 2.56% mega_spruce,
             // 30.8% mega_pine, 33.3% pine, fallen_spruce 1.25%, spruce default.
             Identifier.vanilla("old_growth_pine_taiga") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(
-                            0.025641026f to TreeDecoration.tree(TreeConfigs.MEGA_SPRUCE),
-                            0.30769232f to TreeDecoration.tree(TreeConfigs.MEGA_PINE),
-                            0.33333334f to pineTree,
-                            0.0125f to fallenSpruceTree,
-                        ),
-                        spruceTree,
-                        10,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_old_growth_pine_taiga"), 10, 0.1f, 1),
                     DefaultVegetationDecoration.FLOWERS,
                 ),
             // parity: OverworldBiomes.plains(snowy=true, spikes=false/true)/addSnowyTrees: same TREES_SNOWY feature.
             Identifier.vanilla("snowy_plains") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.0125f to fallenSpruceTree),
-                        spruceTree,
-                        0,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_snowy"), 0, 0.1f, 1),
                     DefaultVegetationDecoration,
                 ),
             Identifier.vanilla("ice_spikes") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.0125f to fallenSpruceTree),
-                        spruceTree,
-                        0,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_snowy"), 0, 0.1f, 1),
                     DefaultVegetationDecoration,
                 ),
             // parity: OverworldBiomes.savanna/addSavannaTrees+addWarmFlowers: TREES_SAVANNA (80% acacia else oak,
             // fallen_oak 1.25%) plus flower_warm (real flowerDefault, rarity 1/16).
             Identifier.vanilla("savanna") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.8f to TreeDecoration.tree(TreeConfigs.ACACIA), 0.0125f to fallenOakTree),
-                        oakTree,
-                        1,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_savanna"), 1, 0.1f, 1),
                     DefaultVegetationDecoration.WARM_FLOWERS,
                 ),
             // parity: OverworldBiomes.savanna(plateau=true)/addSavannaTrees+addWarmFlowers: same as plains savanna.
             Identifier.vanilla("savanna_plateau") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.8f to TreeDecoration.tree(TreeConfigs.ACACIA), 0.0125f to fallenOakTree),
-                        oakTree,
-                        1,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_savanna"), 1, 0.1f, 1),
                     DefaultVegetationDecoration.WARM_FLOWERS,
                 ),
             // parity: OverworldBiomes.savanna(shattered=true)/addShatteredSavannaTrees+addDefaultFlowers (not
             // addWarmFlowers: the shattered variant uses the real default rarity, not the warm one).
             Identifier.vanilla("windswept_savanna") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.8f to TreeDecoration.tree(TreeConfigs.ACACIA), 0.0125f to fallenOakTree),
-                        oakTree,
-                        2,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_windswept_savanna"), 2, 0.1f, 1),
                     DefaultVegetationDecoration.FLOWERS,
                 ),
             // parity: TREES_JUNGLE; all selector shapes are present, decorators remain shared gaps.
             Identifier.vanilla("jungle") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(
-                            0.1f to fancyOakTree,
-                            0.5f to TreeDecoration.tree(TreeConfigs.JUNGLE_BUSH),
-                            0.33333334f to TreeDecoration.tree(TreeConfigs.MEGA_JUNGLE),
-                            0.0125f to fallenJungleTree,
-                        ),
-                        TreeDecoration.tree(TreeConfigs.JUNGLE_TREE),
-                        50,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_jungle"), 50, 0.1f, 1),
                     DefaultVegetationDecoration.WARM_FLOWERS,
                 ),
             // parity: TREES_SPARSE_JUNGLE; all selector shapes are present, decorators remain shared gaps.
             Identifier.vanilla("sparse_jungle") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(
-                            0.1f to fancyOakTree,
-                            0.5f to TreeDecoration.tree(TreeConfigs.JUNGLE_BUSH),
-                            0.0125f to fallenJungleTree,
-                        ),
-                        TreeDecoration.tree(TreeConfigs.JUNGLE_TREE),
-                        2,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_sparse_jungle"), 2, 0.1f, 1),
                     DefaultVegetationDecoration.WARM_FLOWERS,
                 ),
             // parity: OverworldBiomes.windsweptHills(moreTrees=false)/addMountainTrees+addDefaultFlowers+addDefaultGrass:
             // TREES_WINDSWEPT_HILLS: fallen spruce 0.8325%, spruce 66.6%, fancy oak 10%, fallen oak 1.25%, oak default.
             Identifier.vanilla("windswept_hills") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(
-                        0.008325f to fallenSpruceTree,
-                        0.666f to spruceTree,
-                        0.1f to fancyOakTree,
-                        0.0125f to fallenOakTree,
-                    ),
-                    oakTree,
-                    0,
-                    0.1f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("trees_windswept_hills"), 0, 0.1f, 1),
             Identifier.vanilla("windswept_gravelly_hills") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(
-                        0.008325f to fallenSpruceTree,
-                        0.666f to spruceTree,
-                        0.1f to fancyOakTree,
-                        0.0125f to fallenOakTree,
-                    ),
-                    oakTree,
-                    0,
-                    0.1f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("trees_windswept_hills"), 0, 0.1f, 1),
             // parity: OverworldBiomes.windsweptHills(moreTrees=true)/addMountainForestTrees: TREES_WINDSWEPT_FOREST, same species mix.
             Identifier.vanilla("windswept_forest") to
-                TreeDecoration.candidateSequenceCountExtra(
-                    listOf(
-                        0.008325f to fallenSpruceTree,
-                        0.666f to spruceTree,
-                        0.1f to fancyOakTree,
-                        0.0125f to fallenOakTree,
-                    ),
-                    oakTree,
-                    3,
-                    0.1f,
-                    1,
-                ),
+                TreeDecoration.countExtra(TreeDecoration.selector("trees_windswept_forest"), 3, 0.1f, 1),
             // parity: OverworldBiomes.grove/addGroveTrees: TREES_GROVE, 33.3% pine else spruce (real "on snow" placement filter dropped).
             Identifier.vanilla("grove") to
                 TreeDecoration.choice(TreeConfigs.PINE, 0.33333334f, TreeConfigs.SPRUCE, 10, 0.1f, 1),
@@ -322,13 +147,7 @@ public object BiomeDecoration {
             // GroundPlantPatchDecoration.
             Identifier.vanilla("wooded_badlands") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(
-                        listOf(0.0125f to fallenOakTree),
-                        oakLeafLitterTree,
-                        5,
-                        0.1f,
-                        1,
-                    ),
+                    TreeDecoration.countExtra(TreeDecoration.selector("trees_badlands"), 5, 0.1f, 1),
                 ),
             // parity: OverworldBiomes.badlands(wooded=false)/addBadlandGrass; the ground features are
             // independently seeded by GrassPatchDecoration and GroundPlantPatchDecoration.
@@ -348,19 +167,7 @@ public object BiomeDecoration {
             // huge brown 2.5%, huge red 5%, dark_oak 66.7%, fallen_birch 0.25%, birch 20%, fallen_oak
             // 1.25%, fancy_oak 10%, oak default. CountPlacement(16), not countExtra.
             Identifier.vanilla("dark_forest") to
-                TreeDecoration.candidateSequence(
-                    listOf(
-                        0.025f to TreeDecoration.hugeMushroom(HugeMushroomFeature.Kind.BROWN),
-                        0.05f to TreeDecoration.hugeMushroom(HugeMushroomFeature.Kind.RED),
-                        0.6666667f to darkOakLeafLitterTree,
-                        0.0025f to fallenBirchTree,
-                        0.2f to birchLeafLitterTree,
-                        0.0125f to fallenOakTree,
-                        0.1f to fancyOakLeafLitterTree,
-                    ),
-                    oakLeafLitterTree,
-                    16,
-                ),
+                TreeDecoration.sequenceOf(TreeDecoration.selector("dark_forest_vegetation"), 16),
             // parity: PALE_GARDEN_VEGETATION rolls creaking 10%, ordinary pale oak 90%, then ordinary fallback.
             // CountPlacement(16). Pale moss and pale garden flowers are appended by forBiome.
             Identifier.vanilla("pale_garden") to

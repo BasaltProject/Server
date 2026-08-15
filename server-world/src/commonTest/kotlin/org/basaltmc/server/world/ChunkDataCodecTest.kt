@@ -35,6 +35,24 @@ class ChunkDataCodecTest {
     }
 
     @Test
+    fun biomesAloneDecodeBackToWhatTheChunkHolds() {
+        val chunk = FlatWorldGenerator.generate(0, 0)
+        chunk.setBiomeId(0, 0, 0, 7)
+        val buffer =
+            org.basaltmc.wire.io
+                .ByteBuffer()
+        buffer.writeBytes(ChunkDataCodec.encodeBiomes(chunk))
+
+        val first = PalettedContainer.read(buffer, 64, PalettedContainer.BIOME_MAX_INDIRECT_BITS)
+        assertEquals(7, first[0])
+        // One container per section and nothing else: no block data, no counts, no light.
+        for (i in 1 until chunk.sectionCount) {
+            PalettedContainer.read(buffer, 64, PalettedContainer.BIOME_MAX_INDIRECT_BITS)
+        }
+        assertEquals(0, buffer.readableBytes)
+    }
+
+    @Test
     fun lightMasksCoverEverySectionExactlyOnce() {
         val chunk = FlatWorldGenerator.generate(0, 0)
         val light = ChunkDataCodec.encodeLight(chunk)

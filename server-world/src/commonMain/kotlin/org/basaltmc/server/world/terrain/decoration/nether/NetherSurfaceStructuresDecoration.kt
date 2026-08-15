@@ -62,6 +62,28 @@ public object NetherSurfaceStructuresDecoration {
         }
     }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("delta", "small_basalt_columns", "large_basalt_columns")
+
+    /** One of them at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        val origin = Pos(x, y, z)
+        when (placedFeature) {
+            "delta" -> placeDelta(chunk, random, origin)
+            "small_basalt_columns" -> placeColumns(chunk, random, origin, ColumnConfig.SMALL)
+            "large_basalt_columns" -> placeColumns(chunk, random, origin, ColumnConfig.LARGE)
+            else -> return false
+        }
+        return true
+    }
+
     private fun positionsOnEveryLayer(
         chunk: Chunk,
         random: BasaltRandom,

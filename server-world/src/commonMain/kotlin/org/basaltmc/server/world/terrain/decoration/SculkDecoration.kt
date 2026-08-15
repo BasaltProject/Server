@@ -63,6 +63,23 @@ public object SculkDecoration {
         }
     }
 
+    /** One sculk patch grown from an origin: the body of the patch, without the search for a spot. */
+    private fun placeSculkPatchAt(
+        region: SculkRegion,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Boolean {
+        if (!region.canSculkSpreadFrom(origin)) return false
+        val cursors = MutableList(10) { ChargeCursor(origin, 32) }
+        repeat(64) {
+            for (cursor in cursors) cursor.update(region, origin, random)
+        }
+        if (random.nextFloat() <= 0.5f && region.hasFullCollision(origin.offset(0, -1, 0))) {
+            region.set(origin, SCULK_CATALYST_STATE_ID)
+        }
+        return true
+    }
+
     private fun placeSculkVeins(
         region: SculkRegion,
         random: WorldgenRandom,
@@ -75,6 +92,24 @@ public object SculkDecoration {
             val origin = DecorationPos(x, WorldHeight.MIN_Y + random.nextInt(321), z)
             if (environment.biomeAt(x, origin.y, z).substringAfter(':') != "deep_dark") return@repeat
             placeMultifaceGrowth(region, random, origin)
+        }
+    }
+
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("sculk_patch_deep_dark", "sculk_patch_ancient_city", "sculk_vein")
+
+    /** One of them at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        val region = SculkRegion(chunk, null, null)
+        return when (placedFeature) {
+            "sculk_patch_deep_dark", "sculk_patch_ancient_city" -> placeSculkPatchAt(region, random, origin)
+            "sculk_vein" -> placeMultifaceGrowth(region, random, origin)
+            else -> false
         }
     }
 

@@ -1,5 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
@@ -35,6 +36,21 @@ public object PaleGardenDecoration {
                 HeightmapPlacement,
             ),
         )
+
+    /** The patch at one origin, which is what `/place feature` runs for `flower_pale_garden`. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature = SimpleBlockFeature({ _, _ -> closedEyeblossomStateId })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(96), RandomOffsetPlacement(xzSpread = 7, ySpread = 3), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
 
     private fun placed(modifiers: List<PlacementModifier>): BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->

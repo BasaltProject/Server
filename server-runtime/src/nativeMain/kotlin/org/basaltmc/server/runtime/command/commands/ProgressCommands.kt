@@ -1,25 +1,20 @@
 package org.basaltmc.server.runtime.command.commands
 
-import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
-import org.basaltmc.server.runtime.command.ResourceLocationArgument
+import org.basaltmc.server.runtime.command.RegistryArgument
+import org.basaltmc.server.runtime.command.SuggestionContext
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealRecipes
-import org.basaltmc.server.world.crafting.Recipe
+import org.basaltmc.server.runtime.world.RecipeBook
 import org.basaltmc.wire.common.Identifier
-import org.basaltmc.wire.protocol.play.RecipeBookAddPacket
-import org.basaltmc.wire.protocol.play.RecipeBookEntry
-import org.basaltmc.wire.protocol.play.RecipeBookRemovePacket
-import org.basaltmc.wire.protocol.play.RecipeDisplay
-import org.basaltmc.wire.protocol.play.SlotDisplay
 import org.basaltmc.wire.text.Component
 
 /**
@@ -42,10 +37,12 @@ public class AdvancementCommand(
                     literal("everything") { executes { context -> everything(context, action) } }
                     for (mode in listOf("only", "from", "through", "until")) {
                         literal(mode) {
-                            argument("advancement", ResourceLocationArgument) {
+                            argument("advancement", RegistryArgument.key("minecraft:advancement")) {
+                                suggestsFromServer { context -> context.matchingIds(advancements.ids) }
                                 executes { context -> selection(context, action, mode, null) }
                                 if (mode == "only") {
                                     argument("criterion", WordArgument) {
+                                        suggestsFromServer { context -> context.matching(criteriaOf(context)) }
                                         executes { context ->
                                             selection(context, action, mode, context.get("criterion"))
                                         }
@@ -58,6 +55,10 @@ public class AdvancementCommand(
             }
         }
     }
+
+    /** Only the criteria of the advancement already named, which is what vanilla completes here. */
+    private fun criteriaOf(context: SuggestionContext): Set<String> =
+        context.argument<Identifier>("advancement")?.let { advancements[it]?.criteria?.keys }.orEmpty()
 
     private fun everything(
         context: CommandContext,
@@ -107,8 +108,8 @@ public class AdvancementCommand(
         for (target in targets) {
             val moved =
                 when (action) {
-                    Action.GRANT -> progress.grantCriterion(target.name, id, criterion)
-                    Action.REVOKE -> progress.revokeCriterion(target.name, id, criterion)
+                    Action.GRANT -> progress.grantCriterion(target.uuid.toString(), id, criterion)
+                    Action.REVOKE -> progress.revokeCriterion(target.uuid.toString(), id, criterion)
                 }
             if (moved) changed++
         }
@@ -129,9 +130,9 @@ public class AdvancementCommand(
                 when (action) {
                     Action.GRANT ->
                         for (criterion in advancement.criteria.keys) {
-                            if (progress.grantCriterion(target.name, id, criterion)) changed++
+                            if (progress.grantCriterion(target.uuid.toString(), id, criterion)) changed++
                         }
-                    Action.REVOKE -> if (progress.revokeAll(target.name, id)) changed++
+                    Action.REVOKE -> if (progress.revokeAll(target.uuid.toString(), id)) changed++
                 }
             }
         }
@@ -185,7 +186,8 @@ public class RecipeCommand(
             root.literal(verb) {
                 argument("targets", PlayersArgument(single = false)) {
                     literal("*") { executes { context -> apply(context, verb, null) } }
-                    argument("recipe", ResourceLocationArgument) {
+                    argument("recipe", RegistryArgument.key("minecraft:recipe")) {
+                        suggestsFromServer { context -> context.matchingIds(recipes.ids) }
                         executes { context -> apply(context, verb, context.get("recipe")) }
                     }
                 }
@@ -211,7 +213,18 @@ public class RecipeCommand(
         for (target in targets) {
             for (id in ids) {
                 val applied =
-                    if (verb == "give") progress.learn(target.name, id) else progress.forget(target.name, id)
+                    if (verb == "give") {
+                        val learned = progress.learn(target.uuid.toString(), id)
+                        // parity: `ServerPlayer.awardRecipes` fires the unlock trigger itself,
+                        // rather than leaving the advancement to whatever crafting follows.
+                        if (learned) {
+                            context.environment.advancementTriggers
+                                ?.onRecipeUnlocked(target.name, target.uuid.toString(), id)
+                        }
+                        learned
+                    } else {
+                        progress.forget(target.uuid.toString(), id)
+                    }
                 if (applied) {
                     changed++
                     if (id !in moved) moved += id
@@ -247,67 +260,6 @@ public class RecipeCommand(
         verb: String,
         ids: List<Identifier>,
     ) {
-        val numbered = ids.map { recipes.ids.indexOf(it) }.filter { it >= 0 }
-        if (numbered.isEmpty()) return
-        if (verb == "take") {
-            val packet = RecipeBookRemovePacket(numbered)
-            target.connection.sendPlayPacket(RecipeBookRemovePacket.ID) { packet.write(it) }
-            return
-        }
-        val entries = ids.mapNotNull(::entryFor)
-        if (entries.isEmpty()) return
-        val packet = RecipeBookAddPacket(entries, replace = false)
-        target.connection.sendPlayPacket(RecipeBookAddPacket.ID) { packet.write(it) }
+        if (verb == "take") RecipeBook.remove(target, recipes, ids) else RecipeBook.add(target, recipes, ids)
     }
-
-    /** One book entry, or null for a recipe this build did not parse and so cannot draw. */
-    private fun entryFor(id: Identifier): RecipeBookEntry? {
-        val recipe = recipes.recipeFor(id) ?: return null
-        val recipeNumber = recipes.ids.indexOf(id)
-        if (recipeNumber < 0) return null
-        val result = slotFor(setOf(recipe.result.item)) ?: return null
-        val station = slotFor(setOf(Identifier.vanilla("crafting_table"))) ?: SlotDisplay.Empty
-        val display =
-            when (recipe) {
-                is Recipe.Shaped ->
-                    RecipeDisplay.Shaped(
-                        width = recipe.width,
-                        height = recipe.height,
-                        ingredients = recipe.ingredients.map { it?.let { i -> slotFor(i.items) } ?: SlotDisplay.Empty },
-                        result = result,
-                        craftingStation = station,
-                    )
-                is Recipe.Shapeless ->
-                    RecipeDisplay.Shapeless(
-                        ingredients = recipe.ingredients.map { slotFor(it.items) ?: SlotDisplay.Empty },
-                        result = result,
-                        craftingStation = station,
-                    )
-            }
-        val requirements =
-            when (recipe) {
-                is Recipe.Shaped -> recipe.ingredients.filterNotNull().map { itemIds(it.items) }
-                is Recipe.Shapeless -> recipe.ingredients.map { itemIds(it.items) }
-            }.filter { it.isNotEmpty() }
-        return RecipeBookEntry(
-            recipeId = recipeNumber,
-            display = display,
-            category = RecipeBookEntry.CRAFTING_MISC_CATEGORY,
-            craftingRequirements = requirements,
-        )
-    }
-
-    /** One slot: a single item, or a choice between the items an ingredient accepts. */
-    private fun slotFor(items: Set<Identifier>): SlotDisplay? {
-        val ids = itemIds(items)
-        return when {
-            ids.isEmpty() -> null
-            ids.size == 1 -> SlotDisplay.Item(ids.single())
-            else -> SlotDisplay.Composite(ids.map { SlotDisplay.Item(it) })
-        }
-    }
-
-    /** Protocol ids, dropping anything this build's item registry does not know. */
-    private fun itemIds(items: Set<Identifier>): List<Int> =
-        items.mapNotNull { Items.REGISTRY.byIdentifier(it)?.protocolId }
 }

@@ -15,8 +15,16 @@ import org.basaltmc.server.world.structure.StructurePos
 import org.basaltmc.server.world.structure.StructureProjection
 import org.basaltmc.server.world.structure.StructureTemplatePool
 import org.basaltmc.server.world.structure.TemplateLoader
+import org.basaltmc.wire.common.Identifier
 import kotlin.concurrent.AtomicReference
 import kotlin.math.abs
+
+/** Where a village was found, and which of the five it is. */
+public data class LocatedVillage(
+    public val structure: Identifier,
+    public val chunkX: Int,
+    public val chunkZ: Int,
+)
 
 /**
  * Places villages during chunk generation, choosing the variant from the biome at each candidate
@@ -29,6 +37,7 @@ import kotlin.math.abs
  * Starts are rebuilt with vanilla's independent Legacy structure seed. In step four each variant
  * owns its dynamic-registry index, and every start and piece draws one shared xoroshiro stream.
  */
+
 public class VillageStructureGenerator(
     private val router: OverworldNoiseRouter,
     private val grid: StructurePlacementGrid,
@@ -80,6 +89,126 @@ public class VillageStructureGenerator(
                     piece.element.place(templateLoader, chunk, piece.position, piece.rotation, clip, decorationRandom)
                 }
             }
+        }
+    }
+
+    /** Every village structure this generator can make, by the id `/locate` and `/place` name. */
+    public val structureIds: Set<Identifier> get() = STRUCTURE_IDS
+
+    /**
+     * The nearest chunk where [structure] would generate, searched outward over the placement grid.
+     *
+     * parity: `ChunkGenerator.findNearestMapStructure`, which walks the structure set's own cells
+     * ring by ring rather than scanning chunks, and tests each candidate exactly as generation
+     * would: the same weighted draw against the biome at the candidate's own centre column. A
+     * candidate that draws a different village is not a match, which is why this cannot be answered
+     * from the grid alone.
+     */
+    public fun locate(
+        seed: Long,
+        fromChunkX: Int,
+        fromChunkZ: Int,
+        structure: Identifier?,
+        maxCells: Int = DEFAULT_SEARCH_CELLS,
+    ): LocatedVillage? {
+        val cellX = fromChunkX.floorDiv(grid.spacing)
+        val cellZ = fromChunkZ.floorDiv(grid.spacing)
+        for (ring in 0..maxCells) {
+            for (dx in -ring..ring) {
+                for (dz in -ring..ring) {
+                    // Only the ring itself: the inside was searched by a previous, smaller one.
+                    if (ring != 0 && abs(dx) != ring && abs(dz) != ring) continue
+                    val (candidateX, candidateZ) =
+                        grid.candidateChunk(seed, (cellX + dx) * grid.spacing, (cellZ + dz) * grid.spacing)
+                    val variant = selectVariant(candidateX, candidateZ, seed, HashMap()) ?: continue
+                    if (structure != null && variant.id != structure) continue
+                    return LocatedVillage(variant.id, candidateX, candidateZ)
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Assembles [structure] at a chunk that is not its candidate, which is what `/place structure`
+     * does: vanilla generates the structure where it was told, skipping the placement grid and the
+     * biome check that decide where one appears on its own.
+     */
+    public fun assembleAt(
+        structure: Identifier,
+        chunkX: Int,
+        chunkZ: Int,
+        seed: Long,
+    ): List<PlacedStructurePiece>? {
+        val variant = VARIANTS.firstOrNull { it.id == structure } ?: return null
+        val random = WorldgenRandom(LegacyRandom(0L))
+        random.setLargeFeatureSeed(seed, chunkX, chunkZ)
+        val samplers = HashMap<Long, DensityChunkSampler>()
+        return JigsawAssembly(poolLookup, templateLoader, heightAt = { x, z -> surfaceHeightAt(x, z, samplers) })
+            .assemble(
+                variant.startPool,
+                StructurePos(chunkX * 16, 0, chunkZ * 16),
+                maxDepth,
+                random,
+                projectStartToHeightmap = true,
+                maxDistanceFromCenter = maxDistanceFromCenter,
+                useExpansionHack = true,
+            )
+    }
+
+    /**
+     * Assembles any template pool by name, which is what `/place jigsaw` does: no structure, no
+     * placement grid and no biome, just a start pool and a depth.
+     *
+     * parity: `PlaceCommand.placeJigsaw`, minus its `target` argument. Vanilla uses it to pick which
+     * jigsaw block of the start piece the assembly grows from; this assembly grows from every
+     * jigsaw of the start piece, so naming one narrows nothing and the argument is accepted and
+     * ignored rather than pretended.
+     */
+    public fun assemblePool(
+        pool: String,
+        chunkX: Int,
+        chunkZ: Int,
+        maxDepth: Int,
+        seed: Long,
+    ): List<PlacedStructurePiece> {
+        val random = WorldgenRandom(LegacyRandom(0L))
+        random.setLargeFeatureSeed(seed, chunkX, chunkZ)
+        val samplers = HashMap<Long, DensityChunkSampler>()
+        return JigsawAssembly(poolLookup, templateLoader, heightAt = { x, z -> surfaceHeightAt(x, z, samplers) })
+            .assemble(
+                pool,
+                StructurePos(chunkX * 16, 0, chunkZ * 16),
+                maxDepth,
+                random,
+                projectStartToHeightmap = true,
+                maxDistanceFromCenter = maxDistanceFromCenter,
+                useExpansionHack = true,
+            )
+    }
+
+    /** Whether [pool] is a template pool the operator's own jar actually ships. */
+    public fun hasPool(pool: String): Boolean = poolLookup(pool) != null
+
+    /** Writes the part of [pieces] that lands in [chunk]. The caller repeats it per chunk they cover. */
+    public fun placeInto(
+        chunk: Chunk,
+        pieces: List<PlacedStructurePiece>,
+        seed: Long,
+    ) {
+        val clip =
+            StructureBoundingBox(
+                chunk.chunkX * 16,
+                WorldHeight.MIN_Y,
+                chunk.chunkZ * 16,
+                chunk.chunkX * 16 + 15,
+                WorldHeight.MAX_Y,
+                chunk.chunkZ * 16 + 15,
+            )
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        for (piece in pieces) {
+            if (!piece.boundingBox.intersects(clip)) continue
+            piece.element.place(templateLoader, chunk, piece.position, piece.rotation, clip, random)
         }
     }
 
@@ -302,45 +431,80 @@ public class VillageStructureGenerator(
         return (y + 1).coerceAtLeast(SEA_LEVEL)
     }
 
-    private companion object {
-        const val CELL_WIDTH = 4
-        const val CELL_HEIGHT = 8
-        const val SEA_LEVEL = 63
-        const val BEARD_RADIUS = 12
-        const val SURFACE_STRUCTURES_STEP = 4
+    public companion object {
+        /** Vanilla searches 100 cells for a village, which at spacing 34 is a long way out. */
+        private const val DEFAULT_SEARCH_CELLS = 100
+
+        private const val CELL_WIDTH = 4
+        private const val CELL_HEIGHT = 8
+        private const val SEA_LEVEL = 63
+        private const val BEARD_RADIUS = 12
+        private const val SURFACE_STRUCTURES_STEP = 4
 
         // 64 candidate cells is over 2000 chunks of travel at the villages grid spacing; a full
         // re-assembly after an overflow costs about a second per nearby candidate.
-        const val ASSEMBLY_CACHE_CAPACITY = 64
+        private const val ASSEMBLY_CACHE_CAPACITY = 64
 
-        data class Variant(
+        private data class Variant(
+            val id: Identifier,
             val startPool: String,
             val biomes: Set<String>,
             val structureIndex: Int,
         )
 
-        data class CandidateKey(
+        private data class CandidateKey(
             val seed: Long,
             val chunkX: Int,
             val chunkZ: Int,
         )
 
-        data class VillageStart(
+        private data class VillageStart(
             val variant: Variant,
             val pieces: List<PlacedStructurePiece>,
         )
 
         // parity: villages.json's five entries in file order (all weight 1) with each structure's
         // own real `has_structure/village_*` biome tag contents.
-        val VARIANTS =
+        private val VARIANTS =
             listOf(
-                Variant("minecraft:village/plains/town_centers", setOf("plains", "meadow"), 22),
-                Variant("minecraft:village/desert/town_centers", setOf("desert"), 21),
-                Variant("minecraft:village/savanna/town_centers", setOf("savanna"), 23),
-                Variant("minecraft:village/snowy/town_centers", setOf("snowy_plains"), 24),
-                Variant("minecraft:village/taiga/town_centers", setOf("taiga"), 25),
+                Variant(
+                    Identifier.vanilla("village_plains"),
+                    "minecraft:village/plains/town_centers",
+                    setOf("plains", "meadow"),
+                    22,
+                ),
+                Variant(
+                    Identifier.vanilla("village_desert"),
+                    "minecraft:village/desert/town_centers",
+                    setOf("desert"),
+                    21,
+                ),
+                Variant(
+                    Identifier.vanilla("village_savanna"),
+                    "minecraft:village/savanna/town_centers",
+                    setOf("savanna"),
+                    23,
+                ),
+                Variant(
+                    Identifier.vanilla("village_snowy"),
+                    "minecraft:village/snowy/town_centers",
+                    setOf("snowy_plains"),
+                    24,
+                ),
+                Variant(
+                    Identifier.vanilla("village_taiga"),
+                    "minecraft:village/taiga/town_centers",
+                    setOf("taiga"),
+                    25,
+                ),
             )
 
-        val PLACEMENT_VARIANTS = VARIANTS.sortedBy(Variant::structureIndex)
+        private val PLACEMENT_VARIANTS = VARIANTS.sortedBy(Variant::structureIndex)
+
+        /**
+         * The same ids, without a generator in hand: what a command completes with in a world that
+         * generates no villages at all, since the name is a fact about this build, not about it.
+         */
+        public val STRUCTURE_IDS: Set<Identifier> = VARIANTS.map { it.id }.toSet()
     }
 }

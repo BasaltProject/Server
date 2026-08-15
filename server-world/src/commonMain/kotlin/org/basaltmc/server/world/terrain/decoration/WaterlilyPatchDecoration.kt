@@ -34,6 +34,16 @@ public object WaterlilyPatchDecoration {
         }
     }
 
+    /** The patch at one origin, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val region = PatchRegion(chunk, null, null)
+        repeat(10) { placeCandidate(region, random, origin) }
+    }
+
     private fun placeCandidate(
         region: PatchRegion,
         random: WorldgenRandom,

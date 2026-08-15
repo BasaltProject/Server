@@ -6,9 +6,12 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.ComponentArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
+import org.basaltmc.server.runtime.command.ObjectiveArgument
+import org.basaltmc.server.runtime.command.ObjectiveCriteriaArgument
 import org.basaltmc.server.runtime.command.OperationArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.ScoreHolderArgument
+import org.basaltmc.server.runtime.command.ScoreboardSlotArgument
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.scoreboard.Objective
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
@@ -34,7 +37,7 @@ public class ScoreboardCommand(
             literal("list") { executes { context -> listObjectives(context) } }
             literal("add") {
                 argument("objective", WordArgument) {
-                    argument("criteria", WordArgument) {
+                    argument("criteria", ObjectiveCriteriaArgument) {
                         executes { context -> addObjective(context, null) }
                         argument("displayName", ComponentArgument) {
                             executes { context -> addObjective(context, context.get("displayName")) }
@@ -43,20 +46,18 @@ public class ScoreboardCommand(
                 }
             }
             literal("remove") {
-                argument("objective", WordArgument) { executes { context -> removeObjective(context) } }
+                objective { executes { context -> removeObjective(context) } }
             }
             literal("setdisplay") {
-                for (slot in DisplaySlot.entries) {
-                    literal(slot.name.lowercase()) {
-                        executes { context -> setDisplay(context, slot, null) }
-                        argument("objective", WordArgument) {
-                            executes { context -> setDisplay(context, slot, context.get("objective")) }
-                        }
+                argument("slot", ScoreboardSlotArgument) {
+                    executes { context -> setDisplay(context, context.get("slot"), null) }
+                    objective {
+                        executes { context -> setDisplay(context, context.get("slot"), context.get("objective")) }
                     }
                 }
             }
             literal("modify") {
-                argument("objective", WordArgument) {
+                objective {
                     literal("displayname") {
                         argument("displayName", ComponentArgument) {
                             executes { context -> modifyDisplayName(context) }
@@ -77,26 +78,26 @@ public class ScoreboardCommand(
             }
             literal("get") {
                 argument("target", ScoreHolderArgument) {
-                    argument("objective", WordArgument) { executes { context -> getScore(context) } }
+                    objective { executes { context -> getScore(context) } }
                 }
             }
             literal("set") {
                 argument("targets", ScoreHolderArgument) {
-                    argument("objective", WordArgument) {
+                    objective {
                         argument("score", IntegerArgument()) { executes { context -> setScore(context) } }
                     }
                 }
             }
             literal("add") {
                 argument("targets", ScoreHolderArgument) {
-                    argument("objective", WordArgument) {
+                    objective {
                         argument("score", IntegerArgument(min = 0)) { executes { context -> changeScore(context, 1) } }
                     }
                 }
             }
             literal("remove") {
                 argument("targets", ScoreHolderArgument) {
-                    argument("objective", WordArgument) {
+                    objective {
                         argument("score", IntegerArgument(min = 0)) { executes { context -> changeScore(context, -1) } }
                     }
                 }
@@ -104,24 +105,20 @@ public class ScoreboardCommand(
             literal("reset") {
                 argument("targets", ScoreHolderArgument) {
                     executes { context -> reset(context, null) }
-                    argument("objective", WordArgument) {
-                        executes { context ->
-                            reset(context, context.get("objective"))
-                        }
-                    }
+                    objective { executes { context -> reset(context, context.get("objective")) } }
                 }
             }
             literal("enable") {
                 argument("targets", ScoreHolderArgument) {
-                    argument("objective", WordArgument) { executes { context -> enable(context) } }
+                    objective { executes { context -> enable(context) } }
                 }
             }
             literal("operation") {
                 argument("targets", ScoreHolderArgument) {
-                    argument("targetObjective", WordArgument) {
+                    objective("targetObjective") {
                         argument("operation", OperationArgument) {
                             argument("source", ScoreHolderArgument) {
-                                argument("sourceObjective", WordArgument) {
+                                objective("sourceObjective") {
                                     executes { context -> operation(context) }
                                 }
                             }
@@ -130,6 +127,14 @@ public class ScoreboardCommand(
                 }
             }
         }
+    }
+
+    /** An argument naming an objective that already exists, so it completes with the ones that do. */
+    private fun CommandNodeBuilder.objective(
+        name: String = "objective",
+        build: CommandNodeBuilder.() -> Unit,
+    ) {
+        argument(name, ObjectiveArgument) { build() }
     }
 
     private fun objectiveOf(

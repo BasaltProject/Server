@@ -6,6 +6,7 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.GameProfileArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
+import org.basaltmc.server.runtime.command.SuggestionContext
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.wire.text.Component
 
@@ -21,6 +22,8 @@ import org.basaltmc.wire.text.Component
 public class OpCommand : Command(name = "op", permissionLevel = PermissionLevel.ADMINS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("targets", GameProfileArgument) {
+            // parity: `OpCommand`, which completes with who is online and not an operator yet.
+            suggestsFromServer { context -> context.matching(candidates(context, operators = false)) }
             executes { context ->
                 val name = context.get<String>("targets")
                 assign(context, name, context.environment.groups.operatorGroup.name)
@@ -38,6 +41,8 @@ public class OpCommand : Command(name = "op", permissionLevel = PermissionLevel.
 public class DeopCommand : Command(name = "deop", permissionLevel = PermissionLevel.ADMINS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("targets", GameProfileArgument) {
+            // parity: `DeOpCommands`, which completes with the operators rather than with everyone.
+            suggestsFromServer { context -> context.matching(candidates(context, operators = true)) }
             executes { context ->
                 val name = context.get<String>("targets")
                 assign(context, name, context.environment.groups.defaultGroup.name)
@@ -61,6 +66,7 @@ public class GroupCommand : Command(name = "group", permissionLevel = Permission
     override fun build(root: CommandNodeBuilder) {
         root.argument("player", GameProfileArgument) {
             argument("group", WordArgument) {
+                suggestsFromServer { context -> context.matching(context.environment.groups.names) }
                 executes { context ->
                     val name = context.get<String>("player")
                     val group = context.get<String>("group").lowercase()
@@ -84,6 +90,24 @@ public class GroupCommand : Command(name = "group", permissionLevel = Permission
             }
         }
     }
+}
+
+/** Who is online and (is | is not) in the operator group, which is what `/op` and `/deop` complete with. */
+private fun candidates(
+    context: SuggestionContext,
+    operators: Boolean,
+): List<String> {
+    val group = context.environment.groups.operatorGroup.name
+    val ops =
+        context.environment.playerRepository
+            ?.findInGroup(group)
+            .orEmpty()
+            .map { it.name }
+            .toSet()
+    return context.environment.players
+        .snapshot()
+        .map { it.name }
+        .filter { (it in ops) == operators }
 }
 
 /**

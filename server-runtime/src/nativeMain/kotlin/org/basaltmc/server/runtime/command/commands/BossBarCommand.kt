@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.runtime.command.BoolArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
@@ -80,11 +81,15 @@ public class BossBarCommand(
             }
         }
         root.literal("remove") {
-            argument("id", ResourceLocationArgument) { executes { context -> remove(context) } }
+            argument("id", ResourceLocationArgument) {
+                suggestsFromServer { context -> context.matchingIds(registry.all.map { it.id }) }
+                executes { context -> remove(context) }
+            }
         }
         root.literal("list") { executes { context -> list(context) } }
         root.literal("get") {
             argument("id", ResourceLocationArgument) {
+                suggestsFromServer { context -> context.matchingIds(registry.all.map { it.id }) }
                 for (what in listOf("value", "max", "visible", "players")) {
                     literal(what) { executes { context -> get(context, what) } }
                 }
@@ -92,6 +97,7 @@ public class BossBarCommand(
         }
         root.literal("set") {
             argument("id", ResourceLocationArgument) {
+                suggestsFromServer { context -> context.matchingIds(registry.all.map { it.id }) }
                 literal("name") {
                     argument("name", ComponentArgument) { executes { context -> setName(context) } }
                 }
@@ -112,8 +118,8 @@ public class BossBarCommand(
                     argument("max", IntegerArgument(min = 1)) { executes { context -> setMax(context) } }
                 }
                 literal("visible") {
-                    for (visible in listOf(true, false)) {
-                        literal(visible.toString()) { executes { context -> setVisible(context, visible) } }
+                    argument("visible", BoolArgument) {
+                        executes { context -> setVisible(context, context.get("visible")) }
                     }
                 }
                 literal("players") {

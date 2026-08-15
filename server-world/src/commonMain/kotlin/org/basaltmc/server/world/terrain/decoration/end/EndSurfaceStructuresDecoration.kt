@@ -152,6 +152,20 @@ public object EndSurfaceStructuresDecoration {
         chunk.setBlockStateId(x and 15, y, z and 15, stateId)
     }
 
+    /** parity: `end_spike`, which places every spike of this seed that reaches into the chunk. */
+    public fun placeSpikesIn(
+        chunk: Chunk,
+        seed: Long,
+    ): Boolean {
+        var placed = false
+        for (spike in spikesForSeed(seed)) {
+            if (!spike.intersects(chunk)) continue
+            placeSpike(chunk, spike, seed)
+            placed = true
+        }
+        return placed
+    }
+
     private fun placeSpike(
         chunk: Chunk,
         spike: EndSpike,

@@ -88,7 +88,7 @@ class FunctionCommandsTest {
         ).also { it.register(DataCommand(storage)) }
             .also { it.register(FunctionCommand(library, runner)) }
             .also { it.register(ReturnCommand(runner)) }
-            .also { it.register(ScheduleCommand(schedule)) }
+            .also { it.register(ScheduleCommand(library, schedule)) }
             .also { it.register(DataPackCommand(library)) }
 
     private val source = FunctionConsole()

@@ -6,6 +6,7 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.GreedyStringArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
+import org.basaltmc.server.runtime.command.SuggestionContext
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.placeholder.PlaceholderSlots
 import org.basaltmc.server.runtime.player.PlayerSession
@@ -33,6 +34,7 @@ public class PlaceholderCommand :
     override fun build(root: CommandNodeBuilder) {
         root.literal("parse") {
             argument("subject", WordArgument) {
+                suggestsFromServer { context -> context.matching(subjects(context)) }
                 argument("text", GreedyStringArgument) {
                     executes { context ->
                         val parsed = parse(context, subjectOf(context), context.get("text"))
@@ -45,6 +47,7 @@ public class PlaceholderCommand :
 
         root.literal("bcparse") {
             argument("subject", WordArgument) {
+                suggestsFromServer { context -> context.matching(subjects(context)) }
                 argument("text", GreedyStringArgument) {
                     executes { context ->
                         val parsed = parse(context, subjectOf(context), context.get("text"))
@@ -57,6 +60,7 @@ public class PlaceholderCommand :
 
         root.literal("cmdparse") {
             argument("subject", WordArgument) {
+                suggestsFromServer { context -> context.matching(subjects(context)) }
                 argument("text", GreedyStringArgument) {
                     executes { context ->
                         val parsed = parse(context, subjectOf(context), context.get("text"))
@@ -69,7 +73,9 @@ public class PlaceholderCommand :
 
         root.literal("parserel") {
             argument("first", WordArgument) {
+                suggestsFromServer { context -> context.matching(subjects(context)) }
                 argument("second", WordArgument) {
+                    suggestsFromServer { context -> context.matching(subjects(context)) }
                     argument("text", GreedyStringArgument) {
                         executes { context ->
                             val first = onlinePlayer(context, context.get("first"))
@@ -104,10 +110,17 @@ public class PlaceholderCommand :
         root.literal("list") {
             executes { context -> listIdentifiers(context) }
             argument("identifier", WordArgument) {
+                suggestsFromServer { context -> context.matching(context.environment.placeholders.identifiers) }
                 executes { context -> listNames(context, context.get("identifier")) }
             }
         }
     }
+
+    /** Who the text can be about: whoever is online, plus the two keywords [subjectOf] accepts. */
+    private fun subjects(context: SuggestionContext): List<String> =
+        context.environment.players
+            .snapshot()
+            .map { it.name } + listOf("me", "--null")
 
     /**
      * Who the text is about: a name, `me`, or `--null` for deliberately nobody.
@@ -116,6 +129,7 @@ public class PlaceholderCommand :
      * server list line or a console message will do, where there really is no player, without
      * having to log out to find out.
      */
+
     private fun subjectOf(context: CommandContext): PlaceholderContext {
         val subject = context.get<String>("subject")
         if (subject == "--null") return PlaceholderContext.EMPTY

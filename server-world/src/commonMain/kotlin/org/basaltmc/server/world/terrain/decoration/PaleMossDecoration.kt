@@ -85,6 +85,15 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         return DecorationPos(x, belowY, z)
     }
 
+    /** parity: `pale_moss_patch`'s own vegetation, at one position. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        placeVegetation(chunk, random, origin)
+    }
+
     private fun placeVegetation(
         chunk: Chunk,
         random: WorldgenRandom,

@@ -32,6 +32,17 @@ public object EndRawDecoration {
         }
     }
 
+    /** parity: `end_island_decorated`, one island at one position. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        placeIsland(chunk, random, x, y, z)
+    }
+
     private fun placeIsland(
         chunk: Chunk,
         random: BasaltRandom,

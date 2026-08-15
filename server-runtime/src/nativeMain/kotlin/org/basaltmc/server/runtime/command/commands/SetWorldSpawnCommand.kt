@@ -1,12 +1,12 @@
 package org.basaltmc.server.runtime.command.commands
 
-import org.basaltmc.server.runtime.command.AngleArgument
 import org.basaltmc.server.runtime.command.BlockCoordinates
 import org.basaltmc.server.runtime.command.BlockPosArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.PermissionLevel
+import org.basaltmc.server.runtime.command.RotationArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.GlobalPos
@@ -19,8 +19,10 @@ public class SetWorldSpawnCommand : Command(name = "setworldspawn", permissionLe
         root.executes { context -> setSpawn(context, null, 0f) }
         root.argument("pos", BlockPosArgument) {
             executes { context -> setSpawn(context, context.get("pos"), 0f) }
-            argument("angle", AngleArgument) {
-                executes { context -> setSpawn(context, context.get("pos"), context.get("angle")) }
+            argument("rotation", RotationArgument) {
+                executes { context ->
+                    setSpawn(context, context.get("pos"), context.get<Pair<Float, Float>>("rotation").first)
+                }
             }
         }
     }

@@ -1,6 +1,5 @@
 package org.basaltmc.server.runtime.command.commands
 
-import org.basaltmc.server.registry.ParticleTypes
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
@@ -8,26 +7,26 @@ import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.Coordinates
 import org.basaltmc.server.runtime.command.FloatArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
+import org.basaltmc.server.runtime.command.ParsedParticle
+import org.basaltmc.server.runtime.command.ParticleArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
-import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.command.Vec3Argument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.player.PlayerSession
-import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.play.LevelParticlesPacket
 import org.basaltmc.wire.text.Component
 
 /**
- * parity: `ParticleCommand`, for every particle that carries no options.
+ * parity: `ParticleCommand`.
  *
- * A particle with options (`block`, `dust`, `item`, `trail`, and the rest of the twenty-two) needs
- * its option block written after the type id, and a packet missing it desynchronizes the client on
- * the very next frame, so those are refused by name instead.
+ * The options a type carries are parsed and written by [ParticleArgument]: they go straight after
+ * the type id with no length of their own, so a missing or wrongly shaped block desynchronises the
+ * client on the very next packet rather than drawing the wrong particle.
  */
 public class ParticleCommand : Command(name = "particle", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("name", ResourceLocationArgument) {
+        root.argument("name", ParticleArgument) {
             executes { context -> particle(context, null, null, 1, force = false, viewers = null) }
             argument("pos", Vec3Argument) {
                 executes { context -> particle(context, context.get("pos"), null, 1, force = false, viewers = null) }
@@ -85,20 +84,9 @@ public class ParticleCommand : Command(name = "particle", permissionLevel = Perm
         force: Boolean,
         viewers: List<PlayerSession>?,
     ): Int {
-        val id = context.get<Identifier>("name")
-        val type =
-            ParticleTypes[id]
-                ?: throw CommandSyntaxException(
-                    Component.translatable("particle.notFound", Component.text(id.toString())),
-                )
-        if (type.needsOptions) {
-            throw CommandSyntaxException(
-                Component.text(
-                    "'$id' carries extra data (a block, an item or colours) that this build cannot write yet, " +
-                        "so it would arrive as a different particle or break the connection.",
-                ),
-            )
-        }
+        val parsed = context.get<ParsedParticle>("name")
+        val type = parsed.type
+        val id = type.id
         val world = context.world()
         val (x, y, z) = position?.resolve(context.source.position) ?: context.source.position
         val (dx, dy, dz) = delta?.resolve(Triple(0.0, 0.0, 0.0)) ?: Triple(0.0, 0.0, 0.0)
@@ -116,6 +104,7 @@ public class ParticleCommand : Command(name = "particle", permissionLevel = Perm
                 maxSpeed = speed,
                 count = count,
                 overrideLimiter = force,
+                options = parsed.options,
             )
         val audience = viewers ?: context.environment.playersIn(world)
         if (audience.isEmpty()) {

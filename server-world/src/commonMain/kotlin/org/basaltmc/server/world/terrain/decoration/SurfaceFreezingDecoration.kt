@@ -17,32 +17,48 @@ import org.basaltmc.wire.common.Identifier
  * Snow placement also updates the `snowy` property of grass block, podzol, and mycelium below it.
  */
 public object SurfaceFreezingDecoration {
+    /** parity: `freeze_top_layer` over one column rather than the whole chunk. */
+    public fun placeAt(
+        chunk: Chunk,
+        environment: SurfaceRuleEnvironment,
+        x: Int,
+        z: Int,
+    ) {
+        freezeColumn(chunk, environment, x and 15, z and 15)
+    }
+
     public fun decorate(
         chunk: Chunk,
         environment: SurfaceRuleEnvironment,
     ) {
         for (localX in 0 until 16) {
-            for (localZ in 0 until 16) {
-                val worldX = chunk.chunkX * 16 + localX
-                val worldZ = chunk.chunkZ * 16 + localZ
-                val topY = chunk.heightAt(localX, localZ, Chunk.HeightmapType.MOTION_BLOCKING)
-                if (topY !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) continue
+            for (localZ in 0 until 16) freezeColumn(chunk, environment, localX, localZ)
+        }
+    }
 
-                val biomeId = environment.biomeAt(worldX, topY, worldZ)
-                val belowY = topY - 1
-                if (belowY >= WorldHeight.MIN_Y &&
-                    shouldFreeze(chunk, localX, belowY, localZ, biomeId, worldX, worldZ)
-                ) {
-                    chunk.setBlockStateId(localX, belowY, localZ, Blocks.ICE.stateId)
-                }
+    /** One column: ice on exposed water, snow on top of what can hold it. */
+    private fun freezeColumn(
+        chunk: Chunk,
+        environment: SurfaceRuleEnvironment,
+        localX: Int,
+        localZ: Int,
+    ) {
+        val worldX = chunk.chunkX * 16 + localX
+        val worldZ = chunk.chunkZ * 16 + localZ
+        val topY = chunk.heightAt(localX, localZ, Chunk.HeightmapType.MOTION_BLOCKING)
+        if (topY !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
 
-                if (shouldSnow(chunk, localX, topY, localZ, biomeId, worldX, worldZ)) {
-                    chunk.setBlockStateId(localX, topY, localZ, Blocks.SNOW.stateId)
-                    val snowyBelowStateId = Blocks.withSnowy(chunk.getBlockStateId(localX, belowY, localZ), true)
-                    if (snowyBelowStateId != null) {
-                        chunk.setBlockStateId(localX, belowY, localZ, snowyBelowStateId)
-                    }
-                }
+        val biomeId = environment.biomeAt(worldX, topY, worldZ)
+        val belowY = topY - 1
+        if (belowY >= WorldHeight.MIN_Y && shouldFreeze(chunk, localX, belowY, localZ, biomeId, worldX, worldZ)) {
+            chunk.setBlockStateId(localX, belowY, localZ, Blocks.ICE.stateId)
+        }
+
+        if (shouldSnow(chunk, localX, topY, localZ, biomeId, worldX, worldZ)) {
+            chunk.setBlockStateId(localX, topY, localZ, Blocks.SNOW.stateId)
+            val snowyBelowStateId = Blocks.withSnowy(chunk.getBlockStateId(localX, belowY, localZ), true)
+            if (snowyBelowStateId != null) {
+                chunk.setBlockStateId(localX, belowY, localZ, snowyBelowStateId)
             }
         }
     }

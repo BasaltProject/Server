@@ -146,7 +146,16 @@ public class PardonCommand(
     private val ip: Boolean,
 ) : Command(name = if (ip) "pardon-ip" else "pardon", permissionLevel = PermissionLevel.ADMINS) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("target", if (ip) WordArgument else GameProfileArgument) {
+        root.argument(if (ip) "target" else "targets", if (ip) WordArgument else GameProfileArgument) {
+            // parity: `PardonCommand` completes with who is actually banned, not with who is online.
+            suggestsFromServer { context ->
+                context.matching(
+                    context.environment.access
+                        ?.bans(if (ip) BanKind.IP else BanKind.PLAYER)
+                        .orEmpty()
+                        .mapNotNull { if (ip) it.subject else it.name },
+                )
+            }
             executes { context -> pardon(context) }
         }
     }
@@ -155,7 +164,7 @@ public class PardonCommand(
         val access =
             context.environment.access
                 ?: throw CommandSyntaxException(Component.text("This server has no player database to pardon from."))
-        val target = context.get<String>("target")
+        val target = context.get<String>(if (ip) "target" else "targets")
         val subject =
             if (ip) {
                 target
@@ -240,10 +249,35 @@ public class WhitelistCommand(
         root.literal("off") { executes { context -> toggle(context, false) } }
         root.literal("list") { executes { context -> list(context) } }
         root.literal("add") {
-            argument("target", GameProfileArgument) { executes { context -> add(context) } }
+            argument("targets", GameProfileArgument) {
+                suggestsFromServer { context ->
+                    val listed =
+                        context.environment.access
+                            ?.whitelist()
+                            .orEmpty()
+                            .map { it.name }
+                            .toSet()
+                    context.matching(
+                        context.environment.players
+                            .snapshot()
+                            .map { it.name } - listed,
+                    )
+                }
+                executes { context -> add(context) }
+            }
         }
         root.literal("remove") {
-            argument("target", GameProfileArgument) { executes { context -> remove(context) } }
+            argument("targets", GameProfileArgument) {
+                suggestsFromServer { context ->
+                    context.matching(
+                        context.environment.access
+                            ?.whitelist()
+                            .orEmpty()
+                            .map { it.name },
+                    )
+                }
+                executes { context -> remove(context) }
+            }
         }
         root.literal("reload") {
             executes { context ->
@@ -292,7 +326,7 @@ public class WhitelistCommand(
 
     private fun add(context: CommandContext): Int {
         val access = access(context)
-        val name = context.get<String>("target")
+        val name = context.get<String>("targets")
         if (access.whitelistedByName(name) != null) {
             throw CommandSyntaxException(Component.translatable("commands.whitelist.add.failed"))
         }
@@ -316,7 +350,7 @@ public class WhitelistCommand(
 
     private fun remove(context: CommandContext): Int {
         val access = access(context)
-        val name = context.get<String>("target")
+        val name = context.get<String>("targets")
         val entry =
             access.whitelistedByName(name)
                 ?: throw CommandSyntaxException(Component.translatable("commands.whitelist.remove.failed"))

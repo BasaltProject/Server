@@ -37,4 +37,7 @@ public class Registry<T> {
     public val size: Int get() = valueById.size
 
     public fun values(): Collection<T> = valueById.values
+
+    /** Every name registered, in registration order. What command completions are drawn from. */
+    public fun identifiers(): Collection<Identifier> = idByIdentifier.keys
 }

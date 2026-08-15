@@ -29,6 +29,17 @@ public object NetherLocalDecoration {
         }
     }
 
+    /** parity: `basalt_pillar`, at one position rather than scattered over the chunk. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        placePillar(chunk, random, x, y, z)
+    }
+
     private fun placePillar(
         chunk: Chunk,
         random: BasaltRandom,
