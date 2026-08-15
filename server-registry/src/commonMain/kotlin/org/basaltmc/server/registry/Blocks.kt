@@ -1113,7 +1113,7 @@ public object Blocks {
             // loading. These compact generated state-definition specs expand in the registry's
             // exact Cartesian-product order, covering every rotation result, not only states that
             // happened to appear unrotated in one NBT template.
-            for (encoded in VILLAGE_BLOCK_STATE_SPECS) {
+            for (encoded in VILLAGE_BLOCK_STATE_SPECS + PORTAL_BLOCK_STATE_SPECS) {
                 val fields = encoded.split('|', limit = 3)
                 var stateId = fields[0].toInt()
                 val block = Identifier.vanilla(fields[1])

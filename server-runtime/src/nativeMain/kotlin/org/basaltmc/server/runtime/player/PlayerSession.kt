@@ -85,6 +85,17 @@ public class PlayerSession(
     /** The 41 slots this player carries. See [PlayerInventory] for what is and is not modelled. */
     public val inventory: PlayerInventory = PlayerInventory(connection.enchantmentIds)
 
+    /**
+     * How long this player has been standing in a portal, and how long until one works again.
+     *
+     * parity: `Entity.portalProcess`/`portalCooldown`. Both are counted here rather than on the
+     * connection because they belong to the player, not to the socket: a portal half entered
+     * survives a chunk reload the way vanilla's does.
+     */
+    public var portalTicks: Int = 0
+
+    public var portalCooldown: Int = 0
+
     /** Set the moment health hits zero, cleared on respawn. A dead player stops being ticked. */
     public var dead: Boolean = false
 

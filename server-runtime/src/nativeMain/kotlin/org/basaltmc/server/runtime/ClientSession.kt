@@ -28,8 +28,10 @@ import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDialogs
@@ -50,6 +52,7 @@ import org.basaltmc.server.world.ChunkDataCodec
 import org.basaltmc.server.world.ChunkPos
 import org.basaltmc.server.world.ChunkTracker
 import org.basaltmc.server.world.crafting.CraftingInput
+import org.basaltmc.server.world.portal.PortalShape
 import org.basaltmc.wire.auth.Cfb8Cipher
 import org.basaltmc.wire.auth.MinecraftCrypt
 import org.basaltmc.wire.auth.OfflineUuid
@@ -1425,6 +1428,13 @@ public class ClientSession(
             }
         }
 
+        // Breaking the frame puts the portal out, which is the other half of lighting one.
+        currentWorld?.let { loaded ->
+            for (block in NetherPortals.extinguishAround(loaded, action.pos.x, action.pos.y, action.pos.z)) {
+                broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), Blocks.AIR.stateId)
+            }
+        }
+
         if (gamemode == Gamemode.SURVIVAL && brokenBlock != null) {
             // parity: `Player.hasCorrectToolForDrops`. A block marked as needing the right tool
             // gives nothing to the wrong one, which is what makes punching stone a waste of time
@@ -1465,6 +1475,71 @@ public class ClientSession(
         if (worn == held) return
         session.inventory[heldSlot] = worn
         sendInventorySlot(heldSlot)
+    }
+
+    /**
+     * Sets fire where the flint and steel points, and lights a Nether portal if that fire lands
+     * inside an obsidian frame.
+     *
+     * parity: `BaseFireBlock.onPlace` is what checks the frame, not the item, which is why any
+     * fire in the right place opens a portal and why the portal replaces the fire rather than
+     * burning next to it.
+     */
+    private fun igniteAt(
+        session: PlayerSession,
+        pos: BlockPos,
+        heldSlot: Int,
+        held: StoredItemStack,
+    ) {
+        val world = currentWorld ?: return
+        val existing = world.state.getBlockState(pos.x, pos.y, pos.z) ?: return
+        if (!isAirLike(existing)) return
+
+        val shape = NetherPortals.light(world, pos.x, pos.y, pos.z)
+        if (shape != null) {
+            val portal = PortalShape.portalState(shape.axis)
+            for (block in shape.interior()) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), portal)
+        } else {
+            if (!NetherPortals.placeFire(world, pos.x, pos.y, pos.z)) return
+            broadcastBlockUpdate(pos, FIRE_STATE)
+        }
+
+        if (session.gamemode == Gamemode.CREATIVE) return
+        val worn =
+            ItemWear.hurt(held, 1, LegacyRandom(Random.nextLong())) { stack, amount, random ->
+                damageEffects.process(stack, amount, random)
+            }
+        if (worn == held) return
+        session.inventory[heldSlot] = worn
+        sendInventorySlot(heldSlot)
+    }
+
+    /** Arms an end portal frame, and opens the portal when that was the twelfth eye. */
+    private fun placeEnderEye(
+        session: PlayerSession,
+        pos: BlockPos,
+        heldSlot: Int,
+        held: StoredItemStack,
+    ) {
+        val world = currentWorld ?: return
+        val changed = EndPortals.placeEye(world, pos.x, pos.y, pos.z) ?: return
+        for (block in changed) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+        if (session.gamemode == Gamemode.CREATIVE) return
+        val remaining = held.count - 1
+        session.inventory[heldSlot] = if (remaining <= 0) null else held.copy(count = remaining)
+        sendInventorySlot(heldSlot)
+    }
+
+    /** One block change, to everyone standing in this world. */
+    private fun broadcastBlockUpdate(
+        pos: BlockPos,
+        stateId: Int,
+    ) {
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                ClientboundBlockUpdatePacket(pos, stateId).write(it)
+            }
+        }
     }
 
     /**
@@ -1838,6 +1913,19 @@ public class ClientSession(
 
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot]
+
+        // Flint and steel is not a block, so it has to be answered before the "is this placeable"
+        // check below throws the click away. parity: `FlintAndSteelItem.useOn`.
+        if (held != null && Identifier.parse(held.id) == FLINT_AND_STEEL) {
+            igniteAt(session, hit.pos.offset(hit.direction), heldSlot, held)
+            return ack()
+        }
+        // parity: `EnderEyeItem.useOn`, which acts on the frame itself rather than next to it.
+        if (held != null && Identifier.parse(held.id) == ENDER_EYE) {
+            placeEnderEye(session, hit.pos, heldSlot, held)
+            return ack()
+        }
+
         val blockStateId = held?.let { Blocks.REGISTRY.idOf(Identifier.parse(it.id)) }
         if (held == null || blockStateId == null) return ack()
 
@@ -3248,6 +3336,13 @@ public class ClientSession(
         const val MAX_CONTAINER_ID = 100
 
         val CRAFTING_TABLE: Identifier = Identifier.vanilla("crafting_table")
+
+        val FLINT_AND_STEEL: Identifier = Identifier.vanilla("flint_and_steel")
+
+        val ENDER_EYE: Identifier = Identifier.vanilla("ender_eye")
+
+        /** Fire's default state: this build has no model for which sides of it are burning. */
+        val FIRE_STATE: Int = Blocks.REGISTRY.idOf(Identifier.vanilla("fire")) ?: Blocks.AIR.stateId
 
         /** How close (blocks) a player has to be to a dropped item to vacuum it up. Vanilla's own AABB-based range is close to this. */
         const val PICKUP_RADIUS = 1.5

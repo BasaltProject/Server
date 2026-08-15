@@ -89,6 +89,9 @@ public class WorldCommand : Command(name = "world", permissionLevel = Permission
             "world: ${world.name}",
             "type: ${world.declaration.type.name.lowercase()}",
             "dimension: ${world.declaration.dimension}",
+            // Which set of dimensions this world belongs to, which is what decides where its
+            // portals come out. Blank for an overworld, which is a set of its own.
+            "linked to: ${world.declaration.linkedTo ?: "-"}",
             "seed: ${world.metadata.seed}",
             "spawn: ${world.spawn.first}, ${world.spawn.second}, ${world.spawn.third}",
             "chunks loaded: ${world.state.loadedChunkCount}",

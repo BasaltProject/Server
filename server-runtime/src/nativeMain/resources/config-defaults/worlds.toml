@@ -23,8 +23,32 @@ type = "normal"
 # the seed it was generated with wins over this value and a mismatch is logged:
 # changing it does not regenerate terrain that is already on disk.
 # seed = 12345
-# Only "overworld" is implemented so far.
+# overworld, nether or end. The dimension decides the sky, the height limits, the
+# 1:8 of a Nether portal and whether it can rain.
 dimension = "overworld"
+
+# The other two dimensions, as a vanilla server has them.
+#
+# linked_to names the overworld they belong to: a portal lit in that overworld
+# comes out here, and a portal here goes back to it. That is what lets a server
+# have SEVERAL sets of dimensions, each with its own Nether and its own End,
+# without a plugin rewriting portal travel. Leave it out and the world belongs to
+# the default one.
+#
+# With no seed of their own they share the seed of the overworld they belong to,
+# which is what a vanilla save does with its three dimensions.
+#
+# Remove a table and portals to it stop working (the server says so in the log);
+# the files stay where they are.
+[worlds.world_nether]
+type = "normal"
+dimension = "nether"
+linked_to = "world"
+
+[worlds.world_the_end]
+type = "normal"
+dimension = "end"
+linked_to = "world"
 
 # More worlds go here. Each one gets its own chunks, region files and settings,
 # and players travel between them with /tp.
@@ -33,6 +57,21 @@ dimension = "overworld"
 # [worlds.creative]
 # type = "flat"
 # seed = 42
+#
+# A second overworld with its own dimensions, which on Paper takes a plugin:
+# [worlds.skyblock]
+# type = "normal"
+# [worlds.skyblock_nether]
+# dimension = "nether"
+# linked_to = "skyblock"
+# [worlds.skyblock_the_end]
+# dimension = "end"
+# linked_to = "skyblock"
+#
+# Rules: only a nether or an end may name a linked_to, it has to name an overworld
+# that this file declares, and one overworld has at most one nether and one end.
+# Anything else stops the server naming the world, rather than sending portals
+# somewhere nobody chose.
 
 [defaults]
 # Inherited by every world, and overridable per world in worlds/<name>/settings.toml.
