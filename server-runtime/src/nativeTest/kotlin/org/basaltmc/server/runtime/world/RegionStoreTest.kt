@@ -28,17 +28,15 @@ class RegionStoreTest {
     private fun cleanUp() {
         val root = "$worldsRoot/$worldName"
         for (path in listOf(dimension, "the_nether")) {
-            val dir = "$root/dimensions/minecraft/$path/region"
+            val dir = "$root/region"
             for (name in FileIO.list(dir)) FileIO.delete("$dir/$name")
             FileIO.delete(dir)
-            FileIO.delete("$root/dimensions/minecraft/$path")
         }
-        FileIO.delete("$root/dimensions/minecraft")
         FileIO.delete("$root/dimensions")
         FileIO.delete(root)
     }
 
-    private fun store() = RegionStore(worldName, dimension, worldsRoot)
+    private fun store() = RegionStore(worldName, worldsRoot)
 
     private fun chunkWith(
         x: Int,
@@ -58,13 +56,13 @@ class RegionStoreTest {
 
     @Test
     fun roundTripsDimensionSpecificBoundsAndPath() {
-        val store = RegionStore(worldName, "the_nether", worldsRoot, verticalBounds = ChunkHeight.NETHER)
+        val store = RegionStore(worldName, worldsRoot, verticalBounds = ChunkHeight.NETHER)
         val chunk = Chunk(0, 0, ChunkHeight.NETHER)
         chunk.setBlockStateId(1, 255, 1, Blocks.NETHERRACK.stateId)
         store.saveChunks(listOf(chunk), timestamp = 1)
 
         val loaded =
-            RegionStore(worldName, "the_nether", worldsRoot, verticalBounds = ChunkHeight.NETHER).loadChunk(0, 0)
+            RegionStore(worldName, worldsRoot, verticalBounds = ChunkHeight.NETHER).loadChunk(0, 0)
 
         assertNotNull(loaded)
         assertEquals(ChunkHeight.NETHER, loaded.verticalBounds)
@@ -146,7 +144,7 @@ class RegionStoreTest {
      */
     @Test
     fun theCacheIsBoundedByBytesAndNotOnlyByRegionCount() {
-        val store = RegionStore(worldName, dimension, worldsRoot, byteBudget = 1L)
+        val store = RegionStore(worldName, worldsRoot, byteBudget = 1L)
         for (i in 0..3) store.saveChunks(listOf(chunkWith(i * 32, 0, Blocks.STONE.stateId)), timestamp = 1)
 
         assertEquals(1, store.cachedRegionCount, "the byte budget did not evict anything")

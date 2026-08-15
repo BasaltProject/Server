@@ -26,7 +26,6 @@ import kotlin.time.TimeSource
  */
 public class RegionStore(
     worldName: String,
-    private val dimension: String,
     worldsRoot: String = WORLDS_ROOT,
     private val verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
     private val capacity: Int = CAPACITY,
@@ -35,6 +34,9 @@ public class RegionStore(
 ) {
     /**
      * Where this world's files live: `worlds/<name>/`, and nothing outside it belongs to this world.
+     *
+     * Regions sit in `region/`, not under vanilla's `dimensions/<namespace>/<path>/`: that nesting
+     * is for a save holding three dimensions, and here a world is one.
      *
      * Player state deliberately does not live here (it is in `players.db`, beside `worlds/`, not
      * inside any of them). That is the whole point of the layout: vanilla writes
@@ -70,7 +72,7 @@ public class RegionStore(
     public fun regionPath(
         regionX: Int,
         regionZ: Int,
-    ): String = "$worldRoot/dimensions/minecraft/$dimension/region/r.$regionX.$regionZ.linear"
+    ): String = "$worldRoot/region/r.$regionX.$regionZ.linear"
 
     /** Returns `null` if this chunk has never been saved, meaning it still needs to be generated. */
     public fun loadChunk(
