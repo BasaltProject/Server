@@ -52,6 +52,7 @@ import org.basaltmc.server.world.ChunkDataCodec
 import org.basaltmc.server.world.ChunkPos
 import org.basaltmc.server.world.ChunkTracker
 import org.basaltmc.server.world.crafting.CraftingInput
+import org.basaltmc.server.world.light.LightWindow
 import org.basaltmc.server.world.portal.PortalShape
 import org.basaltmc.wire.auth.Cfb8Cipher
 import org.basaltmc.wire.auth.MinecraftCrypt
@@ -1163,7 +1164,10 @@ public class ClientSession(
             ChunkDataCodec.encodeLight(
                 chunk,
                 world?.declaration?.dimension?.hasSkylight ?: true,
-            ) { x, y, z -> world?.state?.getBlockState(x, y, z) }
+                // The chunk and the eight around it, straight off the chunk objects: light reaches
+                // less than a chunk, so that is everything that can shine into this one.
+                LightWindow(chunk) { chunkX, chunkZ -> world?.state?.chunkIfLoaded(chunkX, chunkZ) },
+            )
         val heightmap = ChunkDataCodec.encodeHeightmap(chunk)
         sendCompressed(MapChunkPacket.ID) {
             MapChunkPacket(

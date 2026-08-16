@@ -13,8 +13,11 @@ private val GLASS = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("glass"
 private val WATER = Blocks.WATER.stateId
 
 /** A flat floor at y = 64, which is what most of these start from. */
-private fun flatChunk(): Chunk {
-    val chunk = Chunk(0, 0, ChunkHeight.OVERWORLD)
+private fun flatChunk(
+    chunkX: Int = 0,
+    chunkZ: Int = 0,
+): Chunk {
+    val chunk = Chunk(chunkX, chunkZ, ChunkHeight.OVERWORLD)
     for (x in 0 until 16) {
         for (z in 0 until 16) {
             for (y in ChunkHeight.OVERWORLD.minY until 64) chunk.setBlockStateId(x, y, z, STONE)
@@ -35,17 +38,32 @@ private fun lightAt(
     return sections[index][(localY * 16 + z) * 16 + x]
 }
 
-/** A lid at y = 70 with a single hole, so the only light below comes down that column. */
-private fun roofExceptOneHole(
+/** The chunk on its own: every neighbour missing, which reads as open sky. */
+private fun window(chunk: Chunk): LightWindow = LightWindow(chunk) { _, _ -> null }
+
+/** A lid at [y] over the whole chunk, with at most one hole in it. */
+private fun roof(
     chunk: Chunk,
-    holeX: Int,
-    holeZ: Int,
+    y: Int,
+    holeX: Int = -1,
+    holeZ: Int = -1,
 ) {
     for (x in 0 until 16) {
         for (z in 0 until 16) {
             if (x == holeX && z == holeZ) continue
-            chunk.setBlockStateId(x, 70, z, STONE)
+            chunk.setBlockStateId(x, y, z, STONE)
         }
+    }
+}
+
+/** The chunk, with eight neighbours built the same way: a roof that does not stop at the border. */
+private fun roofedWindow(
+    chunk: Chunk,
+    y: Int,
+): LightWindow {
+    val neighbours = mutableMapOf<Pair<Int, Int>, Chunk>()
+    return LightWindow(chunk) { chunkX, chunkZ ->
+        neighbours.getOrPut(chunkX to chunkZ) { flatChunk(chunkX, chunkZ).also { roof(it, y) } }
     }
 }
 
@@ -54,7 +72,7 @@ class SkyLightTest {
 
     @Test
     fun openSkyIsFullyLitAndSolidGroundIsNot() {
-        val sections = SkyLight.compute(flatChunk()) { _, _, _ -> null }
+        val sections = SkyLight.compute(window(flatChunk()))
 
         assertEquals(15, lightAt(sections, bounds, 8, 64, 8))
         assertEquals(15, lightAt(sections, bounds, 8, 200, 8))
@@ -70,7 +88,7 @@ class SkyLightTest {
         val chunk = flatChunk()
         for (y in 64 until 120) chunk.setBlockStateId(8, y, 8, STONE)
 
-        val sections = SkyLight.compute(chunk) { _, _, _ -> null }
+        val sections = SkyLight.compute(window(chunk))
 
         assertEquals(0, lightAt(sections, bounds, 8, 100, 8))
         assertEquals(15, lightAt(sections, bounds, 2, 100, 2))
@@ -86,8 +104,8 @@ class SkyLightTest {
             for (z in 0 until 16) chunk.setBlockStateId(x, 66, z, STONE)
         }
 
-        // The roof carries on into the neighbours, so the only way in is that column.
-        val sections = SkyLight.compute(chunk) { _, y, _ -> if (y == 66) STONE else null }
+        // The roof carries on into the neighbours, so that column is the only way in.
+        val sections = SkyLight.compute(roofedWindow(chunk, y = 66))
 
         assertEquals(15, lightAt(sections, bounds, 15, 65, 8))
         assertEquals(14, lightAt(sections, bounds, 14, 65, 8))
@@ -99,9 +117,9 @@ class SkyLightTest {
     fun glassLetsTheSkyStraightThrough() {
         val chunk = flatChunk()
         for (y in 64 until 70) chunk.setBlockStateId(1, y, 1, GLASS)
-        roofExceptOneHole(chunk, holeX = 1, holeZ = 1)
+        roof(chunk, y = 70, holeX = 1, holeZ = 1)
 
-        val sections = SkyLight.compute(chunk) { _, y, _ -> if (y == 70) STONE else null }
+        val sections = SkyLight.compute(roofedWindow(chunk, y = 70))
 
         assertEquals(15, lightAt(sections, bounds, 1, 64, 1))
     }
@@ -111,9 +129,9 @@ class SkyLightTest {
     fun waterDimsTheSkyOneLevelPerBlock() {
         val chunk = flatChunk()
         for (y in 64 until 70) chunk.setBlockStateId(3, y, 3, WATER)
-        roofExceptOneHole(chunk, holeX = 3, holeZ = 3)
+        roof(chunk, y = 70, holeX = 3, holeZ = 3)
 
-        val sections = SkyLight.compute(chunk) { _, y, _ -> if (y == 70) STONE else null }
+        val sections = SkyLight.compute(roofedWindow(chunk, y = 70))
 
         assertEquals(14, lightAt(sections, bounds, 3, 69, 3))
         assertEquals(11, lightAt(sections, bounds, 3, 66, 3))
@@ -124,12 +142,12 @@ class SkyLightTest {
     @Test
     fun lightArrivesFromTheNeighbouringChunk() {
         val chunk = flatChunk()
-        // Roofed over entirely: without a neighbour there would be no light under it at all.
-        for (x in 0 until 16) {
-            for (z in 0 until 16) chunk.setBlockStateId(x, 66, z, STONE)
-        }
+        // Roofed over entirely, with open neighbours: the only light comes in from next door.
+        roof(chunk, y = 66)
 
-        val sections = SkyLight.compute(chunk) { _, y, _ -> if (y == 66) Blocks.AIR.stateId else null }
+        val open = mutableMapOf<Pair<Int, Int>, Chunk>()
+        val sections =
+            SkyLight.compute(LightWindow(chunk) { cx, cz -> open.getOrPut(cx to cz) { flatChunk(cx, cz) } })
 
         assertEquals(14, lightAt(sections, bounds, 0, 65, 8))
         assertEquals(14, lightAt(sections, bounds, 15, 65, 8))
@@ -142,7 +160,7 @@ class SkyLightTest {
         val torch = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("torch")))
         chunk.setBlockStateId(8, 64, 8, torch)
 
-        val sections = BlockLight.compute(chunk) { _, _, _ -> null }
+        val sections = checkNotNull(BlockLight.compute(window(chunk)))
 
         assertEquals(14, lightAt(sections, bounds, 8, 64, 8))
         assertEquals(13, lightAt(sections, bounds, 9, 64, 8))
@@ -154,6 +172,50 @@ class SkyLightTest {
 
     @Test
     fun aChunkWithNothingBurningHasNoBlockLightAtAll() {
-        assertEquals(false, BlockLight.hasEmitters(flatChunk()))
+        assertEquals(null, BlockLight.compute(window(flatChunk())))
+    }
+
+    /**
+     * The bug from the cave screenshots: the opening is in the chunk next door, ten blocks away.
+     * With a one block margin no light arrived and the cave was black until a block was placed;
+     * light reaches fifteen blocks, so the window has to be the nine chunks vanilla lights with.
+     */
+    @Test
+    fun lightArrivesFromAnOpeningInTheNextChunk() {
+        // Solid rock from y = 64 up to y = 80, with a corridor at y = 65 running east.
+        fun carved(
+            chunkX: Int,
+            chunkZ: Int,
+        ): Chunk {
+            val chunk = Chunk(chunkX, chunkZ, ChunkHeight.OVERWORLD)
+            for (x in 0 until 16) {
+                for (z in 0 until 16) {
+                    for (y in ChunkHeight.OVERWORLD.minY..80) chunk.setBlockStateId(x, y, z, STONE)
+                    chunk.setBlockStateId(x, 65, z, Blocks.AIR.stateId)
+                }
+            }
+            return chunk
+        }
+
+        val centre = carved(0, 0)
+        val built = mutableMapOf<Pair<Int, Int>, Chunk>()
+        val window =
+            LightWindow(centre) { chunkX, chunkZ ->
+                built.getOrPut(chunkX to chunkZ) {
+                    carved(chunkX, chunkZ).also { chunk ->
+                        // The mouth: one open column down to the corridor, in the chunk to the west.
+                        if (chunkX == -1 && chunkZ == 0) {
+                            for (y in 65..80) chunk.setBlockStateId(14, y, 8, Blocks.AIR.stateId)
+                        }
+                    }
+                }
+            }
+
+        val sections = SkyLight.compute(window)
+
+        // Two blocks into this chunk, six blocks from the mouth: dim, but not black.
+        assertTrue(lightAt(sections, bounds, 1, 65, 8) > 0, "the corridor is black at x = 1")
+        assertTrue(lightAt(sections, bounds, 1, 65, 8) < 15)
+        assertEquals(0, lightAt(sections, bounds, 15, 65, 8))
     }
 }

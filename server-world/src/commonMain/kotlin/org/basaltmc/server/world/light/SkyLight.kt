@@ -19,8 +19,18 @@ import org.basaltmc.wire.common.Identifier
 public object SkyLight {
     public const val MAX: Int = 15
 
-    /** How much light a block takes out of what passes through it. parity: `BlockBehaviour.lightBlock`. */
+    /**
+     * How much light a block takes out of what passes through it.
+     *
+     * parity: `BlockBehaviour.getLightDampening`: fifteen for a block that renders solid, zero for
+     * one that lets the sky through (air, glass, a torch, grass), and one for the rest, which is
+     * water, ice and leaves. Slabs and stairs are the known miss: vanilla asks their shape and this
+     * has no shapes, so they count as solid.
+     */
     public fun opacity(stateId: Int): Int =
+        if (stateId in 0 until TABLE.size) TABLE[stateId] else uncachedOpacity(stateId)
+
+    private fun uncachedOpacity(stateId: Int): Int =
         when {
             Blocks.isAir(stateId) -> 0
             stateId in TRANSPARENT -> 0
@@ -33,60 +43,51 @@ public object SkyLight {
         }
 
     /**
-     * The light of every block in [chunk], as one value per block in section order.
+     * The sky light of the middle chunk of [window].
      *
-     * [blockAt] reads world coordinates outside the chunk and answers null where nothing is loaded,
-     * which is read as open sky.
+     * Only the band with terrain in it is lit: above the tallest block everything is open sky, and
+     * more than fifteen blocks below the lowest surface no sky light can reach, since it loses a
+     * level per block on the way down.
      */
-    public fun compute(
-        chunk: Chunk,
-        blockAt: (x: Int, y: Int, z: Int) -> Int?,
-    ): Array<IntArray> {
-        val minY = chunk.verticalBounds.minY
-        val height = chunk.verticalBounds.height
-        // Nothing above the tallest block casts or takes a shadow, so the whole engine runs on the
-        // band that has terrain in it. Over a normal world that is a third of the column.
-        val top = (chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE).max() - minY + 1).coerceIn(0, height - 1)
-        val stride = LightSpread.SKIRT_WIDTH * LightSpread.SKIRT_WIDTH
-        val light = ByteArray(stride * (top + 1))
-        val opacity = ByteArray(stride * (top + 1))
+    public fun compute(window: LightWindow): Array<IntArray> {
+        val surface = window.surfaceRange()
+        val topY = (surface.last + 1).coerceIn(window.minY, window.maxY)
+        val bottomY = (surface.first - MAX - 1).coerceIn(window.minY, topY)
+        val pass = LightSpread(window, bottomY, topY, outside = MAX)
 
-        // The chunk plus one block of its neighbours, so light spilling in from an open column next
-        // door still arrives.
-        for (localZ in 0 until LightSpread.SKIRT_WIDTH) {
-            for (localX in 0 until LightSpread.SKIRT_WIDTH) {
-                val worldX = chunk.chunkX * 16 + localX - 1
-                val worldZ = chunk.chunkZ * 16 + localZ - 1
-                val inside = localX in 1..16 && localZ in 1..16
-                for (y in 0..top) {
-                    val state =
-                        if (inside) {
-                            chunk.getBlockStateId(localX - 1, minY + y, localZ - 1)
-                        } else {
-                            blockAt(worldX, minY + y, worldZ) ?: Blocks.AIR.stateId
-                        }
-                    opacity[LightSpread.index(localX, y, localZ)] = opacity(state).toByte()
+        // parity: `ChunkSkyLightSources`: a column is a source at full strength down to the first
+        // block that dampens light at all. Everything above that floor is simply 15.
+        val floor = IntArray(LightWindow.WIDTH * LightWindow.WIDTH)
+        for (z in 0 until LightWindow.WIDTH) {
+            for (x in 0 until LightWindow.WIDTH) {
+                var lowest = topY + 1
+                for (y in topY downTo bottomY) {
+                    if (pass.opacityAt(x, y, z) > 0) break
+                    pass.set(x, y, z, MAX)
+                    lowest = y
                 }
+                floor[z * LightWindow.WIDTH + x] = lowest
             }
         }
 
-        // parity: the sky pours down a column at full strength until a block takes some of it.
-        val queue = ArrayDeque<Int>()
-        for (localZ in 0 until LightSpread.SKIRT_WIDTH) {
-            for (localX in 0 until LightSpread.SKIRT_WIDTH) {
-                var level = MAX
-                for (y in top downTo 0) {
-                    val at = LightSpread.index(localX, y, localZ)
-                    level -= opacity[at].toInt()
-                    if (level <= 0) break
-                    light[at] = level.toByte()
-                    queue.addLast(at)
+        // Only the edge of that lit region goes in the queue. A block of open sky with open sky all
+        // round it has nothing to give anyone, and queueing it was most of the cost of a light pass.
+        for (z in 0 until LightWindow.WIDTH) {
+            for (x in 0 until LightWindow.WIDTH) {
+                val lowest = floor[z * LightWindow.WIDTH + x]
+                if (lowest > topY) continue
+                var highestNeighbourFloor = lowest
+                for (side in SIDES) {
+                    val nextX = x + side[0]
+                    val nextZ = z + side[1]
+                    if (nextX !in 0 until LightWindow.WIDTH || nextZ !in 0 until LightWindow.WIDTH) continue
+                    val neighbour = floor[nextZ * LightWindow.WIDTH + nextX]
+                    if (neighbour > highestNeighbourFloor) highestNeighbourFloor = neighbour
                 }
+                for (y in lowest..minOf(highestNeighbourFloor, topY)) pass.push(x, y, z, MAX)
             }
         }
-
-        LightSpread.spread(light, opacity, queue, top + 1)
-        return LightSpread.sections(chunk, light, height, aboveTop = MAX, top = top)
+        return pass.run()
     }
 
     private val DYE_COLOURS =
@@ -131,4 +132,24 @@ public object SkyLight {
                 Blocks.REGISTRY.idOf(Identifier.vanilla("${colour}_stained_glass"))?.let(::add)
             }
         }
+
+    /**
+     * One answer per block state, worked out once.
+     *
+     * The chain above costs a set lookup and a handful of calls, and a light pass asks it a few
+     * hundred thousand times: as a table it measured two orders of magnitude cheaper, which is the
+     * same reason the heightmaps have one.
+     */
+    private val SIDES =
+        arrayOf(
+            intArrayOf(1, 0),
+            intArrayOf(-1, 0),
+            intArrayOf(0, 1),
+            intArrayOf(0, -1),
+        )
+
+    private val TABLE: IntArray = IntArray(Blocks.stateCount) { uncachedOpacity(it) }
+
+    /** The same table, for the bulk fill that reads it a few hundred thousand times. */
+    internal val opacityTable: IntArray get() = TABLE
 }

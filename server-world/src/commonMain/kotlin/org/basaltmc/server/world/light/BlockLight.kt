@@ -1,7 +1,6 @@
 package org.basaltmc.server.world.light
 
 import org.basaltmc.server.registry.Blocks
-import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
 
 /**
@@ -15,18 +14,29 @@ import org.basaltmc.wire.common.Identifier
  */
 public object BlockLight {
     /** parity: `BlockBehaviour.Properties.lightLevel` of the blocks that have one. */
-    public fun emission(stateId: Int): Int = EMISSION[stateId] ?: 0
+    public fun emission(stateId: Int): Int = if (stateId in 0 until TABLE.size) TABLE[stateId] else 0
 
-    /** Whether this chunk has anything worth lighting, so an empty one costs nothing. */
-    public fun hasEmitters(chunk: Chunk): Boolean =
-        (0 until chunk.sectionCount).any { index ->
-            chunk.section(index).mayContain { emission(it) > 0 }
+    /**
+     * The block light of the middle chunk of [window], or null when nothing in reach burns.
+     *
+     * The band is the sections that hold something burning, grown by one on each side: fifteen
+     * levels reach less than a section away, so nothing outside it can be lit.
+     */
+    public fun compute(window: LightWindow): Array<IntArray>? {
+        val sections = window.emitterSections(::emission) ?: return null
+        val bottomY = (window.minY + (sections.first - 1) * 16).coerceAtLeast(window.minY)
+        val topY = (window.minY + (sections.last + 2) * 16 - 1).coerceAtMost(window.maxY)
+        val pass = LightSpread(window, bottomY, topY, outside = 0)
+        for (z in 0 until LightWindow.WIDTH) {
+            for (x in 0 until LightWindow.WIDTH) {
+                for (y in bottomY..topY) {
+                    val emitted = emission(pass.stateAt(x, y, z))
+                    if (emitted > 0) pass.seed(x, y, z, emitted)
+                }
+            }
         }
-
-    public fun compute(
-        chunk: Chunk,
-        blockAt: (x: Int, y: Int, z: Int) -> Int?,
-    ): Array<IntArray> = LightSpread.compute(chunk, blockAt, ::emission)
+        return pass.run()
+    }
 
     private val EMISSION: Map<Int, Int> =
         buildMap {
@@ -70,4 +80,7 @@ public object BlockLight {
             put(3, "magma_block", "sculk_sensor", "sculk_shrieker")
             put(1, "brewing_stand", "brown_mushroom", "dragon_egg", "sculk_vein")
         }
+
+    /** The same table [SkyLight] keeps, and for the same reason: this is read per block. */
+    private val TABLE: IntArray = IntArray(Blocks.stateCount) { EMISSION[it] ?: 0 }
 }
