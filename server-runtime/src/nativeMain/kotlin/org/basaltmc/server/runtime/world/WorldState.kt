@@ -4,6 +4,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
+import org.basaltmc.server.world.ChunkScheduledTick
 import org.basaltmc.server.world.NoiseWorldGenerator
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.io.NativeMutex
@@ -166,6 +167,45 @@ public class WorldState(
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
             true
         }
+
+    /**
+     * Queues a fluid tick [delay] ticks from now, doing nothing if the chunk is not loaded.
+     *
+     * parity: `LevelTicks.schedule`, minus its priorities: only one tick per position and fluid is
+     * ever pending, and re-scheduling an existing one keeps the delay already counting down.
+     */
+    public fun scheduleFluidTick(
+        x: Int,
+        y: Int,
+        z: Int,
+        type: Identifier,
+        delay: Int,
+    ) {
+        mutex.withLock {
+            val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock
+            if (y < chunk.verticalBounds.minY || y > chunk.verticalBounds.maxY) return@withLock
+            chunk.scheduleFluidTick(ChunkScheduledTick(type, x and 15, y, z and 15, delay))
+        }
+    }
+
+    /** Every fluid tick that comes due this tick, as `(x, y, z)` in world coordinates. */
+    public fun dueFluidTicks(): List<IntArray> {
+        val due = mutableListOf<ChunkScheduledTick>()
+        val positions = mutableListOf<IntArray>()
+        mutex.withLock {
+            for (chunk in chunksByPos.values) {
+                if (chunk.scheduledTickCount == 0) continue
+                val before = due.size
+                chunk.advanceFluidTicks(due)
+                for (index in before until due.size) {
+                    val tick = due[index]
+                    positions +=
+                        intArrayOf((chunk.chunkX shl 4) + tick.localX, tick.y, (chunk.chunkZ shl 4) + tick.localZ)
+                }
+            }
+        }
+        return positions
+    }
 
     /**
      * Runtime identities for the immutable entities emitted by generated chunks within

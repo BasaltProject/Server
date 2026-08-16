@@ -48,6 +48,8 @@ import kotlin.time.TimeSource
 internal fun startTestServer(
     preferredPort: Int,
     onlineMode: OnlineMode? = null,
+    /** What the default group may run, for a test that has to drive the server through a command. */
+    defaultPermissions: List<String> = listOf("basalt.command.help", "basalt.command.me"),
 ): Int {
     for (port in candidatePorts(preferredPort)) {
         val config =
@@ -102,7 +104,7 @@ internal fun startTestServer(
                     live =
                         LiveConfigs(
                             ConfigSnapshot(
-                                groups = testGroups(),
+                                groups = testGroups(defaultPermissions),
                                 serverList = testServerList(),
                                 commands = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
                                 animations = AnimationsConfig(emptyMap()),

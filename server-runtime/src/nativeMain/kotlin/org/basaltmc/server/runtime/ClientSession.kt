@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockEntityTypes
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.ItemTools
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
@@ -27,8 +28,11 @@ import org.basaltmc.server.runtime.registry.VanillaTagData
 import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.server.runtime.world.AdvancementTriggers
+import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.EndPortals
+import org.basaltmc.server.runtime.world.FluidFlow
+import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.NetherPortals
@@ -36,6 +40,8 @@ import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDialogs
 import org.basaltmc.server.runtime.world.RealEnchantments
+import org.basaltmc.server.runtime.world.RealEntityTypeTags
+import org.basaltmc.server.runtime.world.RealFluidTags
 import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
@@ -149,6 +155,7 @@ import org.basaltmc.wire.protocol.play.ServerboundPositionPacket
 import org.basaltmc.wire.protocol.play.ServerboundSetCarriedItemPacket
 import org.basaltmc.wire.protocol.play.ServerboundSetCreativeModeSlotPacket
 import org.basaltmc.wire.protocol.play.ServerboundUseItemOnPacket
+import org.basaltmc.wire.protocol.play.ServerboundUseItemPacket
 import org.basaltmc.wire.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.wire.protocol.play.SetChunkCacheRadiusPacket
 import org.basaltmc.wire.protocol.play.SetEntityDataPacket
@@ -244,6 +251,9 @@ public class ClientSession(
     private val blockTags: RealBlockTags? = null,
     /** The real item tags, sent to the client alongside the block ones. */
     private val itemTags: RealItemTags? = null,
+    /** The fluid tags, which are what the client checks before it believes it is under water. */
+    private val fluidTags: RealFluidTags? = null,
+    private val entityTypeTags: RealEntityTypeTags? = null,
 ) {
     private val logger = Logger("Session")
 
@@ -823,6 +833,16 @@ public class ClientSession(
                     ?.membersOf(tagName)
                     .orEmpty()
                     .mapNotNull { Items.REGISTRY.byIdentifier(it)?.protocolId }
+            "minecraft:fluid" ->
+                fluidTags
+                    ?.membersOf(Identifier.parse(tagName))
+                    .orEmpty()
+                    .mapNotNull(RealFluidTags.PROTOCOL_IDS::get)
+            "minecraft:entity_type" ->
+                entityTypeTags
+                    ?.membersOf(Identifier.parse(tagName))
+                    .orEmpty()
+                    .mapNotNull { EntityTypes[it]?.protocolId }
             else -> emptyList()
         }
 
@@ -1293,6 +1313,7 @@ public class ClientSession(
                 playerSession?.let(::closeOpenMenu)
             }
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
+            ServerboundUseItemPacket.ID -> handleUseItem(ServerboundUseItemPacket.read(body))
             ServerboundPickItemFromBlockPacket.ID ->
                 handlePickItemFromBlock(
                     ServerboundPickItemFromBlockPacket.read(body),
@@ -1423,7 +1444,8 @@ public class ClientSession(
         }
 
         val broken = world.getBlockState(action.pos.x, action.pos.y, action.pos.z)
-        val changed = world.setBlockState(action.pos.x, action.pos.y, action.pos.z, Blocks.AIR.stateId)
+        val leaves = meltedIce(broken, action.pos) ?: Blocks.AIR.stateId
+        val changed = world.setBlockState(action.pos.x, action.pos.y, action.pos.z, leaves)
         sendCompressed(ClientboundBlockChangedAckPacket.ID) {
             ClientboundBlockChangedAckPacket(action.sequence).write(it)
         }
@@ -1433,7 +1455,7 @@ public class ClientSession(
 
         for (player in playersInSameWorld()) {
             player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
-                ClientboundBlockUpdatePacket(action.pos, Blocks.AIR.stateId).write(it)
+                ClientboundBlockUpdatePacket(action.pos, leaves).write(it)
             }
         }
 
@@ -1441,6 +1463,10 @@ public class ClientSession(
         currentWorld?.let { loaded ->
             for (block in NetherPortals.extinguishAround(loaded, action.pos.x, action.pos.y, action.pos.z)) {
                 broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), Blocks.AIR.stateId)
+            }
+            // Whatever fluid was being held back by that block now has somewhere to go.
+            for (block in FluidFlow.onBlockChanged(loaded, action.pos.x, action.pos.y, action.pos.z)) {
+                broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
             }
         }
 
@@ -1537,6 +1563,24 @@ public class ClientSession(
         val remaining = held.count - 1
         session.inventory[heldSlot] = if (remaining <= 0) null else held.copy(count = remaining)
         sendInventorySlot(heldSlot)
+    }
+
+    /**
+     * What breaking a block leaves behind, which is water when it was ice over something solid or
+     * liquid. parity: `IceBlock.playerDestroy`. Without it a frozen ocean answers a broken block
+     * with a dry hole, and there is no way into the water at all.
+     *
+     * Silk touch is not read yet, so ice always melts here; the Nether evaporates it as vanilla does.
+     */
+    private fun meltedIce(
+        broken: Int?,
+        pos: BlockPos,
+    ): Int? {
+        if (broken == null || broken !in ICE_STATES) return null
+        val world = currentWorld ?: return null
+        if (world.declaration.dimension.hasCeiling) return null
+        val below = world.state.getBlockState(pos.x, pos.y - 1, pos.z) ?: return null
+        return if (Chunk.HeightmapType.MOTION_BLOCKING.matches(below)) Blocks.WATER.stateId else null
     }
 
     /** One block change, to everyone standing in this world. */
@@ -1893,6 +1937,7 @@ public class ClientSession(
      * state, only the main hand is read, and this build has no block-entity/container-interaction
      * model yet.
      */
+
     private fun handleUseItemOn(useItemOn: ServerboundUseItemOnPacket) {
         fun ack() {
             sendCompressed(ClientboundBlockChangedAckPacket.ID) {
@@ -1957,6 +2002,48 @@ public class ClientSession(
                 ClientboundBlockUpdatePacket(placeAt, blockStateId).write(it)
             }
         }
+        currentWorld?.let { loaded ->
+            for (block in FluidFlow.onBlockChanged(loaded, placeAt.x, placeAt.y, placeAt.z)) {
+                broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+            }
+        }
+    }
+
+    /**
+     * Using an item with nothing under the crosshair, which is how a bucket reaches a fluid.
+     *
+     * The ack comes first and unconditionally: the client already changed its own copy, and the ack
+     * is what undoes it when the server disagrees.
+     */
+    private fun handleUseItem(useItem: ServerboundUseItemPacket) {
+        sendCompressed(ClientboundBlockChangedAckPacket.ID) {
+            ClientboundBlockChangedAckPacket(useItem.sequence).write(it)
+        }
+        val session = playerSession ?: return
+        if (useItem.hand != ServerboundUseItemOnPacket.Hand.MAIN_HAND) return
+        if (session.gamemode == Gamemode.SPECTATOR || session.gamemode == Gamemode.ADVENTURE) return
+        val world = currentWorld ?: return
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot] ?: return
+        val item = Identifier.parse(held.id)
+        if (!Buckets.isBucket(item)) return
+
+        val result =
+            Buckets.use(
+                world = world,
+                item = item,
+                eyeX = session.x,
+                eyeY = session.y + Fluids.eyeHeight(session.sneaking),
+                eyeZ = session.z,
+                yaw = useItem.yaw,
+                pitch = useItem.pitch,
+                creative = session.gamemode == Gamemode.CREATIVE,
+            ) ?: return
+
+        for (block in result.changes) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+        val replacement = result.replacement ?: return
+        session.inventory[heldSlot] = held.copy(id = replacement.toString(), count = 1)
+        sendInventorySlot(heldSlot)
     }
 
     /**
@@ -3110,6 +3197,17 @@ public class ClientSession(
         updatePosition(x, y, z, yaw, pitch, onGround = false)
     }
 
+    /** The air left and whether this player burns, to them and to everyone who can see them. */
+    internal fun syncSubmersion() {
+        val session = playerSession ?: return
+        val packet = SetEntityDataPacket.submersion(session.entityId, session.airSupply, session.fireTicks > 0)
+        sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.uuid == session.uuid) continue
+            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        }
+    }
+
     internal fun syncHealth() {
         val session = playerSession ?: return
         sendCompressed(SetHealthPacket.ID) {
@@ -3376,6 +3474,13 @@ public class ClientSession(
 
         /** Fire's default state: this build has no model for which sides of it are burning. */
         val FIRE_STATE: Int = Blocks.REGISTRY.idOf(Identifier.vanilla("fire")) ?: Blocks.AIR.stateId
+
+        /** The two blocks `IceBlock` covers: packed and blue ice are other blocks and do not melt. */
+        val ICE_STATES: Set<Int> =
+            listOfNotNull(
+                Blocks.ICE.stateId,
+                Blocks.REGISTRY.idOf(Identifier.vanilla("frosted_ice")),
+            ).toSet()
 
         /** How close (blocks) a player has to be to a dropped item to vacuum it up. Vanilla's own AABB-based range is close to this. */
         const val PICKUP_RADIUS = 1.5

@@ -54,6 +54,12 @@ public object GameRuleRegistry {
     /** parity: `show_advancement_messages`, the rule vanilla renamed from `announceAdvancements`. */
     public val SHOW_ADVANCEMENT_MESSAGES: GameRule.Bool = GameRule.Bool("show_advancement_messages", true)
 
+    /** parity: what makes two water sources next to each other fill the block between them. */
+    public val WATER_SOURCE_CONVERSION: GameRule.Bool = GameRule.Bool("water_source_conversion", true)
+
+    /** parity: off in vanilla, which is why lava has no infinite pools. */
+    public val LAVA_SOURCE_CONVERSION: GameRule.Bool = GameRule.Bool("lava_source_conversion", false)
+
     public val ALL: List<GameRule<*>> =
         listOf(
             ADVANCE_TIME,
@@ -75,7 +81,7 @@ public object GameRuleRegistry {
             GameRule.Bool("global_sound_events", true),
             IMMEDIATE_RESPAWN,
             KEEP_INVENTORY,
-            GameRule.Bool("lava_source_conversion", false),
+            LAVA_SOURCE_CONVERSION,
             LIMITED_CRAFTING,
             GameRule.Bool("locator_bar", true),
             LOG_ADMIN_COMMANDS,
@@ -114,7 +120,7 @@ public object GameRuleRegistry {
             GameRule.Bool("tnt_explodes", true),
             GameRule.Bool("tnt_explosion_drop_decay", false),
             GameRule.Bool("universal_anger", false),
-            GameRule.Bool("water_source_conversion", true),
+            WATER_SOURCE_CONVERSION,
         ).sortedBy { it.id }
 
     public fun byId(id: String): GameRule<*>? {

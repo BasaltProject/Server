@@ -120,6 +120,9 @@ public object Blocks {
 
     /** Whether this default block state exposes a non-empty water fluid state. */
     public fun hasWaterFluid(stateId: Int): Boolean {
+        // Every level of the water block, not just the source: flowing water is water, and reading
+        // it as anything else left it out of the section's fluid count and out of the flow engine.
+        if (stateId in WATER.stateId..WATER.stateId + 15) return true
         if (stateId in WATER_FLUID_STATE_IDS) return true
         if (
             isGlowLichenState(stateId) &&
