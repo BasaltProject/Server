@@ -36,6 +36,41 @@ class ChunkDataCodecTest {
         assertEquals(chunk.section(0).nonAirBlockCount, nonAirCount.toInt())
     }
 
+    /**
+     * A section with more distinct states than an indirect palette can address.
+     *
+     * The client picks indirect or global from the bits-per-entry byte alone (`Strategy
+     * .getConfigurationForBitCount`: eight bits still means a palette follows). Writing the global
+     * palette with eight bits, as this did, told the client to read the block data as a palette and
+     * cost it the rest of the chunk. Checked against Mojang's own `LevelChunkSection.read`, which
+     * decodes what this writes with nothing left over.
+     */
+    @Test
+    fun aSectionWithMoreStatesThanAPaletteHoldsGoesGlobalAtTheRegistysOwnWidth() {
+        val chunk = Chunk(0, 0, ChunkHeight.OVERWORLD)
+        var next = 1
+        for (y in 0 until 16) {
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    chunk.setBlockStateId(x, chunk.verticalBounds.minY + y, z, next)
+                    next = if (next >= 400) 1 else next + 1
+                }
+            }
+        }
+        val buffer =
+            org.basaltmc.wire.io
+                .ByteBuffer()
+        buffer.writeBytes(ChunkDataCodec.encodeSections(chunk))
+
+        buffer.readShort()
+        buffer.readShort()
+        val values = PalettedContainer.read(buffer, 4096, PalettedContainer.BLOCK_MAX_INDIRECT_BITS)
+
+        assertEquals(chunk.section(0).blockStateIds().toList(), values.toList())
+        // Every id survives, which eight bits could not have carried.
+        assertTrue(values.any { it > 255 }, "the wide states were truncated on the way out")
+    }
+
     @Test
     fun biomesAloneDecodeBackToWhatTheChunkHolds() {
         val chunk = FlatWorldGenerator.generate(0, 0)
