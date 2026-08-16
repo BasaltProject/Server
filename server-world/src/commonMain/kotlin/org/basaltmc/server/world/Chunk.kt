@@ -85,16 +85,28 @@ public class Chunk(
     }
 
     /**
-     * This chunk's sky light, packed one nibble array per section, computed once and kept until a
-     * block moves. Vanilla keeps light the same way, and for the same reason: recomputing it per
-     * player who is sent the chunk is the same work several times over.
+     * This chunk's sky light, packed one nibble array per section, kept until a block moves.
+     *
+     * [keep] is false when a neighbour was missing: that pass lets light in from where nothing is
+     * known yet, and keeping it left a chunk lit as if it had no neighbours for the rest of its
+     * life, which under water is the difference between a dim sea floor and a lit one.
      */
-    public fun skyLight(compute: () -> Array<ByteArray>): Array<ByteArray> =
-        skyLightSections ?: compute().also { skyLightSections = it }
+    public fun skyLight(
+        keep: Boolean = true,
+        compute: () -> Array<ByteArray>,
+    ): Array<ByteArray> = skyLightSections ?: compute().also { if (keep) skyLightSections = it }
 
     /** The same for the light the blocks themselves give off. */
-    public fun blockLight(compute: () -> Array<ByteArray>): Array<ByteArray> =
-        blockLightSections ?: compute().also { blockLightSections = it }
+    public fun blockLight(
+        keep: Boolean = true,
+        compute: () -> Array<ByteArray>,
+    ): Array<ByteArray> = blockLightSections ?: compute().also { if (keep) blockLightSections = it }
+
+    /** Drops the kept light, for when a neighbour arrives and this chunk's own pass is now stale. */
+    public fun invalidateLight() {
+        skyLightSections = null
+        blockLightSections = null
+    }
 
     private var skyLightSections: Array<ByteArray>? = null
     private var blockLightSections: Array<ByteArray>? = null

@@ -41,6 +41,9 @@ public class LightWindow(
             }
         }
 
+    /** Whether all nine chunks were loaded: light worked out without one errs bright, so it is not kept. */
+    public val isComplete: Boolean = chunks.all { it != null }
+
     private fun chunkAt(
         offsetX: Int,
         offsetZ: Int,
