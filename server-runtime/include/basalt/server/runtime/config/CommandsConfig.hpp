@@ -29,13 +29,22 @@ struct CustomCommand {
     friend bool operator==(const CustomCommand&, const CustomCommand&) = default;
 };
 
+struct CommandOptions {
+    bool logCommands = true;
+    std::int32_t tabCompleteMinLength = 0;
+    bool silentCommandBlockConsole = false;
+};
+
 class CommandsConfig {
 public:
     static constexpr std::string_view kFileName = "commands.toml";
 
     CommandsConfig(std::vector<std::pair<std::string, CommandOverride>> overrides, std::vector<CustomCommand> custom,
-                   std::vector<std::pair<std::string, std::string>> messages)
-        : overrides_(std::move(overrides)), custom_(std::move(custom)), messages_(std::move(messages)) {}
+                   std::vector<std::pair<std::string, std::string>> messages, CommandOptions options = {})
+        : overrides_(std::move(overrides)), custom_(std::move(custom)), messages_(std::move(messages)),
+          options_(options) {}
+
+    [[nodiscard]] const CommandOptions& options() const noexcept { return options_; }
 
     [[nodiscard]] static std::expected<CommandsConfig, std::string>
     load(const ConfigDirectory& directory = ConfigDirectory{},
@@ -55,6 +64,7 @@ private:
     std::vector<std::pair<std::string, CommandOverride>> overrides_;
     std::vector<CustomCommand> custom_;
     std::vector<std::pair<std::string, std::string>> messages_;
+    CommandOptions options_;
 };
 
 } // namespace basalt::server::runtime::config

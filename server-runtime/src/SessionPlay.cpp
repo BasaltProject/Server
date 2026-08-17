@@ -165,7 +165,9 @@ void ClientSession::runCommand(const std::string& command, const chat::SignedArg
         return;
     }
     // No vanilla counterpart: an operator should see what players run, and console output is not protocol parity.
-    logger_.info([session, &line] { return session->name() + " issued server command: /" + line; });
+    if (dispatcher->environment().commands().options().logCommands) {
+        logger_.info([session, &line] { return session->name() + " issued server command: /" + line; });
+    }
     command::PlayerCommandSource source{*session, dispatcher->environment().groups(), signedArguments};
     if (options_.events != nullptr && options_.events->listening(&server::plugins::pluginEventTypes::commandUnknown)) {
         const std::string word = line.substr(0, line.find(' '));
@@ -196,6 +198,10 @@ void ClientSession::sendSuggestions(const play::CommandSuggestionRequestPacket& 
     PlayerSession* session = playerSession_.get();
     command::CommandDispatcher* dispatcher = options_.commands;
     if (session == nullptr || dispatcher == nullptr) {
+        return;
+    }
+    if (static_cast<std::int32_t>(request.command.size()) <
+        dispatcher->environment().commands().options().tabCompleteMinLength) {
         return;
     }
     command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
