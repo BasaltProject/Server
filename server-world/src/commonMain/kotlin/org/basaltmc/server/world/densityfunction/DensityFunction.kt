@@ -32,7 +32,7 @@ public class FunctionContext(
  * noise router builds terrain shape from. Only [compute] (single-point evaluation) and the
  * declared bounds ([minValue]/[maxValue], which several node types need to fold constants and
  * short-circuit `min`/`max`) are modeled: `fillArray` (a bulk-evaluation fast path, a performance
- * optimization only, out of this project's parity contract per its own roadmap §5.4),
+ * optimization only, and outside the parity contract),
  * `mapChildren`/`mapAll` (tree-rewriting visitors, needed only once trees are built from a
  * data-driven codec, which does not exist here yet) and `codec` (that same data-driven loading)
  * are not implemented.

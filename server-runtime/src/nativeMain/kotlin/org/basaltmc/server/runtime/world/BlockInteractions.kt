@@ -9,17 +9,28 @@ public class BlockToggle(
     public val sound: String,
 )
 
+/** A block that changed on its own timer, and the sound it made. */
+public class BlockRelease(
+    public val stateId: Int,
+    public val sound: String,
+)
+
 /**
- * Opening a door, flipping a lever, pushing a trapdoor: the blocks a hand can change on its own.
+ * Opening a door, flipping a lever, pushing a button or a trapdoor: what a hand changes on its own.
  *
- * parity: `DoorBlock`, `TrapDoorBlock`, `FenceGateBlock` and `LeverBlock`'s `useWithoutItem`, which
- * cycle one property and play a sound. What is not here is what happens afterwards: nothing carries
- * the redstone signal a lever makes, because there is no redstone yet, and a button stays pressed
- * because unpressing it needs a scheduled block tick and only fluids have those.
+ * parity: `DoorBlock`, `TrapDoorBlock`, `FenceGateBlock`, `LeverBlock` and `ButtonBlock`'s
+ * `useWithoutItem`, which cycle one property and play a sound. What is not here is what happens
+ * afterwards: nothing carries the redstone signal a lever or a button makes, because there is no
+ * redstone yet.
  */
 public object BlockInteractions {
     /** parity: `BlockSetType.canOpenByHand`, which is false for exactly one family. */
     private const val IRON = "iron"
+
+    /** The button families whose set uses the stone sounds and the shorter press. */
+    private val STONE_BUTTONS = listOf("stone", "polished_blackstone", "copper", "gold", "iron")
+    private const val STONE_PRESS_TICKS = 20
+    private const val WOOD_PRESS_TICKS = 30
 
     /** parity: the sound sets, which are per wood rather than per block. */
     private val SOUND_SETS =
@@ -51,6 +62,9 @@ public object BlockInteractions {
         val kind = toggleOf(stateId) ?: return null
         val block = BlockStateDefinitions.blockOf(stateId) ?: return null
         val open = BlockStateDefinitions.propertiesOf(stateId)[kind.property] != "true"
+        // parity: `ButtonBlock.useWithoutItem` does nothing to a button already down. Its own
+        // scheduled tick is what lets it back up.
+        if (kind == Toggle.BUTTON && !open) return null
         val changes = mutableListOf<IntArray>()
 
         fun flip(
@@ -84,13 +98,38 @@ public object BlockInteractions {
         TRAPDOOR("open"),
         FENCE_GATE("open"),
         LEVER("powered"),
+        BUTTON("powered"),
     }
+
+    /**
+     * How long a pressed button stays down. parity: the `ButtonBlock` constructors, twenty ticks
+     * for every stone-like set and thirty for every wooden one.
+     */
+    public fun pressedTicks(stateId: Int): Int? {
+        if (toggleOf(stateId) != Toggle.BUTTON) return null
+        val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return null
+        return if (STONE_BUTTONS.any { path.startsWith(it) }) STONE_PRESS_TICKS else WOOD_PRESS_TICKS
+    }
+
+    /**
+     * parity: `BlockSetType`'s button sounds, which do not follow its other sounds: a copper, gold
+     * or iron button clicks like stone, and only the four wood families have their own.
+     */
+    private fun buttonSoundSet(block: Identifier): String =
+        when {
+            STONE_BUTTONS.any { block.path.startsWith(it) } -> "stone"
+            block.path.startsWith("bamboo") -> "bamboo_wood"
+            block.path.startsWith("cherry") -> "cherry_wood"
+            block.path.startsWith("crimson") || block.path.startsWith("warped") -> "nether_wood"
+            else -> "wooden"
+        }
 
     private fun toggleOf(stateId: Int): Toggle? {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return null
         // parity: an iron door or trapdoor only moves for redstone, never for a hand.
         return when {
             path == "lever" -> Toggle.LEVER
+            path.endsWith("_button") -> Toggle.BUTTON
             path.startsWith(IRON) -> null
             path.endsWith("_door") -> Toggle.DOOR
             path.endsWith("_trapdoor") -> Toggle.TRAPDOOR
@@ -99,12 +138,33 @@ public object BlockInteractions {
         }
     }
 
+    /** What a button's own scheduled tick does: back up, with the other half of its click. */
+    public fun release(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): BlockRelease? {
+        val stateId = world.state.getBlockState(x, y, z) ?: return null
+        if (toggleOf(stateId) != Toggle.BUTTON) return null
+        if (BlockStateDefinitions.propertiesOf(stateId)["powered"] != "true") return null
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return null
+        val released = BlockStateDefinitions.stateIdOf(block, mapOf("powered" to "false"), stateId) ?: return null
+        if (!world.state.setBlockState(x, y, z, released)) return null
+        return BlockRelease(released, soundFor(block, Toggle.BUTTON, open = false))
+    }
+
     private fun soundFor(
         block: Identifier,
         kind: Toggle,
         open: Boolean,
     ): String {
         if (kind == Toggle.LEVER) return "minecraft:block.lever.click"
+        if (kind ==
+            Toggle.BUTTON
+        ) {
+            return "minecraft:block.${buttonSoundSet(block)}_button.click_${if (open) "on" else "off"}"
+        }
         val action = if (open) "open" else "close"
         val set = SOUND_SETS.firstOrNull { block.path.startsWith(it.first) }?.second
         return when (kind) {

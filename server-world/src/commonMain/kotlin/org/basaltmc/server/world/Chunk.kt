@@ -165,22 +165,33 @@ public class Chunk(
     public fun scheduledFluidTicks(): List<ChunkScheduledTick> = scheduledFluidTicksBacking.toList()
 
     /**
-     * Counts every pending fluid tick down one and hands the ones that come due to [due].
+     * Counts every pending tick down one and hands the ones that come due to [due].
      *
      * The countdown itself does not dirty the chunk: whatever the tick then does to a block will,
      * and marking it every tick would have a single flowing spring rewriting its region file
      * twenty times a second.
      */
+    public fun advanceBlockTicks(due: MutableList<ChunkScheduledTick>) {
+        advance(scheduledBlockTicksBacking, due)
+    }
+
     public fun advanceFluidTicks(due: MutableList<ChunkScheduledTick>) {
-        if (scheduledFluidTicksBacking.isEmpty()) return
+        advance(scheduledFluidTicksBacking, due)
+    }
+
+    private fun advance(
+        pending: MutableList<ChunkScheduledTick>,
+        due: MutableList<ChunkScheduledTick>,
+    ) {
+        if (pending.isEmpty()) return
         var index = 0
-        while (index < scheduledFluidTicksBacking.size) {
-            val tick = scheduledFluidTicksBacking[index]
+        while (index < pending.size) {
+            val tick = pending[index]
             if (tick.delay <= 1) {
                 due += tick
-                scheduledFluidTicksBacking.removeAt(index)
+                pending.removeAt(index)
             } else {
-                scheduledFluidTicksBacking[index] = tick.copy(delay = tick.delay - 1)
+                pending[index] = tick.copy(delay = tick.delay - 1)
                 index++
             }
         }

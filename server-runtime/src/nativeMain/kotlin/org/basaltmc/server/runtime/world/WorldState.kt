@@ -188,15 +188,35 @@ public class WorldState(
         }
     }
 
+    /** Asks for [type] at these coordinates to be ticked in [delay] ticks. */
+    public fun scheduleBlockTick(
+        x: Int,
+        y: Int,
+        z: Int,
+        type: Identifier,
+        delay: Int,
+    ) {
+        mutex.withLock {
+            val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock
+            if (y < chunk.verticalBounds.minY || y > chunk.verticalBounds.maxY) return@withLock
+            chunk.scheduleBlockTick(ChunkScheduledTick(type, x and 15, y, z and 15, delay))
+        }
+    }
+
     /** Every fluid tick that comes due this tick, as `(x, y, z)` in world coordinates. */
-    public fun dueFluidTicks(): List<IntArray> {
+    public fun dueFluidTicks(): List<IntArray> = dueTicks { chunk, due -> chunk.advanceFluidTicks(due) }
+
+    /** The same for block ticks: a button that has been held down long enough, and later redstone. */
+    public fun dueBlockTicks(): List<IntArray> = dueTicks { chunk, due -> chunk.advanceBlockTicks(due) }
+
+    private fun dueTicks(advance: (Chunk, MutableList<ChunkScheduledTick>) -> Unit): List<IntArray> {
         val due = mutableListOf<ChunkScheduledTick>()
         val positions = mutableListOf<IntArray>()
         mutex.withLock {
             for (chunk in chunksByPos.values) {
                 if (chunk.scheduledTickCount == 0) continue
                 val before = due.size
-                chunk.advanceFluidTicks(due)
+                advance(chunk, due)
                 for (index in before until due.size) {
                     val tick = due[index]
                     positions +=

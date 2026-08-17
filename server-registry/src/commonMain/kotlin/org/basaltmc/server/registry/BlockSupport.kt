@@ -34,6 +34,7 @@ public object BlockSupport {
 
     /** Which block owns each state, filled on first use: only set-shaped rules need it. */
     private var blockOfState: IntArray? = null
+    private var waterlike: BooleanArray? = null
 
     init {
         rules =
@@ -71,6 +72,12 @@ public object BlockSupport {
      * ask what must *not* be beside them (cactus, chorus flower). They are never broken.
      */
     public fun isModelled(stateId: Int): Boolean = ruleOf(stateId) != UNKNOWN
+
+    /** Whether the state is water or holds it, which is what "there is water about" is asked of. */
+    public fun holdsWater(stateId: Int): Boolean {
+        val table = waterlike ?: buildWaterlike().also { waterlike = it }
+        return stateId in table.indices && table[stateId]
+    }
 
     /** parity: `BlockState.isRandomlyTicking`, which is what makes crops grow and ice melt. */
     public fun ticksRandomly(stateId: Int): Boolean = stateId in randomTicking.indices && randomTicking[stateId]
@@ -149,6 +156,23 @@ public object BlockSupport {
         for (state in table.indices) {
             val block = BlockStateDefinitions.blockOf(state) ?: continue
             table[state] = ids[block.path] ?: -1
+        }
+        return table
+    }
+
+    /** Water itself, plus every state carrying `waterlogged=true`. */
+    private fun buildWaterlike(): BooleanArray {
+        val table = BooleanArray(byState.size)
+        for (state in table.indices) {
+            val block = BlockStateDefinitions.blockOf(state) ?: continue
+            // Every level of it, not just the source block, which is one state of sixteen.
+            if (block.path == "water") {
+                table[state] = true
+                continue
+            }
+            val definition = BlockStateDefinitions.of(block) ?: continue
+            if ("waterlogged" !in definition.propertyNames) continue
+            table[state] = BlockStateDefinitions.propertiesOf(state)["waterlogged"] == "true"
         }
         return table
     }

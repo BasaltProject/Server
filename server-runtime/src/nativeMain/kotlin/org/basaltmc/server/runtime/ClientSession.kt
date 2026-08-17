@@ -50,6 +50,7 @@ import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
+import org.basaltmc.server.runtime.world.NeighbourUpdates
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealBlockTags
@@ -63,6 +64,7 @@ import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.Signs
 import org.basaltmc.server.runtime.world.SnowyBlocks
 import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.WorldState
@@ -125,6 +127,7 @@ import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
 import org.basaltmc.wire.protocol.play.AnimatePacket
 import org.basaltmc.wire.protocol.play.BlockDestructionPacket
+import org.basaltmc.wire.protocol.play.BlockEntityDataPacket
 import org.basaltmc.wire.protocol.play.BlockHitResult
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.BossEventPacket
@@ -160,6 +163,7 @@ import org.basaltmc.wire.protocol.play.LevelEventPacket
 import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
 import org.basaltmc.wire.protocol.play.OpenScreenPacket
+import org.basaltmc.wire.protocol.play.OpenSignEditorPacket
 import org.basaltmc.wire.protocol.play.PlayDisconnectPacket
 import org.basaltmc.wire.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.wire.protocol.play.PlayerCombatKillPacket
@@ -193,6 +197,7 @@ import org.basaltmc.wire.protocol.play.SetHealthPacket
 import org.basaltmc.wire.protocol.play.SetHeldSlotPacket
 import org.basaltmc.wire.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.wire.protocol.play.SetTimePacket
+import org.basaltmc.wire.protocol.play.SignUpdatePacket
 import org.basaltmc.wire.protocol.play.SignedChatCommandPacket
 import org.basaltmc.wire.protocol.play.SoundPacket
 import org.basaltmc.wire.protocol.play.SoundSource
@@ -1402,6 +1407,7 @@ public class ClientSession(
                 ContainerClosePacket.read(body)
                 playerSession?.let(::closeOpenMenu)
             }
+            SignUpdatePacket.ID -> writeSign(SignUpdatePacket.read(body))
             SWING_PACKET_ID -> handleSwing(body.readVarInt())
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
             ServerboundUseItemPacket.ID -> handleUseItem(ServerboundUseItemPacket.read(body))
@@ -1592,6 +1598,7 @@ public class ClientSession(
         }
         stopDigging()
         refreshSnowUnder(action.pos)
+        notifyNeighbours(action.pos)
         // Breaking the frame puts the portal out, which is the other half of lighting one.
         currentWorld?.let { loaded ->
             for (block in NetherPortals.extinguishAround(loaded, action.pos.x, action.pos.y, action.pos.z)) {
@@ -1759,6 +1766,67 @@ public class ClientSession(
             velocityY = -sin(pitch) * THROW_SPEED + THROW_LIFT,
             velocityZ = cos(yaw) * cos(pitch) * THROW_SPEED,
         )
+    }
+
+    /** A newly placed sign: its block entity, then the editor for whoever put it there. */
+    private fun openNewSign(
+        pos: BlockPos,
+        stateId: Int,
+    ) {
+        val world = currentWorld ?: return
+        val type = Signs.typeOf(stateId) ?: return
+        val chunk = world.state.chunkIfLoaded(pos.x shr 4, pos.z shr 4) ?: return
+        chunk.setBlockEntity(Signs.blockEntity(pos.x and 15, pos.y, pos.z and 15, type))
+        sendCompressed(OpenSignEditorPacket.ID) { OpenSignEditorPacket(pos, isFrontText = true).write(it) }
+    }
+
+    /** Reopens an existing sign, unless it has been waxed. Answers whether it did. */
+    private fun editSign(pos: BlockPos): Boolean {
+        val world = currentWorld ?: return false
+        val chunk = world.state.chunkIfLoaded(pos.x shr 4, pos.z shr 4) ?: return false
+        val existing = chunk.blockEntityAt(pos.x and 15, pos.y, pos.z and 15) ?: return false
+        if (Signs.isWaxed(existing.data)) return false
+        sendCompressed(OpenSignEditorPacket.ID) { OpenSignEditorPacket(pos, isFrontText = true).write(it) }
+        return true
+    }
+
+    /**
+     * What someone typed on a sign, kept and shown to everyone.
+     *
+     * parity: `ServerPlayer.updateSignText`, minus the checks this build has nothing to make: no
+     * chat filtering, and no owner, since nothing records who placed it.
+     */
+    private fun writeSign(update: SignUpdatePacket) {
+        val world = currentWorld ?: return
+        val pos = update.pos
+        val stateId = world.state.getBlockState(pos.x, pos.y, pos.z) ?: return
+        val type = Signs.typeOf(stateId) ?: return
+        val chunk = world.state.chunkIfLoaded(pos.x shr 4, pos.z shr 4) ?: return
+        val existing = chunk.blockEntityAt(pos.x and 15, pos.y, pos.z and 15)
+        if (existing != null && Signs.isWaxed(existing.data)) return
+        val data = Signs.withText(existing?.data ?: Signs.emptyData(), update.isFrontText, update.lines)
+        chunk.setBlockEntity(Signs.blockEntity(pos.x and 15, pos.y, pos.z and 15, type, data))
+        val typeId = BlockEntityTypes.idOf(type) ?: return
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(BlockEntityDataPacket.ID) {
+                BlockEntityDataPacket(pos, typeId, data).write(it)
+            }
+        }
+    }
+
+    /**
+     * Tells the blocks around [pos] that it changed, and clears up whatever stopped standing.
+     *
+     * parity: `Level.updateNeighborsAt`. What falls drops its loot with no tool involved, because
+     * nobody mined it: vanilla's `dropResources` is called by the block itself.
+     */
+    private fun notifyNeighbours(pos: BlockPos) {
+        val world = currentWorld ?: return
+        NeighbourUpdates.afterChange(world, pos.x, pos.y, pos.z) { stateId, x, y, z ->
+            val at = BlockPos(x, y, z)
+            broadcastBlockUpdate(at, Blocks.AIR.stateId)
+            Blocks.byStateId(stateId)?.let { dropLootFor(it.block, at) }
+        }
     }
 
     /**
@@ -2183,6 +2251,9 @@ public class ClientSession(
                 toggleBlock(hit.pos)
                 return ack()
             }
+            // parity: `SignBlockEntity.executeClickCommandsIfPresent` aside, clicking a sign that is
+            // not waxed opens it for editing again.
+            if (clickedState != null && Signs.isSign(clickedState) && editSign(hit.pos)) return ack()
         }
 
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
@@ -2240,6 +2311,14 @@ public class ClientSession(
         if (BlockPlacement.isObstructed(blockStateId, placeAt.x, placeAt.y, placeAt.z, buildersInTheWay())) {
             return ack()
         }
+        // parity: `BlockItem.canPlace` also asks `canSurvive`, which is what refuses a torch hung
+        // on nothing rather than letting it be placed and drop on the next update.
+        val loadedWorld = currentWorld
+        if (loadedWorld != null &&
+            !NeighbourUpdates.isSupported(loadedWorld, placeAt.x, placeAt.y, placeAt.z, blockStateId)
+        ) {
+            return ack()
+        }
         val changed = world.setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)
         ack()
         if (!changed) return
@@ -2259,6 +2338,8 @@ public class ClientSession(
         // under snow) can change how they look.
         refreshSnowUnder(placeAt)
         refreshSnowAt(placeAt)
+        notifyNeighbours(placeAt)
+        if (Signs.isSign(blockStateId)) openNewSign(placeAt, blockStateId)
         currentWorld?.let { loaded ->
             for (block in FluidFlow.onBlockChanged(loaded, placeAt.x, placeAt.y, placeAt.z)) {
                 broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
@@ -3878,7 +3959,13 @@ public class ClientSession(
     /** Opening a door, flipping a lever: the change goes to everyone, and so does the sound. */
     private fun toggleBlock(pos: BlockPos) {
         val world = currentWorld ?: return
+        val before = world.state.getBlockState(pos.x, pos.y, pos.z)
         val toggled = BlockInteractions.toggle(world, pos.x, pos.y, pos.z) ?: return
+        // parity: `ButtonBlock.press` schedules its own release. Everything else here stays put
+        // until something touches it again.
+        BlockInteractions.pressedTicks(before ?: 0)?.let { delay ->
+            world.state.scheduleBlockTick(pos.x, pos.y, pos.z, BUTTON_TICK, delay)
+        }
         for (block in toggled.changes) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
         val sound =
             SoundPacket(
@@ -4407,6 +4494,9 @@ public class ClientSession(
                 SetEquipmentPacket.Type.LEGS,
                 SetEquipmentPacket.Type.FEET,
             )
+
+        /** What a scheduled block tick on a button is filed under. */
+        val BUTTON_TICK = Identifier.vanilla("button")
 
         /** `minecraft:move_player_rot` and `minecraft:move_player_status_only`, read directly. */
         const val MOVE_PLAYER_ROT_ID = 0x20

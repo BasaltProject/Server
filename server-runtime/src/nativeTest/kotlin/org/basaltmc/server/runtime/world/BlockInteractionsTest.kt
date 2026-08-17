@@ -121,6 +121,49 @@ class BlockInteractionsTest {
         assertFalse(BlockInteractions.isToggleable(Blocks.STONE.stateId))
     }
 
+    /** parity: `ButtonBlock`, twenty ticks down for a stone button and thirty for a wooden one. */
+    @Test
+    fun aButtonGoesDownByHandAndComesBackUpOnItsOwn() {
+        val stone = state("stone_button", mapOf("powered" to "false", "face" to "floor", "facing" to "north"))
+        world.state.setBlockState(6, 64, 1, stone)
+
+        val pressed = assertNotNull(BlockInteractions.toggle(world, 6, 64, 1))
+        assertEquals("true", propertiesAt(6, 64, 1)["powered"])
+        assertEquals("minecraft:block.stone_button.click_on", pressed.sound)
+        assertEquals(20, BlockInteractions.pressedTicks(stone))
+
+        // A second press does nothing: only its own tick lets it up.
+        assertNull(BlockInteractions.toggle(world, 6, 64, 1))
+
+        val released = assertNotNull(BlockInteractions.release(world, 6, 64, 1))
+        assertEquals("false", propertiesAt(6, 64, 1)["powered"])
+        assertEquals("minecraft:block.stone_button.click_off", released.sound)
+        assertNull(BlockInteractions.release(world, 6, 64, 1), "and again does nothing")
+    }
+
+    @Test
+    fun aWoodenButtonStaysDownLongerAndSoundsDifferent() {
+        val oak = state("oak_button", mapOf("powered" to "false", "face" to "floor", "facing" to "north"))
+        world.state.setBlockState(7, 64, 1, oak)
+
+        assertEquals(30, BlockInteractions.pressedTicks(oak))
+        assertEquals(
+            "minecraft:block.wooden_button.click_on",
+            assertNotNull(BlockInteractions.toggle(world, 7, 64, 1)).sound,
+        )
+    }
+
+    @Test
+    fun aBambooButtonHasItsOwnSound() {
+        val bamboo = state("bamboo_button", mapOf("powered" to "false", "face" to "floor", "facing" to "north"))
+        world.state.setBlockState(8, 64, 1, bamboo)
+
+        assertEquals(
+            "minecraft:block.bamboo_wood_button.click_on",
+            assertNotNull(BlockInteractions.toggle(world, 8, 64, 1)).sound,
+        )
+    }
+
     @Test
     fun everyWoodenDoorCanBeOpened() {
         for (wood in listOf("oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "bamboo")) {
