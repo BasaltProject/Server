@@ -9,10 +9,22 @@ public data class WorldSettings(
     public val difficulty: String,
     public val viewDistance: Int,
     public val saveIntervalSeconds: Int,
+    /**
+     * Whether the End's exit portal is open from the start.
+     *
+     * A divergence, and off by default: vanilla only opens it when the dragon dies, and there is no
+     * dragon in this build yet, so an End nobody can leave is what parity actually means today.
+     */
+    public val openEndExitPortal: Boolean = false,
 ) {
     public companion object {
         public val VANILLA: WorldSettings =
-            WorldSettings(difficulty = "easy", viewDistance = 10, saveIntervalSeconds = 30)
+            WorldSettings(
+                difficulty = "easy",
+                viewDistance = 10,
+                saveIntervalSeconds = 30,
+                openEndExitPortal = false,
+            )
 
         /** Reads whichever of the three keys [table] declares, leaving the rest at [inherited]. */
         public fun from(
@@ -25,6 +37,7 @@ public data class WorldSettings(
                 saveIntervalSeconds =
                     table?.intOrNull("save-interval-seconds")?.toInt()?.coerceAtLeast(0)
                         ?: inherited.saveIntervalSeconds,
+                openEndExitPortal = table?.boolOrNull("open-end-exit-portal") ?: inherited.openEndExitPortal,
             )
     }
 }
