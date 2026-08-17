@@ -53,6 +53,7 @@ import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
+import org.basaltmc.server.runtime.world.MossCarpetTopper
 import org.basaltmc.server.runtime.world.NeighbourUpdates
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
@@ -67,9 +68,11 @@ import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.ScaffoldingPlacement
 import org.basaltmc.server.runtime.world.Signs
 import org.basaltmc.server.runtime.world.SnowyBlocks
 import org.basaltmc.server.runtime.world.Submersion
+import org.basaltmc.server.runtime.world.WallVariants
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.runtime.world.WorldWeather
 import org.basaltmc.server.storage.BanKind
@@ -2344,8 +2347,15 @@ public class ClientSession(
             useBucketOn(session, heldBlock, heldSlot, held, hit)
             return ack()
         }
-        val defaultStateId = heldBlock?.let { Blocks.REGISTRY.idOf(it) }
-        if (held == null || heldBlock == null || defaultStateId == null) return ack()
+        // parity: `StandingAndWallBlockItem` and friends: a torch, a sign, a banner or a head put
+        // against a side goes down as its wall form, not as the standing one refusing to stand.
+        val againstAWall =
+            hit.direction != org.basaltmc.wire.protocol.play.Direction.UP &&
+                hit.direction != org.basaltmc.wire.protocol.play.Direction.DOWN
+        val placedBlock =
+            heldBlock?.let { if (againstAWall) WallVariants.of(it) ?: it else it }
+        val defaultStateId = placedBlock?.let { Blocks.REGISTRY.idOf(it) }
+        if (held == null || placedBlock == null || defaultStateId == null) return ack()
 
         // parity: `BlockPlaceContext`: the clicked block is replaced when it is one of the things
         // that give way (grass, a fern, a snow layer, fire, a fluid), and the block goes next to it
@@ -2355,19 +2365,48 @@ public class ClientSession(
             clickedForPlacing != null &&
                 BlockShapes.isReplaceable(clickedForPlacing) &&
                 BlockStateDefinitions.blockOf(clickedForPlacing) != heldBlock
-        val placeAt = if (replaceClicked) hit.pos else hit.pos.offset(hit.direction)
+        // parity: `ScaffoldingBlockItem.updatePlacementContext`, the one placement rule that lives in
+        // the item: clicking a scaffolding builds up the tower instead of hanging one off the face.
+        val placementWorld = currentWorld
+        val scaffoldTarget =
+            if (heldBlock.path == "scaffolding" && placementWorld != null) {
+                ScaffoldingPlacement.target(
+                    placementWorld,
+                    hit.pos.x,
+                    hit.pos.y,
+                    hit.pos.z,
+                    hit.direction,
+                    session.yaw,
+                    session.sneaking,
+                    hit.inside,
+                )
+            } else {
+                null
+            }
+        val placeAt =
+            when {
+                scaffoldTarget != null -> BlockPos(scaffoldTarget.first, scaffoldTarget.second, scaffoldTarget.third)
+                replaceClicked -> hit.pos
+                else -> hit.pos.offset(hit.direction)
+            }
         val existing = world.getBlockState(placeAt.x, placeAt.y, placeAt.z)
         if (existing == null || !BlockShapes.isReplaceable(existing)) return ack()
 
         val placedStateId =
             BlockPlacement.stateFor(
-                block = heldBlock,
+                block = placedBlock,
                 defaultStateId = defaultStateId,
                 face = hit.direction,
                 clickY = hit.clickY,
                 yaw = session.yaw,
                 pitch = session.pitch,
                 replacing = existing,
+                world = currentWorld,
+                x = placeAt.x,
+                y = placeAt.y,
+                z = placeAt.z,
+                clickX = hit.clickX,
+                clickZ = hit.clickZ,
             )
         // The half a two-block one starts as, whatever the state table's first entry happens to be.
         val blockStateId = DoubleBlocks.firstHalf(placedStateId)
@@ -2396,6 +2435,14 @@ public class ClientSession(
         ack()
         if (!changed) return
         second?.let { world.setBlockState(it.x, it.y, it.z, it.stateId) }
+        // parity: `MossyCarpetBlock.setPlacedBy`, which grows a second carpet over the one placed.
+        if (BlockStateDefinitions.blockOf(blockStateId)?.path == "pale_moss_carpet") {
+            loadedWorld?.let { placedIn ->
+                MossCarpetTopper
+                    .above(placedIn, placeAt.x, placeAt.y, placeAt.z) { Random.nextBoolean() }
+                    ?.let { topper -> world.setBlockState(placeAt.x, placeAt.y + 1, placeAt.z, topper) }
+            }
+        }
 
         if (session.gamemode == Gamemode.SURVIVAL) {
             val remaining = held.count - 1
