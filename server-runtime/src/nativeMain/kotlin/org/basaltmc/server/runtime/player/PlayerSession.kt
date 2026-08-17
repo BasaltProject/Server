@@ -73,6 +73,16 @@ public class PlayerSession(
     public var skinParts: Byte = ALL_SKIN_PARTS
 
     public var health: Float = MAX_HEALTH
+
+    /** parity: `LivingEntity.getAbsorptionAmount`, the pool damage eats before health does. */
+    public var absorption: Float = 0f
+
+    /** parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss. */
+    public var invulnerableTicks: Int = 0
+
+    /** parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the rest of it. */
+    public var lastHurt: Float = 0f
+
     public val food: FoodData = FoodData()
     public val experience: ExperienceData = ExperienceData()
 
