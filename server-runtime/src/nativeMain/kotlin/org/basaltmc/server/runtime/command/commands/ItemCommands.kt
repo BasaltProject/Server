@@ -14,10 +14,11 @@ import org.basaltmc.server.runtime.command.EntitiesArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.ItemArgument
 import org.basaltmc.server.runtime.command.ItemSlotArgument
+import org.basaltmc.server.runtime.command.LootModifierArgument
+import org.basaltmc.server.runtime.command.LootTableArgument
 import org.basaltmc.server.runtime.command.ParsedItem
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
-import org.basaltmc.server.runtime.command.RegistryArgument
 import org.basaltmc.server.runtime.command.Vec3Argument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
@@ -114,7 +115,7 @@ public class ItemCommand : Command(name = "item", permissionLevel = PermissionLe
             literal("entity") {
                 argument("targets", PlayersArgument(single = false)) {
                     argument("slot", ItemSlotArgument) {
-                        argument("modifier", RegistryArgument.resource("minecraft:item_modifier")) {
+                        argument("modifier", LootModifierArgument) {
                             executes { context -> noModifiers(context) }
                         }
                     }
@@ -123,7 +124,7 @@ public class ItemCommand : Command(name = "item", permissionLevel = PermissionLe
             literal("block") {
                 argument("pos", BlockPosArgument) {
                     argument("slot", ItemSlotArgument) {
-                        argument("modifier", RegistryArgument.resource("minecraft:item_modifier")) {
+                        argument("modifier", LootModifierArgument) {
                             executes { context -> noModifiers(context) }
                         }
                     }
@@ -139,7 +140,7 @@ public class ItemCommand : Command(name = "item", permissionLevel = PermissionLe
                 argument("source", BlockPosArgument) {
                     argument("sourceSlot", ItemSlotArgument) {
                         executes { context -> run(context) }
-                        argument("modifier", RegistryArgument.resource("minecraft:item_modifier")) {
+                        argument("modifier", LootModifierArgument) {
                             executes { context -> noModifiers(context) }
                         }
                     }
@@ -149,7 +150,7 @@ public class ItemCommand : Command(name = "item", permissionLevel = PermissionLe
                 argument("source", PlayersArgument(single = true)) {
                     argument("sourceSlot", ItemSlotArgument) {
                         executes { context -> run(context) }
-                        argument("modifier", RegistryArgument.resource("minecraft:item_modifier")) {
+                        argument("modifier", LootModifierArgument) {
                             executes { context -> noModifiers(context) }
                         }
                     }
@@ -396,7 +397,7 @@ public class LootCommand(
     /** The four sources, declared once per destination the way vanilla pairs them. */
     private fun CommandNodeBuilder.sources(run: (CommandContext, List<StoredItemStack>) -> Int) {
         literal("fish") {
-            argument("loot_table", RegistryArgument.resource("minecraft:loot_table")) {
+            argument("loot_table", LootTableArgument) {
                 suggestsFromServer { context -> context.matchingIds(lootTables.ids()) }
                 argument("pos", BlockPosArgument) {
                     executes { context -> run(context, rollTable(context)) }
@@ -413,7 +414,7 @@ public class LootCommand(
             }
         }
         literal("loot") {
-            argument("loot_table", RegistryArgument.resource("minecraft:loot_table")) {
+            argument("loot_table", LootTableArgument) {
                 suggestsFromServer { context -> context.matchingIds(lootTables.ids()) }
                 executes { context -> run(context, rollTable(context)) }
             }

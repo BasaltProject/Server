@@ -1,8 +1,13 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.protocol.play.Direction
+import org.basaltmc.wire.protocol.play.normalX
+import org.basaltmc.wire.protocol.play.normalY
+import org.basaltmc.wire.protocol.play.normalZ
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
@@ -62,6 +67,27 @@ public object Buckets {
         return pour(world, hit, content, creative)
     }
 
+    /**
+     * The same, on the block the client says it hit, which is what a click on a block gives us.
+     *
+     * The client only sends `use_item` when its own ray hits nothing, and a filled bucket traces
+     * straight through fluids, so aiming at water with a wall behind it arrives here and not in
+     * [use]. Without this, a bucket emptied anywhere near a block did nothing at all.
+     */
+    public fun useOn(
+        world: LoadedWorld,
+        item: Identifier,
+        x: Int,
+        y: Int,
+        z: Int,
+        face: Direction,
+        creative: Boolean,
+    ): Result? {
+        val hit = Hit(x, y, z, face.normalX, face.normalY, face.normalZ)
+        val content = contentOf(item) ?: return fill(world, hit)
+        return pour(world, hit, content, creative)
+    }
+
     /** parity: `BucketItem.emptyContents`: onto the face it hit, or into the block itself if that can hold it. */
     private fun pour(
         world: LoadedWorld,
@@ -95,11 +121,12 @@ public object Buckets {
         return Result(changes, if (kind == FluidKind.WATER) WATER else LAVA)
     }
 
-    /** Air and fluids give way to a poured bucket; anything a player walks into does not. */
+    /**
+     * parity: `BlockState.canBeReplaced(Fluid)`: whatever gives way to a placed block, plus
+     * anything that is not solid, which is what lets a bucket be emptied into water or lava.
+     */
     private fun replaceable(stateId: Int): Boolean =
-        Blocks.isAir(stateId) ||
-            FluidFlow.kindOf(stateId) != null ||
-            !Chunk.HeightmapType.MOTION_BLOCKING.matches(stateId)
+        BlockShapes.isReplaceable(stateId) || !BlockShapes.isSolidState(stateId)
 
     private data class Hit(
         val x: Int,

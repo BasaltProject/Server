@@ -2,6 +2,8 @@ package org.basaltmc.server.runtime
 
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockEntityTypes
+import org.basaltmc.server.registry.BlockShapes
+import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.ConsumeEffect
 import org.basaltmc.server.registry.EntityTypes
@@ -59,7 +61,9 @@ import org.basaltmc.server.runtime.world.RealFluidTags
 import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
+import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.SnowyBlocks
 import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.runtime.world.WorldWeather
@@ -119,6 +123,7 @@ import org.basaltmc.wire.protocol.login.LoginDisconnectPacket
 import org.basaltmc.wire.protocol.login.LoginFinishedPacket
 import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
+import org.basaltmc.wire.protocol.play.BlockHitResult
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.BossEventPacket
 import org.basaltmc.wire.protocol.play.ChatCommandPacket
@@ -275,6 +280,7 @@ public class ClientSession(
     private val itemTags: RealItemTags? = null,
     /** The fluid tags, which are what the client checks before it believes it is under water. */
     private val fluidTags: RealFluidTags? = null,
+    private val timelineTags: RealTimelineTags? = null,
     private val damageTypeTags: RealDamageTypeTags? = null,
     private val entityTypeTags: RealEntityTypeTags? = null,
 ) {
@@ -868,6 +874,12 @@ public class ClientSession(
                     ?.membersOf(Identifier.parse(tagName))
                     .orEmpty()
                     .mapNotNull(RealFluidTags.PROTOCOL_IDS::get)
+            // The ids are indices into the timeline registry this server sent, in that same order.
+            "minecraft:timeline" ->
+                timelineTags
+                    ?.membersOf(Identifier.parse(tagName))
+                    .orEmpty()
+                    .mapNotNull { id -> timelines?.ids?.indexOf(id)?.takeIf { it >= 0 } }
             "minecraft:entity_type" ->
                 entityTypeTags
                     ?.membersOf(Identifier.parse(tagName))
@@ -1506,6 +1518,7 @@ public class ClientSession(
             }
         }
 
+        refreshSnowUnder(action.pos)
         // Breaking the frame puts the portal out, which is the other half of lighting one.
         currentWorld?.let { loaded ->
             for (block in NetherPortals.extinguishAround(loaded, action.pos.x, action.pos.y, action.pos.z)) {
@@ -2040,12 +2053,26 @@ public class ClientSession(
         // parity: `ServerPlayerGameMode.useItemOn` falls through to using the item itself, which is
         // what lets anyone eat while looking at the ground rather than only at the sky.
         if (held != null && heldBlock != null && startEating(session, heldBlock, heldSlot)) return ack()
+        // A bucket aimed at a block: the client only sends `use_item` when nothing is in the way,
+        // so without this, water poured anywhere near a wall went nowhere. parity: `BucketItem.use`.
+        if (held != null && heldBlock != null && Buckets.isBucket(heldBlock)) {
+            useBucketOn(session, heldBlock, heldSlot, held, hit)
+            return ack()
+        }
         val defaultStateId = heldBlock?.let { Blocks.REGISTRY.idOf(it) }
         if (held == null || heldBlock == null || defaultStateId == null) return ack()
 
-        val placeAt = if (hit.inside) hit.pos else hit.pos.offset(hit.direction)
+        // parity: `BlockPlaceContext`: the clicked block is replaced when it is one of the things
+        // that give way (grass, a fern, a snow layer, fire, a fluid), and the block goes next to it
+        // otherwise. A flower, a firefly bush and leaves are not replaceable, so those get built on.
+        val clickedForPlacing = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)
+        val replaceClicked =
+            clickedForPlacing != null &&
+                BlockShapes.isReplaceable(clickedForPlacing) &&
+                BlockStateDefinitions.blockOf(clickedForPlacing) != heldBlock
+        val placeAt = if (replaceClicked) hit.pos else hit.pos.offset(hit.direction)
         val existing = world.getBlockState(placeAt.x, placeAt.y, placeAt.z)
-        if (existing == null || !isAirLike(existing)) return ack()
+        if (existing == null || !BlockShapes.isReplaceable(existing)) return ack()
 
         val blockStateId =
             BlockPlacement.stateFor(
@@ -2057,6 +2084,11 @@ public class ClientSession(
                 pitch = session.pitch,
                 replacing = existing,
             )
+        // parity: `BlockItem.canPlace`: a block never goes down inside somebody. Without this you
+        // can wall yourself in, which is the one thing vanilla will not let you do by accident.
+        if (BlockPlacement.isObstructed(blockStateId, placeAt.x, placeAt.y, placeAt.z, buildersInTheWay())) {
+            return ack()
+        }
         val changed = world.setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)
         ack()
         if (!changed) return
@@ -2072,6 +2104,10 @@ public class ClientSession(
                 ClientboundBlockUpdatePacket(placeAt, blockStateId).write(it)
             }
         }
+        // Both the block under it (a snow layer put on grass) and the block itself (grass put
+        // under snow) can change how they look.
+        refreshSnowUnder(placeAt)
+        refreshSnowAt(placeAt)
         currentWorld?.let { loaded ->
             for (block in FluidFlow.onBlockChanged(loaded, placeAt.x, placeAt.y, placeAt.z)) {
                 broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
@@ -3534,6 +3570,59 @@ public class ClientSession(
 
     /** parity: `BlockTags.CLIMBABLE`, which is what stops a fall without stopping the player. */
     private fun isClimbable(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path in CLIMBABLE_BLOCKS
+
+    /**
+     * Takes the snow off the block under [pos], or puts it on. parity: `SnowyBlock.updateShape`,
+     * which vanilla runs through a block update and this build runs where the block changed.
+     */
+    private fun refreshSnowUnder(pos: BlockPos) = refreshSnowAt(BlockPos(pos.x, pos.y - 1, pos.z))
+
+    private fun refreshSnowAt(pos: BlockPos) {
+        val world = currentWorld ?: return
+        val updated = SnowyBlocks.updated(world, pos.x, pos.y, pos.z) ?: return
+        if (!world.state.setBlockState(pos.x, pos.y, pos.z, updated)) return
+        broadcastBlockUpdate(pos, updated)
+    }
+
+    /** parity: `BucketItem.use` with the block the client says it hit, rather than a second raycast. */
+    private fun useBucketOn(
+        session: PlayerSession,
+        item: Identifier,
+        slot: Int,
+        held: StoredItemStack,
+        hit: BlockHitResult,
+    ) {
+        val world = currentWorld ?: return
+        val result =
+            Buckets.useOn(
+                world = world,
+                item = item,
+                x = hit.pos.x,
+                y = hit.pos.y,
+                z = hit.pos.z,
+                face = hit.direction,
+                creative = session.gamemode == Gamemode.CREATIVE,
+            ) ?: return
+        for (block in result.changes) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+        val replacement = result.replacement ?: return
+        session.inventory[slot] = held.copy(id = replacement.toString(), count = 1)
+        sendInventorySlot(slot)
+    }
+
+    /**
+     * The boxes of everything in this world that stops a block being placed inside it.
+     *
+     * parity: `Entity.blocksBuilding`, which is on for anything alive and off for dropped items and
+     * arrows, plus spectators, who are built straight through.
+     */
+    private fun buildersInTheWay(): List<DoubleArray> {
+        val session = playerSession ?: return emptyList()
+        val players = playersInSameWorld().toMutableList()
+        if (players.none { it.entityId == session.entityId }) players += session
+        return players
+            .filter { it.gamemode != Gamemode.SPECTATOR }
+            .map { BlockPlacement.playerBox(it.x, it.y, it.z, it.sneaking) }
+    }
 
     /** Opening a door, flipping a lever: the change goes to everyone, and so does the sound. */
     private fun toggleBlock(pos: BlockPos) {

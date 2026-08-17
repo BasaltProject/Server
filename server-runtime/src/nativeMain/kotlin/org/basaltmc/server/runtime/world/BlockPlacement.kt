@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.play.Direction
@@ -97,6 +98,65 @@ public object BlockPlacement {
         return BlockStateDefinitions.stateIdOf(block, properties, fromStateId = defaultStateId) ?: defaultStateId
     }
 
+    /**
+     * Whether the block would be placed inside somebody.
+     *
+     * parity: `BlockItem.canPlace` over `Level.isUnobstructed`: the collision shape of the state
+     * about to be placed, moved to its position, must not overlap the box of anything that blocks
+     * building. A shape that only touches a box does not overlap it, which is why standing on a
+     * block and putting another one at your feet still works.
+     *
+     * A block with no collision at all (a torch, a flower) never obstructs anyone, so it goes down
+     * even inside a player, exactly as in vanilla.
+     */
+    public fun isObstructed(
+        stateId: Int,
+        blockX: Int,
+        blockY: Int,
+        blockZ: Int,
+        boxes: List<DoubleArray>,
+    ): Boolean {
+        if (boxes.isEmpty() || BlockShapes.isEmptyShape(stateId)) return false
+        for (box in BlockShapes.collisionBoxes(stateId)) {
+            val minX = blockX + box[0] / BlockShapes.UNITS.toDouble()
+            val minY = blockY + box[1] / BlockShapes.UNITS.toDouble()
+            val minZ = blockZ + box[2] / BlockShapes.UNITS.toDouble()
+            val maxX = blockX + box[3] / BlockShapes.UNITS.toDouble()
+            val maxY = blockY + box[4] / BlockShapes.UNITS.toDouble()
+            val maxZ = blockZ + box[5] / BlockShapes.UNITS.toDouble()
+            for (other in boxes) {
+                if (minX < other[3] &&
+                    maxX > other[0] &&
+                    minY < other[4] &&
+                    maxY > other[1] &&
+                    minZ < other[5] &&
+                    maxZ > other[2]
+                ) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /** parity: `Player.getDimensions`, which is what the box around a player measures. */
+    public fun playerBox(
+        x: Double,
+        y: Double,
+        z: Double,
+        sneaking: Boolean,
+    ): DoubleArray {
+        val half = PLAYER_WIDTH / 2
+        return doubleArrayOf(
+            x - half,
+            y,
+            z - half,
+            x + half,
+            y + if (sneaking) SNEAKING_HEIGHT else PLAYER_HEIGHT,
+            z + half,
+        )
+    }
+
     private fun isClickedFaceBlock(block: Identifier): Boolean =
         CLICKED_FACE_BLOCKS.any { block.path == it || block.path.endsWith("_$it") }
 
@@ -156,6 +216,11 @@ public object BlockPlacement {
 
     /** South first, the way vanilla numbers the quarters of a yaw. */
     private val HORIZONTAL = arrayOf(Direction.SOUTH, Direction.WEST, Direction.NORTH, Direction.EAST)
+
+    /** parity: `Player`'s own dimensions: 0.6 wide, 1.8 tall standing and 1.5 crouching. */
+    private const val PLAYER_WIDTH = 0.6
+    private const val PLAYER_HEIGHT = 1.8
+    private const val SNEAKING_HEIGHT = 1.5
 
     private const val QUARTER_TURN = 90f
     private const val HALF_TURN = 180.0

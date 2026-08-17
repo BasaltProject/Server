@@ -7,6 +7,7 @@ import org.basaltmc.server.runtime.config.WorldSettings
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.protocol.play.Direction
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,6 +58,45 @@ class BucketsTest {
         assertEquals(Blocks.WATER.stateId, world.state.getBlockState(0, 64, 0))
         assertEquals(Buckets.EMPTY, result.replacement)
         assertEquals(true, result.changes.any { it[1] == 64 })
+    }
+
+    /**
+     * The bug from the report: aiming at water with a wall behind it makes the client send
+     * `use_item_on` rather than `use_item`, and nothing was listening for it, so the bucket did
+     * nothing at all. parity: `BucketItem.use`, whose ray goes straight through fluids.
+     */
+    @Test
+    fun aFullBucketEmptiesIntoWaterItWasAimedAt() {
+        world.state.setBlockState(0, 64, 0, Blocks.WATER.stateId + 3)
+
+        val result =
+            assertNotNull(
+                Buckets.useOn(world, Buckets.WATER, x = 0, y = 64, z = 0, face = Direction.UP, creative = false),
+            )
+
+        assertEquals(Blocks.WATER.stateId, world.state.getBlockState(0, 64, 0), "the flowing water became a source")
+        assertEquals(Buckets.EMPTY, result.replacement)
+    }
+
+    /** parity: `canBeReplaced(Fluid)`: lava is not solid either, so water goes straight into it. */
+    @Test
+    fun aFullBucketEmptiesIntoLava() {
+        world.state.setBlockState(0, 64, 0, Blocks.LAVA.stateId)
+
+        assertNotNull(Buckets.useOn(world, Buckets.WATER, x = 0, y = 64, z = 0, face = Direction.UP, creative = false))
+
+        assertEquals(Blocks.WATER.stateId, world.state.getBlockState(0, 64, 0))
+    }
+
+    /** A solid block is not replaced: the water goes onto the face that was clicked. */
+    @Test
+    fun aFullBucketOnAStoneFacePoursNextToIt() {
+        world.state.setBlockState(0, 64, 0, Blocks.STONE.stateId)
+
+        assertNotNull(Buckets.useOn(world, Buckets.WATER, x = 0, y = 64, z = 0, face = Direction.UP, creative = false))
+
+        assertEquals(Blocks.STONE.stateId, world.state.getBlockState(0, 64, 0))
+        assertEquals(Blocks.WATER.stateId, world.state.getBlockState(0, 65, 0))
     }
 
     /** parity: creative keeps the bucket it poured. */

@@ -115,6 +115,7 @@ import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTestInstances
+import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RecipeBook
 import org.basaltmc.server.runtime.world.StructureTemplates
@@ -131,6 +132,7 @@ import org.basaltmc.server.world.terrain.OverworldNoiseRouter
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.auth.OnlineMode
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
 import org.basaltmc.wire.common.timings.TickDurations
@@ -200,6 +202,22 @@ public class BasaltServer(
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
     private val fluidTags = RealFluidTags(serverJar)
+    private val timelineTags = RealTimelineTags(serverJar)
+
+    init {
+        // Loud on purpose: a client whose overworld timeline tag is empty renders a sky that never
+        // moves, and nothing else in the log would say why.
+        val overworldTimelines = timelineTags.membersOf(Identifier.vanilla("in_overworld"))
+        if (overworldTimelines.isEmpty()) {
+            logger.warn {
+                "No timelines are tagged for the overworld, so the sky will not move. " +
+                    "The server jar's data is missing or could not be read."
+            }
+        } else {
+            logger.debug { "Overworld timelines: ${overworldTimelines.joinToString()}." }
+        }
+    }
+
     private val damageTypeTags = RealDamageTypeTags(serverJar)
     private val entityTags = RealEntityTypeTags(serverJar)
     private val advancements = RealAdvancements(serverJar)
@@ -1245,6 +1263,7 @@ public class BasaltServer(
                     advancementTriggers = advancementTriggers,
                     blockTags = blockTags,
                     fluidTags = fluidTags,
+                    timelineTags = timelineTags,
                     damageTypeTags = damageTypeTags,
                     entityTypeTags = entityTags,
                     itemTags = itemTags,
