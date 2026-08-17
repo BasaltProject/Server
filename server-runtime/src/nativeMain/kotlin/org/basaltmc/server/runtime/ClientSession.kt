@@ -45,6 +45,7 @@ import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
 import org.basaltmc.server.runtime.world.EndPortals
+import org.basaltmc.server.runtime.world.Fires
 import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
@@ -1677,6 +1678,8 @@ public class ClientSession(
         } else {
             if (!NetherPortals.placeFire(world, pos.x, pos.y, pos.z)) return
             broadcastBlockUpdate(pos, FIRE_STATE)
+            // parity: `BaseFireBlock.onPlace`, which is what starts fire acting at all.
+            Fires.schedule(world, pos.x, pos.y, pos.z, LegacyRandom(Random.nextLong()))
         }
 
         if (session.gamemode == Gamemode.CREATIVE) return
@@ -1822,7 +1825,13 @@ public class ClientSession(
      */
     private fun notifyNeighbours(pos: BlockPos) {
         val world = currentWorld ?: return
-        NeighbourUpdates.afterChange(world, pos.x, pos.y, pos.z) { stateId, x, y, z ->
+        NeighbourUpdates.afterChange(
+            world,
+            pos.x,
+            pos.y,
+            pos.z,
+            onReshaped = { stateId, x, y, z -> broadcastBlockUpdate(BlockPos(x, y, z), stateId) },
+        ) { stateId, x, y, z ->
             val at = BlockPos(x, y, z)
             broadcastBlockUpdate(at, Blocks.AIR.stateId)
             Blocks.byStateId(stateId)?.let { dropLootFor(it.block, at) }
@@ -1921,6 +1930,8 @@ public class ClientSession(
                         pitch = entity.pitch,
                         yaw = entity.yaw,
                         headYaw = entity.yaw,
+                        // A falling block is drawn from this: without it every one is stone.
+                        objectData = entity.objectData,
                     ).write(it)
                 }
                 continue

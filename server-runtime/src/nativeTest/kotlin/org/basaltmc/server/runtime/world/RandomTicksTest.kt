@@ -13,6 +13,7 @@ import org.basaltmc.wire.common.logging.Logger
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RandomTicksTest {
@@ -161,6 +162,87 @@ class RandomTicksTest {
             if (ticks.tick(world, listOf(intArrayOf(0, 0)), speed = 3, random = random).isNotEmpty()) grew = true
         }
         assertTrue(grew, "over enough ticks the picker should have landed on the one crop in the chunk")
+    }
+
+    /** parity: `SpreadingSnowyBlock.randomTick`, which needs light nine above the block it spreads to. */
+    @Test
+    fun grassSpreadsOntoBareDirt() {
+        world.state.setBlockState(2, 70, 2, state("grass_block", mapOf("snowy" to "false")))
+        world.state.setBlockState(3, 70, 2, Blocks.DIRT.stateId)
+
+        assertTrue(
+            run(2, 70, 2, rounds = 3000) {
+                BlockStateDefinitions.blockOf(checkNotNull(world.state.getBlockState(3, 70, 2)))?.path == "grass_block"
+            },
+            "the dirt beside it should have turned to grass",
+        )
+    }
+
+    /** parity: `canStayAlive`, which is what turns grass under a building back into dirt. */
+    @Test
+    fun grassUnderASolidBlockGoesBackToDirt() {
+        world.state.setBlockState(5, 70, 2, state("grass_block", mapOf("snowy" to "false")))
+        world.state.setBlockState(5, 71, 2, Blocks.STONE.stateId)
+
+        assertTrue(
+            run(5, 70, 2, rounds = 50) { world.state.getBlockState(5, 70, 2) == Blocks.DIRT.stateId },
+            "covered grass should have died",
+        )
+    }
+
+    /** parity: `FarmlandBlock.randomTick`: it dries a step at a time away from water. */
+    @Test
+    fun farmlandDriesOutAndThenRevertsToDirt() {
+        world.state.setBlockState(8, 70, 5, state("farmland", mapOf("moisture" to "7")))
+
+        assertTrue(
+            run(8, 70, 5, rounds = 50) {
+                BlockStateDefinitions.propertiesOf(checkNotNull(world.state.getBlockState(8, 70, 5)))["moisture"] == "0"
+            },
+            "it should have dried right down",
+        )
+        assertTrue(
+            run(8, 70, 5, rounds = 50) { world.state.getBlockState(8, 70, 5) == Blocks.DIRT.stateId },
+            "and then gone back to dirt with nothing growing on it",
+        )
+    }
+
+    @Test
+    fun farmlandBesideWaterStaysWet() {
+        world.state.setBlockState(11, 70, 5, state("farmland", mapOf("moisture" to "0")))
+        world.state.setBlockState(13, 70, 5, Blocks.WATER.stateId)
+
+        run(11, 70, 5, rounds = 20) { false }
+
+        assertEquals(
+            "7",
+            BlockStateDefinitions.propertiesOf(checkNotNull(world.state.getBlockState(11, 70, 5)))["moisture"],
+        )
+    }
+
+    /** parity: `CactusBlock.randomTick`, which climbs to three like cane and then keeps ageing. */
+    @Test
+    fun aCactusClimbsToThreeAndStopsThere() {
+        world.state.setBlockState(14, 70, 8, state("sand"))
+        world.state.setBlockState(14, 71, 8, state("cactus", mapOf("age" to "0")))
+
+        for (y in 71..74) run(14, y, 8, rounds = 400) { false }
+
+        val top = BlockStateDefinitions.blockOf(checkNotNull(world.state.getBlockState(14, 73, 8)))
+        assertEquals(Identifier.vanilla("cactus"), top, "it should have grown three tall")
+        assertEquals(Blocks.AIR.stateId, world.state.getBlockState(14, 75, 8), "and no further")
+    }
+
+    /** parity: `CactusBlock.canSurvive`, the rule about what must not be beside it. */
+    @Test
+    fun aCactusWithABlockBesideItComesDown() {
+        world.state.setBlockState(1, 78, 8, state("sand"))
+        world.state.setBlockState(1, 79, 8, state("cactus", mapOf("age" to "0")))
+        assertTrue(NeighbourUpdates.isSupported(world, 1, 79, 8))
+
+        world.state.setBlockState(2, 79, 8, Blocks.STONE.stateId)
+
+        assertFalse(NeighbourUpdates.isSupported(world, 1, 79, 8), "a cactus cannot touch a solid block")
     }
 
     private companion object {
