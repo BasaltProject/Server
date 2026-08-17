@@ -15,9 +15,8 @@ import kotlin.uuid.Uuid
  * and `DropperBlock.dispenseFrom`, which puts the item into whatever container it faces and throws
  * it otherwise. A dispenser with nothing in it plays the click and does nothing.
  *
- * The special behaviours of a dispenser (shooting an arrow, pouring a bucket, shearing a sheep) are
- * `DispenseItemBehavior`s and nearly all of them make an entity, which is §6.4. What both blocks do
- * with an ordinary item is the same, and that is what this does.
+ * The special behaviours (shooting an arrow, pouring a bucket, shearing a sheep) are
+ * `DispenseItemBehavior`s, and the ones that make an entity wait for entities to exist.
  */
 @OptIn(ExperimentalUuidApi::class)
 public object Dispensers {
@@ -80,6 +79,16 @@ public object Dispensers {
         val out = BlockFace.entries.firstOrNull { it.name.lowercase() == facing } ?: return false
         val stack = slots[slot] ?: return false
 
+        // parity: the `DispenseItemBehavior`s that change blocks. The ones that make an entity
+        // fall through to being thrown.
+        val special = dispenseOnBlock(world, x, y, z, out, stack)
+        if (special != null) {
+            slots[slot] = special
+            BlockInventory.write(entity.data, slots)
+            chunk.markDirty()
+            return true
+        }
+
         val into = containerInFront(world, x, y, z, out)
         if (into != null) {
             if (!insertOne(world, into, stack, out.opposite)) return false
@@ -91,6 +100,45 @@ public object Dispensers {
         chunk.markDirty()
         return true
     }
+
+    /**
+     * The block-changing behaviours: a full bucket pours, an empty one fills, and flint and steel
+     * lights a fire. Answers the stack the slot is left holding, or null when the item has no
+     * behaviour of this kind.
+     *
+     * parity: `DispenseItemBehavior.bootStrap`'s filled-bucket, empty-bucket and flint-and-steel
+     * entries. The rest of that table makes entities.
+     */
+    private fun dispenseOnBlock(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        out: BlockFace,
+        stack: ItemStack,
+    ): ItemStack? {
+        val tx = x + out.stepX
+        val ty = y + out.stepY
+        val tz = z + out.stepZ
+        if (Buckets.isBucket(stack.item)) {
+            val face = faceOf(out) ?: return null
+            val result = Buckets.useOn(world, stack.item, tx, ty, tz, face, creative = false) ?: return null
+            // parity: `consumeWithRemainder`, which puts what the bucket became back in the slot.
+            val left = if (stack.count <= 1) null else stack.copy(count = stack.count - 1)
+            return left ?: result.replacement?.let { ItemStack(it, 1) }
+        }
+        if (stack.item == FLINT_AND_STEEL) {
+            if (!Fires.ignite(world, tx, ty, tz)) return null
+            return stack
+        }
+        return null
+    }
+
+    private fun faceOf(face: BlockFace): org.basaltmc.wire.protocol.play.Direction? =
+        org.basaltmc.wire.protocol.play.Direction.entries
+            .firstOrNull { it.name == face.name }
+
+    private val FLINT_AND_STEEL = Identifier.vanilla("flint_and_steel")
 
     /** parity: `DispenserBlockEntity.getRandomSlot`, which picks evenly among the slots with something in. */
     private fun randomFullSlot(

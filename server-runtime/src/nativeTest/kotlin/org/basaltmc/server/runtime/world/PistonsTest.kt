@@ -17,8 +17,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /** parity: `PistonStructureResolver` and `PistonBaseBlock.isPushable`. */
+@OptIn(ExperimentalUuidApi::class)
 class PistonsTest {
     private val world =
         LoadedWorld(
@@ -112,6 +115,79 @@ class PistonsTest {
         assertEquals("air", pathAt(2, 76, 1))
     }
 
+    /**
+     * parity: `PistonBaseBlock.checkIfExtend` and its two ticks: the signal books the move, the move
+     * lands later, and the arm is a block of its own.
+     */
+    @Test
+    fun aPistonExtendsAndPullsBackAgain() {
+        world.state.setBlockState(1, 90, 1, state("sticky_piston", mapOf("facing" to "east", "extended" to "false")))
+        world.state.setBlockState(2, 90, 1, Blocks.STONE.stateId)
+        world.state.setBlockState(1, 91, 1, state("redstone_block"))
+
+        Pistons.trigger(world, 1, 90, 1)
+        val pending =
+            world.state
+                .chunkIfLoaded(0, 0)
+                ?.scheduledBlockTicks()
+                .orEmpty()
+        assertTrue(
+            pending.any { it.localX == 1 && it.y == 90 && it.type.path == "piston" && it.delay == 2 },
+            "two ticks, like vanilla's slide: $pending",
+        )
+
+        Pistons.finish(world, 1, 90, 1)
+        assertEquals("piston_head", pathAt(2, 90, 1), "the arm is out")
+        assertEquals("stone", pathAt(3, 90, 1), "and the stone moved along")
+        assertEquals("true", BlockStateDefinitions.propertiesOf(world.state.getBlockState(1, 90, 1) ?: 0)["extended"])
+
+        // Take the power away and it comes back, bringing the stone with it because it is sticky.
+        world.state.setBlockState(1, 91, 1, Blocks.AIR.stateId)
+        Pistons.finish(world, 1, 90, 1)
+        assertEquals("stone", pathAt(2, 90, 1), "a sticky piston pulls it back")
+        assertEquals("air", pathAt(3, 90, 1))
+        assertEquals("false", BlockStateDefinitions.propertiesOf(world.state.getBlockState(1, 90, 1) ?: 0)["extended"])
+    }
+
+    /**
+     * parity: `MovingPistonBlock`: while the arm slides, what is being pushed is a `moving_piston`
+     * carrying the state it will become. It is not the block it was, and it is not solid.
+     */
+    @Test
+    fun aBlockOnTheMoveIsAMovingPiston() {
+        world.state.setBlockState(1, 96, 1, state("piston", mapOf("facing" to "east", "extended" to "false")))
+        world.state.setBlockState(2, 96, 1, Blocks.STONE.stateId)
+        world.state.setBlockState(1, 97, 1, state("redstone_block"))
+
+        Pistons.trigger(world, 1, 96, 1)
+
+        assertEquals("moving_piston", pathAt(2, 96, 1), "mid-slide it is neither stone nor air")
+        val carried =
+            checkNotNull(world.state.chunkIfLoaded(0, 0)?.blockEntityAt(2, 96, 1)) { "no block entity on the move" }
+        assertEquals(Blocks.STONE.stateId, (carried.data["blockState"] as? org.basaltmc.wire.nbt.NbtInt)?.value)
+
+        Pistons.finish(world, 1, 96, 1)
+
+        assertEquals("stone", pathAt(3, 96, 1), "and it lands where it was going")
+        assertEquals("piston_head", pathAt(2, 96, 1))
+    }
+
+    /** parity: `getNeighborSignal`, which will not let a piston be powered by its own face. */
+    @Test
+    fun aPistonIgnoresASignalOnItsFace() {
+        world.state.setBlockState(1, 94, 1, state("piston", mapOf("facing" to "east", "extended" to "false")))
+        world.state.setBlockState(2, 94, 1, state("redstone_block"))
+
+        Pistons.trigger(world, 1, 94, 1)
+
+        val pending =
+            world.state
+                .chunkIfLoaded(0, 0)
+                ?.scheduledBlockTicks()
+                .orEmpty()
+        assertEquals(0, pending.count { it.localX == 1 && it.y == 94 }, "the block it faces does not count")
+    }
+
     /** parity: `addBranchingBlocks`: a slime block takes what is stuck to its sides with it. */
     @Test
     fun aSlimeBlockDragsWhatIsStuckToIt() {
@@ -173,5 +249,54 @@ class PistonsTest {
                 state("chest", mapOf("facing" to "north", "type" to "single")),
             ),
         )
+    }
+
+    /**
+     * parity: `PistonMovingBlockEntity.moveCollidedEntities`: what is standing where a pushed block
+     * is going comes along with it. The item is moved here; the player is handed back, because
+     * moving one means telling its client.
+     */
+    @Test
+    fun whatIsInTheWayIsShovedAlong() {
+        world.state.setBlockState(1, 100, 1, state("piston", mapOf("facing" to "east", "extended" to "false")))
+        world.state.setBlockState(2, 100, 1, Blocks.STONE.stateId)
+        world.state.setBlockState(1, 101, 1, state("redstone_block"))
+        val dropped =
+            world.state.spawnItem(
+                WorldState.DroppedItem(
+                    entityId = 1,
+                    uuid = Uuid.random(),
+                    item = Identifier.vanilla("stick"),
+                    count = 1,
+                    x = 3.5,
+                    y = 100.0,
+                    z = 1.5,
+                ),
+            )
+        val standing = Pistons.PlayerPosition("someone", 3.5, 100.0, 1.5)
+        val pushed = mutableListOf<Pistons.PlayerPosition>()
+
+        Pistons.trigger(world, 1, 100, 1)
+        Pistons.finish(world, 1, 100, 1, listOf(standing)) { pushed += it }
+
+        assertEquals(4.5, dropped.x, "the item went east with the stone")
+        assertEquals(1, pushed.size, "and so did the player")
+        assertEquals(4.5, pushed[0].x)
+        assertEquals(100.0, pushed[0].y, "sideways only")
+    }
+
+    /** Nothing standing in the way means nothing to move, which is the usual case. */
+    @Test
+    fun anEmptyPathMovesNobody() {
+        world.state.setBlockState(1, 104, 1, state("piston", mapOf("facing" to "east", "extended" to "false")))
+        world.state.setBlockState(2, 104, 1, Blocks.STONE.stateId)
+        world.state.setBlockState(1, 105, 1, state("redstone_block"))
+        val away = Pistons.PlayerPosition("elsewhere", 3.5, 104.0, 8.5)
+        val pushed = mutableListOf<Pistons.PlayerPosition>()
+
+        Pistons.trigger(world, 1, 104, 1)
+        Pistons.finish(world, 1, 104, 1, listOf(away)) { pushed += it }
+
+        assertTrue(pushed.isEmpty(), "three blocks away is not in the way")
     }
 }

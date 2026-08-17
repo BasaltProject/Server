@@ -36,6 +36,7 @@ public object Redstone {
     public fun signalOf(
         stateId: Int,
         from: BlockFace,
+        openers: Int = 0,
     ): Int {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return 0
         val properties = BlockStateDefinitions.propertiesOf(stateId)
@@ -61,6 +62,20 @@ public object Redstone {
             path == "light_weighted_pressure_plate" || path == "heavy_weighted_pressure_plate" ->
                 properties["power"]?.toIntOrNull() ?: 0
             path == "redstone_wire" -> if (from == BlockFace.DOWN) 0 else properties["power"]?.toIntOrNull() ?: 0
+            // parity: `DaylightDetectorBlock`, which feeds every side with what it reads off the sky.
+            path == "daylight_detector" -> properties["power"]?.toIntOrNull() ?: 0
+            // parity: `DetectorRailBlock`, `LecternBlock` and `TripWireHookBlock`, all fifteen or
+            // nothing. What turns them on is a minecart, a page or a tripwire.
+            path == "detector_rail" || path == "lectern" || path == "tripwire_hook" ->
+                if (properties["powered"] == "true") MAX_SIGNAL else 0
+            // parity: `LightningRodBlock`, which stays powered for the eight ticks after a strike.
+            path == "lightning_rod" -> if (properties["powered"] == "true") MAX_SIGNAL else 0
+            // parity: `TargetBlock` and `SculkSensorBlock`, both of which carry their strength in
+            // `power` and count it down on their own scheduled tick.
+            path == "target" || path == "sculk_sensor" || path == "calibrated_sculk_sensor" ->
+                properties["power"]?.toIntOrNull() ?: 0
+            // parity: `TrappedChestBlock.getSignal`, one per person looking inside, capped at fifteen.
+            path == "trapped_chest" -> openers.coerceIn(0, MAX_SIGNAL)
             else -> 0
         }
     }
@@ -80,6 +95,7 @@ public object Redstone {
     public fun directSignalOf(
         stateId: Int,
         from: BlockFace,
+        openers: Int = 0,
     ): Int {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return 0
         val properties = BlockStateDefinitions.propertiesOf(stateId)
@@ -95,6 +111,17 @@ public object Redstone {
                 if (from == BlockFace.UP) properties["power"]?.toIntOrNull() ?: 0 else 0
             // parity: an observer and a diode power the block they feed strongly.
             path == "repeater" || path == "comparator" || path == "observer" -> signalOf(stateId, from)
+            // parity: a detector rail, a lectern, a sculk sensor and a trapped chest all feed the
+            // block underneath them and nothing else.
+            path == "detector_rail" ||
+                path == "lectern" ||
+                path == "sculk_sensor" ||
+                path == "calibrated_sculk_sensor" ||
+                path == "trapped_chest" ->
+                if (from == BlockFace.UP) signalOf(stateId, from, openers) else 0
+            // parity: `TripWireHookBlock` and `LightningRodBlock`, which feed the side they face.
+            path == "tripwire_hook" || path == "lightning_rod" ->
+                if (properties["facing"] == from.name.lowercase()) signalOf(stateId, from) else 0
             else -> 0
         }
     }
@@ -119,7 +146,7 @@ public object Redstone {
         from: BlockFace,
     ): Int {
         val stateId = world.state.getBlockState(x, y, z) ?: return 0
-        val own = signalOf(stateId, from)
+        val own = signalOf(stateId, from, ContainerOpeners.count(world.name, x, y, z))
         if (!BlockSupport.conductsRedstone(stateId)) return own
         return maxOf(own, directSignalTo(world, x, y, z))
     }
@@ -133,8 +160,11 @@ public object Redstone {
     ): Int {
         var best = 0
         for (face in BlockFace.entries) {
-            val neighbour = world.state.getBlockState(x + face.stepX, y + face.stepY, z + face.stepZ) ?: continue
-            best = maxOf(best, directSignalOf(neighbour, face))
+            val nx = x + face.stepX
+            val ny = y + face.stepY
+            val nz = z + face.stepZ
+            val neighbour = world.state.getBlockState(nx, ny, nz) ?: continue
+            best = maxOf(best, directSignalOf(neighbour, face, ContainerOpeners.count(world.name, nx, ny, nz)))
             if (best >= MAX_SIGNAL) return MAX_SIGNAL
         }
         return best

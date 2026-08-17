@@ -108,6 +108,7 @@ import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NetherPortals
+import org.basaltmc.server.runtime.world.Pistons
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RandomTicks
 import org.basaltmc.server.runtime.world.RealAdvancements
@@ -162,6 +163,7 @@ import org.basaltmc.wire.text.LangTable
 import org.basaltmc.wire.text.TextColor
 import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -733,8 +735,6 @@ public class BasaltServer(
             .onFailure { logger.error(it) { "Failed to save ${snapshots.size} player(s)" } }
     }
 
-    /** One tick-loop hook for all of it: unloading has to save what it drops, so they belong together. */
-
     /** parity: `MinecraftServer.saveEverything`, the whole autosave: every world, then the players. */
     private fun persistEverything() {
         // Emitted before the work, not after: if this method ever stops completing, the last thing
@@ -1111,6 +1111,7 @@ public class BasaltServer(
             // `TntBlock`'s fuse.
             RedstoneReactors.lampTick(world, position[0], position[1], position[2])?.let { scheduled += it }
             // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
+            scheduled += finishPiston(world, position, watchers)
             Dispensers.fire(world, position[0], position[1], position[2], LegacyRandom(Random.nextLong())) {
                 playerRegistry.allocateEntityId()
             }
@@ -1162,6 +1163,30 @@ public class BasaltServer(
             }
         }
     }
+
+    /**
+     * The piston half of a scheduled tick, with the players close enough to be shoved by it.
+     *
+     * parity: `PistonMovingBlockEntity.moveCollidedEntities`. A player who gets pushed is teleported,
+     * because a client only learns it moved when the server says so.
+     */
+    private fun finishPiston(
+        world: LoadedWorld,
+        position: IntArray,
+        watchers: List<PlayerSession>,
+    ): List<org.basaltmc.server.runtime.world.BlockChange> {
+        val nearby =
+            watchers
+                .filter { abs(it.x - position[0]) <= pistonReach && abs(it.z - position[2]) <= pistonReach }
+                .map { Pistons.PlayerPosition(it.uuid.toString(), it.x, it.y, it.z) }
+        return Pistons.finish(world, position[0], position[1], position[2], nearby) { pushed ->
+            val player = watchers.firstOrNull { it.uuid.toString() == pushed.uuid } ?: return@finish
+            player.connection.teleportTo(pushed.x, pushed.y, pushed.z, player.yaw, player.pitch)
+        }
+    }
+
+    /** How far from a piston a player can be and still be in the way of what it pushes. */
+    private val pistonReach = 14.0
 
     /** Moves whatever is in mid-air, and puts it back down as a block where it lands. */
     private fun tickFallingBlocks(world: LoadedWorld) {

@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldSettings
@@ -109,6 +110,60 @@ class DispensersTest {
 
         assertEquals(before + 1, world.state.items().size, "an item is now lying in the world")
         assertNull(BlockInventory.read(dropper, 9)[3], "and the slot is empty")
+    }
+
+    /**
+     * parity: the filled-bucket behaviour, which pours instead of throwing the bucket, and leaves an
+     * empty bucket in the slot.
+     */
+    @Test
+    fun aDispenserPoursAWaterBucket() {
+        world.state.setBlockState(14, 70, 2, Blocks.STONE.stateId)
+        val data =
+            place(
+                "dispenser",
+                14,
+                71,
+                2,
+                mapOf("facing" to "up", "triggered" to "false"),
+                size = 9,
+            )
+        val slots = arrayOfNulls<org.basaltmc.server.world.loot.ItemStack>(9)
+        slots[0] =
+            org.basaltmc.server.world.loot
+                .ItemStack(Identifier.vanilla("water_bucket"), 1)
+        BlockInventory.write(data, slots)
+
+        assertTrue(Dispensers.fire(world, 14, 71, 2, LegacyRandom(1L)) { nextId++ })
+
+        assertEquals(
+            "water",
+            BlockStateDefinitions.blockOf(world.state.getBlockState(14, 72, 2) ?: 0)?.path,
+            "the water went where it was pointed",
+        )
+        assertEquals(
+            Identifier.vanilla("bucket"),
+            BlockInventory.read(data, 9)[0]?.item,
+            "and the empty bucket stayed behind",
+        )
+    }
+
+    /** parity: `FlintAndSteelDispenseItemBehavior`, which lights the block in front of it. */
+    @Test
+    fun aDispenserLightsAFire() {
+        // Pointed sideways at a space that has a floor, which is what fire needs to stand on.
+        world.state.setBlockState(13, 74, 1, Blocks.STONE.stateId)
+        val data =
+            place("dispenser", 13, 75, 2, mapOf("facing" to "north", "triggered" to "false"), size = 9)
+        val slots = arrayOfNulls<org.basaltmc.server.world.loot.ItemStack>(9)
+        slots[0] =
+            org.basaltmc.server.world.loot
+                .ItemStack(Identifier.vanilla("flint_and_steel"), 1)
+        BlockInventory.write(data, slots)
+
+        assertTrue(Dispensers.fire(world, 13, 75, 2, LegacyRandom(1L)) { nextId++ })
+
+        assertEquals("fire", BlockStateDefinitions.blockOf(world.state.getBlockState(13, 75, 1) ?: 0)?.path)
     }
 
     /** An empty dispenser does nothing at all. */

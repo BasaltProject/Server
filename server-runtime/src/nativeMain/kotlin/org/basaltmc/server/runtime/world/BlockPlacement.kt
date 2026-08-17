@@ -27,7 +27,6 @@ public object BlockPlacement {
     private val CLICKED_FACE_BLOCKS =
         setOf("lightning_rod", "end_rod", "shulker_box", "amethyst_cluster", "amethyst_bud")
 
-    /** Horizontal blocks that face the same way as the player instead of back at them. */
     /**
      * The blocks whose `getStateForPlacement` uses `getHorizontalDirection()` as it comes, taken
      * from the jar rather than guessed: everything else takes its opposite, because a furnace or a

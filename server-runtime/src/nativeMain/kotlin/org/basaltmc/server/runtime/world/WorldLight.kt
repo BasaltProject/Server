@@ -14,6 +14,14 @@ import org.basaltmc.wire.protocol.play.NibbleArray
 public object WorldLight {
     public const val MAX_LEVEL: Int = 15
 
+    /** parity: `Level.getBrightness(LightLayer.SKY, pos)`, which is what a daylight detector reads. */
+    public fun skyLight(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int = level(world, x, y, z, sky = true)
+
     /** parity: `Level.getBrightness(LightLayer.BLOCK, pos)`, what ice and snow ask before melting. */
     public fun blockLight(
         world: LoadedWorld,

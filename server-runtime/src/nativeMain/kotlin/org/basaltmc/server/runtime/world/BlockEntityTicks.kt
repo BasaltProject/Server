@@ -36,6 +36,20 @@ public object BlockEntityTicks {
         recipeFor: (Recipe.Cooker, ItemStack) -> Recipe.Cooking?,
     ): List<Changed> {
         val changes = mutableListOf<Changed>()
+        // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
+        if (world.gameTime % DaylightDetectors.INTERVAL_TICKS == 0L) {
+            for (position in chunks) {
+                val chunk = world.state.chunkIfLoaded(position[0], position[1]) ?: continue
+                for (entity in chunk.blockEntities()) {
+                    if (entity.type.path != "daylight_detector") continue
+                    val x = (position[0] shl 4) + entity.localX
+                    val z = (position[1] shl 4) + entity.localZ
+                    DaylightDetectors.update(world, x, entity.y, z)?.let {
+                        changes += Changed(x, entity.y, z, it.stateId)
+                    }
+                }
+            }
+        }
         for (position in chunks) {
             val chunk = world.state.chunkIfLoaded(position[0], position[1]) ?: continue
             if (chunk.blockEntityCount == 0) continue
