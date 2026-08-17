@@ -25,6 +25,15 @@ import org.basaltmc.wire.io.TcpConnection
 import org.basaltmc.wire.io.Zlib
 import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.protocol.PacketFraming
+import org.basaltmc.wire.protocol.configuration.FinishConfigurationPacket
+import org.basaltmc.wire.protocol.configuration.SelectKnownPacksPacket
+import org.basaltmc.wire.protocol.handshake.ClientIntent
+import org.basaltmc.wire.protocol.handshake.HandshakePacket
+import org.basaltmc.wire.protocol.login.LoginAcknowledgedPacket
+import org.basaltmc.wire.protocol.login.LoginCompressionPacket
+import org.basaltmc.wire.protocol.login.LoginFinishedPacket
+import org.basaltmc.wire.protocol.login.LoginStartPacket
+import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.protocol.readVarInt
@@ -33,6 +42,8 @@ import kotlin.concurrent.AtomicInt
 import kotlin.concurrent.AtomicLong
 import kotlin.concurrent.AtomicReference
 import kotlin.time.TimeSource
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Starts a real [BasaltServer] on its own [NativeThread] and returns the port it ended up on:
@@ -50,6 +61,8 @@ internal fun startTestServer(
     onlineMode: OnlineMode? = null,
     /** What the default group may run, for a test that has to drive the server through a command. */
     defaultPermissions: List<String> = listOf("basalt.command.help", "basalt.command.me"),
+    /** A second, empty world, for a test about what crossing between two of them does. */
+    withSecondWorld: Boolean = false,
 ): Int {
     for (port in candidatePorts(preferredPort)) {
         val config =
@@ -75,6 +88,7 @@ internal fun startTestServer(
         // world that has just been generated: that is how one run leaving dirt behind made the next
         // one refuse to place a block there and fail somewhere else entirely.
         deleteDirectory("$TEST_DATA_ROOT/worlds/test_world_$port")
+        deleteDirectory("$TEST_DATA_ROOT/worlds/${secondWorldName(port)}")
         // One world per port. Every server here owns its own RegionStore, and two of them reading
         // and writing the same region files at once is a genuine race: a worker that reads a
         // half-written region dies, and the startup that was waiting on its chunks never finishes
@@ -90,7 +104,21 @@ internal fun startTestServer(
                             seed = 0L,
                             isDefault = true,
                         ),
-                    ),
+                    ) +
+                        // Void, so the second world costs a directory and no generation at all.
+                        if (!withSecondWorld) {
+                            emptyList()
+                        } else {
+                            listOf(
+                                WorldDeclaration(
+                                    secondWorldName(port),
+                                    WorldDimension.OVERWORLD,
+                                    WorldType.VOID,
+                                    seed = 0L,
+                                    isDefault = false,
+                                ),
+                            )
+                        },
                 defaults = WorldSettings(difficulty = "easy", viewDistance = 3, saveIntervalSeconds = 30),
                 worldsRoot = "$TEST_DATA_ROOT/worlds",
             )
@@ -287,6 +315,71 @@ private fun isPeriodic(
 ): Boolean {
     val id = ByteBuffer(frame.size).also { it.writeBytes(frame) }.readVarInt()
     return id == PlayKeepAlivePacket.CLIENTBOUND_ID || (skipClockUpdates && id == SetTimePacket.ID)
+}
+
+/** The name [startTestServer] gives its optional second world. */
+internal fun secondWorldName(port: Int): String = "test_void_$port"
+
+/** Reads and discards frames until one with this packet id arrives, returning its body past the id. */
+internal fun drainUntil(
+    connection: TcpConnection,
+    incoming: ByteBuffer,
+    packetId: Int,
+    limit: Int = 400,
+): ByteBuffer {
+    var seen = 0
+    repeat(limit) {
+        val body = readFrame(connection, incoming, compressionEnabled = true)
+        seen++
+        if (body.readVarInt() == packetId) return body
+    }
+    error("packet 0x${packetId.toString(16)} never arrived after $seen other frames")
+}
+
+/** What a test knows about the player it just drove into Play. */
+internal class LoggedIn(
+    val connection: TcpConnection,
+    val incoming: ByteBuffer,
+    val threshold: Int,
+    val entityId: Int,
+    val name: String,
+)
+
+/**
+ * The Login and Configuration handshake, stripped to what reaching Play needs.
+ *
+ * [PlayFlowIntegrationTest] asserts the whole sequence in order, which is its point; a test about
+ * something else only needs to arrive, so this dispatches by packet id and ignores the rest.
+ */
+@OptIn(ExperimentalUuidApi::class)
+internal fun loginToPlay(
+    connection: TcpConnection,
+    incoming: ByteBuffer,
+    name: String,
+    uuid: Uuid = Uuid.fromLongs(0L, 0L),
+): LoggedIn {
+    sendUncompressed(connection, HandshakePacket.ID) {
+        HandshakePacket(776, "127.0.0.1", 0, ClientIntent.LOGIN).write(it)
+    }
+    sendUncompressed(connection, LoginStartPacket.ID) { LoginStartPacket(name, uuid).write(it) }
+
+    val compressionBody = readFrame(connection, incoming, compressionEnabled = false)
+    check(compressionBody.readVarInt() == LoginCompressionPacket.ID)
+    val threshold = LoginCompressionPacket.read(compressionBody).threshold
+
+    check(readFrame(connection, incoming, compressionEnabled = true).readVarInt() == LoginFinishedPacket.ID)
+    sendCompressed(connection, LoginAcknowledgedPacket.ID, threshold) { }
+
+    drainUntil(connection, incoming, SelectKnownPacksPacket.CLIENTBOUND_ID)
+    sendCompressed(connection, SelectKnownPacksPacket.SERVERBOUND_ID, threshold) {
+        SelectKnownPacksPacket(emptyList()).write(it)
+    }
+
+    drainUntil(connection, incoming, FinishConfigurationPacket.ID)
+    sendCompressed(connection, FinishConfigurationPacket.ID, threshold) { }
+
+    val loginPlay = LoginPlayPacket.read(drainUntil(connection, incoming, LoginPlayPacket.ID))
+    return LoggedIn(connection, incoming, threshold, loginPlay.entityId, name)
 }
 
 /** Removes a directory and everything under it, so a test world cannot outlive its run. */

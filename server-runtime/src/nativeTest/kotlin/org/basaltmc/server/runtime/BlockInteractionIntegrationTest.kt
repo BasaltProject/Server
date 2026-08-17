@@ -13,14 +13,6 @@ import org.basaltmc.wire.auth.OfflineUuid
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.io.TcpConnection
-import org.basaltmc.wire.protocol.configuration.FinishConfigurationPacket
-import org.basaltmc.wire.protocol.configuration.SelectKnownPacksPacket
-import org.basaltmc.wire.protocol.handshake.ClientIntent
-import org.basaltmc.wire.protocol.handshake.HandshakePacket
-import org.basaltmc.wire.protocol.login.LoginAcknowledgedPacket
-import org.basaltmc.wire.protocol.login.LoginCompressionPacket
-import org.basaltmc.wire.protocol.login.LoginFinishedPacket
-import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.BlockHitResult
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.ChatCommandPacket
@@ -31,7 +23,6 @@ import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.wire.protocol.play.Direction
-import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
 import org.basaltmc.wire.protocol.play.OpenScreenPacket
 import org.basaltmc.wire.protocol.play.PalettedContainer
@@ -52,7 +43,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 /**
  * One survival player over a real socket (same harness as [PlayFlowIntegrationTest]), seeded into
@@ -129,7 +119,7 @@ class BlockInteractionIntegrationTest {
 
         val connection = TcpConnection.connect("127.0.0.1", port)
         val incoming = ByteBuffer()
-        val threshold = login(connection, incoming, name)
+        val threshold = loginToPlay(connection, incoming, name).threshold
 
         // Drain everything up to (and including) the seeded inventory, to confirm the seed itself
         // reached the client: if this assertion fails, nothing downstream can be trusted either.
@@ -415,7 +405,7 @@ class BlockInteractionIntegrationTest {
 
         val connection = TcpConnection.connect("127.0.0.1", port)
         val incoming = ByteBuffer()
-        val threshold = login(connection, incoming, "Wade")
+        val threshold = loginToPlay(connection, incoming, "Wade").threshold
         val batch = ChunkBatchFinishedPacket.read(drainUntil(connection, incoming, ChunkBatchFinishedPacket.ID))
         assertEquals(25, batch.batchSize)
         sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
@@ -435,7 +425,7 @@ class BlockInteractionIntegrationTest {
         // in the chunk, and this is where they were wrong.
         val second = TcpConnection.connect("127.0.0.1", port)
         val secondIncoming = ByteBuffer()
-        login(second, secondIncoming, "Wanda")
+        loginToPlay(second, secondIncoming, "Wanda")
         var found = false
         var frames = 0
         while (frames++ < 400 && !found) {
@@ -478,52 +468,4 @@ class BlockInteractionIntegrationTest {
         second.close()
         connection.close()
     }
-}
-
-/** Reads and discards frames until one with this packet id arrives, returning its body with the id already consumed. */
-private fun drainUntil(
-    connection: TcpConnection,
-    incoming: ByteBuffer,
-    packetId: Int,
-): ByteBuffer {
-    var seen = 0
-    repeat(400) {
-        val body = readFrame(connection, incoming, compressionEnabled = true)
-        seen++
-        val id = body.readVarInt()
-        if (id == packetId) return body
-    }
-    error("packet 0x${packetId.toString(16)} never arrived after $seen other frames")
-}
-
-/** The Login+Configuration handshake, stripped to just what is needed to reach Play. */
-private fun login(
-    connection: TcpConnection,
-    incoming: ByteBuffer,
-    name: String,
-): Int {
-    sendUncompressed(connection, HandshakePacket.ID) {
-        HandshakePacket(776, "127.0.0.1", 0, ClientIntent.LOGIN).write(it)
-    }
-    sendUncompressed(connection, LoginStartPacket.ID) {
-        LoginStartPacket(name, Uuid.fromLongs(0L, 0L)).write(it)
-    }
-
-    val compressionBody = readFrame(connection, incoming, compressionEnabled = false)
-    check(compressionBody.readVarInt() == LoginCompressionPacket.ID)
-    val threshold = LoginCompressionPacket.read(compressionBody).threshold
-
-    check(readFrame(connection, incoming, compressionEnabled = true).readVarInt() == LoginFinishedPacket.ID)
-    sendCompressed(connection, LoginAcknowledgedPacket.ID, threshold) { }
-
-    drainUntil(connection, incoming, SelectKnownPacksPacket.CLIENTBOUND_ID)
-    sendCompressed(connection, SelectKnownPacksPacket.SERVERBOUND_ID, threshold) {
-        SelectKnownPacksPacket(emptyList()).write(it)
-    }
-
-    drainUntil(connection, incoming, FinishConfigurationPacket.ID)
-    sendCompressed(connection, FinishConfigurationPacket.ID, threshold) { }
-
-    drainUntil(connection, incoming, LoginPlayPacket.ID)
-    return threshold
 }
