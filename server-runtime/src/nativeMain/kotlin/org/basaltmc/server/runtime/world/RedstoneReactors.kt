@@ -56,6 +56,11 @@ public object RedstoneReactors {
             path.endsWith("copper_bulb") -> bulb(world, x, y, z, stateId, properties, changes)
             path == "note_block" -> powered(world, x, y, z, stateId, properties, changes)
             path == "tnt" -> tnt(world, x, y, z, properties, changes)
+            path == "powered_rail" || path == "activator_rail" ->
+                PoweredRails.update(world, x, y, z)?.let { changes += it }
+            // parity: `BellBlock.neighborChanged`. The ring itself is a sound and a block event,
+            // which no block has a way to send yet; the state it leaves behind is this.
+            path == "bell" -> powered(world, x, y, z, stateId, properties, changes)
             else -> Unit
         }
     }
@@ -181,9 +186,8 @@ public object RedstoneReactors {
     /**
      * parity: `TntBlock.neighborChanged`, which primes it and takes the block away.
      *
-     * The primed TNT is an entity in vanilla, with a fuse of eighty ticks and a shove of momentum.
-     * Entities are §6.4, so the block goes and the explosion is booked for the same eighty ticks
-     * from where it stood.
+     * The primed TNT is an entity in vanilla, so until entities exist the block goes and the
+     * explosion is booked for the same eighty ticks from where it stood.
      */
     private fun tnt(
         world: LoadedWorld,

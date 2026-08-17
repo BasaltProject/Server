@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime
 
 import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
@@ -95,6 +96,7 @@ import org.basaltmc.server.runtime.world.Beds
 import org.basaltmc.server.runtime.world.BlockEntityTicks
 import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.Crafters
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.Dispensers
 import org.basaltmc.server.runtime.world.EndPodium
@@ -110,6 +112,7 @@ import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.Pistons
 import org.basaltmc.server.runtime.world.PlayerProgress
+import org.basaltmc.server.runtime.world.PressurePlates
 import org.basaltmc.server.runtime.world.RandomTicks
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealBlockTags
@@ -814,6 +817,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Fluid tick failed in world '${world.name}'" } }
             runCatching { tickRandomBlocks(world) }
                 .onFailure { logger.error(it) { "Random block tick failed in world '${world.name}'" } }
+            runCatching { tickPressurePlates(world) }
+                .onFailure { logger.error(it) { "Pressure plate tick failed in world '${world.name}'" } }
             runCatching { tickScheduledBlocks(world) }
                 .onFailure { logger.error(it) { "Scheduled block tick failed in world '${world.name}'" } }
             runCatching { tickBlockEntities(world) }
@@ -1053,8 +1058,8 @@ public class BasaltServer(
     }
 
     /**
-     * Runs the block ticks that have come due. For now that is buttons letting themselves back up;
-     * redstone (§6.2) is what fills the rest in.
+     * Runs the block ticks that have come due: buttons letting themselves back up, redstone
+     * components spending their delay, pistons landing, plates coming back up.
      */
     private fun tickScheduledBlocks(world: LoadedWorld) {
         val due = world.state.dueBlockTicks()
@@ -1110,11 +1115,32 @@ public class BasaltServer(
             // parity: `RedstoneLampBlock.tick`, the four ticks a lamp waits before going dark, and
             // `TntBlock`'s fuse.
             RedstoneReactors.lampTick(world, position[0], position[1], position[2])?.let { scheduled += it }
+            // parity: `BasePressurePlateBlock.tick`, the turn a pressed plate books to come back up.
+            if (PressurePlates.isPlate(world.state.getBlockState(position[0], position[1], position[2]) ?: 0)) {
+                PressurePlates
+                    .update(
+                        world,
+                        position[0],
+                        position[1],
+                        position[2],
+                        standingOn(world, position[0], position[1], position[2], watchers),
+                    )?.let { scheduled += it }
+            }
             // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
             scheduled += finishPiston(world, position, watchers)
             Dispensers.fire(world, position[0], position[1], position[2], LegacyRandom(Random.nextLong())) {
                 playerRegistry.allocateEntityId()
             }
+            // parity: `CrafterBlock.tick`, four ticks after the signal arrived.
+            Crafters
+                .craft(
+                    world,
+                    position[0],
+                    position[1],
+                    position[2],
+                    { input -> recipes.resultFor(input) },
+                ) { playerRegistry.allocateEntityId() }
+                ?.let { scheduled += it }
             RedstoneComponents.tick(world, position[0], position[1], position[2])?.let { moved ->
                 scheduled += moved
                 scheduled += Redstone.settle(world, moved.x, moved.y, moved.z)
@@ -1162,6 +1188,80 @@ public class BasaltServer(
                 }
             }
         }
+    }
+
+    /**
+     * Presses the plates people are standing on.
+     *
+     * parity: `BasePressurePlateBlock.entityInside`, which is a collision rather than a tick. Here
+     * the players are walked once a tick instead, which reaches the same state on the same tick: a
+     * plate is pressed while somebody is on it and books its own turn to come back up.
+     */
+    private fun tickPressurePlates(world: LoadedWorld) {
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        if (watchers.isEmpty()) return
+        for (player in watchers) {
+            if (player.gamemode == Gamemode.SPECTATOR) continue
+            val x = floor(player.x).toInt()
+            val z = floor(player.z).toInt()
+            val y = PressurePlates.blockUnder(player.y)
+            val stateId = world.state.getBlockState(x, y, z) ?: continue
+            if (!PressurePlates.isPlate(stateId)) continue
+            if (!PressurePlates.isStandingOn(x, y, z, player.x, player.y, player.z)) continue
+            val change = PressurePlates.update(world, x, y, z, standingOn(world, x, y, z, watchers)) ?: continue
+            announceRedstone(world, watchers, change)
+        }
+    }
+
+    /** How many things are on the plate at these coordinates, the way its own sensitivity counts. */
+    private fun standingOn(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        watchers: List<PlayerSession>,
+    ): Int {
+        var count =
+            watchers.count {
+                it.gamemode != Gamemode.SPECTATOR && PressurePlates.isStandingOn(x, y, z, it.x, it.y, it.z)
+            }
+        // parity: the stone and blackstone plates are `MOBS`, so a dropped item does not press them.
+        val path = BlockStateDefinitions.blockOf(world.state.getBlockState(x, y, z) ?: 0)?.path.orEmpty()
+        if (path != "stone_pressure_plate" && path != "polished_blackstone_pressure_plate") {
+            count += world.state.items().count { PressurePlates.isStandingOn(x, y, z, it.x, it.y, it.z) }
+        }
+        return count
+    }
+
+    /** Sends a block that redstone moved to everyone watching, and lets its neighbours react. */
+    private fun announceRedstone(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        change: org.basaltmc.server.runtime.world.BlockChange,
+    ) {
+        val pos = BlockPos(change.x, change.y, change.z)
+        for (player in watchers) {
+            player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                ClientboundBlockUpdatePacket(pos, change.stateId).write(it)
+            }
+        }
+        for (settled in Redstone.settle(world, change.x, change.y, change.z)) {
+            val at = BlockPos(settled.x, settled.y, settled.z)
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(at, settled.stateId).write(it)
+                }
+            }
+        }
+        for (reacted in RedstoneReactors.update(world, change.x, change.y, change.z)) {
+            val at = BlockPos(reacted.x, reacted.y, reacted.z)
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(at, reacted.stateId).write(it)
+                }
+            }
+        }
+        RedstoneComponents.scheduleAround(world, change.x, change.y, change.z)
     }
 
     /**
@@ -1239,7 +1339,26 @@ public class BasaltServer(
     private fun tickBlockEntities(world: LoadedWorld) {
         val chunks = simulatedChunks(world)
         if (chunks.isEmpty()) return
-        val changes = BlockEntityTicks.tick(world, chunks) { cooker, stack -> recipes.cookingFor(cooker, stack) }
+        val changes =
+            BlockEntityTicks.tick(
+                world,
+                chunks,
+                { cooker, stack -> recipes.cookingFor(cooker, stack) },
+                // parity: `CampfireBlockEntity.cookTick`, which drops what is done beside the fire.
+                { done ->
+                    world.state.spawnItem(
+                        WorldState.DroppedItem(
+                            entityId = playerRegistry.allocateEntityId(),
+                            uuid = Uuid.random(),
+                            item = done.stack.item,
+                            count = done.stack.count,
+                            x = done.x + 0.5,
+                            y = done.y + 1.0,
+                            z = done.z + 0.5,
+                        ),
+                    )
+                },
+            )
         if (changes.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (change in changes) {

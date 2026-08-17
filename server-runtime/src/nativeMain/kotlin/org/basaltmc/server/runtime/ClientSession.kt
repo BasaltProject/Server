@@ -42,6 +42,7 @@ import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.BlockInventory
 import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
+import org.basaltmc.server.runtime.world.Campfires
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.ContainerOpeners
 import org.basaltmc.server.runtime.world.Containers
@@ -531,17 +532,12 @@ public class ClientSession(
                 drainFrames()
             }
         } catch (e: SocketException) {
-            // A connection dropping is part of this class's normal lifecycle, not a failure worth
-            // surfacing: server-list pings in particular reset the socket the instant they have
-            // their answer. Letting it escape logged an uncaught-exception line on every ping.
+            // A connection dropping is normal, not a failure worth surfacing: a server-list ping
+            // resets the socket the instant it has its answer.
             logger.debug { "Connection closed: ${e.message}" }
         } catch (e: Exception) {
-            // One malformed (or misunderstood) packet must cost one connection, not the thread that
-            // was reading it. Before this, a decoder that read past the end of a frame escaped as
-            // an uncaught exception on a native thread, which killed the read loop and disconnected
-            // the player with nothing in the log but a stack-trace line. It is logged loudly on
-            // purpose: reaching here is always a bug in a decoder or a hostile client, never
-            // routine, and the id in the message is what identifies which.
+            // One malformed packet costs one connection, not the thread reading it. Logged loudly
+            // on purpose: reaching here is a decoder bug or a hostile client, never routine.
             logger.error(e) {
                 "Dropping ${playerSession?.name ?: "connection"}: " +
                     "failed to handle packet 0x${lastPacketId.toString(16)} in $state"
@@ -778,13 +774,9 @@ public class ClientSession(
                 },
             ).write(it)
         }
-        // These 13 are the only registries a real client hard-requires non-empty (see
-        // VanillaRegistryData's KDoc); the rest of the full 29-registry set is a documented gap.
-        // Entry names matter here, not just presence: spawn eggs for wolf/pig/cow/chicken/zombie
-        // nautilus carry a default variant component resolving each registry's real `DEFAULT`
-        // ResourceKey (confirmed live: chicken_variant crashed looking up specifically
-        // minecraft:temperate, not just any entry). Cat and frog have no spawn egg and no DEFAULT
-        // in the real jar, so any entry name works for them.
+        // The registries a real client needs non-empty (see VanillaRegistryData). The entry names
+        // matter, not only their presence: a spawn egg resolves each registry's own `DEFAULT` key,
+        // and a client looking up `minecraft:temperate` in an empty chicken_variant crashes.
         sendRegistry("minecraft:wolf_variant", "minecraft:pale", VanillaRegistryData.wolfVariant())
         sendRegistry("minecraft:wolf_sound_variant", "minecraft:classic", VanillaRegistryData.wolfSoundVariant())
         sendRegistry("minecraft:pig_variant", "minecraft:temperate", VanillaRegistryData.pigVariant())
@@ -854,13 +846,9 @@ public class ClientSession(
                 VanillaRegistryData.instruments.map { (id, value) -> RegistryEntry("minecraft:$id", value) },
             ).write(it)
         }
-        // The remaining registries in RegistryDataLoader.SYNCHRONIZED_REGISTRIES that nothing in
-        // item bootstrap needs populated yet: sent empty so the client's RegistryAccess has an
-        // entry for them at all (a registry that was never sent doesn't exist client-side, which
-        // breaks resolving tags scoped to it: confirmed live, see VanillaTagData's KDoc).
-        // The enchantment registry, when this build could convert every file the jar ships. A
-        // partial one disconnects clients at login (see RealEnchantments), so it is all or nothing
-        // and the empty entry below covers the "nothing" case.
+        // The rest of `RegistryDataLoader.SYNCHRONIZED_REGISTRIES`, sent empty: a registry that was
+        // never sent does not exist client-side, and tags scoped to it stop resolving. Enchantments
+        // are all or nothing, because a partial registry disconnects at login (see RealEnchantments).
         val enchantmentEntries = enchantments?.entries.orEmpty()
         if (enchantmentEntries.isNotEmpty()) {
             sendCompressed(RegistryDataPacket.ID) {
@@ -896,13 +884,9 @@ public class ClientSession(
             if (emptyRegistryId == "minecraft:timeline" && timelineEntries.isNotEmpty()) continue
             sendCompressed(RegistryDataPacket.ID) { RegistryDataPacket(emptyRegistryId, emptyList()).write(it) }
         }
-        // Client bootstrap looks tags up by key whether or not the tagged registry is loaded: a
-        // real client failed on damage_type's is_fire with no `tags` packet sent at all. So every
-        // tag name the 26.2 jar ships goes out (see VanillaTagData), existing being enough there.
-        //
-        // Members matter separately: the client evaluates its own tool rules against them, and an
-        // empty `mineable/pickaxe` means no rule matches and every tool mines at bare-hand speed.
-        // Known members are sent, the rest keep the empty-but-present shape.
+        // Every tag name the jar ships goes out (see VanillaTagData): the client looks tags up by
+        // key whether or not their registry is loaded. Members matter separately, because it runs
+        // its own tool rules against them and an empty `mineable/pickaxe` means bare-hand speed.
         sendCompressed(TagsPacket.ID) {
             TagsPacket(
                 VanillaTagData.tagsByRegistry.map { (registryId, tagNames) ->
@@ -1065,14 +1049,9 @@ public class ClientSession(
         sendCompressed(SetChunkCacheRadiusPacket.ID) { SetChunkCacheRadiusPacket(chunkRadius).write(it) }
         sendCompressed(SetSimulationDistancePacket.ID) { SetSimulationDistancePacket(chunkRadius).write(it) }
 
-        // Mirrors real vanilla's join order (PlayerList.placeNewPlayer/sendLevelInfo, confirmed by
-        // decompiling the real jar): teleport and player info arrive before level data, and the
-        // level_chunks_load_start game event comes right before chunks, not after. Sending chunks
-        // first (as an earlier version of this code did) left a real client stuck on "loading
-        // terrain" forever, even with correct chunk data and a correct batch wrapper.
-        // parity: `PlayerList.sendLevelInfo` sends the clocks just before the spawn position, and
-        // the weather events only when it is actually raining. A client never told the time draws a
-        // sun frozen wherever its last server left it.
+        // parity: `PlayerList.placeNewPlayer`/`sendLevelInfo`, and the order matters: teleport and
+        // player info before level data, and `level_chunks_load_start` right before the chunks.
+        // Chunks first leaves a real client on "loading terrain" for ever.
         sendTime(world)
         if (world.weather.raining) sendWeather(world.weather)
         // parity: `CustomBossEvents.onPlayerConnect`, which shows a joining player every bar that
@@ -2148,15 +2127,9 @@ public class ClientSession(
                     SetEntityDataPacket.item(item.entityId, WireItemStack(protocolId, item.count)).write(it)
                 }
             } else if (item.resting && settledItems.add(item.entityId)) {
-                // One correction when it stops, and nothing while it falls.
-                //
-                // A real client simulates a dropped item itself from the velocity the spawn packet
-                // carried, and it interpolates. Sending an absolute teleport every tick on top of
-                // that overrides its simulation twenty times a second with positions computed on a
-                // *different* 20 Hz loop than the one that produced them, so the two drift against
-                // each other and the item visibly stutters. Vanilla only syncs when something the
-                // client could not have predicted happens; this syncs the one thing that matters,
-                // where it came to rest.
+                // One correction when it stops, and nothing while it falls: the client simulates
+                // the item from the velocity it was spawned with, and a teleport every tick fights
+                // that simulation on a different clock, which shows up as a stutter.
                 sendPlayPacket(EntityTeleportPacket.ID) {
                     EntityTeleportPacket(
                         entityId = item.entityId,
@@ -2320,13 +2293,8 @@ public class ClientSession(
         if (session.gamemode == Gamemode.SPECTATOR || session.gamemode == Gamemode.ADVENTURE) return ack()
 
         val hit = useItemOn.blockHit
-        // Interacting with the block comes first, and has to: the usual way to open a crafting
-        // table is to right-click it with an empty hand, and the held-item checks below reject
-        // exactly that. parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it
-        // considers the item as something to place.
-        //
-        // Sneaking overrides it and places instead, which is how vanilla lets you put a block on
-        // top of a table rather than opening it.
+        // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it considers the
+        // item as something to place, and sneaking overrides that and places instead.
         if (!session.sneaking) {
             val clicked = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)?.let(Blocks::byStateId)
             if (clicked?.block == CRAFTING_TABLE) {
@@ -2340,6 +2308,15 @@ public class ClientSession(
             }
             if (cookerPath != null && cookerPath in Containers.PLAIN) {
                 openChest(session, hit.pos, cookerPath)
+                return ack()
+            }
+            if (cookerPath == "crafter") {
+                openCrafter(session, hit.pos)
+                return ack()
+            }
+            // parity: `CampfireBlock.useItemOn`, which takes one piece of food onto the fire and
+            // refuses anything a campfire cannot cook.
+            if (cookerPath != null && Campfires.isCampfire(cookerPath) && placeOnCampfire(session, hit.pos)) {
                 return ack()
             }
             val clickedState = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)
@@ -2472,7 +2449,9 @@ public class ClientSession(
         // parity: `AbstractFurnaceBlock.newBlockEntity`: a cooker is nothing without the entity that
         // holds its slots and its fire.
         val placedPath = BlockStateDefinitions.blockOf(blockStateId)?.path
-        if (placedPath != null && (placedPath in Furnaces.COOKERS || placedPath in Containers.PLAIN)) {
+        if (placedPath != null &&
+            (placedPath in Furnaces.COOKERS || placedPath in Containers.PLAIN || placedPath == "crafter")
+        ) {
             loadedWorld?.state?.chunkIfLoaded(placeAt.x shr 4, placeAt.z shr 4)?.setBlockEntity(
                 ChunkBlockEntity(
                     placeAt.x and 15,
@@ -2695,6 +2674,66 @@ public class ClientSession(
         }
     }
 
+    /**
+     * Puts what the player is holding onto a campfire.
+     *
+     * parity: `CampfireBlock.useItemOn`: one piece into the first free slot, at the recipe's own
+     * cooking time, and nothing at all if the campfire cannot cook it.
+     */
+    private fun placeOnCampfire(
+        session: PlayerSession,
+        pos: BlockPos,
+    ): Boolean {
+        val world = currentWorld ?: return false
+        val stateId = world.state.getBlockState(pos.x, pos.y, pos.z) ?: return false
+        if (!Campfires.isLitCampfire(stateId)) return false
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot] ?: return false
+        val chunk = world.state.chunkIfLoaded(pos.x shr 4, pos.z shr 4) ?: return false
+        val entity =
+            chunk.blockEntityAt(pos.x and 15, pos.y, pos.z and 15)
+                ?: ChunkBlockEntity(pos.x and 15, pos.y, pos.z and 15, Campfires.BLOCK, NbtCompound())
+                    .also { chunk.setBlockEntity(it) }
+        val state = Campfires.read(entity.data)
+        val stack =
+            org.basaltmc.server.world.loot
+                .ItemStack(Identifier.parse(held.id), 1)
+        if (!Campfires.placeFood(state, stack) { food -> recipes?.cookingFor(campfireCooker, food) }) return false
+        Campfires.write(state, entity.data)
+        chunk.markDirty()
+        if (session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
+        }
+        return true
+    }
+
+    /**
+     * Opens a crafter.
+     *
+     * parity: `CrafterBlock.useWithoutItem`. Its nine slots are the block's own, like a chest's, and
+     * nothing is taken out by hand: the block pushes what it makes out of its front.
+     */
+    private fun openCrafter(
+        session: PlayerSession,
+        pos: BlockPos,
+    ) {
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.crafter(nextContainerId)
+        openBlock = pos
+        openBlockSize = Menu.CRAFTER_SIZE
+        openBlockData = IntArray(4) { -1 }
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = OpenScreenPacket.CRAFTER_MENU,
+                title = Component.translatable("container.crafter"),
+            ).write(it)
+        }
+        sendInventory()
+    }
+
     /** The block's own slots, read straight off its block entity. */
     private fun readBlockSlot(index: Int): StoredItemStack? {
         val entity = openBlockEntity() ?: return null
@@ -2717,20 +2756,25 @@ public class ClientSession(
         val world = currentWorld ?: return
         val chunk = world.state.chunkIfLoaded(position.x shr 4, position.z shr 4) ?: return
         val entity = chunk.blockEntityAt(position.x and 15, position.y, position.z and 15) ?: return
-        val state = Furnaces.read(entity.data)
-        if (index !in state.items.indices) return
-        state.items[index] =
+        // Every slot of the block, not the three a cooker has: writing back fewer than it holds is
+        // what would empty a chest the moment somebody moved its first item.
+        val slots = BlockInventory.read(entity.data, openBlockSize)
+        if (index !in slots.indices) return
+        slots[index] =
             stack?.let {
                 org.basaltmc.server.world.loot
                     .ItemStack(Identifier.parse(it.id), it.count)
             }
+        BlockInventory.write(entity.data, slots)
         // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the
         // thing being cooked changes: a new item does not inherit the last one's progress.
-        if (index == Furnaces.INPUT_SLOT) {
+        val cooking = BlockStateDefinitions.blockOf(world.state.getBlockState(position.x, position.y, position.z) ?: 0)
+        if (index == Furnaces.INPUT_SLOT && cooking?.path in Furnaces.COOKERS) {
+            val state = Furnaces.read(entity.data)
             state.cookingTimer = 0
             state.cookingTotalTime = Furnaces.cookTimeFor(state) { source -> cookingFor(position, source) }
+            Furnaces.write(state, entity.data)
         }
-        Furnaces.write(state, entity.data)
         chunk.markDirty()
     }
 
@@ -2751,6 +2795,9 @@ public class ClientSession(
         val cooker = Furnaces.COOKERS[block?.path] ?: return null
         return recipes?.cookingFor(cooker, stack)
     }
+
+    /** parity: `RecipeType.CAMPFIRE_COOKING`, the only cooker that is not a block with a window. */
+    private val campfireCooker = org.basaltmc.server.world.crafting.Recipe.Cooker.CAMPFIRE
 
     /** Keeps an open cooker's window in step: its bars, and its slots as the fire eats them. */
     private fun syncOpenContainer() {
