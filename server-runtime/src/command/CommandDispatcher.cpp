@@ -82,6 +82,12 @@ void CommandFeedback::success(const CommandSource& source, const Component& rawM
     if (!broadcastToAdmins) {
         return;
     }
+    // parity: `ConsoleInput.shouldInformAdmins` and `RconConsoleSource.shouldInformAdmins`.
+    const CommandEnvironment::Options& options = environment_->options();
+    if (source.player() == nullptr &&
+        !(source.name() == "Rcon" ? options.broadcastRconToOps : options.broadcastConsoleToOps)) {
+        return;
+    }
     const Component broadcast = Component::translatable("chat.type.admin", {source.displayName(), message})
                                     .color(wire::text::kGray)
                                     .italic(true);

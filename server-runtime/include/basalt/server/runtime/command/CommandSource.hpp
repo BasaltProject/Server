@@ -27,6 +27,10 @@ inline constexpr std::int32_t kGamemasters = 2;
 inline constexpr std::int32_t kAdmins = 3;
 inline constexpr std::int32_t kOwners = 4;
 
+/// What an operator's permission level is, from `op-permission-level`; set once at startup.
+[[nodiscard]] std::int32_t operatorLevel() noexcept;
+void setOperatorLevel(std::int32_t level) noexcept;
+
 } // namespace permissionLevel
 
 inline constexpr std::string_view kAdminPermission = "basalt.admin.broadcast";

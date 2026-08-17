@@ -62,6 +62,8 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     options.worldSeed = wiring.worldSeed;
     options.defaultWorldName = wiring.defaultWorldName;
     options.maxPlayers = wiring.maxPlayers;
+    options.broadcastConsoleToOps = wiring.broadcastConsoleToOps;
+    options.broadcastRconToOps = wiring.broadcastRconToOps;
     options.stopServer = wiring.stopServer;
     options.dropBrokenBlock = wiring.dropBrokenBlock;
     options.summonGolem = wiring.summonGolem;

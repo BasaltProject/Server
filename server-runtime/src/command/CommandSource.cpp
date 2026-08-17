@@ -1,10 +1,21 @@
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::command {
+
+namespace {
+std::atomic<std::int32_t> gOperatorLevel{permissionLevel::kOwners};
+} // namespace
+
+std::int32_t permissionLevel::operatorLevel() noexcept { return gOperatorLevel.load(std::memory_order_relaxed); }
+
+void permissionLevel::setOperatorLevel(std::int32_t level) noexcept {
+    gOperatorLevel.store(level, std::memory_order_relaxed);
+}
 
 ConsoleCommandSource::ConsoleCommandSource(wire::common::Logger logger, wire::text::LangTable lang, SpawnAt spawn)
     : logger_(std::move(logger)), lang_(std::move(lang)), spawn_(std::move(spawn)) {}
@@ -34,7 +45,7 @@ wire::text::Component PlayerCommandSource::displayName() const { return wire::te
 
 std::int32_t PlayerCommandSource::permissionLevel() const {
     const std::optional<bool> granted = player_->permissionGrant(kAdminPermission);
-    return granted.value_or(groups_->resolve(player_->group, kAdminPermission)) ? permissionLevel::kOwners
+    return granted.value_or(groups_->resolve(player_->group, kAdminPermission)) ? permissionLevel::operatorLevel()
                                                                                 : permissionLevel::kAll;
 }
 
