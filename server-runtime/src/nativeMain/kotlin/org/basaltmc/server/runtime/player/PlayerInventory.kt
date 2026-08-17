@@ -204,6 +204,10 @@ public class PlayerInventory(
         private const val MENU_STORAGE_START = 9
         private const val MENU_OFFHAND = 45
 
+        /** Where the four worn pieces sit, head first, in this class's own numbering. */
+        public const val ARMOUR_START: Int = 36
+        public const val ARMOUR_SLOTS: Int = 4
+
         private const val STORAGE_ARMOUR_START = 36
         private const val STORAGE_OFFHAND = 40
 

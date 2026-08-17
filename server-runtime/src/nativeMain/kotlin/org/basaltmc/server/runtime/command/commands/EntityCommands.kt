@@ -170,7 +170,8 @@ public class DamageCommand(
         val target = context.get<List<CommandTarget>>("target").single()
         val amount = context.get<Float>("amount").toDouble()
         when (target) {
-            is CommandTarget.Player -> target.session.connection.hurt(amount.toFloat(), "generic")
+            is CommandTarget.Player ->
+                target.session.connection.hurt(amount.toFloat(), "generic", context.get<Identifier>("damageType"))
             is CommandTarget.Entity -> {
                 val entity = target.entity
                 entity.health -= amount

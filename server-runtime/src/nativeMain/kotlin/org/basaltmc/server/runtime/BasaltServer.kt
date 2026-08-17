@@ -92,6 +92,7 @@ import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.FluidKind
@@ -103,6 +104,7 @@ import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealBlockTags
+import org.basaltmc.server.runtime.world.RealDamageTypeTags
 import org.basaltmc.server.runtime.world.RealDialogs
 import org.basaltmc.server.runtime.world.RealEnchantments
 import org.basaltmc.server.runtime.world.RealEntityTypeTags
@@ -196,6 +198,7 @@ public class BasaltServer(
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
     private val fluidTags = RealFluidTags(serverJar)
+    private val damageTypeTags = RealDamageTypeTags(serverJar)
     private val entityTags = RealEntityTypeTags(serverJar)
     private val advancements = RealAdvancements(serverJar)
     private val enchantments = RealEnchantments(serverJar)
@@ -777,7 +780,7 @@ public class BasaltServer(
             if (player.gamemode == Gamemode.CREATIVE || player.gamemode == Gamemode.SPECTATOR) continue
             val damage = border.damageAt(player.x, player.z)
             if (damage <= 0f) continue
-            player.connection.hurt(damage, "outOfWorldBorder")
+            player.connection.hurt(damage, "outOfWorldBorder", DamageTypes.OUTSIDE_BORDER)
         }
     }
 
@@ -849,7 +852,7 @@ public class BasaltServer(
                 player.airSupply = Fluids.airAfterTick(player.airSupply, eyesInWater = true)
                 if (player.airSupply <= Fluids.DROWNING_AIR) {
                     player.airSupply = 0
-                    player.connection.hurt(Fluids.DROWN_DAMAGE, "drown")
+                    player.connection.hurt(Fluids.DROWN_DAMAGE, "drown", DamageTypes.DROWN)
                 }
             } else {
                 player.airSupply = Fluids.airAfterTick(player.airSupply, eyesInWater = false)
@@ -864,14 +867,14 @@ public class BasaltServer(
             if (inLava) {
                 player.fireTicks = Fluids.LAVA_FIRE_TICKS
                 if (world.gameTime % LAVA_DAMAGE_INTERVAL_TICKS == 0L) {
-                    player.connection.hurt(Fluids.LAVA_DAMAGE, "lava")
+                    player.connection.hurt(Fluids.LAVA_DAMAGE, "lava", DamageTypes.LAVA)
                 }
             } else if (player.fireTicks > 0) {
                 player.fireTicks--
                 // parity: `Entity.baseTick` burns for one heart every second, and lava's own damage
                 // replaces it while standing in it.
                 if (player.fireTicks % FIRE_DAMAGE_INTERVAL_TICKS == 0) {
-                    player.connection.hurt(Fluids.FIRE_DAMAGE, "onFire")
+                    player.connection.hurt(Fluids.FIRE_DAMAGE, "onFire", DamageTypes.ON_FIRE)
                 }
             }
 
@@ -917,10 +920,12 @@ public class BasaltServer(
                 }
             MobEffects.POISON ->
                 if (onInterval(ticks, POISON_INTERVAL, active.amplifier) && player.health > 1f) {
-                    player.connection.hurt(1f, "magic")
+                    player.connection.hurt(1f, "magic", DamageTypes.MAGIC)
                 }
             MobEffects.WITHER ->
-                if (onInterval(ticks, WITHER_INTERVAL, active.amplifier)) player.connection.hurt(1f, "wither")
+                if (onInterval(ticks, WITHER_INTERVAL, active.amplifier)) {
+                    player.connection.hurt(1f, "wither", DamageTypes.WITHER)
+                }
             MobEffects.HUNGER -> player.food.addExhaustion(HUNGER_EXHAUSTION * (active.amplifier + 1))
             else -> Unit
         }
@@ -1200,6 +1205,7 @@ public class BasaltServer(
                     advancementTriggers = advancementTriggers,
                     blockTags = blockTags,
                     fluidTags = fluidTags,
+                    damageTypeTags = damageTypeTags,
                     entityTypeTags = entityTags,
                     itemTags = itemTags,
                 ).run()

@@ -12,6 +12,7 @@ import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.RegistryArgument
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.world.ActiveEffect
+import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.text.Component
@@ -101,7 +102,7 @@ public class EffectCommand : Command(name = "effect", permissionLevel = Permissi
                 continue
             }
             if (effect == MobEffects.INSTANT_DAMAGE) {
-                player.connection.hurt(INSTANT_AMOUNT * (1 shl amplifier), "magic")
+                player.connection.hurt(INSTANT_AMOUNT * (1 shl amplifier), "magic", DamageTypes.MAGIC)
                 continue
             }
             val active = ActiveEffect(effect, amplifier, durationTicks, visible = visible, showIcon = visible)
