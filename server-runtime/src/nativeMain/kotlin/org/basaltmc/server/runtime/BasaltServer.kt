@@ -96,6 +96,7 @@ import org.basaltmc.server.runtime.world.BlockEntityTicks
 import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.DamageTypes
+import org.basaltmc.server.runtime.world.Dispensers
 import org.basaltmc.server.runtime.world.EndPodium
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.FallingBlocks
@@ -125,6 +126,7 @@ import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RecipeBook
 import org.basaltmc.server.runtime.world.Redstone
 import org.basaltmc.server.runtime.world.RedstoneComponents
+import org.basaltmc.server.runtime.world.RedstoneReactors
 import org.basaltmc.server.runtime.world.ScheduledBlocks
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.Submersion
@@ -1105,6 +1107,13 @@ public class BasaltServer(
             ScheduledBlocks.driedGhast(world, position[0], position[1], position[2], scheduled)
             // parity: `RedstoneTorchBlock.tick` and `DiodeBlock.tick`, which is where a component's
             // delay is actually spent. What it changes then settles the dust around it.
+            // parity: `RedstoneLampBlock.tick`, the four ticks a lamp waits before going dark, and
+            // `TntBlock`'s fuse.
+            RedstoneReactors.lampTick(world, position[0], position[1], position[2])?.let { scheduled += it }
+            // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
+            Dispensers.fire(world, position[0], position[1], position[2], LegacyRandom(Random.nextLong())) {
+                playerRegistry.allocateEntityId()
+            }
             RedstoneComponents.tick(world, position[0], position[1], position[2])?.let { moved ->
                 scheduled += moved
                 scheduled += Redstone.settle(world, moved.x, moved.y, moved.z)

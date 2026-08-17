@@ -21,6 +21,11 @@ public object RedstoneComponents {
 
     public val COMPARATOR: Identifier = Identifier.vanilla("comparator")
 
+    public val OBSERVER: Identifier = Identifier.vanilla("observer")
+
+    /** parity: `ObserverBlock`'s own two ticks, both to fire and to stop. */
+    private const val OBSERVER_DELAY = 2
+
     /** parity: `ComparatorBlock`'s own two-tick turn. */
     private const val COMPARATOR_DELAY = 2
 
@@ -69,6 +74,32 @@ public object RedstoneComponents {
     }
 
     /**
+     * parity: `ObserverBlock.neighborChanged`, which only fires for the block it faces: an observer
+     * watches one direction and ignores everything else that moves around it.
+     */
+    public fun watchFor(
+        world: LoadedWorld,
+        changedX: Int,
+        changedY: Int,
+        changedZ: Int,
+    ) {
+        for (face in BlockFace.entries) {
+            val x = changedX + face.stepX
+            val y = changedY + face.stepY
+            val z = changedZ + face.stepZ
+            val stateId = world.state.getBlockState(x, y, z) ?: continue
+            if (pathOf(stateId) != "observer") continue
+            // The observer at (x,y,z) watches the block it faces; that has to be the one that moved.
+            val facing = BlockStateDefinitions.propertiesOf(stateId)["facing"] ?: continue
+            val watching = BlockFace.entries.firstOrNull { it.name.lowercase() == facing } ?: continue
+            if (x + watching.stepX != changedX || y + watching.stepY != changedY || z + watching.stepZ != changedZ) {
+                continue
+            }
+            world.state.scheduleBlockTick(x, y, z, OBSERVER, OBSERVER_DELAY)
+        }
+    }
+
+    /**
      * One component's turn. Answers the new state when it moved, so the caller can tell the clients
      * and carry the change on to the dust around it.
      */
@@ -82,8 +113,25 @@ public object RedstoneComponents {
             "redstone_torch", "redstone_wall_torch" -> torchTick(world, x, y, z)
             "repeater" -> repeaterTick(world, x, y, z)
             "comparator" -> comparatorTick(world, x, y, z)
+            "observer" -> observerTick(world, x, y, z)
             else -> null
         }
+
+    /**
+     * parity: `ObserverBlock.tick`: it pulses. On its turn it goes on and books another turn to go
+     * off again, which is the two-tick blink everybody builds clocks out of.
+     */
+    private fun observerTick(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): BlockChange? {
+        val stateId = world.state.getBlockState(x, y, z) ?: return null
+        val powered = BlockStateDefinitions.propertiesOf(stateId)["powered"] == "true"
+        if (!powered) world.state.scheduleBlockTick(x, y, z, OBSERVER, OBSERVER_DELAY)
+        return turn(world, x, y, z, stateId, "powered", (!powered).toString())
+    }
 
     /**
      * parity: `RedstoneTorchBlock.tick`: lit while the block it hangs on is not powered, out while
@@ -297,5 +345,5 @@ public object RedstoneComponents {
 
     private fun pathOf(stateId: Int): String? = BlockStateDefinitions.blockOf(stateId)?.path
 
-    private val COMPONENTS = setOf("redstone_torch", "redstone_wall_torch", "repeater", "comparator")
+    private val COMPONENTS = setOf("redstone_torch", "redstone_wall_torch", "repeater", "comparator", "observer")
 }

@@ -103,8 +103,11 @@ class NeighbourUpdatesTest {
      */
     @Test
     fun bothHalvesOfADoorGoTogether() {
-        val lower = state("oak_door", mapOf("half" to "lower", "facing" to "north"))
-        val upper = state("oak_door", mapOf("half" to "upper", "facing" to "north"))
+        // Spelled out rather than left to the state table's first entry, which is a *powered* door:
+        // a door marked powered with nothing feeding it is corrected on the next neighbour update.
+        val shut = mapOf("facing" to "north", "open" to "false", "powered" to "false")
+        val lower = state("oak_door", shut + mapOf("half" to "lower"))
+        val upper = state("oak_door", shut + mapOf("half" to "upper"))
         world.state.setBlockState(4, 64, 1, Blocks.STONE.stateId)
         world.state.setBlockState(4, 65, 1, lower)
         world.state.setBlockState(4, 66, 1, upper)

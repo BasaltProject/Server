@@ -25,6 +25,12 @@ public object ItemComponentCodecs {
     public const val STORED_ENCHANTMENTS: String = "minecraft:stored_enchantments"
     public const val DAMAGE: String = "minecraft:damage"
 
+    /** parity: `DataComponents.REPAIR_COST`, the prior work an anvil charges for. */
+    public const val REPAIR_COST: String = "minecraft:repair_cost"
+
+    /** parity: `DataComponents.CUSTOM_NAME`, what an anvil writes when it renames something. */
+    public const val CUSTOM_NAME: String = "minecraft:custom_name"
+
     private val NUMBERS =
         mapOf(
             "minecraft:max_stack_size" to ItemComponent.MAX_STACK_SIZE,

@@ -56,6 +56,17 @@ public object NeighbourUpdates {
         // once and the components book their own turn, which is what their delay is.
         for (change in Redstone.settle(world, x, y, z)) onReshaped(change.stateId, change.x, change.y, change.z)
         RedstoneComponents.scheduleAround(world, x, y, z)
+        // parity: `ObserverBlock.neighborChanged`, which fires only for the block it is watching.
+        RedstoneComponents.watchFor(world, x, y, z)
+        // parity: every `neighborChanged` that reads the power: doors, lamps, bulbs and the rest.
+        for (change in RedstoneReactors.update(world, x, y, z)) onReshaped(change.stateId, change.x, change.y, change.z)
+        // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.
+        for (face in BlockFace.entries) {
+            Dispensers
+                .onNeighbourChange(world, x + face.stepX, y + face.stepY, z + face.stepZ)
+                ?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
+        }
+        Dispensers.onNeighbourChange(world, x, y, z)?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
         // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
         Sponges.absorb(world, x, y, z, onReshaped)
         Sponges.dryIfEvaporating(world, x, y, z, onReshaped)

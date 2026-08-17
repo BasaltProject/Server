@@ -25,10 +25,13 @@ public object Containers {
             "chest" to 27,
             "trapped_chest" to 27,
             "barrel" to 27,
+            "hopper" to 5,
+            "dispenser" to 9,
+            "dropper" to 9,
         )
 
     /** The blocks that only hold, with no machinery of their own. */
-    public val PLAIN: Set<String> = setOf("chest", "trapped_chest", "barrel")
+    public val PLAIN: Set<String> = setOf("chest", "trapped_chest", "barrel", "hopper", "dispenser", "dropper")
 
     /** parity: `Item.getMaxStackSize`, which this build does not read yet: everything stacks to 64. */
     private const val DEFAULT_MAX_STACK = 64

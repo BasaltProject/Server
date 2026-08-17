@@ -36,6 +36,9 @@ public object BlockConnections {
     /** parity: `#minecraft:causes_periodic_geyser_eruptions`, which is a magma block. */
     public fun eruptsPeriodically(stateId: Int): Boolean = inFamily("geyser_periodic", stateId)
 
+    /** parity: `BlockState.hasBlockEntity`, which is the last thing a piston asks before pushing. */
+    public fun hasBlockEntity(stateId: Int): Boolean = inFamily("block_entity", stateId)
+
     /** parity: `#minecraft:sniffer_egg_hatch_boost`, the moss that halves an egg's wait. */
     public fun boostsHatching(stateId: Int): Boolean = inFamily("hatch_boost", stateId)
 
