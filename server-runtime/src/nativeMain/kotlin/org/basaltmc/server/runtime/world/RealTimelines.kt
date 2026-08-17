@@ -23,6 +23,10 @@ public class RealTimelines(
 
     public val size: Int get() = entries.size
 
+    public val ids: List<Identifier> get() = entries.map { it.first }
+
+    public fun definitionOf(id: Identifier): NbtCompound? = entries.firstOrNull { it.first == id }?.second
+
     private fun load(serverJar: ServerJarAssets): List<Pair<Identifier, NbtCompound>> {
         val loaded = mutableListOf<Pair<Identifier, NbtCompound>>()
         for (entry in serverJar.entriesUnder(TIMELINE_PREFIX).sorted()) {

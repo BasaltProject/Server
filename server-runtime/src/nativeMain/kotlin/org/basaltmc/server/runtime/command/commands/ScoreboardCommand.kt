@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.runtime.command.BoolArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
@@ -12,10 +13,12 @@ import org.basaltmc.server.runtime.command.OperationArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.ScoreHolderArgument
 import org.basaltmc.server.runtime.command.ScoreboardSlotArgument
+import org.basaltmc.server.runtime.command.StyleArgument
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.scoreboard.Objective
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.wire.protocol.play.DisplaySlot
+import org.basaltmc.wire.protocol.play.NumberFormat
 import org.basaltmc.wire.protocol.play.ObjectiveRenderType
 import org.basaltmc.wire.protocol.play.ResetScorePacket
 import org.basaltmc.wire.protocol.play.SetDisplayObjectivePacket
@@ -68,6 +71,13 @@ public class ScoreboardCommand(
                             literal(type.name.lowercase()) { executes { context -> modifyRenderType(context, type) } }
                         }
                     }
+                    literal("displayautoupdate") {
+                        argument("value", BoolArgument) { executes { context -> modifyAutoUpdate(context) } }
+                    }
+                    literal("numberformat") {
+                        executes { context -> modifyNumberFormat(context, null) }
+                        numberFormats { context, format -> modifyNumberFormat(context, format) }
+                    }
                 }
             }
         }
@@ -79,6 +89,26 @@ public class ScoreboardCommand(
             literal("get") {
                 argument("target", ScoreHolderArgument) {
                     objective { executes { context -> getScore(context) } }
+                }
+            }
+            literal("display") {
+                literal("name") {
+                    argument("targets", ScoreHolderArgument) {
+                        objective {
+                            executes { context -> displayName(context, null) }
+                            argument("name", ComponentArgument) {
+                                executes { context -> displayName(context, context.get("name")) }
+                            }
+                        }
+                    }
+                }
+                literal("numberformat") {
+                    argument("targets", ScoreHolderArgument) {
+                        objective {
+                            executes { context -> displayFormat(context, null) }
+                            numberFormats { context, format -> displayFormat(context, format) }
+                        }
+                    }
                 }
             }
             literal("set") {
@@ -251,6 +281,102 @@ public class ScoreboardCommand(
         return 0
     }
 
+    /** The three shapes a number format takes, declared once for both places that accept one. */
+    private fun CommandNodeBuilder.numberFormats(run: (CommandContext, NumberFormat) -> Int) {
+        literal("blank") { executes { context -> run(context, NumberFormat.Blank) } }
+        literal("fixed") {
+            argument("contents", ComponentArgument) {
+                executes { context -> run(context, NumberFormat.Fixed(context.get("contents"))) }
+            }
+        }
+        literal("styled") {
+            argument("style", StyleArgument) {
+                executes { context -> run(context, NumberFormat.Styled(context.get("style"))) }
+            }
+        }
+    }
+
+    private fun modifyAutoUpdate(context: CommandContext): Int {
+        val objective = objectiveOf(context)
+        objective.displayAutoUpdate = context.get("value")
+        context.success(
+            Component.translatable("commands.scoreboard.objectives.modify.displayautoupdate", objective.displayName),
+            broadcastToAdmins = true,
+        )
+        return 0
+    }
+
+    private fun modifyNumberFormat(
+        context: CommandContext,
+        format: NumberFormat?,
+    ): Int {
+        val objective = objectiveOf(context)
+        objective.numberFormat = format
+        resend(context, objective)
+        context.success(
+            Component.translatable(
+                if (format == null) {
+                    "commands.scoreboard.objectives.modify.reset.numberFormat"
+                } else {
+                    "commands.scoreboard.objectives.modify.numberFormat"
+                },
+                objective.displayName,
+            ),
+            broadcastToAdmins = true,
+        )
+        return 0
+    }
+
+    private fun displayName(
+        context: CommandContext,
+        name: Component?,
+    ): Int {
+        val objective = objectiveOf(context)
+        val holders = context.get<List<String>>("targets")
+        for (holder in holders) scoreboard.setDisplayName(holder, objective.name, name)
+        for (holder in holders) resendScore(context, holder, objective)
+        context.success(
+            Component.translatable(
+                if (name ==
+                    null
+                ) {
+                    "commands.scoreboard.players.display.name.clear.success.single"
+                } else {
+                    "commands.scoreboard.players.display.name.success.single"
+                },
+                Component.text(holders.firstOrNull().orEmpty()),
+                objective.displayName,
+            ),
+            broadcastToAdmins = true,
+        )
+        return holders.size
+    }
+
+    private fun displayFormat(
+        context: CommandContext,
+        format: NumberFormat?,
+    ): Int {
+        val objective = objectiveOf(context)
+        val holders = context.get<List<String>>("targets")
+        for (holder in holders) scoreboard.setNumberFormat(holder, objective.name, format)
+        for (holder in holders) resendScore(context, holder, objective)
+        context.success(
+            Component.translatable(
+                if (format ==
+                    null
+                ) {
+                    "commands.scoreboard.players.display.numberFormat.clear.success.single"
+                } else {
+                    "commands.scoreboard.players.display.numberFormat.success.single"
+                },
+                Component.text(holders.firstOrNull().orEmpty()),
+                objective.displayName,
+            ),
+            broadcastToAdmins = true,
+        )
+        return holders.size
+    }
+
     private fun modifyDisplayName(context: CommandContext): Int {
         val objective = objectiveOf(context)
         objective.displayName = context.get("displayName")
@@ -271,6 +397,39 @@ public class ScoreboardCommand(
             broadcastToAdmins = true,
         )
         return 0
+    }
+
+    /** Re-sends the objective so a client redraws it with whatever changed. */
+    private fun resend(
+        context: CommandContext,
+        objective: Objective,
+    ) {
+        broadcast(context) {
+            SetObjectivePacket(
+                objective.name,
+                SetObjectivePacket.METHOD_CHANGE,
+                objective.displayName,
+                objective.renderType,
+                objective.numberFormat,
+            )
+        }
+    }
+
+    private fun resendScore(
+        context: CommandContext,
+        holder: String,
+        objective: Objective,
+    ) {
+        val value = scoreboard.score(holder, objective.name) ?: return
+        broadcast(context) {
+            SetScorePacket(
+                holder,
+                objective.name,
+                value,
+                scoreboard.displayNameOf(holder, objective.name),
+                scoreboard.numberFormatOf(holder, objective.name),
+            )
+        }
     }
 
     private fun modifyRenderType(

@@ -26,6 +26,38 @@ public class RealLootTables(
     @Volatile
     private var cache: Map<Identifier, LootTable?> = emptyMap()
 
+    /** Any table by its own id, which is what `/loot ... loot <table>` rolls. */
+    public fun byId(id: Identifier): LootTable? = read(id, "data/minecraft/loot_table/${id.path}.json")
+
+    /** parity: an entity's death table, `entities/<type>`. */
+    public fun forEntity(type: Identifier): LootTable? =
+        read(Identifier.vanilla("entities/${type.path}"), "data/minecraft/loot_table/entities/${type.path}.json")
+
+    /** Every table the jar ships, for the completions the client asks for. */
+    public fun ids(): List<Identifier> =
+        serverJar
+            ?.entriesUnder("data/minecraft/loot_table/")
+            .orEmpty()
+            .filter { it.endsWith(".json") }
+            .map { Identifier.vanilla(it.removePrefix("data/minecraft/loot_table/").removeSuffix(".json")) }
+
+    private fun read(
+        key: Identifier,
+        path: String,
+    ): LootTable? {
+        cache[key]?.let { return it }
+        if (cache.containsKey(key)) return null
+        val jar = serverJar ?: return null
+        val resolved =
+            runCatching { LootTableJson.parse(jar.readText(path)) }
+                .onFailure { error ->
+                    val reason = if (error is LootTableParseException) error.message else "no such loot table"
+                    logger.debug { "$key rolls nothing: $reason" }
+                }.getOrNull()
+        cache = cache + (key to resolved)
+        return resolved
+    }
+
     /** The block's own loot table, or `null` if it breaks empty-handed (no table, or one this build cannot parse yet). */
     public fun forBlock(block: Identifier): LootTable? {
         cache[block]?.let { return it }

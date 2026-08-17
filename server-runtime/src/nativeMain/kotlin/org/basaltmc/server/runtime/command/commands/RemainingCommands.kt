@@ -5,6 +5,7 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.runtime.command.BlockCoordinates
 import org.basaltmc.server.runtime.command.BlockPosArgument
+import org.basaltmc.server.runtime.command.BoolArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
@@ -21,6 +22,7 @@ import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.command.TeamColorArgument
 import org.basaltmc.server.runtime.command.TemplateMirrorArgument
 import org.basaltmc.server.runtime.command.TemplateRotationArgument
+import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.player.PlayerInventory
 import org.basaltmc.server.runtime.player.PlayerSession
@@ -712,37 +714,140 @@ public class TestCommand(
     private val failed = mutableSetOf<Identifier>()
 
     override fun build(root: CommandNodeBuilder) {
+        // parity: the whole tree, so a datapack that drives tests parses here too. The arguments
+        // that lay tests out in the world (rotation, rows, radius) are read and ignored: there are
+        // no test structures in this build, only function tests.
         root.literal("runall") { executes { context -> runAll(context, instances.all) } }
-        root.literal("runthese") { executes { context -> runAll(context, instances.all) } }
-        root.literal("runfailed") {
-            executes { context -> runAll(context, instances.all.filter { it.id in failed }) }
-        }
-        root.literal("clearall") {
-            executes { context ->
-                val cleared = failed.size
-                failed.clear()
-                context.success(
-                    Component.translatable("commands.test.clear.success", Component.text(cleared.toString())),
-                )
-                cleared
+        for (name in listOf("runthese", "runthat", "runclosest")) {
+            root.literal(name) {
+                executes { context -> runAll(context, instances.all) }
+                argument("numberOfTimes", IntegerArgument(min = 0)) {
+                    executes { context -> runAll(context, instances.all) }
+                    argument("untilFailed", BoolArgument) { executes { context -> runAll(context, instances.all) } }
+                }
             }
+        }
+        root.literal("runfailed") {
+            executes { context -> runFailed(context) }
+            argument("onlyRequiredTests", BoolArgument) {
+                executes { context -> runFailed(context) }
+                repeats { context -> runFailed(context) }
+            }
+            repeats { context -> runFailed(context) }
         }
         root.literal("run") {
             argument("tests", RegistryArgument.selector("minecraft:test_instance")) {
                 suggestsFromServer { context -> context.matchingIds(instances.all.map { it.id }) }
-                executes { context ->
-                    val id = context.get<Identifier>("tests")
-                    val instance =
-                        instances[id]
-                            ?: throw CommandSyntaxException(
-                                Component.translatable(
-                                    "commands.test.error.test_instance_not_found",
-                                ),
-                            )
-                    runAll(context, listOf(instance))
+                executes { context -> runNamed(context) }
+                repeats { context -> runNamed(context) }
+            }
+        }
+        root.literal("runmultiple") {
+            argument("tests", RegistryArgument.selector("minecraft:test_instance")) {
+                suggestsFromServer { context -> context.matchingIds(instances.all.map { it.id }) }
+                executes { context -> runNamed(context) }
+                argument("amount", IntegerArgument(min = 0)) { executes { context -> runNamed(context) } }
+            }
+        }
+        root.literal("verify") {
+            argument("tests", RegistryArgument.selector("minecraft:test_instance")) {
+                suggestsFromServer { context -> context.matchingIds(instances.all.map { it.id }) }
+                executes { context -> runNamed(context) }
+            }
+        }
+        root.literal("clearall") {
+            executes { context -> clear(context) }
+            argument("radius", IntegerArgument(min = 0)) { executes { context -> clear(context) } }
+        }
+        for (name in listOf("clearthat", "clearthese")) {
+            root.literal(name) { executes { context -> clear(context) } }
+        }
+        for (name in listOf("resetclosest", "resetthat", "resetthese")) {
+            root.literal(name) { executes { context -> nothingPlaced(context) } }
+        }
+        root.literal("locate") {
+            argument("tests", RegistryArgument.selector("minecraft:test_instance")) {
+                suggestsFromServer { context -> context.matchingIds(instances.all.map { it.id }) }
+                executes { context -> nothingPlaced(context) }
+            }
+        }
+        root.literal("create") {
+            argument("id", ResourceLocationArgument) {
+                executes { context -> noStructures(context) }
+                argument("width", IntegerArgument(min = 0)) {
+                    executes { context -> noStructures(context) }
+                    argument("height", IntegerArgument(min = 0)) {
+                        argument("depth", IntegerArgument(min = 0)) { executes { context -> noStructures(context) } }
+                    }
                 }
             }
         }
+        root.literal("pos") {
+            executes { context -> reportPosition(context, "pos") }
+            argument("var", WordArgument) { executes { context -> reportPosition(context, context.get("var")) } }
+        }
+        root.literal("stop") { executes { context -> stop(context) } }
+    }
+
+    /** The `<numberOfTimes> [<untilFailed>] [<rotationSteps>] [<testsPerRow>]` tail several forms share. */
+    private fun CommandNodeBuilder.repeats(run: (CommandContext) -> Int) {
+        argument("numberOfTimes", IntegerArgument(min = 0)) {
+            executes { context -> run(context) }
+            argument("untilFailed", BoolArgument) {
+                executes { context -> run(context) }
+                argument("rotationSteps", IntegerArgument(min = 0)) {
+                    executes { context -> run(context) }
+                    argument("testsPerRow", IntegerArgument(min = 1)) { executes { context -> run(context) } }
+                }
+            }
+        }
+    }
+
+    private fun runFailed(context: CommandContext): Int = runAll(context, instances.all.filter { it.id in failed })
+
+    private fun runNamed(context: CommandContext): Int {
+        val id = context.get<Identifier>("tests")
+        val instance =
+            instances[id]
+                ?: throw CommandSyntaxException(
+                    Component.translatable("commands.test.error.test_instance_not_found"),
+                )
+        return runAll(context, listOf(instance))
+    }
+
+    private fun clear(context: CommandContext): Int {
+        val cleared = failed.size
+        failed.clear()
+        context.success(Component.translatable("commands.test.clear.success", Component.text(cleared.toString())))
+        return cleared
+    }
+
+    /** Nothing is laid out in the world, so there is nothing to reset, locate or clear there. */
+    private fun nothingPlaced(context: CommandContext): Int {
+        context.success(Component.translatable("commands.test.error.no_test_instances"))
+        return 0
+    }
+
+    private fun noStructures(context: CommandContext): Int =
+        throw CommandSyntaxException(
+            Component.text("Test structures are not modelled in this build: only function tests run."),
+        )
+
+    /** parity: `/test pos`, which prints the position as a line to paste into a test. */
+    private fun reportPosition(
+        context: CommandContext,
+        variable: String,
+    ): Int {
+        val (x, y, z) = context.source.position
+        context.success(
+            Component.text("final BlockPos $variable = new BlockPos(${x.toInt()}, ${y.toInt()}, ${z.toInt()});"),
+        )
+        return 1
+    }
+
+    private fun stop(context: CommandContext): Int {
+        context.success(Component.translatable("commands.test.no_tests"))
+        return 0
     }
 
     private fun runAll(
