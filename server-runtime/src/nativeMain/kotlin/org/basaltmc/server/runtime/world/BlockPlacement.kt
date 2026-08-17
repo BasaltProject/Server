@@ -24,7 +24,7 @@ import kotlin.math.sin
 public object BlockPlacement {
     /** Six-way blocks that point at the face that was clicked rather than away from the player. */
     private val CLICKED_FACE_BLOCKS =
-        setOf("lightning_rod", "end_rod", "shulker_box", "amethyst_cluster", "budding_amethyst")
+        setOf("lightning_rod", "end_rod", "shulker_box", "amethyst_cluster", "amethyst_bud")
 
     /** Horizontal blocks that face the same way as the player instead of back at them. */
     private val PLAYER_FACING_BLOCKS = setOf("campfire", "bell", "decorated_pot", "calibrated_sculk_sensor")
@@ -50,11 +50,30 @@ public object BlockPlacement {
 
         if (definition.valuesOf("axis").size == 3) properties["axis"] = axisOf(face)
 
+        // parity: `FaceAttachedHorizontalDirectionalBlock`, the buttons, levers and grindstones:
+        // what they hang on comes from the face that was clicked, and only then which way they look.
+        val attachment = definition.valuesOf("face")
+        if (attachment.isNotEmpty()) {
+            properties["face"] =
+                when (face) {
+                    Direction.UP -> "floor"
+                    Direction.DOWN -> "ceiling"
+                    else -> "wall"
+                }
+        }
+
         val facing = definition.valuesOf("facing")
         when {
             facing.size == 6 ->
                 properties["facing"] =
                     if (isClickedFaceBlock(block)) name(face) else name(opposite(nearestLooking(yaw, pitch)))
+            facing.size == 4 && attachment.isNotEmpty() ->
+                properties["facing"] =
+                    if (properties["face"] == "wall") name(face) else name(playerDirection(yaw))
+            // parity: `AnvilBlock`, which lands sideways to whoever put it down.
+            facing.size == 4 && block.path.endsWith("anvil") ->
+                properties["facing"] =
+                    name(clockwise(playerDirection(yaw)))
             facing.size == 4 ->
                 properties["facing"] =
                     if (isPlayerFacingBlock(block)) name(playerDirection(yaw)) else name(opposite(playerDirection(yaw)))
@@ -82,7 +101,10 @@ public object BlockPlacement {
         CLICKED_FACE_BLOCKS.any { block.path == it || block.path.endsWith("_$it") }
 
     private fun isPlayerFacingBlock(block: Identifier): Boolean =
-        block.path.endsWith("_stairs") || PLAYER_FACING_BLOCKS.any { block.path == it || block.path.endsWith("_$it") }
+        block.path.endsWith("_stairs") ||
+            // A door is only half placed here (there is no second block), but it faces right.
+            block.path.endsWith("_door") ||
+            PLAYER_FACING_BLOCKS.any { block.path == it || block.path.endsWith("_$it") }
 
     /** parity: `Direction.fromYRot`, the quarter turn the player's yaw falls in. */
     public fun playerDirection(yaw: Float): Direction = HORIZONTAL[floor(yaw / QUARTER_TURN + 0.5f).toInt() and 3]
@@ -103,6 +125,15 @@ public object BlockPlacement {
             else -> if (z > 0) Direction.SOUTH else Direction.NORTH
         }
     }
+
+    private fun clockwise(face: Direction): Direction =
+        when (face) {
+            Direction.NORTH -> Direction.EAST
+            Direction.EAST -> Direction.SOUTH
+            Direction.SOUTH -> Direction.WEST
+            Direction.WEST -> Direction.NORTH
+            else -> face
+        }
 
     private fun axisOf(face: Direction): String =
         when (face) {

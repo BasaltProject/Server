@@ -97,6 +97,22 @@ public class LocateCommand : Command(name = "locate", permissionLevel = Permissi
                 }
             }
         }
+        // Nether portals are the one point of interest this build indexes, so they are found even
+        // in chunks nobody has loaded. Everything else can only be seen where the blocks are.
+        if (Identifier.vanilla("nether_portal") in blocks) {
+            world.portals.nearest(startX, startY, startZ, POI_RADIUS)?.let { indexed ->
+                val dx = (indexed[0] - startX).toLong()
+                val dy = (indexed[1] - startY).toLong()
+                val dz = (indexed[2] - startZ).toLong()
+                val distance = dx * dx + dy * dy + dz * dz
+                if (distance < bestDistance) {
+                    bestDistance = distance
+                    bestX = indexed[0]
+                    bestY = indexed[1]
+                    bestZ = indexed[2]
+                }
+            }
+        }
         if (bestDistance == Long.MAX_VALUE) {
             throw CommandSyntaxException(
                 Component.translatable("commands.locate.poi.not_found", Component.text(wanted.toString())),

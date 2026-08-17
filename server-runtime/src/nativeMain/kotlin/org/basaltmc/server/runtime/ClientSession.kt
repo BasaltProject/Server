@@ -35,6 +35,7 @@ import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.BedProblem
 import org.basaltmc.server.runtime.world.Beds
+import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
@@ -183,6 +184,8 @@ import org.basaltmc.wire.protocol.play.SetHeldSlotPacket
 import org.basaltmc.wire.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.protocol.play.SignedChatCommandPacket
+import org.basaltmc.wire.protocol.play.SoundPacket
+import org.basaltmc.wire.protocol.play.SoundSource
 import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.SpawnInfo
 import org.basaltmc.wire.protocol.play.SpawnPositionPacket
@@ -2012,6 +2015,10 @@ public class ClientSession(
                 useBed(session, hit.pos, clickedState)
                 return ack()
             }
+            if (clickedState != null && BlockInteractions.isToggleable(clickedState)) {
+                toggleBlock(hit.pos)
+                return ack()
+            }
         }
 
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
@@ -3527,6 +3534,29 @@ public class ClientSession(
 
     /** parity: `BlockTags.CLIMBABLE`, which is what stops a fall without stopping the player. */
     private fun isClimbable(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path in CLIMBABLE_BLOCKS
+
+    /** Opening a door, flipping a lever: the change goes to everyone, and so does the sound. */
+    private fun toggleBlock(pos: BlockPos) {
+        val world = currentWorld ?: return
+        val toggled = BlockInteractions.toggle(world, pos.x, pos.y, pos.z) ?: return
+        for (block in toggled.changes) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+        val sound =
+            SoundPacket(
+                sound = toggled.sound,
+                source = SoundSource.BLOCKS,
+                x = pos.x + 0.5,
+                y = pos.y + 0.5,
+                z = pos.z + 0.5,
+                volume = 1f,
+                pitch = 1f,
+                seed = Random.nextLong(),
+            )
+        sendPlayPacket(SoundPacket.ID) { sound.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.entityId == playerSession?.entityId) continue
+            other.connection.sendPlayPacket(SoundPacket.ID) { sound.write(it) }
+        }
+    }
 
     /**
      * Clicking a bed: sleep in it, or say why not.
