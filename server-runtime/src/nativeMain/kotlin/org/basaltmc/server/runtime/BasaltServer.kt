@@ -147,8 +147,8 @@ import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.LangTable
-import org.basaltmc.wire.text.PlainTextSerializer
 import org.basaltmc.wire.text.TextColor
+import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
 import kotlin.math.floor
 import kotlin.random.Random
@@ -287,7 +287,9 @@ public class BasaltServer(
             announce = { _, message ->
                 if (defaultWorld.gameRules[GameRuleRegistry.SHOW_ADVANCEMENT_MESSAGES]) {
                     for (player in playerRegistry.snapshot()) player.sendSystemMessage(message)
-                    logger.info { PlainTextSerializer.serialize(message) }
+                    // Resolved, not serialized: a client translates the key itself, a log cannot,
+                    // and this one printed `chat.type.advancement.task` at an operator.
+                    logger.info { message.resolvePlainText(lang) }
                 }
             },
             awardExperience = { name, amount ->

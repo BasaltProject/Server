@@ -13,14 +13,10 @@ import kotlin.math.sin
 /**
  * Which state a block goes down as: facing somewhere, on its side, upside down.
  *
- * parity: each block's own `getStateForPlacement`. The families are told apart by the properties
- * the block actually has, which comes from its real state definition, plus a list of the blocks
- * that break the family rule (a lightning rod points where it was clicked, a staircase looks the
- * same way the player does).
+ * parity: each block's own `getStateForPlacement`, told apart by the properties the block really
+ * has plus the lists below for the ones that break their family's rule.
  *
- * What is not modelled: anything needing to read the world back. A ladder does not check the wall
- * behind it, an end rod put against another end rod does not flip, and no block refuses a spot it
- * cannot hold on to.
+ * Nothing here reads the world back, so no block refuses a spot it cannot hold on to.
  */
 public object BlockPlacement {
     /** Six-way blocks that point at the face that was clicked rather than away from the player. */
@@ -33,9 +29,7 @@ public object BlockPlacement {
     /**
      * The state [block] should be placed in, or [defaultStateId] when nothing about it orients.
      *
-     * [clickY] is where in the clicked block the cursor was, from 0 at its floor to 1 at its
-     * ceiling, and [replacing] the state already in the spot, which is what turns two slabs into a
-     * double one.
+     * [clickY] is where in the clicked block the cursor was, 0 at its floor and 1 at its ceiling.
      */
     public fun stateFor(
         block: Identifier,
@@ -101,13 +95,8 @@ public object BlockPlacement {
     /**
      * Whether the block would be placed inside somebody.
      *
-     * parity: `BlockItem.canPlace` over `Level.isUnobstructed`: the collision shape of the state
-     * about to be placed, moved to its position, must not overlap the box of anything that blocks
-     * building. A shape that only touches a box does not overlap it, which is why standing on a
-     * block and putting another one at your feet still works.
-     *
-     * A block with no collision at all (a torch, a flower) never obstructs anyone, so it goes down
-     * even inside a player, exactly as in vanilla.
+     * parity: `BlockItem.canPlace` over `Level.isUnobstructed`. Touching is not overlapping, which
+     * is why a block at your own feet still goes down, and an empty shape never obstructs anyone.
      */
     public fun isObstructed(
         stateId: Int,

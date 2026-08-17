@@ -193,6 +193,15 @@ public class TeleportCommand :
         destination: PlayerSession,
     ): Int {
         for (target in targets) {
+            // parity: `TeleportCommand` moves to the entity, and an entity in another dimension
+            // takes you to that dimension. Teleporting the coordinates alone dropped you at their
+            // numbers in your own world, next to nobody.
+            if (target.worldName != destination.worldName) {
+                val world = context.environment.worlds[destination.worldName]
+                if (world != null) {
+                    target.connection.switchWorld(world, destination.x, destination.y, destination.z)
+                }
+            }
             target.connection.teleportTo(
                 destination.x,
                 destination.y,
