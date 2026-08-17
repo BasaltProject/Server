@@ -35,6 +35,9 @@ public class RandomTicks {
      */
     private val walks = HashMap<String, Int>()
 
+    /** How a block that spawns something gets an id for it, when the caller can give one. */
+    private var allocateEntityId: (() -> Int)? = null
+
     /**
      * Runs one tick's worth over [chunks], returning what changed.
      *
@@ -46,7 +49,9 @@ public class RandomTicks {
         chunks: List<IntArray>,
         speed: Int,
         random: LegacyRandom,
+        allocateEntityId: (() -> Int)? = null,
     ): List<BlockChange> {
+        this.allocateEntityId = allocateEntityId
         if (speed <= 0) return emptyList()
         val changes = mutableListOf<BlockChange>()
         for (position in chunks) {
@@ -84,7 +89,9 @@ public class RandomTicks {
         y: Int,
         z: Int,
         random: LegacyRandom,
+        allocateEntityId: (() -> Int)? = null,
     ): List<BlockChange> {
+        this.allocateEntityId = allocateEntityId ?: this.allocateEntityId
         val stateId = world.state.getBlockState(x, y, z) ?: return emptyList()
         if (!BlockSupport.ticksRandomly(stateId)) return emptyList()
         val changes = mutableListOf<BlockChange>()
@@ -133,6 +140,10 @@ public class RandomTicks {
                 BlockGrowth.stem(world, x, y, z, stateId, growthSpeed(world, x, y, z, block), random, changes)
             block.path == "bamboo" -> BlockGrowth.bamboo(world, x, y, z, stateId, random, changes)
             block.path == "bamboo_sapling" -> BlockGrowth.bambooSapling(world, x, y, z, random, changes)
+            block.path == "nether_portal" ->
+                allocateEntityId?.let { BlockGrowth.netherPortal(world, x, y, z, random, it) }
+            block.path.endsWith("eyeblossom") -> BlockGrowth.eyeblossom(world, x, y, z, stateId, changes)
+            block.path == "pointed_dripstone" -> BlockGrowth.dripstone(world, x, y, z, stateId, random, changes)
             block.path == "vine" -> BlockGrowth.vine(world, x, y, z, stateId, random, changes)
             block.path == "dried_ghast" -> BlockGrowth.driedGhast(world, x, y, z, stateId)
             block.path == "chorus_flower" -> BlockGrowth.chorusFlower(world, x, y, z, stateId, random, changes)

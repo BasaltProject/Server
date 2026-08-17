@@ -245,6 +245,70 @@ class BlockGrowthTest {
         )
     }
 
+    /** parity: `SpeleothemBlock`, which lengthens a stalactite or drips a stalagmite up to meet it. */
+    @Test
+    fun aStalactiteUnderDripstoneGrows() {
+        world.state.setBlockState(7, 92, 5, state("dripstone_block"))
+        world.state.setBlockState(
+            7,
+            91,
+            5,
+            state(
+                "pointed_dripstone",
+                mapOf("vertical_direction" to "down", "thickness" to "tip", "waterlogged" to "false"),
+            ),
+        )
+        world.state.setBlockState(7, 85, 5, Blocks.STONE.stateId)
+
+        assertTrue(
+            run(7, 91, 5, rounds = 20000) {
+                pathAt(7, 90, 5) == "pointed_dripstone" || pathAt(7, 86, 5) == "pointed_dripstone"
+            },
+            "it should have grown down or dripped a stalagmite up from the floor",
+        )
+    }
+
+    /**
+     * parity: the `day` timeline's two keyframes for `gameplay/eyeblossom_open`: open from 12600,
+     * closed from 23401. The attribute has exactly one source in vanilla's data, and it is the
+     * clock this build already keeps.
+     */
+    @Test
+    fun anEyeblossomOpensAtDuskAndClosesAtDawn() {
+        world.state.setBlockState(1, 92, 8, state("closed_eyeblossom"))
+        world.clock.totalTicks = 13000
+
+        assertTrue(run(1, 92, 8, rounds = 10) { pathAt(1, 92, 8) == "open_eyeblossom" }, "it should open at night")
+
+        world.clock.totalTicks = 1000
+        assertTrue(
+            run(1, 92, 8, rounds = 10) { pathAt(1, 92, 8) == "closed_eyeblossom" },
+            "and close again by day",
+        )
+    }
+
+    /**
+     * parity: `NetherPortalBlock.randomTick`. The piglin stands still because nothing has a brain
+     * yet (§6.4); what is under test is the block's own rule.
+     */
+    @Test
+    fun aPortalSpawnsAPiglinInTheOverworld() {
+        world.state.setBlockState(4, 92, 8, Blocks.STONE.stateId)
+        world.state.setBlockState(4, 93, 8, state("nether_portal", mapOf("axis" to "x")))
+
+        var spawned: org.basaltmc.server.runtime.entity.ServerEntity? = null
+        val random = LegacyRandom(4L)
+        repeat(20000) {
+            if (spawned == null) {
+                spawned = BlockGrowth.netherPortal(world, 4, 93, 8, random) { 1 }
+            }
+        }
+
+        val piglin = checkNotNull(spawned) { "the portal should have spawned one" }
+        assertEquals(Identifier.vanilla("zombified_piglin"), piglin.type)
+        assertEquals(93.0, piglin.y, "on top of the floor under the portal")
+    }
+
     /** parity: `MushroomBlock.randomTick`, which will not crowd more than five into its box. */
     @Test
     fun mushroomsSpreadButNotIntoACrowd() {

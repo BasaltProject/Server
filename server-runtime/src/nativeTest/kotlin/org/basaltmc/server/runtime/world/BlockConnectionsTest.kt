@@ -217,6 +217,103 @@ class BlockConnectionsTest {
         assertEquals("true", under["up"])
     }
 
+    /** parity: `FenceGateBlock.updateShape`, which sinks a gate into the wall beside it. */
+    @Test
+    fun aGateBesideAWallSinksIntoIt() {
+        world.state.setBlockState(2, 78, 2, state("oak_fence_gate", mapOf("facing" to "north", "in_wall" to "false")))
+        world.state.setBlockState(1, 78, 2, state("cobblestone_wall"))
+
+        NeighbourUpdates.reshape(world, 2, 78, 2)
+
+        assertEquals(
+            "true",
+            BlockStateDefinitions.propertiesOf(checkNotNull(world.state.getBlockState(2, 78, 2)))["in_wall"],
+        )
+    }
+
+    /**
+     * parity: `ChestBlock.updateShape`. It follows a neighbour that has already claimed its side,
+     * and a half whose partner has gone goes back to single. Making a double chest in the first
+     * place is the placement's job, not this one's.
+     */
+    @Test
+    fun aChestFollowsItsPartnerAndLetsGoWhenItLeaves() {
+        world.state.setBlockState(5, 78, 2, state("chest", mapOf("facing" to "north", "type" to "single")))
+        // parity: `ChestBlock.getConnectedDirection`: facing north, a right half pairs westwards,
+        // so this one is the partner of the chest beside it and that one becomes the left half.
+        world.state.setBlockState(6, 78, 2, state("chest", mapOf("facing" to "north", "type" to "right")))
+
+        NeighbourUpdates.reshape(world, 5, 78, 2)
+        assertEquals(
+            "left",
+            BlockStateDefinitions.propertiesOf(checkNotNull(world.state.getBlockState(5, 78, 2)))["type"],
+            "it should have taken the other half",
+        )
+
+        world.state.setBlockState(6, 78, 2, Blocks.AIR.stateId)
+        NeighbourUpdates.reshape(world, 5, 78, 2)
+        assertEquals(
+            "single",
+            BlockStateDefinitions.propertiesOf(checkNotNull(world.state.getBlockState(5, 78, 2)))["type"],
+            "and let go once its partner went",
+        )
+    }
+
+    /** parity: `BedBlock.updateShape`: a half without its other half goes. */
+    @Test
+    fun halfABedDoesNotStay() {
+        world.state.setBlockState(9, 78, 2, state("white_bed", mapOf("part" to "foot", "facing" to "north")))
+        world.state.setBlockState(9, 78, 1, state("white_bed", mapOf("part" to "head", "facing" to "north")))
+
+        world.state.setBlockState(9, 78, 1, Blocks.AIR.stateId)
+        NeighbourUpdates.reshape(world, 9, 78, 2)
+
+        assertEquals(Blocks.AIR.stateId, world.state.getBlockState(9, 78, 2))
+    }
+
+    /** parity: `CampfireBlock.updateShape`, whose signal fire is a hay bale underneath. */
+    @Test
+    fun aCampfireOverHayBecomesASignalFire() {
+        world.state.setBlockState(12, 78, 2, state("campfire", mapOf("signal_fire" to "false", "lit" to "true")))
+        world.state.setBlockState(12, 77, 2, state("hay_block", mapOf("axis" to "y")))
+
+        NeighbourUpdates.reshape(world, 12, 78, 2)
+
+        assertEquals(
+            "true",
+            BlockStateDefinitions.propertiesOf(checkNotNull(world.state.getBlockState(12, 78, 2)))["signal_fire"],
+        )
+    }
+
+    /** parity: `DoorBlock.updateShape`: the halves keep each other in step, and alone they go. */
+    @Test
+    fun theHalvesOfADoorKeepEachOtherInStep() {
+        world.state.setBlockState(
+            14,
+            78,
+            2,
+            state("oak_door", mapOf("half" to "lower", "facing" to "north", "open" to "false")),
+        )
+        world.state.setBlockState(
+            14,
+            79,
+            2,
+            state("oak_door", mapOf("half" to "upper", "facing" to "north", "open" to "true")),
+        )
+
+        NeighbourUpdates.reshape(world, 14, 78, 2)
+
+        assertEquals(
+            "true",
+            BlockStateDefinitions.propertiesOf(checkNotNull(world.state.getBlockState(14, 78, 2)))["open"],
+            "the bottom should have taken the top's state",
+        )
+
+        world.state.setBlockState(14, 79, 2, Blocks.AIR.stateId)
+        NeighbourUpdates.reshape(world, 14, 78, 2)
+        assertEquals(Blocks.AIR.stateId, world.state.getBlockState(14, 78, 2), "and half a door does not stay")
+    }
+
     @Test
     fun anOrdinaryBlockHasNothingToReshape() {
         world.state.setBlockState(13, 64, 1, Blocks.STONE.stateId)

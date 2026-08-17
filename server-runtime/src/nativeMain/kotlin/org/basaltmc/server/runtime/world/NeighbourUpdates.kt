@@ -39,7 +39,9 @@ public object NeighbourUpdates {
     ) {
         // The block that just arrived reaches out to what was already there, which is the other
         // half of `updateShape`: a fence put down beside a fence joins it, not only the other way.
-        reshape(world, x, y, z)?.let { onReshaped(it, x, y, z) }
+        val bubbles = mutableListOf<BlockChange>()
+        reshape(world, x, y, z, bubbles)?.let { onReshaped(it, x, y, z) }
+        for (change in bubbles) onReshaped(change.stateId, change.x, change.y, change.z)
         // parity: `FallingBlock.onPlace` and its `updateShape`, which both do nothing but ask to be
         // looked at again in two ticks.
         FallingBlocks.scheduleIfFalling(world, x, y + 1, z)
@@ -72,8 +74,13 @@ public object NeighbourUpdates {
     ) {
         FallingBlocks.scheduleIfFalling(world, x, y, z)
         var changed = false
-        reshape(world, x, y, z)?.let {
+        val bubbles = mutableListOf<BlockChange>()
+        reshape(world, x, y, z, bubbles)?.let {
             onReshaped(it, x, y, z)
+            changed = true
+        }
+        for (change in bubbles) {
+            onReshaped(change.stateId, change.x, change.y, change.z)
             changed = true
         }
         if (breakIfUnsupported(world, x, y, z, onBroken) || changed) push(pending, x, y, z)
@@ -90,8 +97,17 @@ public object NeighbourUpdates {
         x: Int,
         y: Int,
         z: Int,
+        bubbles: MutableList<BlockChange> = mutableListOf(),
     ): Int? {
         val stateId = world.state.getBlockState(x, y, z) ?: return null
+        // parity: the scheduled ticks that change a block into something else rather than break it.
+        // Vanilla defers these by a tick; the outcome is the same and this is where it is known.
+        ScheduledBlocks.coveredSoil(world, x, y, z)?.let { return it }
+        ScheduledBlocks.coral(world, x, y, z)?.let { return it }
+        ScheduledBlocks.scaffolding(world, x, y, z)?.let { return it }
+        // A column is more than one block, so it reports through the caller rather than as one state.
+        ScheduledBlocks.bubbleColumn(world, x, y, z, bubbles)
+        Reshapes.of(world, x, y, z, stateId)?.let { return it }
         if (BlockConnections.isLeaves(stateId)) return retreeLeaves(world, x, y, z, stateId)
         if (BlockConnections.isStairs(stateId)) return turnStairs(world, x, y, z, stateId)
         if (BlockConnections.isWall(stateId)) return rebuildWall(world, x, y, z, stateId)
@@ -303,7 +319,12 @@ public object NeighbourUpdates {
         z: Int,
         stateId: Int = world.state.getBlockState(x, y, z) ?: Blocks.AIR.stateId,
     ): Boolean {
-        if (BlockStateDefinitions.blockOf(stateId)?.path == "cactus") return cactusSurvives(world, x, y, z)
+        val path = BlockStateDefinitions.blockOf(stateId)?.path
+        if (path == "cactus") return cactusSurvives(world, x, y, z)
+        // parity: `ScaffoldingBlock.canSurvive`, which is `getDistance(level, pos) < 7`: a number
+        // worked out from the whole row, not something a single neighbour can answer. The probe
+        // that built the support table asks one neighbour at a time, so it cannot see this one.
+        if (path == "scaffolding") return !ScheduledBlocks.scaffoldingHasFallen(world, x, y, z)
         if (!BlockSupport.needsSupport(stateId) || !BlockSupport.isModelled(stateId)) return true
         val down = stateAt(world, x, y - 1, z)
         val up = stateAt(world, x, y + 1, z)

@@ -97,6 +97,10 @@ class NeighbourUpdatesTest {
         assertEquals(Blocks.AIR.stateId, at(3, 66, 1))
     }
 
+    /**
+     * parity: `DoorBlock.updateShape` turns the top half into air rather than breaking it, so a
+     * door drops one door and not two. Only the half that was mined counts as broken.
+     */
     @Test
     fun bothHalvesOfADoorGoTogether() {
         val lower = state("oak_door", mapOf("half" to "lower", "facing" to "north"))
@@ -107,7 +111,7 @@ class NeighbourUpdatesTest {
 
         val broken = dig(4, 64, 1)
 
-        assertEquals(listOf(lower, upper), broken, "the bottom goes first and takes the top with it")
+        assertEquals(listOf(lower), broken, "only the half that was mined drops anything")
         assertEquals(Blocks.AIR.stateId, at(4, 66, 1))
     }
 

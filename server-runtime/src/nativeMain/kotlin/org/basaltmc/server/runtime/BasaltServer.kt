@@ -122,6 +122,7 @@ import org.basaltmc.server.runtime.world.RealTestInstances
 import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RecipeBook
+import org.basaltmc.server.runtime.world.ScheduledBlocks
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
@@ -1081,6 +1082,27 @@ public class BasaltServer(
                 }
                 continue
             }
+            val scheduled = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+            ScheduledBlocks.frostedIce(
+                world,
+                position[0],
+                position[1],
+                position[2],
+                LegacyRandom(Random.nextLong()),
+                scheduled,
+            )
+            ScheduledBlocks.driedGhast(world, position[0], position[1], position[2], scheduled)
+            if (scheduled.isNotEmpty()) {
+                for (change in scheduled) {
+                    val pos = BlockPos(change.x, change.y, change.z)
+                    for (player in watchers) {
+                        player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                            ClientboundBlockUpdatePacket(pos, change.stateId).write(it)
+                        }
+                    }
+                }
+                continue
+            }
             val released = BlockInteractions.release(world, position[0], position[1], position[2]) ?: continue
             val pos = BlockPos(position[0], position[1], position[2])
             for (player in watchers) {
@@ -1130,7 +1152,10 @@ public class BasaltServer(
         if (speed <= 0) return
         val chunks = simulatedChunks(world)
         if (chunks.isEmpty()) return
-        val changes = randomTicks.tick(world, chunks, speed, LegacyRandom(Random.nextLong()))
+        val changes =
+            randomTicks.tick(world, chunks, speed, LegacyRandom(Random.nextLong())) {
+                playerRegistry.allocateEntityId()
+            }
         if (changes.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (change in changes) {
