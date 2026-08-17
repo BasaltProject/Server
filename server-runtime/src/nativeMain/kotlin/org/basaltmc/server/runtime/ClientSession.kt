@@ -211,6 +211,7 @@ import org.basaltmc.wire.text.TextColor
 import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
@@ -995,7 +996,7 @@ public class ClientSession(
         // Seeds the tracker with exactly the square about to be sent below, so later crossings
         // compute deltas relative to it instead of re-sending everything as "newly loaded" on the
         // first move.
-        chunkTracker.update(centerChunkX, centerChunkZ, viewRadius)
+        val initialChunks = chunkTracker.update(centerChunkX, centerChunkZ, viewRadius)
         sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(centerChunkX, centerChunkZ).write(it) }
         sendCompressed(SetChunkCacheRadiusPacket.ID) { SetChunkCacheRadiusPacket(chunkRadius).write(it) }
         sendCompressed(SetSimulationDistancePacket.ID) { SetSimulationDistancePacket(chunkRadius).write(it) }
@@ -1094,19 +1095,39 @@ public class ClientSession(
         sendCompressed(GameEventPacket.ID) {
             GameEventPacket(GameEventPacket.LEVEL_CHUNKS_LOAD_START, 0f).write(it)
         }
-        // The declared view distance above is a promise: send every chunk it actually covers, not
-        // just whatever BasaltServer happened to pre-generate at startup. This one batch is the
-        // only place that still waits for generation, because a client cannot enter the world
-        // without ground under it; from here on chunks stream in through `flushReadyChunks`.
-        // Ordered nearest-first so the queue builds what the player is looking at before the edges.
-        val loginPositions =
-            (-chunkRadius..chunkRadius)
-                .flatMap { dx -> (-chunkRadius..chunkRadius).map { dz -> (centerChunkX + dx) to (centerChunkZ + dz) } }
-                .sortedBy { squaredDistanceToCenter(it.first, it.second) }
-        val loginChunks = generationQueue.awaitAll(loginPositions)
+        // Only the ground the player lands on is waited for; the rest of the view distance streams
+        // in through `flushReadyChunks` like it does after a respawn or a walk.
+        //
+        // It used to wait for the whole view distance, and that is what made joining feel dead for
+        // three seconds: this runs on the read thread, so nothing the client sent (a block broken,
+        // a block placed) was even read until the last of 441 chunks had been generated, and the
+        // tab list and the scoreboard, which are sent below, arrived just as late.
+        //
+        // One ring wider than what is sent, so every chunk that goes out already has its eight
+        // neighbours: light worked out without them lets the sky in from nowhere.
+        val awaited =
+            (-(LOGIN_CHUNK_RADIUS + 1)..(LOGIN_CHUNK_RADIUS + 1))
+                .flatMap { dx ->
+                    (-(LOGIN_CHUNK_RADIUS + 1)..(LOGIN_CHUNK_RADIUS + 1)).map { dz ->
+                        (centerChunkX + dx) to (centerChunkZ + dz)
+                    }
+                }.sortedBy { squaredDistanceToCenter(it.first, it.second) }
+        generationQueue.awaitAll(awaited)
+        val loginChunks =
+            awaited
+                .filter { position ->
+                    abs(position.first - centerChunkX) <= LOGIN_CHUNK_RADIUS &&
+                        abs(position.second - centerChunkZ) <= LOGIN_CHUNK_RADIUS
+                }.mapNotNull { position -> world.state.chunkIfLoaded(position.first, position.second) }
         sendCompressed(ChunkBatchStartPacket.ID) { }
         for (chunk in loginChunks) sendChunk(chunk)
         sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(loginChunks.size).write(it) }
+
+        // Everything else the view distance covers, queued for the outbound loop to stream.
+        val sent = loginChunks.map { chunk -> chunk.chunkX to chunk.chunkZ }.toSet()
+        val streaming = initialChunks.toLoad.filter { (it.x to it.z) !in sent }
+        chunkStreamMutex.withLock { for (pos in streaming) pendingChunks.add(pos) }
+        for (pos in streaming) generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
 
         for (other in others) {
             other.connection.sendPlayPacket(PlayerInfoUpdatePacket.ID) {
@@ -4128,6 +4149,14 @@ public class ClientSession(
         // parity: `Player.drop`'s own throw, and the small pop a broken block's drop gets.
         const val THROW_SPEED = 0.3
         const val THROW_LIFT = 0.1
+
+        /**
+         * How much ground is generated before the player is let in, in chunks around them.
+         *
+         * Two is what a client needs to stop showing "loading terrain"; the rest arrives while
+         * they are already standing there, which is what vanilla's chunk batches are for.
+         */
+        const val LOGIN_CHUNK_RADIUS = 2
 
         /** parity: `AbsorptionMobEffect`, two hearts per level. */
         const val ABSORPTION_PER_LEVEL = 4f
