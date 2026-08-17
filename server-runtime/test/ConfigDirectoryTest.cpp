@@ -49,7 +49,7 @@ TEST_CASE("a missing file is written from its commented default and then read") 
     REQUIRE(java->find("port") != nullptr);
 }
 
-TEST_CASE("a file that is already there is not overwritten by the default") {
+TEST_CASE("a file that is already there is only ever appended to") {
     const std::string root = scratch("config-existing");
     fileIO::createDirectories(root);
     fileIO::writeText(root + "/server.toml", "[server]\nport = 25566\n");
@@ -60,7 +60,9 @@ TEST_CASE("a file that is already there is not overwritten by the default") {
     const toml::TomlTable* server = loaded->table("server");
     REQUIRE(server != nullptr);
     REQUIRE(server->find("port") != nullptr);
-    CHECK(*fileIO::readText(root + "/server.toml") == "[server]\nport = 25566\n");
+    const std::string kept = *fileIO::readText(root + "/server.toml");
+    CHECK(kept.starts_with("[server]\nport = 25566\n"));
+    CHECK(kept.find("\n# compression-level = -1") != std::string::npos);
 }
 
 TEST_CASE("a file that does not parse names itself rather than being replaced") {

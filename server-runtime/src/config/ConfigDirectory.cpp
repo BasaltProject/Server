@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
+#include <basalt/server/runtime/config/ConfigUpgrade.hpp>
 #include <basalt/wire/io/ConfigFiles.hpp>
 
 #include <string>
@@ -18,6 +19,9 @@ std::expected<TomlTable, std::string> ConfigDirectory::load(std::string_view fil
         return std::unexpected(document.error());
     if (document->generated)
         logger_.info([&path] { return path + " not found, generating one with default values."; });
+    if (!document->generated) {
+        static_cast<void>(appendMissingOptions(path, fileName, defaultContents, document->values, logger_));
+    }
     return std::move(document->values);
 }
 
