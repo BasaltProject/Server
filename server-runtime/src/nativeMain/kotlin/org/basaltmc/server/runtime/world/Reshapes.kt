@@ -14,8 +14,8 @@ import org.basaltmc.wire.common.Identifier
  * schedule a fluid tick, and both of those already happen elsewhere. These are the rest: a gate
  * that sinks into a wall, a chest that pairs up, a bed that loses its other half.
  *
- * Fences, panes, walls, stairs and leaves are in [BlockConnections] and [NeighbourUpdates], where
- * they went first; redstone wire, repeaters and tripwire are §6.2.
+ * Fences, panes, walls, stairs and leaves are in [BlockConnections] and [NeighbourUpdates], and
+ * redstone wire and repeaters in [Redstone].
  */
 public object Reshapes {
     /** Answers the state this block should now be, or null when it is none of these. */
@@ -36,11 +36,52 @@ public object Reshapes {
             path == "chorus_plant" -> chorusPlant(world, x, y, z, stateId, block)
             path == "campfire" || path == "soul_campfire" -> campfire(world, x, y, z, stateId, block)
             path == "pale_hanging_moss" -> hangingMoss(world, x, y, z, stateId, block)
-            path == "pointed_dripstone" -> dripstoneThickness(world, x, y, z, stateId, block)
+            path == "pointed_dripstone" || path == "sulfur_spike" ->
+                dripstoneThickness(world, x, y, z, stateId, block)
             path.endsWith("mushroom_block") || path == "mushroom_stem" -> hugeMushroom(world, x, y, z, stateId, block)
             path == "bell" -> bell(world, x, y, z, stateId, block)
+            path.startsWith("attached_") && path.endsWith("_stem") -> detachedStem(world, x, y, z, stateId)
+            path == "potent_sulfur" -> Geysers.validState(world, x, y, z, stateId)
+            path == "pale_moss_carpet" -> mossCarpet(world, x, y, z, stateId, block)
             else -> null
         }
+    }
+
+    /**
+     * parity: `AttachedStemBlock.updateShape`: pick the melon and the stem it fed goes back to
+     * being a grown stem, pointing nowhere.
+     */
+    private fun detachedStem(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+    ): Int? {
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        val facing = properties["facing"] ?: return null
+        val fruit = FRUIT_OF[BlockStateDefinitions.blockOf(stateId)?.path] ?: return null
+        val offsetX =
+            if (facing == "west") {
+                -1
+            } else if (facing == "east") {
+                1
+            } else {
+                0
+            }
+        val offsetZ =
+            if (facing == "north") {
+                -1
+            } else if (facing == "south") {
+                1
+            } else {
+                0
+            }
+        val neighbour = world.state.getBlockState(x + offsetX, y, z + offsetZ) ?: return null
+        if (BlockStateDefinitions.blockOf(neighbour)?.path == fruit) return null
+        val detached =
+            BlockStateDefinitions.stateIdOf(Identifier.vanilla(fruit + "_stem"), mapOf("age" to "7")) ?: return null
+        return apply(world, x, y, z, stateId, detached)
     }
 
     /** parity: `FenceGateBlock.updateShape`, which sinks a gate into a wall beside it. */
@@ -211,8 +252,11 @@ public object Reshapes {
     }
 
     /**
-     * parity: `SpeleothemBlock.calculateSpeleothemThickness`, the four shapes a dripstone takes
-     * depending on what is above and below it.
+     * parity: `SpeleothemBlock.calculateSpeleothemThickness`, whose answer depends on what the
+     * piece in front already is and not only on whether there is one: a spike hanging off a tip is
+     * a frustum, and the one against the ceiling is only the base while nothing is behind it.
+     *
+     * A tip meeting another tip head on merges, which is the pair that catches a drop of water.
      */
     private fun dripstoneThickness(
         world: LoadedWorld,
@@ -223,29 +267,80 @@ public object Reshapes {
         block: Identifier,
     ): Int? {
         val properties = BlockStateDefinitions.propertiesOf(stateId)
-        val down = properties["vertical_direction"] == "down"
-        val behind = if (down) stateAt(world, x, y + 1, z) else stateAt(world, x, y - 1, z)
-        val ahead = if (down) stateAt(world, x, y - 1, z) else stateAt(world, x, y + 1, z)
-        val sameBehind = isDripstone(behind, down)
-        val sameAhead = isDripstone(ahead, down)
+        val spike = BlockStateDefinitions.blockOf(stateId)?.path ?: return null
+        val down = properties["vertical_direction"] != "up"
+        val inFront = stateAt(world, x, if (down) y - 1 else y + 1, z)
+        val behind = stateAt(world, x, if (down) y + 1 else y - 1, z)
+        val merging = properties["thickness"] == "tip_merge"
         val thickness =
-            when {
-                !sameAhead && !sameBehind -> "tip"
-                !sameAhead -> "frustum"
-                !sameBehind -> "base"
-                else -> "middle"
+            if (isSpeleothem(inFront, spike, pointsDown = !down)) {
+                if (!merging && thicknessOf(inFront) != "tip_merge") "tip" else "tip_merge"
+            } else if (!isSpeleothem(inFront, spike, pointsDown = down)) {
+                "tip"
+            } else if (thicknessOf(inFront) != "tip" && thicknessOf(inFront) != "tip_merge") {
+                if (!isSpeleothem(behind, spike, pointsDown = down)) "base" else "middle"
+            } else {
+                "frustum"
             }
         return changed(world, x, y, z, stateId, block, "thickness", thickness)
     }
 
-    private fun isDripstone(
+    private fun thicknessOf(stateId: Int): String? = BlockStateDefinitions.propertiesOf(stateId)["thickness"]
+
+    private fun isSpeleothem(
         stateId: Int,
-        down: Boolean,
+        spike: String,
+        pointsDown: Boolean,
     ): Boolean {
-        if (BlockStateDefinitions.blockOf(stateId)?.path != "pointed_dripstone") return false
-        val theirs = BlockStateDefinitions.propertiesOf(stateId)["vertical_direction"]
-        return theirs == if (down) "down" else "up"
+        if (BlockStateDefinitions.blockOf(stateId)?.path != spike) return false
+        return (BlockStateDefinitions.propertiesOf(stateId)["vertical_direction"] != "up") == pointsDown
     }
+
+    /**
+     * parity: `MossyCarpetBlock.getUpdatedState`: a side keeps standing while there is a wall to
+     * hold it, grows tall under another carpet's side, and drops when the carpet below has none.
+     * A carpet left with no sides at all and no base is gone.
+     */
+    private fun mossCarpet(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        block: Identifier,
+    ): Int? {
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        val base = properties["bottom"] == "true"
+        val above = stateAt(world, x, y + 1, z)
+        val below = stateAt(world, x, y - 1, z)
+        val wanted = HashMap<String, String>(4)
+        var standing = base
+        for (face in HORIZONTAL) {
+            val name = face.name.lowercase()
+            val neighbour = stateAt(world, x + offsetX(face), y + offsetY(face), z + offsetZ(face))
+            var side = if (BlockShapes.isFaceSturdy(neighbour, face.opposite)) properties[name] ?: "none" else "none"
+            if (side == "low") {
+                if (isCarpetWith(above, name) && BlockStateDefinitions.propertiesOf(above)["bottom"] != "true") {
+                    side = "tall"
+                }
+                if (!base && isCarpet(below) && BlockStateDefinitions.propertiesOf(below)[name] == "none") {
+                    side = "none"
+                }
+            }
+            if (side != "none") standing = true
+            wanted[name] = side
+        }
+        if (!standing) return apply(world, x, y, z, stateId, Blocks.AIR.stateId)
+        val reshaped = BlockStateDefinitions.stateIdOf(block, wanted, stateId) ?: return null
+        return apply(world, x, y, z, stateId, reshaped)
+    }
+
+    private fun isCarpet(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "pale_moss_carpet"
+
+    private fun isCarpetWith(
+        stateId: Int,
+        face: String,
+    ): Boolean = isCarpet(stateId) && BlockStateDefinitions.propertiesOf(stateId)[face] != "none"
 
     /** parity: `HugeMushroomBlock.updateShape`: a face touching another cap stops being drawn. */
     private fun hugeMushroom(
@@ -374,4 +469,9 @@ public object Reshapes {
         } else {
             0
         }
+
+    private val HORIZONTAL = listOf(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.WEST, BlockFace.EAST)
+
+    /** parity: each `AttachedStemBlock`'s own `fruit`. */
+    private val FRUIT_OF = mapOf("attached_melon_stem" to "melon", "attached_pumpkin_stem" to "pumpkin")
 }

@@ -1098,6 +1098,17 @@ public class BasaltServer(
                 scheduled,
             )
             ScheduledBlocks.driedGhast(world, position[0], position[1], position[2], scheduled)
+            ScheduledBlocks.frogspawn(world, position[0], position[1], position[2], scheduled)
+            org.basaltmc.server.runtime.world.Geysers
+                .tick(world, position[0], position[1], position[2], scheduled)
+            ScheduledBlocks.snifferEgg(
+                world,
+                position[0],
+                position[1],
+                position[2],
+                LegacyRandom(Random.nextLong()),
+                scheduled,
+            )
             if (scheduled.isNotEmpty()) {
                 for (change in scheduled) {
                     val pos = BlockPos(change.x, change.y, change.z)

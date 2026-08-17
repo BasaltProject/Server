@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.BlockConnections
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
@@ -20,6 +21,10 @@ public object ScheduledBlocks {
     /** What a scheduled tick on each of these is filed under. */
     public val FROSTED_ICE: Identifier = Identifier.vanilla("frosted_ice")
     public val DRIED_GHAST: Identifier = Identifier.vanilla("dried_ghast")
+
+    public val SNIFFER_EGG: Identifier = Identifier.vanilla("sniffer_egg")
+
+    public val FROGSPAWN: Identifier = Identifier.vanilla("frogspawn")
     public val BUBBLE_COLUMN: Identifier = Identifier.vanilla("bubble_column")
 
     /**
@@ -268,11 +273,91 @@ public object ScheduledBlocks {
     }
 
     /**
+     * parity: `SnifferEggBlock.onPlace`: three turns of a hatch that halves on moss, each one asked
+     * for as the last one lands, plus its own random spread.
+     */
+    public fun scheduleHatch(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        seed: Long,
+    ) {
+        val stateId = world.state.getBlockState(x, y, z) ?: return
+        if (BlockStateDefinitions.blockOf(stateId)?.path != "sniffer_egg") return
+        val below = world.state.getBlockState(x, y - 1, z) ?: 0
+        val hatchTime = if (BlockConnections.boostsHatching(below)) BOOSTED_HATCH_TICKS else REGULAR_HATCH_TICKS
+        val spread = LegacyRandom(seed).nextInt(HATCH_SPREAD_TICKS)
+        world.state.scheduleBlockTick(x, y, z, SNIFFER_EGG, hatchTime / 3 + spread)
+    }
+
+    /** parity: `FrogspawnBlock.onPlace`, an hour or so away and never the same twice. */
+    public fun scheduleFrogspawn(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        seed: Long,
+    ) {
+        val stateId = world.state.getBlockState(x, y, z) ?: return
+        if (BlockStateDefinitions.blockOf(stateId)?.path != "frogspawn") return
+        val spread = LegacyRandom(seed).nextInt(FROGSPAWN_MAX_DELAY - FROGSPAWN_MIN_DELAY)
+        world.state.scheduleBlockTick(x, y, z, FROGSPAWN, FROGSPAWN_MIN_DELAY + spread)
+    }
+
+    /**
+     * parity: `FrogspawnBlock.tick`, which either breaks the spawn or hatches it away.
+     *
+     * The tadpoles that swim out wait for entities: what this owns is the block going.
+     */
+    public fun frogspawn(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        changes: MutableList<BlockChange>,
+    ) {
+        val stateId = world.state.getBlockState(x, y, z) ?: return
+        if (BlockStateDefinitions.blockOf(stateId)?.path != "frogspawn") return
+        if (!world.state.setBlockState(x, y, z, Blocks.AIR.stateId)) return
+        changes += BlockChange(x, y, z, Blocks.AIR.stateId)
+    }
+
+    /**
+     * parity: `SnifferEggBlock.tick`: it cracks twice and then goes.
+     *
+     * The sniffer that walks out of it waits for entities, like a turtle egg's turtle.
+     */
+    public fun snifferEgg(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        random: LegacyRandom,
+        changes: MutableList<BlockChange>,
+    ) {
+        val stateId = world.state.getBlockState(x, y, z) ?: return
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return
+        if (block.path != "sniffer_egg") return
+        val hatch = BlockStateDefinitions.propertiesOf(stateId)["hatch"]?.toIntOrNull() ?: return
+        if (hatch >= SNIFFER_MAX_HATCH) {
+            if (!world.state.setBlockState(x, y, z, Blocks.AIR.stateId)) return
+            changes += BlockChange(x, y, z, Blocks.AIR.stateId)
+            return
+        }
+        val cracked =
+            BlockStateDefinitions.stateIdOf(block, mapOf("hatch" to (hatch + 1).toString()), stateId) ?: return
+        if (!world.state.setBlockState(x, y, z, cracked)) return
+        changes += BlockChange(x, y, z, cracked)
+        scheduleHatch(world, x, y, z, random.nextLong())
+    }
+
+    /**
      * parity: `BubbleColumnBlock.updateColumn`: soul sand pushes a column up through the water
      * above it and magma drags one down, and the column climbs while there is water to fill.
      *
-     * What the column then does to whoever swims into it is `entityInside`, and that waits for the
-     * entities of §6.4. The blocks themselves are this system's.
+     * What the column then does to whoever swims into it is `entityInside`, which waits for
+     * entities.
      */
     public fun bubbleColumn(
         world: LoadedWorld,
@@ -352,4 +437,14 @@ public object ScheduledBlocks {
     private const val MELT_LIGHT = 11
     private const val DRIED_GHAST_MAX = 3
     private const val DRIED_GHAST_DELAY = 5000
+
+    /** parity: `SnifferEggBlock`'s own three numbers. */
+    private const val SNIFFER_MAX_HATCH = 2
+    private const val REGULAR_HATCH_TICKS = 24000
+    private const val BOOSTED_HATCH_TICKS = 12000
+    private const val HATCH_SPREAD_TICKS = 300
+
+    /** parity: `FrogspawnBlock`'s own two delays. */
+    private const val FROGSPAWN_MIN_DELAY = 3600
+    private const val FROGSPAWN_MAX_DELAY = 12000
 }

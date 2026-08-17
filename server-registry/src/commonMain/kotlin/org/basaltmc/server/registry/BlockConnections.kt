@@ -30,6 +30,15 @@ public object BlockConnections {
     /** parity: `#minecraft:maintains_farmland`, the crops that keep tilled soil from reverting. */
     public fun maintainsFarmland(stateId: Int): Boolean = inFamily("maintains_farmland", stateId)
 
+    /** parity: `#minecraft:causes_continuous_geyser_eruptions`, which is lava. */
+    public fun erupsContinuously(stateId: Int): Boolean = inFamily("geyser_continuous", stateId)
+
+    /** parity: `#minecraft:causes_periodic_geyser_eruptions`, which is a magma block. */
+    public fun eruptsPeriodically(stateId: Int): Boolean = inFamily("geyser_periodic", stateId)
+
+    /** parity: `#minecraft:sniffer_egg_hatch_boost`, the moss that halves an egg's wait. */
+    public fun boostsHatching(stateId: Int): Boolean = inFamily("hatch_boost", stateId)
+
     /** parity: `#minecraft:supports_cactus`, which is sand and little else. */
     public fun supportsCactus(stateId: Int): Boolean = inFamily("supports_cactus", stateId)
 

@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
+import kotlin.random.Random
 
 /**
  * What a block change does to the blocks around it.
@@ -47,6 +48,12 @@ public object NeighbourUpdates {
         // air used to sit there for good, because only its neighbours were ever asked.
         FallingBlocks.scheduleIfFalling(world, x, y, z)
         FallingBlocks.scheduleIfFalling(world, x, y + 1, z)
+        // parity: `SnifferEggBlock.onPlace`, which asks for the first of its three turns as soon as
+        // the egg is down. Re-scheduling keeps a delay already counting, so a neighbour moving
+        // nearby does not put the egg back to the start.
+        ScheduledBlocks.scheduleHatch(world, x, y, z, Random.nextLong())
+        // parity: `FrogspawnBlock.onPlace`, the same idea on a longer and rougher clock.
+        ScheduledBlocks.scheduleFrogspawn(world, x, y, z, Random.nextLong())
         val pending = ArrayDeque<Int>(INITIAL_QUEUE)
         push(pending, x, y, z)
         var examined = 0
@@ -251,6 +258,23 @@ public object NeighbourUpdates {
             0
         }
 
+    private fun speleothemSurvives(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        path: String,
+    ): Boolean {
+        val down = BlockStateDefinitions.propertiesOf(stateId)["vertical_direction"] != "up"
+        val behind = stateAt(world, x, if (down) y + 1 else y - 1, z)
+        val tip = if (down) BlockFace.DOWN else BlockFace.UP
+        if (BlockShapes.isFaceSturdy(behind, tip)) return true
+        if (BlockStateDefinitions.blockOf(behind)?.path != path) return false
+        val theirs = BlockStateDefinitions.propertiesOf(behind)["vertical_direction"] != "up"
+        return theirs == down
+    }
+
     /**
      * parity: `CactusBlock.canSurvive`, written out here because it is one of the rules a probe of
      * one neighbour at a time cannot express: it asks what must *not* be beside it.
@@ -282,6 +306,10 @@ public object NeighbourUpdates {
         return BlockStateDefinitions.propertiesOf(stateId)["distance"]?.toIntOrNull() ?: DECAY_DISTANCE
     }
 
+    /** parity: `PitcherCropBlock.canSurvive`, where only the lower half asks about the light. */
+    private fun isLowerHalf(stateId: Int): Boolean =
+        BlockStateDefinitions.propertiesOf(stateId)["half"].let { it == null || it == "lower" }
+
     /** Whether the block at these coordinates would stay where it is. */
     public fun isSupported(
         world: LoadedWorld,
@@ -296,6 +324,17 @@ public object NeighbourUpdates {
         // worked out from the whole row, not something a single neighbour can answer. The probe
         // that built the support table asks one neighbour at a time, so it cannot see this one.
         if (path == "scaffolding") return !ScheduledBlocks.scaffoldingHasFallen(world, x, y, z)
+        // parity: `SpeleothemBlock.isValidSpeleothemPlacement`, which hangs a spike off a sturdy
+        // face *or* off another spike pointing the same way. The probe that built the support table
+        // tries each block in its default state, and the default spike points up, so a hanging
+        // column looked to it like a spike held up by nothing.
+        if (path != null && path in SPELEOTHEMS) return speleothemSurvives(world, x, y, z, stateId, path)
+        // parity: `CropBlock.canSurvive`, which asks for light eight on top of its soil. The probe
+        // that built the support table answers one neighbour at a time and cannot see the sky, so
+        // it was told the light is fifteen and the light half is checked here instead.
+        if (path in LIGHT_HUNGRY_CROPS && isLowerHalf(stateId)) {
+            if (WorldLight.rawBrightness(world, x, y, z) < CROP_SURVIVAL_LIGHT) return false
+        }
         if (!BlockSupport.needsSupport(stateId) || !BlockSupport.isModelled(stateId)) return true
         val down = stateAt(world, x, y - 1, z)
         val up = stateAt(world, x, y + 1, z)
@@ -364,8 +403,18 @@ public object NeighbourUpdates {
 
     private val HORIZONTAL = listOf(BlockFace.NORTH, BlockFace.SOUTH, BlockFace.WEST, BlockFace.EAST)
 
+    /** parity: `SpeleothemBlock`'s two blocks in 26.2. */
+    private val SPELEOTHEMS = setOf("pointed_dripstone", "sulfur_spike")
+
     /** parity: `LeavesBlock.DECAY_DISTANCE`. */
     private const val DECAY_DISTANCE = 7
+
+    /** parity: `CropBlock.hasSufficientLight`, which is eight and not the nine growing needs. */
+    private const val CROP_SURVIVAL_LIGHT = 8
+
+    /** The crops whose `canSurvive` is `CropBlock`'s: soil underneath *and* light on top. */
+    private val LIGHT_HUNGRY_CROPS =
+        setOf("wheat", "carrots", "potatoes", "beetroots", "torchflower_crop", "pitcher_crop")
 
     private const val INITIAL_QUEUE = 24
     private const val DIRECTIONS = 6
