@@ -27,6 +27,22 @@ public class RealRecipes(
 ) {
     private val recipes: List<Recipe> = serverJar?.let(::load).orEmpty()
 
+    /** Every cooking recipe, keyed by what cooks it. parity: `RecipeManager`'s own index by type. */
+    private val cooking: Map<Recipe.Cooker, List<Recipe.Cooking>> by lazy {
+        recipes.filterIsInstance<Recipe.Cooking>().groupBy { it.cooker }
+    }
+
+    /**
+     * What [cooker] makes of [stack], or null when it makes nothing.
+     *
+     * parity: `RecipeManager.getRecipeFor`, which walks the recipes of that type and takes the
+     * first that accepts what is in the slot.
+     */
+    public fun cookingFor(
+        cooker: Recipe.Cooker,
+        stack: ItemStack,
+    ): Recipe.Cooking? = cooking[cooker]?.firstOrNull { it.accepts(stack) }
+
     /** The id each parsed recipe came from, in the same order, so a match can be named. */
     private var parsedIds: List<Identifier> = emptyList()
 

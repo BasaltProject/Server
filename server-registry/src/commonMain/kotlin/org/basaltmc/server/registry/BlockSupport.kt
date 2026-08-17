@@ -31,6 +31,7 @@ public object BlockSupport {
     private val sets: Array<ByteArray>
     private val byState: IntArray
     private val randomTicking: BooleanArray
+    private val redstoneConductors: BooleanArray
 
     /** Which block owns each state, filled on first use: only set-shaped rules need it. */
     private var blockOfState: IntArray? = null
@@ -59,6 +60,8 @@ public object BlockSupport {
         }
         randomTicking = BooleanArray((RANDOM_TICKING_STATES.maxOrNull() ?: 0) + 1)
         for (state in RANDOM_TICKING_STATES) randomTicking[state] = true
+        redstoneConductors = BooleanArray((REDSTONE_CONDUCTOR_STATES.maxOrNull() ?: 0) + 1)
+        for (state in REDSTONE_CONDUCTOR_STATES) redstoneConductors[state] = true
     }
 
     /** Whether anything has to hold this state up at all. */
@@ -78,6 +81,13 @@ public object BlockSupport {
         val table = waterlike ?: buildWaterlike().also { waterlike = it }
         return stateId in table.indices && table[stateId]
     }
+
+    /**
+     * parity: `BlockStateBase.isRedstoneConductor`: what a signal reaches through and what a wire
+     * climbs over. Not the same as solid: a slab conducts, a piece of glass does not.
+     */
+    public fun conductsRedstone(stateId: Int): Boolean =
+        stateId in redstoneConductors.indices && redstoneConductors[stateId]
 
     /** parity: `BlockState.isRandomlyTicking`, which is what makes crops grow and ice melt. */
     public fun ticksRandomly(stateId: Int): Boolean = stateId in randomTicking.indices && randomTicking[stateId]

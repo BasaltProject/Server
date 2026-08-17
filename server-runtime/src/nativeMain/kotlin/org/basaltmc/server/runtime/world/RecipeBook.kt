@@ -66,11 +66,15 @@ public object RecipeBook {
                         result = result,
                         craftingStation = station,
                     )
+                // The book's furnace tabs come with the furnace menu; a cooking recipe is not part
+                // of the crafting book this sends.
+                is Recipe.Cooking -> return null
             }
         val requirements =
             when (recipe) {
                 is Recipe.Shaped -> recipe.ingredients.filterNotNull().map { itemIds(it.items) }
                 is Recipe.Shapeless -> recipe.ingredients.map { itemIds(it.items) }
+                is Recipe.Cooking -> listOf(itemIds(recipe.ingredient.items))
             }.filter { it.isNotEmpty() }
         return RecipeBookEntry(
             recipeId = recipeNumber,

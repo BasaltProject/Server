@@ -38,9 +38,11 @@ import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.BedProblem
 import org.basaltmc.server.runtime.world.Beds
 import org.basaltmc.server.runtime.world.BlockInteractions
+import org.basaltmc.server.runtime.world.BlockInventory
 import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.Containers
 import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.DoubleBlocks
@@ -50,6 +52,7 @@ import org.basaltmc.server.runtime.world.Explosions
 import org.basaltmc.server.runtime.world.Fires
 import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.Fluids
+import org.basaltmc.server.runtime.world.Furnaces
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
@@ -82,6 +85,7 @@ import org.basaltmc.server.storage.StoredPlayer
 import org.basaltmc.server.storage.StoredSpawnPoint
 import org.basaltmc.server.storage.StoredStats
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.server.world.ChunkDataCodec
 import org.basaltmc.server.world.ChunkPos
 import org.basaltmc.server.world.ChunkTracker
@@ -155,6 +159,7 @@ import org.basaltmc.wire.protocol.play.CommandSuggestionsPacket
 import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.protocol.play.ContainerClosePacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
+import org.basaltmc.wire.protocol.play.ContainerSetDataPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.wire.protocol.play.DamageEventPacket
 import org.basaltmc.wire.protocol.play.EntityEventPacket
@@ -397,6 +402,18 @@ public class ClientSession(
     /** What [craftingGrid] currently makes, recomputed whenever it changes. */
     private var craftingResult: StoredItemStack? = null
 
+    /** The cooker whose window is open, if the open window belongs to one. */
+    private var openBlock: BlockPos? = null
+
+    /** What the open cooker last showed, so a bar is only re-sent when it moves. */
+    private var openBlockData = IntArray(4) { -1 }
+
+    /** And the same for its three slots, which the fire changes without anybody clicking. */
+    private val shownBlockSlots = arrayOfNulls<StoredItemStack>(3)
+
+    /** How many slots the open block has, which is what tells a chest from a cooker. */
+    private var openBlockSize = FURNACE_SLOTS
+
     /**
      * What this player is holding on the cursor inside their open window, kept server-side rather
      * than taken from the client's own claim: trusting theirs is how a stack gets duplicated.
@@ -483,6 +500,11 @@ public class ClientSession(
                         timings.of("player.entities").time { syncSummonedEntities() }
                         timings.of("player.generated_entities").time { syncGeneratedEntities() }
                         timings.of("player.ui").time { tickUi() }
+                        // The two bars of an open cooker, on this thread like everything else that
+                        // writes to this socket.
+                        timings.of("player.container").time {
+                            if (openBlock != null && openBlockSize == FURNACE_SLOTS) syncOpenContainer()
+                        }
                         sendKeepAliveIfDue()
                     }
                     sleepMillis(OUTBOUND_INTERVAL_MILLIS)
@@ -2308,6 +2330,15 @@ public class ClientSession(
                 openCraftingTable(session)
                 return ack()
             }
+            val cookerPath = clicked?.block?.path
+            if (cookerPath != null && cookerPath in Furnaces.COOKERS) {
+                openFurnace(session, hit.pos, cookerPath)
+                return ack()
+            }
+            if (cookerPath != null && cookerPath in Containers.PLAIN) {
+                openChest(session, hit.pos, cookerPath)
+                return ack()
+            }
             val clickedState = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)
             if (clickedState != null && Beds.isBed(clickedState)) {
                 useBed(session, hit.pos, clickedState)
@@ -2435,6 +2466,20 @@ public class ClientSession(
         ack()
         if (!changed) return
         second?.let { world.setBlockState(it.x, it.y, it.z, it.stateId) }
+        // parity: `AbstractFurnaceBlock.newBlockEntity`: a cooker is nothing without the entity that
+        // holds its slots and its fire.
+        val placedPath = BlockStateDefinitions.blockOf(blockStateId)?.path
+        if (placedPath != null && (placedPath in Furnaces.COOKERS || placedPath in Containers.PLAIN)) {
+            loadedWorld?.state?.chunkIfLoaded(placeAt.x shr 4, placeAt.z shr 4)?.setBlockEntity(
+                ChunkBlockEntity(
+                    placeAt.x and 15,
+                    placeAt.y,
+                    placeAt.z and 15,
+                    Identifier.vanilla(placedPath),
+                    NbtCompound(),
+                ),
+            )
+        }
         // parity: `MossyCarpetBlock.setPlacedBy`, which grows a second carpet over the one placed.
         if (BlockStateDefinitions.blockOf(blockStateId)?.path == "pale_moss_carpet") {
             loadedWorld?.let { placedIn ->
@@ -2529,6 +2574,165 @@ public class ClientSession(
         sendInventory()
     }
 
+    /**
+     * Opens a furnace, a blast furnace or a smoker.
+     *
+     * parity: `AbstractFurnaceBlock.use`, which opens the block's own menu. The three slots are the
+     * block's, so nothing is copied into the session: a click reads and writes the block entity.
+     */
+    private fun openFurnace(
+        session: PlayerSession,
+        pos: BlockPos,
+        cooker: String,
+    ) {
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.furnace(nextContainerId)
+        openBlock = pos
+        openBlockSize = FURNACE_SLOTS
+        openBlockData = IntArray(4) { -1 }
+        val menuType =
+            when (cooker) {
+                "blast_furnace" -> OpenScreenPacket.BLAST_FURNACE_MENU
+                "smoker" -> OpenScreenPacket.SMOKER_MENU
+                else -> OpenScreenPacket.FURNACE_MENU
+            }
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = menuType,
+                title = Component.translatable("container.$cooker"),
+            ).write(it)
+        }
+        sendInventory()
+        sendFurnaceBars()
+    }
+
+    /**
+     * Opens a chest, a trapped chest or a barrel.
+     *
+     * parity: `ChestBlock.use`, which opens the block's own container. Double chests are not paired
+     * yet, so each half opens as its own three rows.
+     */
+    private fun openChest(
+        session: PlayerSession,
+        pos: BlockPos,
+        block: String,
+    ) {
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.chest(nextContainerId)
+        openBlock = pos
+        openBlockSize = Menu.CHEST_SIZE
+        openBlockData = IntArray(4) { -1 }
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = OpenScreenPacket.CHEST_MENU,
+                title = Component.translatable("container.$block"),
+            ).write(it)
+        }
+        sendInventory()
+    }
+
+    /** The block's own slots, read straight off its block entity. */
+    private fun readBlockSlot(index: Int): StoredItemStack? {
+        val entity = openBlockEntity() ?: return null
+        val stack = BlockInventory.read(entity.data, openBlockSize).getOrNull(index) ?: return null
+        return StoredItemStack(stack.item.toString(), stack.count)
+    }
+
+    private fun openBlockEntity(): org.basaltmc.server.world.ChunkBlockEntity? {
+        val position = openBlock ?: return null
+        val world = currentWorld ?: return null
+        val chunk = world.state.chunkIfLoaded(position.x shr 4, position.z shr 4) ?: return null
+        return chunk.blockEntityAt(position.x and 15, position.y, position.z and 15)
+    }
+
+    private fun writeBlockSlot(
+        index: Int,
+        stack: StoredItemStack?,
+    ) {
+        val position = openBlock ?: return
+        val world = currentWorld ?: return
+        val chunk = world.state.chunkIfLoaded(position.x shr 4, position.z shr 4) ?: return
+        val entity = chunk.blockEntityAt(position.x and 15, position.y, position.z and 15) ?: return
+        val state = Furnaces.read(entity.data)
+        if (index !in state.items.indices) return
+        state.items[index] =
+            stack?.let {
+                org.basaltmc.server.world.loot
+                    .ItemStack(Identifier.parse(it.id), it.count)
+            }
+        // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the
+        // thing being cooked changes: a new item does not inherit the last one's progress.
+        if (index == Furnaces.INPUT_SLOT) {
+            state.cookingTimer = 0
+            state.cookingTotalTime = Furnaces.cookTimeFor(state) { source -> cookingFor(position, source) }
+        }
+        Furnaces.write(state, entity.data)
+        chunk.markDirty()
+    }
+
+    private fun furnaceState(): Furnaces.State? {
+        val position = openBlock ?: return null
+        val world = currentWorld ?: return null
+        val chunk = world.state.chunkIfLoaded(position.x shr 4, position.z shr 4) ?: return null
+        val entity = chunk.blockEntityAt(position.x and 15, position.y, position.z and 15) ?: return null
+        return Furnaces.read(entity.data)
+    }
+
+    private fun cookingFor(
+        position: BlockPos,
+        stack: org.basaltmc.server.world.loot.ItemStack,
+    ): org.basaltmc.server.world.crafting.Recipe.Cooking? {
+        val world = currentWorld ?: return null
+        val block = BlockStateDefinitions.blockOf(world.state.getBlockState(position.x, position.y, position.z) ?: 0)
+        val cooker = Furnaces.COOKERS[block?.path] ?: return null
+        return recipes?.cookingFor(cooker, stack)
+    }
+
+    /** Keeps an open cooker's window in step: its bars, and its slots as the fire eats them. */
+    private fun syncOpenContainer() {
+        sendFurnaceBars()
+        val session = playerSession ?: return
+        val state = furnaceState() ?: return
+        for (index in state.items.indices) {
+            val menuSlot = openMenu.menuSlotOf(MenuSlot.Block(index)) ?: continue
+            val shown = shownBlockSlots.getOrNull(index)
+            val now = state.items[index]?.let { StoredItemStack(it.item.toString(), it.count) }
+            if (shown == now) continue
+            if (index < shownBlockSlots.size) shownBlockSlots[index] = now
+            sendPlayPacket(ContainerSetSlotPacket.ID) {
+                ContainerSetSlotPacket(
+                    containerId = openMenu.containerId,
+                    stateId = ++containerStateId,
+                    slot = menuSlot,
+                    item = session.inventory.toWire(now),
+                ).write(it)
+            }
+        }
+    }
+
+    /**
+     * The two bars of an open cooker, sent only when a number moves.
+     *
+     * parity: `AbstractContainerMenu.broadcastChanges`, which does the same for its data slots.
+     */
+    public fun sendFurnaceBars() {
+        val state = furnaceState() ?: return
+        val values =
+            intArrayOf(state.litTimeRemaining, state.litTotalTime, state.cookingTimer, state.cookingTotalTime)
+        for (index in values.indices) {
+            if (values[index] == openBlockData[index]) continue
+            openBlockData[index] = values[index]
+            val value = values[index]
+            sendPlayPacket(ContainerSetDataPacket.ID) {
+                ContainerSetDataPacket(openMenu.containerId, index, value).write(it)
+            }
+        }
+    }
+
     /** Back to the player's own window, giving them back whatever was on the grid or the cursor. */
     private fun closeOpenMenu(session: PlayerSession) {
         if (openMenu.containerId == 0) {
@@ -2539,6 +2743,7 @@ public class ClientSession(
         }
         returnCraftingGrid(session)
         openMenu = Menu.playerInventory()
+        openBlock = null
         recomputeCraftingResult()
         sendInventory()
     }
@@ -2551,6 +2756,7 @@ public class ClientSession(
         when (slot) {
             is MenuSlot.Inventory -> session.inventory[slot.index]
             is MenuSlot.Grid -> craftingGrid.getOrNull(slot.index)
+            is MenuSlot.Block -> readBlockSlot(slot.index)
             MenuSlot.Result -> craftingResult
         }
 
@@ -2566,12 +2772,19 @@ public class ClientSession(
                 if (slot.index in craftingGrid.indices) craftingGrid[slot.index] = stack
                 recomputeCraftingResult()
             }
+            is MenuSlot.Block -> writeBlockSlot(slot.index, stack)
             MenuSlot.Result -> Unit
         }
     }
 
-    /** Whether a stack may be put into this slot at all. The result slot only ever gives. */
-    private fun canPlaceInto(slot: MenuSlot): Boolean = slot != MenuSlot.Result
+    /**
+     * Whether a stack may be put into this slot at all.
+     *
+     * parity: `FurnaceResultSlot`, which takes nothing: the result slot of a window only ever gives,
+     * and so does the cooked one.
+     */
+    private fun canPlaceInto(slot: MenuSlot): Boolean =
+        slot != MenuSlot.Result && !(slot is MenuSlot.Block && slot.index == Furnaces.RESULT_SLOT)
 
     /**
      * Recomputes what the grid makes. Called after anything touches it, which is what makes the
@@ -4621,6 +4834,9 @@ public class ClientSession(
         val BUTTON_TICK = Identifier.vanilla("button")
 
         /** `minecraft:move_player_rot` and `minecraft:move_player_status_only`, read directly. */
+        /** parity: `AbstractFurnaceBlockEntity`'s three slots, which is how a cooker is told apart. */
+        const val FURNACE_SLOTS = 3
+
         const val MOVE_PLAYER_ROT_ID = 0x20
         const val MOVE_PLAYER_STATUS_ONLY_ID = 0x21
 

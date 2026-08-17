@@ -38,9 +38,33 @@ public object RecipeJson {
         return when (type) {
             "minecraft:crafting_shaped" -> parseShaped(root, group, result, resolveTag)
             "minecraft:crafting_shapeless" -> parseShapeless(root, group, result, resolveTag)
+            // parity: each cooking type's own default in `cookingMapCodec`, which is what a recipe
+            // file leaving `cookingtime` out gets.
+            "minecraft:smelting" -> parseCooking(root, group, result, Recipe.Cooker.SMELTING, 200, resolveTag)
+            "minecraft:blasting" -> parseCooking(root, group, result, Recipe.Cooker.BLASTING, 100, resolveTag)
+            "minecraft:smoking" -> parseCooking(root, group, result, Recipe.Cooker.SMOKING, 100, resolveTag)
+            "minecraft:campfire_cooking" ->
+                parseCooking(root, group, result, Recipe.Cooker.CAMPFIRE, 100, resolveTag)
             else -> throw RecipeParseException("Unsupported recipe type: $type")
         }
     }
+
+    private fun parseCooking(
+        root: JsonObject,
+        group: String,
+        result: ItemStack,
+        cooker: Recipe.Cooker,
+        defaultCookingTime: Int,
+        resolveTag: (Identifier) -> Set<Identifier>,
+    ): Recipe.Cooking =
+        Recipe.Cooking(
+            group = group,
+            result = result,
+            cooker = cooker,
+            ingredient = parseIngredient(root.getValue("ingredient"), resolveTag),
+            experience = (root["experience"] as? JsonPrimitive)?.content?.toFloat() ?: 0f,
+            cookingTime = (root["cookingtime"] as? JsonPrimitive)?.content?.toInt() ?: defaultCookingTime,
+        )
 
     private fun parseResult(result: JsonObject): ItemStack =
         ItemStack(

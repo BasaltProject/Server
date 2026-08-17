@@ -15,6 +15,13 @@ public enum class BlockFace(
 
     public val opposite: BlockFace get() = OPPOSITES[ordinal]
 
+    /** One step along this face, which is what every walk over neighbours needs. */
+    public val stepX: Int get() = if (axis == 0) (if (positive) 1 else -1) else 0
+
+    public val stepY: Int get() = if (axis == 1) (if (positive) 1 else -1) else 0
+
+    public val stepZ: Int get() = if (axis == 2) (if (positive) 1 else -1) else 0
+
     private companion object {
         val OPPOSITES = arrayOf(UP, DOWN, SOUTH, NORTH, EAST, WEST)
     }
