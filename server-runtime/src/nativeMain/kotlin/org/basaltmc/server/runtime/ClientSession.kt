@@ -3,8 +3,10 @@ package org.basaltmc.server.runtime
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockEntityTypes
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.ConsumeEffect
 import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.ItemArmour
+import org.basaltmc.server.registry.ItemFood
 import org.basaltmc.server.registry.ItemTools
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
@@ -31,6 +33,8 @@ import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
+import org.basaltmc.server.runtime.world.BedProblem
+import org.basaltmc.server.runtime.world.Beds
 import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
@@ -62,6 +66,7 @@ import org.basaltmc.server.storage.BanKind
 import org.basaltmc.server.storage.PlayerStore
 import org.basaltmc.server.storage.StoredItemStack
 import org.basaltmc.server.storage.StoredPlayer
+import org.basaltmc.server.storage.StoredSpawnPoint
 import org.basaltmc.server.storage.StoredStats
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkDataCodec
@@ -322,6 +327,13 @@ public class ClientSession(
     private var firstSeenEpochSeconds = 0L
     private var playTimeTicks = 0L
     private var compressionEnabled = false
+
+    /** parity: `Entity.fallDistance`, added up from the movement rather than asked of the client. */
+    private var fallDistance = 0.0
+
+    /** Which slot is being eaten from, and how many ticks of the mouthful are left. */
+    private var eatingSlot = -1
+    private var eatingTicks = 0
 
     private var pendingUsername: String? = null
     private var challenge: ByteArray? = null
@@ -1305,6 +1317,7 @@ public class ClientSession(
             PlayerCommandPacket.ID -> {
                 val command = PlayerCommandPacket.read(body)
                 when (command.action) {
+                    PlayerCommandPacket.Action.STOP_SLEEPING -> wakeUp()
                     PlayerCommandPacket.Action.START_SPRINTING -> playerSession?.sprinting = true
                     PlayerCommandPacket.Action.STOP_SPRINTING -> playerSession?.sprinting = false
                     else -> Unit
@@ -1428,6 +1441,9 @@ public class ClientSession(
         when (action.action) {
             ServerboundPlayerActionPacket.Action.DROP_ITEM -> dropHeldItem(all = false)
             ServerboundPlayerActionPacket.Action.DROP_ALL_ITEMS -> dropHeldItem(all = true)
+            // parity: letting go before the animation ends eats nothing at all.
+            ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM -> stopEating()
+            ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND -> swapWithOffhand()
             else -> Unit
         }
 
@@ -1991,6 +2007,11 @@ public class ClientSession(
                 openCraftingTable(session)
                 return ack()
             }
+            val clickedState = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)
+            if (clickedState != null && Beds.isBed(clickedState)) {
+                useBed(session, hit.pos, clickedState)
+                return ack()
+            }
         }
 
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
@@ -2009,6 +2030,9 @@ public class ClientSession(
         }
 
         val heldBlock = held?.let { Identifier.parse(it.id) }
+        // parity: `ServerPlayerGameMode.useItemOn` falls through to using the item itself, which is
+        // what lets anyone eat while looking at the ground rather than only at the sky.
+        if (held != null && heldBlock != null && startEating(session, heldBlock, heldSlot)) return ack()
         val defaultStateId = heldBlock?.let { Blocks.REGISTRY.idOf(it) }
         if (held == null || heldBlock == null || defaultStateId == null) return ack()
 
@@ -2065,6 +2089,7 @@ public class ClientSession(
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot] ?: return
         val item = Identifier.parse(held.id)
+        if (startEating(session, item, heldSlot)) return
         if (!Buckets.isBucket(item)) return
 
         val result =
@@ -2693,6 +2718,7 @@ public class ClientSession(
             session.food.addExhaustion(FoodData.jumpExhaustion(session.sprinting))
             session.stats.increment(StoredStats.JUMP)
         }
+        trackFall(session, y, onGround, feet)
         // Horizontal only, and only on the ground, which is how vanilla tells walking apart from
         // falling and from being moved by something else.
         if (onGround) {
@@ -3026,6 +3052,8 @@ public class ClientSession(
         if (session.invulnerableTicks > 0) session.invulnerableTicks--
         if (session.dead) return
         tryPickupNearbyItems()
+        tickEating(session)
+        if (session.sleepingBed != null) session.sleepTicks++
         if (session.gamemode == Gamemode.CREATIVE || session.gamemode == Gamemode.SPECTATOR) return
 
         val healthBefore = session.health
@@ -3367,6 +3395,8 @@ public class ClientSession(
         sendCompressed(PlayerPositionPacket.ID) {
             PlayerPositionPacket(0, x, y, z, 0.0, 0.0, 0.0, yaw, pitch, relativeFlags = 0).write(it)
         }
+        // parity: `Entity.teleportTo` clears the fall, so arriving is never a landing.
+        fallDistance = 0.0
         // Straight to updatePosition rather than waiting for the client to confirm: the world has
         // to agree the player is there now, so chunks around the destination start generating
         // immediately instead of one round trip later.
@@ -3388,6 +3418,264 @@ public class ClientSession(
         val session = playerSession ?: return
         sendCompressed(SetHealthPacket.ID) {
             SetHealthPacket(session.health, session.food.foodLevel, session.food.saturationLevel).write(it)
+        }
+    }
+
+    /**
+     * Starts eating what is in hand, if it is food and there is room for it.
+     *
+     * parity: `ServerPlayer.startUsingItem`. The server times the mouthful itself rather than
+     * trusting the client to say when it finished, which is what stops one click feeding a player
+     * twice.
+     */
+    private fun startEating(
+        session: PlayerSession,
+        item: Identifier,
+        slot: Int,
+    ): Boolean {
+        val food = ItemFood.of(item) ?: return false
+        if (!food.canAlwaysEat && session.food.foodLevel >= FoodData.MAX_FOOD) return true
+        eatingSlot = slot
+        eatingTicks = food.consumeTicks
+        return true
+    }
+
+    private fun stopEating() {
+        eatingSlot = -1
+        eatingTicks = 0
+    }
+
+    /** One tick of the mouthful, and the swallow at the end of it. */
+    private fun tickEating(session: PlayerSession) {
+        if (eatingSlot < 0) return
+        val held = session.inventory[eatingSlot]
+        val food = held?.let { ItemFood.of(Identifier.parse(it.id)) }
+        // Anything that moved the stack under them (dropping it, a click, swapping slots) stops it.
+        if (food == null || eatingSlot != PlayerInventory.HOTBAR_START + session.inventory.heldSlot) {
+            stopEating()
+            return
+        }
+        if (--eatingTicks > 0) return
+        val slot = eatingSlot
+        stopEating()
+        session.food.eat(food.nutrition, food.saturation)
+        applyConsumeEffects(session, food.effects)
+        if (session.gamemode != Gamemode.CREATIVE) {
+            val remaining = held.count - 1
+            // parity: `use_remainder` replaces what was eaten: the bowl, the bottle, the bucket.
+            val leftover = food.remainder?.let { held.copy(id = it.toString(), count = 1) }
+            session.inventory[slot] =
+                when {
+                    remaining > 0 -> held.copy(count = remaining)
+                    else -> leftover
+                }
+            sendInventorySlot(slot)
+            // A stack of two bowls of stew leaves the second bowl looking for a slot of its own,
+            // and on the floor when there is none.
+            if (remaining > 0 && leftover != null && session.inventory.add(leftover) > 0) {
+                spawnDroppedItem(
+                    item = Identifier.parse(leftover.id),
+                    count = 1,
+                    x = session.x,
+                    y = session.y + THROW_EYE_HEIGHT,
+                    z = session.z,
+                )
+            }
+            if (remaining > 0 && leftover != null) sendInventory()
+        }
+        syncHealth()
+    }
+
+    /**
+     * How far this player has fallen, and what it costs them when they land.
+     *
+     * parity: `Entity.checkFallDamage` plus `LivingEntity.calculateFallDamage`, which is
+     * `floor(distance - 3)`: the distance is added up from the movement itself, not asked of the
+     * client, and anything that cancels a fall in vanilla (water, a ladder, flying, creative)
+     * clears it instead.
+     */
+    private fun trackFall(
+        session: PlayerSession,
+        y: Double,
+        onGround: Boolean,
+        feetState: Int?,
+    ) {
+        val cancelled =
+            session.flying ||
+                session.gamemode == Gamemode.CREATIVE ||
+                session.gamemode == Gamemode.SPECTATOR ||
+                (feetState != null && (Fluids.of(feetState) != Submersion.NONE || isClimbable(feetState)))
+        if (cancelled) {
+            fallDistance = 0.0
+            return
+        }
+        if (!onGround && y < session.y) fallDistance += session.y - y
+        if (onGround && !session.onGround) {
+            applyFallDamage(session)
+            fallDistance = 0.0
+        }
+        if (onGround) fallDistance = 0.0
+    }
+
+    private fun applyFallDamage(session: PlayerSession) {
+        if (currentWorld?.gameRules?.get(GameRuleRegistry.FALL_DAMAGE) == false) return
+        val damage = Combat.fallDamage(fallDistance)
+        if (damage <= 0) return
+        session.stats.addFallen(fallDistance)
+        hurt(damage.toFloat(), DEATH_FALL, DamageTypes.FALL)
+    }
+
+    /** parity: `BlockTags.CLIMBABLE`, which is what stops a fall without stopping the player. */
+    private fun isClimbable(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path in CLIMBABLE_BLOCKS
+
+    /**
+     * Clicking a bed: sleep in it, or say why not.
+     *
+     * parity: `BedBlock.useWithoutItem` over `ServerPlayer.startSleepInBed`. The spawn point is set
+     * before the night check, as vanilla does, so a bed clicked in daylight still becomes home.
+     */
+    private fun useBed(
+        session: PlayerSession,
+        pos: BlockPos,
+        state: Int,
+    ) {
+        val world = currentWorld ?: return
+        val step = Beds.headOffset(state)
+        val head = if (Beds.isHead(state)) pos else BlockPos(pos.x + step[0], pos.y + step[1], pos.z + step[2])
+        val headState = world.state.getBlockState(head.x, head.y, head.z) ?: return
+        if (!Beds.isBed(headState)) return
+
+        if (Beds.explodesIn(world.declaration.dimension)) {
+            for (block in Beds.destroy(world, head.x, head.y, head.z)) {
+                broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+            }
+            sendActionBar(Component.translatable("block.minecraft.bed.not_valid"))
+            return
+        }
+        // parity: `ServerPlayer.startSleepInBed` sets the spawn point once the bed is reachable and
+        // free, and only then asks whether the night allows sleeping.
+        val reachProblem = bedReachProblem(session, head, headState)
+        if (reachProblem != null) {
+            sendActionBar(Component.translatable(reachProblem.translationKey))
+            return
+        }
+        setSpawnPointAt(session, head)
+        if (!Beds.isNight(world.clock.totalTicks) && !world.weather.thundering) {
+            sendActionBar(Component.translatable(BedProblem.NOT_POSSIBLE_NOW.translationKey))
+            return
+        }
+
+        world.state.setBlockState(head.x, head.y, head.z, Beds.withOccupied(headState, occupied = true))
+        broadcastBlockUpdate(head, Beds.withOccupied(headState, occupied = true))
+        session.sleepingBed = Triple(head.x, head.y, head.z)
+        session.sleepTicks = 0
+        val packet = SetEntityDataPacket.sleeping(session.entityId, head)
+        sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.entityId == session.entityId) continue
+            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        }
+    }
+
+    private fun bedReachProblem(
+        session: PlayerSession,
+        head: BlockPos,
+        headState: Int,
+    ): BedProblem? {
+        if (Beds.isOccupied(headState)) return BedProblem.OCCUPIED
+        val dx = session.x - (head.x + 0.5)
+        val dy = session.y - head.y
+        val dz = session.z - (head.z + 0.5)
+        if (dx * dx + dy * dy + dz * dz > Beds.RANGE * Beds.RANGE) return BedProblem.TOO_FAR_AWAY
+        return null
+    }
+
+    /** parity: the bed becomes the respawn point whether or not the night lets anyone sleep. */
+    private fun setSpawnPointAt(
+        session: PlayerSession,
+        bed: BlockPos,
+    ) {
+        val access = playerStore?.takeIf { it.isOpen }?.access ?: return
+        access.setSpawnPoint(
+            StoredSpawnPoint(
+                uuid = session.uuid.toString(),
+                world = session.worldName,
+                x = bed.x + 0.5,
+                y = bed.y.toDouble(),
+                z = bed.z + 0.5,
+                yaw = session.yaw,
+            ),
+        )
+        sendActionBar(Component.translatable("block.minecraft.set_spawn"))
+    }
+
+    /** Out of bed: the flag on the block and the pose. Nobody was moved into it, so nobody moves out. */
+    internal fun wakeUp() {
+        val session = playerSession ?: return
+        val bed = session.sleepingBed ?: return
+        session.sleepingBed = null
+        session.sleepTicks = 0
+        val world = currentWorld
+        val state = world?.state?.getBlockState(bed.first, bed.second, bed.third)
+        if (world != null && state != null && Beds.isBed(state)) {
+            val awake = Beds.withOccupied(state, occupied = false)
+            world.state.setBlockState(bed.first, bed.second, bed.third, awake)
+            broadcastBlockUpdate(BlockPos(bed.first, bed.second, bed.third), awake)
+        }
+        val packet = SetEntityDataPacket.sleeping(session.entityId, null)
+        sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.entityId == session.entityId) continue
+            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        }
+    }
+
+    private fun sendActionBar(message: Component) {
+        sendPlayPacket(SystemChatPacket.ID) { SystemChatPacket(message, isActionBar = true).write(it) }
+    }
+
+    /** parity: `ServerGamePacketListenerImpl`'s `SWAP_ITEM_WITH_OFFHAND`: the F key. */
+    private fun swapWithOffhand() {
+        val session = playerSession ?: return
+        if (session.gamemode == Gamemode.SPECTATOR) return
+        stopEating()
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot]
+        session.inventory[heldSlot] = session.inventory[PlayerInventory.OFFHAND_SLOT]
+        session.inventory[PlayerInventory.OFFHAND_SLOT] = held
+        sendInventorySlot(heldSlot)
+        sendInventorySlot(PlayerInventory.OFFHAND_SLOT)
+        syncHeldAttributes()
+    }
+
+    /** parity: `Consumable.onConsume`, which is what makes a golden apple worth eating. */
+    private fun applyConsumeEffects(
+        session: PlayerSession,
+        effects: List<ConsumeEffect>,
+    ) {
+        for (effect in effects) {
+            when (effect) {
+                is ConsumeEffect.ClearAll -> {
+                    for (id in session.effects.keys.toList()) {
+                        session.effects.remove(id)
+                        sendEffectRemoved(id)
+                    }
+                }
+                is ConsumeEffect.Remove -> {
+                    if (session.effects.remove(effect.effect) != null) sendEffectRemoved(effect.effect)
+                }
+                is ConsumeEffect.Apply -> {
+                    if (effect.probability < 1f && Random.nextFloat() >= effect.probability) continue
+                    val active =
+                        ActiveEffect(
+                            effect = effect.effect,
+                            amplifier = effect.amplifier,
+                            remainingTicks = effect.durationTicks,
+                        )
+                    session.effects[effect.effect] = active
+                    sendEffect(active)
+                }
+            }
         }
     }
 
@@ -3500,6 +3788,8 @@ public class ClientSession(
     private fun leavePlayIfPresent() {
         val session = playerSession ?: return
         val registry = playerRegistry ?: return
+        // Leaving while asleep would otherwise leave the bed occupied for ever.
+        wakeUp()
         // Before removing them from the registry, so a save triggered elsewhere cannot race this
         // one into writing a player who is already half gone.
         savePlayerState()
@@ -3661,6 +3951,20 @@ public class ClientSession(
 
         // parity: `DamageTypes.STARVE`'s message id, which the client renders as "<name> starved to death".
         const val DEATH_STARVE = "starve"
+        const val DEATH_FALL = "fall"
+
+        val CLIMBABLE_BLOCKS =
+            setOf(
+                "ladder",
+                "vine",
+                "scaffolding",
+                "twisting_vines",
+                "twisting_vines_plant",
+                "weeping_vines",
+                "weeping_vines_plant",
+                "cave_vines",
+                "cave_vines_plant",
+            )
 
         /** The largest crafting grid any window here has, so one array serves both. */
         const val MAX_GRID_SIZE = 9

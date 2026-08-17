@@ -209,6 +209,10 @@ public class PlayerInventory(
         public const val ARMOUR_SLOTS: Int = 4
 
         private const val STORAGE_ARMOUR_START = 36
+
+        /** Where the off-hand stack lives in this class's own numbering. */
+        public const val OFFHAND_SLOT: Int = 40
+
         private const val STORAGE_OFFHAND = 40
 
         /**

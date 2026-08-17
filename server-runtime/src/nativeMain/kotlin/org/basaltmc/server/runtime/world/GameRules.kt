@@ -57,6 +57,17 @@ public object GameRuleRegistry {
     /** parity: what makes two water sources next to each other fill the block between them. */
     public val WATER_SOURCE_CONVERSION: GameRule.Bool = GameRule.Bool("water_source_conversion", true)
 
+    /** parity: the share of the players who have to be in bed for the night to end. */
+    public val PLAYERS_SLEEPING_PERCENTAGE: GameRule.Integer =
+        GameRule.Integer(
+            "players_sleeping_percentage",
+            100,
+            min = 0,
+        )
+
+    /** parity: what a fall costs, and what turning it off costs nothing. */
+    public val FALL_DAMAGE: GameRule.Bool = GameRule.Bool("fall_damage", true)
+
     /** parity: off in vanilla, which is why lava has no infinite pools. */
     public val LAVA_SOURCE_CONVERSION: GameRule.Bool = GameRule.Bool("lava_source_conversion", false)
 
@@ -73,7 +84,6 @@ public object GameRuleRegistry {
             GameRule.Bool("elytra_movement_check", true),
             GameRule.Bool("ender_pearls_vanish_on_death", true),
             GameRule.Bool("entity_drops", true),
-            GameRule.Bool("fall_damage", true),
             GameRule.Bool("fire_damage", true),
             GameRule.Integer("fire_spread_radius_around_player", 128, min = -1),
             GameRule.Bool("forgive_dead_players", true),
@@ -98,7 +108,6 @@ public object GameRuleRegistry {
             GameRule.Bool("player_movement_check", true),
             PLAYERS_NETHER_PORTAL_CREATIVE_DELAY,
             PLAYERS_NETHER_PORTAL_DEFAULT_DELAY,
-            GameRule.Integer("players_sleeping_percentage", 100, min = 0),
             GameRule.Bool("projectiles_can_break_blocks", true),
             GameRule.Bool("pvp", true),
             GameRule.Bool("raids", true),
@@ -121,6 +130,8 @@ public object GameRuleRegistry {
             GameRule.Bool("tnt_explosion_drop_decay", false),
             GameRule.Bool("universal_anger", false),
             WATER_SOURCE_CONVERSION,
+            FALL_DAMAGE,
+            PLAYERS_SLEEPING_PERCENTAGE,
         ).sortedBy { it.id }
 
     public fun byId(id: String): GameRule<*>? {

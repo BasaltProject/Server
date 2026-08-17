@@ -1,5 +1,7 @@
 package org.basaltmc.server.runtime.player
 
+import kotlin.math.floor
+
 /**
  * How much of a hit actually lands: armour first, then resistance and protection.
  *
@@ -13,6 +15,10 @@ public object Combat {
     private const val MIN_ARMOUR_RATIO = 0.2f
     private const val TOUGHNESS_DIVIDER = 4f
     private const val RESISTANCE_PER_LEVEL = 5
+
+    /** parity: `Attributes.SAFE_FALL_DISTANCE`, and the epsilon `calculateFallPower` adds. */
+    public const val SAFE_FALL_DISTANCE: Double = 3.0
+    private const val FALL_EPSILON = 1.0E-6
 
     /** parity: `CombatRules.getDamageAfterAbsorb`. */
     public fun afterArmour(
@@ -30,6 +36,21 @@ public object Combat {
         damage: Float,
         protection: Float,
     ): Float = damage * (1f - protection.coerceIn(0f, MAX_ARMOUR) / PROTECTION_DIVIDER)
+
+    /**
+     * What a fall of [fallDistance] blocks costs.
+     *
+     * parity: `LivingEntity.calculateFallDamage` over `calculateFallPower`: the distance minus the
+     * three blocks of `Attributes.SAFE_FALL_DISTANCE`, floored, with vanilla's own epsilon so a
+     * fall of exactly four blocks hurts.
+     */
+    public fun fallDamage(
+        fallDistance: Double,
+        safeFallDistance: Double = SAFE_FALL_DISTANCE,
+    ): Int {
+        val power = fallDistance + FALL_EPSILON - safeFallDistance
+        return if (power <= 0.0) 0 else floor(power).toInt()
+    }
 
     /**
      * parity: `LivingEntity.getDamageAfterMagicAbsorb`'s resistance case, which counts in fifths

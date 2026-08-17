@@ -54,6 +54,15 @@ class CombatTest {
         assertClose(2f, Combat.afterProtection(damage = 10f, protection = 100f))
     }
 
+    /** parity: three blocks are free, and every one after that is half a heart. */
+    @Test
+    fun aFallCostsHalfAHeartPerBlockPastThree() {
+        assertEquals(0, Combat.fallDamage(0.0))
+        assertEquals(0, Combat.fallDamage(3.0))
+        assertEquals(1, Combat.fallDamage(4.0))
+        assertEquals(20, Combat.fallDamage(23.0))
+    }
+
     @Test
     fun theArmourTableHasTheRealValues() {
         val chestplate = checkNotNull(ItemArmour.of(Identifier.vanilla("diamond_chestplate")))
