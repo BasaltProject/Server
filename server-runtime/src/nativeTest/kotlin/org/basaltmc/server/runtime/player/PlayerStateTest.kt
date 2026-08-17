@@ -91,12 +91,38 @@ class FoodDataTest {
 
     @Test
     fun onlySprintingOnTheGroundCostsExhaustion() {
-        assertEquals(0f, FoodData.movementExhaustion(1.0, 0.0, sprinting = false, onGround = true))
-        assertEquals(0f, FoodData.movementExhaustion(1.0, 0.0, sprinting = true, onGround = false))
+        assertEquals(0f, walked(1.0, sprinting = false, onGround = true))
+        assertEquals(0f, walked(1.0, sprinting = true, onGround = false))
         // 0.1 per block, computed through vanilla's own round-to-centimetres path.
-        assertEquals(0.1f, FoodData.movementExhaustion(1.0, 0.0, sprinting = true, onGround = true), 1e-6f)
-        assertEquals(0.05f, FoodData.movementExhaustion(0.5, 0.0, sprinting = true, onGround = true), 1e-6f)
+        assertEquals(0.1f, walked(1.0, sprinting = true, onGround = true), 1e-6f)
+        assertEquals(0.05f, walked(0.5, sprinting = true, onGround = true), 1e-6f)
     }
+
+    /** parity: swimming costs a tenth of sprinting, and counts the vertical distance too. */
+    @Test
+    fun swimmingCostsItsOwnRate() {
+        assertEquals(0.01f, walked(1.0, sprinting = false, onGround = false, inWater = true), 1e-6f)
+        // sqrt(3) blocks, rounded to centimetres the way vanilla rounds it.
+        assertEquals(
+            0.0173f,
+            FoodData.movementExhaustion(1.0, 1.0, 1.0, sprinting = false, onGround = false, inWater = true),
+            1e-6f,
+        )
+    }
+
+    /** parity: `ServerPlayer.jumpFromGround`, 0.05 and 0.2 while sprinting. */
+    @Test
+    fun jumpingCostsMoreWhenSprinting() {
+        assertEquals(0.05f, FoodData.jumpExhaustion(sprinting = false))
+        assertEquals(0.2f, FoodData.jumpExhaustion(sprinting = true))
+    }
+
+    private fun walked(
+        distance: Double,
+        sprinting: Boolean,
+        onGround: Boolean,
+        inWater: Boolean = false,
+    ): Float = FoodData.movementExhaustion(distance, 0.0, 0.0, sprinting, onGround, inWater)
 }
 
 class ExperienceDataTest {

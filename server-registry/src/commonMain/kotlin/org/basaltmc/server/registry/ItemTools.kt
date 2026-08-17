@@ -77,6 +77,12 @@ public object ItemTools {
         hardness: Float,
         requiresCorrectTool: Boolean,
         efficiencyLevel: Int,
+        /** parity: `MobEffectUtil.getDigSpeedAmplification`, or -1 for nobody hasted. */
+        hasteAmplifier: Int = -1,
+        /** parity: `MobEffects.MINING_FATIGUE`'s amplifier, or -1 for nobody slowed. */
+        miningFatigueAmplifier: Int = -1,
+        underwater: Boolean = false,
+        inAir: Boolean = false,
         tagContains: (tag: String, block: Identifier) -> Boolean,
     ): Float {
         if (hardness < 0f) return 0f
@@ -85,10 +91,28 @@ public object ItemTools {
         // parity: the enchantment only helps a tool that is already faster than a bare hand, and
         // its `minecraft:mining_efficiency` amount is `levels_squared` with one added.
         if (speed > 1f && efficiencyLevel > 0) speed += efficiencyLevel * efficiencyLevel + 1f
+        if (hasteAmplifier >= 0) speed *= 1f + (hasteAmplifier + 1) * HASTE_PER_LEVEL
+        if (miningFatigueAmplifier >= 0) speed *= fatigueScale(miningFatigueAmplifier)
+        // parity: `Player.getDestroySpeed`: under water without the aqua affinity attribute it is a
+        // fifth, and off the ground it is a fifth again.
+        if (underwater) speed *= SUBMERGED_MINING_SPEED
+        if (inAir) speed /= IN_AIR_DIVISOR
         val correct = !requiresCorrectTool || isCorrectForDrops(item, block, tagContains)
         return speed / hardness / if (correct) CORRECT_TOOL_DIVISOR else WRONG_TOOL_DIVISOR
     }
 
+    /** parity: the four steps `MobEffects.MINING_FATIGUE` multiplies by. */
+    private fun fatigueScale(amplifier: Int): Float =
+        when (amplifier) {
+            0 -> 0.3f
+            1 -> 0.09f
+            2 -> 0.0027f
+            else -> 0.00081f
+        }
+
+    private const val HASTE_PER_LEVEL = 0.2f
+    private const val SUBMERGED_MINING_SPEED = 0.2f
+    private const val IN_AIR_DIVISOR = 5f
     private const val CORRECT_TOOL_DIVISOR = 30f
     private const val WRONG_TOOL_DIVISOR = 100f
 }

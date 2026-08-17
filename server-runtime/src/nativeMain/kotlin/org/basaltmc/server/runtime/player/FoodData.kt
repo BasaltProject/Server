@@ -154,16 +154,31 @@ public class FoodData {
          */
         public fun movementExhaustion(
             dx: Double,
+            dy: Double,
             dz: Double,
             sprinting: Boolean,
             onGround: Boolean,
+            inWater: Boolean,
         ): Float {
-            if (!onGround || !sprinting) return 0f
-            val centimetres = (sqrt(dx * dx + dz * dz).toFloat() * 100f).roundToInt()
+            // parity: `Player.checkMovementStatistics` charges for swimming in three dimensions and
+            // for sprinting in two, and for nothing else a player does on their own feet.
+            val distance = if (inWater) sqrt(dx * dx + dy * dy + dz * dz) else sqrt(dx * dx + dz * dz)
+            val centimetres = (distance.toFloat() * 100f).roundToInt()
             if (centimetres <= 0) return 0f
-            return SPRINT_EXHAUSTION_PER_CM * centimetres * 0.01f
+            return when {
+                inWater -> SWIM_EXHAUSTION_PER_CM * centimetres * 0.01f
+                onGround && sprinting -> SPRINT_EXHAUSTION_PER_CM * centimetres * 0.01f
+                else -> 0f
+            }
         }
 
+        /** parity: `ServerPlayer.jumpFromGround`, which costs four times as much while sprinting. */
+        public fun jumpExhaustion(sprinting: Boolean): Float =
+            if (sprinting) SPRINT_JUMP_EXHAUSTION else JUMP_EXHAUSTION
+
         private const val SPRINT_EXHAUSTION_PER_CM = 0.1f
+        private const val SWIM_EXHAUSTION_PER_CM = 0.01f
+        private const val JUMP_EXHAUSTION = 0.05f
+        private const val SPRINT_JUMP_EXHAUSTION = 0.2f
     }
 }

@@ -1,7 +1,9 @@
 package org.basaltmc.server.runtime.player
 
 import org.basaltmc.server.runtime.ClientSession
+import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.Fluids
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.login.GameProfileProperty
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.SystemChatPacket
@@ -96,6 +98,9 @@ public class PlayerSession(
 
     public var fireTicks: Int = 0
 
+    /** Status effects this player carries, by effect id. parity: `LivingEntity.activeEffects`. */
+    public val effects: MutableMap<Identifier, ActiveEffect> = mutableMapOf()
+
     /**
      * How long this player has been standing in a portal, and how long until one works again.
      *
@@ -136,6 +141,7 @@ public class PlayerSession(
         // parity: `ServerPlayer.restoreFrom` on a respawn, which starts them breathing and unlit.
         airSupply = Fluids.MAX_AIR
         fireTicks = 0
+        effects.clear()
     }
 
     public companion object {
