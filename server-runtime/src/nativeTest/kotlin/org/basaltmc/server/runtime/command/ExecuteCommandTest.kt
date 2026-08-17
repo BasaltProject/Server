@@ -155,10 +155,11 @@ class ExecuteCommandTest {
         assertEquals(0, run("execute if loaded 5000 64 5000"))
     }
 
+    /** parity: an unknown clause is a parse error now that the chain is a tree, as it is in vanilla. */
     @Test
-    fun anUnknownSubcommandIsRefusedByName() {
-        run("execute nonsense run seed")
-        assertTrue(source.messages.any { "Unknown subcommand" in it })
+    fun anUnknownSubcommandDoesNotParse() {
+        assertEquals(0, run("execute nonsense run seed"))
+        assertTrue(source.messages.any { "Unknown command" in it })
     }
 
     @Test

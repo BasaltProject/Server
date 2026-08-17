@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.command
 
 import org.basaltmc.server.runtime.command.commands.CommandStorage
+import org.basaltmc.server.runtime.command.commands.DataAccess
 import org.basaltmc.server.runtime.command.commands.DataCommand
 import org.basaltmc.server.runtime.command.commands.DataPackCommand
 import org.basaltmc.server.runtime.command.commands.FunctionCommand
@@ -69,6 +70,10 @@ class FunctionCommandsTest {
             "$root/testpack/data/basalt/function/nested/inner.mcfunction",
             "data modify storage basalt:test nested set value 5",
         )
+        FileIO.writeText(
+            "$root/testpack/data/basalt/function/macro.mcfunction",
+            "\$data modify storage basalt:test macro set value \$(amount)",
+        )
         library = FunctionLibrary(root, Logger("FunctionCommandsTest").apply { minLevel = LogLevel.ERROR })
         library.reload()
     }
@@ -86,7 +91,7 @@ class FunctionCommandsTest {
                 maxPlayers = 20,
             ),
         ).also { it.register(DataCommand(storage)) }
-            .also { it.register(FunctionCommand(library, runner)) }
+            .also { it.register(FunctionCommand(library, runner, DataAccess(storage))) }
             .also { it.register(ReturnCommand(runner)) }
             .also { it.register(ScheduleCommand(library, schedule)) }
             .also { it.register(DataPackCommand(library)) }
@@ -102,6 +107,29 @@ class FunctionCommandsTest {
     fun aFunctionRunsEveryLineAndSkipsCommentsAndBlanks() {
         run("function basalt:counter")
         assertEquals(2, stored("counter"))
+    }
+
+    /** parity: a `$` line takes its `$(name)` from the arguments the call supplies. */
+    @Test
+    fun aMacroLineTakesItsArgumentsFromTheCall() {
+        run("""function basalt:macro {amount:42}""")
+
+        assertEquals(42, stored("macro"))
+    }
+
+    /** parity: `with storage`, which reads the arguments out of a holder instead of the line. */
+    @Test
+    fun aMacroCanReadItsArgumentsFromStorage() {
+        run("""data modify storage basalt:args amount set value 7""")
+        run("""function basalt:macro with storage basalt:args""")
+
+        assertEquals(7, stored("macro"))
+    }
+
+    @Test
+    fun aMacroWithoutArgumentsIsRefused() {
+        assertEquals(0, run("function basalt:macro"))
+        assertTrue(source.messages.any { "missing_arguments" in it })
     }
 
     @Test

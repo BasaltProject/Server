@@ -72,6 +72,21 @@ internal fun testEnvironment(): CommandEnvironment =
         maxPlayers = 20,
     )
 
+/** A source that differs only in its name, which is all the chain tests need to tell them apart. */
+private class NamedSource(
+    override val name: String,
+) : CommandSource {
+    override val permissionLevel: Int = PermissionLevel.OWNERS
+
+    override fun hasPermission(node: String?): Boolean = true
+
+    override val displayName: Component = Component.text(name)
+    override val position: Triple<Double, Double, Double> = Triple(0.0, 0.0, 0.0)
+    override val player: PlayerSession? = null
+
+    override fun sendSystemMessage(message: Component) = Unit
+}
+
 class CommandDispatcherTest {
     @Test
     fun runsALiteralCommandAndItsArguments() {
@@ -88,6 +103,62 @@ class CommandDispatcherTest {
 
         assertEquals(1, dispatcher.execute(RecordingSource(), "count 7"))
         assertEquals(7, seen)
+    }
+
+    /**
+     * The shape `/execute as <targets> run <command>`: the tail runs once per source, and with the
+     * arguments of its own link, not the last one's.
+     */
+    @Test
+    fun aForkingRedirectRunsTheTailOncePerSource() {
+        val dispatcher = CommandDispatcher(testEnvironment())
+        val ran = mutableListOf<String>()
+        dispatcher.register("say") {
+            argument("what", WordArgument) {
+                executes { context ->
+                    ran += "${context.source.name}: ${context.get<String>("what")}"
+                    1
+                }
+            }
+        }
+        val root = dispatcher.rootNode
+        dispatcher.register("run3") {
+            argument("prefix", WordArgument) {
+                redirectTo(
+                    root,
+                    forks = true,
+                    modifier = { context ->
+                        val prefix = context.get<String>("prefix")
+                        List(3) { index -> NamedSource("$prefix$index") }
+                    },
+                )
+            }
+        }
+
+        assertEquals(3, dispatcher.execute(RecordingSource(), "run3 who say hi"))
+        assertEquals(listOf("who0: hi", "who1: hi", "who2: hi"), ran)
+    }
+
+    /** A link that hands over exactly one source does not fork: the tail runs once, as that source. */
+    @Test
+    fun aPlainRedirectSwapsTheSourceForTheTail() {
+        val dispatcher = CommandDispatcher(testEnvironment())
+        var seen: String? = null
+        dispatcher.register("who") {
+            executes { context ->
+                seen = context.source.name
+                1
+            }
+        }
+        val root = dispatcher.rootNode
+        dispatcher.register("as") {
+            argument("name", WordArgument) {
+                redirectTo(root, modifier = { context -> listOf(NamedSource(context.get("name"))) })
+            }
+        }
+
+        assertEquals(1, dispatcher.execute(RecordingSource(), "as Steve who"))
+        assertEquals("Steve", seen)
     }
 
     @Test

@@ -20,8 +20,8 @@ import org.basaltmc.wire.protocol.play.TeamColor
 import org.basaltmc.wire.text.Component
 
 /**
- * parity: `TeamCommand`, minus `deathMessageVisibility`, which needs death messages to be filtered
- * per team and so belongs with the death message work rather than here.
+ * parity: `TeamCommand`. `deathMessageVisibility` is stored and travels with the team; who is
+ * actually shown a death message belongs with the death message work, not here.
  */
 public class TeamCommand(
     private val teams: Teams,
@@ -85,6 +85,13 @@ public class TeamCommand(
                     for (visibility in NameTagVisibility.entries) {
                         literal(visibility.serializedName) {
                             executes { context -> modifyNameTagVisibility(context, visibility) }
+                        }
+                    }
+                }
+                literal("deathMessageVisibility") {
+                    for (visibility in NameTagVisibility.entries) {
+                        literal(visibility.serializedName) {
+                            executes { context -> modifyDeathMessageVisibility(context, visibility) }
                         }
                     }
                 }
@@ -353,6 +360,25 @@ public class TeamCommand(
         context.success(
             Component.translatable(
                 "commands.team.option.nametagVisibility.success",
+                team.displayName,
+                Component.text(visibility.serializedName),
+            ),
+            broadcastToAdmins = true,
+        )
+        return 0
+    }
+
+    private fun modifyDeathMessageVisibility(
+        context: CommandContext,
+        visibility: NameTagVisibility,
+    ): Int {
+        val team = teamOf(context)
+        if (team.deathMessageVisibility == visibility) throw unchanged("deathMessageVisibility")
+        team.deathMessageVisibility = visibility
+        changed(context, team)
+        context.success(
+            Component.translatable(
+                "commands.team.option.deathMessageVisibility.success",
                 team.displayName,
                 Component.text(visibility.serializedName),
             ),

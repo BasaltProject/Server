@@ -15,23 +15,25 @@ import org.basaltmc.wire.text.Component
  * parity: `GameRuleCommand`. One literal per rule, each optionally taking a value, exactly as
  * vanilla builds the tree, so the client autocompletes rule names.
  *
- * Vanilla also declares every rule a second time under its full `minecraft:` id; that duplicate is
- * skipped, since nothing resolves rules by namespaced id here yet.
+ * Every rule is declared twice, bare and under its `minecraft:` id, which is what vanilla does and
+ * what makes `/gamerule minecraft:keep_inventory` work.
  */
 public class GameRuleCommand : Command(name = "gamerule", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         for (rule in GameRuleRegistry.ALL) {
-            root.literal(rule.id) {
-                executes { context -> query(context, rule) }
-                when (rule) {
-                    is GameRule.Bool ->
-                        argument("value", BoolArgument) {
-                            executes { context -> set(context, rule, context.get<Boolean>("value").toString()) }
-                        }
-                    is GameRule.Integer ->
-                        argument("value", IntegerArgument(min = rule.min, max = rule.max)) {
-                            executes { context -> set(context, rule, context.get<Int>("value").toString()) }
-                        }
+            for (name in listOf(rule.id, "minecraft:${rule.id}")) {
+                root.literal(name) {
+                    executes { context -> query(context, rule) }
+                    when (rule) {
+                        is GameRule.Bool ->
+                            argument("value", BoolArgument) {
+                                executes { context -> set(context, rule, context.get<Boolean>("value").toString()) }
+                            }
+                        is GameRule.Integer ->
+                            argument("value", IntegerArgument(min = rule.min, max = rule.max)) {
+                                executes { context -> set(context, rule, context.get<Int>("value").toString()) }
+                            }
+                    }
                 }
             }
         }

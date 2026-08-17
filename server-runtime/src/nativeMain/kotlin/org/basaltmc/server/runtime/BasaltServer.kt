@@ -52,6 +52,8 @@ import org.basaltmc.server.runtime.command.commands.SetIdleTimeoutCommand
 import org.basaltmc.server.runtime.command.commands.SpawnPointCommand
 import org.basaltmc.server.runtime.command.commands.SpectateCommand
 import org.basaltmc.server.runtime.command.commands.SpreadPlayersCommand
+import org.basaltmc.server.runtime.command.commands.StopwatchCommand
+import org.basaltmc.server.runtime.command.commands.Stopwatches
 import org.basaltmc.server.runtime.command.commands.SummonCommand
 import org.basaltmc.server.runtime.command.commands.SwingCommand
 import org.basaltmc.server.runtime.command.commands.TeamCommand
@@ -61,6 +63,7 @@ import org.basaltmc.server.runtime.command.commands.TickCommand
 import org.basaltmc.server.runtime.command.commands.TimingsCommand
 import org.basaltmc.server.runtime.command.commands.TransferCommand
 import org.basaltmc.server.runtime.command.commands.TriggerCommand
+import org.basaltmc.server.runtime.command.commands.UnpublishCommand
 import org.basaltmc.server.runtime.command.commands.WaypointCommand
 import org.basaltmc.server.runtime.command.commands.WhitelistCommand
 import org.basaltmc.server.runtime.command.commands.WorldBorderCommand
@@ -444,6 +447,9 @@ public class BasaltServer(
     /** Who a scheduled function runs as: the console, which is what vanilla uses for the same job. */
     private val consoleSource = ConsoleCommandSource(logger, lang)
 
+    /** Named stopwatches `/stopwatch` keeps, in wall-clock time as vanilla counts them. */
+    private val stopwatches = Stopwatches { serverClock.elapsedNow().inWholeMilliseconds }
+
     /** Named NBT compounds `/data ... storage` keeps, read back from disk at startup. */
     public val commandStorage: CommandStorage = CommandStorage().also { it.load() }
 
@@ -496,21 +502,27 @@ public class BasaltServer(
             .also { it.register(BossBarCommand(bossBars)) }
             .also { it.register(ScoreboardCommand(scoreboard)) }
             .also { it.register(TriggerCommand(scoreboard)) }
-            .also { it.register(ExecuteCommand(scoreboard, bossBars, DataAccess(commandStorage))) }
             .also {
+                it.register(
+                    ExecuteCommand(scoreboard, bossBars, DataAccess(commandStorage), functionRunner, playerRegistry),
+                )
+            }.also {
                 it.register(
                     DebugCommand(
                         timings,
                         timingsReport,
                         nowNanos = { serverClock.elapsedNow().inWholeNanoseconds },
                         ticksRun = { tickLoop.ticksRun },
+                        functions = functionRunner,
                     ),
                 )
             }.also { it.register(PerfCommand(timings, timingsReport) { serverClock.elapsedNow().inWholeNanoseconds }) }
             .also { it.register(JfrCommand(timings)) }
             .also { it.register(PublishCommand { config.port }) }
+            .also { it.register(UnpublishCommand()) }
+            .also { it.register(StopwatchCommand(stopwatches)) }
             .also { it.register(FetchProfileCommand(::fetchMojangUuid)) }
-            .also { it.register(FunctionCommand(functions, functionRunner)) }
+            .also { it.register(FunctionCommand(functions, functionRunner, DataAccess(commandStorage))) }
             .also { it.register(ReturnCommand(functionRunner)) }
             .also { it.register(ScheduleCommand(functions, functionSchedule)) }
             .also { it.register(DataPackCommand(functions)) }

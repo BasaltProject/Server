@@ -229,11 +229,16 @@ public object GameProfileArgument : ArgumentType<String> {
  * a level. Declaring it as a dimension would have the client reject names it has never heard of.
  */
 public object WorldArgument : ArgumentType<org.basaltmc.server.runtime.world.LoadedWorld> {
-    override val wire: ArgumentParser = ArgumentParser.BrigadierString(ArgumentParser.BrigadierString.Kind.SINGLE_WORD)
+    /**
+     * parity: `minecraft:dimension`, which is what `/execute in` and `if dimension` declare.
+     *
+     * A world here is not always a dimension id, so the completions are this server's own world
+     * names and the client is told to ask for them rather than offer its three.
+     */
+    override val wire: ArgumentParser = ArgumentParser.Dimension
 
     override val suggestions: SuggestionProvider = SuggestionProvider { it.matching(it.environment.worlds.keys) }
 
-    // A plain string carries nothing to complete from, so the client has to be told to ask.
     override val clientSuggestions: String = SuggestionProviders.ASK_SERVER
 
     override fun parse(

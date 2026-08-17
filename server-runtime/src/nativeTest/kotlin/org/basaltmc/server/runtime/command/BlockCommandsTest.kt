@@ -158,6 +158,33 @@ class BlockCommandsTest {
         assertEquals(Blocks.STONE.stateId, world.state.getBlockState(8, 95, 8))
     }
 
+    /** parity: `/clone from <dimension>`, which reads the region out of another world. */
+    @Test
+    fun cloneFromNamesTheWorldItReadsFrom() {
+        run("fill 0 96 0 1 96 1 stone")
+        run("clone from world 0 96 0 1 96 1 20 96 20 replace")
+
+        assertEquals(Blocks.STONE.stateId, world.state.getBlockState(20, 96, 20))
+    }
+
+    /** parity: `/clone ... to <dimension> <destination>`, the writing half of the same pair. */
+    @Test
+    fun cloneToNamesTheWorldItWritesInto() {
+        run("fill 0 97 0 1 97 1 stone")
+        run("clone 0 97 0 1 97 1 to world 22 97 22 replace")
+
+        assertEquals(Blocks.STONE.stateId, world.state.getBlockState(22, 97, 22))
+    }
+
+    /** `strict` is accepted and copies the same states, which is all it can mean here. */
+    @Test
+    fun cloneStrictCopiesTheSameBlocks() {
+        run("fill 0 98 0 1 98 1 stone")
+        run("clone 0 98 0 1 98 1 24 98 24 strict replace")
+
+        assertEquals(Blocks.STONE.stateId, world.state.getBlockState(24, 98, 24))
+    }
+
     @Test
     fun cloneMaskedKeepsWhatIsUnderTheAirItSkipped() {
         run("fill 0 100 0 1 100 1 stone")

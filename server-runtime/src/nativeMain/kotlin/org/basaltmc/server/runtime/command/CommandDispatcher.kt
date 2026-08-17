@@ -82,6 +82,16 @@ public fun interface CommandExecutor {
 }
 
 /**
+ * What a redirecting node does to the source before the rest of the line runs.
+ *
+ * parity: brigadier's `RedirectModifier`, which is how `/execute as @e at @s run ...` works: each
+ * link hands the next one its own sources, and a forking link runs the tail once per source.
+ */
+public fun interface SourceModifier {
+    public fun sources(context: CommandContext): List<CommandSource>
+}
+
+/**
  * A node of the server's own command tree.
  *
  * Same shape as brigadier's: a root with literal and argument children, each optionally executable
@@ -106,6 +116,12 @@ public sealed class CommandNode {
     /** parity: what vanilla demands for this command. Recorded, not enforced; see [PermissionLevel]. */
     public var requiredLevel: Int = PermissionLevel.ALL
     public var redirect: CommandNode? = null
+
+    /** Set on a redirecting node to change the source the tail runs as. */
+    public var modifier: SourceModifier? = null
+
+    /** parity: brigadier's `forks`, which makes the tail run once per source instead of failing on many. */
+    public var forks: Boolean = false
 
     public abstract val name: String
 
@@ -146,7 +162,10 @@ public class ArgumentNode(
 
 /** Builder for one node's children, executor and permission requirement. */
 public class CommandNodeBuilder(
-    private val node: CommandNode,
+    /** The node being built, for a command that has to redirect back onto its own tree. */
+    public val node: CommandNode,
+    /** The tree's root, which is where `/execute run` sends the rest of the line. */
+    public val root: CommandNode = node,
 ) {
     /** Overrides the permission this node needs, for a sub-command that should be harder to reach. */
     public fun permission(permission: String) {
@@ -181,8 +200,14 @@ public class CommandNodeBuilder(
         (node as? ArgumentNode)?.suggestionProviderId = provider
     }
 
-    public fun redirectTo(target: CommandNode) {
+    public fun redirectTo(
+        target: CommandNode,
+        forks: Boolean = false,
+        modifier: SourceModifier? = null,
+    ) {
         node.redirect = target
+        node.forks = forks
+        node.modifier = modifier
     }
 
     public fun literal(
@@ -192,7 +217,7 @@ public class CommandNodeBuilder(
         val child = LiteralNode(name)
         child.requiredLevel = node.requiredLevel
         child.permission = node.permission
-        CommandNodeBuilder(child).build()
+        CommandNodeBuilder(child, root).build()
         node.children.add(child)
         return child
     }
@@ -205,7 +230,7 @@ public class CommandNodeBuilder(
         val child = ArgumentNode(name, type)
         child.requiredLevel = node.requiredLevel
         child.permission = node.permission
-        CommandNodeBuilder(child).build()
+        CommandNodeBuilder(child, root).build()
         node.children.add(child)
         return child
     }
@@ -223,6 +248,9 @@ public class CommandDispatcher(
     public val environment: CommandEnvironment,
 ) {
     private val root = RootNode()
+
+    /** The tree's root: what `/execute run` and every alias redirect onto. */
+    public val rootNode: CommandNode get() = root
     internal val feedback: CommandFeedback = CommandFeedback(environment)
 
     /** What was registered from code, so a reload can build the tree again from the same list. */
@@ -273,7 +301,7 @@ public class CommandDispatcher(
         // command it belongs to.
         node.requiredLevel = command.permissionLevel
         node.permission = override.permission ?: command.permission
-        command.build(CommandNodeBuilder(node))
+        command.build(CommandNodeBuilder(node, root))
         root.children.add(node)
         for (alias in command.aliases + override.aliases) registerAlias(alias, node)
         return node
@@ -285,7 +313,7 @@ public class CommandDispatcher(
         build: CommandNodeBuilder.() -> Unit,
     ): LiteralNode {
         val node = LiteralNode(name)
-        CommandNodeBuilder(node).build()
+        CommandNodeBuilder(node, root).build()
         root.children.add(node)
         return node
     }
@@ -326,11 +354,7 @@ public class CommandDispatcher(
         input: String,
     ): Int =
         try {
-            val parsed = parse(reader, root, source, emptyMap())
-            val executor =
-                parsed.executor
-                    ?: throw reader.syntaxError(UNKNOWN_COMMAND)
-            executor.run(CommandContext(source, this, input, parsed.arguments))
+            runChain(parse(reader, root, source, emptyMap()), 0, source, input, reader)
         } catch (e: CommandSyntaxException) {
             reportSyntaxError(source, e)
             0
@@ -340,10 +364,57 @@ public class CommandDispatcher(
             0
         }
 
-    private class ParseResult(
-        val executor: CommandExecutor?,
+    /**
+     * One link of a parsed line: what it parsed, and what it does to the source for the next link.
+     *
+     * parity: brigadier's `CommandContext` chain. A redirect ends a link, which is why
+     * `/execute as @e run say hi` keeps `@e` instead of losing it to the last redirect.
+     */
+    private class Link(
         val arguments: Map<String, Any>,
+        val modifier: SourceModifier?,
+        val forks: Boolean,
+        val executor: CommandExecutor?,
     )
+
+    /** Runs a parsed chain, fanning out wherever a link forks. parity: `ContextChain.executeAll`. */
+    private fun runChain(
+        links: List<Link>,
+        index: Int,
+        source: CommandSource,
+        input: String,
+        reader: StringReader,
+    ): Int {
+        val link = links[index]
+        if (index == links.lastIndex) {
+            val executor = link.executor ?: throw reader.syntaxError(UNKNOWN_COMMAND)
+            // A command that failed still reports, which is what `/execute store success` writes 0 on.
+            val result =
+                try {
+                    executor.run(CommandContext(source, this, input, link.arguments))
+                } catch (e: CommandSyntaxException) {
+                    (source as? ExecutionSource)?.report(0)
+                    throw e
+                }
+            (source as? ExecutionSource)?.report(result)
+            return result
+        }
+        val modifier =
+            link.modifier
+                ?: return runChain(links, index + 1, source, input, reader)
+        val sources = modifier.sources(CommandContext(source, this, input, link.arguments))
+        if (!link.forks) {
+            val single = sources.singleOrNull() ?: return 0
+            return runChain(links, index + 1, single, input, reader)
+        }
+        var successes = 0
+        for (next in sources) {
+            // One branch failing is not the others' problem: vanilla runs the rest and counts.
+            val result = runCatching { runChain(links, index + 1, next, input, reader) }.getOrDefault(0)
+            if (result > 0) successes++
+        }
+        return successes
+    }
 
     /**
      * Walks one node's children, trying each in turn and backtracking on failure, and reports
@@ -360,30 +431,32 @@ public class CommandDispatcher(
         node: CommandNode,
         source: CommandSource,
         arguments: Map<String, Any>,
-    ): ParseResult {
-        val target = node.redirect ?: node
-        if (!reader.canRead()) return ParseResult(node.executor, arguments)
+    ): List<Link> {
+        val redirect = node.redirect
+        if (!reader.canRead()) return listOf(Link(arguments, null, false, node.executor))
         // Every node but the first is preceded by the separator that ended the previous one.
         if (node !is RootNode) reader.expect(' ')
         if (!reader.canRead()) throw reader.syntaxError(UNKNOWN_COMMAND)
 
+        val target = redirect ?: node
         val start = reader.cursor
         var deepestError: CommandSyntaxException? = null
         for (child in target.sortedChildren) {
             if (!source.mayUse(child)) continue
             reader.cursor = start
-            val branchArguments = arguments.toMutableMap()
+            // What follows a redirect is its own command, so it starts with no arguments.
+            val branchArguments = (if (redirect == null) arguments else emptyMap()).toMutableMap()
             try {
                 when (child) {
-                    is LiteralNode -> {
-                        val word = reader.readUnquotedString()
-                        if (word != child.name) continue
-                    }
+                    // Matched as text, not as a word: `/execute if score ... >= ...` names literals
+                    // that are not words at all. parity: `LiteralCommandNode.parse`.
+                    is LiteralNode -> if (!reader.readLiteral(child.name)) continue
                     is ArgumentNode -> branchArguments[child.name] = child.type.parse(reader, source, environment)
                     is RootNode -> continue
                 }
                 if (reader.canRead() && reader.peek() != ' ') throw reader.syntaxError(EXPECTED_SEPARATOR)
-                return parse(reader, child, source, branchArguments)
+                val tail = parse(reader, child, source, branchArguments)
+                return if (redirect == null) tail else listOf(Link(arguments, node.modifier, node.forks, null)) + tail
             } catch (e: CommandSyntaxException) {
                 if (deepestError == null || e.cursor > deepestError.cursor) deepestError = e
             }
@@ -451,7 +524,7 @@ public class CommandDispatcher(
                     if (typing && child.name.lowercase().startsWith(rest.lowercase())) {
                         out += start to CommandSuggestion(child.name)
                     }
-                    if (runCatching { reader.readUnquotedString() }.getOrNull() != child.name) continue
+                    if (!reader.readLiteral(child.name)) continue
                     collect(reader, child, source, arguments, out)
                 }
                 is ArgumentNode -> {

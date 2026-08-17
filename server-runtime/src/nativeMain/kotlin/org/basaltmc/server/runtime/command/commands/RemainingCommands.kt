@@ -11,6 +11,7 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.CommandTarget
 import org.basaltmc.server.runtime.command.EntitiesArgument
+import org.basaltmc.server.runtime.command.FloatArgument
 import org.basaltmc.server.runtime.command.HexColorArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
@@ -43,6 +44,7 @@ import org.basaltmc.wire.protocol.play.ShowDialogPacket
 import org.basaltmc.wire.protocol.play.TeamColor
 import org.basaltmc.wire.protocol.play.TrackedWaypointPacket
 import org.basaltmc.wire.text.Component
+import org.basaltmc.wire.text.TextColor
 import kotlin.random.Random
 import kotlin.uuid.ExperimentalUuidApi
 
@@ -235,11 +237,32 @@ public class PlaceCommand(
                             executes { context ->
                                 place(context, context.get("pos"), context.get("rotation"), context.get("mirror"))
                             }
+                            // parity: integrity and its seed decide which blocks a template drops
+                            // on the way in. This build places every block, so they are accepted
+                            // and reported rather than silently changing nothing.
+                            argument("integrity", FloatArgument(min = 0f, max = 1f)) {
+                                executes { context -> placeWhole(context) }
+                                argument("seed", IntegerArgument()) {
+                                    executes { context -> placeWhole(context) }
+                                    literal("strict") { executes { context -> placeWhole(context) } }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    /** Every block of the template, whatever integrity was asked for. */
+    private fun placeWhole(context: CommandContext): Int {
+        val integrity = context.get<Float>("integrity")
+        if (integrity < 1f) {
+            context.source.sendSystemMessage(
+                Component.text("Integrity is not modelled yet: the whole template goes in.", TextColor.GRAY),
+            )
+        }
+        return place(context, context.get("pos"), context.get("rotation"), context.get("mirror"))
     }
 
     private fun place(

@@ -1,37 +1,63 @@
 package org.basaltmc.server.runtime.command.commands
 
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.runtime.command.BlockPosArgument
 import org.basaltmc.server.runtime.command.BlockPredicateArgument
+import org.basaltmc.server.runtime.command.BlockPredicateInput
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
+import org.basaltmc.server.runtime.command.CommandNode
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSource
-import org.basaltmc.server.runtime.command.CommandSyntaxException
+import org.basaltmc.server.runtime.command.CommandTarget
+import org.basaltmc.server.runtime.command.Coordinates
+import org.basaltmc.server.runtime.command.DoubleArgument
+import org.basaltmc.server.runtime.command.EntitiesArgument
+import org.basaltmc.server.runtime.command.EntityAnchor
+import org.basaltmc.server.runtime.command.EntityAnchorArgument
 import org.basaltmc.server.runtime.command.ExecutionSource
-import org.basaltmc.server.runtime.command.GreedyStringArgument
+import org.basaltmc.server.runtime.command.FloatRangeArgument
+import org.basaltmc.server.runtime.command.HeightmapArgument
+import org.basaltmc.server.runtime.command.IntRangeArgument
+import org.basaltmc.server.runtime.command.ItemPredicateArgument
+import org.basaltmc.server.runtime.command.ItemSlotsArgument
+import org.basaltmc.server.runtime.command.LootPredicateArgument
+import org.basaltmc.server.runtime.command.NbtPathArgument
+import org.basaltmc.server.runtime.command.ObjectiveArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.PlayersArgument
+import org.basaltmc.server.runtime.command.RegistryArgument
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
-import org.basaltmc.server.runtime.command.StringReader
+import org.basaltmc.server.runtime.command.RotationArgument
+import org.basaltmc.server.runtime.command.ScoreHolderArgument
+import org.basaltmc.server.runtime.command.SuggestionProviders
+import org.basaltmc.server.runtime.command.SwizzleArgument
 import org.basaltmc.server.runtime.command.Vec3Argument
 import org.basaltmc.server.runtime.command.WorldArgument
 import org.basaltmc.server.runtime.command.worldIn
-import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
+import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.text.Component
+import kotlin.math.atan2
 import kotlin.math.floor
+import kotlin.math.sqrt
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
- * parity: `ExecuteCommand`.
+ * parity: `ExecuteCommand`, declared as the tree vanilla declares rather than as one greedy string.
  *
- * The chain is one greedy argument rather than a redirecting tree: this dispatcher's redirects
- * change which node parses next, not what an earlier link's arguments were, so a declared chain
- * would keep only its last modifier. Cost: no client autocompletion past `/execute`.
+ * Each link redirects back onto `/execute` with a modifier, so the client parses and completes the
+ * whole chain and every link keeps its own arguments. `run` redirects onto the dispatcher root,
+ * which is what makes the rest of the line a command in its own right.
  *
- * Missing, each for want of a subsystem: `facing`, `if blocks|data|predicate|items`, and `store`
- * into anything but a score.
+ * Declared but inert, each for want of the system underneath: `on` (no entity relations), `if
+ * predicate`, `if items` and `if stopwatch`. They parse and fail rather than being missing from the
+ * tree, so a line that uses one reads as false instead of as a syntax error.
  */
 public class ExecuteCommand(
     private val scoreboard: Scoreboard,
@@ -39,318 +65,428 @@ public class ExecuteCommand(
     private val bossBars: BossBarRegistry? = null,
     /** Where `store ... storage` writes and `if data` reads, or null in a fixture without it. */
     private val data: DataAccess? = null,
+    /** What `if function` runs, or null where no functions are loaded. */
+    private val functions: FunctionRunner? = null,
+    /** Where `summon` gets an entity id, or null in a fixture that cannot spawn. */
+    private val players: PlayerRegistry? = null,
 ) : Command(name = "execute", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("chain", GreedyStringArgument) {
-            executes { context -> execute(context, StringReader(context.get("chain"))) }
+        val execute = root.node
+
+        root.literal("run") { redirectTo(root.root) }
+        buildContextClauses(root, execute)
+        for (positive in listOf(true, false)) {
+            root.literal(if (positive) "if" else "unless") { buildConditions(this, execute, positive) }
         }
-    }
-
-    /** One link's state: who it runs as, where, and what it should do with the result. */
-    private class Chain(
-        val sources: List<CommandSource>,
-        val stores: List<Store> = emptyList(),
-    )
-
-    /** Where a result goes when the chain finishes. parity: `/execute store`'s three destinations. */
-    private sealed interface Store {
-        val fromSuccess: Boolean
-
-        class Score(
-            val holders: List<String>,
-            val objective: String,
-            override val fromSuccess: Boolean,
-        ) : Store
-
-        class BossBar(
-            val id: Identifier,
-            val max: Boolean,
-            override val fromSuccess: Boolean,
-        ) : Store
-
-        class Data(
-            val storage: Identifier,
-            val path: String,
-            val type: String,
-            val scale: Double,
-            override val fromSuccess: Boolean,
-        ) : Store
-
-        class BlockData(
-            val pos: Triple<Int, Int, Int>,
-            val path: String,
-            val type: String,
-            val scale: Double,
-            override val fromSuccess: Boolean,
-        ) : Store
-    }
-
-    private fun execute(
-        context: CommandContext,
-        reader: StringReader,
-    ): Int {
-        var chain = Chain(listOf(context.source))
-        while (true) {
-            reader.skipWhitespace()
-            if (!reader.canRead()) throw reader.syntaxError("Expected a subcommand")
-            val keyword = reader.readUnquotedString()
-            when (keyword) {
-                "run" -> return run(context, chain, reader)
-                "as" -> chain = withEach(context, chain, reader) { source, target -> asEntity(source, target) }
-                "at" -> chain = withEach(context, chain, reader) { source, target -> atEntity(source, target) }
-                "positioned" -> chain = positioned(context, chain, reader)
-                "rotated" -> chain = rotated(context, chain, reader)
-                "facing" -> chain = facing(context, chain, reader)
-                "in" -> chain = inWorld(context, chain, reader)
-                "align" -> chain = align(chain, reader)
-                "anchored" -> chain = anchored(chain, reader)
-                "if", "unless" -> {
-                    val outcome = condition(context, chain, reader, negated = keyword == "unless")
-                    chain = outcome.chain ?: return outcome.result
-                }
-                "store" -> chain = store(context, chain, reader)
-                else -> {
-                    reader.cursor -= keyword.length
-                    throw reader.syntaxError("Unknown subcommand '$keyword'")
-                }
+        root.literal("store") {
+            for (fromSuccess in listOf(false, true)) {
+                literal(if (fromSuccess) "success" else "result") { buildStores(this, execute, fromSuccess) }
             }
-            if (chain.sources.isEmpty()) return 0
         }
     }
 
-    private fun run(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-    ): Int {
-        reader.skipWhitespace()
-        val command = reader.remaining
-        if (command.isBlank()) throw reader.syntaxError("Expected a command to run")
-        var successes = 0
-        var total = 0
-        for (source in chain.sources) {
-            val result = context.dispatcher.execute(source, command)
-            if (result != 0) successes++
-            total += result
-        }
-        applyStores(context, chain, successes, total)
-        return total
-    }
-
-    private fun applyStores(
-        context: CommandContext,
-        chain: Chain,
-        successes: Int,
-        total: Int,
+    /** The clauses that only change the source: who, where, facing what, in which world. */
+    private fun buildContextClauses(
+        root: CommandNodeBuilder,
+        execute: CommandNode,
     ) {
-        for (store in chain.stores) {
-            val value = if (store.fromSuccess) successes else total
-            when (store) {
-                is Store.Score -> for (holder in store.holders) scoreboard.setScore(holder, store.objective, value)
-                is Store.BossBar -> {
-                    val bar = bossBars?.get(store.id) ?: continue
-                    if (store.max) bar.max = maxOf(1, value) else bar.value = value
-                }
-                is Store.Data -> data?.store(store.storage, store.path, (value * store.scale), store.type)
-                is Store.BlockData ->
-                    data?.storeInBlock(context, store.pos, store.path, value * store.scale, store.type)
-            }
-        }
-    }
-
-    private inline fun withEach(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-        transform: (CommandSource, PlayerSession) -> CommandSource,
-    ): Chain {
-        val targets = readPlayers(context, reader)
-        val sources = chain.sources.flatMap { source -> targets.map { transform(source, it) } }
-        return Chain(sources, chain.stores)
-    }
-
-    private fun asEntity(
-        source: CommandSource,
-        target: PlayerSession,
-    ): CommandSource = ExecutionSource(source, player = target)
-
-    private fun atEntity(
-        source: CommandSource,
-        target: PlayerSession,
-    ): CommandSource =
-        ExecutionSource(
-            source,
-            position = Triple(target.x, target.y, target.z),
-            rotation = target.yaw to target.pitch,
-        )
-
-    private fun positioned(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-    ): Chain {
-        reader.skipWhitespace()
-        if (reader.remaining.startsWith("as ")) {
-            reader.cursor += "as".length
-            return withEach(context, chain, reader) { source, target ->
-                ExecutionSource(source, position = Triple(target.x, target.y, target.z))
-            }
-        }
-        val sources =
-            chain.sources.map { source ->
-                val coordinates = Vec3Argument.parse(reader, source, context.environment)
-                ExecutionSource(source, position = coordinates.resolve(source.position))
-            }
-        return Chain(sources, chain.stores)
-    }
-
-    private fun rotated(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-    ): Chain {
-        reader.skipWhitespace()
-        if (reader.remaining.startsWith("as ")) {
-            reader.cursor += "as".length
-            return withEach(context, chain, reader) { source, target ->
-                ExecutionSource(source, rotation = target.yaw to target.pitch)
-            }
-        }
-        val yaw = reader.readDouble().toFloat()
-        reader.expect(' ')
-        val pitch = reader.readDouble().toFloat()
-        return Chain(chain.sources.map { ExecutionSource(it, rotation = yaw to pitch) }, chain.stores)
-    }
-
-    /**
-     * `facing <pos>` and `facing entity <targets> <anchor>`: turns each source to look at
-     * something, which is what a `run tp ~ ~ ~ ~ ~` or a positioned raycast then uses.
-     */
-    private fun facing(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-    ): Chain {
-        reader.skipWhitespace()
-        if (reader.remaining.startsWith("entity ")) {
-            reader.cursor += "entity".length
-            val targets = readPlayers(context, reader)
-            reader.skipWhitespace()
-            // The anchor is required after the selector, and only changes where we aim.
-            val anchor = if (reader.canRead() && reader.peek() != ' ') reader.readUnquotedString() else "feet"
-            val eyes = anchor == "eyes"
-            val sources =
-                chain.sources.flatMap { source ->
-                    targets.map { target ->
-                        val targetY = target.y + if (eyes) EYE_HEIGHT else 0.0
-                        val (yaw, pitch) = anglesFrom(source, target.x, targetY, target.z)
-                        ExecutionSource(source, rotation = yaw to pitch)
+        root.literal("as") {
+            argument("targets", EntitiesArgument()) {
+                redirectTo(execute, forks = true) { context ->
+                    context.targets("targets").map { target ->
+                        ExecutionSource(context.source, player = target.playerOrNull(), entity = target)
                     }
                 }
-            return Chain(sources, chain.stores)
-        }
-        val sources =
-            chain.sources.map { source ->
-                val coordinates = Vec3Argument.parse(reader, source, context.environment)
-                val (x, y, z) = coordinates.resolve(source.position)
-                val (yaw, pitch) = anglesFrom(source, x, y, z)
-                ExecutionSource(source, rotation = yaw to pitch)
             }
-        return Chain(sources, chain.stores)
-    }
-
-    /** parity: `Entity.lookAt`: yaw grows clockwise from +Z, pitch is positive downwards. */
-    private fun anglesFrom(
-        source: CommandSource,
-        x: Double,
-        y: Double,
-        z: Double,
-    ): Pair<Float, Float> {
-        val (sourceX, sourceY, sourceZ) = source.position
-        val eyeY = sourceY + if ((source as? ExecutionSource)?.anchorEyes == true) EYE_HEIGHT else 0.0
-        val dx = x - sourceX
-        val dy = y - eyeY
-        val dz = z - sourceZ
-        val horizontal = kotlin.math.sqrt(dx * dx + dz * dz)
-        val yaw = (-kotlin.math.atan2(dx, dz) * DEGREES_PER_RADIAN).toFloat()
-        val pitch = (-kotlin.math.atan2(dy, horizontal) * DEGREES_PER_RADIAN).toFloat()
-        return yaw to pitch
-    }
-
-    private fun inWorld(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-    ): Chain {
-        reader.skipWhitespace()
-        val world = WorldArgument.parse(reader, context.source, context.environment)
-        return Chain(chain.sources.map { ExecutionSource(it, world = world) }, chain.stores)
-    }
-
-    /** parity: `align`, which floors the named axes so a position snaps to its block corner. */
-    private fun align(
-        chain: Chain,
-        reader: StringReader,
-    ): Chain {
-        reader.skipWhitespace()
-        val axes = reader.readUnquotedString()
-        if (axes.isEmpty() || axes.any { it !in "xyz" } || axes.toSet().size != axes.length) {
-            throw reader.syntaxError("Invalid swizzle, expected combination of 'x', 'y' and 'z'")
         }
-        val sources =
-            chain.sources.map { source ->
-                val (x, y, z) = source.position
-                ExecutionSource(
-                    source,
-                    position =
+        root.literal("at") {
+            argument("targets", EntitiesArgument()) {
+                redirectTo(execute, forks = true) { context ->
+                    context.targets("targets").map { target -> context.source.at(target) }
+                }
+            }
+        }
+        root.literal("positioned") {
+            argument("pos", Vec3Argument) {
+                redirectTo(execute) { context ->
+                    val position = context.get<Coordinates>("pos").resolve(context.source.position)
+                    listOf(ExecutionSource(context.source, position = position))
+                }
+            }
+            literal("as") {
+                argument("targets", EntitiesArgument()) {
+                    redirectTo(execute, forks = true) { context ->
+                        context.targets("targets").map { target ->
+                            ExecutionSource(context.source, position = Triple(target.x, target.y, target.z))
+                        }
+                    }
+                }
+            }
+            literal("over") {
+                argument("heightmap", HeightmapArgument) {
+                    redirectTo(execute) { context -> listOf(context.over(context.get("heightmap"))) }
+                }
+            }
+        }
+        root.literal("rotated") {
+            argument("rot", RotationArgument) {
+                redirectTo(execute) { context ->
+                    listOf(ExecutionSource(context.source, rotation = context.get("rot")))
+                }
+            }
+            literal("as") {
+                argument("targets", EntitiesArgument()) {
+                    redirectTo(execute, forks = true) { context ->
+                        context.targets("targets").map { target ->
+                            ExecutionSource(context.source, rotation = target.yaw to target.pitch)
+                        }
+                    }
+                }
+            }
+        }
+        root.literal("facing") {
+            argument("pos", Vec3Argument) {
+                redirectTo(execute) { context ->
+                    val (x, y, z) = context.get<Coordinates>("pos").resolve(context.source.position)
+                    listOf(context.source.facing(x, y, z))
+                }
+            }
+            literal("entity") {
+                argument("targets", EntitiesArgument()) {
+                    argument("anchor", EntityAnchorArgument) {
+                        redirectTo(execute, forks = true) { context ->
+                            val eyes = context.get<EntityAnchor>("anchor") == EntityAnchor.EYES
+                            context.targets("targets").map { target ->
+                                val y = target.y + if (eyes) EYE_HEIGHT else 0.0
+                                context.source.facing(target.x, y, target.z)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        root.literal("align") {
+            argument("axes", SwizzleArgument) {
+                redirectTo(execute) { context ->
+                    val axes = context.get<Set<Char>>("axes")
+                    val (x, y, z) = context.source.position
+                    val aligned =
                         Triple(
                             if ('x' in axes) floor(x) else x,
                             if ('y' in axes) floor(y) else y,
                             if ('z' in axes) floor(z) else z,
-                        ),
-                )
+                        )
+                    listOf(ExecutionSource(context.source, position = aligned))
+                }
             }
-        return Chain(sources, chain.stores)
+        }
+        root.literal("anchored") {
+            argument("anchor", EntityAnchorArgument) {
+                redirectTo(execute) { context ->
+                    val eyes = context.get<EntityAnchor>("anchor") == EntityAnchor.EYES
+                    listOf(ExecutionSource(context.source, anchorEyes = eyes))
+                }
+            }
+        }
+        root.literal("in") {
+            argument("dimension", WorldArgument) {
+                redirectTo(execute) { context ->
+                    listOf(ExecutionSource(context.source, world = context.get<LoadedWorld>("dimension")))
+                }
+            }
+        }
+        root.literal("summon") {
+            argument("entity", RegistryArgument.resource("minecraft:entity_type")) {
+                suggestsFromClient(SuggestionProviders.SUMMONABLE_ENTITIES)
+                redirectTo(execute) { context -> listOfNotNull(summon(context)) }
+            }
+        }
+        root.literal("on") {
+            // parity: the eight relations `/execute on` accepts. None of them exist in this build,
+            // so each yields nobody and the rest of the line does not run.
+            for (relation in RELATIONS) {
+                literal(relation) { redirectTo(execute, forks = true) { emptyList() } }
+            }
+        }
     }
 
-    private fun anchored(
-        chain: Chain,
-        reader: StringReader,
-    ): Chain {
-        reader.skipWhitespace()
-        val anchor = reader.readUnquotedString()
-        if (anchor != "eyes" && anchor != "feet") throw reader.syntaxError("Invalid entity anchor")
-        return Chain(chain.sources.map { ExecutionSource(it, anchorEyes = anchor == "eyes") }, chain.stores)
+    /** parity: `execute summon`, which spawns the entity and runs the rest of the line as it. */
+    @OptIn(ExperimentalUuidApi::class)
+    private fun summon(context: CommandContext): CommandSource? {
+        val registry = players ?: return null
+        val id = context.get<Identifier>("entity")
+        if (id == EntityTypes.PLAYER) return null
+        val type = EntityTypes[id] ?: return null
+        val world = context.source.worldIn(context.environment) ?: return null
+        val (x, y, z) = context.source.position
+        val entity =
+            ServerEntity(
+                entityId = registry.allocateEntityId(),
+                uuid = Uuid.random(),
+                type = id,
+                protocolType = type.protocolId,
+                x = x,
+                y = y,
+                z = z,
+            )
+        world.state.spawnEntity(entity)
+        return ExecutionSource(context.source, entity = CommandTarget.Entity(entity, world.name))
+    }
+
+    private fun buildConditions(
+        builder: CommandNodeBuilder,
+        execute: CommandNode,
+        positive: Boolean,
+    ) {
+        builder.literal("block") {
+            argument("pos", BlockPosArgument) {
+                argument("block", BlockPredicateArgument) {
+                    conditional(this, execute, positive) { context ->
+                        val (x, y, z) = context.blockPos("pos")
+                        val state =
+                            context.source
+                                .worldIn(context.environment)
+                                ?.state
+                                ?.getBlockState(x, y, z)
+                        if (state != null && context.get<BlockPredicateInput>("block").matches(state)) 1 else null
+                    }
+                }
+            }
+        }
+        builder.literal("blocks") {
+            argument("start", BlockPosArgument) {
+                argument("end", BlockPosArgument) {
+                    argument("destination", BlockPosArgument) {
+                        for (masked in listOf(false, true)) {
+                            literal(if (masked) "masked" else "all") {
+                                conditional(this, execute, positive) { context -> compareRegions(context, masked) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        builder.literal("data") {
+            literal("block") {
+                argument("sourcePos", BlockPosArgument) {
+                    argument("path", NbtPathArgument) {
+                        conditional(this, execute, positive) { context ->
+                            val holder = DataHolderRef.Block(context.blockPos("sourcePos"))
+                            existing(context, holder)
+                        }
+                    }
+                }
+            }
+            literal("entity") {
+                argument("source", EntitiesArgument(single = true)) {
+                    argument("path", NbtPathArgument) {
+                        conditional(this, execute, positive) { context ->
+                            val player =
+                                context.targets("source").firstOrNull()?.playerOrNull() ?: return@conditional null
+                            existing(context, DataHolderRef.Entity(player))
+                        }
+                    }
+                }
+            }
+            literal("storage") {
+                argument("source", ResourceLocationArgument) {
+                    argument("path", NbtPathArgument) {
+                        conditional(this, execute, positive) { context ->
+                            existing(context, DataHolderRef.Storage(context.get("source")))
+                        }
+                    }
+                }
+            }
+        }
+        builder.literal("dimension") {
+            argument("dimension", WorldArgument) {
+                conditional(this, execute, positive) { context ->
+                    val world = context.get<LoadedWorld>("dimension")
+                    if (context.source.worldIn(context.environment)?.name == world.name) 1 else null
+                }
+            }
+        }
+        builder.literal("entity") {
+            argument("entities", EntitiesArgument()) {
+                conditional(this, execute, positive) { context -> context.targets("entities").size.takeIf { it > 0 } }
+            }
+        }
+        builder.literal("loaded") {
+            argument("pos", BlockPosArgument) {
+                conditional(this, execute, positive) { context ->
+                    val (x, _, z) = context.blockPos("pos")
+                    val loaded =
+                        context.source
+                            .worldIn(context.environment)
+                            ?.state
+                            ?.isLoaded(x shr 4, z shr 4)
+                    if (loaded == true) 1 else null
+                }
+            }
+        }
+        builder.literal("biome") {
+            argument("pos", BlockPosArgument) {
+                argument("biome", RegistryArgument.orTag("worldgen/biome")) {
+                    conditional(this, execute, positive) { context -> matchesBiome(context) }
+                }
+            }
+        }
+        builder.literal("function") {
+            argument("name", RegistryArgument.FUNCTION) {
+                conditional(this, execute, positive) { context ->
+                    val runner = functions ?: return@conditional null
+                    val id = context.get<Identifier>("name")
+                    runCatching { runner.run(context.dispatcher, context.source, id) }.getOrDefault(0).takeIf { it > 0 }
+                }
+            }
+        }
+        builder.literal("score") { buildScoreConditions(this, execute, positive) }
+        // Declared so the tree matches vanilla's; each needs a system this build has not got.
+        builder.literal("predicate") {
+            argument("predicate", LootPredicateArgument) { conditional(this, execute, positive) { null } }
+        }
+        builder.literal("items") {
+            literal("block") {
+                argument("pos", BlockPosArgument) {
+                    argument("slots", ItemSlotsArgument) {
+                        argument("item_predicate", ItemPredicateArgument) {
+                            conditional(this, execute, positive) { null }
+                        }
+                    }
+                }
+            }
+            literal("entity") {
+                argument("entities", EntitiesArgument()) {
+                    argument("slots", ItemSlotsArgument) {
+                        argument("item_predicate", ItemPredicateArgument) {
+                            conditional(this, execute, positive) { null }
+                        }
+                    }
+                }
+            }
+        }
+        builder.literal("stopwatch") {
+            argument("id", ResourceLocationArgument) {
+                argument("range", FloatRangeArgument) { conditional(this, execute, positive) { null } }
+            }
+        }
+    }
+
+    private fun buildScoreConditions(
+        builder: CommandNodeBuilder,
+        execute: CommandNode,
+        positive: Boolean,
+    ) {
+        builder.argument("target", ScoreHolderArgument) {
+            argument("targetObjective", ObjectiveArgument) {
+                for (operator in COMPARISONS) {
+                    literal(operator) {
+                        argument("source", ScoreHolderArgument) {
+                            argument("sourceObjective", ObjectiveArgument) {
+                                conditional(this, execute, positive) { context ->
+                                    compareScores(context, operator)
+                                }
+                            }
+                        }
+                    }
+                }
+                literal("matches") {
+                    argument("range", IntRangeArgument) {
+                        conditional(this, execute, positive) { context ->
+                            val value = context.score("target", "targetObjective") ?: return@conditional null
+                            if (matchesRange(value, context.get("range"))) 1 else null
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun buildStores(
+        builder: CommandNodeBuilder,
+        execute: CommandNode,
+        fromSuccess: Boolean,
+    ) {
+        builder.literal("score") {
+            argument("targets", ScoreHolderArgument) {
+                argument("objective", ObjectiveArgument) {
+                    storing(this, execute, fromSuccess) { context, value ->
+                        val objective = context.get<String>("objective")
+                        for (holder in context.get<List<String>>("targets")) {
+                            scoreboard.setScore(holder, objective, value)
+                        }
+                    }
+                }
+            }
+        }
+        builder.literal("bossbar") {
+            argument("id", ResourceLocationArgument) {
+                for (max in listOf(false, true)) {
+                    literal(if (max) "max" else "value") {
+                        storing(this, execute, fromSuccess) { context, value ->
+                            val bar = bossBars?.get(context.get<Identifier>("id")) ?: return@storing
+                            if (max) bar.max = maxOf(1, value) else bar.value = value
+                        }
+                    }
+                }
+            }
+        }
+        builder.literal("storage") {
+            argument("target", ResourceLocationArgument) {
+                argument("path", NbtPathArgument) {
+                    typedStore(this, execute, fromSuccess) { context, value, type ->
+                        data?.store(context.get("target"), context.get("path"), value, type)
+                    }
+                }
+            }
+        }
+        builder.literal("block") {
+            argument("targetPos", BlockPosArgument) {
+                argument("path", NbtPathArgument) {
+                    typedStore(this, execute, fromSuccess) { context, value, type ->
+                        data?.storeInBlock(context, context.blockPos("targetPos"), context.get("path"), value, type)
+                    }
+                }
+            }
+        }
+        // Declared for the tree's sake: a player's data is not a compound this build can write to.
+        builder.literal("entity") {
+            argument("target", EntitiesArgument(single = true)) {
+                argument("path", NbtPathArgument) { typedStore(this, execute, fromSuccess) { _, _, _ -> } }
+            }
+        }
+    }
+
+    /** The `<type> <scale>` tail every data store shares. parity: the six number types vanilla writes. */
+    private fun typedStore(
+        builder: CommandNodeBuilder,
+        execute: CommandNode,
+        fromSuccess: Boolean,
+        write: (CommandContext, Double, String) -> Unit,
+    ) {
+        for (type in NUMBER_TYPES) {
+            builder.literal(type) {
+                argument("scale", DoubleArgument()) {
+                    storing(this, execute, fromSuccess) { context, value ->
+                        write(context, value * context.get<Double>("scale"), type)
+                    }
+                }
+            }
+        }
     }
 
     /**
-     * What `if`/`unless` produced: the chain to carry on with, or null with the result of a
-     * condition that ended the line, which is what `/execute if ...` on its own reports.
+     * A condition node: it gates the rest of the line, and reports on its own when the line ends
+     * there. parity: `ExecuteCommand.addConditional`, which declares both on the same node.
      */
-    private class Conditioned(
-        val chain: Chain?,
-        val result: Int = 0,
-    )
-
-    private fun condition(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-        negated: Boolean,
-    ): Conditioned {
-        reader.skipWhitespace()
-        val kind = reader.readUnquotedString()
-        lastConditionCount = null
-        val surviving =
-            chain.sources.filter { source ->
-                val matched = test(context, source, kind, reader, chain.sources.first() === source)
-                matched != negated
-            }
-        reader.skipWhitespace()
-        if (!reader.canRead()) {
-            // The condition was the last thing on the line, so it reports rather than gates.
-            val count = if (surviving.isNotEmpty()) lastConditionCount ?: surviving.size else 0
-            lastConditionCount = null
+    private fun conditional(
+        builder: CommandNodeBuilder,
+        execute: CommandNode,
+        positive: Boolean,
+        test: (CommandContext) -> Int?,
+    ) {
+        builder.executes { context ->
+            val count = count(test, context, positive)
             context.success(
                 if (count > 0) {
                     Component.translatable("commands.execute.conditional.pass_count", Component.text(count.toString()))
@@ -358,303 +494,184 @@ public class ExecuteCommand(
                     Component.translatable("commands.execute.conditional.fail")
                 },
             )
-            applyStores(context, chain, if (count > 0) 1 else 0, count)
-            return Conditioned(null, result = count)
+            count
         }
-        return Conditioned(Chain(surviving, chain.stores))
+        builder.redirectTo(execute, forks = true) { context ->
+            if (count(test, context, positive) > 0) listOf(context.source) else emptyList()
+        }
     }
 
-    /**
-     * One condition against one source. [consume] says whether this call is the one that advances
-     * the reader: the condition text is shared by every source, so only the first parse moves it.
-     */
-    private fun test(
+    /** What a condition reports: how many it matched, or zero when it did not hold. */
+    private fun count(
+        test: (CommandContext) -> Int?,
         context: CommandContext,
-        source: CommandSource,
-        kind: String,
-        reader: StringReader,
-        consume: Boolean,
-    ): Boolean {
-        val start = reader.cursor
-        val result =
-            when (kind) {
-                "block" -> {
-                    reader.skipWhitespace()
-                    val coordinates = BlockPosArgument.parse(reader, source, context.environment)
-                    reader.skipWhitespace()
-                    val predicate = BlockPredicateArgument.parse(reader, source, context.environment)
-                    val world = source.worldIn(context.environment)
-                    val (x, y, z) = coordinates.resolve(source.position)
-                    val state = world?.state?.getBlockState(x, y, z)
-                    state != null && predicate.matches(state)
-                }
-                "entity" -> {
-                    reader.skipWhitespace()
-                    runCatching { PlayersArgument(single = false).parse(reader, source, context.environment) }
-                        .getOrElse { emptyList() }
-                        .isNotEmpty()
-                }
-                "loaded" -> {
-                    reader.skipWhitespace()
-                    val coordinates = BlockPosArgument.parse(reader, source, context.environment)
-                    val (x, _, z) = coordinates.resolve(source.position)
-                    source.worldIn(context.environment)?.state?.isLoaded(x shr 4, z shr 4) == true
-                }
-                "dimension" -> {
-                    reader.skipWhitespace()
-                    val world = WorldArgument.parse(reader, source, context.environment)
-                    source.worldIn(context.environment)?.name == world.name
-                }
-                "score" -> testScore(context, source, reader)
-                "data" -> testData(context, source, reader)
-                "blocks" -> testBlocks(context, source, reader)
-                else -> {
-                    reader.cursor = start
-                    throw reader.syntaxError("Unsupported condition '$kind'")
-                }
-            }
-        if (!consume) reader.cursor = start
-        return result
+        positive: Boolean,
+    ): Int {
+        val matched = runCatching { test(context) }.getOrNull()
+        if ((matched != null) != positive) return 0
+        return matched ?: 1
     }
 
-    /**
-     * `if blocks <start> <end> <destination> (all|masked)`: compares two regions block by block.
-     *
-     * parity: `all` requires every position to match, `masked` ignores air in the source, and the
-     * result is the number of matching blocks rather than 1, which is what makes
-     * `/execute store result ... if blocks` useful.
-     */
-    private fun testBlocks(
-        context: CommandContext,
-        source: CommandSource,
-        reader: StringReader,
-    ): Boolean {
-        reader.skipWhitespace()
-        val start = BlockPosArgument.parse(reader, source, context.environment).resolve(source.position)
-        reader.skipWhitespace()
-        val end = BlockPosArgument.parse(reader, source, context.environment).resolve(source.position)
-        reader.skipWhitespace()
-        val destination = BlockPosArgument.parse(reader, source, context.environment).resolve(source.position)
-        reader.skipWhitespace()
-        val mode = reader.readUnquotedString().ifEmpty { "all" }
-        if (mode != "all" && mode != "masked") throw reader.syntaxError("Expected 'all' or 'masked'")
+    /** A store node: wraps the source so whatever the chain ends up running reports back here. */
+    private fun storing(
+        builder: CommandNodeBuilder,
+        execute: CommandNode,
+        fromSuccess: Boolean,
+        write: (CommandContext, Int) -> Unit,
+    ) {
+        builder.redirectTo(execute) { context ->
+            val base = context.source as? ExecutionSource ?: ExecutionSource(context.source)
+            listOf(
+                base.withCallback { success, result ->
+                    write(context, if (fromSuccess) (if (success) 1 else 0) else result)
+                },
+            )
+        }
+    }
 
-        val world = source.worldIn(context.environment) ?: return false
+    private fun existing(
+        context: CommandContext,
+        holder: DataHolderRef,
+    ): Int? {
+        val path = context.get<String>("path")
+        return if (data?.pathExists(context, holder, path) == true) 1 else null
+    }
+
+    /** parity: `if blocks`, whose result is how many matched, and `masked` ignores air in the source. */
+    private fun compareRegions(
+        context: CommandContext,
+        masked: Boolean,
+    ): Int? {
+        val world = context.source.worldIn(context.environment) ?: return null
+        val start = context.blockPos("start")
+        val end = context.blockPos("end")
+        val destination = context.blockPos("destination")
         val minX = minOf(start.first, end.first)
         val minY = minOf(start.second, end.second)
         val minZ = minOf(start.third, end.third)
-        val maxX = maxOf(start.first, end.first)
-        val maxY = maxOf(start.second, end.second)
-        val maxZ = maxOf(start.third, end.third)
 
         var matched = 0
-        for (x in minX..maxX) {
-            for (y in minY..maxY) {
-                for (z in minZ..maxZ) {
-                    val sourceState = world.state.getBlockState(x, y, z) ?: return false
-                    if (mode == "masked" && sourceState == Blocks.AIR.stateId) continue
+        for (x in minX..maxOf(start.first, end.first)) {
+            for (y in minY..maxOf(start.second, end.second)) {
+                for (z in minZ..maxOf(start.third, end.third)) {
+                    val sourceState = world.state.getBlockState(x, y, z) ?: return null
+                    if (masked && sourceState == Blocks.AIR.stateId) continue
                     val targetState =
                         world.state.getBlockState(
                             destination.first + (x - minX),
                             destination.second + (y - minY),
                             destination.third + (z - minZ),
-                        ) ?: return false
-                    if (sourceState != targetState) return false
+                        ) ?: return null
+                    if (sourceState != targetState) return null
                     matched++
                 }
             }
         }
-        lastConditionCount = matched
-        return true
+        return matched
     }
 
-    /**
-     * How many things the last condition matched, which `if blocks` reports instead of 1. Reset by
-     * every condition that does not set it.
-     */
-    private var lastConditionCount: Int? = null
+    private fun matchesBiome(context: CommandContext): Int? {
+        val world = context.source.worldIn(context.environment) ?: return null
+        val (x, y, z) = context.blockPos("pos")
+        val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return null
+        val biomeId =
+            chunk.section((y - chunk.verticalBounds.minY) / 16).getBiomeId(
+                (x and 15) / 4,
+                ((y - chunk.verticalBounds.minY) % 16) / 4,
+                (z and 15) / 4,
+            )
+        val wanted = context.get<Identifier>("biome")
+        return if (org.basaltmc.server.registry.Biomes.REGISTRY
+                .byId(biomeId)
+                ?.id == wanted
+        ) {
+            1
+        } else {
+            null
+        }
+    }
 
-    /** `if data (block <pos>|entity <target>|storage <id>) <path>`, true when the path exists. */
-    private fun testData(
+    private fun compareScores(
         context: CommandContext,
-        source: CommandSource,
-        reader: StringReader,
-    ): Boolean {
-        reader.skipWhitespace()
-        val holder = reader.readUnquotedString()
-        reader.skipWhitespace()
-        val query =
-            when (holder) {
-                "storage" -> {
-                    val id = ResourceLocationArgument.parse(reader, source, context.environment)
-                    reader.skipWhitespace()
-                    val path = reader.readUnquotedString()
-                    data?.pathExists(context, DataHolderRef.Storage(id), path) ?: false
-                }
-                "block" -> {
-                    val pos = BlockPosArgument.parse(reader, source, context.environment)
-                    reader.skipWhitespace()
-                    val path = reader.readUnquotedString()
-                    data?.pathExists(context, DataHolderRef.Block(pos.resolve(source.position)), path) ?: false
-                }
-                "entity" -> {
-                    val targets = PlayersArgument(single = true).parse(reader, source, context.environment)
-                    reader.skipWhitespace()
-                    val path = reader.readUnquotedString()
-                    data?.pathExists(context, DataHolderRef.Entity(targets.single()), path) ?: false
-                }
-                else -> throw reader.syntaxError("Expected 'block', 'entity' or 'storage'")
+        operator: String,
+    ): Int? {
+        val value = context.score("target", "targetObjective") ?: return null
+        val other = context.score("source", "sourceObjective") ?: return null
+        val holds =
+            when (operator) {
+                "<" -> value < other
+                "<=" -> value <= other
+                "=" -> value == other
+                ">=" -> value >= other
+                else -> value > other
             }
-        return query
-    }
-
-    /** `if score <holder> <objective> (matches <range> | (<|<=|=|>=|>) <holder> <objective>)`. */
-    private fun testScore(
-        context: CommandContext,
-        source: CommandSource,
-        reader: StringReader,
-    ): Boolean {
-        reader.skipWhitespace()
-        val holder = readHolder(context, source, reader)
-        reader.skipWhitespace()
-        val objective = reader.readUnquotedString()
-        val value = scoreboard.score(holder, objective)
-        reader.skipWhitespace()
-        val operator = reader.readUnquotedString().ifEmpty { readOperator(reader) }
-        if (operator == "matches") {
-            reader.skipWhitespace()
-            val range = reader.readUnquotedString()
-            return value != null && matchesRange(value, range, reader)
-        }
-        reader.skipWhitespace()
-        val otherHolder = readHolder(context, source, reader)
-        reader.skipWhitespace()
-        val otherObjective = reader.readUnquotedString()
-        val other = scoreboard.score(otherHolder, otherObjective)
-        if (value == null || other == null) return false
-        return when (operator) {
-            "<" -> value < other
-            "<=" -> value <= other
-            "=" -> value == other
-            ">=" -> value >= other
-            ">" -> value > other
-            else -> throw reader.syntaxError("Invalid score comparison '$operator'")
-        }
-    }
-
-    private fun readOperator(reader: StringReader): String {
-        val start = reader.cursor
-        while (reader.canRead() && reader.peek() in "<>=") reader.skip()
-        return reader.string.substring(start, reader.cursor)
-    }
-
-    private fun readHolder(
-        context: CommandContext,
-        source: CommandSource,
-        reader: StringReader,
-    ): String {
-        if (reader.canRead() && reader.peek() == '@') {
-            return PlayersArgument(single = true)
-                .parse(reader, source, context.environment)
-                .single()
-                .name
-        }
-        val start = reader.cursor
-        while (reader.canRead() && !reader.peek().isWhitespace()) reader.skip()
-        return reader.string.substring(start, reader.cursor)
+        return if (holds) 1 else null
     }
 
     /** parity: `MinMaxBounds.Ints`, whose forms are `n`, `a..b`, `a..` and `..b`. */
     private fun matchesRange(
         value: Int,
         range: String,
-        reader: StringReader,
     ): Boolean {
-        if (".." !in range) {
-            val exact = range.toIntOrNull() ?: throw reader.syntaxError("Invalid integer range '$range'")
-            return value == exact
-        }
+        if (".." !in range) return value == range.toIntOrNull()
         val min = range.substringBefore("..").takeIf { it.isNotEmpty() }?.toIntOrNull()
         val max = range.substringAfter("..").takeIf { it.isNotEmpty() }?.toIntOrNull()
         return (min == null || value >= min) && (max == null || value <= max)
     }
 
-    /** `store (result|success) score <holders> <objective>`. */
-    private fun store(
-        context: CommandContext,
-        chain: Chain,
-        reader: StringReader,
-    ): Chain {
-        reader.skipWhitespace()
-        val which = reader.readUnquotedString()
-        if (which != "result" && which != "success") {
-            throw reader.syntaxError("Expected 'result' or 'success'")
-        }
-        reader.skipWhitespace()
-        val target = reader.readUnquotedString()
-        val fromSuccess = which == "success"
-        return when (target) {
-            "score" -> {
-                reader.skipWhitespace()
-                val holder = readHolder(context, chain.sources.first(), reader)
-                reader.skipWhitespace()
-                val objective = reader.readUnquotedString()
-                Chain(chain.sources, chain.stores + Store.Score(listOf(holder), objective, fromSuccess))
-            }
-            "bossbar" -> {
-                reader.skipWhitespace()
-                val id = ResourceLocationArgument.parse(reader, chain.sources.first(), context.environment)
-                reader.skipWhitespace()
-                val field = reader.readUnquotedString()
-                if (field != "value" && field != "max") throw reader.syntaxError("Expected 'value' or 'max'")
-                Chain(chain.sources, chain.stores + Store.BossBar(id, field == "max", fromSuccess))
-            }
-            "storage" -> {
-                reader.skipWhitespace()
-                val id = ResourceLocationArgument.parse(reader, chain.sources.first(), context.environment)
-                reader.skipWhitespace()
-                val path = reader.readUnquotedString()
-                reader.skipWhitespace()
-                // The value type and scale, which vanilla requires here.
-                val type = reader.readUnquotedString()
-                reader.skipWhitespace()
-                val scale = if (reader.canRead() && reader.peek() != ' ') reader.readDouble() else 1.0
-                Chain(chain.sources, chain.stores + Store.Data(id, path, type, scale, fromSuccess))
-            }
-            "block" -> {
-                reader.skipWhitespace()
-                val pos =
-                    BlockPosArgument
-                        .parse(reader, chain.sources.first(), context.environment)
-                        .resolve(chain.sources.first().position)
-                reader.skipWhitespace()
-                val path = reader.readUnquotedString()
-                reader.skipWhitespace()
-                val type = reader.readUnquotedString()
-                reader.skipWhitespace()
-                val scale = if (reader.canRead() && reader.peek() != ' ') reader.readDouble() else 1.0
-                Chain(chain.sources, chain.stores + Store.BlockData(pos, path, type, scale, fromSuccess))
-            }
-            else ->
-                throw CommandSyntaxException(
-                    Component.text(
-                        "`/execute store` writes to a score, a bossbar or command storage in this build; " +
-                            "block and entity data need holders that are not writable yet.",
-                    ),
-                    reader.string,
-                    reader.cursor,
-                )
-        }
+    private fun CommandContext.score(
+        holderArgument: String,
+        objectiveArgument: String,
+    ): Int? {
+        val holder = get<List<String>>(holderArgument).firstOrNull() ?: return null
+        return scoreboard.score(holder, get(objectiveArgument))
     }
 
-    private fun readPlayers(
-        context: CommandContext,
-        reader: StringReader,
-    ): List<PlayerSession> {
-        reader.skipWhitespace()
-        return runCatching {
-            PlayersArgument(single = false).parse(reader, context.source, context.environment)
-        }.getOrElse { emptyList() }
+    private fun CommandContext.targets(name: String): List<CommandTarget> = get(name)
+
+    private fun CommandContext.blockPos(name: String): Triple<Int, Int, Int> =
+        get<org.basaltmc.server.runtime.command.BlockCoordinates>(name).resolve(source.position)
+
+    private fun CommandTarget.playerOrNull() = (this as? CommandTarget.Player)?.session
+
+    /** parity: `at`, which takes the target's position, rotation and world, but not its identity. */
+    private fun CommandSource.at(target: CommandTarget): CommandSource =
+        ExecutionSource(
+            this,
+            position = Triple(target.x, target.y, target.z),
+            rotation = target.yaw to target.pitch,
+        )
+
+    /** parity: `Entity.lookAt`: yaw grows clockwise from +Z, pitch is positive downwards. */
+    private fun CommandSource.facing(
+        x: Double,
+        y: Double,
+        z: Double,
+    ): CommandSource {
+        val (sourceX, sourceY, sourceZ) = position
+        val eyeY = sourceY + if ((this as? ExecutionSource)?.anchorEyes == true) EYE_HEIGHT else 0.0
+        val dx = x - sourceX
+        val dy = y - eyeY
+        val dz = z - sourceZ
+        val yaw = (-atan2(dx, dz) * DEGREES_PER_RADIAN).toFloat()
+        val pitch = (-atan2(dy, sqrt(dx * dx + dz * dz)) * DEGREES_PER_RADIAN).toFloat()
+        return ExecutionSource(this, rotation = yaw to pitch)
+    }
+
+    /** parity: `positioned over`, which drops the position onto the named heightmap. */
+    private fun CommandContext.over(heightmap: String): CommandSource {
+        val world = source.worldIn(environment) ?: return source
+        val (x, _, z) = source.position
+        val chunk = world.state.chunkIfLoaded(floor(x).toInt() shr 4, floor(z).toInt() shr 4) ?: return source
+        val type =
+            when (heightmap) {
+                "world_surface" -> Chunk.HeightmapType.WORLD_SURFACE
+                "ocean_floor" -> Chunk.HeightmapType.OCEAN_FLOOR
+                "motion_blocking_no_leaves" -> Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES
+                else -> Chunk.HeightmapType.MOTION_BLOCKING
+            }
+        val height = chunk.heightAt(floor(x).toInt() and 15, floor(z).toInt() and 15, type)
+        return ExecutionSource(source, position = Triple(x, height.toDouble(), z))
     }
 
     private companion object {
@@ -662,5 +679,11 @@ public class ExecuteCommand(
 
         /** parity: a player's eye height, which is what `anchored eyes` aims from. */
         const val EYE_HEIGHT = 1.62
+
+        val COMPARISONS = listOf("<", "<=", "=", ">=", ">")
+        val NUMBER_TYPES = listOf("byte", "double", "float", "int", "long", "short")
+
+        val RELATIONS =
+            listOf("attacker", "controller", "leasher", "origin", "owner", "passengers", "target", "vehicle")
     }
 }

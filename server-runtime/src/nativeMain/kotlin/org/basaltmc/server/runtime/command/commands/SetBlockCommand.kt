@@ -30,6 +30,9 @@ public class SetBlockCommand : Command(name = "setblock", permissionLevel = Perm
                 literal("destroy") { executes { context -> setBlock(context, Mode.DESTROY) } }
                 literal("keep") { executes { context -> setBlock(context, Mode.KEEP) } }
                 literal("replace") { executes { context -> setBlock(context, Mode.REPLACE) } }
+                // parity: `strict` places the state exactly as written; this build never adjusts
+                // one to its surroundings, so it is what every form already does.
+                literal("strict") { executes { context -> setBlock(context, Mode.REPLACE) } }
             }
         }
     }
