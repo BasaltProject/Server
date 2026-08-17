@@ -38,6 +38,9 @@ public object GameRuleRegistry {
     public val LOG_ADMIN_COMMANDS: GameRule.Bool = GameRule.Bool("log_admin_commands", true)
     public val SHOW_DEATH_MESSAGES: GameRule.Bool = GameRule.Bool("show_death_messages", true)
     public val RANDOM_TICK_SPEED: GameRule.Integer = GameRule.Integer("random_tick_speed", 3, min = 0)
+
+    /** Named because the vine spread asks for it by name. parity: `GameRules.RULE_SPREAD_VINES`. */
+    public val SPREAD_VINES: GameRule.Bool = GameRule.Bool("spread_vines", true)
     public val IMMEDIATE_RESPAWN: GameRule.Bool = GameRule.Bool("immediate_respawn", false)
 
     /** parity: the three rules a Nether portal reads before it takes anyone anywhere. */
@@ -125,7 +128,7 @@ public object GameRuleRegistry {
             GameRule.Bool("spawn_wandering_traders", true),
             GameRule.Bool("spawn_wardens", true),
             GameRule.Bool("spectators_generate_chunks", true),
-            GameRule.Bool("spread_vines", true),
+            SPREAD_VINES,
             GameRule.Bool("tnt_explodes", true),
             GameRule.Bool("tnt_explosion_drop_decay", false),
             GameRule.Bool("universal_anger", false),

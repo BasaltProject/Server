@@ -3614,15 +3614,12 @@ public class ClientSession(
      * Moves this player into another world, or does nothing if they are already in it.
      *
      * A world change is a *level* change to the client, which is why each world has its own
-     * [LoadedWorld.levelKey]: the respawn packet makes the client throw away its chunk cache and
-     * rebuild it, and it only does that when the level key differs. The rest follows from that: the
-     * tracker is reset because the client no longer has anything, and the chunks are re-requested
-     * from the new world's queue.
+     * [LoadedWorld.levelKey]: the respawn packet makes it throw away its chunk cache and rebuild,
+     * and it only does that when the key differs.
      *
-     * What everyone *else* sees is deliberately not sent from here. Each connection's [syncPlayers]
-     * owns its own tracking set, so a removal written straight to another player's socket left that
-     * set claiming this entity was still there, and coming back never spawned it again: the reason
-     * a player who crossed worlds twice stayed invisible until the other one relogged.
+     * What everyone *else* sees is deliberately not sent from here: each connection's [syncPlayers]
+     * owns its tracking set, and writing a removal straight to another player's socket left that
+     * set out of date, so coming back never spawned this player again.
      */
     internal fun switchWorld(
         target: LoadedWorld,

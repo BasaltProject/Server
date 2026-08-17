@@ -1,6 +1,7 @@
 package org.basaltmc.server.world.region
 
 import org.basaltmc.server.registry.Biomes
+import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkBlockEntity
@@ -241,14 +242,23 @@ public object ChunkNbt {
             slotOfValue = scratch.blockSlots,
             paletteValues = scratch.paletteValues,
         ) { stateId ->
-            val block =
-                Blocks.byStateId(stateId) ?: throw ChunkNbtException("no block registered for state id $stateId")
+            // Every state, not only the ones some caller happened to register: a chunk holds
+            // whatever the world put in it, and a crop that grew or a fence that connected is a
+            // state nobody named. [BlockStateDefinitions] knows all 32366 of them.
+            val name =
+                BlockStateDefinitions.blockOf(stateId)
+                    ?: Blocks.byStateId(stateId)?.block
+                    ?: throw ChunkNbtException("no block registered for state id $stateId")
+            val properties =
+                BlockStateDefinitions.propertiesOf(stateId).ifEmpty {
+                    Blocks.byStateId(stateId)?.properties.orEmpty()
+                }
             val entry = NbtCompound()
-            entry.putString("Name", block.block.toString())
-            if (block.properties.isNotEmpty()) {
-                val properties = NbtCompound()
-                for ((name, value) in block.properties) properties.putString(name, value)
-                entry["Properties"] = properties
+            entry.putString("Name", name.toString())
+            if (properties.isNotEmpty()) {
+                val propertiesTag = NbtCompound()
+                for ((property, value) in properties) propertiesTag.putString(property, value)
+                entry["Properties"] = propertiesTag
             }
             entry
         }
@@ -289,7 +299,9 @@ public object ChunkNbt {
                                     ?: throw ChunkNbtException("invalid property $key for block $name")
                             )
                     }
-                Blocks.stateIdOf(Identifier.parse(name), properties)
+                val block = Identifier.parse(name)
+                BlockStateDefinitions.stateIdOf(block, properties)
+                    ?: Blocks.stateIdOf(block, properties)
                     ?: throw ChunkNbtException("unknown block state $name$properties")
             }
         return decodePalette(

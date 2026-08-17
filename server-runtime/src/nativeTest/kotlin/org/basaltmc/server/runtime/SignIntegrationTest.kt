@@ -52,6 +52,10 @@ class SignIntegrationTest {
         val watcher = TcpConnection.connect("127.0.0.1", port)
         val watcherIncoming = ByteBuffer()
         val watcherThreshold = loginToPlay(watcher, watcherIncoming, "Watcher").threshold
+        // Drained to the end of its first batch before anything else happens. Reads here are one at
+        // a time, so a socket left with a view distance of chunks queued on it is one this test
+        // cannot come back to quickly, and the sign update would be waiting behind all of it.
+        ChunkBatchFinishedPacket.read(drainUntil(watcher, watcherIncoming, ChunkBatchFinishedPacket.ID))
         sendCompressed(watcher, ChunkBatchReceivedPacket.ID, watcherThreshold) { it.writeFloat(16f) }
 
         // A floor first: a sign needs something under it now, so placing one in mid-air is refused.
@@ -94,8 +98,18 @@ class SignIntegrationTest {
             SignUpdatePacket(signPos, isFrontText = true, lines = lines).write(it)
         }
 
-        // And what was typed reaches the other player as the sign's own data.
-        val data = BlockEntityDataPacket.read(drainUntil(watcher, watcherIncoming, BlockEntityDataPacket.ID))
+        // The writer reads its own copy first, and it has to: the broadcast runs on this
+        // connection's read thread and writes to every player in the world, so leaving this socket
+        // unread while waiting on the other one parks the very thread that would answer it.
+        val own =
+            BlockEntityDataPacket.read(drainUntil(connection, incoming, BlockEntityDataPacket.ID, limit = 4000))
+        assertEquals(signPos, own.pos)
+
+        // And it reaches the onlooker, which is the half a single client could never show.
+        val data =
+            BlockEntityDataPacket.read(
+                drainUntil(watcher, watcherIncoming, BlockEntityDataPacket.ID, limit = 4000),
+            )
         assertEquals(signPos, data.pos)
         val front = checkNotNull(data.tag?.get("front_text")) as NbtCompound
         val messages = checkNotNull(front["messages"]) as NbtList

@@ -2374,6 +2374,56 @@ internal val RANDOM_TICKING_STATES: IntArray =
         32364,
     )
 
+/** What each copper block turns into as it weathers. parity: `WeatheringCopper.NEXT_BY_BLOCK`. */
+internal val ALL_WEATHERING_STEPS: List<Pair<String, String>> =
+    listOf(
+        "copper_bars" to "exposed_copper_bars",
+        "exposed_copper_bars" to "weathered_copper_bars",
+        "weathered_copper_bars" to "oxidized_copper_bars",
+        "copper_chain" to "exposed_copper_chain",
+        "exposed_copper_chain" to "weathered_copper_chain",
+        "weathered_copper_chain" to "oxidized_copper_chain",
+        "copper_lantern" to "exposed_copper_lantern",
+        "exposed_copper_lantern" to "weathered_copper_lantern",
+        "weathered_copper_lantern" to "oxidized_copper_lantern",
+        "copper_block" to "exposed_copper",
+        "exposed_copper" to "weathered_copper",
+        "weathered_copper" to "oxidized_copper",
+        "cut_copper" to "exposed_cut_copper",
+        "exposed_cut_copper" to "weathered_cut_copper",
+        "weathered_cut_copper" to "oxidized_cut_copper",
+        "chiseled_copper" to "exposed_chiseled_copper",
+        "exposed_chiseled_copper" to "weathered_chiseled_copper",
+        "weathered_chiseled_copper" to "oxidized_chiseled_copper",
+        "cut_copper_stairs" to "exposed_cut_copper_stairs",
+        "exposed_cut_copper_stairs" to "weathered_cut_copper_stairs",
+        "weathered_cut_copper_stairs" to "oxidized_cut_copper_stairs",
+        "cut_copper_slab" to "exposed_cut_copper_slab",
+        "exposed_cut_copper_slab" to "weathered_cut_copper_slab",
+        "weathered_cut_copper_slab" to "oxidized_cut_copper_slab",
+        "copper_door" to "exposed_copper_door",
+        "exposed_copper_door" to "weathered_copper_door",
+        "weathered_copper_door" to "oxidized_copper_door",
+        "copper_trapdoor" to "exposed_copper_trapdoor",
+        "exposed_copper_trapdoor" to "weathered_copper_trapdoor",
+        "weathered_copper_trapdoor" to "oxidized_copper_trapdoor",
+        "copper_grate" to "exposed_copper_grate",
+        "exposed_copper_grate" to "weathered_copper_grate",
+        "weathered_copper_grate" to "oxidized_copper_grate",
+        "copper_bulb" to "exposed_copper_bulb",
+        "exposed_copper_bulb" to "weathered_copper_bulb",
+        "weathered_copper_bulb" to "oxidized_copper_bulb",
+        "copper_chest" to "exposed_copper_chest",
+        "exposed_copper_chest" to "weathered_copper_chest",
+        "weathered_copper_chest" to "oxidized_copper_chest",
+        "copper_golem_statue" to "exposed_copper_golem_statue",
+        "exposed_copper_golem_statue" to "weathered_copper_golem_statue",
+        "weathered_copper_golem_statue" to "oxidized_copper_golem_statue",
+        "lightning_rod" to "exposed_lightning_rod",
+        "exposed_lightning_rod" to "weathered_lightning_rod",
+        "weathered_lightning_rod" to "oxidized_lightning_rod",
+    )
+
 /**
  * How readily each block catches fire and how readily it burns away, straight from the two
  * tables `FireBlock` builds at bootstrap: block id, ignite odds, burn odds.

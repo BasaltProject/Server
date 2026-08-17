@@ -17,6 +17,42 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class ChunkNbtTest {
+    /**
+     * A chunk holds whatever the world put in it, not only the states someone registered by name.
+     *
+     * This is the crash a grown sugar cane caused: the palette resolved state ids through the
+     * handful of named ones, so the first save after a crop grew, a fence connected or a leaf
+     * counted its distance took the whole save thread down with it.
+     */
+    @Test
+    fun statesNobodyNamedStillSaveAndLoad() {
+        val chunk = Chunk(0, 0)
+        val grown =
+            listOf(
+                state("sugar_cane", mapOf("age" to "3")),
+                state("wheat", mapOf("age" to "5")),
+                state("oak_fence", mapOf("north" to "true", "south" to "true", "waterlogged" to "false")),
+                state("oak_leaves", mapOf("distance" to "4", "persistent" to "false", "waterlogged" to "false")),
+                state("cobblestone_wall", mapOf("up" to "false", "north" to "tall")),
+            )
+        for ((index, stateId) in grown.withIndex()) chunk.setBlockStateId(index, 70, 0, stateId)
+
+        val read = ChunkNbt.read(ChunkNbt.write(chunk))
+
+        for ((index, stateId) in grown.withIndex()) {
+            assertEquals(stateId, read.getBlockStateId(index, 70, 0), "state $stateId did not come back")
+        }
+    }
+
+    private fun state(
+        name: String,
+        properties: Map<String, String>,
+    ): Int =
+        checkNotNull(
+            org.basaltmc.server.registry.BlockStateDefinitions
+                .stateIdOf(Identifier.vanilla(name), properties),
+        )
+
     @Test
     fun aSingleBlockSectionRoundTripsWithNoDataArray() {
         val chunk = Chunk(3, -5)
