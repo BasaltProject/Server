@@ -87,20 +87,27 @@ public class Chunk(
     /**
      * This chunk's sky light, packed one nibble array per section, kept until a block moves.
      *
-     * [keep] is false when a neighbour was missing: that pass lets light in from where nothing is
-     * known yet, and keeping it left a chunk lit as if it had no neighbours for the rest of its
-     * life, which under water is the difference between a dim sea floor and a lit one.
+     * A pass run without every neighbour loaded is kept all the same: it lets light in from where
+     * nothing is known yet, and [invalidateLight] throws it away as soon as the missing neighbour
+     * arrives. Not keeping it meant recomputing the whole chunk on *every* query at the edge of
+     * the loaded area, which cost over two milliseconds a time.
      */
-    public fun skyLight(
-        keep: Boolean = true,
-        compute: () -> Array<ByteArray>,
-    ): Array<ByteArray> = skyLightSections ?: compute().also { if (keep) skyLightSections = it }
+    public fun skyLight(compute: () -> Array<ByteArray>): Array<ByteArray> =
+        skyLightSections ?: compute().also { skyLightSections = it }
 
     /** The same for the light the blocks themselves give off. */
-    public fun blockLight(
-        keep: Boolean = true,
-        compute: () -> Array<ByteArray>,
-    ): Array<ByteArray> = blockLightSections ?: compute().also { if (keep) blockLightSections = it }
+    public fun blockLight(compute: () -> Array<ByteArray>): Array<ByteArray> =
+        blockLightSections ?: compute().also { blockLightSections = it }
+
+    /**
+     * The light this chunk has already worked out, or null when nobody has asked yet.
+     *
+     * A reader that only wants one block's light uses this to skip building a window over the nine
+     * chunks around it: that window was costing more than the lookup it was there to serve.
+     */
+    public fun cachedSkyLight(): Array<ByteArray>? = skyLightSections
+
+    public fun cachedBlockLight(): Array<ByteArray>? = blockLightSections
 
     /** Drops the kept light, for when a neighbour arrives and this chunk's own pass is now stale. */
     public fun invalidateLight() {

@@ -7,7 +7,9 @@ import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
 import org.basaltmc.server.world.NoiseWorldGenerator
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.common.collections.Long2ObjectMap
 import org.basaltmc.wire.io.NativeMutex
+import kotlin.concurrent.Volatile
 import kotlin.math.floor
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -37,6 +39,18 @@ public class WorldState(
         HashMap<Long, Chunk>().apply {
             for (chunk in initialChunks) this[key(chunk.chunkX, chunk.chunkZ)] = chunk
         }
+
+    /**
+     * A read-only copy of [chunksByPos], replaced under [mutex] whenever a chunk is added or
+     * dropped, so a reader can find its chunk without taking the lock at all.
+     *
+     * Block *reads* off that chunk need no lock either: [org.basaltmc.server.world.PalettedContainer]
+     * is written by one thread and read by any number, which is what the send path already relies
+     * on. Taking the lock for them cost 635 ns a read against 131 ns without it, and a tick of
+     * random block updates does tens of thousands.
+     */
+    @Volatile
+    private var loadedChunks: Long2ObjectMap<Chunk> = snapshotOf(chunksByPos)
 
     private val generatedEntitiesByKey = mutableMapOf<GeneratedEntityKey, GeneratedWorldEntity>()
 
@@ -103,6 +117,7 @@ public class WorldState(
                     removed++
                 }
             }
+            if (removed > 0) loadedChunks = snapshotOf(chunksByPos)
             removed
         }
 
@@ -110,13 +125,13 @@ public class WorldState(
     public fun isLoaded(
         chunkX: Int,
         chunkZ: Int,
-    ): Boolean = mutex.withLock { key(chunkX, chunkZ) in chunksByPos }
+    ): Boolean = loadedChunks.containsKey(key(chunkX, chunkZ))
 
     /** The chunk if it is already in memory, or `null`. Never generates, so it is safe on a connection thread. */
     public fun chunkIfLoaded(
         chunkX: Int,
         chunkZ: Int,
-    ): Chunk? = mutex.withLock { chunksByPos[key(chunkX, chunkZ)] }
+    ): Chunk? = loadedChunks.get(key(chunkX, chunkZ))
 
     /** Returns the chunk at this position, generating (but not sending or persisting) it first if unseen. */
     public fun getOrGenerateChunk(
@@ -132,6 +147,7 @@ public class WorldState(
                 existing
             } else {
                 chunksByPos[key] = generated
+                loadedChunks = snapshotOf(chunksByPos)
                 // The neighbours were lit without this chunk, so their light let the sky in through
                 // where it now stands. parity: vanilla relights a chunk's neighbourhood on load.
                 for (offsetZ in -1..1) {
@@ -149,11 +165,10 @@ public class WorldState(
         x: Int,
         y: Int,
         z: Int,
-    ): Int? =
-        mutex.withLock {
-            val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock null
-            chunk.getBlockStateId(x and 15, y, z and 15)
-        }
+    ): Int? {
+        val chunk = loadedChunks.get(key(x shr 4, z shr 4)) ?: return null
+        return chunk.getBlockStateId(x and 15, y, z and 15)
+    }
 
     /** Returns `true` if the position falls inside a loaded chunk (and the block was set), `false` otherwise. */
     public fun setBlockState(
@@ -228,17 +243,12 @@ public class WorldState(
     }
 
     /**
-     * Runtime identities for the immutable entities emitted by generated chunks within
-     * [radiusChunks] of ([centerChunkX], [centerChunkZ]).
+     * Runtime identities for the entities of generated chunks within [radiusChunks] of
+     * ([centerChunkX], [centerChunkZ]).
      *
-     * Bounded because the caller throws away everything farther than its own view radius anyway,
-     * and this runs once per player per tick holding [mutex]: over every loaded chunk it was a copy
-     * of the chunk map, a sort of it, and a copy of each chunk's own list, twenty times a second,
-     * against the lock the generation workers need.
-     *
-     * Walked in coordinate order rather than sorted, so a new entity's id still depends only on
-     * position. Identities are not pruned here: a chunk that falls outside the radius keeps its
-     * entities' ids, and [evictClean] is what forgets them, when the chunk itself goes.
+     * Bounded because this runs once per player per tick holding [mutex], against the lock the
+     * generation workers need. Walked in coordinate order rather than sorted, so an entity's id
+     * still depends only on position; [evictClean] is what forgets them, when the chunk goes.
      */
     public fun generatedEntities(
         allocateEntityId: () -> Int,
@@ -462,6 +472,12 @@ public class WorldState(
     }
 
     public companion object {
+        private fun snapshotOf(chunks: Map<Long, Chunk>): Long2ObjectMap<Chunk> {
+            val copy = Long2ObjectMap<Chunk>(chunks.size * 2 + 4)
+            for ((chunkKey, chunk) in chunks) copy.put(chunkKey, chunk)
+            return copy
+        }
+
         private fun key(
             chunkX: Int,
             chunkZ: Int,

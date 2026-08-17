@@ -1,9 +1,7 @@
 -- Who may connect: bans by player, bans by address, and the whitelist.
 --
 -- In the same database as players and not in `config/`, because these are state the server writes,
--- not configuration the operator maintains by hand: §5.1's own line. Vanilla keeps them in
--- `banned-players.json`, `banned-ips.json` and `whitelist.json` for the same reason it keeps
--- everything in files, which is that it has no database.
+-- not configuration the operator maintains by hand.
 CREATE TABLE ban (
     -- The player's UUID, or the address for an IP ban. One table, because both answer the same
     -- question at login and a two-table version needs the same union query anyway.

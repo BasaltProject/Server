@@ -22,7 +22,7 @@ public data class WorldSettings(
             WorldSettings(
                 difficulty = "easy",
                 viewDistance = 10,
-                saveIntervalSeconds = 30,
+                saveIntervalSeconds = 300,
                 openEndExitPortal = false,
             )
 

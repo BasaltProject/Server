@@ -118,13 +118,10 @@ public class ChunkGenerationQueue(
     public fun awaitAll(positions: List<Pair<Int, Int>>): List<Chunk> {
         if (positions.isEmpty()) return emptyList()
         for ((index, position) in positions.withIndex()) request(position.first, position.second, index)
-        // One lock acquisition per poll, not one per position. Checking each of a view distance's
-        // worth of positions individually, every millisecond, was hundreds of thousands of lock
-        // acquisitions a second from a single thread, against which nothing else got a turn.
-        //
-        // Bounded, because waiting forever turns any lost worker into a server that never finishes
-        // starting and never says why. Past the deadline the remaining chunks are generated here,
-        // on this thread, which is slower but always finishes.
+        // One lock acquisition per poll, not one per position: asking about each position on its
+        // own was hundreds of thousands of acquisitions a second. Bounded, because a lost worker
+        // would otherwise be a server that never finishes starting; past the deadline the rest are
+        // generated on this thread.
         var waited = 0L
         while (world.countMissing(positions) > 0 && waited < AWAIT_TIMEOUT_MILLIS) {
             sleepMillis(AWAIT_POLL_MILLIS)

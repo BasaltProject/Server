@@ -45,17 +45,23 @@ public object WorldLight {
         val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return 0
         if (y < chunk.verticalBounds.minY || y > chunk.verticalBounds.maxY) return 0
         if (sky && !world.declaration.dimension.hasSkylight) return 0
-        val window = LightWindow(chunk) { chunkX, chunkZ -> world.state.chunkIfLoaded(chunkX, chunkZ) }
+        // The already-computed pass first, and only build the nine-chunk window when there is none.
+        // Rebuilding it per query cost eleven microseconds a time, and the grass alone asks for it
+        // thousands of times a tick: it was most of a tick on its own.
+        val cached = if (sky) chunk.cachedSkyLight() else chunk.cachedBlockLight()
         val sections =
-            if (sky) {
-                chunk.skyLight(keep = window.isComplete) {
-                    val computed = SkyLight.compute(window)
-                    Array(computed.size) { NibbleArray.pack(computed[it]) }
-                }
-            } else {
-                chunk.blockLight(keep = window.isComplete) {
-                    val computed = BlockLight.compute(window) ?: return@blockLight emptyArray()
-                    Array(computed.size) { NibbleArray.pack(computed[it]) }
+            cached ?: run {
+                val window = LightWindow(chunk) { chunkX, chunkZ -> world.state.chunkIfLoaded(chunkX, chunkZ) }
+                if (sky) {
+                    chunk.skyLight {
+                        val computed = SkyLight.compute(window)
+                        Array(computed.size) { NibbleArray.pack(computed[it]) }
+                    }
+                } else {
+                    chunk.blockLight {
+                        val computed = BlockLight.compute(window) ?: return@blockLight emptyArray()
+                        Array(computed.size) { NibbleArray.pack(computed[it]) }
+                    }
                 }
             }
         val section = (y - chunk.verticalBounds.minY) shr 4

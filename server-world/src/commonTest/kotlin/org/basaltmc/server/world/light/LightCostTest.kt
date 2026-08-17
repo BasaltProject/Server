@@ -7,6 +7,7 @@ import org.basaltmc.wire.common.Identifier
 import kotlin.math.sin
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 private val STONE_ID = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("stone")))
@@ -43,11 +44,15 @@ class LightCostTest {
         // Warm the heightmaps, which generation has already paid for by the time light runs.
         window.surfaceRange()
 
-        val runs = 10
         repeat(2) { SkyLight.compute(window) }
-        val started = TimeSource.Monotonic.markNow()
-        repeat(runs) { SkyLight.compute(window) }
-        val perChunk = started.elapsedNow() / runs
+        // The best of three rounds, not the mean: the whole test suite runs in parallel, and a
+        // round that lost the cores says nothing about what the pass costs.
+        var perChunk = Duration.INFINITE
+        repeat(3) {
+            val started = TimeSource.Monotonic.markNow()
+            repeat(10) { SkyLight.compute(window) }
+            perChunk = minOf(perChunk, started.elapsedNow() / 10)
+        }
 
         assertTrue(perChunk.inWholeMicroseconds < 10_000, "one chunk took $perChunk")
     }

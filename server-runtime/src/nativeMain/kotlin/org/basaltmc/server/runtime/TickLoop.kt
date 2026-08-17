@@ -23,13 +23,24 @@ import kotlin.time.TimeSource
 @OptIn(ExperimentalTime::class)
 public class TickLoop(
     saveIntervalSeconds: Int = DEFAULT_SAVE_INTERVAL_SECONDS,
+    /** parity: vanilla unloads every tick; a sweep that walks every chunk cannot, so it has its own clock. */
+    unloadIntervalSeconds: Int = DEFAULT_UNLOAD_INTERVAL_SECONDS,
     /** Every tick's duration, for the distribution `/timings` reports. */
     public val durations: TickDurations = TickDurations(),
     /**
-     * The periodic sweep, on its own thread. On the tick thread it outlasted [CATCH_UP_LIMIT], so
+     * The periodic save, on its own thread. On the tick thread it outlasted [CATCH_UP_LIMIT], so
      * its backlog was dropped rather than caught up and those ticks were simply lost.
      */
     private val onSaveInterval: () -> Unit = {},
+    /**
+     * Dropping the chunks nobody can reach, which is not the same job as saving them.
+     *
+     * parity: vanilla unloads in `ChunkMap.processUnloads`, every tick, and autosaves every five
+     * minutes. Hanging both off the save interval meant memory only came back when the world was
+     * written, so raising that interval to vanilla's would have kept every chunk a wandering
+     * player had ever seen.
+     */
+    private val onUnloadInterval: () -> Unit = {},
     /**
      * Runs every tick. Deliberately not a general extension point: it exists so something checks
      * for a termination signal 20 times a second, which no other thread here can do (the accept
@@ -38,12 +49,14 @@ public class TickLoop(
     private val onTick: () -> Unit = {},
 ) {
     /** 0 seconds means no periodic save at all; chunks still go out when they unload or on stop. */
-    private val saveIntervalTicks: Long = saveIntervalSeconds.toLong() * TICKS_PER_SECOND
+    private val saveIntervalSeconds: Int = saveIntervalSeconds
+    private val unloadIntervalTicks: Long = unloadIntervalSeconds.toLong() * TICKS_PER_SECOND
     private val running = AtomicInt(0)
     private val rates = AtomicReference(TickRates.IDLE)
 
     // A flag, not a queue: a sweep that outlasts an interval owes one more sweep, not several.
     private val sweepRequested = AtomicInt(0)
+    private val unloadRequested = AtomicInt(0)
     private val sweeping = AtomicInt(0)
 
     /** How many ticks a second the loop is actually managing, over one, five and fifteen minutes. */
@@ -99,10 +112,11 @@ public class TickLoop(
 
     public fun start() {
         running.value = 1
-        if (saveIntervalTicks > 0) startSweeper()
+        startSweeper()
         NativeThread.start {
             val meter = TickMeter()
             var tick = 0L
+            var ticksUntilSave = nextAutosaveInterval()
             val clock = TimeSource.Monotonic.markNow()
             var nextTickMillis = 0L
             while (running.value == 1) {
@@ -115,18 +129,23 @@ public class TickLoop(
                 tick++
                 ticksCounted.value = tick
                 if (!skip) onTick()
-                if (saveIntervalTicks > 0 && tick % saveIntervalTicks == 0L) sweepRequested.value = 1
+                if (saveIntervalSeconds > 0 && --ticksUntilSave <= 0L) {
+                    // parity: `MinecraftServer.autoSave`, which recomputes the interval each time
+                    // from the rate the server is running at.
+                    ticksUntilSave = nextAutosaveInterval()
+                    sweepRequested.value = 1
+                }
+                // Unloading is not gated on the save interval: a server told not to write
+                // periodically still must not hold every chunk anyone has walked through.
+                if (tick % unloadIntervalTicks == 0L) unloadRequested.value = 1
 
                 // Recorded before the sleep, so it is the work that is measured and not the wait.
                 durations.record(clock.elapsedNow().inWholeNanoseconds, started.elapsedNow().inWholeNanoseconds)
                 rates.value = meter.tick()
 
-                // Slept towards an absolute deadline rather than for "a tick minus the work".
-                // sleepMillis only promises *at least* what it is asked for, so a computed delta
-                // overshoots by a millisecond or two every tick and never gets it back: measured, that
-                // drift alone held an idle server at 17 TPS. Counting deadlines from the start makes
-                // an overshoot cost that tick and not the ones after it.
-                // A sprint runs flat out, so the deadline follows the work rather than the clock.
+                // Slept towards an absolute deadline, not for "a tick minus the work": sleepMillis
+                // promises *at least* what it is asked for, and that drift alone held an idle server
+                // at 17 TPS. A sprint runs flat out, so its deadline follows the work.
                 if (sprinting) {
                     nextTickMillis = clock.elapsedNow().inWholeMilliseconds
                     continue
@@ -154,16 +173,29 @@ public class TickLoop(
         }
     }
 
+    /**
+     * How many ticks until the next autosave.
+     *
+     * parity: `MinecraftServer.computeNextAutosaveInterval`, which counts the interval in ticks at
+     * the rate being asked for, so slowing the tick rate does not stretch five minutes into an
+     * hour, and never lets it fall under a hundred ticks.
+     */
+    private fun nextAutosaveInterval(): Long =
+        maxOf(MIN_AUTOSAVE_TICKS, (targetRate.value * saveIntervalSeconds).toLong())
+
     private fun startSweeper() {
         NativeThread.start {
             while (running.value == 1) {
-                if (!sweepRequested.compareAndSet(1, 0)) {
+                val saving = sweepRequested.compareAndSet(1, 0)
+                val unloading = unloadRequested.compareAndSet(1, 0)
+                if (!saving && !unloading) {
                     sleepMillis(SWEEP_POLL_MILLIS)
                     continue
                 }
                 sweeping.value = 1
                 try {
-                    onSaveInterval()
+                    if (saving) onSaveInterval()
+                    if (unloading) onUnloadInterval()
                 } finally {
                     sweeping.value = 0
                 }
@@ -241,10 +273,13 @@ public class TickLoop(
         /** Fifteen minutes, the longest window reported. */
         private const val WINDOW_SECONDS = 900
 
-        // How much exploration a crash can cost, and an operator's to change (`save-interval-seconds`).
-        // Linear compresses a region as one stream, so saving any chunk rewrites all 1024 of its
-        // neighbours; that is affordable now only because a region streams straight to disk instead
-        // of being built in memory first.
-        public const val DEFAULT_SAVE_INTERVAL_SECONDS: Int = 30
+        // parity: `MinecraftServer.computeNextAutosaveInterval`, five minutes at the rate asked for
+        // and never fewer than a hundred ticks. Linear compresses a region as one stream, so saving
+        // one chunk rewrites all 1024 of its neighbours.
+        public const val DEFAULT_SAVE_INTERVAL_SECONDS: Int = 300
+
+        private const val MIN_AUTOSAVE_TICKS = 100L
+
+        public const val DEFAULT_UNLOAD_INTERVAL_SECONDS: Int = 30
     }
 }
