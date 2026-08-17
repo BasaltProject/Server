@@ -77,7 +77,7 @@ enable-player-collisions = true
 
 std::string_view gameplayRulesTemplate() noexcept { return kGameplayTemplate; }
 
-void readGameplayRules(const TomlTable& table, GameplayRules& rules) {
+void readWorldTuning(const TomlTable& table, WorldTuning& rules) {
     if (const TomlTable* fire = table.table("fire"); fire != nullptr) {
         rules.fireTickDelay = whole(*fire, "tick-delay", rules.fireTickDelay, 1, 1 << 20);
     }

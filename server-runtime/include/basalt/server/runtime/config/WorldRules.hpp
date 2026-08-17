@@ -69,7 +69,7 @@ struct HungerRules {
     friend bool operator==(const HungerRules&, const HungerRules&) = default;
 };
 
-struct GameplayRules {
+struct WorldTuning {
     std::int32_t fireTickDelay = 30;
     std::int32_t cactusMaxHeight = 3;
     std::int32_t sugarCaneMaxHeight = 3;
@@ -82,7 +82,7 @@ struct GameplayRules {
     bool playerCollisions = true;
     HungerRules hunger;
 
-    friend bool operator==(const GameplayRules&, const GameplayRules&) = default;
+    friend bool operator==(const WorldTuning&, const WorldTuning&) = default;
 };
 
 struct AntiXrayRules {
@@ -109,7 +109,7 @@ struct WorldRules {
     std::int32_t hopperTransferTicks = 8;
     std::int32_t hopperAmount = 1;
     std::int32_t hopperCheckTicks = 1;
-    GameplayRules gameplay;
+    WorldTuning gameplay;
     EnvironmentRules environment;
     BorderRules border;
     AntiXrayRules antiXray = AntiXrayRules::vanilla();
@@ -124,7 +124,7 @@ struct WorldRules {
 
 [[nodiscard]] std::string_view gameplayRulesTemplate() noexcept;
 
-void readGameplayRules(const wire::common::toml::TomlTable& table, GameplayRules& rules);
+void readWorldTuning(const wire::common::toml::TomlTable& table, WorldTuning& rules);
 
 /// The commented sections of the rules, as `[defaults.x]` for worlds.toml or commented `[x]` for a world's own file.
 [[nodiscard]] std::string worldRulesTemplate(bool forDefaults);
