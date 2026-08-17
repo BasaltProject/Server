@@ -84,6 +84,22 @@ class FallingBlocksTest {
         assertEquals(state("sand"), world.state.getBlockState(4, 65, 2))
     }
 
+    /**
+     * Sand put down with nothing under it falls too, not only sand that loses its floor.
+     *
+     * It used to sit there: the neighbour update asked every block around the change whether it
+     * should fall, and never the one that had just arrived.
+     */
+    @Test
+    fun sandPlacedInMidAirIsAskedToFallAsWell() {
+        world.state.setBlockState(8, 70, 2, state("sand"))
+        NeighbourUpdates.afterChange(world, 8, 70, 2) { _, _, _, _ -> }
+
+        assertTrue(world.state.dueBlockTicks().isEmpty())
+        val due = world.state.dueBlockTicks()
+        assertEquals(listOf(listOf(8, 70, 2)), due.map { it.toList() }, "the sand itself should have been asked")
+    }
+
     /** Digging out from under a pile is what asks for the tick that starts the fall. */
     @Test
     fun diggingUnderSandSchedulesItsFall() {

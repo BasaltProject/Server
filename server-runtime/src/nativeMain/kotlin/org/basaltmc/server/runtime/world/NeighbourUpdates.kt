@@ -43,7 +43,9 @@ public object NeighbourUpdates {
         reshape(world, x, y, z, bubbles)?.let { onReshaped(it, x, y, z) }
         for (change in bubbles) onReshaped(change.stateId, change.x, change.y, change.z)
         // parity: `FallingBlock.onPlace` and its `updateShape`, which both do nothing but ask to be
-        // looked at again in two ticks.
+        // looked at again in two ticks. The block that just arrived counts: sand put down in mid
+        // air used to sit there for good, because only its neighbours were ever asked.
+        FallingBlocks.scheduleIfFalling(world, x, y, z)
         FallingBlocks.scheduleIfFalling(world, x, y + 1, z)
         val pending = ArrayDeque<Int>(INITIAL_QUEUE)
         push(pending, x, y, z)

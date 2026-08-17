@@ -43,6 +43,7 @@ import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
+import org.basaltmc.server.runtime.world.DoubleBlocks
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.Explosions
@@ -154,6 +155,7 @@ import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.wire.protocol.play.DamageEventPacket
 import org.basaltmc.wire.protocol.play.EntityEventPacket
+import org.basaltmc.wire.protocol.play.EntityPositionSyncPacket
 import org.basaltmc.wire.protocol.play.EntityTeleportPacket
 import org.basaltmc.wire.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.wire.protocol.play.GameEventPacket
@@ -1980,15 +1982,21 @@ public class ClientSession(
                 }
                 continue
             }
-            sendPlayPacket(EntityTeleportPacket.ID) {
-                EntityTeleportPacket(
-                    entity.entityId,
-                    entity.x,
-                    entity.y,
-                    entity.z,
-                    entity.yaw,
-                    entity.pitch,
-                    false,
+            // parity: `ServerEntity.sendChanges` sends a position *sync* for anything that has to be
+            // exact, and it carries the velocity. That is what lets the client interpolate: a
+            // teleport every tick snaps, which is what made a falling block judder down.
+            sendPlayPacket(EntityPositionSyncPacket.ID) {
+                EntityPositionSyncPacket(
+                    entityId = entity.entityId,
+                    x = entity.x,
+                    y = entity.y,
+                    z = entity.z,
+                    velocityX = 0.0,
+                    velocityY = entity.velocityY,
+                    velocityZ = 0.0,
+                    yaw = entity.yaw,
+                    pitch = entity.pitch,
+                    onGround = false,
                 ).write(it)
             }
         }
@@ -2351,7 +2359,7 @@ public class ClientSession(
         val existing = world.getBlockState(placeAt.x, placeAt.y, placeAt.z)
         if (existing == null || !BlockShapes.isReplaceable(existing)) return ack()
 
-        val blockStateId =
+        val placedStateId =
             BlockPlacement.stateFor(
                 block = heldBlock,
                 defaultStateId = defaultStateId,
@@ -2361,6 +2369,8 @@ public class ClientSession(
                 pitch = session.pitch,
                 replacing = existing,
             )
+        // The half a two-block one starts as, whatever the state table's first entry happens to be.
+        val blockStateId = DoubleBlocks.firstHalf(placedStateId)
         // parity: `BlockItem.canPlace`: a block never goes down inside somebody. Without this you
         // can wall yourself in, which is the one thing vanilla will not let you do by accident.
         if (BlockPlacement.isObstructed(blockStateId, placeAt.x, placeAt.y, placeAt.z, buildersInTheWay())) {
@@ -2374,9 +2384,18 @@ public class ClientSession(
         ) {
             return ack()
         }
+        // parity: `setPlacedBy` on a door, a bed or a tall flower: the client asks for one block and
+        // the game puts down two. Without the second one the first has no partner and `updateShape`
+        // takes it straight back out, which is what made beds and doors impossible to place.
+        val second = DoubleBlocks.secondHalf(blockStateId, placeAt.x, placeAt.y, placeAt.z)
+        if (second != null) {
+            val room = world.getBlockState(second.x, second.y, second.z)
+            if (room == null || !BlockShapes.isReplaceable(room)) return ack()
+        }
         val changed = world.setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)
         ack()
         if (!changed) return
+        second?.let { world.setBlockState(it.x, it.y, it.z, it.stateId) }
 
         if (session.gamemode == Gamemode.SURVIVAL) {
             val remaining = held.count - 1
@@ -2389,6 +2408,7 @@ public class ClientSession(
                 ClientboundBlockUpdatePacket(placeAt, blockStateId).write(it)
             }
         }
+        second?.let { broadcastBlockUpdate(BlockPos(it.x, it.y, it.z), it.stateId) }
         // Both the block under it (a snow layer put on grass) and the block itself (grass put
         // under snow) can change how they look.
         refreshSnowUnder(placeAt)
