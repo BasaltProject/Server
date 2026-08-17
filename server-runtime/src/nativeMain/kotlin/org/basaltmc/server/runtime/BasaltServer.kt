@@ -1,6 +1,9 @@
 package org.basaltmc.server.runtime
 
 import org.basaltmc.server.assets.ServerJarAssets
+import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.CommandEnvironment
 import org.basaltmc.server.runtime.command.ConsoleCommandSource
@@ -91,6 +94,7 @@ import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.FluidFlow
+import org.basaltmc.server.runtime.world.FluidKind
 import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
@@ -114,6 +118,7 @@ import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
 import org.basaltmc.server.runtime.world.WorldMetadata
+import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.storage.PlayerStore
 import org.basaltmc.server.world.GenerationMetrics
 import org.basaltmc.server.world.portal.PortalAxis
@@ -140,10 +145,12 @@ import org.basaltmc.wire.text.PlainTextSerializer
 import org.basaltmc.wire.text.TextColor
 import kotlin.concurrent.AtomicInt
 import kotlin.math.floor
+import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.TimeSource
+import kotlin.uuid.Uuid
 
 /**
  * A thread-per-connection server, per `wire-io`'s current scope (no event loop yet), covering
@@ -942,12 +949,44 @@ public class BasaltServer(
         for (position in due) {
             for (change in FluidFlow.tick(world, position[0], position[1], position[2])) {
                 val pos = BlockPos(change[0], change[1], change[2])
+                dropWashedAwayBlock(world, pos, change[4])
                 for (player in watchers) {
                     player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
                         ClientboundBlockUpdatePacket(pos, change[3]).write(it)
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Drops what a flow washed away. parity: `WaterFluid.beforeDestroyingBlock`, which rolls the
+     * block's own loot table exactly as breaking it by hand would.
+     *
+     * Lava is the exception and drops nothing: its `beforeDestroyingBlock` only plays the fizz.
+     */
+    private fun dropWashedAwayBlock(
+        world: LoadedWorld,
+        pos: BlockPos,
+        destroyedState: Int,
+    ) {
+        if (destroyedState <= 0 || FluidFlow.kindOf(destroyedState) != null) return
+        if (FluidFlow.kindOf(world.state.getBlockState(pos.x, pos.y, pos.z) ?: return) != FluidKind.WATER) return
+        val block = Blocks.byStateId(destroyedState)?.block ?: return
+        val table = lootTables.forBlock(block) ?: return
+        for (stack in table.generate(LegacyRandom(Random.nextLong()))) {
+            if (Items.REGISTRY.byIdentifier(stack.item) == null) continue
+            world.state.spawnItem(
+                WorldState.DroppedItem(
+                    entityId = playerRegistry.allocateEntityId(),
+                    uuid = Uuid.random(),
+                    item = stack.item,
+                    count = stack.count,
+                    x = pos.x + 0.5,
+                    y = pos.y + 0.5,
+                    z = pos.z + 0.5,
+                ),
+            )
         }
     }
 
