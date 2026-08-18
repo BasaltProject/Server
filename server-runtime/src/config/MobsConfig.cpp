@@ -419,9 +419,10 @@ void readOverrideFields(const TomlTable& table, MobOverride& into, std::string_v
             continue;
         }
         const std::optional<std::int64_t> number = table.integer(spelled);
-        if (!number.has_value() || *number < 0 || *number > std::numeric_limits<std::int32_t>::max()) {
-            error =
-                std::string{file} + ": overrides." + type + "." + spelled + " must be a whole number of at least 0.";
+        if (!number.has_value() || *number < static_cast<std::int64_t>(field.least) ||
+            *number > std::numeric_limits<std::int32_t>::max()) {
+            error = std::string{file} + ": overrides." + type + "." + spelled + " must be a whole number of at least " +
+                    std::to_string(static_cast<std::int64_t>(field.least)) + ".";
             return;
         }
         into.*(field.member) = static_cast<std::int32_t>(*number);

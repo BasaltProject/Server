@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/config/ConfigDefaults.hpp>
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
 #include <basalt/server/runtime/config/MobsConfig.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <doctest.h>
@@ -48,7 +49,7 @@ TEST_CASE("a missing file is written from its commented default and then read") 
     REQUIRE(java->find("port") != nullptr);
 }
 
-TEST_CASE("a file that is already there is not overwritten by the default") {
+TEST_CASE("a file that is already there is only ever appended to") {
     const std::string root = scratch("config-existing");
     fileIO::createDirectories(root);
     fileIO::writeText(root + "/server.toml", "[server]\nport = 25566\n");
@@ -59,7 +60,9 @@ TEST_CASE("a file that is already there is not overwritten by the default") {
     const toml::TomlTable* server = loaded->table("server");
     REQUIRE(server != nullptr);
     REQUIRE(server->find("port") != nullptr);
-    CHECK(*fileIO::readText(root + "/server.toml") == "[server]\nport = 25566\n");
+    const std::string kept = *fileIO::readText(root + "/server.toml");
+    CHECK(kept.starts_with("[server]\nport = 25566\n"));
+    CHECK(kept.find("\n# compression-level = -1") != std::string::npos);
 }
 
 TEST_CASE("a file that does not parse names itself rather than being replaced") {
@@ -111,6 +114,14 @@ TEST_CASE("an override naming an unknown field is refused with the file") {
         MobSettings::from(*parsed, MobSettings::vanilla(), "mobs.toml");
     REQUIRE_FALSE(settings.has_value());
     CHECK(settings.error().starts_with("mobs.toml: overrides.zombie.max-helth"));
+}
+
+TEST_CASE("the generated world rules read back as vanilla's") {
+    const std::string text = std::string{kWorldsDefaultToml} + worldRulesTemplate(true);
+    const auto parsed = toml::parse(text);
+    REQUIRE(parsed.has_value());
+    CHECK(WorldSettings::from(parsed->table("defaults"), WorldSettings::vanilla()) == WorldSettings::vanilla());
+    CHECK(toml::parse(std::string{kWorldSettingsDefaultToml} + worldRulesTemplate(false)).has_value());
 }
 
 TEST_CASE("an override reads drops, name lists and refuses an unknown goal") {
