@@ -33,7 +33,7 @@ using DoubleField = Field<std::optional<double> MobOverride::*>;
 using BoolField = Field<std::optional<bool> MobOverride::*>;
 using IntField = Field<std::optional<std::int32_t> MobOverride::*>;
 
-constexpr std::array<DoubleField, 16> kDoubleFields{{
+constexpr std::array<DoubleField, 29> kDoubleFields{{
     {"max-health", &MobOverride::maxHealth, 0.01},
     {"attack-damage", &MobOverride::attackDamage, 0.0},
     {"movement-speed", &MobOverride::movementSpeed, 0.0},
@@ -50,9 +50,22 @@ constexpr std::array<DoubleField, 16> kDoubleFields{{
     {"explosion-knockback-resistance", &MobOverride::explosionKnockbackResistance, 0.0},
     {"oxygen-bonus", &MobOverride::oxygenBonus, 0.0},
     {"experience-multiplier", &MobOverride::experienceMultiplier, 0.0},
+    {"gravity", &MobOverride::gravity, -1.0},
+    {"step-height", &MobOverride::stepHeight, 0.0},
+    {"tempt-range", &MobOverride::temptRange, 0.0},
+    {"baby-chance", &MobOverride::babyChance, 0.0},
+    {"jockey-chance", &MobOverride::jockeyChance, 0.0},
+    {"charged-chance", &MobOverride::chargedChance, 0.0},
+    {"offspring-chance", &MobOverride::offspringChance, 0.0},
+    {"max-health-min", &MobOverride::maxHealthMin, 0.01},
+    {"max-health-max", &MobOverride::maxHealthMax, 0.01},
+    {"movement-speed-min", &MobOverride::movementSpeedMin, 0.0},
+    {"movement-speed-max", &MobOverride::movementSpeedMax, 0.0},
+    {"jump-strength-min", &MobOverride::jumpStrengthMin, 0.0},
+    {"jump-strength-max", &MobOverride::jumpStrengthMax, 0.0},
 }};
 
-constexpr std::array<BoolField, 13> kBoolFields{{
+constexpr std::array<BoolField, 22> kBoolFields{{
     {"burn-in-daylight", &MobOverride::burnInDaylight, 0.0},
     {"no-ai", &MobOverride::noAi, 0.0},
     {"persistent", &MobOverride::persistent, 0.0},
@@ -66,16 +79,142 @@ constexpr std::array<BoolField, 13> kBoolFields{{
     {"spawn-enabled", &MobOverride::spawnEnabled, 0.0},
     {"drops-enabled", &MobOverride::dropsEnabled, 0.0},
     {"mob-griefing", &MobOverride::mobGriefing, 0.0},
+    {"ridable", &MobOverride::ridable, 0.0},
+    {"controllable", &MobOverride::controllable, 0.0},
+    {"ridable-in-water", &MobOverride::ridableInWater, 0.0},
+    {"always-drop-exp", &MobOverride::alwaysDropExp, 0.0},
+    {"can-breed", &MobOverride::canBreed, 0.0},
+    {"explode-when-killed", &MobOverride::explodeWhenKilled, 0.0},
+    {"jockey-only-babies", &MobOverride::jockeyOnlyBabies, 0.0},
+    {"jockey-try-existing-chickens", &MobOverride::jockeyTryExistingChickens, 0.0},
+    {"drops-replace", &MobOverride::dropsReplace, 0.0},
 }};
 
-constexpr std::array<IntField, 6> kIntFields{{
+constexpr std::array<IntField, 14> kIntFields{{
     {"max-no-damage-ticks", &MobOverride::maxNoDamageTicks, 0.0},
     {"max-air-supply", &MobOverride::maxAirSupply, 0.0},
     {"breed-cooldown", &MobOverride::breedCooldown, 0.0},
     {"despawn-soft-range", &MobOverride::despawnSoftRange, 0.0},
     {"despawn-hard-range", &MobOverride::despawnHardRange, 0.0},
     {"explosion-radius", &MobOverride::explosionRadius, 0.0},
+    {"ridable-max-y", &MobOverride::ridableMaxY, -2048.0},
+    {"offspring-min", &MobOverride::offspringMin, 0.0},
+    {"offspring-max", &MobOverride::offspringMax, 0.0},
+    {"spawn-weight", &MobOverride::spawnWeight, 0.0},
+    {"spawn-min-light", &MobOverride::spawnMinLight, 0.0},
+    {"spawn-max-light", &MobOverride::spawnMaxLight, 0.0},
+    {"spawn-min-y", &MobOverride::spawnMinY, -2048.0},
+    {"spawn-max-y", &MobOverride::spawnMaxY, -2048.0},
 }};
+
+constexpr std::array<std::string_view, 106> kGoalNames{"anger_target",
+                                                       "angry_at_player",
+                                                       "avoid_entity",
+                                                       "bat_flight",
+                                                       "beam_attack",
+                                                       "become_angry_target",
+                                                       "bee_attack",
+                                                       "beg",
+                                                       "blaze_attack",
+                                                       "breath_air",
+                                                       "breed",
+                                                       "cast_spell",
+                                                       "cat_lie_on_block",
+                                                       "cat_relax_on_owner",
+                                                       "cat_sit_on_block",
+                                                       "climb_walls",
+                                                       "copper_golem_idle",
+                                                       "copper_golem_transport",
+                                                       "crossbow_attack",
+                                                       "dolphin_jump",
+                                                       "dolphin_move_to_item",
+                                                       "dolphin_play_with_items",
+                                                       "dolphin_swim_to_treasure",
+                                                       "dolphin_swim_with_player",
+                                                       "eat_block",
+                                                       "enderman_freeze_when_looked_at",
+                                                       "enderman_look_for_player",
+                                                       "enter_hive",
+                                                       "fireball_attack",
+                                                       "float",
+                                                       "follow_flock_leader",
+                                                       "follow_owner",
+                                                       "follow_parent",
+                                                       "follow_ridden_boat",
+                                                       "ghast_float",
+                                                       "ghast_look",
+                                                       "go_to_hive",
+                                                       "go_to_known_flower",
+                                                       "grow_crop",
+                                                       "hop_about",
+                                                       "hover_wander",
+                                                       "hurt_by_other",
+                                                       "hurt_by_target",
+                                                       "johnny_attack",
+                                                       "land_on_owners_shoulder",
+                                                       "leap_at_target",
+                                                       "llama_attack_wolf",
+                                                       "llama_follow_caravan",
+                                                       "llama_hurt_by_target",
+                                                       "llama_spit",
+                                                       "locate_hive",
+                                                       "long_distance_patrol",
+                                                       "look_at_player",
+                                                       "look_at_player_sometimes",
+                                                       "melee_attack",
+                                                       "move_towards_trader_home",
+                                                       "nearest_attackable_entity",
+                                                       "nearest_attackable_player",
+                                                       "obtain_raid_leader_banner",
+                                                       "owner_hurt_by_target",
+                                                       "owner_hurt_target",
+                                                       "panic",
+                                                       "pathfind_to_raid",
+                                                       "phantom_circle",
+                                                       "phantom_strategy",
+                                                       "phantom_sweep",
+                                                       "phantom_target",
+                                                       "pollinate",
+                                                       "raider_celebration",
+                                                       "raider_move_through_village",
+                                                       "random_look_around",
+                                                       "random_stand",
+                                                       "random_stroll",
+                                                       "random_swimming",
+                                                       "ranged_attack",
+                                                       "reset_universal_anger_target",
+                                                       "run_around_like_crazy",
+                                                       "shulker_attack",
+                                                       "shulker_peek",
+                                                       "shulker_target",
+                                                       "sit_when_ordered_to",
+                                                       "swell",
+                                                       "swim_about",
+                                                       "teleport_away",
+                                                       "tempt",
+                                                       "throw_potion",
+                                                       "trader_llama_defend_trader",
+                                                       "trader_use_item",
+                                                       "try_find_water",
+                                                       "turtle_go_home",
+                                                       "turtle_go_to_water",
+                                                       "turtle_lay_egg",
+                                                       "turtle_random_stroll",
+                                                       "turtle_travel",
+                                                       "validate",
+                                                       "vex_charge",
+                                                       "vex_random_move",
+                                                       "wander",
+                                                       "wandering_trader_wander",
+                                                       "warden_busy",
+                                                       "warden_investigate",
+                                                       "warden_sniff",
+                                                       "wither_do_nothing",
+                                                       "wither_target",
+                                                       "wolf_avoid_llama",
+                                                       "wololo_spell"};
+
+constexpr std::array<std::string_view, 4> kListFields{"drops", "breeding-items", "disabled-goals", "spawn-biomes"};
 
 std::string kebab(std::string_view key) {
     std::string spelled{key};
@@ -138,6 +277,95 @@ struct Reader {
     }
 };
 
+[[nodiscard]] std::optional<std::string_view> findKey(const TomlTable& table, std::string_view name) {
+    for (const std::string& key : table.keys()) {
+        if (kebab(key) == name) {
+            return std::string_view{key};
+        }
+    }
+    return std::nullopt;
+}
+
+void readLists(const TomlTable& table, MobOverride& into, std::string_view file, const std::string& type,
+               std::optional<std::string>& error) {
+    const auto fail = [&](std::string_view key, std::string_view what) {
+        error = std::string{file} + ": overrides." + type + "." + std::string{key} + " " + std::string{what};
+    };
+    if (const auto key = findKey(table, "drops")) {
+        const TomlTable* drops = table.table(*key);
+        if (drops == nullptr) {
+            return fail("drops", "must be a table of item tables, for example [overrides.cow.drops.diamond].");
+        }
+        into.drops.clear();
+        for (const std::string& itemKey : drops->keys()) {
+            const TomlTable* entry = drops->table(itemKey);
+            const std::string itemName = itemKey.find(':') == std::string::npos ? "minecraft:" + itemKey : itemKey;
+            const auto parsed = wire::common::Identifier::parse(itemName);
+            if (entry == nullptr || !parsed.has_value() || registry::items::registry().byName(*parsed) == nullptr) {
+                return fail("drops." + itemKey, "must be a table naming an item, with chance, min and max.");
+            }
+            MobDrop drop{.item = parsed->toString()};
+            Reader reader{*entry, file, "overrides." + type + ".drops." + itemKey, std::nullopt};
+            reader.real("chance", drop.chance, 0.0);
+            reader.integer("min", drop.minCount, 0, 64);
+            reader.integer("max", drop.maxCount, 0, 64);
+            if (reader.error.has_value()) {
+                error = reader.error;
+                return;
+            }
+            if (drop.chance > 1.0 || drop.maxCount < drop.minCount) {
+                return fail("drops." + itemKey, "needs a chance of at most 1 and a max of at least min.");
+            }
+            into.drops.push_back(std::move(drop));
+        }
+    }
+    const auto strings = [&](std::string_view name, std::optional<std::vector<std::string>>& target, auto&& valid,
+                             std::string_view what) {
+        const auto key = findKey(table, name);
+        if (!key.has_value() || error.has_value()) {
+            return;
+        }
+        std::vector<std::string> list = table.stringList(*key);
+        const TomlValue* raw = table.find(*key);
+        const auto* array = raw == nullptr ? nullptr : raw->get<std::vector<TomlValue>>();
+        if (array == nullptr || array->size() != list.size()) {
+            return fail(name, "must be a list of strings.");
+        }
+        for (std::string& entry : list) {
+            if (!valid(entry)) {
+                return fail(name, std::string{what} + " Found \"" + entry + "\".");
+            }
+        }
+        target = std::move(list);
+    };
+    strings(
+        "breeding-items", into.breedingItems,
+        [](std::string& name) {
+            if (name.find(':') == std::string::npos) {
+                name = "minecraft:" + name;
+            }
+            const auto parsed = wire::common::Identifier::parse(name);
+            return parsed.has_value() && registry::items::registry().byName(*parsed) != nullptr;
+        },
+        "must hold item names.");
+    strings(
+        "disabled-goals", into.disabledGoals,
+        [](std::string& name) { return std::ranges::find(kGoalNames, name) != kGoalNames.end(); },
+        "must hold goal names, such as panic or look_at_player.");
+    strings(
+        "spawn-biomes", into.spawnBiomes,
+        [](std::string& name) {
+            const bool tag = name.starts_with('#');
+            std::string bare = tag ? name.substr(1) : name;
+            if (bare.find(':') == std::string::npos) {
+                bare = "minecraft:" + bare;
+            }
+            name = (tag ? "#" : "") + bare;
+            return wire::common::Identifier::parse(bare).has_value();
+        },
+        "must hold biome names or #tags.");
+}
+
 void readOverrideFields(const TomlTable& table, MobOverride& into, std::string_view file, const std::string& type,
                         std::optional<std::string>& error) {
     for (const std::string& key : table.keys()) {
@@ -145,7 +373,8 @@ void readOverrideFields(const TomlTable& table, MobOverride& into, std::string_v
         const auto known = [&name](const auto& fields) {
             return std::ranges::find(fields, name, &std::remove_cvref_t<decltype(fields[0])>::name) != fields.end();
         };
-        if (!known(kDoubleFields) && !known(kBoolFields) && !known(kIntFields)) {
+        if (!known(kDoubleFields) && !known(kBoolFields) && !known(kIntFields) &&
+            std::ranges::find(kListFields, name) == kListFields.end()) {
             error = std::string{file} + ": overrides." + type + "." + key +
                     " is not a known field. Known fields are listed in the file's reference.";
             return;
@@ -197,6 +426,11 @@ void readOverrideFields(const TomlTable& table, MobOverride& into, std::string_v
         }
         into.*(field.member) = static_cast<std::int32_t>(*number);
     }
+    readLists(table, into, file, type, error);
+    if (!error.has_value() && into.offspringMin.has_value() && into.offspringMax.has_value() &&
+        *into.offspringMax < *into.offspringMin) {
+        error = std::string{file} + ": overrides." + type + ".offspring-max must not be below offspring-min.";
+    }
 }
 
 [[nodiscard]] std::optional<std::string> readOverrides(const TomlTable& overrides, MobSettings& settings,
@@ -226,20 +460,22 @@ void readOverrideFields(const TomlTable& table, MobOverride& into, std::string_v
 
 } // namespace
 
-std::array<std::string_view, 35> mobOverrideFieldNames() {
-    std::array<std::string_view, 35> names{};
-    std::size_t at = 0;
+std::vector<std::string_view> mobOverrideFieldNames() {
+    std::vector<std::string_view> names;
     for (const DoubleField& field : kDoubleFields) {
-        names[at++] = field.name;
+        names.push_back(field.name);
     }
     for (const BoolField& field : kBoolFields) {
-        names[at++] = field.name;
+        names.push_back(field.name);
     }
     for (const IntField& field : kIntFields) {
-        names[at++] = field.name;
+        names.push_back(field.name);
     }
+    names.insert(names.end(), kListFields.begin(), kListFields.end());
     return names;
 }
+
+std::span<const std::string_view> knownGoalNames() { return kGoalNames; }
 
 std::string_view mobCategoryKey(std::size_t index) { return index < kCategoryKeys.size() ? kCategoryKeys[index] : ""; }
 

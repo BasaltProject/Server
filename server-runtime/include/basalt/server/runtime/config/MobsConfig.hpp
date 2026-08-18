@@ -9,10 +9,21 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace basalt::server::runtime::config {
+
+struct MobDrop {
+    std::string item;
+    double chance = 1.0;
+    std::int32_t minCount = 1;
+    std::int32_t maxCount = 1;
+
+    friend bool operator==(const MobDrop&, const MobDrop&) = default;
+};
 
 /// One entity type's tweaks; an absent field is vanilla's own value.
 struct MobOverride {
@@ -32,6 +43,19 @@ struct MobOverride {
     std::optional<double> explosionKnockbackResistance;
     std::optional<double> oxygenBonus;
     std::optional<double> experienceMultiplier;
+    std::optional<double> gravity;
+    std::optional<double> stepHeight;
+    std::optional<double> temptRange;
+    std::optional<double> babyChance;
+    std::optional<double> jockeyChance;
+    std::optional<double> chargedChance;
+    std::optional<double> offspringChance;
+    std::optional<double> maxHealthMin;
+    std::optional<double> maxHealthMax;
+    std::optional<double> movementSpeedMin;
+    std::optional<double> movementSpeedMax;
+    std::optional<double> jumpStrengthMin;
+    std::optional<double> jumpStrengthMax;
 
     std::optional<bool> burnInDaylight;
     std::optional<bool> noAi;
@@ -46,6 +70,15 @@ struct MobOverride {
     std::optional<bool> spawnEnabled;
     std::optional<bool> dropsEnabled;
     std::optional<bool> mobGriefing;
+    std::optional<bool> ridable;
+    std::optional<bool> controllable;
+    std::optional<bool> ridableInWater;
+    std::optional<bool> alwaysDropExp;
+    std::optional<bool> canBreed;
+    std::optional<bool> explodeWhenKilled;
+    std::optional<bool> jockeyOnlyBabies;
+    std::optional<bool> jockeyTryExistingChickens;
+    std::optional<bool> dropsReplace;
 
     std::optional<std::int32_t> maxNoDamageTicks;
     std::optional<std::int32_t> maxAirSupply;
@@ -53,12 +86,28 @@ struct MobOverride {
     std::optional<std::int32_t> despawnSoftRange;
     std::optional<std::int32_t> despawnHardRange;
     std::optional<std::int32_t> explosionRadius;
+    std::optional<std::int32_t> ridableMaxY;
+    std::optional<std::int32_t> offspringMin;
+    std::optional<std::int32_t> offspringMax;
+    std::optional<std::int32_t> spawnWeight;
+    std::optional<std::int32_t> spawnMinLight;
+    std::optional<std::int32_t> spawnMaxLight;
+    std::optional<std::int32_t> spawnMinY;
+    std::optional<std::int32_t> spawnMaxY;
+
+    std::vector<MobDrop> drops;
+    std::optional<std::vector<std::string>> breedingItems;
+    std::optional<std::vector<std::string>> disabledGoals;
+    std::optional<std::vector<std::string>> spawnBiomes;
 
     friend bool operator==(const MobOverride&, const MobOverride&) = default;
 };
 
 /// Every field name the `overrides.<entity_type>` tables accept, in kebab-case.
-[[nodiscard]] std::array<std::string_view, 35> mobOverrideFieldNames();
+[[nodiscard]] std::vector<std::string_view> mobOverrideFieldNames();
+
+/// Goal names `disabled-goals` accepts.
+[[nodiscard]] std::span<const std::string_view> knownGoalNames();
 
 inline constexpr std::size_t kMobCategoryCount = 7;
 
