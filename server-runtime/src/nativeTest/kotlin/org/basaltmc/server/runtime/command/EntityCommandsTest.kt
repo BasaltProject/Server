@@ -107,8 +107,10 @@ class EntityCommandsTest {
     fun damageTakesHealthAndKillsAtZero() {
         run("summon minecraft:cow 0 64 0")
         val entity = world.state.entities().single()
+        // parity: `DefaultAttributes`, where a cow is ten hearts' worth and not the generic twenty.
+        assertEquals(10.0, entity.health)
         run("damage @e[type=cow] 5")
-        assertEquals(15.0, entity.health)
+        assertEquals(5.0, entity.health)
         run("damage @e[type=cow] 20")
         assertTrue(entity.removed)
     }

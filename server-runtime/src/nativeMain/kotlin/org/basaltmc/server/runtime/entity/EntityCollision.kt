@@ -123,6 +123,71 @@ public object EntityCollision {
         out[2] = movedZ
     }
 
+    /**
+     * The same move, but allowed to climb up to [stepHeight] on the way.
+     *
+     * parity: `Entity.collide`'s step-up half: when a move is stopped sideways and the thing is on
+     * the ground, vanilla retries it lifted by each height a collider offers, in order, and takes the
+     * first that gets further than the flat try did. That is what walks a mob onto a slab, and what
+     * refuses to walk it onto a whole block.
+     */
+    public fun collideWithStep(
+        world: WorldState,
+        box: Aabb,
+        dx: Double,
+        dy: Double,
+        dz: Double,
+        stepHeight: Double,
+        onGround: Boolean,
+        out: DoubleArray,
+    ) {
+        collide(world, box, dx, dy, dz, out)
+        if (stepHeight <= 0.0) return
+        val flatX = out[0]
+        val flatY = out[1]
+        val flatZ = out[2]
+        if (flatX == dx && flatZ == dz) return
+        val landed = flatY != dy && dy < 0.0
+        if (!onGround && !landed) return
+
+        val grounded = if (landed) box.move(0.0, flatY, 0.0) else box
+        val flatHorizontal = flatX * flatX + flatZ * flatZ
+        val stepped = DoubleArray(3)
+        for (height in candidateHeights(world, grounded, dx, dz, stepHeight, flatY)) {
+            collide(world, grounded, dx, height, dz, stepped)
+            if (stepped[0] * stepped[0] + stepped[2] * stepped[2] <= flatHorizontal) continue
+            out[0] = stepped[0]
+            // parity: `subtract(0, aabb.minY - groundedAABB.minY, 0)`, which is the drop it already took.
+            out[1] = stepped[1] + (if (landed) flatY else 0.0)
+            out[2] = stepped[2]
+            return
+        }
+    }
+
+    /**
+     * parity: `collectCandidateStepUpHeights`: every Y a collider in the way offers, measured from
+     * the feet, up to the step height and in order.
+     */
+    private fun candidateHeights(
+        world: WorldState,
+        grounded: Aabb,
+        dx: Double,
+        dz: Double,
+        stepHeight: Double,
+        skip: Double,
+    ): List<Double> {
+        val reach = grounded.expandTowards(dx, stepHeight, dz)
+        val heights = mutableSetOf<Double>()
+        for (collider in collidingBoxes(world, reach)) {
+            for (edge in listOf(collider.minY, collider.maxY)) {
+                val height = edge - grounded.minY
+                if (height <= 0.0 || height > stepHeight || height == skip) continue
+                heights += height
+            }
+        }
+        return heights.sorted()
+    }
+
     /** Whether anything solid overlaps [box]. parity: `Level.noCollision`, inverted. */
     public fun collides(
         world: WorldState,
