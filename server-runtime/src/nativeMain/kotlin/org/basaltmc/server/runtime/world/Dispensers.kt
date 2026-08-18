@@ -3,6 +3,8 @@ package org.basaltmc.server.runtime.world
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.EntityTypes
+import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.world.loot.ItemStack
 import org.basaltmc.wire.common.Identifier
 import kotlin.uuid.ExperimentalUuidApi
@@ -78,6 +80,16 @@ public object Dispensers {
         val facing = BlockStateDefinitions.propertiesOf(stateId)["facing"] ?: return false
         val out = BlockFace.entries.firstOrNull { it.name.lowercase() == facing } ?: return false
         val stack = slots[slot] ?: return false
+
+        // parity: `DispenserBlock.registerProjectileBehavior`, which shoots rather than throws.
+        val projectile = Projectiles.dispensed(stack.item)
+        if (projectile != null) {
+            shoot(world, x, y, z, out, projectile, allocateEntityId, random)
+            slots[slot] = if (stack.count <= 1) null else stack.copy(count = stack.count - 1)
+            BlockInventory.write(entity.data, slots)
+            chunk.markDirty()
+            return true
+        }
 
         // parity: the `DispenseItemBehavior`s that change blocks. The ones that make an entity
         // fall through to being thrown.
@@ -227,7 +239,42 @@ public object Dispensers {
         )
     }
 
+    /**
+     * parity: `ProjectileDispenseBehavior`, which shoots along the face at 1.1 with six degrees of
+     * spread, from `getDispensePosition(source, 0.7, (0, 0.1, 0))`.
+     */
+    private fun shoot(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        out: BlockFace,
+        kind: Projectiles.Kind,
+        allocateEntityId: () -> Int,
+        random: LegacyRandom,
+    ) {
+        val protocolType = EntityTypes[kind.type]?.protocolId ?: return
+        Projectiles.spawn(
+            world.state,
+            kind,
+            entityId = allocateEntityId(),
+            protocolType = protocolType,
+            x = x + 0.5 + DISPENSE_REACH * out.stepX,
+            y = y + 0.5 + DISPENSE_REACH * out.stepY + PROJECTILE_LIFT,
+            z = z + 0.5 + DISPENSE_REACH * out.stepZ,
+            dirX = out.stepX.toDouble(),
+            dirY = out.stepY.toDouble(),
+            dirZ = out.stepZ.toDouble(),
+            power = Projectiles.DISPENSER_POWER,
+            uncertainty = Projectiles.DISPENSER_UNCERTAINTY,
+            random = random,
+        )
+    }
+
     /** parity: `DispenserBlock.getDispensePosition`'s own 0.7 out of the face. */
     private const val DISPENSE_REACH = 0.7
+
+    /** parity: the `(0, 0.1, 0)` offset a projectile leaves with, so it clears the block below. */
+    private const val PROJECTILE_LIFT = 0.1
     private const val MAX_STACK = 64
 }

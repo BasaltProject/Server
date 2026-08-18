@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.entity
 
+import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.wire.common.Identifier
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -28,8 +29,19 @@ public class ServerEntity(
     /** What the spawn packet carries beyond the type: for a falling block, the state it holds. */
     public var objectData: Int = 0
 
-    /** How fast it is going down, for the few entities this build moves itself. */
+    /** How fast it is going, in blocks a tick. parity: `Entity.deltaMovement`. */
+    public var velocityX: Double = 0.0
     public var velocityY: Double = 0.0
+    public var velocityZ: Double = 0.0
+
+    /** Whether the last move ended against something below. parity: `Entity.onGround`. */
+    public var onGround: Boolean = false
+
+    /** Ticks lived. parity: `Entity.tickCount`, which is what most timers count from. */
+    public var age: Int = 0
+
+    /** Ticks before it goes off, or [NO_FUSE] for anything that is not primed. parity: `PrimedTnt.fuse`. */
+    public var fuse: Int = NO_FUSE
 
     /** Attribute base values that were changed from their default. parity: `AttributeMap`, without modifiers. */
     public val attributeValues: MutableMap<String, Double> = mutableMapOf()
@@ -81,8 +93,15 @@ public class ServerEntity(
         return value
     }
 
+    /** parity: `EntityType`'s own box, which is what the world collides with. */
+    public val width: Double get() = EntityTypeShapes.widthOf(type)
+    public val height: Double get() = EntityTypeShapes.heightOf(type)
+
     public companion object {
         public const val DEFAULT_MAX_HEALTH: Double = 20.0
+
+        /** parity: `PrimedTnt.NO_FUSE`. */
+        public const val NO_FUSE: Int = -1
     }
 }
 

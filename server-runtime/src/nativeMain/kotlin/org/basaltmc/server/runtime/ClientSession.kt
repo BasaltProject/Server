@@ -1985,6 +1985,9 @@ public class ClientSession(
                         headYaw = entity.yaw,
                         // A falling block is drawn from this: without it every one is stone.
                         objectData = entity.objectData,
+                        velocityX = entity.velocityX,
+                        velocityY = entity.velocityY,
+                        velocityZ = entity.velocityZ,
                     ).write(it)
                 }
                 continue
@@ -1998,12 +2001,12 @@ public class ClientSession(
                     x = entity.x,
                     y = entity.y,
                     z = entity.z,
-                    velocityX = 0.0,
+                    velocityX = entity.velocityX,
                     velocityY = entity.velocityY,
-                    velocityZ = 0.0,
+                    velocityZ = entity.velocityZ,
                     yaw = entity.yaw,
                     pitch = entity.pitch,
-                    onGround = false,
+                    onGround = entity.onGround,
                 ).write(it)
             }
         }

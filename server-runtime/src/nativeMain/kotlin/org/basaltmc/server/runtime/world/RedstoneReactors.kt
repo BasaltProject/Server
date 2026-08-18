@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.wire.common.Identifier
 
 /**
@@ -184,10 +185,9 @@ public object RedstoneReactors {
     }
 
     /**
-     * parity: `TntBlock.neighborChanged`, which primes it and takes the block away.
-     *
-     * The primed TNT is an entity in vanilla, so until entities exist the block goes and the
-     * explosion is booked for the same eighty ticks from where it stood.
+     * parity: `TntBlock.neighborChanged`, which lights it and takes the block away. What is left is
+     * the entity, booked for the tick it lands on rather than the block it stood in: the caller
+     * spawns it when it sees the block go.
      */
     private fun tnt(
         world: LoadedWorld,
@@ -199,7 +199,9 @@ public object RedstoneReactors {
     ) {
         if (properties["unstable"] == "true") return
         if (Redstone.bestNeighbourSignal(world, x, y, z) <= 0) return
-        world.state.scheduleBlockTick(x, y, z, TNT_FUSE, TNT_FUSE_TICKS)
+        if (!world.state.setBlockState(x, y, z, Blocks.AIR.stateId)) return
+        changes += BlockChange(x, y, z, Blocks.AIR.stateId)
+        world.state.primeTnt(x, y, z)
     }
 
     private fun write(
@@ -217,8 +219,4 @@ public object RedstoneReactors {
         if (!world.state.setBlockState(x, y, z, turned)) return
         changes += BlockChange(x, y, z, turned)
     }
-
-    /** parity: `TntBlock`'s own fuse, in ticks. */
-    public val TNT_FUSE: Identifier = Identifier.vanilla("tnt")
-    private const val TNT_FUSE_TICKS = 80
 }
