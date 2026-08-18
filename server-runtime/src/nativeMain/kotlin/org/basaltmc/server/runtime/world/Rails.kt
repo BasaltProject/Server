@@ -48,23 +48,44 @@ public object Rails {
     }
 
     /**
-     * The rail's own shape, worked out again without touching its neighbours.
+     * What a rail does when something beside it changes, which is almost always nothing.
      *
-     * parity: `BaseRailBlock.updateShape`. The neighbours get their own turn from the update that is
-     * already walking them, so bending them from here would write each of them twice.
+     * parity: `BaseRailBlock.updateState(state, level, pos, block)` is **empty**, and only
+     * `RailBlock` overrides it: a plain rail re-decides its shape when the block that changed gives
+     * off a signal *and* it has three ways it could go. That is the T-junction a lever switches, and
+     * it is the only case. Re-deciding on every update instead was what made a track laid one rail
+     * at a time reroute itself behind you.
      */
-    public fun reshape(
+    public fun onNeighbourChange(
         world: LoadedWorld,
         x: Int,
         y: Int,
         z: Int,
-        stateId: Int,
+        changed: Int,
     ): Int? {
-        if (!isRail(stateId)) return null
+        val stateId = world.state.getBlockState(x, y, z) ?: return null
+        // Only the plain rail: the three that carry a signal never turn a corner at all.
+        if (BlockStateDefinitions.blockOf(stateId)?.path != "rail") return null
+        if (!Redstone.isSignalSource(changed)) return null
+        if (potentialConnections(world, x, y, z) != THREE_WAY) return null
         val shape = shapeFor(world, x, y, z, stateId) ?: return null
         if (BlockStateDefinitions.propertiesOf(stateId)["shape"] == shape) return null
         return withShape(world, x, y, z, stateId, shape)
     }
+
+    /** parity: `RailBlock.updateState`'s own three, the junction a signal can throw. */
+    private const val THREE_WAY = 3
+
+    /** parity: `countPotentialConnections`, which counts rails beside it whatever they point at. */
+    private fun potentialConnections(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int =
+        listOf(intArrayOf(0, -1), intArrayOf(0, 1), intArrayOf(-1, 0), intArrayOf(1, 0)).count { step ->
+            railAt(world, x + step[0], y, z + step[1]) != null
+        }
 
     /** parity: `RailState.place`'s shape choice, neighbours first and the default only as a fallback. */
     private fun shapeFor(
@@ -100,12 +121,21 @@ public object Rails {
                     alongX -> EAST_WEST
                     else -> null
                 }
-            // parity: with no signal the corners are tried in this order, last one winning.
+            // parity: `place(hasSignal, ...)`, whose two orders differ only in which corner wins
+            // when a rail could take either: powered, the last one tried is north-west.
             if (!straight) {
-                if (north && west) shape = "north_west"
-                if (north && east) shape = "north_east"
-                if (south && west) shape = "south_west"
-                if (south && east) shape = "south_east"
+                val hasSignal = Redstone.bestNeighbourSignal(world, x, y, z) > 0
+                if (hasSignal) {
+                    if (south && east) shape = "south_east"
+                    if (south && west) shape = "south_west"
+                    if (north && east) shape = "north_east"
+                    if (north && west) shape = "north_west"
+                } else {
+                    if (north && west) shape = "north_west"
+                    if (north && east) shape = "north_east"
+                    if (south && west) shape = "south_west"
+                    if (south && east) shape = "south_east"
+                }
             }
         }
         return slope(world, x, y, z, shape ?: defaultShape)

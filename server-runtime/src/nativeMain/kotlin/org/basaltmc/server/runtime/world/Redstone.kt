@@ -335,6 +335,41 @@ public object Redstone {
     public fun isWire(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "redstone_wire"
 
     /**
+     * parity: `BlockBehaviour.isSignalSource`, the seventeen blocks that can feed a circuit.
+     *
+     * Answered by asking [signalOf] from every side rather than by a list, so a block that gives off
+     * a signal here is exactly a block a dust reaches towards.
+     */
+    public fun isSignalSource(stateId: Int): Boolean {
+        val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return false
+        // The buttons and the plates are one per wood, so they are matched rather than listed.
+        return path in SIGNAL_SOURCES || path.endsWith("_button") || path.endsWith("_pressure_plate")
+    }
+
+    /** parity: the blocks whose `isSignalSource` is true, whatever they are giving off right now. */
+    private val SIGNAL_SOURCES =
+        setOf(
+            "redstone_block",
+            "redstone_torch",
+            "redstone_wall_torch",
+            "repeater",
+            "comparator",
+            "observer",
+            "lever",
+            "daylight_detector",
+            "detector_rail",
+            "lectern",
+            "tripwire_hook",
+            "lightning_rod",
+            "sculk_sensor",
+            "calibrated_sculk_sensor",
+            "trapped_chest",
+            "light_weighted_pressure_plate",
+            "heavy_weighted_pressure_plate",
+            "target",
+        )
+
+    /**
      * Settles the dust at these coordinates and every piece it reaches, answering what changed.
      *
      * parity: vanilla walks this out one neighbour update at a time, updating a wire and then the

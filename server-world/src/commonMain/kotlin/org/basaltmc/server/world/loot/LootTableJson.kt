@@ -108,6 +108,15 @@ public object LootTableJson {
                     count = parseNumberProvider(function.getValue("count")),
                     limit = (function["limit"] as? JsonPrimitive)?.content?.toDoubleOrNull()?.toInt(),
                 )
+            // parity: `copy_components`, `copy_custom_data`, `copy_state` and `copy_name`: all four
+            // carry something off the block entity onto the stack. What they carry is put on by the
+            // caller that knows the block (a shulker box's contents, say), so the drop itself is
+            // right without them, and refusing the whole table left the block dropping nothing.
+            "minecraft:copy_components",
+            "minecraft:copy_custom_data",
+            "minecraft:copy_state",
+            "minecraft:copy_name",
+            -> LootFunction.CopyFromBlock
             else -> throw LootTableParseException("Unsupported loot function type: $type")
         }
     }

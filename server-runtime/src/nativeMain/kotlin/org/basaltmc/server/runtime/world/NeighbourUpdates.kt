@@ -76,6 +76,15 @@ public object NeighbourUpdates {
             onReshaped(change.stateId, change.x, change.y, change.z)
             if (change.effects.isNotEmpty()) effects += change
         }
+        // parity: `RailBlock.updateState`, the one case a rail re-bends on a neighbour change: a
+        // three-way junction with a signal arriving at it.
+        world.state.getBlockState(x, y, z)?.let { changed ->
+            for (face in BlockFace.entries) {
+                Rails
+                    .onNeighbourChange(world, x + face.stepX, y + face.stepY, z + face.stepZ, changed)
+                    ?.let { onReshaped(it, x + face.stepX, y + face.stepY, z + face.stepZ) }
+            }
+        }
         // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.
         for (face in BlockFace.entries) {
             Dispensers
@@ -163,8 +172,8 @@ public object NeighbourUpdates {
         // A column is more than one block, so it reports through the caller rather than as one state.
         ScheduledBlocks.bubbleColumn(world, x, y, z, bubbles)
         NoteBlocks.retune(world, x, y, z, stateId)?.let { return it }
-        // parity: `BaseRailBlock.updateShape`, which re-bends a rail whose neighbours moved.
-        Rails.reshape(world, x, y, z, stateId)?.let { return it }
+        // parity: `RedStoneWireBlock.updateShape`, which is what draws a line of dust as a line.
+        RedstoneWire.reshape(world, x, y, z, stateId)?.let { return it }
         Reshapes.of(world, x, y, z, stateId)?.let { return it }
         return connect(world, x, y, z, stateId)
     }

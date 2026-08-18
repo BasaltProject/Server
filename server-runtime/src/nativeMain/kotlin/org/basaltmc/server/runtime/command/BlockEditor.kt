@@ -1,12 +1,11 @@
 package org.basaltmc.server.runtime.command
 
+import org.basaltmc.server.registry.BlockEntityTypes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.world.BlockChange
-import org.basaltmc.server.runtime.world.Containers
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.NeighbourUpdates
-import org.basaltmc.server.runtime.world.Shelves
 import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.server.world.ChunkHeight
 import org.basaltmc.wire.nbt.NbtCompound
@@ -97,7 +96,7 @@ public class BlockEditor(
         stateId: Int,
     ) {
         val block = BlockStateDefinitions.blockOf(stateId) ?: return
-        if (Containers.SIZES[block.path] == null && !Shelves.isShelf(block.path)) return
+        if (BlockEntityTypes.ofBlock(block) == null) return
         val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return
         if (chunk.blockEntityAt(x and 15, y, z and 15) != null) return
         chunk.setBlockEntity(ChunkBlockEntity(x and 15, y, z and 15, block, NbtCompound()))

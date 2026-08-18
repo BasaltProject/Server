@@ -89,6 +89,7 @@ import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RealVillagerTrades
 import org.basaltmc.server.runtime.world.Redstone
+import org.basaltmc.server.runtime.world.RedstoneWire
 import org.basaltmc.server.runtime.world.ScaffoldingPlacement
 import org.basaltmc.server.runtime.world.Shelves
 import org.basaltmc.server.runtime.world.Shulkers
@@ -455,6 +456,15 @@ public class ClientSession(
      * one window, and which of them leads is decided by the state rather than by which was clicked.
      */
     private var openBlockSecond: BlockPos? = null
+
+    /**
+     * Where the opener count was taken, which is the block that was clicked.
+     *
+     * Not the same as [openBlock] since a double chest opens as its *first* half whichever end was
+     * clicked: counting the opening on one block and the closing on another left the lid up for
+     * good and a trapped chest powered for good.
+     */
+    private var openedAt: BlockPos? = null
 
     /** What the open cooker last showed, so a bar is only re-sent when it moves. */
     private var openBlockData = IntArray(4) { -1 }
@@ -1864,6 +1874,9 @@ public class ClientSession(
     /** parity: `BellBlock.isProperHit`, which will not take a click on the very top of the block. */
     private val bellHitTop = 0.8124f
 
+    /** parity: `MinecartItem.useOn`, the sixteenth of a block a cart sits above its rail. */
+    private val minecartRestHeight = 0.0625
+
     /** The other half of a block change: what it asks everyone nearby to hear or see. */
     internal fun broadcastEffects(
         pos: BlockPos,
@@ -2607,6 +2620,14 @@ public class ClientSession(
         if (held != null && heldBlock != null && startEating(session, heldBlock, heldSlot)) return ack()
         // A bucket aimed at a block: the client only sends `use_item` when nothing is in the way,
         // so without this, water poured anywhere near a wall went nowhere. parity: `BucketItem.use`.
+        // parity: `MinecartItem.useOn`, which only works on a rail and sits the cart on it.
+        if (held != null && heldBlock != null && heldBlock.path.endsWith("minecart")) {
+            if (placeMinecart(session, heldBlock, heldSlot, held, hit)) return ack()
+        }
+        // parity: `BoatItem.use`, which puts the boat where the player is looking.
+        if (held != null && heldBlock != null && isBoat(heldBlock)) {
+            if (placeBoat(session, heldBlock, heldSlot, held, hit)) return ack()
+        }
         // parity: `SpawnEggItem.useOn`, which drops the mob on top of what was clicked.
         if (held != null && heldBlock != null && heldBlock.path.endsWith("_spawn_egg")) {
             if (useSpawnEgg(session, heldBlock, heldSlot, held, hit)) return ack()
@@ -2713,22 +2734,21 @@ public class ClientSession(
             Rails.place(placedIn, placeAt.x, placeAt.y, placeAt.z) { x, y, z, stateId ->
                 broadcastBlockUpdate(BlockPos(x, y, z), stateId)
             }
+            // parity: `RedStoneWireBlock.getStateForPlacement`, which draws the dust as it lands.
+            RedstoneWire.reshape(placedIn, placeAt.x, placeAt.y, placeAt.z, blockStateId)?.let {
+                broadcastBlockUpdate(placeAt, it)
+            }
         }
         second?.let { world.setBlockState(it.x, it.y, it.z, it.stateId) }
         // parity: `AbstractFurnaceBlock.newBlockEntity`: a cooker is nothing without the entity that
         // holds its slots and its fire.
         val placedPath = BlockStateDefinitions.blockOf(blockStateId)?.path
-        if (placedPath != null &&
-            (placedPath in Furnaces.COOKERS || placedPath in Containers.PLAIN || placedPath == "crafter")
-        ) {
+        // parity: `Level.setBlock` gives a block its block entity as it lands. Every block that owns
+        // one needs it, not the handful of containers this used to list: a bell without one is a
+        // bell whose body the client never draws.
+        if (placedBlock.let { BlockEntityTypes.ofBlock(it) } != null) {
             loadedWorld?.state?.chunkIfLoaded(placeAt.x shr 4, placeAt.z shr 4)?.setBlockEntity(
-                ChunkBlockEntity(
-                    placeAt.x and 15,
-                    placeAt.y,
-                    placeAt.z and 15,
-                    Identifier.vanilla(placedPath),
-                    NbtCompound(),
-                ),
+                ChunkBlockEntity(placeAt.x and 15, placeAt.y, placeAt.z and 15, placedBlock, NbtCompound()),
             )
         }
         // parity: `BlockItem.updateCustomBlockEntityTag`: a shulker box placed from an item that
@@ -2940,7 +2960,13 @@ public class ClientSession(
             ).write(it)
         }
         sendInventory()
+        openedAt = pos
         announceOpeners(pos, block, ContainerOpeners.open(session.worldName, pos.x, pos.y, pos.z))
+        // parity: `ChestBlock`'s lid is per block entity, so both halves of a double chest open.
+        openBlockSecond?.let { other ->
+            val at = if (openBlock == pos) other else checkNotNull(openBlock)
+            announceOpeners(at, block, ContainerOpeners.open(session.worldName, at.x, at.y, at.z))
+        }
     }
 
     /**
@@ -3252,6 +3278,90 @@ public class ClientSession(
         villager?.let { it.villagerExperience += offer.experience }
         sendInventory()
         sendOffers()
+    }
+
+    /**
+     * parity: `MinecartItem.useOn`: a cart only goes down on a rail, a sixteenth of a block above
+     * it, and half a block higher again when the rail is a slope.
+     */
+    private fun placeMinecart(
+        session: PlayerSession,
+        item: Identifier,
+        heldSlot: Int,
+        held: StoredItemStack,
+        hit: BlockHitResult,
+    ): Boolean {
+        val world = currentWorld ?: return false
+        val rail = world.state.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z) ?: return false
+        if (!Rails.isRail(rail)) return false
+        val shape = BlockStateDefinitions.propertiesOf(rail)["shape"] ?: return false
+        val slope = if (shape.startsWith("ascending")) 0.5 else 0.0
+        val type =
+            if (item.path ==
+                "minecart"
+            ) {
+                item
+            } else {
+                Identifier.vanilla(item.path.removeSuffix("_minecart") + "_minecart")
+            }
+        return spawnFromItem(
+            session,
+            type,
+            heldSlot,
+            held,
+            hit.pos.x + 0.5,
+            hit.pos.y + minecartRestHeight + slope,
+            hit.pos.z + 0.5,
+        )
+    }
+
+    /** parity: `BoatItem.use`, which drops the boat on what the player is looking at. */
+    private fun placeBoat(
+        session: PlayerSession,
+        item: Identifier,
+        heldSlot: Int,
+        held: StoredItemStack,
+        hit: BlockHitResult,
+    ): Boolean {
+        // parity: `getBoat` puts it at the hit itself, which is the face of the block clicked.
+        val at = hit.pos.offset(hit.direction)
+        return spawnFromItem(session, boatEntity(item), heldSlot, held, at.x + 0.5, at.y.toDouble(), at.z + 0.5)
+    }
+
+    /** parity: the boat items, whose entity is the item without its `_boat`/`_chest_boat` tail. */
+    private fun isBoat(item: Identifier): Boolean =
+        item.path.endsWith("_boat") || item.path == "bamboo_raft" || item.path == "bamboo_chest_raft"
+
+    private fun boatEntity(item: Identifier): Identifier = item
+
+    private fun spawnFromItem(
+        session: PlayerSession,
+        type: Identifier,
+        heldSlot: Int,
+        held: StoredItemStack,
+        x: Double,
+        y: Double,
+        z: Double,
+    ): Boolean {
+        val world = currentWorld ?: return false
+        val entityType = EntityTypes[type] ?: return false
+        val entityId = playerRegistry?.allocateEntityId() ?: return false
+        world.state.spawnEntity(
+            ServerEntity(
+                entityId = entityId,
+                uuid = Uuid.random(),
+                type = type,
+                protocolType = entityType.protocolId,
+                x = x,
+                y = y,
+                z = z,
+            ),
+        )
+        if (session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
+        }
+        return true
     }
 
     /**
@@ -3635,7 +3745,8 @@ public class ClientSession(
             return
         }
         returnCraftingGrid(session)
-        val closing = openBlock
+        val closing = openedAt
+        val closingSecond = openBlockSecond?.let { other -> if (openBlock == closing) other else openBlock }
         val closingBlock = closing?.let { openContainerBlock(it) }
         openMenu = Menu.playerInventory()
         openBlock = null
@@ -3647,7 +3758,15 @@ public class ClientSession(
                 closingBlock,
                 ContainerOpeners.close(session.worldName, closing.x, closing.y, closing.z),
             )
+            closingSecond?.let { other ->
+                announceOpeners(
+                    other,
+                    closingBlock,
+                    ContainerOpeners.close(session.worldName, other.x, other.y, other.z),
+                )
+            }
         }
+        openedAt = null
         recomputeCraftingResult()
         sendInventory()
     }
@@ -4189,7 +4308,8 @@ public class ClientSession(
         val stateId = world.getBlockState(packet.pos.x, packet.pos.y, packet.pos.z) ?: return
         if (isAirLike(stateId)) return
         val block = Blocks.byStateId(stateId) ?: return
-        val item = Items.REGISTRY.byIdentifier(block.block) ?: return
+        // parity: `Block.asItem`, which is not the block's own name for dust, crops or cocoa.
+        val item = Items.REGISTRY.byIdentifier(ItemBlocks.itemOf(block.block)) ?: return
         val inventory = session.inventory
         val id = item.id.toString()
 

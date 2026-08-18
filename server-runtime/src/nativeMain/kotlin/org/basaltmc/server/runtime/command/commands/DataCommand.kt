@@ -18,6 +18,7 @@ import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.io.FileIO
 import org.basaltmc.wire.nbt.NbtByte
@@ -300,7 +301,9 @@ public class DataCommand(
                         ?: throw CommandSyntaxException(
                             Component.translatable("commands.data.block.invalid"),
                         )
-                chunk.setBlockEntity(existing.copy(data = value))
+                chunk.setBlockEntity(
+                    ChunkBlockEntity(existing.localX, existing.y, existing.localZ, existing.type, value),
+                )
             }
             is Holder.Entity ->
                 throw CommandSyntaxException(
@@ -581,7 +584,15 @@ public class DataAccess(
         val (x, y, z) = pos
         val chunk = context.world().state.chunkIfLoaded(x shr 4, z shr 4) ?: return
         val existing = chunk.blockEntityAt(x and 15, y, z and 15) ?: return
-        chunk.setBlockEntity(existing.copy(data = DataPaths.set(existing.data, path, numberTag(value, type))))
+        chunk.setBlockEntity(
+            ChunkBlockEntity(
+                existing.localX,
+                existing.y,
+                existing.localZ,
+                existing.type,
+                DataPaths.set(existing.data, path, numberTag(value, type)),
+            ),
+        )
     }
 
     private fun numberTag(
