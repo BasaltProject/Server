@@ -67,6 +67,22 @@ public object LootTableJson {
             "minecraft:random_chance" -> LootCondition.RandomChance(parseNumberProvider(condition.getValue("chance")))
             "minecraft:survives_explosion" -> LootCondition.SurvivesExplosion
             "minecraft:match_tool" -> LootCondition.MatchTool
+            // parity: the conditions a mob's own table carries, about what died and what killed it.
+            "minecraft:entity_properties", "minecraft:damage_source_properties" -> LootCondition.EntityProperties
+            "minecraft:killed_by_player" -> LootCondition.KilledByPlayer
+            "minecraft:inverted" -> LootCondition.Inverted(parseCondition(condition.getValue("term") as JsonObject))
+            "minecraft:any_of" ->
+                LootCondition.AnyOf(
+                    (condition.getValue("terms") as JsonArray).map { parseCondition(it as JsonObject) },
+                )
+            "minecraft:all_of" ->
+                LootCondition.AllOf(
+                    (condition.getValue("terms") as JsonArray).map { parseCondition(it as JsonObject) },
+                )
+            "minecraft:random_chance_with_enchanted_bonus" ->
+                LootCondition.RandomChanceWithEnchantedBonus(
+                    (condition["unenchanted_chance"] as? JsonPrimitive)?.content?.toFloatOrNull() ?: 0f,
+                )
             else -> throw LootTableParseException("Unsupported loot condition type: $type")
         }
     }
@@ -80,6 +96,17 @@ public object LootTableJson {
                 LootFunction.SetCount(
                     count = parseNumberProvider(function.getValue("count")),
                     add = (function["add"] as? JsonPrimitive)?.content?.toBoolean() ?: false,
+                )
+            // parity: `furnace_smelt`, the cooked drop a mob killed by fire leaves.
+            "minecraft:furnace_smelt" -> LootFunction.FurnaceSmelt
+            // parity: `set_potion` and `set_ominous_bottle_amplifier`, which only set a component:
+            // the item itself is right without them, so they are read and left alone.
+            "minecraft:set_potion", "minecraft:set_ominous_bottle_amplifier" -> LootFunction.FurnaceSmelt
+            // parity: `enchanted_count_increase`, the looting bonus every mob's table carries.
+            "minecraft:enchanted_count_increase" ->
+                LootFunction.EnchantedCountIncrease(
+                    count = parseNumberProvider(function.getValue("count")),
+                    limit = (function["limit"] as? JsonPrimitive)?.content?.toDoubleOrNull()?.toInt(),
                 )
             else -> throw LootTableParseException("Unsupported loot function type: $type")
         }

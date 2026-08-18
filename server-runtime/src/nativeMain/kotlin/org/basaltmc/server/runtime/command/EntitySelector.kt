@@ -116,6 +116,8 @@ public class EntitySelector internal constructor(
                 if (entity.removed) continue
                 result += CommandTarget.Entity(entity, loaded.name)
             }
+            // parity: `@e` is every entity, and what is lying on the floor is one of them.
+            for (item in loaded.state.items()) result += CommandTarget.Item(item, loaded.name)
         }
         return result
     }
@@ -831,4 +833,6 @@ private fun targetNbt(target: CommandTarget): NbtCompound =
     when (target) {
         is CommandTarget.Player -> EntityNbt.of(target.session)
         is CommandTarget.Entity -> EntityNbt.of(target.entity)
+        // A dropped item carries no NBT this build models, so `nbt=` never matches one.
+        is CommandTarget.Item -> NbtCompound()
     }

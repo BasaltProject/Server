@@ -105,6 +105,7 @@ public class WaypointCommand(
             when (target) {
                 is CommandTarget.Player -> target.session.uuid
                 is CommandTarget.Entity -> target.entity.uuid
+                is CommandTarget.Item -> target.item.uuid
             }
         val packet =
             TrackedWaypointPacket(

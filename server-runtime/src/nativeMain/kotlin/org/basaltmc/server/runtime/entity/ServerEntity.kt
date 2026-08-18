@@ -108,6 +108,14 @@ public class ServerEntity(
     /** Set when it has been killed or removed, so the sync pass tells clients to forget it. */
     public var removed: Boolean = false
 
+    /**
+     * Whether it was killed rather than simply forgotten.
+     *
+     * parity: `Entity.die` against `Entity.discard`, which is the difference between a cow that
+     * drops beef and one that despawned because nobody was near it.
+     */
+    public var killed: Boolean = false
+
     /** Modifiers by attribute then by id. parity: `AttributeInstance`'s three operations. */
     public val attributeModifiers: MutableMap<String, MutableMap<String, AttributeModifier>> = mutableMapOf()
 

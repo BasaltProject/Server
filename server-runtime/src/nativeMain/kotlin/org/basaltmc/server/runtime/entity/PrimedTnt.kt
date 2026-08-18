@@ -68,6 +68,9 @@ public object PrimedTnt {
         world: WorldState,
         entity: ServerEntity,
     ): Boolean {
+        // parity: `PrimedTnt`'s own constructor, which starts at eighty: a block of TNT summoned
+        // rather than lit still has a fuse, and without this it went off on its first tick.
+        if (entity.fuse == ServerEntity.NO_FUSE) entity.fuse = DEFAULT_FUSE
         EntityPhysics.move(
             world,
             entity,

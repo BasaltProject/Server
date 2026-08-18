@@ -37,4 +37,57 @@ public sealed interface LootCondition {
     public data object MatchTool : LootCondition {
         override fun test(random: BasaltRandom): Boolean = false
     }
+
+    /**
+     * parity: `LootItemEntityPropertyCondition` and `DamageSourcePropertiesCondition`, which ask
+     * about the entity that died or what killed it: whether it was on fire, a baby, in water.
+     *
+     * This evaluator is handed a random and nothing else, so it answers false: a mob killed here is
+     * not on fire and not a baby, which is what an ordinary kill looks like. The drops that hang on
+     * it (a burning cow's cooked beef) are declared here rather than guessed at.
+     */
+    public data object EntityProperties : LootCondition {
+        override fun test(random: BasaltRandom): Boolean = false
+    }
+
+    /**
+     * parity: `LootItemKilledByPlayerCondition`. Everything that dies in this build dies to a player
+     * or to a command, so this is true: it is what makes a mob drop the things only a player's kill
+     * gives, like a zombie's rare armour roll.
+     */
+    public data object KilledByPlayer : LootCondition {
+        override fun test(random: BasaltRandom): Boolean = true
+    }
+
+    /** parity: `InvertedLootItemCondition`, which is its own child answered backwards. */
+    public data class Inverted(
+        val inner: LootCondition,
+    ) : LootCondition {
+        override fun test(random: BasaltRandom): Boolean = !inner.test(random)
+    }
+
+    /** parity: `AnyOfCondition`, true when any one of its children is. */
+    public data class AnyOf(
+        val terms: List<LootCondition>,
+    ) : LootCondition {
+        override fun test(random: BasaltRandom): Boolean = terms.any { it.test(random) }
+    }
+
+    /** parity: `AllOfCondition`, true only when every one of them is. */
+    public data class AllOf(
+        val terms: List<LootCondition>,
+    ) : LootCondition {
+        override fun test(random: BasaltRandom): Boolean = terms.all { it.test(random) }
+    }
+
+    /**
+     * parity: `LootItemRandomChanceWithEnchantedBonusCondition`: the plain chance, plus what the
+     * killer's enchantment adds. Nothing carries an enchantment into a roll here, so it is the
+     * unenchanted chance, which is what an ordinary kill rolls in vanilla too.
+     */
+    public data class RandomChanceWithEnchantedBonus(
+        val chance: Float,
+    ) : LootCondition {
+        override fun test(random: BasaltRandom): Boolean = random.nextFloat() < chance
+    }
 }
