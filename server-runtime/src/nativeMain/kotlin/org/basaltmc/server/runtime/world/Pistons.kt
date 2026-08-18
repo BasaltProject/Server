@@ -271,19 +271,25 @@ public object Pistons {
     /** parity: `PistonBaseBlock`'s own two ticks between the arm starting to move and the blocks landing. */
     public const val MOVE_TICKS: Int = 2
 
+    /** parity: `PistonBaseBlock.TRIGGER_EXTEND` and `TRIGGER_CONTRACT`. */
+    private const val EXTEND = 0
+    private const val CONTRACT = 1
+
     /**
      * parity: `PistonBaseBlock.checkIfExtend`: a piston extends when it is powered from anywhere but
      * its own face, and pulls back when that power goes.
      *
      * The move itself lands two ticks later, which is when vanilla's `moving_piston` finishes its
-     * slide. The slide is not drawn (that needs the block entity that carries a block along); the
-     * tick it lands on is the same.
+     * slide. The head sliding is the client's own half, from the block event this sends.
      */
     public fun trigger(
         world: LoadedWorld,
         x: Int,
         y: Int,
         z: Int,
+        // parity: `Level.blockEvent`, which is the only thing that makes a piston *look* like it
+        // moves: the head slides on the client while the server takes its two ticks to move blocks.
+        effects: MutableList<BlockChange> = mutableListOf(),
     ) {
         val stateId = world.state.getBlockState(x, y, z) ?: return
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return
@@ -298,6 +304,16 @@ public object Pistons {
             val push = resolve(world, x, y, z, direction, extending = true) ?: return
             beginMove(world, push, direction, sticky = path == "sticky_piston")
         }
+        // parity: `PistonBaseBlock.checkIfExtend`: 0 to push out, 1 to pull back, and the face it
+        // moves along as the second byte.
+        effects +=
+            BlockChange(
+                x,
+                y,
+                z,
+                stateId,
+                listOf(BlockEffect.Event(b0 = if (powered) EXTEND else CONTRACT, b1 = direction.ordinal)),
+            )
         world.state.scheduleBlockTick(x, y, z, PISTON, MOVE_TICKS)
     }
 

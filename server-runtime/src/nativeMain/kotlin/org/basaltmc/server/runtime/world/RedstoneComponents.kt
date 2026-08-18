@@ -2,7 +2,9 @@ package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 
 /**
  * The pieces that read a signal and answer with one of their own: the torch that inverts and the
@@ -214,14 +216,37 @@ public object RedstoneComponents {
         val input = comparatorInput(world, x, y, z, properties)
         val sides = alternateSignal(world, x, y, z, properties)
         val subtracting = properties["mode"] == "subtract"
-        val shouldPower =
+        // parity: `ComparatorBlock.calculateOutputSignal`: nothing at all when the sides win, and
+        // otherwise the input, less the sides in subtract mode.
+        val output =
             when {
-                input == 0 -> false
-                input > sides -> true
-                else -> input == sides && !subtracting
+                input == 0 -> 0
+                sides > input -> 0
+                subtracting -> input - sides
+                else -> input
             }
+        // parity: `ComparatorBlockEntity.setOutputSignal`, which is where the level lives: the state
+        // only says whether there is one, so without this every comparator fed a flat fifteen.
+        storeOutput(world, x, y, z, output)
+        val shouldPower = output > 0
         if ((properties["powered"] == "true") == shouldPower) return null
         return turn(world, x, y, z, stateId, "powered", shouldPower.toString())
+    }
+
+    private fun storeOutput(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        output: Int,
+    ) {
+        val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return
+        val entity =
+            chunk.blockEntityAt(x and 15, y, z and 15)
+                ?: ChunkBlockEntity(x and 15, y, z and 15, COMPARATOR, NbtCompound())
+                    .also { chunk.setBlockEntity(it) }
+        entity.data.putInt(Redstone.COMPARATOR_OUTPUT_KEY, output)
+        chunk.markDirty()
     }
 
     /**

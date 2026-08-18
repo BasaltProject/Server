@@ -36,13 +36,26 @@ public object NeighbourUpdates {
         y: Int,
         z: Int,
         onReshaped: (stateId: Int, x: Int, y: Int, z: Int) -> Unit = { _, _, _, _ -> },
+        // What the blocks that reacted asked to be heard: a door swinging, a note, a bell.
+        effects: MutableList<BlockChange> = mutableListOf(),
+        /**
+         * Whether the block that was written is itself reshaped.
+         *
+         * parity: `BlockState.updateNeighbourShapes` reshapes the *neighbours*, never the block, so
+         * a command that writes half a door leaves that half alone until something else touches it.
+         * True here because a block placed by hand does connect to what is already around it, which
+         * vanilla does in `getStateForPlacement` instead.
+         */
+        reshapeSelf: Boolean = true,
         onBroken: (stateId: Int, x: Int, y: Int, z: Int) -> Unit,
     ) {
         // The block that just arrived reaches out to what was already there, which is the other
         // half of `updateShape`: a fence put down beside a fence joins it, not only the other way.
         val bubbles = mutableListOf<BlockChange>()
-        reshape(world, x, y, z, bubbles)?.let { onReshaped(it, x, y, z) }
-        for (change in bubbles) onReshaped(change.stateId, change.x, change.y, change.z)
+        if (reshapeSelf) {
+            reshape(world, x, y, z, bubbles)?.let { onReshaped(it, x, y, z) }
+            for (change in bubbles) onReshaped(change.stateId, change.x, change.y, change.z)
+        }
         // parity: `FallingBlock.onPlace` and its `updateShape`, which both do nothing but ask to be
         // looked at again in two ticks. The block that just arrived counts: sand put down in mid
         // air used to sit there for good, because only its neighbours were ever asked.
@@ -59,7 +72,10 @@ public object NeighbourUpdates {
         // parity: `ObserverBlock.neighborChanged`, which fires only for the block it is watching.
         RedstoneComponents.watchFor(world, x, y, z)
         // parity: every `neighborChanged` that reads the power: doors, lamps, bulbs and the rest.
-        for (change in RedstoneReactors.update(world, x, y, z)) onReshaped(change.stateId, change.x, change.y, change.z)
+        for (change in RedstoneReactors.update(world, x, y, z)) {
+            onReshaped(change.stateId, change.x, change.y, change.z)
+            if (change.effects.isNotEmpty()) effects += change
+        }
         // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.
         for (face in BlockFace.entries) {
             Dispensers
@@ -75,9 +91,9 @@ public object NeighbourUpdates {
                 ?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
         }
         // parity: `PistonBaseBlock.checkIfExtend`, which books the move rather than making it now.
-        Pistons.trigger(world, x, y, z)
+        Pistons.trigger(world, x, y, z, effects)
         for (face in BlockFace.entries) {
-            Pistons.trigger(world, x + face.stepX, y + face.stepY, z + face.stepZ)
+            Pistons.trigger(world, x + face.stepX, y + face.stepY, z + face.stepZ, effects)
         }
         // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
         Sponges.absorb(world, x, y, z, onReshaped)
@@ -147,7 +163,27 @@ public object NeighbourUpdates {
         // A column is more than one block, so it reports through the caller rather than as one state.
         ScheduledBlocks.bubbleColumn(world, x, y, z, bubbles)
         NoteBlocks.retune(world, x, y, z, stateId)?.let { return it }
+        // parity: `BaseRailBlock.updateShape`, which re-bends a rail whose neighbours moved.
+        Rails.reshape(world, x, y, z, stateId)?.let { return it }
         Reshapes.of(world, x, y, z, stateId)?.let { return it }
+        return connect(world, x, y, z, stateId)
+    }
+
+    /**
+     * Joins a block to what is beside it: a fence to a fence, a wall to a wall, a staircase to its
+     * corner, and leaves to their trunk.
+     *
+     * parity: this half of `updateShape` is also what vanilla's `getStateForPlacement` does for
+     * these blocks, so the placement path asks for it directly instead of reshaping the block it
+     * just put down: reshaping it undid every state placement had decided, a double chest included.
+     */
+    public fun connect(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+    ): Int? {
         if (BlockConnections.isLeaves(stateId)) return retreeLeaves(world, x, y, z, stateId)
         if (BlockConnections.isStairs(stateId)) return turnStairs(world, x, y, z, stateId)
         if (BlockConnections.isWall(stateId)) return rebuildWall(world, x, y, z, stateId)

@@ -12,55 +12,45 @@ import org.basaltmc.server.registry.BlockStateDefinitions
  */
 public object Containers {
     /**
-     * How many slots each container has, which is the denominator of the fullness.
-     *
-     * A double chest reads as one container of 54 in vanilla; pairing is not modelled yet, so each
-     * half answers for its own 27. Marked here rather than answering a confident wrong number.
+     * Every chest there is: the wooden two and the eight copper ones 26.2 added, which are chests in
+     * every way that matters (they pair, they open six rows, a comparator reads them).
      */
+    public val CHESTS: List<String> =
+        listOf("chest", "trapped_chest") +
+            listOf("", "exposed_", "weathered_", "oxidized_").flatMap {
+                listOf(it + "copper_chest", "waxed_" + it + "copper_chest")
+            }
+
+    /** parity: `ChestBlockEntity`, three rows. A paired chest reads as one of 54; see [DoubleChests]. */
+    public const val CHEST_SIZE: Int = 27
+
+    /** How many slots each container has, which is the denominator of the fullness. */
     public val SIZES: Map<String, Int> =
-        mapOf(
-            "furnace" to 3,
-            "blast_furnace" to 3,
-            "smoker" to 3,
-            "chest" to 27,
-            "trapped_chest" to 27,
-            "barrel" to 27,
-            "hopper" to 5,
-            "dispenser" to 9,
-            "dropper" to 9,
-            "crafter" to 9,
-            // parity: `BrewingStandBlock.getAnalogOutputSignal`, its five slots read like any container.
-            "brewing_stand" to BrewingStands.SIZE,
-            // A jukebox holds one disc, and what a comparator reads off it is the song, not the slot.
-            "jukebox" to 1,
-            // A lectern holds one book, and what a comparator reads off it is the page.
-            "lectern" to 1,
-            // parity: `ContainerSingleItem`, one stack and no screen.
-            "decorated_pot" to DecoratedPots.SIZE,
-            // parity: `ChiseledBookShelfBlockEntity`, six slots read by which was touched last.
-            "chiseled_bookshelf" to ChiseledBookshelves.SIZE,
-            "shulker_box" to Shulkers.SIZE,
-            "white_shulker_box" to Shulkers.SIZE,
-            "orange_shulker_box" to Shulkers.SIZE,
-            "magenta_shulker_box" to Shulkers.SIZE,
-            "light_blue_shulker_box" to Shulkers.SIZE,
-            "yellow_shulker_box" to Shulkers.SIZE,
-            "lime_shulker_box" to Shulkers.SIZE,
-            "pink_shulker_box" to Shulkers.SIZE,
-            "gray_shulker_box" to Shulkers.SIZE,
-            "light_gray_shulker_box" to Shulkers.SIZE,
-            "cyan_shulker_box" to Shulkers.SIZE,
-            "purple_shulker_box" to Shulkers.SIZE,
-            "blue_shulker_box" to Shulkers.SIZE,
-            "brown_shulker_box" to Shulkers.SIZE,
-            "green_shulker_box" to Shulkers.SIZE,
-            "red_shulker_box" to Shulkers.SIZE,
-            "black_shulker_box" to Shulkers.SIZE,
-        )
+        CHESTS.associateWith { CHEST_SIZE } +
+            mapOf(
+                "furnace" to 3,
+                "blast_furnace" to 3,
+                "smoker" to 3,
+                "barrel" to 27,
+                "hopper" to 5,
+                "dispenser" to 9,
+                "dropper" to 9,
+                "crafter" to 9,
+                // parity: `BrewingStandBlock.getAnalogOutputSignal`, its five slots read like any container.
+                "brewing_stand" to BrewingStands.SIZE,
+                // A jukebox holds one disc, and what a comparator reads off it is the song, not the slot.
+                "jukebox" to 1,
+                // A lectern holds one book, and what a comparator reads off it is the page.
+                "lectern" to 1,
+                // parity: `ContainerSingleItem`, one stack and no screen.
+                "decorated_pot" to DecoratedPots.SIZE,
+                // parity: `ChiseledBookShelfBlockEntity`, six slots read by which was touched last.
+                "chiseled_bookshelf" to ChiseledBookshelves.SIZE,
+            ) + Shulkers.BLOCKS.associateWith { Shulkers.SIZE }
 
     /** The blocks that only hold, with no machinery of their own. */
     public val PLAIN: Set<String> =
-        setOf("chest", "trapped_chest", "barrel", "hopper", "dispenser", "dropper") + Shulkers.BLOCKS
+        setOf("barrel", "hopper", "dispenser", "dropper") + CHESTS + Shulkers.BLOCKS
 
     /** parity: `Item.getMaxStackSize`, which this build does not read yet: everything stacks to 64. */
     private const val DEFAULT_MAX_STACK = 64

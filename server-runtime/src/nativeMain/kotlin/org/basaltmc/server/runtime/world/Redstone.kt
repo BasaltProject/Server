@@ -37,6 +37,14 @@ public object Redstone {
         stateId: Int,
         from: BlockFace,
         openers: Int = 0,
+        /**
+         * What a comparator there is putting out.
+         *
+         * parity: `ComparatorBlockEntity.getOutputSignal`. A comparator is the one source whose
+         * strength is not in its state, so it has to be handed in; a repeater and an observer are
+         * always fifteen and ignore it.
+         */
+        comparatorOutput: Int = MAX_SIGNAL,
     ): Int {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return 0
         val properties = BlockStateDefinitions.propertiesOf(stateId)
@@ -53,7 +61,7 @@ public object Redstone {
             // the side `FACING` names.
             path == "repeater" || path == "comparator" || path == "observer" ->
                 if (properties["powered"] == "true" && properties["facing"] == from.name.lowercase()) {
-                    MAX_SIGNAL
+                    if (path == "comparator") comparatorOutput else MAX_SIGNAL
                 } else {
                     0
                 }
@@ -98,6 +106,7 @@ public object Redstone {
         stateId: Int,
         from: BlockFace,
         openers: Int = 0,
+        comparatorOutput: Int = MAX_SIGNAL,
     ): Int {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return 0
         val properties = BlockStateDefinitions.propertiesOf(stateId)
@@ -112,7 +121,8 @@ public object Redstone {
             path == "light_weighted_pressure_plate" || path == "heavy_weighted_pressure_plate" ->
                 if (from == BlockFace.UP) properties["power"]?.toIntOrNull() ?: 0 else 0
             // parity: an observer and a diode power the block they feed strongly.
-            path == "repeater" || path == "comparator" || path == "observer" -> signalOf(stateId, from)
+            path == "repeater" || path == "comparator" || path == "observer" ->
+                signalOf(stateId, from, comparatorOutput = comparatorOutput)
             // parity: a detector rail, a lectern, a sculk sensor and a trapped chest all feed the
             // block underneath them and nothing else.
             path == "detector_rail" ||
@@ -148,9 +158,30 @@ public object Redstone {
         from: BlockFace,
     ): Int {
         val stateId = world.state.getBlockState(x, y, z) ?: return 0
-        val own = signalOf(stateId, from, ContainerOpeners.count(world.name, x, y, z))
+        val own =
+            signalOf(
+                stateId,
+                from,
+                ContainerOpeners.count(world.name, x, y, z),
+                comparatorOutputAt(world, x, y, z),
+            )
         if (!BlockSupport.conductsRedstone(stateId)) return own
         return maxOf(own, directSignalTo(world, x, y, z))
+    }
+
+    /** parity: `ComparatorBlockEntity`'s own `OutputSignal`, which is where the level is kept. */
+    public const val COMPARATOR_OUTPUT_KEY: String = "OutputSignal"
+
+    /** What the comparator at these coordinates last worked out, or fifteen when nothing is stored. */
+    public fun comparatorOutputAt(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int {
+        val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return MAX_SIGNAL
+        val entity = chunk.blockEntityAt(x and 15, y, z and 15) ?: return MAX_SIGNAL
+        return (entity.data[COMPARATOR_OUTPUT_KEY] as? org.basaltmc.wire.nbt.NbtInt)?.value ?: MAX_SIGNAL
     }
 
     /** parity: `SignalGetter.getDirectSignalTo`, the strongest strong signal reaching a block. */
@@ -166,7 +197,16 @@ public object Redstone {
             val ny = y + face.stepY
             val nz = z + face.stepZ
             val neighbour = world.state.getBlockState(nx, ny, nz) ?: continue
-            best = maxOf(best, directSignalOf(neighbour, face, ContainerOpeners.count(world.name, nx, ny, nz)))
+            best =
+                maxOf(
+                    best,
+                    directSignalOf(
+                        neighbour,
+                        face,
+                        ContainerOpeners.count(world.name, nx, ny, nz),
+                        comparatorOutputAt(world, nx, ny, nz),
+                    ),
+                )
             if (best >= MAX_SIGNAL) return MAX_SIGNAL
         }
         return best

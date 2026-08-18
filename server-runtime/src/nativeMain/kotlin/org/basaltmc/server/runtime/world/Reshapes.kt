@@ -32,7 +32,7 @@ public object Reshapes {
             path.endsWith("_fence_gate") -> gate(world, x, y, z, stateId, block)
             path.endsWith("_bed") -> bed(world, x, y, z, stateId, block)
             path.endsWith("_door") -> door(world, x, y, z, stateId, block)
-            path == "chest" || path == "trapped_chest" -> chest(world, x, y, z, stateId, block)
+            path in Containers.CHESTS -> chest(world, x, y, z, stateId, block)
             path == "chorus_plant" -> chorusPlant(world, x, y, z, stateId, block)
             path == "campfire" || path == "soul_campfire" -> campfire(world, x, y, z, stateId, block)
             path == "pale_hanging_moss" -> hangingMoss(world, x, y, z, stateId, block)

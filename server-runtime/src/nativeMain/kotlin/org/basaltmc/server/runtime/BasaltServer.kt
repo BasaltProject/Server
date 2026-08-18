@@ -184,6 +184,8 @@ import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.protocol.play.BlockEventPacket
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
+import org.basaltmc.wire.protocol.play.ExplodePacket
+import org.basaltmc.wire.protocol.play.ExplosionParticle
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.LevelEventPacket
 import org.basaltmc.wire.protocol.play.SoundPacket
@@ -1250,6 +1252,14 @@ public class BasaltServer(
             }
             val released = BlockInteractions.release(world, position[0], position[1], position[2]) ?: continue
             val pos = BlockPos(position[0], position[1], position[2])
+            // parity: `ButtonBlock.tick` into `updateNeighbours`: a button coming back up has to
+            // take the signal with it, or whatever it powered stays on for good.
+            announceRedstone(
+                world,
+                watchers,
+                org.basaltmc.server.runtime.world
+                    .BlockChange(pos.x, pos.y, pos.z, released.stateId),
+            )
             for (player in watchers) {
                 player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
                     ClientboundBlockUpdatePacket(pos, released.stateId).write(it)
@@ -1723,6 +1733,13 @@ public class BasaltServer(
         if (!kind.sticks) entity.removed = true
     }
 
+    /** parity: `Explosion.isSmall`, which is what picks the small flash over the big one. */
+    private val largeExplosion = 2.0f
+
+    private fun particleId(path: String): Int =
+        org.basaltmc.server.registry.ParticleTypes[Identifier.vanilla(path)]
+            ?.protocolId ?: 0
+
     /**
      * Sets off an explosion, drops what it broke and hurts whoever was standing in it.
      *
@@ -1738,6 +1755,27 @@ public class BasaltServer(
         power: Float,
     ) {
         val broken = Explosions.explode(world, x, y, z, power, LegacyRandom(Random.nextLong()))
+        // parity: `ServerLevel.explode`'s own packet, which is the flash, the smoke thrown off the
+        // blocks and the bang. The blocks themselves go out as ordinary updates below, so without
+        // this an explosion was a wall of stone silently turning into air.
+        val explode =
+            ExplodePacket(
+                x = x,
+                y = y,
+                z = z,
+                radius = power,
+                blockCount = broken.size,
+                particleId = particleId(if (power < largeExplosion) "explosion" else "explosion_emitter"),
+                sound = "entity.generic.explode",
+                blockParticles =
+                    listOf(
+                        ExplosionParticle(particleId("poof"), ExplodePacket.POOF_SCALING, 1f),
+                        ExplosionParticle(particleId("smoke"), ExplodePacket.SMOKE_SCALING, 1f),
+                    ),
+            )
+        for (player in watchers) {
+            player.connection.sendPlayPacket(ExplodePacket.ID) { explode.write(it) }
+        }
         for (block in broken) {
             val at = BlockPos(block.x, block.y, block.z)
             for (player in watchers) {

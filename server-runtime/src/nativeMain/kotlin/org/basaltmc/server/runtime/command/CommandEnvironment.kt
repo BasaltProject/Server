@@ -8,6 +8,7 @@ import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.server.runtime.scoreboard.Teams
 import org.basaltmc.server.runtime.world.AdvancementTriggers
+import org.basaltmc.server.runtime.world.BlockEffect
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.PlayerProgress
@@ -19,6 +20,7 @@ import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
 import org.basaltmc.wire.common.timings.Timings
+import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.ClockUpdate
 import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.text.Component
@@ -108,6 +110,21 @@ public class CommandEnvironment(
     /** Everyone standing in [world], for the packets that only mean anything to them. */
     public fun playersIn(world: LoadedWorld): List<PlayerSession> =
         players.snapshot().filter { it.worldName == world.name }
+
+    /** What a block a command changed asked everyone in [world] to hear: a door, a note, a bell. */
+    public fun blockEffects(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        effects: List<BlockEffect>,
+    ) {
+        if (effects.isEmpty()) return
+        // One is enough: a connection sends these to everyone in its own world, not only to itself.
+        val anyone = playersIn(world).firstOrNull() ?: return
+        anyone.connection.broadcastEffects(BlockPos(x, y, z), stateId, effects)
+    }
 
     /** Pushes [world]'s clock to whoever is in it, after a `/time` moved it. */
     public fun syncTime(world: LoadedWorld) {
