@@ -468,7 +468,7 @@ void CombatSystem::lightWhereItLanded(world::LoadedWorld& world, const std::vect
     const std::int32_t y = hit.blockY + server::registry::stepY(hit.face);
     const std::int32_t z = hit.blockZ + server::registry::stepZ(hit.face);
     const std::int32_t delay =
-        world.settings().rules.gameplay.fireTickDelay + options_.nextInt(world::fires::kDelaySpread);
+        world.settings().rules.tuning.fireTickDelay + options_.nextInt(world::fires::kDelaySpread);
     if (!world::fires::igniteOnImpact(world.state(), x, y, z, delay)) {
         return;
     }

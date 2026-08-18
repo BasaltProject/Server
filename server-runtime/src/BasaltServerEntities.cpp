@@ -426,7 +426,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             }
             if (world.dragonFight() != nullptr) {
                 const std::int32_t delay =
-                    world.settings().rules.gameplay.fireTickDelay + random.nextInt(world::fires::kDelaySpread);
+                    world.settings().rules.tuning.fireTickDelay + random.nextInt(world::fires::kDelaySpread);
                 if (const std::optional<std::int32_t> lit =
                         world::endCrystals::keepFireLit(world.state(), *entity, delay);
                     lit.has_value()) {

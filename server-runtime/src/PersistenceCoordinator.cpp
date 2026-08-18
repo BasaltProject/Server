@@ -71,7 +71,7 @@ void PersistenceCoordinator::unloadUnreachableChunks() const {
         if (watched) {
             before = world->state().loadedChunkKeys();
         }
-        const config::WorldTuning& chunks = world->settings().rules.gameplay;
+        const config::TuningRules& chunks = world->settings().rules.tuning;
         unloaded += world->unloadUnreachable(positions, chunks.keepSpawnLoadedRange, chunks.unloadMarginChunks);
         if (watched) {
             const std::vector<std::int64_t> keys = world->state().loadedChunkKeys();
