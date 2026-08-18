@@ -169,9 +169,10 @@ internal class ParsedBlock(
                         if (properties.isEmpty()) {
                             Component.translatable("argument.block.id.invalid", Component.text(id.toString()))
                         } else {
-                            Component.text(
-                                "Block state '$id[$written]' is not one this build knows: only default states and " +
-                                    "the property combinations world generation writes are registered.",
+                            Component.translatable(
+                                "argument.block.property.unknown",
+                                Component.text(id.toString()),
+                                Component.text(written),
                             )
                         },
                         reader.string,

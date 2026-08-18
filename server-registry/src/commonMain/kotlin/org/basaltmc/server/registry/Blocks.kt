@@ -100,13 +100,21 @@ public object Blocks {
     /** Resolves both registered default states and the non-default states emitted by worldgen. */
     public fun byStateId(stateId: Int): BlockState? = derivedStatesById[stateId] ?: REGISTRY.byId(stateId)
 
-    /** Resolves a block plus its serialized vanilla properties back to a network state ID. */
+    /**
+     * Resolves a block plus its serialized vanilla properties back to a network state ID.
+     *
+     * The table only holds the combinations worldgen writes, so anything else is worked out from the
+     * block's property definition, taking the default state's values for whatever was left unsaid.
+     * parity: `BlockStateParser`, which reads a partial state the same way.
+     */
     public fun stateIdOf(
         block: Identifier,
         properties: Map<String, String>,
     ): Int? {
-        if (properties.isEmpty()) return REGISTRY.idOf(block)
+        val default = REGISTRY.idOf(block) ?: return null
+        if (properties.isEmpty()) return default
         return derivedStateIds[StateKey(block, properties)]
+            ?: BlockStateDefinitions.stateIdOf(block, properties, default)
     }
 
     /**

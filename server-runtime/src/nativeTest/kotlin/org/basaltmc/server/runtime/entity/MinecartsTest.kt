@@ -131,6 +131,19 @@ class MinecartsTest {
         assertFalse(Minecarts.moveAlongTrack(world, cart))
     }
 
+    /** parity: a powered rail with a block beside it nudges a still cart off the wall. */
+    @Test
+    fun aPoweredRailNudgesAStillCart() {
+        val world = world()
+        railLine(world, 2, 14, block = "powered_rail", powered = true)
+        world.setBlockState(1, 65, 8, Blocks.STONE.stateId)
+        val cart = cart(world, x = 2.5)
+
+        repeat(20) { Minecarts.moveAlongTrack(world, cart) }
+
+        assertTrue(cart.x > 4.5, "it should have been nudged east: ${cart.x}")
+    }
+
     /** parity: a corner turns the cart, which is what a curved rail is for. */
     @Test
     fun aCornerTurnsIt() {

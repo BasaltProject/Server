@@ -240,7 +240,7 @@ public object RedstoneComponents {
         val bx = x + face.stepX
         val by = y + face.stepY
         val bz = z + face.stepZ
-        Containers.analogSignal(world, bx, by, bz)?.let { return it }
+        Containers.analogSignal(world, bx, by, bz, from = face.opposite.name.lowercase())?.let { return it }
         val plain = Redstone.signalFrom(world, bx, by, bz, face)
         val target = world.state.getBlockState(bx, by, bz) ?: return plain
         // parity: a comparator reads a container one block further when a solid block is in the way.
@@ -248,7 +248,14 @@ public object RedstoneComponents {
             org.basaltmc.server.registry.BlockSupport
                 .conductsRedstone(target)
         ) {
-            Containers.analogSignal(world, bx + face.stepX, by + face.stepY, bz + face.stepZ)?.let { return it }
+            Containers
+                .analogSignal(
+                    world,
+                    bx + face.stepX,
+                    by + face.stepY,
+                    bz + face.stepZ,
+                    from = face.opposite.name.lowercase(),
+                )?.let { return it }
         }
         return plain
     }

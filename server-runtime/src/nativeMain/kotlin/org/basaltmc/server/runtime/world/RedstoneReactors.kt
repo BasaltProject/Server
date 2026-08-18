@@ -4,6 +4,8 @@ import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.protocol.play.SoundSource
+import kotlin.random.Random
 
 /**
  * The blocks that do something when the power around them changes: doors, lamps, bulbs and the rest.
@@ -55,13 +57,13 @@ public object RedstoneReactors {
                 openable(world, x, y, z, stateId, properties, changes)
             path == "redstone_lamp" -> lamp(world, x, y, z, stateId, properties, changes)
             path.endsWith("copper_bulb") -> bulb(world, x, y, z, stateId, properties, changes)
-            path == "note_block" -> powered(world, x, y, z, stateId, properties, changes)
+            path == "note_block" -> noteBlock(world, x, y, z, stateId, properties, changes)
             path == "tnt" -> tnt(world, x, y, z, properties, changes)
             path == "powered_rail" || path == "activator_rail" ->
                 PoweredRails.update(world, x, y, z)?.let { changes += it }
-            // parity: `BellBlock.neighborChanged`. The ring itself is a sound and a block event,
-            // which no block has a way to send yet; the state it leaves behind is this.
-            path == "bell" -> powered(world, x, y, z, stateId, properties, changes)
+            path == "bell" -> bell(world, x, y, z, stateId, properties, changes)
+            // parity: `ShelfBlock.neighborChanged`, which joins or breaks its chain with the signal.
+            Shelves.isShelf(path) -> Shelves.reactToSignal(world, x, y, z, changes)
             else -> Unit
         }
     }
@@ -85,7 +87,7 @@ public object RedstoneReactors {
                 Redstone.bestNeighbourSignal(world, x, y + otherHalf, z) > 0
         if (signal == (properties["powered"] == "true")) return
         val wanted = mapOf("powered" to signal.toString(), "open" to signal.toString())
-        write(world, x, y, z, stateId, wanted, changes)
+        write(world, x, y, z, stateId, wanted, changes, openSound(stateId, signal))
         // parity: `DoorBlock.updateShape`, where the other half copies this one rather than deciding
         // for itself. Without it a door opens halfway, which is not a state vanilla can be in.
         val twinY = y + otherHalf
@@ -106,7 +108,8 @@ public object RedstoneReactors {
     ) {
         val signal = Redstone.bestNeighbourSignal(world, x, y, z) > 0
         if (signal == (properties["powered"] == "true")) return
-        write(world, x, y, z, stateId, mapOf("powered" to signal.toString(), "open" to signal.toString()), changes)
+        val wanted = mapOf("powered" to signal.toString(), "open" to signal.toString())
+        write(world, x, y, z, stateId, wanted, changes, openSound(stateId, signal))
     }
 
     /**
@@ -166,7 +169,87 @@ public object RedstoneReactors {
         if (signal == powered) return
         val wanted = mutableMapOf("powered" to signal.toString())
         if (!powered) wanted["lit"] = (properties["lit"] != "true").toString()
-        write(world, x, y, z, stateId, wanted, changes)
+        val flipped = wanted["lit"]
+        val effects =
+            if (flipped == null) {
+                emptyList()
+            } else {
+                listOf(
+                    BlockEffect.Sound(
+                        if (flipped == "true") "block.copper_bulb.turn_on" else "block.copper_bulb.turn_off",
+                        SoundSource.BLOCKS,
+                        volume = 1f,
+                        pitch = 1f,
+                    ),
+                )
+            }
+        write(world, x, y, z, stateId, wanted, changes, effects)
+    }
+
+    /**
+     * parity: `NoteBlock.neighborChanged`, which plays the note on the way up only: a signal going
+     * away is silent.
+     */
+    private fun noteBlock(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        properties: Map<String, String>,
+        changes: MutableList<BlockChange>,
+    ) {
+        val signal = Redstone.bestNeighbourSignal(world, x, y, z) > 0
+        if (signal == (properties["powered"] == "true")) return
+        val effects = if (signal) NoteBlocks.playNote(world, x, y, z, stateId) else emptyList()
+        write(world, x, y, z, stateId, mapOf("powered" to signal.toString()), changes, effects)
+    }
+
+    /** parity: `BellBlock.neighborChanged` into `attemptToRing`, which swings it the way it faces. */
+    private fun bell(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        properties: Map<String, String>,
+        changes: MutableList<BlockChange>,
+    ) {
+        val signal = Redstone.bestNeighbourSignal(world, x, y, z) > 0
+        if (signal == (properties["powered"] == "true")) return
+        val effects =
+            if (!signal) {
+                emptyList()
+            } else {
+                listOf(
+                    BlockEffect.Event(b0 = 1, b1 = facingValue(properties["facing"])),
+                    BlockEffect.Sound("block.bell.use", SoundSource.BLOCKS, volume = 2f, pitch = 1f),
+                )
+            }
+        write(world, x, y, z, stateId, mapOf("powered" to signal.toString()), changes, effects)
+    }
+
+    /** parity: `Direction.get3DDataValue`, which is what a bell's swing travels as. */
+    private fun facingValue(facing: String?): Int =
+        when (facing) {
+            "down" -> 0
+            "up" -> 1
+            "south" -> 3
+            "west" -> 4
+            "east" -> 5
+            else -> 2
+        }
+
+    /**
+     * parity: `DoorBlock.playSound` and its two cousins, which is the same sound a hand makes and
+     * the same tenth of a tone of randomness.
+     */
+    private fun openSound(
+        stateId: Int,
+        open: Boolean,
+    ): List<BlockEffect> {
+        val sound = BlockInteractions.redstoneSound(stateId, open) ?: return emptyList()
+        return listOf(BlockEffect.Sound(sound, SoundSource.BLOCKS, 1f, Random.nextFloat() * 0.1f + 0.9f))
     }
 
     /** parity: `NoteBlock.neighborChanged`. The note itself is a sound, which is the client's half. */
@@ -212,11 +295,12 @@ public object RedstoneReactors {
         stateId: Int,
         properties: Map<String, String>,
         changes: MutableList<BlockChange>,
+        effects: List<BlockEffect> = emptyList(),
     ) {
         val block = BlockStateDefinitions.blockOf(stateId) ?: return
         val turned = BlockStateDefinitions.stateIdOf(block, properties, stateId) ?: return
         if (turned == stateId) return
         if (!world.state.setBlockState(x, y, z, turned)) return
-        changes += BlockChange(x, y, z, turned)
+        changes += BlockChange(x, y, z, turned, effects)
     }
 }

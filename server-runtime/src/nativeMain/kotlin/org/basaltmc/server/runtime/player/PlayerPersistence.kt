@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.player
 
 import org.basaltmc.server.storage.StoredGamemode
+import org.basaltmc.server.storage.StoredInventory
 import org.basaltmc.server.storage.StoredPlayer
 import org.basaltmc.wire.protocol.play.Gamemode
 import kotlin.time.Clock
@@ -47,6 +48,7 @@ public object PlayerPersistence {
             group = session.group,
             stats = session.stats.snapshot(playTimeTicks),
             inventory = session.inventory.snapshot(),
+            enderChest = StoredInventory(session.enderChest.toList()),
             tags = session.tags.toSet(),
         )
 
@@ -68,6 +70,9 @@ public object PlayerPersistence {
         session.flying = session.gamemode == Gamemode.SPECTATOR
         session.stats.restore(stored.stats)
         session.inventory.restore(stored.inventory)
+        for (slot in session.enderChest.indices) {
+            session.enderChest[slot] = stored.enderChest.slots.getOrNull(slot)
+        }
         session.tags.clear()
         session.tags += stored.tags
     }

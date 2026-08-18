@@ -194,6 +194,10 @@ public object BlockPlacement {
             properties["signal_fire"] = (below == "hay_block").toString()
             properties["lit"] = (properties["waterlogged"] != "true").toString()
         }
+        // parity: `NoteBlock.getStateForPlacement`, which takes its instrument from what it lands on.
+        if (path == "note_block" && world != null) {
+            properties["instrument"] = NoteBlocks.instrumentAt(world, x, y, z).serializedName
+        }
         // parity: `ScaffoldingBlock.getStateForPlacement`, which counts its distance as it lands.
         if (path == "scaffolding" && world != null) {
             val distance = scaffoldDistance(world, x, y, z)

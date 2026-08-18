@@ -9,12 +9,16 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.Weathering
 import org.basaltmc.wire.common.Identifier
 
-/** A block a random tick changed, so the caller can tell the clients about it. */
+/**
+ * A block that changed, so the caller can tell the clients about it, and whatever else it wants them
+ * to hear or see while they are at it.
+ */
 public class BlockChange(
     public val x: Int,
     public val y: Int,
     public val z: Int,
     public val stateId: Int,
+    public val effects: List<BlockEffect> = emptyList(),
 )
 
 /**

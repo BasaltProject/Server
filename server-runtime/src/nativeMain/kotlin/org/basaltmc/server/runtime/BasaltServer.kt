@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime
 import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.Items
@@ -104,6 +105,7 @@ import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.Beds
+import org.basaltmc.server.runtime.world.BlockEffect
 import org.basaltmc.server.runtime.world.BlockEntityTicks
 import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
@@ -179,9 +181,11 @@ import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.ShutdownSignal
 import org.basaltmc.wire.io.TcpListener
 import org.basaltmc.wire.io.sleepMillis
+import org.basaltmc.wire.protocol.play.BlockEventPacket
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.Gamemode
+import org.basaltmc.wire.protocol.play.LevelEventPacket
 import org.basaltmc.wire.protocol.play.SoundPacket
 import org.basaltmc.wire.protocol.play.SoundSource
 import org.basaltmc.wire.text.Component
@@ -1194,8 +1198,18 @@ public class BasaltServer(
             ProjectileHits.releaseTarget(world, position[0], position[1], position[2])?.let { scheduled += it }
             // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
             scheduled += finishPiston(world, position, watchers)
-            Dispensers.fire(world, position[0], position[1], position[2], LegacyRandom(Random.nextLong())) {
-                playerRegistry.allocateEntityId()
+            val dispenserEffects = mutableListOf<BlockEffect>()
+            Dispensers.fire(
+                world,
+                position[0],
+                position[1],
+                position[2],
+                LegacyRandom(Random.nextLong()),
+                dispenserEffects,
+            ) { playerRegistry.allocateEntityId() }
+            if (dispenserEffects.isNotEmpty()) {
+                val stateId = world.state.getBlockState(position[0], position[1], position[2]) ?: 0
+                sendEffects(watchers, position[0], position[1], position[2], stateId, dispenserEffects)
             }
             // parity: `CrafterBlock.tick`, four ticks after the signal arrived.
             Crafters
@@ -1380,9 +1394,11 @@ public class BasaltServer(
         return count
     }
 
-    /** Sends a block that redstone moved to everyone watching, and lets its neighbours react. */
-    private fun announceRedstone(
-        world: LoadedWorld,
+    /**
+     * One block, its new state, and whatever it asked the clients to hear or see while they are at
+     * it: a note, a bell, a door swinging, a dispenser clicking at nothing.
+     */
+    private fun announceBlock(
         watchers: List<PlayerSession>,
         change: org.basaltmc.server.runtime.world.BlockChange,
     ) {
@@ -1392,21 +1408,69 @@ public class BasaltServer(
                 ClientboundBlockUpdatePacket(pos, change.stateId).write(it)
             }
         }
-        for (settled in Redstone.settle(world, change.x, change.y, change.z)) {
-            val at = BlockPos(settled.x, settled.y, settled.z)
-            for (player in watchers) {
-                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
-                    ClientboundBlockUpdatePacket(at, settled.stateId).write(it)
+        if (change.effects.isEmpty()) return
+        sendEffects(watchers, change.x, change.y, change.z, change.stateId, change.effects)
+    }
+
+    /** The effect half on its own, for the blocks that make a noise without changing state. */
+    private fun sendEffects(
+        watchers: List<PlayerSession>,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        effects: List<BlockEffect>,
+    ) {
+        val pos = BlockPos(x, y, z)
+        for (effect in effects) {
+            when (effect) {
+                is BlockEffect.Sound -> {
+                    val sound =
+                        SoundPacket(
+                            sound = effect.name,
+                            source = effect.source,
+                            x = x + 0.5,
+                            y = y + 0.5,
+                            z = z + 0.5,
+                            volume = effect.volume,
+                            pitch = effect.pitch,
+                            seed = Random.nextLong(),
+                        )
+                    for (player in watchers) {
+                        player.connection.sendPlayPacket(SoundPacket.ID) { sound.write(it) }
+                    }
+                }
+
+                is BlockEffect.Event -> {
+                    val blockId = BlockSupport.blockRegistryIdOf(stateId)
+                    for (player in watchers) {
+                        player.connection.sendPlayPacket(BlockEventPacket.ID) {
+                            BlockEventPacket(pos, effect.b0, effect.b1, blockId).write(it)
+                        }
+                    }
+                }
+
+                is BlockEffect.Effect -> {
+                    for (player in watchers) {
+                        player.connection.sendPlayPacket(LevelEventPacket.ID) {
+                            LevelEventPacket(effect.type, pos, effect.data).write(it)
+                        }
+                    }
                 }
             }
         }
+    }
+
+    /** Sends a block that redstone moved to everyone watching, and lets its neighbours react. */
+    private fun announceRedstone(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        change: org.basaltmc.server.runtime.world.BlockChange,
+    ) {
+        announceBlock(watchers, change)
+        for (settled in Redstone.settle(world, change.x, change.y, change.z)) announceBlock(watchers, settled)
         for (reacted in RedstoneReactors.update(world, change.x, change.y, change.z)) {
-            val at = BlockPos(reacted.x, reacted.y, reacted.z)
-            for (player in watchers) {
-                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
-                    ClientboundBlockUpdatePacket(at, reacted.stateId).write(it)
-                }
-            }
+            announceBlock(watchers, reacted)
         }
         RedstoneComponents.scheduleAround(world, change.x, change.y, change.z)
     }
