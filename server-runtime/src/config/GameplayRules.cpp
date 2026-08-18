@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 
 #include <algorithm>
 
@@ -244,6 +245,13 @@ GameplayRules GameplayRules::from(const TomlTable* gameplay, const GameplayRules
             flag(*table, "shulker-box-drop-contents-when-destroyed", rules.items.shulkerBoxDropContentsWhenDestroyed);
     }
     return rules;
+}
+
+bool operator==(const GameplayHandle& left, const GameplayHandle& right) {
+    static const GameplayRules kVanilla;
+    const GameplayRules& a = left.ptr != nullptr ? *left.ptr : kVanilla;
+    const GameplayRules& b = right.ptr != nullptr ? *right.ptr : kVanilla;
+    return a == b;
 }
 
 } // namespace basalt::server::runtime::config
