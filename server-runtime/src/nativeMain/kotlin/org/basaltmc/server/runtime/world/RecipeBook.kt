@@ -66,15 +66,20 @@ public object RecipeBook {
                         result = result,
                         craftingStation = station,
                     )
-                // The book's furnace tabs come with the furnace menu; a cooking recipe is not part
-                // of the crafting book this sends.
-                is Recipe.Cooking -> return null
+                // The book's furnace tabs come with the furnace menu, and the stonecutter draws its
+                // own list: neither is part of the crafting book this sends.
+                // The furnace tabs come with the furnace menu, the stonecutter and the smithing
+                // table draw their own lists, and a special has no fixed shape to draw at all.
+                is Recipe.Cooking, is Recipe.Stonecutting, is Recipe.Smithing, is Recipe.Special -> return null
             }
         val requirements =
             when (recipe) {
                 is Recipe.Shaped -> recipe.ingredients.filterNotNull().map { itemIds(it.items) }
                 is Recipe.Shapeless -> recipe.ingredients.map { itemIds(it.items) }
                 is Recipe.Cooking -> listOf(itemIds(recipe.ingredient.items))
+                is Recipe.Stonecutting -> listOf(itemIds(recipe.ingredient.items))
+                is Recipe.Smithing -> listOf(itemIds(recipe.base.items))
+                is Recipe.Special -> recipe.target?.let { listOf(itemIds(it.items)) } ?: emptyList()
             }.filter { it.isNotEmpty() }
         return RecipeBookEntry(
             recipeId = recipeNumber,

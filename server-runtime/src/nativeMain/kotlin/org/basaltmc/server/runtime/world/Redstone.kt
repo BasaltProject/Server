@@ -45,6 +45,12 @@ public object Redstone {
          * always fifteen and ignore it.
          */
         comparatorOutput: Int = MAX_SIGNAL,
+        /**
+         * parity: `RedStoneWireBlock.shouldSignal`, a flag vanilla turns off while a piece of dust
+         * works out its own strength. Every wire answers zero while it is off, which is what stops a
+         * line of dust holding itself up through the block it is lying on.
+         */
+        mutedWire: Boolean = false,
     ): Int {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return 0
         val properties = BlockStateDefinitions.propertiesOf(stateId)
@@ -69,7 +75,10 @@ public object Redstone {
             path.endsWith("_pressure_plate") -> plateSignal(properties)
             path == "light_weighted_pressure_plate" || path == "heavy_weighted_pressure_plate" ->
                 properties["power"]?.toIntOrNull() ?: 0
-            path == "redstone_wire" -> if (from == BlockFace.DOWN) 0 else properties["power"]?.toIntOrNull() ?: 0
+            // parity: `RedStoneWireBlock.getSignal`: dust only feeds the sides it is *drawn towards*,
+            // plus the block underneath it. Feeding every side lit whatever happened to be next to a
+            // line of dust running past it.
+            path == "redstone_wire" -> if (mutedWire) 0 else wireSignal(properties, from)
             // parity: `DaylightDetectorBlock`, which feeds every side with what it reads off the sky.
             path == "daylight_detector" -> properties["power"]?.toIntOrNull() ?: 0
             // parity: `DetectorRailBlock`, `LecternBlock` and `TripWireHookBlock`, all fifteen or
@@ -107,6 +116,7 @@ public object Redstone {
         from: BlockFace,
         openers: Int = 0,
         comparatorOutput: Int = MAX_SIGNAL,
+        mutedWire: Boolean = false,
     ): Int {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return 0
         val properties = BlockStateDefinitions.propertiesOf(stateId)
@@ -120,6 +130,9 @@ public object Redstone {
                 if (from == BlockFace.UP) plateSignal(properties) else 0
             path == "light_weighted_pressure_plate" || path == "heavy_weighted_pressure_plate" ->
                 if (from == BlockFace.UP) properties["power"]?.toIntOrNull() ?: 0 else 0
+            // parity: `RedStoneWireBlock.getDirectSignal`, which is its `getSignal` again: dust
+            // powers what it points at strongly, and that is what a repeater behind it reads.
+            path == "redstone_wire" -> if (mutedWire) 0 else wireSignal(properties, from)
             // parity: an observer and a diode power the block they feed strongly.
             path == "repeater" || path == "comparator" || path == "observer" ->
                 signalOf(stateId, from, comparatorOutput = comparatorOutput)
@@ -156,6 +169,7 @@ public object Redstone {
         y: Int,
         z: Int,
         from: BlockFace,
+        mutedWire: Boolean = false,
     ): Int {
         val stateId = world.state.getBlockState(x, y, z) ?: return 0
         val own =
@@ -164,9 +178,10 @@ public object Redstone {
                 from,
                 ContainerOpeners.count(world.name, x, y, z),
                 comparatorOutputAt(world, x, y, z),
+                mutedWire,
             )
         if (!BlockSupport.conductsRedstone(stateId)) return own
-        return maxOf(own, directSignalTo(world, x, y, z))
+        return maxOf(own, directSignalTo(world, x, y, z, mutedWire))
     }
 
     /** parity: `ComparatorBlockEntity`'s own `OutputSignal`, which is where the level is kept. */
@@ -184,12 +199,30 @@ public object Redstone {
         return (entity.data[COMPARATOR_OUTPUT_KEY] as? org.basaltmc.wire.nbt.NbtInt)?.value ?: MAX_SIGNAL
     }
 
+    /**
+     * parity: `RedStoneWireBlock.getSignal`, whose three cases are all here: nothing downwards,
+     * everything upwards (the block the dust sits on), and sideways only where it is connected.
+     */
+    private fun wireSignal(
+        properties: Map<String, String>,
+        from: BlockFace,
+    ): Int {
+        if (from == BlockFace.DOWN) return 0
+        val power = properties["power"]?.toIntOrNull() ?: 0
+        if (power == 0) return 0
+        if (from == BlockFace.UP) return power
+        // The side facing whoever is asking, which is the opposite of the way they asked from.
+        val side = properties[from.opposite.name.lowercase()] ?: return 0
+        return if (side == "none") 0 else power
+    }
+
     /** parity: `SignalGetter.getDirectSignalTo`, the strongest strong signal reaching a block. */
     public fun directSignalTo(
         world: LoadedWorld,
         x: Int,
         y: Int,
         z: Int,
+        mutedWire: Boolean = false,
     ): Int {
         var best = 0
         for (face in BlockFace.entries) {
@@ -205,6 +238,7 @@ public object Redstone {
                         face,
                         ContainerOpeners.count(world.name, nx, ny, nz),
                         comparatorOutputAt(world, nx, ny, nz),
+                        mutedWire,
                     ),
                 )
             if (best >= MAX_SIGNAL) return MAX_SIGNAL
@@ -283,7 +317,8 @@ public object Redstone {
         for (face in BlockFace.entries) {
             val neighbour = world.state.getBlockState(x + face.stepX, y + face.stepY, z + face.stepZ) ?: continue
             if (isWire(neighbour)) continue
-            best = maxOf(best, signalFrom(world, x + face.stepX, y + face.stepY, z + face.stepZ, face))
+            best =
+                maxOf(best, signalFrom(world, x + face.stepX, y + face.stepY, z + face.stepZ, face, mutedWire = true))
             if (best >= MAX_SIGNAL) return MAX_SIGNAL
         }
         return best

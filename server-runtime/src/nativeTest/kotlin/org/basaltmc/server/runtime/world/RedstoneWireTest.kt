@@ -108,6 +108,24 @@ class RedstoneWireTest {
         assertEquals("none", sidesAt(6, 2)["south"])
     }
 
+    /**
+     * The path a real placement takes: the dust that is already there has to be redrawn by the
+     * update the new one sends, not only the new one.
+     */
+    @Test
+    fun dustAlreadyThereIsRedrawnWhenAnotherLandsBesideIt() {
+        dust(5, 8)
+        RedstoneWire.reshape(world, 5, 70, 8, checkNotNull(world.state.getBlockState(5, 70, 8)))
+        assertEquals("none", sidesAt(5, 8)["east"], "alone, it is a dot")
+
+        dust(6, 8)
+        RedstoneWire.reshape(world, 6, 70, 8, checkNotNull(world.state.getBlockState(6, 70, 8)))
+        NeighbourUpdates.afterChange(world, 6, 70, 8, reshapeSelf = false) { _, _, _, _ -> }
+
+        assertEquals("side", sidesAt(5, 8)["east"], "and now it reaches the new one")
+        assertEquals("side", sidesAt(6, 8)["west"])
+    }
+
     /** parity: `RedstoneSide.UP`, the dust climbing the block beside it. */
     @Test
     fun aDustClimbsTheBlockBesideIt() {

@@ -23,6 +23,7 @@ import org.basaltmc.wire.protocol.play.ChatMessagePacket
 import org.basaltmc.wire.protocol.play.ChunkBatchFinishedPacket
 import org.basaltmc.wire.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.wire.protocol.play.ChunkBatchStartPacket
+import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.ClientboundPlayerAbilitiesPacket
 import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
@@ -38,6 +39,7 @@ import org.basaltmc.wire.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.wire.protocol.play.PlayerPositionPacket
 import org.basaltmc.wire.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.wire.protocol.play.RotateHeadPacket
+import org.basaltmc.wire.protocol.play.SectionBlocksUpdatePacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.wire.protocol.play.ServerboundPositionPacket
 import org.basaltmc.wire.protocol.play.SetChunkCacheCenterPacket
@@ -52,6 +54,7 @@ import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.SpawnPositionPacket
 import org.basaltmc.wire.protocol.play.SystemChatPacket
 import org.basaltmc.wire.protocol.play.UpdateLightPacket
+import org.basaltmc.wire.protocol.play.UpdateRecipesPacket
 import org.basaltmc.wire.protocol.readVarInt
 import org.basaltmc.wire.protocol.writeBoolean
 import org.basaltmc.wire.protocol.writeProtocolString
@@ -183,6 +186,11 @@ class PlayFlowIntegrationTest {
         val abilitiesBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(ClientboundPlayerAbilitiesPacket.ID, abilitiesBody.readVarInt())
         ClientboundPlayerAbilitiesPacket.read(abilitiesBody)
+
+        // parity: `PlayerList.placeNewPlayer` sends the recipes between the abilities and the
+        // permission level. The stonecutter's buttons are drawn from them, client side.
+        val recipesBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(UpdateRecipesPacket.ID, recipesBody.readVarInt())
 
         // parity: the permission level goes right before the tree, and the client needs it to allow
         // selectors in its own parser.
@@ -320,6 +328,10 @@ class PlayFlowIntegrationTest {
                 // once (the mover's own broadcast and the tracker's pairing), so its position in
                 // the stream is not something to assert. Its encoding has its own round-trip test.
                 id == RotateHeadPacket.ID -> Unit
+                // A block moving on its own (a random tick growing grass, water finding its level)
+                // reaches whoever is nearby at whatever moment it happens, so it lands wherever a
+                // test happens to be reading. Skipped like the chunk traffic, for the same reason.
+                id == ClientboundBlockUpdatePacket.ID || id == SectionBlocksUpdatePacket.ID -> Unit
                 id == ChunkBatchFinishedPacket.ID ->
                     sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
                 // A system chat has to be decoded to be told apart, and the buffer cannot rewind,

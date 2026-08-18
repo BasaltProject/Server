@@ -147,10 +147,11 @@ class RecipeTest {
 
     @Test
     fun unsupportedRecipeTypesThrowWithTheTypeName() {
-        // Smelting and the other three cookers are modelled now; the stonecutter is not.
-        val json = """{"type": "minecraft:stonecutting", "result": {"id": "minecraft:stick"}}"""
+        // Every type the jar carries is modelled now, so what is refused is a type that is not one:
+        // a datapack inventing its own still has to fail by name rather than silently.
+        val json = """{"type": "minecraft:not_a_recipe_type", "result": {"id": "minecraft:stick"}}"""
         val exception = assertFailsWith<RecipeParseException> { RecipeJson.parse(json) { emptySet() } }
-        assertTrue(exception.message!!.contains("minecraft:stonecutting"))
+        assertTrue(exception.message!!.contains("minecraft:not_a_recipe_type"))
     }
 
     @Test

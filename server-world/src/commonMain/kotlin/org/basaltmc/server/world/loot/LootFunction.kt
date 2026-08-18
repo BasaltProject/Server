@@ -4,14 +4,16 @@ import org.basaltmc.server.random.BasaltRandom
 
 /**
  * A post-processing step applied to a generated [ItemStack]. Mirrors vanilla's `LootItemFunction`:
- * `minecraft:set_count` (which most drops use to roll a count) and
- * `minecraft:enchanted_count_increase` (the looting bonus, which every mob's own table carries).
- * The rest (`enchant_randomly`, `smelt`, `explosion_decay`...) are a documented gap.
+ * `minecraft:set_count` (which most drops use to roll a count), `minecraft:explosion_decay` (what
+ * an explosion swallows) and `minecraft:enchanted_count_increase` (the looting bonus every mob's
+ * table carries). The rest (`enchant_randomly` and friends) are a documented gap.
  */
 public sealed interface LootFunction {
     public fun apply(
         stack: ItemStack,
         random: BasaltRandom,
+        /** The radius of the explosion this roll is for, or null when nothing blew up. */
+        explosionRadius: Float? = null,
     ): ItemStack
 
     /**
@@ -26,12 +28,33 @@ public sealed interface LootFunction {
         override fun apply(
             stack: ItemStack,
             random: BasaltRandom,
+            explosionRadius: Float?,
         ): ItemStack {
             val level = 0
             if (level == 0) return stack
             stack.count += level * count.getInt(random)
             limit?.let { stack.count = minOf(stack.count, it) }
             return stack
+        }
+    }
+
+    /**
+     * parity: `ApplyExplosionDecay`: each item of the stack survives with a chance of one over the
+     * explosion's radius, rolled one at a time. It is why a TNT crater leaves a handful of blocks
+     * and not every one it broke.
+     */
+    public data object ExplosionDecay : LootFunction {
+        override fun apply(
+            stack: ItemStack,
+            random: BasaltRandom,
+            explosionRadius: Float?,
+        ): ItemStack {
+            val radius = explosionRadius ?: return stack
+            if (radius <= 0f) return stack
+            val chance = 1.0f / radius
+            var kept = 0
+            repeat(stack.count) { if (random.nextFloat() <= chance) kept++ }
+            return if (kept <= 0) stack.copy(count = 0) else stack.copy(count = kept)
         }
     }
 
@@ -46,6 +69,7 @@ public sealed interface LootFunction {
         override fun apply(
             stack: ItemStack,
             random: BasaltRandom,
+            explosionRadius: Float?,
         ): ItemStack = stack
     }
 
@@ -57,6 +81,7 @@ public sealed interface LootFunction {
         override fun apply(
             stack: ItemStack,
             random: BasaltRandom,
+            explosionRadius: Float?,
         ): ItemStack = stack
     }
 
@@ -67,6 +92,7 @@ public sealed interface LootFunction {
         override fun apply(
             stack: ItemStack,
             random: BasaltRandom,
+            explosionRadius: Float?,
         ): ItemStack {
             val base = if (add) stack.count else 0
             stack.count = base + count.getInt(random)

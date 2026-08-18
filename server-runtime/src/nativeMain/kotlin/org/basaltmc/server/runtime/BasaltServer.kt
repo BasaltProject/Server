@@ -1783,7 +1783,7 @@ public class BasaltServer(
                     ClientboundBlockUpdatePacket(at, Blocks.AIR.stateId).write(it)
                 }
             }
-            Blocks.byStateId(block.stateId)?.let { dropExplodedBlock(world, it.block, at) }
+            Blocks.byStateId(block.stateId)?.let { dropExplodedBlock(world, it.block, at, power) }
         }
         for (block in broken) {
             NeighbourUpdates.afterChange(
@@ -1806,7 +1806,9 @@ public class BasaltServer(
                         ClientboundBlockUpdatePacket(at, Blocks.AIR.stateId).write(it)
                     }
                 }
-                Blocks.byStateId(stateId)?.let { dropExplodedBlock(world, it.block, at) }
+                // What the blast knocked loose afterwards falls as an ordinary break, not as part
+                // of the explosion: parity with `dropResources`, which carries no radius.
+                Blocks.byStateId(stateId)?.let { dropExplodedBlock(world, it.block, at, power = 0f) }
             }
         }
         for (player in watchers) {
@@ -1825,9 +1827,12 @@ public class BasaltServer(
         world: LoadedWorld,
         block: Identifier,
         pos: BlockPos,
+        power: Float,
     ) {
         val table = lootTables.forBlock(block) ?: return
-        for (stack in table.generate(LegacyRandom(Random.nextLong()))) {
+        // parity: `LootContextParams.EXPLOSION_RADIUS`, which `explosion_decay` turns into the one
+        // in `power` chance each item has of surviving the blast.
+        for (stack in table.generate(LegacyRandom(Random.nextLong()), explosionRadius = power)) {
             if (Items.REGISTRY.byIdentifier(stack.item) == null) continue
             world.state.spawnItem(
                 WorldState.DroppedItem(
