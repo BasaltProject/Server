@@ -141,6 +141,7 @@ import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTestInstances
 import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.RealVillagerTrades
 import org.basaltmc.server.runtime.world.RecipeBook
 import org.basaltmc.server.runtime.world.Redstone
 import org.basaltmc.server.runtime.world.RedstoneComponents
@@ -234,6 +235,9 @@ public class BasaltServer(
 
     /** What each biome offers the spawner, out of the operator's own jar. */
     private val biomeSpawns = RealBiomeSpawns(serverJar)
+
+    /** What each villager offers, out of the same jar. */
+    private val villagerTrades = RealVillagerTrades(serverJar)
     private val recipes = RealRecipes(serverJar)
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
@@ -1973,6 +1977,7 @@ public class BasaltServer(
                     timings = timings,
                     lootTables = lootTables,
                     recipes = recipes,
+                    villagerTrades = villagerTrades,
                     bossBars = bossBars,
                     whitelistEnforced = { whitelistEnforced },
                     enchantments = enchantments,
