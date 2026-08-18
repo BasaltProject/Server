@@ -17,7 +17,7 @@
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
-#include <basalt/server/runtime/config/GameplayRules.hpp>
+#include <basalt/server/runtime/config/MobsConfig.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
@@ -46,7 +46,6 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
-#include <basalt/server/runtime/world/BreedingCooldowns.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerDrops.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
@@ -217,6 +216,12 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         return;
     }
     if (tameOrSit(*world, *session, *entity)) {
+        return;
+    }
+    // A ridable override seats a player who clicks it with an empty hand and is not crouching.
+    if (entity->tuning != nullptr && entity->tuning->ridable == true && !entity->dying && !session->sneaking &&
+        entity->passengerIds.empty() && !session->vehicleId.has_value() && !session->inventory.heldItem().has_value()) {
+        mount(*session, *entity);
         return;
     }
     // parity: `Allay.mobInteract`.
@@ -396,15 +401,12 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         }
         return;
     }
-    if (!item.has_value() || !entity::breeding::isFood(entity->type(), *item)) {
+    if (!item.has_value() || !entity::breeding::isFood(*entity, *item)) {
         return;
     }
     // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster.
     const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
-    const world::LoadedWorld* herd = owner_->currentWorld();
-    const bool waiting = herd != nullptr && herd->state().gameplay().mechanics.animalBreedingCooldownSeconds > 0 &&
-                         world::breedingCooldowns::active(session->uuid().toString(), entity->type(), herd->gameTime());
-    if (entity::breeding::canFallInLove(*entity) && !waiting) {
+    if (entity::breeding::canFallInLove(*entity)) {
         entity::breeding::feed(*entity, session->uuid().toString());
     } else if (entity::breeding::canAgeUp(*entity)) {
         entity::breeding::feedBaby(*entity);

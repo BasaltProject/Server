@@ -120,7 +120,8 @@ bool shouldDropExperience(const ServerEntity& entity) {
 }
 
 bool dropsExperience(const ServerEntity& entity, bool mobDrops) {
-    return entity.lastHurtByPlayerTime > 0 && shouldDropExperience(entity) && mobDrops;
+    const bool always = entity.tuning != nullptr && entity.tuning->alwaysDropExp == true;
+    return (entity.lastHurtByPlayerTime > 0 || always) && shouldDropExperience(entity) && mobDrops;
 }
 
 static std::int32_t rawReward(const ServerEntity& entity, random::RandomSource& random) {

@@ -882,7 +882,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     plugins::worldEventHooks::spawning(spawningHooks, eventSink_);
     spawning_ = std::make_unique<NaturalSpawningSystem>(
         playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, std::move(spawningHooks),
-        NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+        NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                       .biomeTag = [loader = std::make_shared<world::BiomeTagLoader>(jar.readText)](
+                                                       const std::string& tag) { return loader->biomesIn(tag); }});
     // parity: the biome tags a spawner's rules ask, read once: `BiomeTagLoader` caches as it goes.
     auto spawnerBiomes = std::make_shared<std::map<std::string, std::set<std::string>, std::less<>>>();
     world::BiomeTagLoader biomeTags{jar.readText};

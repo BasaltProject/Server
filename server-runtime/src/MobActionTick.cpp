@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/entity/Frogs.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
+#include <basalt/server/runtime/entity/LivingMovement.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobMisc.hpp>
@@ -247,6 +248,26 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
     entity::ai::lookControl::tick(mob);
 }
 
+void MobActionSystem::tickRidden(world::LoadedWorld& world, ServerEntity& mob, const PlayerSession& rider) {
+    constexpr std::int32_t kJumpInput = 0x10;
+    // parity: `LivingEntity.tickRidden` turns the mount with its rider and the pitch to half.
+    mob.yaw = rider.yaw;
+    mob.headYaw = rider.yaw;
+    mob.pitch = rider.pitch * 0.5F;
+    entity::ai::navigation::stop(mob);
+    // parity: `getRiddenInput`: strafing at half strength and backing up at a quarter.
+    const double strafe = ((rider.inputLeft ? 1.0 : 0.0) - (rider.inputRight ? 1.0 : 0.0)) * 0.5;
+    double forward = (rider.inputForward ? 1.0 : 0.0) - (rider.inputBack ? 1.0 : 0.0);
+    if (forward <= 0.0) {
+        forward *= 0.25;
+    }
+    if ((rider.extras.inputFlags & kJumpInput) != 0) {
+        entity::livingMovement::jump(world.state(), mob);
+    }
+    entity::ai::moveControl::strafe(mob, strafe, forward, 1.0);
+    entity::ai::moveControl::tick(world.state(), mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed));
+}
+
 namespace {
 
 using BrainTick = void (MobActionSystem::*)(world::LoadedWorld&, entity::ai::MobContext&);
@@ -312,6 +333,11 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     }
     if (mob.goals == nullptr) {
         mob.goals = entity::ai::mobGoals::forType(mob.type());
+        if (mob.goals != nullptr && mob.tuning != nullptr && mob.tuning->disabledGoals.has_value()) {
+            for (const std::string& goal : *mob.tuning->disabledGoals) {
+                mob.goals->remove(goal);
+            }
+        }
     }
     // parity: `Mob.serverAiStep`.
     // parity: `Raider.aiStep`.
@@ -610,15 +636,26 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
                   wire::protocol::play::SoundSource::Neutral);
     } else {
         const server::registry::EntityTypeEntry* childEntry = server::registry::entityTypes::of(childType);
-        auto baby = std::make_unique<ServerEntity>(
-            players_->allocateEntityId(), wire::common::Uuid::random(), childType,
-            childEntry == nullptr ? entry->protocolId : childEntry->protocolId, animal.x, animal.y, animal.z);
-        baby->age = entity::breeding::kBabyAge;
-        if (entity::horses::isHorse(animal.type())) {
+        std::int32_t offspring = 1;
+        if (const config::MobOverride* tweak = animal.tuning.get(); tweak != nullptr) {
             random::RandomSource random = freshRandom();
-            entity::horses::inherit(*baby, animal, partner, random);
+            const std::int32_t least = tweak->offspringMin.value_or(1);
+            const std::int32_t most = std::max(least, tweak->offspringMax.value_or(least));
+            offspring = random.nextDouble() < tweak->offspringChance.value_or(1.0)
+                            ? least + (most > least ? random.nextInt(most - least + 1) : 0)
+                            : 0;
         }
-        world.state().spawnEntity(std::move(baby));
+        for (std::int32_t each = 0; each < offspring; ++each) {
+            auto baby = std::make_unique<ServerEntity>(
+                players_->allocateEntityId(), wire::common::Uuid::random(), childType,
+                childEntry == nullptr ? entry->protocolId : childEntry->protocolId, animal.x, animal.y, animal.z);
+            baby->age = entity::breeding::kBabyAge;
+            if (entity::horses::isHorse(animal.type())) {
+                random::RandomSource random = freshRandom();
+                entity::horses::inherit(*baby, animal, partner, random);
+            }
+            world.state().spawnEntity(std::move(baby));
+        }
     }
     // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent.
     if (breeder.has_value() && hooks_.bredAnimals) {

@@ -41,7 +41,8 @@ ServerEntity* NaturalSpawningSystem::materializeSpawnForest(world::LoadedWorld& 
     if (!spawnAllowed(world, request.type, request.x, request.y, request.z, eventReason)) {
         return nullptr;
     }
-    const world::MobSpawnContext context{.random = &random,
+    const world::MobSpawnContext context{.mobs = &world.mobSettings(),
+                                         .random = &random,
                                          .specialMultiplier = specialMultiplierAt(world, blockX, blockZ),
                                          .difficulty = world.difficulty(),
                                          .equipment = equipment_,
@@ -103,7 +104,8 @@ ServerEntity* NaturalSpawningSystem::materializeVillageSiegeZombie(world::Loaded
         return nullptr;
     }
     // parity: `VillageSiege`.
-    const world::MobSpawnContext context{.random = &random,
+    const world::MobSpawnContext context{.mobs = &world.mobSettings(),
+                                         .random = &random,
                                          .specialMultiplier = specialMultiplierAt(world, 0, 0),
                                          .difficulty = world.difficulty(),
                                          .equipment = equipment_,
@@ -161,7 +163,8 @@ ServerEntity* NaturalSpawningSystem::materializeEventMob(world::LoadedWorld& wor
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));
     const float yaw = random.nextFloat() * kFullRotation;
-    const world::MobSpawnContext context{.random = &random,
+    const world::MobSpawnContext context{.mobs = &world.mobSettings(),
+                                         .random = &random,
                                          .specialMultiplier = specialMultiplierAt(world, blockX, blockZ),
                                          .difficulty = world.difficulty(),
                                          .equipment = equipment_,
@@ -184,7 +187,8 @@ ServerEntity* NaturalSpawningSystem::spawnEventRaider(world::LoadedWorld& world,
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));
-    const world::MobSpawnContext context{.random = &random,
+    const world::MobSpawnContext context{.mobs = &world.mobSettings(),
+                                         .random = &random,
                                          .specialMultiplier = specialMultiplierAt(world, blockX, blockZ),
                                          .difficulty = world.difficulty(),
                                          .equipment = equipment_,
@@ -208,7 +212,8 @@ world::MobSpawnForest NaturalSpawningSystem::finalizeForSpawner(world::LoadedWor
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));
-    const world::MobSpawnContext context{.random = &random,
+    const world::MobSpawnContext context{.mobs = &world.mobSettings(),
+                                         .random = &random,
                                          .specialMultiplier = specialMultiplierAt(world, blockX, blockZ),
                                          .difficulty = world.difficulty(),
                                          .equipment = equipment_,

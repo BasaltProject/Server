@@ -20,6 +20,7 @@
 #include <basalt/server/runtime/world/SpawnPotential.hpp>
 #include <basalt/server/runtime/world/StructureSpawnLists.hpp>
 #include <basalt/server/runtime/world/VillageGolemSpawner.hpp>
+#include <basalt/server/runtime/world/WorldLight.hpp>
 
 #include <algorithm>
 #include <array>
@@ -61,6 +62,32 @@ entity::Aabb entityBox(const ServerEntity& entity) {
 entity::Aabb playerBox(double x, double y, double z, bool sneaking) {
     const std::array<double, 6> packed = world::blockPlacement::playerBox(x, y, z, sneaking);
     return entity::Aabb{packed[0], packed[1], packed[2], packed[3], packed[4], packed[5]};
+}
+
+bool spawnConditionsHold(world::LoadedWorld& world, const config::MobOverride& tweak,
+                         const world::SpawnRequest& request, std::int32_t x, std::int32_t y, std::int32_t z,
+                         const std::function<std::set<std::string>(const std::string&)>& biomeTag) {
+    if (tweak.spawnEnabled == false || (tweak.spawnMinY.has_value() && y < *tweak.spawnMinY) ||
+        (tweak.spawnMaxY.has_value() && y > *tweak.spawnMaxY)) {
+        return false;
+    }
+    if (tweak.spawnMinLight.has_value() || tweak.spawnMaxLight.has_value()) {
+        const std::int32_t light = world::worldLight::rawBrightness(world.state(), x, y, z, true, world.skyDarken());
+        if ((tweak.spawnMinLight.has_value() && light < *tweak.spawnMinLight) ||
+            (tweak.spawnMaxLight.has_value() && light > *tweak.spawnMaxLight)) {
+            return false;
+        }
+    }
+    if (tweak.spawnBiomes.has_value()) {
+        const std::string biome = request.biome.has_value() ? request.biome->toString() : std::string{};
+        return std::ranges::any_of(*tweak.spawnBiomes, [&](const std::string& entry) {
+            if (entry.starts_with('#')) {
+                return biomeTag && biomeTag(entry.substr(1)).contains(biome);
+            }
+            return entry == biome;
+        });
+    }
+    return true;
 }
 
 } // namespace
@@ -308,9 +335,18 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
                     [&](const Identifier& biome, std::int32_t x, std::int32_t y, std::int32_t z) {
                         const std::optional<std::vector<world::SpawnerEntry>> structured =
                             structureSpawnLists.listAt(entity::mobCategoryFacts(category).categoryName, x, y, z);
-                        return structured.has_value()
-                                   ? *structured
-                                   : biomeSpawns_->listFor(biome, entity::mobCategoryFacts(category).categoryName);
+                        std::vector<world::SpawnerEntry> list =
+                            structured.has_value()
+                                ? *structured
+                                : biomeSpawns_->listFor(biome, entity::mobCategoryFacts(category).categoryName);
+                        for (world::SpawnerEntry& entry : list) {
+                            const config::MobOverride* tweak = mobs.overrideFor(entry.type.path());
+                            if (tweak != nullptr && tweak->spawnWeight.has_value()) {
+                                entry.weight = *tweak->spawnWeight;
+                            }
+                        }
+                        std::erase_if(list, [](const world::SpawnerEntry& entry) { return entry.weight <= 0; });
+                        return list;
                     },
                 .playerDistanceSquared = [&watchers](double x, double y, double z) -> std::optional<double> {
                     std::optional<double> nearest;
@@ -344,7 +380,8 @@ void NaturalSpawningSystem::tickNaturalSpawning(world::LoadedWorld& world, const
                             return false;
                         }
                         if (const config::MobOverride* tweak = mobs.overrideFor(request.type.path());
-                            tweak != nullptr && tweak->spawnEnabled == false) {
+                            tweak != nullptr &&
+                            !spawnConditionsHold(world, *tweak, request, blockX, blockY, blockZ, options_.biomeTag)) {
                             return false;
                         }
                         if (materializeNaturalForest(world, request, blockX, blockY, blockZ, random) == nullptr) {

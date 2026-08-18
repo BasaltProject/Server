@@ -1051,7 +1051,7 @@ void BasaltServer::startBedrockListener() {
                     }
                     return;
                 }
-                if (!item.has_value() || !entity::breeding::isFood(target->type(), *item)) {
+                if (!item.has_value() || !entity::breeding::isFood(*target, *item)) {
                     return;
                 }
                 // parity: `Animal.mobInteract`: love for a grown one, a faster childhood for a calf.

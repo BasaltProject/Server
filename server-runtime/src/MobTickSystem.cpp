@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
@@ -15,6 +16,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WanderingTraderLifetime.hpp>
+#include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
@@ -139,6 +141,17 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
                             random::RandomSource& random) {
     entity.idleTicks++;
     entity.tickCount++;
+    if (entity.tuning != nullptr && entity.tuning->ridable == true && !entity.passengerIds.empty()) {
+        const bool wet = entity.tuning->ridableInWater != true && entity::ai::inWater(world.state(), entity);
+        const bool tooHigh = entity.tuning->ridableMaxY.has_value() && entity.y > *entity.tuning->ridableMaxY;
+        if (wet || tooHigh) {
+            for (const PlayerSession* player : watchers) {
+                if (player->vehicleId == entity.entityId() && player->connection().dismount) {
+                    player->connection().dismount();
+                }
+            }
+        }
+    }
     // parity: `Entity.baseTick`, the boarding cooldown a dismount leaves.
     if (entity.boardingCooldown > 0) {
         --entity.boardingCooldown;
@@ -239,7 +252,17 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
                          std::ranges::any_of(watchers, [&entity](const PlayerSession* player) {
                              return player->entityId() == entity.passengerIds.front();
                          });
-    if (!entity.noAi && !steered) {
+    const PlayerSession* driver = nullptr;
+    if (entity.tuning != nullptr && entity.tuning->controllable == true && !entity.passengerIds.empty() &&
+        !entity::flyers::flies(entity.type())) {
+        const auto found = std::ranges::find_if(watchers, [&entity](const PlayerSession* player) {
+            return player->entityId() == entity.passengerIds.front();
+        });
+        driver = found == watchers.end() ? nullptr : *found;
+    }
+    if (driver != nullptr) {
+        actions_->tickRidden(world, entity, *driver);
+    } else if (!entity.noAi && !steered) {
         const std::optional<std::int32_t> targeted = entity.targetId;
         actions_->tickMobAi(world, entity, views, living, random);
         if (entity.targetId != targeted) {
@@ -247,6 +270,9 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         }
         if (entity.type().path() == "dolphin") {
             actions_->dolphinPicksUp(world, entity);
+        }
+        if (entity.tuning != nullptr) {
+            actions_->mobPicksUpLoot(world, entity);
         }
         ServerEntity* partner = entity::breeding::tick(entity, living);
         if (partner != nullptr) {
