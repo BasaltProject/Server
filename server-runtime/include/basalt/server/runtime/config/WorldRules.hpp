@@ -51,6 +51,8 @@ struct EnvironmentRules {
     std::int32_t portalCreateRadius = 16;
     bool voidDamage = true;
     bool disableThunder = false;
+    bool disableExplosionKnockback = false;
+    bool disableIceAndSnow = false;
     std::int32_t fishingMinWaitTicks = 100;
     std::int32_t fishingMaxWaitTicks = 600;
     std::int32_t netherCeilingVoidDamageHeight = 0;
@@ -80,6 +82,16 @@ struct TuningRules {
     std::int32_t unloadMarginChunks = 4;
     bool keepSprintOnAttack = false;
     bool playerCollisions = true;
+    double leashSnapDistance = 12.0;
+    std::int32_t mapMarkerLimit = 256;
+    std::int32_t mapFrameInterval = 10;
+    std::int32_t maxTntPerTick = -1;
+    std::int32_t autosaveChunksPerBatch = 8;
+    std::int32_t commandBlockPermissionLevel = 2;
+    bool disableNoteBlockUpdates = false;
+    bool disableTripwireUpdates = false;
+    bool disableChorusPlantUpdates = false;
+    bool disableMushroomBlockUpdates = false;
     HungerRules hunger;
 
     friend bool operator==(const TuningRules&, const TuningRules&) = default;
@@ -101,7 +113,6 @@ struct AntiXrayRules {
 };
 
 struct WorldRules {
-    std::int32_t simulationDistance = 10;
     bool generateStructures = true;
     std::int32_t maxWorldSize = 29999984;
     std::map<std::string, std::string> gameRules;
@@ -122,7 +133,7 @@ struct WorldRules {
 /// Shared with the gameplay half of the template, which lives in its own file.
 [[nodiscard]] std::string renderRulesTemplate(std::string_view text, bool forDefaults);
 
-[[nodiscard]] std::string_view gameplayRulesTemplate() noexcept;
+[[nodiscard]] std::string_view tuningRulesTemplate() noexcept;
 
 void readTuningRules(const wire::common::toml::TomlTable& table, TuningRules& rules);
 

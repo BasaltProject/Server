@@ -4,7 +4,6 @@
 
 # difficulty = "easy"
 # view-distance = 10
-# simulation-distance = 10
 # save-interval-seconds = 300
 # open-end-exit-portal = false
 # hardcore = false

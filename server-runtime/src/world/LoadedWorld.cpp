@@ -80,7 +80,6 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     if (settings_.rules.antiXray.enabled) {
         antiXray_ = std::make_shared<const AntiXray>(settings_.rules.antiXray, declaration_.dimension);
     }
-    tunables_.simulationDistance = settings_.rules.simulationDistance;
     tunables_.voidDamage = settings_.rules.environment.voidDamage;
     if (hardcore_) {
         difficulty_ = "hard";
