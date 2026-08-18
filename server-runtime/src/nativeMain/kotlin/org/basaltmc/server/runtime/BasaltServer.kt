@@ -140,6 +140,7 @@ import org.basaltmc.server.runtime.world.RedstoneReactors
 import org.basaltmc.server.runtime.world.ScheduledBlocks
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.Submersion
+import org.basaltmc.server.runtime.world.Tripwires
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
 import org.basaltmc.server.runtime.world.WorldMetadata
@@ -826,6 +827,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Random block tick failed in world '${world.name}'" } }
             runCatching { tickPressurePlates(world) }
                 .onFailure { logger.error(it) { "Pressure plate tick failed in world '${world.name}'" } }
+            runCatching { tickTripwires(world) }
+                .onFailure { logger.error(it) { "Tripwire tick failed in world '${world.name}'" } }
             runCatching { tickScheduledBlocks(world) }
                 .onFailure { logger.error(it) { "Scheduled block tick failed in world '${world.name}'" } }
             runCatching { tickBlockEntities(world) }
@@ -1135,6 +1138,19 @@ public class BasaltServer(
                         standingOn(world, position[0], position[1], position[2], watchers),
                     )?.let { scheduled += it }
             }
+            // parity: `TripWireBlock.tick`, the recheck a pressed wire books for itself.
+            if (BlockStateDefinitions.blockOf(world.state.getBlockState(position[0], position[1], position[2]) ?: 0)
+                == Tripwires.WIRE
+            ) {
+                val stillOn =
+                    watchers.any {
+                        Tripwires.isStandingOn(position[0], position[1], position[2], it.x, it.y, it.z)
+                    } ||
+                        world.state.items().any {
+                            Tripwires.isStandingOn(position[0], position[1], position[2], it.x, it.y, it.z)
+                        }
+                Tripwires.press(world, position[0], position[1], position[2], stillOn, scheduled)
+            }
             // parity: `TargetBlock`'s own scheduled tick, which lets the signal go again.
             ProjectileHits.releaseTarget(world, position[0], position[1], position[2])?.let { scheduled += it }
             // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
@@ -1223,6 +1239,64 @@ public class BasaltServer(
             announceRedstone(world, watchers, change)
         }
     }
+
+    /**
+     * Presses the tripwires something is standing in.
+     *
+     * parity: `TripWireBlock.entityInside`, which is a collision in vanilla and a walk over the
+     * players and dropped items here. What it powers is the hook at the end of the string.
+     */
+    private fun tickTripwires(world: LoadedWorld) {
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+        val crossed = HashSet<Long>()
+        for (player in watchers) {
+            if (player.gamemode == Gamemode.SPECTATOR) continue
+            crossingsOf(world, player.x, player.y, player.z, crossed)
+        }
+        for (item in world.state.items()) crossingsOf(world, item.x, item.y, item.z, crossed)
+        for (packed in crossed) {
+            Tripwires.press(
+                world,
+                unpackX(packed),
+                unpackY(packed),
+                unpackZ(packed),
+                occupied = true,
+                changes = changes,
+            )
+        }
+        for (change in changes) announceRedstone(world, watchers, change)
+    }
+
+    /** The tripwire block a thing at these coordinates is standing in, if it is standing in one. */
+    private fun crossingsOf(
+        world: LoadedWorld,
+        x: Double,
+        y: Double,
+        z: Double,
+        into: MutableSet<Long>,
+    ) {
+        val blockX = floor(x).toInt()
+        val blockZ = floor(z).toInt()
+        for (blockY in floor(y - 0.1).toInt()..floor(y).toInt()) {
+            val stateId = world.state.getBlockState(blockX, blockY, blockZ) ?: continue
+            if (BlockStateDefinitions.blockOf(stateId) != Tripwires.WIRE) continue
+            if (!Tripwires.isStandingOn(blockX, blockY, blockZ, x, y, z)) continue
+            into += pack(blockX, blockY, blockZ)
+        }
+    }
+
+    private fun pack(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Long = (x.toLong() and 0x3ffffff shl 38) or (z.toLong() and 0x3ffffff shl 12) or (y.toLong() and 0xfff)
+
+    private fun unpackX(packed: Long): Int = (packed shl 0 shr 38).toInt()
+
+    private fun unpackY(packed: Long): Int = (packed shl 52 shr 52).toInt()
+
+    private fun unpackZ(packed: Long): Int = (packed shl 26 shr 38).toInt()
 
     /** How many things are on the plate at these coordinates, the way its own sensitivity counts. */
     private fun standingOn(

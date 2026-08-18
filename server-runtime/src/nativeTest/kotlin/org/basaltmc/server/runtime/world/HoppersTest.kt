@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /** parity: `HopperBlockEntity.tryMoveItems`, one item per turn and eight ticks of rest after it. */
 class HoppersTest {
@@ -169,5 +170,58 @@ class HoppersTest {
         val slots = BlockInventory.read(furnaceData, 3)
         assertEquals(1, slots[0]?.count, "the ingredient slot took it")
         assertNull(slots[1], "and the fuel slot was left alone")
+    }
+
+    /** parity: `suckInItems`, which eats what is lying in the box above it. */
+    @Test
+    fun aHopperEatsWhatLiesOnIt() {
+        val hopperData =
+            place(
+                "hopper",
+                2,
+                70,
+                2,
+                mapOf("facing" to "down", "enabled" to "true"),
+                size = Hoppers.SIZE,
+            )
+        val dropped =
+            world.state.spawnItem(
+                WorldState.DroppedItem(
+                    entityId = 41,
+                    uuid = kotlin.uuid.Uuid.random(),
+                    item = Identifier.vanilla("diamond"),
+                    count = 3,
+                    x = 2.5,
+                    y = 70.9,
+                    z = 2.5,
+                ),
+            )
+
+        assertTrue(Hoppers.tick(world, 2, 70, 2))
+
+        assertTrue(world.state.items().isEmpty(), "the item should be gone")
+        assertEquals(3, BlockInventory.read(hopperData, Hoppers.SIZE).firstOrNull { it != null }?.count)
+        assertEquals(0, dropped.count)
+    }
+
+    /** parity: the suck box starts at 11/16, so an item under the hopper is not eaten. */
+    @Test
+    fun anItemBelowItIsLeftAlone() {
+        place("hopper", 3, 70, 2, mapOf("facing" to "down", "enabled" to "true"), size = Hoppers.SIZE)
+        world.state.spawnItem(
+            WorldState.DroppedItem(
+                entityId = 42,
+                uuid = kotlin.uuid.Uuid.random(),
+                item = Identifier.vanilla("diamond"),
+                count = 1,
+                x = 3.5,
+                y = 70.2,
+                z = 3.5,
+            ),
+        )
+
+        Hoppers.tick(world, 3, 70, 2)
+
+        assertEquals(1, world.state.items().size, "it is below the mouth, so it stays")
     }
 }

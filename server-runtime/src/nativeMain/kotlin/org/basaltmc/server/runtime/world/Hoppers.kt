@@ -13,7 +13,7 @@ import org.basaltmc.wire.nbt.NbtInt
  * `enabled` is false, it pushes one item into whatever it faces, pulls one out of whatever is above
  * it, and any move at all puts it back on an eight tick cooldown.
  *
- * Picking items up off the floor is an entity's job and is not here.
+ * A hopper also eats what is lying above it, which is `suckInItems`' own box.
  */
 public object Hoppers {
     /** parity: `HopperBlockEntity.HOPPER_CONTAINER_SIZE`. */
@@ -21,6 +21,10 @@ public object Hoppers {
 
     /** parity: `HopperBlockEntity.MOVE_ITEM_SPEED`, the eight ticks between moves. */
     private const val COOLDOWN = 8
+
+    /** parity: `Hopper.SUCK_AABB`, `Block.column(16, 11, 32)`: from 11/16 up to two blocks. */
+    private const val SUCK_BOTTOM = 11.0 / 16.0
+    private const val SUCK_TOP = 2.0
 
     private const val COOLDOWN_KEY = "TransferCooldown"
 
@@ -54,6 +58,7 @@ public object Hoppers {
         val slots = BlockInventory.read(entity.data, SIZE)
         var moved = push(world, x, y, z, out, slots)
         if (!moved) moved = pull(world, x, y, z, slots)
+        if (!moved) moved = suckIn(world, x, y, z, slots)
         if (!moved) return false
         BlockInventory.write(entity.data, slots)
         entity.data.putInt(COOLDOWN_KEY, COOLDOWN)
@@ -102,6 +107,35 @@ public object Hoppers {
             return true
         }
         return false
+    }
+
+    /**
+     * parity: `suckInItems`' other half: what is lying in the box above the hopper goes in, whole
+     * stack at a time. `Hopper.SUCK_AABB` is the block's own width, from 11/16 up to two blocks.
+     */
+    private fun suckIn(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        slots: Array<ItemStack?>,
+    ): Boolean {
+        var took = false
+        for (item in world.state.items()) {
+            if (item.count <= 0) continue
+            if (item.x < x || item.x > x + 1 || item.z < z || item.z > z + 1) continue
+            if (item.y < y + SUCK_BOTTOM || item.y > y + SUCK_TOP) continue
+            var left = item.count
+            while (left > 0 && accepts(slots, ItemStack(item.item, 1))) {
+                add(slots, ItemStack(item.item, 1))
+                left--
+            }
+            if (left == item.count) continue
+            took = true
+            item.count = left
+            if (left <= 0) world.state.removeItem(item.entityId)
+        }
+        return took
     }
 
     /** Puts one of [stack] into the container, answering whether it went in. */
