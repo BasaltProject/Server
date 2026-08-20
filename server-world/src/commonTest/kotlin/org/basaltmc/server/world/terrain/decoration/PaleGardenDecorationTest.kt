@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PaleGardenDecorationTest {
@@ -29,6 +30,8 @@ class PaleGardenDecorationTest {
         val chunk = flatGrassChunk()
         PaleGardenDecoration.RARE_FLOWER.decorate(chunk, WorldgenRandom(XoroshiroRandom(seed)))
         assertTrue(countSurface(chunk) > 0)
+        assertEquals(countSurface(chunk), chunk.scheduledBlockTicks().size)
+        assertTrue(chunk.scheduledBlockTicks().all { it.type.path == "closed_eyeblossom" && it.delay == 1 })
     }
 
     private fun flatGrassChunk(): Chunk {
