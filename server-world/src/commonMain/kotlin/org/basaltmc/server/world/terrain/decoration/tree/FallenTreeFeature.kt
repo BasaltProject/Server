@@ -139,7 +139,7 @@ public object FallenTreeFeature {
         z: Int,
     ): Boolean =
         y > WorldHeight.MIN_Y &&
-            Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getBlockStateId(x and 15, y - 1, z and 15))
+            Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getDecorationBlockStateId(x, y - 1, z))
 
     private fun isValidTreePos(
         chunk: Chunk,
@@ -148,7 +148,7 @@ public object FallenTreeFeature {
         z: Int,
     ): Boolean =
         y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
+            Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
 
     private fun isAir(
         chunk: Chunk,
@@ -157,7 +157,7 @@ public object FallenTreeFeature {
         z: Int,
     ): Boolean =
         y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
+            Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
 
     private fun set(
         chunk: Chunk,
@@ -166,7 +166,7 @@ public object FallenTreeFeature {
         z: Int,
         stateId: Int,
     ) {
-        if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+        if (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) chunk.setDecorationBlockStateId(x, y, z, stateId)
     }
 
     private data class HorizontalDirection(

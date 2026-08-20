@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class SimpleBlockFeatureTest {
     @Test
@@ -22,5 +23,21 @@ class SimpleBlockFeatureTest {
         expected.nextInt(16)
 
         assertEquals(expected.nextLong(), actual.nextLong())
+    }
+
+    @Test
+    fun sequentialExternalWritesRemainAtTheirWorldCoordinates() {
+        val chunk = Chunk(0, 0)
+        chunk.setDecorationBlockStateId(16, 62, 4, Blocks.GRASS_BLOCK.stateId)
+
+        assertTrue(
+            SimpleBlockFeature({ _, _ -> Blocks.OAK_LOG.stateId })
+                .place(chunk, WorldgenRandom(XoroshiroRandom(1L)), DecorationPos(16, 63, 4)),
+        )
+
+        val writes = chunk.takeGeneratedBlockWrites()
+        assertEquals(Blocks.GRASS_BLOCK.stateId, writes.single { it.y == 62 }.stateId)
+        assertEquals(Blocks.OAK_LOG.stateId, writes.single { it.y == 63 }.stateId)
+        assertTrue(writes.all { it.x == 16 && it.z == 4 })
     }
 }

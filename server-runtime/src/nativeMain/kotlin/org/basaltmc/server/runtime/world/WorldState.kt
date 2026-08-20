@@ -10,6 +10,9 @@ import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.sched.Owner
 import org.basaltmc.server.runtime.sched.Region
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.ChunkBlockEntity
+import org.basaltmc.server.world.ChunkGeneratedBlockEntityWrite
+import org.basaltmc.server.world.ChunkGeneratedBlockWrite
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
 import org.basaltmc.server.world.NoiseWorldGenerator
@@ -93,6 +96,20 @@ public class WorldState(
     private var loadedChunks: Long2ObjectMap<Chunk> = snapshotOf(chunksByPos)
 
     private val generatedEntitiesByKey = mutableMapOf<GeneratedEntityKey, GeneratedWorldEntity>()
+    private val pendingGeneratedBlockWrites = HashMap<Long, MutableList<ChunkGeneratedBlockWrite>>()
+    private val pendingGeneratedBlockEntityWrites = HashMap<Long, MutableList<ChunkGeneratedBlockEntityWrite>>()
+
+    init {
+        // Tests and embedders may seed a world with detached generated chunks. Production starts
+        // empty, but those chunks still deserve the same cross-border handoff as [install].
+        for (chunk in initialChunks) {
+            applyPendingGeneratedBlockWrites(chunk)
+            applyPendingGeneratedBlockEntityWrites(chunk)
+            deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites())
+            deliverGeneratedBlockEntityWrites(chunk.takeGeneratedBlockEntityWrites())
+        }
+        loadedChunks = snapshotOf(chunksByPos)
+    }
 
     public val chunks: List<Chunk> get() = mutex.withLock { chunksByPos.values.toList() }
 
@@ -237,6 +254,10 @@ public class WorldState(
                 existing
             } else {
                 chunksByPos[key] = chunk
+                applyPendingGeneratedBlockWrites(chunk)
+                applyPendingGeneratedBlockEntityWrites(chunk)
+                deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites())
+                deliverGeneratedBlockEntityWrites(chunk.takeGeneratedBlockEntityWrites())
                 loadedChunks = snapshotOf(chunksByPos)
                 chunkVersion.addAndGet(1)
                 pendingEntities += chunk.takeSavedEntities()
@@ -251,6 +272,68 @@ public class WorldState(
                 chunk
             }
         }
+    }
+
+    /**
+     * Delivers decorations that crossed out of their source chunk without ever wrapping them back
+     * into it. A target that has not arrived yet keeps the write until its own install.
+     */
+    private fun deliverGeneratedBlockWrites(writes: List<ChunkGeneratedBlockWrite>) {
+        for (write in writes) {
+            val targetKey = key(write.x shr 4, write.z shr 4)
+            val target = chunksByPos[targetKey]
+            if (target == null) {
+                pendingGeneratedBlockWrites.getOrPut(targetKey, ::mutableListOf) += write
+            } else {
+                applyGeneratedBlockWrite(target, write)
+            }
+        }
+    }
+
+    private fun applyPendingGeneratedBlockWrites(chunk: Chunk) {
+        val writes = pendingGeneratedBlockWrites.remove(key(chunk.chunkX, chunk.chunkZ)) ?: return
+        for (write in writes) applyGeneratedBlockWrite(chunk, write)
+    }
+
+    private fun applyGeneratedBlockWrite(
+        chunk: Chunk,
+        write: ChunkGeneratedBlockWrite,
+    ) {
+        if (write.y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
+        val localX = write.x and 15
+        val localZ = write.z and 15
+        val current = chunk.getBlockStateId(localX, write.y, localZ)
+        if (current == write.expectedStateId) {
+            chunk.setBlockStateId(localX, write.y, localZ, write.stateId)
+        }
+    }
+
+    private fun deliverGeneratedBlockEntityWrites(writes: List<ChunkGeneratedBlockEntityWrite>) {
+        for (write in writes) {
+            val targetKey = key(write.x shr 4, write.z shr 4)
+            val target = chunksByPos[targetKey]
+            if (target == null) {
+                pendingGeneratedBlockEntityWrites.getOrPut(targetKey, ::mutableListOf) += write
+            } else {
+                applyGeneratedBlockEntityWrite(target, write)
+            }
+        }
+    }
+
+    private fun applyPendingGeneratedBlockEntityWrites(chunk: Chunk) {
+        val writes = pendingGeneratedBlockEntityWrites.remove(key(chunk.chunkX, chunk.chunkZ)) ?: return
+        for (write in writes) applyGeneratedBlockEntityWrite(chunk, write)
+    }
+
+    private fun applyGeneratedBlockEntityWrite(
+        chunk: Chunk,
+        write: ChunkGeneratedBlockEntityWrite,
+    ) {
+        if (write.y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
+        val localX = write.x and 15
+        val localZ = write.z and 15
+        if (chunk.getBlockStateId(localX, write.y, localZ) != write.expectedStateId) return
+        chunk.setBlockEntity(ChunkBlockEntity(localX, write.y, localZ, write.type, write.data))
     }
 
     /**

@@ -26,27 +26,27 @@ public class SimpleBlockFeature(
         // providers consume RNG even when the candidate ultimately cannot be placed.
         val stateId = toPlace(random, origin)
         if (origin.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
-        val localX = origin.x and 15
-        val localZ = origin.z and 15
-        if (!Blocks.isAir(chunk.getBlockStateId(localX, origin.y, localZ))) return false
+        if (!Blocks.isAir(chunk.getDecorationBlockStateId(origin.x, origin.y, origin.z))) return false
         if (origin.y - 1 < WorldHeight.MIN_Y ||
-            !Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getBlockStateId(localX, origin.y - 1, localZ))
+            !Chunk.HeightmapType.OCEAN_FLOOR.matches(
+                chunk.getDecorationBlockStateId(origin.x, origin.y - 1, origin.z),
+            )
         ) {
             return false
         }
         if (isDoublePlant) {
             if (origin.y + 1 > WorldHeight.MAX_Y ||
-                !Blocks.isAir(chunk.getBlockStateId(localX, origin.y + 1, localZ))
+                !Blocks.isAir(chunk.getDecorationBlockStateId(origin.x, origin.y + 1, origin.z))
             ) {
                 return false
             }
         }
 
-        chunk.setBlockStateId(localX, origin.y, localZ, stateId)
+        chunk.setDecorationBlockStateId(origin.x, origin.y, origin.z, stateId)
         if (isDoublePlant) {
             val upperStateId =
                 Blocks.upperDoublePlantStateId(stateId) ?: error("state $stateId is not a lower double plant")
-            chunk.setBlockStateId(localX, origin.y + 1, localZ, upperStateId)
+            chunk.setDecorationBlockStateId(origin.x, origin.y + 1, origin.z, upperStateId)
         }
         return true
     }
