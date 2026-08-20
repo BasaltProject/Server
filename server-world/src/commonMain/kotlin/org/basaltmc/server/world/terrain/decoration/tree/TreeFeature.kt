@@ -1,5 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration.tree
 
+import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
@@ -2073,6 +2074,7 @@ public object TreeFeature {
         originY: Int,
         originZ: Int,
         config: TreeConfiguration,
+        mossyCarpetRandom: BasaltRandom = random,
     ): Boolean {
         val treeHeight = config.trunkPlacer.getTreeHeight(random)
         val foliageHeight = config.foliagePlacer.foliageHeight(random, treeHeight)
@@ -2114,7 +2116,9 @@ public object TreeFeature {
         if (config.decorators.isNotEmpty()) {
             recorder.phase = PlacementPhase.DECORATION
             chunk.observeBlockWrites(recorder::record) {
-                for (decorator in config.decorators) decorate(chunk, random, decoratorContext, decorator)
+                for (decorator in config.decorators) {
+                    decorate(chunk, random, mossyCarpetRandom, decoratorContext, decorator)
+                }
             }
         }
         updateLeaves(chunk, recorder.context())
@@ -2172,6 +2176,7 @@ public object TreeFeature {
     private fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
+        mossyCarpetRandom: BasaltRandom,
         context: TreeDecoratorContext,
         decorator: TreeDecoratorConfiguration,
     ) {
@@ -2192,7 +2197,8 @@ public object TreeFeature {
                     decorator.probability,
                 )
             is TreeDecoratorConfiguration.Cocoa -> decorateCocoa(chunk, random, context.logs, decorator.probability)
-            is TreeDecoratorConfiguration.PaleMoss -> decoratePaleMoss(chunk, random, context, decorator)
+            is TreeDecoratorConfiguration.PaleMoss ->
+                decoratePaleMoss(chunk, random, mossyCarpetRandom, context, decorator)
             is TreeDecoratorConfiguration.CreakingHeart ->
                 decorateCreakingHeart(
                     chunk,
@@ -2352,6 +2358,7 @@ public object TreeFeature {
     private fun decoratePaleMoss(
         chunk: Chunk,
         random: WorldgenRandom,
+        mossyCarpetRandom: BasaltRandom,
         context: TreeDecoratorContext,
         decorator: TreeDecoratorConfiguration.PaleMoss,
     ) {
@@ -2360,7 +2367,12 @@ public object TreeFeature {
         if (shuffledLogs.isEmpty()) return
         val origin = shuffledLogs.minBy(BlockPos::y)
         if (random.nextFloat() < decorator.groundProbability) {
-            PaleMossDecoration.placePatchAt(chunk, random, DecorationPos(origin.x, origin.y + 1, origin.z))
+            PaleMossDecoration.placePatchAt(
+                chunk,
+                random,
+                DecorationPos(origin.x, origin.y + 1, origin.z),
+                mossyCarpetRandom,
+            )
         }
         for (log in context.logs) {
             if (random.nextFloat() < decorator.trunkProbability && isAir(chunk, log.x, log.y - 1, log.z)) {
@@ -2411,6 +2423,14 @@ public object TreeFeature {
                 }
             } ?: return
         setBlock(chunk, target.x, target.y, target.z, naturalDormantCreakingHeartStateId)
+        chunk.setDecorationBlockEntity(
+            target.x,
+            target.y,
+            target.z,
+            naturalDormantCreakingHeartStateId,
+            Identifier.vanilla("creaking_heart"),
+            NbtCompound(),
+        )
     }
 
     /** // parity: AttachedToLeavesDecorator used by both mangrove tree configurations. */

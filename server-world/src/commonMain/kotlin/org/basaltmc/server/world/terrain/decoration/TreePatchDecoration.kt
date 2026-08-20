@@ -45,6 +45,12 @@ public object TreePatchDecoration {
         placementObserver: ((name: String, position: DecorationPos) -> Unit)?,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
+        val worldgenRegionRandom =
+            XoroshiroRandom(seed)
+                .forkPositional()
+                .fromHashOf("minecraft:worldgen_region_random")
+                .forkPositional()
+                .at(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
         val context = PlacementContext(chunk)
         val origin = DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
@@ -68,7 +74,7 @@ public object TreePatchDecoration {
                 if (spec.name == BAMBOO_VEGETATION) {
                     BambooVegetationDecoration.placeAt(chunk, random, position, context)
                 } else {
-                    TreeDecoration.placeAt(chunk, random, position, spec.name)
+                    TreeDecoration.placeAt(chunk, random, position, spec.name, worldgenRegionRandom)
                 }
             }
         }
