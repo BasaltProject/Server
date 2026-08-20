@@ -183,7 +183,7 @@ public object BiomeDecoration {
             // cherry_bees_005). See CherryGroveDecoration's own KDoc.
             Identifier.vanilla("cherry_grove") to CherryGroveDecoration,
             // parity: river vegetation is composed in forBiome so water trees precede bushes and defaults.
-            Identifier.vanilla("river") to combine(DefaultVegetationDecoration, AquaticDecoration.RIVER),
+            Identifier.vanilla("river") to DefaultVegetationDecoration,
             Identifier.vanilla("frozen_river") to DefaultVegetationDecoration,
             // parity: OverworldBiomes.beach(snowy=false, stony=false)/addDefaultFlowers+addDefaultGrass.
             Identifier.vanilla("beach") to DefaultVegetationDecoration,
@@ -242,16 +242,15 @@ public object BiomeDecoration {
             // (huge red/brown 50/50, one attempt per chunk) + brown_mushroom_taiga (rarity 4) +
             // red_mushroom_taiga (rarity 256). Shared near-water vegetation is appended by forBiome.
             Identifier.vanilla("mushroom_fields") to MushroomFieldsDecoration.HUGE_ONLY,
-            // parity: OverworldBiomes.ocean/coldOcean/lukeWarmOcean. Each variant selects the
-            // matching real seagrass count/tall probability, then its cold or warm kelp density.
-            Identifier.vanilla("ocean") to AquaticDecoration.OCEAN,
-            Identifier.vanilla("deep_ocean") to AquaticDecoration.DEEP_OCEAN,
-            Identifier.vanilla("cold_ocean") to AquaticDecoration.COLD_OCEAN,
-            Identifier.vanilla("deep_cold_ocean") to AquaticDecoration.DEEP_COLD_OCEAN,
-            Identifier.vanilla("lukewarm_ocean") to AquaticDecoration.LUKEWARM_OCEAN,
-            Identifier.vanilla("deep_lukewarm_ocean") to AquaticDecoration.DEEP_LUKEWARM_OCEAN,
-            // parity: warm ocean adds coral first, then seagrass_warm and sea_pickle.
-            Identifier.vanilla("warm_ocean") to AquaticDecoration.WARM_OCEAN,
+            // Seagrass, kelp and sea pickles are independently seeded by AquaticPatchDecoration.
+            Identifier.vanilla("ocean") to noVegetalDecoration,
+            Identifier.vanilla("deep_ocean") to noVegetalDecoration,
+            Identifier.vanilla("cold_ocean") to noVegetalDecoration,
+            Identifier.vanilla("deep_cold_ocean") to noVegetalDecoration,
+            Identifier.vanilla("lukewarm_ocean") to noVegetalDecoration,
+            Identifier.vanilla("deep_lukewarm_ocean") to noVegetalDecoration,
+            // Coral remains on the legacy path until its own exact global-index port.
+            Identifier.vanilla("warm_ocean") to CoralDecoration,
             // parity: frozenOcean adds packed/blue icebergs in LOCAL_MODIFICATIONS, blue ice in
             // SURFACE_STRUCTURES, then water trees and the same default vegetation as beaches.
             Identifier.vanilla("frozen_ocean") to DefaultVegetationDecoration,
@@ -272,13 +271,9 @@ public object BiomeDecoration {
                         requireBase(id),
                         PlainsDecoration.FLOWERS,
                     )
-                "ocean" -> oceanWithExtra(AquaticDecoration.OCEAN)
-                "deep_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_OCEAN)
-                "cold_ocean" -> oceanWithExtra(AquaticDecoration.COLD_OCEAN)
-                "deep_cold_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_COLD_OCEAN)
-                "lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.LUKEWARM_OCEAN)
-                "deep_lukewarm_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_LUKEWARM_OCEAN)
-                "warm_ocean" -> oceanWithExtra(AquaticDecoration.WARM_OCEAN)
+                "ocean", "deep_ocean", "cold_ocean", "deep_cold_ocean", "lukewarm_ocean", "deep_lukewarm_ocean" ->
+                    oceanWithExtra(noVegetalDecoration)
+                "warm_ocean" -> oceanWithExtra(CoralDecoration)
                 "frozen_ocean", "deep_frozen_ocean" ->
                     combine(
                         TreeDecoration.WATER,
@@ -288,7 +283,6 @@ public object BiomeDecoration {
                     combine(
                         TreeDecoration.WATER,
                         DefaultVegetationDecoration,
-                        AquaticDecoration.RIVER,
                     )
                 "frozen_river" ->
                     combine(
@@ -296,25 +290,16 @@ public object BiomeDecoration {
                         requireBase(id),
                     )
                 "swamp" ->
-                    combine(
-                        requireBase(id),
-                        AquaticDecoration.SWAMP,
-                    )
+                    requireBase(id)
                 "mangrove_swamp" ->
-                    combine(requireBase(id), AquaticDecoration.SWAMP)
+                    requireBase(id)
                 "desert" -> requireBase(id)
                 "badlands", "eroded_badlands", "wooded_badlands" -> requireBase(id)
                 "mushroom_fields" -> requireBase(id)
                 "jungle", "bamboo_jungle" ->
-                    combine(
-                        requireBase(id),
-                        JungleVineDecoration,
-                    )
+                    requireBase(id)
                 "sparse_jungle" ->
-                    combine(
-                        requireBase(id),
-                        JungleVineDecoration,
-                    )
+                    requireBase(id)
                 "savanna", "savanna_plateau" -> requireBase(id)
                 "windswept_savanna" -> requireBase(id)
                 "forest" ->
