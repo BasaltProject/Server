@@ -8,6 +8,7 @@ import org.basaltmc.server.runtime.entity.CubeMobs
 import org.basaltmc.server.runtime.entity.EntityCollision
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.sched.Owner
+import org.basaltmc.server.runtime.sched.Region
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
@@ -59,8 +60,24 @@ public class WorldState(
      */
     public var owner: Owner? = null
 
-    /** Refuses an access from anywhere but the owner, and only while [Ownership.strict] is on. */
+    /**
+     * How many regions this world is in, which decides whether [mine] can say anything useful.
+     *
+     * Set by [LoadedWorld]; one for a world built on its own.
+     */
+    public var regionCount: () -> Int = { 1 }
+
+    /**
+     * Refuses an access from anywhere but the owner, and only while [Ownership.strict] is on.
+     *
+     * Skipped while a world is split: [owner] is the first region's, and a block out in the second
+     * one belongs to that one instead, so the check would refuse what is in fact correct. Checking
+     * per position is what closes it, and it needs the position at every call site rather than at
+     * some of them; until then the enforcement is what it was designed for, which is the default
+     * single-region mode.
+     */
     private fun mine(what: String) {
+        if (regionCount() > 1) return
         owner?.check(what)
     }
 
@@ -155,6 +172,12 @@ public class WorldState(
             if (removed > 0) loadedChunks = snapshotOf(chunksByPos)
             removed
         }
+
+    /**
+     * Every loaded chunk as one packed key, for whoever has to reason about the shape of the world
+     * rather than about its contents: the region scheduler works out what touches what from this.
+     */
+    public fun loadedChunkKeys(): List<Long> = mutex.withLock { chunksByPos.keys.toList() }
 
     /** Whether this chunk is already in memory, without generating it: what the queue and the send path poll. */
     public fun isLoaded(
@@ -645,12 +668,15 @@ public class WorldState(
      * Deliberately does no I/O and takes no other lock: it runs on the tick thread, which must
      * never touch a socket (see [org.basaltmc.server.runtime.TickLoop]).
      */
-    public fun tickItems(): List<Int> =
+    public fun tickItems(region: Region? = null): List<Int> =
         mutex.withLock {
             val despawned = mutableListOf<Int>()
             val iterator = droppedItems.iterator()
             while (iterator.hasNext()) {
                 val item = iterator.next()
+                // An item belongs to whoever owns the ground it is lying on. With the world in one
+                // piece that is everybody, and this is always true.
+                if (region != null && !region.ownsPosition(item.x, item.z)) continue
                 item.age++
                 if (item.pickupDelay > 0) item.pickupDelay--
                 if (item.age >= LIFETIME_TICKS) {

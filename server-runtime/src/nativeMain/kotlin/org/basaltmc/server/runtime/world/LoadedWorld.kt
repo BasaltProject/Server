@@ -6,6 +6,8 @@ import org.basaltmc.server.runtime.config.WorldSettings
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.entity.EntityNbt
 import org.basaltmc.server.runtime.sched.Owner
+import org.basaltmc.server.runtime.sched.Region
+import org.basaltmc.server.runtime.sched.RegionScheduler
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.FlatWorldGenerator
 import org.basaltmc.server.world.LeafDistances
@@ -44,17 +46,28 @@ public class LoadedWorld(
     public val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     public val villageGenerator: VillageStructureGenerator? = null,
     private val normalGenerator: ((chunkX: Int, chunkZ: Int) -> Chunk)? = null,
+    /**
+     * Who hands out the regions this world is ticked in.
+     *
+     * The server passes its own, so every world shares one scheduler and one global owner. A world
+     * built on its own (a test) gets one to itself, which is the same code with one region in it.
+     */
+    scheduler: RegionScheduler = RegionScheduler(),
 ) {
     public val name: String get() = declaration.name
+
+    /** The region this world is ticked in. One per world while the world is in one piece. */
+    public val region: Region = scheduler.regionFor(declaration.name)
 
     /**
      * Who owns this world's state: its chunks, its blocks and everything living in them.
      *
      * The tick thread claims it on its first turn, and from then on anybody else reaches it with
      * [org.basaltmc.server.runtime.sched.Owner.submit] rather than by touching it. One world, one
-     * owner today; one per region when regions are turned on, with the same rule.
+     * region, one owner today; one owner per region when regions are turned on, with the
+     * same rule.
      */
-    public val owner: Owner = Owner(declaration.name)
+    public val owner: Owner get() = region.owner
 
     /**
      * Who owns the block at these coordinates.
@@ -65,14 +78,15 @@ public class LoadedWorld(
      * two of them.
      */
     public fun ownerOf(
-        @Suppress("UNUSED_PARAMETER") x: Int,
-        @Suppress("UNUSED_PARAMETER") z: Int,
-    ): Owner = owner
+        x: Int,
+        z: Int,
+    ): Owner = regionScheduler.regionFor(name, x shr 4, z shr 4).owner
 
     /** Who owns an entity: the region it is standing in, which today is the whole world. */
-    public fun ownerOf(
-        @Suppress("UNUSED_PARAMETER") entity: org.basaltmc.server.runtime.entity.ServerEntity,
-    ): Owner = owner
+    public fun ownerOf(entity: org.basaltmc.server.runtime.entity.ServerEntity): Owner =
+        ownerOf(entity.x.toInt(), entity.z.toInt())
+
+    private val regionScheduler: RegionScheduler = scheduler
 
     /**
      * What the client calls this world: a `ResourceKey<Level>`, not a dimension type.
@@ -127,7 +141,10 @@ public class LoadedWorld(
     public val portals: PortalIndex = PortalIndex().also { it.load(worldRoot) }
 
     public val state: WorldState =
-        WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk).also { it.owner = owner }
+        WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk).also {
+            it.owner = owner
+            it.regionCount = { regionScheduler.regionsOf(declaration.name).size.coerceAtLeast(1) }
+        }
 
     public val generationQueue: ChunkGenerationQueue =
         ChunkGenerationQueue(state, declaration.dimension.registryPath, workerCount = generationWorkers)

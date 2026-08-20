@@ -31,6 +31,15 @@ public data class BasaltConfig(
     public val logKeepDays: Int,
     public val logColor: ColorMode,
     public val generationMetrics: Boolean,
+    /**
+     * Whether a world may be split into regions that tick independently.
+     *
+     * NOT VANILLA above one region: two of them stop having a fixed order of tick between them and
+     * what crosses a border is deferred a tick, so it is off unless the operator asks for it.
+     */
+    public val regional: Boolean = false,
+    /** How many regions tick at once with [regional] on. Zero means "one per pair of cores". */
+    public val regionThreads: Int = 0,
 ) {
     public companion object {
         private val DEFAULT =
@@ -45,6 +54,8 @@ public data class BasaltConfig(
                 logKeepDays = 14,
                 logColor = ColorMode.AUTO,
                 generationMetrics = false,
+                regional = false,
+                regionThreads = 0,
             )
 
         /** The file this configuration lives in, inside [ConfigDirectory]. */
@@ -108,8 +119,17 @@ public data class BasaltConfig(
                 logColor = logging?.stringOrNull("color")?.let(::parseColorMode) ?: DEFAULT.logColor,
                 generationMetrics =
                     performance?.boolOrNull("generation-metrics") ?: DEFAULT.generationMetrics,
+                regional = performance?.boolOrNull("regional") ?: DEFAULT.regional,
+                regionThreads = regionThreadsOf(performance?.stringOrNull("region-threads")),
             )
         }
+
+        /**
+         * parity of shape with Folia's own `threads = -1`: a number is taken as it is, and anything
+         * else ("auto", missing) means "work it out", which is zero here and is resolved by the
+         * scheduler rather than by the file.
+         */
+        private fun regionThreadsOf(value: String?): Int = value?.toIntOrNull() ?: DEFAULT.regionThreads
 
         private fun parseColorMode(name: String): ColorMode =
             ColorMode.entries.find { it.name.equals(name, ignoreCase = true) } ?: DEFAULT.logColor
