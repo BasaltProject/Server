@@ -7,18 +7,24 @@ import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.ConsumeEffect
+import org.basaltmc.server.registry.EntityAttributes
 import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.Fuels
 import org.basaltmc.server.registry.ItemArmour
 import org.basaltmc.server.registry.ItemBlocks
 import org.basaltmc.server.registry.ItemFood
 import org.basaltmc.server.registry.ItemTools
+import org.basaltmc.server.registry.ItemWeapons
 import org.basaltmc.server.registry.Items
+import org.basaltmc.server.registry.ParticleTypes
 import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.PlayerCommandSource
 import org.basaltmc.server.runtime.command.commands.BossBarRegistry
 import org.basaltmc.server.runtime.command.timePacket
 import org.basaltmc.server.runtime.entity.Breeding
+import org.basaltmc.server.runtime.entity.DamageSource
+import org.basaltmc.server.runtime.entity.EntityCombat
+import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.entity.Villagers
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
@@ -99,6 +105,7 @@ import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.Trades
 import org.basaltmc.server.runtime.world.Vibrations
 import org.basaltmc.server.runtime.world.WallVariants
+import org.basaltmc.server.runtime.world.WeaponDamage
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.runtime.world.WorldWeather
 import org.basaltmc.server.storage.BanKind
@@ -159,6 +166,7 @@ import org.basaltmc.wire.protocol.login.LoginFinishedPacket
 import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
 import org.basaltmc.wire.protocol.play.AnimatePacket
+import org.basaltmc.wire.protocol.play.AttackPacket
 import org.basaltmc.wire.protocol.play.BlockDestructionPacket
 import org.basaltmc.wire.protocol.play.BlockEntityDataPacket
 import org.basaltmc.wire.protocol.play.BlockEventPacket
@@ -197,9 +205,11 @@ import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.GlobalPos
 import org.basaltmc.wire.protocol.play.Heightmap
 import org.basaltmc.wire.protocol.play.HeightmapType
+import org.basaltmc.wire.protocol.play.HurtAnimationPacket
 import org.basaltmc.wire.protocol.play.InteractPacket
 import org.basaltmc.wire.protocol.play.LecternMenuType
 import org.basaltmc.wire.protocol.play.LevelEventPacket
+import org.basaltmc.wire.protocol.play.LevelParticlesPacket
 import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
 import org.basaltmc.wire.protocol.play.MerchantCost
@@ -235,6 +245,7 @@ import org.basaltmc.wire.protocol.play.ServerboundUseItemPacket
 import org.basaltmc.wire.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.wire.protocol.play.SetChunkCacheRadiusPacket
 import org.basaltmc.wire.protocol.play.SetEntityDataPacket
+import org.basaltmc.wire.protocol.play.SetEntityMotionPacket
 import org.basaltmc.wire.protocol.play.SetEquipmentPacket
 import org.basaltmc.wire.protocol.play.SetExperiencePacket
 import org.basaltmc.wire.protocol.play.SetHealthPacket
@@ -268,6 +279,7 @@ import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
@@ -401,6 +413,9 @@ public class ClientSession(
     /** parity: `Entity.fallDistance`, added up from the movement rather than asked of the client. */
     private var fallDistance = 0.0
 
+    /** How far the last step moved, squared. parity: `getKnownMovement`, which the sweep reads. */
+    private var lastStepSquared = 0.0
+
     /** Where this player is digging, for how long, and which crack stage everyone else has seen. */
     private var diggingAt: BlockPos? = null
     private var diggingTicks = 0
@@ -409,6 +424,10 @@ public class ClientSession(
     /** Which slot is being eaten from, and how many ticks of the mouthful are left. */
     private var eatingSlot = -1
     private var eatingTicks = 0
+
+    /** The bow being drawn, and for how long. parity: `LivingEntity.useItem`/`useItemRemaining`. */
+    private var drawingSlot = -1
+    private var drawingTicks = 0
 
     private var pendingUsername: String? = null
     private var challenge: ByteArray? = null
@@ -1506,6 +1525,7 @@ public class ClientSession(
                 playerSession?.let(::closeOpenMenu)
             }
             InteractPacket.ID -> handleInteract(InteractPacket.read(body))
+            AttackPacket.ID -> handleAttack(AttackPacket.read(body))
             SelectTradePacket.ID -> selectTrade(SelectTradePacket.read(body).index)
             ContainerButtonClickPacket.ID ->
                 clickContainerButton(ContainerButtonClickPacket.read(body).buttonId)
@@ -1619,7 +1639,10 @@ public class ClientSession(
             ServerboundPlayerActionPacket.Action.DROP_ITEM -> dropHeldItem(all = false)
             ServerboundPlayerActionPacket.Action.DROP_ALL_ITEMS -> dropHeldItem(all = true)
             // parity: letting go before the animation ends eats nothing at all.
-            ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM -> stopEating()
+            ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM -> {
+                stopEating()
+                releaseBow()
+            }
             ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND -> swapWithOffhand()
             else -> Unit
         }
@@ -2849,6 +2872,7 @@ public class ClientSession(
         val held = session.inventory[heldSlot] ?: return
         val item = Identifier.parse(held.id)
         if (startEating(session, item, heldSlot)) return
+        if (startDrawing(session, item, heldSlot)) return
         if (!Buckets.isBucket(item)) return
 
         val result =
@@ -3076,6 +3100,246 @@ public class ClientSession(
                 ).write(it)
             }
         }
+    }
+
+    /** Tells everyone who can see it that something happened to an entity. */
+    private fun broadcastEntityEvent(
+        entityId: Int,
+        event: Int,
+    ) {
+        val packet = EntityEventPacket(entityId, event.toByte())
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(EntityEventPacket.ID) { packet.write(it) }
+        }
+    }
+
+    /** The red flash of a hit on something that is not a player, and who is blamed for it. */
+    private fun broadcastDamageEvent(
+        entity: ServerEntity,
+        damageType: Identifier,
+        causeEntityId: Int,
+    ) {
+        val registryId = VanillaRegistryData.damageTypes.indexOfFirst { it.first == damageType.path }
+        if (registryId < 0) return
+        val packet =
+            DamageEventPacket(
+                entityId = entity.entityId,
+                damageType = registryId,
+                causeEntityId = causeEntityId,
+                directEntityId = causeEntityId,
+            )
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(DamageEventPacket.ID) { packet.write(it) }
+        }
+    }
+
+    /** How fast an entity is going now, which is the only way a knocked-back mob moves on a client. */
+    private fun broadcastMotion(entity: ServerEntity) {
+        val packet =
+            SetEntityMotionPacket(entity.entityId, entity.velocityX, entity.velocityY, entity.velocityZ)
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(SetEntityMotionPacket.ID) { packet.write(it) }
+        }
+    }
+
+    /** A sound heard where it happened, by everyone in the world. */
+    private fun broadcastSound(
+        name: String,
+        x: Double,
+        y: Double,
+        z: Double,
+        source: SoundSource = SoundSource.NEUTRAL,
+        volume: Float = 1f,
+        pitch: Float = 1f,
+    ) {
+        val packet = SoundPacket(name, source, x, y, z, volume, pitch, Random.nextLong())
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(SoundPacket.ID) { packet.write(it) }
+        }
+    }
+
+    /**
+     * What a killed entity leaves behind.
+     *
+     * parity: `LivingEntity.die`. The dying animation is the client's own half, off the entity
+     * event; the loot is rolled by the tick loop, which is what [ServerEntity.killed] is for.
+     */
+    private fun killEntity(entity: ServerEntity) {
+        broadcastSound(EntityCombat.deathSound(entity.type), entity.x, entity.y, entity.z, SoundSource.HOSTILE)
+        broadcastEntityEvent(entity.entityId, EntityEventPacket.LIVING_DEATH)
+        entity.killed = true
+        entity.removed = true
+    }
+
+    /**
+     * A player hitting something.
+     *
+     * parity: `Player.attack`. The damage is the attribute plus whatever is in hand, scaled by how
+     * far the swing has recharged (a fifth of it at worst), half again for a critical, and a
+     * sprinting hit pushes half as much again.
+     */
+    private fun handleAttack(attack: AttackPacket) {
+        val session = playerSession ?: return
+        if (session.dead || session.gamemode == Gamemode.SPECTATOR) return
+        val world = currentWorld ?: return
+        val target = world.state.entity(attack.entityId) ?: return
+        if (target.removed || !EntityAttributes.isLiving(target.type)) return
+        if (!withinAttackReach(session, target)) return
+
+        val weapon = session.inventory.heldItem?.let { runCatching { Identifier.parse(it.id) }.getOrNull() }
+        val stats = ItemWeapons.of(weapon)
+        val strength =
+            Combat.attackStrengthScale(
+                session.ticksSinceSwing,
+                ItemWeapons.BASE_ATTACK_SPEED + (stats?.attackSpeed ?: 0.0),
+            )
+        session.ticksSinceSwing = 0
+
+        val base = (ItemWeapons.BASE_ATTACK_DAMAGE + (stats?.attackDamage ?: 0.0)).toFloat()
+        // parity: what the enchantments add rides on the swing but not on the critical, and is put
+        // back on top after the charge and the critical have had the base to themselves.
+        val enchanted = WeaponDamage.of(session.inventory.heldItem, base) { enchantments?.definitionOf(it) }
+        val boost = strength * (enchanted - base)
+        var damage = base * Combat.chargeScale(strength)
+        val fullStrength = strength > FULL_STRENGTH
+        // parity: `canCriticalAttack`, which is the falling half of a jump and nothing else.
+        val critical = fullStrength && fallDistance > 0.0 && !session.onGround && !session.sprinting
+        if (critical) damage *= Combat.CRITICAL_MULTIPLIER
+        damage += boost
+        if (damage <= 0f) return
+
+        val knockbackAttack = session.sprinting && fullStrength
+        if (knockbackAttack) {
+            broadcastSound(SOUND_ATTACK_KNOCKBACK, session.x, session.y, session.z, SoundSource.PLAYERS)
+        }
+        val result = EntityCombat.hurt(target, damage, session.x, session.z)
+        if (!result.landed) {
+            broadcastSound(SOUND_ATTACK_NO_DAMAGE, session.x, session.y, session.z, SoundSource.PLAYERS)
+            return
+        }
+        // parity: `causeExtraKnockback`, which is the half a sprinting hit adds and nothing else
+        // without enchantments: the 0.4 every hit is worth was already taken inside the hit.
+        if (knockbackAttack) {
+            EntityCombat.knockback(target, SPRINT_KNOCKBACK, session.x - target.x, session.z - target.z)
+        }
+        // parity: `isSweepAttack`: a sword, on the ground, walking, and a swing that is neither a
+        // critical nor a sprinting one.
+        val sweep =
+            fullStrength &&
+                !critical &&
+                !knockbackAttack &&
+                session.onGround &&
+                lastStepSquared < SWEEP_SPEED_LIMIT * SWEEP_SPEED_LIMIT &&
+                weapon?.path?.endsWith(SWORD_SUFFIX) == true
+        if (sweep) sweepAround(session, target, world, strength)
+        broadcastDamageEvent(target, DamageTypes.PLAYER_ATTACK, session.entityId)
+        broadcastMotion(target)
+        target.targetId = session.entityId
+        if (critical) {
+            broadcastSound(SOUND_ATTACK_CRIT, session.x, session.y, session.z, SoundSource.PLAYERS)
+            // parity: `ServerPlayer.crit`, which is an animation on the target rather than particles.
+            broadcastAnimation(target.entityId, AnimatePacket.CRITICAL_HIT)
+        }
+        if (!critical && !sweep) {
+            val sound = if (fullStrength) SOUND_ATTACK_STRONG else SOUND_ATTACK_WEAK
+            broadcastSound(sound, session.x, session.y, session.z, SoundSource.PLAYERS)
+        }
+        session.stats.addDamageDealt(result.damage)
+        session.food.addExhaustion(ATTACK_EXHAUSTION)
+        if (result.died) {
+            killEntity(target)
+        } else {
+            broadcastSound(
+                EntityCombat.hurtSound(target.type),
+                target.x,
+                target.y,
+                target.z,
+                SoundSource.HOSTILE,
+            )
+        }
+    }
+
+    /**
+     * The rest of the swing, for everything else standing around the target.
+     *
+     * parity: `Player.doSweepAttack`: a point of damage each, the same push, and only what is
+     * within a block of the target and three of the player.
+     */
+    private fun sweepAround(
+        session: PlayerSession,
+        target: ServerEntity,
+        world: LoadedWorld,
+        strength: Float,
+    ) {
+        broadcastSound(SOUND_ATTACK_SWEEP, session.x, session.y, session.z, SoundSource.PLAYERS)
+        val damage = SWEEP_DAMAGE * strength
+        for (nearby in world.state.entities()) {
+            if (nearby.entityId == target.entityId || nearby.removed) continue
+            if (!EntityAttributes.isLiving(nearby.type)) continue
+            if (abs(nearby.x - target.x) > SWEEP_RANGE + nearby.width / 2.0) continue
+            if (abs(nearby.z - target.z) > SWEEP_RANGE + nearby.width / 2.0) continue
+            if (nearby.y > target.y + target.height + SWEEP_HEIGHT) continue
+            if (nearby.y + nearby.height < target.y - SWEEP_HEIGHT) continue
+            val dx = nearby.x - session.x
+            val dz = nearby.z - session.z
+            if (dx * dx + dz * dz >= SWEEP_PLAYER_RANGE) continue
+            val result = EntityCombat.hurt(nearby, damage, session.x, session.z)
+            if (!result.landed) continue
+            broadcastDamageEvent(nearby, DamageTypes.PLAYER_ATTACK, session.entityId)
+            broadcastMotion(nearby)
+            if (result.died) killEntity(nearby) else nearby.targetId = session.entityId
+        }
+        // parity: the sweep's own particle, a block ahead of where the player is looking.
+        val yaw = session.yaw * PI.toFloat() / HALF_CIRCLE
+        broadcastParticle(
+            PARTICLE_SWEEP,
+            session.x - sin(yaw).toDouble(),
+            session.y + SWEEP_PARTICLE_HEIGHT,
+            session.z + cos(yaw).toDouble(),
+            count = 0,
+        )
+    }
+
+    /** One animation on an entity, for everyone in the world. */
+    private fun broadcastAnimation(
+        entityId: Int,
+        animation: Int,
+    ) {
+        val packet = AnimatePacket(entityId, animation)
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(AnimatePacket.ID) { packet.write(it) }
+        }
+    }
+
+    /** One particle effect where it happened, for everyone in the world. */
+    private fun broadcastParticle(
+        particle: String,
+        x: Double,
+        y: Double,
+        z: Double,
+        count: Int,
+    ) {
+        val id = ParticleTypes[Identifier.vanilla(particle)]?.protocolId ?: return
+        val packet = LevelParticlesPacket(particleTypeId = id, x = x, y = y, z = z, count = count)
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(LevelParticlesPacket.ID) { packet.write(it) }
+        }
+    }
+
+    /**
+     * parity: `ServerGamePacketListenerImpl.handleInteract`, which measures three blocks of reach
+     * plus three of slack from the eyes to the target's box before it lets anything through.
+     */
+    private fun withinAttackReach(
+        session: PlayerSession,
+        target: ServerEntity,
+    ): Boolean {
+        val half = target.width / 2.0
+        val dx = maxOf(abs(target.x - session.x) - half, 0.0)
+        val dz = maxOf(abs(target.z - session.z) - half, 0.0)
+        val eyeY = session.y + THROW_EYE_HEIGHT
+        val dy = maxOf(maxOf(target.y - eyeY, eyeY - (target.y + target.height)), 0.0)
+        return dx * dx + dy * dy + dz * dz < ATTACK_REACH * ATTACK_REACH
     }
 
     /**
@@ -4695,6 +4959,7 @@ public class ClientSession(
             val dx = x - session.x
             val dz = z - session.z
             session.stats.addWalked(kotlin.math.sqrt(dx * dx + dz * dz))
+            lastStepSquared = dx * dx + dz * dz
         }
         session.x = x
         session.y = y
@@ -5025,9 +5290,12 @@ public class ClientSession(
         playTimeTicks++
         checkAdvancements(session)
         if (session.invulnerableTicks > 0) session.invulnerableTicks--
+        // parity: `Player.tick`, which counts this up for as long as the player is not swinging.
+        session.ticksSinceSwing++
         if (session.dead) return
         tryPickupNearbyItems()
         tickEating(session)
+        tickDrawing(session)
         if (session.sleepingBed != null) session.sleepTicks++
         tickDigging(session)
         if (session.gamemode == Gamemode.CREATIVE || session.gamemode == Gamemode.SPECTATOR) return
@@ -5077,6 +5345,7 @@ public class ClientSession(
         amount: Float,
         deathMessageId: String,
         damageType: Identifier? = null,
+        source: DamageSource? = null,
     ) {
         val session = playerSession ?: return
         if (session.dead || session.invulnerable) return
@@ -5094,7 +5363,10 @@ public class ClientSession(
         }
         val reduced = reduced(session, incoming, damageType)
         if (reduced <= 0f) return
-        if (!cooling) sendDamageEvent(session, damageType)
+        if (!cooling) {
+            sendDamageEvent(session, damageType, source?.entityId ?: -1)
+            if (source != null) pushAway(session, source)
+        }
         // parity: `LivingEntity.hurt` takes it out of absorption first, and only the rest off health.
         val absorbed = minOf(session.absorption, reduced)
         if (absorbed > 0f) {
@@ -5429,6 +5701,105 @@ public class ClientSession(
         eatingSlot = slot
         eatingTicks = food.consumeTicks
         return true
+    }
+
+    /**
+     * Starts drawing a bow, if there is anything to shoot with it.
+     *
+     * parity: `BowItem.use`, which refuses without an arrow unless the player has infinite
+     * materials, and otherwise just starts the draw: the shot happens on release.
+     */
+    private fun startDrawing(
+        session: PlayerSession,
+        item: Identifier,
+        slot: Int,
+    ): Boolean {
+        if (item.path != BOW) return false
+        if (session.gamemode != Gamemode.CREATIVE && session.inventory.indexOf(ARROW_ITEM) == null) return true
+        drawingSlot = slot
+        drawingTicks = 0
+        return true
+    }
+
+    private fun stopDrawing() {
+        drawingSlot = -1
+        drawingTicks = 0
+    }
+
+    /**
+     * Lets a drawn bow go.
+     *
+     * parity: `BowItem.releaseUsing`: the power is the square of the draw, a shot under a tenth is
+     * no shot at all, and a full draw flies at three times that and counts as a critical.
+     */
+    private fun releaseBow() {
+        val session = playerSession ?: return
+        if (drawingSlot < 0) return
+        val held = session.inventory[drawingSlot]
+        val drawn = drawingTicks
+        stopDrawing()
+        if (held == null || Identifier.parse(held.id).path != BOW) return
+        val power = bowPower(drawn)
+        if (power < MIN_BOW_POWER) return
+        val creative = session.gamemode == Gamemode.CREATIVE
+        val arrowSlot = session.inventory.indexOf(ARROW_ITEM)
+        if (!creative && arrowSlot == null) return
+        val world = currentWorld ?: return
+        val entityId = playerRegistry?.allocateEntityId() ?: return
+        val protocolType = EntityTypes[Projectiles.ARROW.type]?.protocolId ?: return
+
+        val pitch = session.pitch * PI.toFloat() / HALF_CIRCLE
+        val yaw = session.yaw * PI.toFloat() / HALF_CIRCLE
+        val arrow =
+            Projectiles.spawn(
+                world = world.state,
+                kind = Projectiles.ARROW,
+                entityId = entityId,
+                protocolType = protocolType,
+                x = session.x,
+                y = session.y + THROW_EYE_HEIGHT,
+                z = session.z,
+                dirX = (-sin(yaw) * cos(pitch)).toDouble(),
+                dirY = (-sin(pitch)).toDouble(),
+                dirZ = (cos(yaw) * cos(pitch)).toDouble(),
+                power = power * BOW_POWER_SCALE,
+                uncertainty = BOW_UNCERTAINTY,
+                random = LegacyRandom(Random.nextLong()),
+            )
+        arrow.ownerId = session.entityId
+        arrow.critical = power >= 1f
+        broadcastSound(
+            SOUND_ARROW_SHOOT,
+            session.x,
+            session.y,
+            session.z,
+            SoundSource.PLAYERS,
+            pitch = 1f / (Random.nextFloat() * 0.4f + 1.2f) + power * 0.5f,
+        )
+        if (creative || arrowSlot == null) return
+        val stack = session.inventory[arrowSlot] ?: return
+        session.inventory[arrowSlot] = if (stack.count <= 1) null else stack.copy(count = stack.count - 1)
+        sendInventorySlot(arrowSlot)
+    }
+
+    /** One tick of the draw. Letting go of the bow, or of the slot it is in, gives it up. */
+    private fun tickDrawing(session: PlayerSession) {
+        if (drawingSlot < 0) return
+        val held = session.inventory[drawingSlot]
+        if (held == null ||
+            Identifier.parse(held.id).path != BOW ||
+            drawingSlot != PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        ) {
+            stopDrawing()
+            return
+        }
+        drawingTicks++
+    }
+
+    /** parity: `BowItem.getPowerForTime`. */
+    private fun bowPower(ticks: Int): Float {
+        val drawn = ticks / BOW_DRAW_TICKS
+        return minOf((drawn * drawn + drawn * 2f) / 3f, 1f)
     }
 
     private fun stopEating() {
@@ -5829,15 +6200,52 @@ public class ClientSession(
     private fun sendDamageEvent(
         session: PlayerSession,
         damageType: Identifier?,
+        causeEntityId: Int = -1,
     ) {
         val registryId = VanillaRegistryData.damageTypes.indexOfFirst { it.first == (damageType?.path ?: "generic") }
         if (registryId < 0) return
-        val packet = DamageEventPacket(entityId = session.entityId, damageType = registryId)
+        val packet =
+            DamageEventPacket(
+                entityId = session.entityId,
+                damageType = registryId,
+                causeEntityId = causeEntityId,
+                directEntityId = causeEntityId,
+            )
         sendPlayPacket(DamageEventPacket.ID) { packet.write(it) }
         for (other in playersInSameWorld()) {
             if (other.entityId == session.entityId) continue
             other.connection.sendPlayPacket(DamageEventPacket.ID) { packet.write(it) }
         }
+    }
+
+    /**
+     * The shove a hit is worth, and the lean the client puts on the screen.
+     *
+     * parity: `LivingEntity.dealDefaultKnockback` and `ServerPlayer.indicateDamage`. A client moves
+     * its own player, so the push only happens because the motion packet says so; the server has no
+     * copy of what the player was already doing, so the push starts from a standstill.
+     */
+    private fun pushAway(
+        session: PlayerSession,
+        source: DamageSource,
+    ) {
+        val towardsX = source.x - session.x
+        val towardsZ = source.z - session.z
+        val moved =
+            Combat.knockback(
+                power = EntityCombat.DEFAULT_KNOCKBACK,
+                towardsX = towardsX,
+                towardsZ = towardsZ,
+                velocityX = 0.0,
+                velocityY = 0.0,
+                velocityZ = 0.0,
+                onGround = session.onGround,
+            )
+        sendPlayPacket(SetEntityMotionPacket.ID) {
+            SetEntityMotionPacket(session.entityId, moved[0], moved[1], moved[2]).write(it)
+        }
+        val angle = (atan2(towardsZ, towardsX) * RADIANS_TO_DEGREES).toFloat() - session.yaw
+        sendPlayPacket(HurtAnimationPacket.ID) { HurtAnimationPacket(session.entityId, angle).write(it) }
     }
 
     /** parity: absorption rides on the player's own entity data, not on `set_health`. */
@@ -6102,6 +6510,54 @@ public class ClientSession(
 
         // One server tick: fast enough that chunks appear promptly, slow enough to be idle-cheap.
         const val OUTBOUND_INTERVAL_MILLIS = 50L
+
+        /** parity: `Player.attack`, where a swing over nine tenths charged counts as a full one. */
+        const val FULL_STRENGTH = 0.9f
+
+        /** parity: `Player.attack`'s own `causeFoodExhaustion(0.1)`. */
+        const val ATTACK_EXHAUSTION = 0.1f
+
+        /** parity: `Player.entityInteractionRange` plus the slack the packet handler allows. */
+        const val ATTACK_REACH = 6.0
+
+        /** parity: the half a sprinting hit adds on top of the 0.4 every hit is worth. */
+        const val SPRINT_KNOCKBACK = 0.5
+
+        /** What one radian is worth in degrees, for the angle a hit leans the screen by. */
+        const val RADIANS_TO_DEGREES = 57.29577951308232
+
+        const val SOUND_ATTACK_KNOCKBACK = "entity.player.attack.knockback"
+        const val SOUND_ATTACK_NO_DAMAGE = "entity.player.attack.nodamage"
+        const val SOUND_ATTACK_CRIT = "entity.player.attack.crit"
+        const val SOUND_ATTACK_STRONG = "entity.player.attack.strong"
+        const val SOUND_ATTACK_WEAK = "entity.player.attack.weak"
+        const val SOUND_ATTACK_SWEEP = "entity.player.attack.sweep"
+
+        /** parity: `isSweepAttack`, whose limit is the walking speed times two and a half. */
+        const val SWEEP_SPEED_LIMIT = 0.25
+
+        /** parity: `doSweepAttack`, a point of damage inside a block of the target. */
+        const val SWEEP_DAMAGE = 1f
+        const val SWEEP_RANGE = 1.0
+        const val SWEEP_HEIGHT = 0.25
+        const val SWEEP_PLAYER_RANGE = 9.0
+        const val SWEEP_PARTICLE_HEIGHT = 0.5
+
+        /** parity: `ItemTags.SWORDS`, which in vanilla is every item whose name ends this way. */
+        const val SWORD_SUFFIX = "_sword"
+
+        const val PARTICLE_SWEEP = "sweep_attack"
+
+        const val BOW = "bow"
+        const val ARROW_ITEM = "minecraft:arrow"
+
+        /** parity: `BowItem`, whose draw takes a second and whose shot flies at three. */
+        const val BOW_DRAW_TICKS = 20f
+        const val BOW_POWER_SCALE = 3f
+        const val BOW_UNCERTAINTY = 1f
+        const val MIN_BOW_POWER = 0.1f
+        const val HALF_CIRCLE = 180f
+        const val SOUND_ARROW_SHOOT = "entity.arrow.shoot"
 
         // parity: `DamageTypes.STARVE`'s message id, which the client renders as "<name> starved to death".
         const val DEATH_STARVE = "starve"

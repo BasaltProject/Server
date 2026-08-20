@@ -71,4 +71,47 @@ class CombatTest {
         assertEquals("chest", chestplate.slot)
         assertEquals(2f, checkNotNull(ItemArmour.of(Identifier.vanilla("iron_helmet"))).armour)
     }
+
+    @Test
+    fun theDifficultyDecidesHowMuchOfAMobsHitLands() {
+        assertEquals(0f, Combat.afterDifficulty(6f, "peaceful"))
+        assertEquals(4f, Combat.afterDifficulty(6f, "easy"))
+        assertEquals(6f, Combat.afterDifficulty(6f, "normal"))
+        assertEquals(9f, Combat.afterDifficulty(6f, "hard"))
+    }
+
+    @Test
+    fun easyNeverMakesAHitBigger() {
+        assertEquals(1f, Combat.afterDifficulty(1f, "easy"))
+    }
+
+    @Test
+    fun aSwingRechargesOverItsOwnDelay() {
+        // A bare hand swings four times a second, so five ticks is a full swing.
+        assertEquals(1f, Combat.attackStrengthScale(20, 4.0))
+        assertTrue(Combat.attackStrengthScale(0, 4.0) < 0.2f)
+        assertEquals(1f, Combat.attackStrengthScale(5, 4.0))
+    }
+
+    @Test
+    fun anUnchargedSwingStillLandsAFifthOfIt() {
+        assertEquals(0.2f, Combat.chargeScale(0f))
+        assertEquals(1f, Combat.chargeScale(1f))
+    }
+
+    @Test
+    fun aPushTakesHalfTheSpeedAndSendsItTheOtherWay() {
+        val moved =
+            Combat.knockback(
+                power = 0.4,
+                towardsX = 1.0,
+                towardsZ = 0.0,
+                velocityX = 0.2,
+                velocityY = 0.0,
+                velocityZ = 0.0,
+                onGround = true,
+            )
+        assertEquals(0.1 - 0.4, moved[0], 1e-9)
+        assertEquals(0.4, moved[1], 1e-9)
+    }
 }

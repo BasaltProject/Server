@@ -44,6 +44,8 @@ public data class StoredStats(
         public val PLAY_TIME: String = custom("play_time")
         public val WALK_ONE_CM: String = custom("walk_one_cm")
         public val DAMAGE_TAKEN: String = custom("damage_taken")
+        public val DAMAGE_DEALT: String = custom("damage_dealt")
+        public val MOB_KILLS: String = custom("mob_kills")
         public val JUMP: String = custom("jump")
         public val FALL_ONE_CM: String = custom("fall_one_cm")
     }

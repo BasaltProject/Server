@@ -68,6 +68,27 @@ public class ServerEntity(
     /** Ticks before it goes off, or [NO_FUSE] for anything that is not primed. parity: `PrimedTnt.fuse`. */
     public var fuse: Int = NO_FUSE
 
+    /** parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss. */
+    public var hurtCooldown: Int = 0
+
+    /** parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the rest of it. */
+    public var lastHurt: Float = 0f
+
+    /** Who shot it, by entity id. parity: `Projectile.owner`, which is who a kill is blamed on. */
+    public var ownerId: Int? = null
+
+    /** parity: `AbstractArrow.isCritArrow`, set by a fully drawn bow and worth extra damage. */
+    public var critical: Boolean = false
+
+    /** Who it is angry at, by entity id, or null when nothing has hit it. parity: `Mob.target`. */
+    public var targetId: Int? = null
+
+    /** parity: `Mob.attackTime`, the ticks a mob waits between swings. */
+    public var attackCooldown: Int = 0
+
+    /** parity: `MeleeAttackGoal.ticksUntilNextPathRecalculation`, so a chase does not repath a tick. */
+    public var repathCooldown: Int = 0
+
     /** Where it is walking, as x/y/z, or null when it is standing still. parity: `MoveControl`'s wanted position. */
     public var walkTarget: DoubleArray? = null
 

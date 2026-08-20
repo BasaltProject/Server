@@ -119,4 +119,66 @@ class ProjectilesTest {
         assertEquals(Projectiles.EGG, Projectiles.dispensed(Identifier.vanilla("brown_egg")))
         assertNull(Projectiles.dispensed(Identifier.vanilla("stone")), "an ordinary item is thrown, not shot")
     }
+
+    @Test
+    fun aFlightThroughABoxAnswersWhereItMetIt() {
+        // A zombie's box, two blocks along the arrow's own line.
+        val at =
+            Projectiles.clipBox(
+                0.0,
+                1.5,
+                0.0,
+                0.0,
+                1.5,
+                3.0,
+                -0.3,
+                0.0,
+                1.7,
+                0.3,
+                1.95,
+                2.3,
+            )
+        assertNotNull(at)
+        assertTrue(abs(at - 1.7 / 3.0) < 1e-9)
+    }
+
+    @Test
+    fun aFlightPastABoxMeetsNothing() {
+        assertNull(
+            Projectiles.clipBox(
+                0.0,
+                1.5,
+                0.0,
+                0.0,
+                1.5,
+                3.0,
+                4.0,
+                0.0,
+                1.7,
+                4.6,
+                1.95,
+                2.3,
+            ),
+        )
+    }
+
+    @Test
+    fun aFlightThatStopsShortOfABoxMeetsNothing() {
+        assertNull(
+            Projectiles.clipBox(
+                0.0,
+                1.5,
+                0.0,
+                0.0,
+                1.5,
+                1.0,
+                -0.3,
+                0.0,
+                1.7,
+                0.3,
+                1.95,
+                2.3,
+            ),
+        )
+    }
 }

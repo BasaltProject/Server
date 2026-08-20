@@ -44,28 +44,60 @@ public object MobBrain {
         modifier: Double = 1.0,
     ) {
         mob.age++
-        if (mob.walkTarget == null) {
-            if (random.nextInt(STROLL_INTERVAL) == 0) startStroll(world, mob, random)
-            LivingMovement.travel(world, mob, forward = 0.0, strafe = 0.0, speed = speed)
-            return
-        }
+        if (mob.walkTarget == null && random.nextInt(STROLL_INTERVAL) == 0) startStroll(world, mob, random)
+        walk(world, mob, speed, modifier)
+    }
 
-        // parity: `PathNavigation.tick`, which walks the path a node at a time rather than pushing
-        // straight at the target: that is what takes a mob round a wall instead of into it.
+    /**
+     * Walks whatever path the mob has, a node at a time. Answers false once there is nowhere left
+     * to go.
+     *
+     * parity: `PathNavigation.tick`, which follows the path rather than pushing straight at the
+     * target: that is what takes a mob round a wall instead of into it.
+     */
+    public fun walk(
+        world: WorldState,
+        mob: ServerEntity,
+        speed: Double,
+        modifier: Double = 1.0,
+    ): Boolean {
         val node = nextNode(mob)
         if (node == null) {
             mob.walkTarget = null
             mob.path = null
             LivingMovement.travel(world, mob, forward = 0.0, strafe = 0.0, speed = speed)
-            return
+            return false
         }
-
-        val dx = node[0] - mob.x
-        val dz = node[2] - mob.z
-        turnTowards(mob, dx, dz)
+        turnTowards(mob, node[0] - mob.x, node[2] - mob.z)
         LivingMovement.travel(world, mob, forward = 1.0, strafe = 0.0, speed = speed * modifier)
         // parity: `MoveControl`'s own jump when the way is blocked but the step was not enough.
         if (mob.horizontallyBlocked && mob.onGround) LivingMovement.jump(world, mob)
+        return true
+    }
+
+    /** Works out the way to a point and starts walking it. parity: `PathNavigation.moveTo`. */
+    public fun pathTo(
+        world: WorldState,
+        mob: ServerEntity,
+        x: Double,
+        y: Double,
+        z: Double,
+    ): Boolean {
+        val path =
+            PathFinder.find(
+                world,
+                floor(mob.x).toInt(),
+                floor(mob.y).toInt(),
+                floor(mob.z).toInt(),
+                floor(x).toInt(),
+                floor(y).toInt(),
+                floor(z).toInt(),
+            ) ?: return false
+        if (path.isEmpty()) return false
+        mob.walkTarget = doubleArrayOf(x, y, z)
+        mob.path = path
+        mob.pathIndex = 0
+        return true
     }
 
     /** Picks somewhere to go and works out the way there; without a way, it stays put. */
@@ -75,20 +107,7 @@ public object MobBrain {
         random: BasaltRandom,
     ) {
         val target = strollTarget(world, mob, random) ?: return
-        val path =
-            PathFinder.find(
-                world,
-                floor(mob.x).toInt(),
-                floor(mob.y).toInt(),
-                floor(mob.z).toInt(),
-                floor(target[0]).toInt(),
-                floor(target[1]).toInt(),
-                floor(target[2]).toInt(),
-            ) ?: return
-        if (path.isEmpty()) return
-        mob.walkTarget = target
-        mob.path = path
-        mob.pathIndex = 0
+        pathTo(world, mob, target[0], target[1], target[2])
     }
 
     /** The node it is walking to now, stepping on when it arrives. Null when the path is walked out. */

@@ -89,6 +89,14 @@ public class PlayerSession(
     /** parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the rest of it. */
     public var lastHurt: Float = 0f
 
+    /**
+     * Ticks since the last swing, which is what a hit is charged from.
+     *
+     * parity: `Player.attackStrengthTicker`. A swing before the bar refills lands a fifth of the
+     * damage, which is the whole reason a player waits between hits.
+     */
+    public var ticksSinceSwing: Int = 0
+
     public val food: FoodData = FoodData()
     public val experience: ExperienceData = ExperienceData()
 

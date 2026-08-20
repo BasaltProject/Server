@@ -182,6 +182,50 @@ public object Projectiles {
         return null
     }
 
+    /**
+     * How far along the line from/to a box is first touched, from zero to one, or null when the
+     * line misses it.
+     *
+     * parity: `AABB.clip` over `ProjectileUtil.getEntityHitResult`, which is what makes an arrow
+     * hit whoever it passes through rather than only whoever it ends the tick inside.
+     */
+    public fun clipBox(
+        fromX: Double,
+        fromY: Double,
+        fromZ: Double,
+        toX: Double,
+        toY: Double,
+        toZ: Double,
+        minX: Double,
+        minY: Double,
+        minZ: Double,
+        maxX: Double,
+        maxY: Double,
+        maxZ: Double,
+    ): Double? {
+        var enter = 0.0
+        var exit = 1.0
+        val axes =
+            arrayOf(
+                doubleArrayOf(fromX, toX - fromX, minX, maxX),
+                doubleArrayOf(fromY, toY - fromY, minY, maxY),
+                doubleArrayOf(fromZ, toZ - fromZ, minZ, maxZ),
+            )
+        for (axis in axes) {
+            val (start, delta, low, high) = axis
+            if (delta == 0.0) {
+                if (start < low || start > high) return null
+                continue
+            }
+            val first = (low - start) / delta
+            val second = (high - start) / delta
+            enter = maxOf(enter, minOf(first, second))
+            exit = minOf(exit, maxOf(first, second))
+            if (enter > exit) return null
+        }
+        return enter
+    }
+
     /** parity: the two `atan2` calls that turn the movement into a yaw and a pitch. */
     private fun aimAlongMovement(entity: ServerEntity) {
         val horizontal = sqrt(entity.velocityX * entity.velocityX + entity.velocityZ * entity.velocityZ)
