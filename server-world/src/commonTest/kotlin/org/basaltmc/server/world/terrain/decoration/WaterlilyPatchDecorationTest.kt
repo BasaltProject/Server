@@ -24,6 +24,7 @@ class WaterlilyPatchDecorationTest {
 
         assertEquals(11, trace.writes)
         assertEquals(-8315557046034469117L, trace.hash)
+        assertEquals(5, chunk.takeGeneratedBlockWrites().size)
         val vector = vector(chunk)
         assertContentEquals(intArrayOf(26624, 256, 71418, 6), vector.counts)
         assertEquals(-7953542159652726649L, vector.categoryHash)

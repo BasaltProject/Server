@@ -7,6 +7,7 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class BushPatchDecorationTest {
     @Test
@@ -24,6 +25,9 @@ class BushPatchDecorationTest {
 
         assertEquals(7, trace.writes)
         assertEquals(2230447378615305955L, trace.hash)
+        val external = chunk.takeGeneratedBlockWrites()
+        assertEquals(2, external.size)
+        assertTrue(external.all { it.expectedStateId == Blocks.AIR.stateId })
         val vector = vector(chunk)
         assertContentEquals(intArrayOf(26624, 256, 71419, 5), vector.counts)
         assertEquals(7830217330186833734L, vector.categoryHash)

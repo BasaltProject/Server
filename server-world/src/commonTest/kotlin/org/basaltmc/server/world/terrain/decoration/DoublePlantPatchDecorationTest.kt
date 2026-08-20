@@ -7,6 +7,7 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DoublePlantPatchDecorationTest {
     @Test
@@ -26,6 +27,9 @@ class DoublePlantPatchDecorationTest {
 
             assertEquals(case.writes, trace.writes, "${case.name} writes")
             assertEquals(case.traceHash, trace.hash, "${case.name} trace")
+            val external = chunk.takeGeneratedBlockWrites()
+            assertEquals(case.externalWrites, external.size, "${case.name} external writes")
+            assertTrue(external.all { it.expectedStateId == Blocks.AIR.stateId })
             val vector = vector(chunk)
             assertContentEquals(case.counts, vector.counts, "${case.name} counts")
             assertEquals(case.categoryHash, vector.categoryHash, "${case.name} category hash")
@@ -173,6 +177,7 @@ class DoublePlantPatchDecorationTest {
         val rawStateHash: Long,
         val writes: Int,
         val traceHash: Long,
+        val externalWrites: Int,
     )
 
     private companion object {
@@ -187,6 +192,7 @@ class DoublePlantPatchDecorationTest {
                     8900036784792845259L,
                     34,
                     -181056490292152895L,
+                    14,
                 ),
                 Case(
                     "patch_large_fern",
@@ -197,6 +203,7 @@ class DoublePlantPatchDecorationTest {
                     3864674802480823379L,
                     50,
                     4587153096977197129L,
+                    14,
                 ),
             )
     }

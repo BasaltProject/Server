@@ -146,7 +146,7 @@ public object TallGrassDecoration {
             if (position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ) {
                 chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
             } else {
-                externalWrites[position] = stateId
+                setExternalDecorationBlockStateId(chunk, externalWrites, externalBlockState, position, stateId)
             }
             blockWriteObserver?.invoke(position.x, position.y, position.z, stateId)
         }
