@@ -19,8 +19,7 @@ import kotlin.uuid.Uuid
  *
  * Health, hunger and experience live here rather than on the connection because they outlive any
  * single packet exchange and are what a respawn resets; the connection ([connection]) is only how
- * they reach the client. Nothing here is persisted yet: a rejoin starts from these defaults, which
- * is a documented gap, not the intended end state.
+ * they reach the client, and `players.db` is where it survives a rejoin.
  */
 @OptIn(ExperimentalUuidApi::class)
 public class PlayerSession(

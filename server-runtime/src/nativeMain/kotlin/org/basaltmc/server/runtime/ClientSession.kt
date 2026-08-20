@@ -31,6 +31,7 @@ import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.entity.Taming
 import org.basaltmc.server.runtime.entity.Villagers
+import org.basaltmc.server.runtime.entity.Wardens
 import org.basaltmc.server.runtime.entity.ai.Navigation
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.item.ItemDamageEffects
@@ -294,6 +295,7 @@ import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.roundToLong
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.native.concurrent.ThreadLocal
@@ -433,6 +435,7 @@ public class ClientSession(
     private var diggingStage = -1
 
     /** Which slot is being eaten from, and how many ticks of the mouthful are left. */
+    private var usingItem = false
     private var eatingSlot = -1
     private var eatingTicks = 0
 
@@ -1209,7 +1212,11 @@ public class ClientSession(
         // Their advancements and recipe book, before anything can ask about them: `limited_crafting`
         // consults the book on the first click.
         progress?.load(session.uuid.toString())
-        logger.info { "${session.name} logged in with entity id $entityId at ($spawnX, $spawnY, $spawnZ)" }
+        // Where this player actually is, which for somebody coming back is not the world spawn.
+        logger.info {
+            "${session.name} logged in with entity id $entityId at " +
+                "(${oneDecimal(session.x)}, ${oneDecimal(session.y)}, ${oneDecimal(session.z)})"
+        }
         session.profileProperties = pendingProfile?.properties.orEmpty()
         session.skinParts = pendingSkinParts
         logger.info { "${session.name} joined the game" }
@@ -2616,11 +2623,9 @@ public class ClientSession(
      * plain blocks whose item shares the block's own name place correctly), then places it in the
      * empty space [ServerboundUseItemOnPacket.blockHit] points at.
      *
-     * parity: `ServerPlayerGameMode.useItemOn`. Oriented placement (stairs, logs, slabs facing the
-     * player), off-hand placing, and interacting with a block instead of placing on it (opening a
-     * container, flipping a lever) are all documented gaps: every block places in its default
-     * state, only the main hand is read, and this build has no block-entity/container-interaction
-     * model yet.
+     * parity: `ServerPlayerGameMode.useItemOn`, which answers a click on a block before it
+     * considers placing anything: a container opens, a lever flips, a bed is slept in. Off-hand
+     * placing is a documented gap, since only the main hand is read.
      */
 
     private fun handleUseItemOn(useItemOn: ServerboundUseItemOnPacket) {
@@ -2717,6 +2722,12 @@ public class ClientSession(
             }
             if (clickedState != null && BlockInteractions.isToggleable(clickedState)) {
                 toggleBlock(hit.pos)
+                return ack()
+            }
+            // parity: `RepeaterBlock.useWithoutItem` and `ComparatorBlock.useWithoutItem`, the
+            // right click that moves the delay on a notch or flips the comparator's mode.
+            if (clickedState != null && BlockInteractions.isCycleable(clickedState)) {
+                cycleBlock(hit.pos)
                 return ack()
             }
             // parity: `SignBlockEntity.executeClickCommandsIfPresent` aside, clicking a sign that is
@@ -2965,6 +2976,9 @@ public class ClientSession(
             ) ?: return
 
         for (block in result.changes) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+        // parity: `BucketItem.emptyContents` calls `setBlock`, so what was around it hears about it:
+        // grass that had a snow layer over it until the water took its place stops wearing snow.
+        for (block in result.changes) notifyNeighbours(BlockPos(block[0], block[1], block[2]))
         val replacement = result.replacement ?: return
         session.inventory[heldSlot] = held.copy(id = replacement.toString(), count = 1)
         sendInventorySlot(heldSlot)
@@ -3427,6 +3441,8 @@ public class ClientSession(
         // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it: one
         // sends a monster after whoever swung, the other sends an animal running.
         target.hurtBy = session.entityId
+        // parity: `Warden.hurtServer`, which adds the angry threshold plus twenty to whoever hit it.
+        if (Wardens.isWarden(target.type)) Wardens.anger(target, session.entityId, Wardens.HURT)
         target.panicTicks = PANIC_TICKS
         // parity: `OwnerHurtTargetGoal`, which sends a pet after whatever its owner just hit.
         for (pet in world.state.entities()) {
@@ -3488,6 +3504,7 @@ public class ClientSession(
                 killEntity(nearby)
             } else {
                 nearby.hurtBy = session.entityId
+                if (Wardens.isWarden(nearby.type)) Wardens.anger(nearby, session.entityId, Wardens.HURT)
                 nearby.panicTicks = PANIC_TICKS
             }
         }
@@ -5060,8 +5077,8 @@ public class ClientSession(
      * Middle-click "pick block". In creative, always fills the current hotbar slot with a full
      * stack of the targeted block's item; in survival, only swaps it in from wherever this player
      * already carries it, matching vanilla: survival pick-block cannot conjure an item from
-     * nothing. [ServerboundPickItemFromBlockPacket.includeData] (copying a sign's text, a
-     * container's contents onto the picked stack) is a documented gap: no block entities yet.
+     * nothing. [ServerboundPickItemFromBlockPacket.includeData], the control-click that copies a
+     * sign's text or a container's contents onto the picked stack, is a documented gap.
      */
     private fun handlePickItemFromBlock(packet: ServerboundPickItemFromBlockPacket) {
         val session = playerSession ?: return
@@ -5157,6 +5174,15 @@ public class ClientSession(
                 SystemChatPacket(message, isActionBar = false).write(it)
             }
         }
+    }
+
+    /** A coordinate as the log wants it: one decimal, which is as much as anybody reads off it. */
+    private fun oneDecimal(value: Double): String {
+        // The sign is kept apart from the digits: dividing a negative tenth by ten is zero, so
+        // anything between -1 and 0 came out looking positive.
+        val tenths = (abs(value) * 10.0).roundToLong()
+        val sign = if (value < 0.0 && tenths != 0L) "-" else ""
+        return "$sign${tenths / 10}.${tenths % 10}"
     }
 
     /** Everyone who can actually see this player: the tab list is server-wide, entities are not. */
@@ -5955,9 +5981,22 @@ public class ClientSession(
         slot: Int,
     ): Boolean {
         val food = ItemFood.of(item) ?: return false
-        if (!food.canAlwaysEat && session.food.foodLevel >= FoodData.MAX_FOOD) return true
+        // A click on a block and the click that follows it are one mouthful, not two: the client
+        // sends `use_item_on` and then `use_item` for the same press, and restarting the timer on
+        // the second one meant a held button never finished a single one. parity: vanilla starts the
+        // use once because its `useItemOn` never falls through to `use` on the same packet.
+        if (eatingSlot == slot) return true
+        if (!food.canAlwaysEat && session.food.foodLevel >= FoodData.MAX_FOOD) {
+            // parity: `ServerPlayerGameMode.useItem` sends the whole inventory back whenever the use
+            // never started. Without it a client that had already predicted the mouthful kept the
+            // animation and the missing item for good, which is what a full player saw here.
+            sendInventoryAll()
+            syncHealth()
+            return true
+        }
         eatingSlot = slot
         eatingTicks = food.consumeTicks
+        setUsingItem(true)
         return true
     }
 
@@ -5976,12 +6015,14 @@ public class ClientSession(
         if (session.gamemode != Gamemode.CREATIVE && session.inventory.indexOf(ARROW_ITEM) == null) return true
         drawingSlot = slot
         drawingTicks = 0
+        setUsingItem(true)
         return true
     }
 
     private fun stopDrawing() {
         drawingSlot = -1
         drawingTicks = 0
+        setUsingItem(false)
     }
 
     /**
@@ -6122,6 +6163,32 @@ public class ClientSession(
         sendPlayPacket(CooldownPacket.ID) { CooldownPacket(item.toString(), ticks).write(it) }
     }
 
+    /**
+     * The "this one is using an item" flag, sent to everybody including its owner.
+     *
+     * parity: `LivingEntity.setLivingEntityFlag(1, ...)`. The owner's own client needs it as much as
+     * the onlookers do: `LocalPlayer.isUsingItem` is its own flag, and the only thing that clears it
+     * is this metadata coming back saying the server is no longer using anything. Without it the
+     * client thought it was still eating for ever, so holding the button never started a second
+     * mouthful and the animation stayed up.
+     */
+    private fun setUsingItem(using: Boolean) {
+        if (usingItem == using) return
+        usingItem = using
+        val session = playerSession ?: return
+        val flags = if (using) LIVING_FLAG_USING_ITEM else 0
+        val packet =
+            SetEntityDataPacket(
+                session.entityId,
+                listOf(SetEntityDataPacket.Entry.Bytes(SetEntityDataPacket.LIVING_FLAGS_INDEX, flags.toByte())),
+            )
+        sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.entityId == session.entityId) continue
+            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        }
+    }
+
     /** parity: `BowItem.getPowerForTime`. */
     private fun bowPower(ticks: Int): Float {
         val drawn = ticks / BOW_DRAW_TICKS
@@ -6131,6 +6198,7 @@ public class ClientSession(
     private fun stopEating() {
         eatingSlot = -1
         eatingTicks = 0
+        setUsingItem(false)
     }
 
     /** One tick of the mouthful, and the swallow at the end of it. */
@@ -6365,6 +6433,33 @@ public class ClientSession(
         for (other in playersInSameWorld()) {
             if (other.entityId == playerSession?.entityId) continue
             other.connection.sendPlayPacket(SoundPacket.ID) { sound.write(it) }
+        }
+    }
+
+    /** Moving a repeater's delay on, or a comparator's mode over: the change and its click. */
+    private fun cycleBlock(pos: BlockPos) {
+        val world = currentWorld ?: return
+        val cycled = BlockInteractions.cycle(world, pos.x, pos.y, pos.z) ?: return
+        broadcastBlockUpdate(pos, cycled.stateId)
+        // parity: both of them are components, so the change has to reach the dust and the diodes
+        // around them: a repeater set to four notches re-books its own turn from here.
+        notifyNeighbours(pos)
+        val sound = cycled.sound ?: return
+        val packet =
+            SoundPacket(
+                sound = sound,
+                source = SoundSource.BLOCKS,
+                x = pos.x + 0.5,
+                y = pos.y + 0.5,
+                z = pos.z + 0.5,
+                volume = cycled.volume,
+                pitch = cycled.pitch,
+                seed = Random.nextLong(),
+            )
+        sendPlayPacket(SoundPacket.ID) { packet.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.entityId == playerSession?.entityId) continue
+            other.connection.sendPlayPacket(SoundPacket.ID) { packet.write(it) }
         }
     }
 
@@ -6872,6 +6967,9 @@ public class ClientSession(
 
         /** parity: `Player.attack`'s own `causeFoodExhaustion(0.1)`. */
         const val ATTACK_EXHAUSTION = 0.1f
+
+        /** parity: `LivingEntity.setLivingEntityFlag`'s first bit, the one that says "using". */
+        const val LIVING_FLAG_USING_ITEM = 0x01
 
         /** parity: `Player.entityInteractionRange` plus the slack the packet handler allows. */
         const val ATTACK_REACH = 6.0

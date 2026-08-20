@@ -77,7 +77,7 @@ public class FoodData {
      * starvation damage; all three keep this class free of the rest of the player.
      *
      * parity: `net.minecraft.world.food.FoodData.tick`. `naturalRegeneration` is assumed on
-     * (vanilla's own game rule default); game rules themselves are a documented gap.
+     * (vanilla's own game rule default) rather than read from the world's rules.
      */
     public fun tick(
         difficulty: Difficulty,
@@ -149,8 +149,7 @@ public class FoodData {
          *
          * parity: `ServerPlayer.checkMovementStatistics`. Walking and crouching really are free in
          * 26.2 (their multiplier is literally `0.0F` in the jar); sprinting costs 0.1 per block.
-         * Swimming and jumping also cost there, and are a documented gap here: neither fluid state
-         * nor a jump is observable from the packets this server handles yet.
+         * Swimming costs 0.01 and a jump 0.05, or 0.2 while sprinting, both charged from here.
          */
         public fun movementExhaustion(
             dx: Double,

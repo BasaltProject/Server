@@ -127,6 +127,17 @@ public class ServerEntity(
     /** Whether it is winding up a shot. parity: `Ghast.setCharging`/`Blaze.setCharged`. */
     public var charging: Boolean = false
 
+    /**
+     * How angry a warden is at each entity it has noticed, by entity id.
+     *
+     * parity: `AngerManagement`, and null for everything that is not a warden: a map per entity
+     * would cost every arrow and every item in the world one.
+     */
+    public var anger: MutableMap<Int, Int>? = null
+
+    /** parity: `MemoryModuleType.TOUCH_COOLDOWN`, the second a warden waits between shoves. */
+    public var touchCooldown: Int = 0
+
     /** parity: `Raider.getCurrentRaid`, kept here as the village this raider is walking to. */
     public var raidCenter: IntArray? = null
 

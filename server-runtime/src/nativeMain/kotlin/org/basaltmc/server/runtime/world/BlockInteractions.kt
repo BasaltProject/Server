@@ -9,6 +9,14 @@ public class BlockToggle(
     public val sound: String,
 )
 
+/** A block whose property moved one notch on, and the sound it made if any. */
+public class BlockCycle(
+    public val stateId: Int,
+    public val sound: String?,
+    public val pitch: Float = 1f,
+    public val volume: Float = 1f,
+)
+
 /** A block that changed on its own timer, and the sound it made. */
 public class BlockRelease(
     public val stateId: Int,
@@ -90,6 +98,57 @@ public object BlockInteractions {
         if (changes.isEmpty()) return null
         return BlockToggle(changes, soundFor(block, kind, open))
     }
+
+    /**
+     * The right click that moves a repeater's delay on a notch or flips a comparator's mode.
+     *
+     * parity: `RepeaterBlock.useWithoutItem`, which cycles the delay in silence, and
+     * `ComparatorBlock.useWithoutItem`, which cycles the mode and clicks.
+     */
+    public fun cycle(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): BlockCycle? {
+        val stateId = world.state.getBlockState(x, y, z) ?: return null
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return null
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        return when (block.path) {
+            "repeater" -> {
+                val delay = properties["delay"]?.toIntOrNull() ?: 1
+                val next = if (delay >= MAX_DELAY) 1 else delay + 1
+                val turned =
+                    BlockStateDefinitions.stateIdOf(block, mapOf("delay" to next.toString()), fromStateId = stateId)
+                        ?: return null
+                if (!world.state.setBlockState(x, y, z, turned)) return null
+                BlockCycle(turned, sound = null)
+            }
+            "comparator" -> {
+                val subtracting = properties["mode"] == "subtract"
+                val mode = if (subtracting) "compare" else "subtract"
+                val turned =
+                    BlockStateDefinitions.stateIdOf(block, mapOf("mode" to mode), fromStateId = stateId) ?: return null
+                if (!world.state.setBlockState(x, y, z, turned)) return null
+                // parity: the pitch says which way it went, and it is quieter than a lever.
+                val pitch = if (subtracting) COMPARE_PITCH else SUBTRACT_PITCH
+                BlockCycle(turned, COMPARATOR_CLICK, pitch = pitch, volume = COMPARATOR_VOLUME)
+            }
+            else -> null
+        }
+    }
+
+    /** Whether a hand moves this block on a notch rather than flipping it. */
+    public fun isCycleable(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path in CYCLEABLE
+
+    private val CYCLEABLE = setOf("repeater", "comparator")
+
+    /** parity: `RepeaterBlock.DELAY`, one to four, and `ComparatorBlock`'s own click. */
+    private const val MAX_DELAY = 4
+    private const val COMPARATOR_CLICK = "block.comparator.click"
+    private const val COMPARATOR_VOLUME = 0.3f
+    private const val SUBTRACT_PITCH = 0.55f
+    private const val COMPARE_PITCH = 0.5f
 
     private enum class Toggle(
         val property: String,
