@@ -101,10 +101,18 @@ public sealed class TrunkPlacer(
         z: Int,
         trunkStateId: Int,
     ): Boolean {
-        if (!isValidTreePos(chunk, x, y, z)) return false
+        if (!validTreePos(chunk, x, y, z)) return false
         setBlock(chunk, x, y, z, trunkStateId)
         return true
     }
+
+    /** // parity: TrunkPlacer.validTreePos; specialized placers may extend the accepted blocks. */
+    protected open fun validTreePos(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean = isValidTreePos(chunk, x, y, z)
 
     /** // parity: TrunkPlacer.placeBelowTrunkBlock with the default rule provider. */
     protected fun placeBelowTrunkBlock(
@@ -125,7 +133,7 @@ public sealed class TrunkPlacer(
         y: Int,
         z: Int,
     ): Boolean =
-        isValidTreePos(chunk, x, y, z) ||
+        validTreePos(chunk, x, y, z) ||
             TreeFeature.isLogState(chunk.getDecorationBlockStateId(x, y, z))
 
     /** // parity: TrunkPlacer.placeLogIfFree. */
@@ -647,10 +655,8 @@ public class MegaJungleTrunkPlacer(
 
 /**
  * // parity: UpwardsBranchingTrunkPlacer (mangrove): a straight trunk with random horizontal
- * branches rolled at every log. [TrunkPlacer.isFree]/`validTreePos`'s real `canGrowThrough` override
- * (logs may grow through mangrove leaves/propagules) is not ported: a documented, minor gap, not
- * expected to change the trunk's own shape in the common case (nothing else is placed yet when the
- * trunk runs).
+ * branches rolled at every log. Its `can_grow_through` block set extends both the preflight and the
+ * actual log placement predicate.
  */
 public class UpwardsBranchingTrunkPlacer(
     baseHeight: Int,
@@ -660,6 +666,17 @@ public class UpwardsBranchingTrunkPlacer(
     private val placeBranchPerLogProbability: Float,
     private val extraBranchLength: IntProvider,
 ) : TrunkPlacer(baseHeight, heightRandA, heightRandB) {
+    override fun validTreePos(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        if (super.validTreePos(chunk, x, y, z)) return true
+        if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
+        return Blocks.byStateId(chunk.getDecorationBlockStateId(x, y, z))?.block?.path in canGrowThroughPaths
+    }
+
     override fun placeTrunk(
         chunk: Chunk,
         random: WorldgenRandom,
@@ -735,6 +752,21 @@ public class UpwardsBranchingTrunkPlacer(
             attachments.add(FoliageAttachment(logX, heightAlongBranch, logZ, 0, false))
             attachments.add(FoliageAttachment(logX, heightAlongBranch - 2, logZ, 0, false))
         }
+    }
+
+    private companion object {
+        // parity: block tag mangrove_logs_can_grow_through.
+        val canGrowThroughPaths: Set<String> =
+            setOf(
+                "mud",
+                "muddy_mangrove_roots",
+                "mangrove_roots",
+                "mangrove_leaves",
+                "mangrove_log",
+                "mangrove_propagule",
+                "moss_carpet",
+                "vine",
+            )
     }
 }
 
@@ -875,9 +907,8 @@ public class CherryTrunkPlacer(
 /**
  * // parity: RootPlacer + MangroveRootPlacer (the only root placer real vanilla has), decompiled
  * from the real jar: an elevated trunk start plus a recursive root simulation per horizontal
- * direction. Waterlogged root states not modeled (no fluids, this file's documented gap);
- * `TreeFeature.validTreePos` keeps this file's established air-only simplification, with the real
- * `mangrove_roots_can_grow_through` tag on top as a literal set extracted from the jar's own data.
+ * direction, including potentially-waterlogged root states and the real
+ * `mangrove_roots_can_grow_through` tag.
  */
 public class MangroveRootPlacer(
     private val trunkOffsetY: IntProvider,
@@ -1006,7 +1037,7 @@ public class MangroveRootPlacer(
     ): Boolean {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
         val id = chunk.getDecorationBlockStateId(x, y, z)
-        return Blocks.isAir(id) || id in canGrowThroughIds
+        return isValidTreePos(chunk, x, y, z) || Blocks.byStateId(id)?.block?.path in canGrowThroughPaths
     }
 
     private fun placeRoot(
@@ -1021,9 +1052,9 @@ public class MangroveRootPlacer(
         // parity: MangroveRootPlacer.placeRoot: mud/muddy roots become muddy_mangrove_roots
         // regardless of canPlaceRoot; everything else goes through the real RootPlacer.placeRoot.
         if (current == mudStateId || current == muddyMangroveRootsStateId) {
-            chunk.setDecorationBlockStateId(x, y, z, muddyMangroveRootsStateId)
+            chunk.setDecorationBlockStateId(x, y, z, potentiallyWaterlogged(muddyMangroveRootsStateId, current))
         } else if (canPlaceRoot(chunk, x, y, z)) {
-            chunk.setDecorationBlockStateId(x, y, z, mangroveRootsStateId)
+            chunk.setDecorationBlockStateId(x, y, z, potentiallyWaterlogged(mangroveRootsStateId, current))
             if (random.nextFloat() < ABOVE_ROOT_CHANCE &&
                 y + 1 <= WorldHeight.MAX_Y &&
                 Blocks.isAir(chunk.getDecorationBlockStateId(x, y + 1, z))
@@ -1031,6 +1062,18 @@ public class MangroveRootPlacer(
                 chunk.setDecorationBlockStateId(x, y + 1, z, mossCarpetStateId)
             }
         }
+    }
+
+    private fun potentiallyWaterlogged(
+        stateId: Int,
+        replacedStateId: Int,
+    ): Int {
+        val state = Blocks.byStateId(stateId) ?: return stateId
+        if (!state.properties.containsKey("waterlogged")) return stateId
+        return Blocks.stateIdOf(
+            state.block,
+            state.properties + ("waterlogged" to Blocks.hasWaterFluid(replacedStateId).toString()),
+        ) ?: stateId
     }
 
     private companion object {
@@ -1055,15 +1098,8 @@ public class MangroveRootPlacer(
         val mossCarpetStateId = state("moss_carpet")
 
         // parity: block tag mangrove_roots_can_grow_through.
-        val canGrowThroughIds: Set<Int> =
-            listOf("mud", "muddy_mangrove_roots", "mangrove_roots", "moss_carpet", "vine", "mangrove_propagule", "snow")
-                .mapNotNull {
-                    Blocks.REGISTRY
-                        .byIdentifier(
-                            org.basaltmc.wire.common.Identifier
-                                .vanilla(it),
-                        )?.stateId
-                }.toSet()
+        val canGrowThroughPaths: Set<String> =
+            setOf("mud", "muddy_mangrove_roots", "mangrove_roots", "moss_carpet", "vine", "mangrove_propagule", "snow")
     }
 }
 
