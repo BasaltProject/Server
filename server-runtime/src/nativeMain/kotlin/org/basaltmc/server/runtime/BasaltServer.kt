@@ -885,6 +885,12 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Scheduled function '$id' failed" } }
         }
         for (world in worlds.values) {
+            // The tick thread owns every world's state. Claiming it here rather than at startup
+            // keeps it true even if the loop ever moves to another thread, and running what other
+            // threads left for it *before* the tick is what makes their work part of this tick
+            // rather than of an unpredictable one.
+            if (!world.owner.isCurrent) world.owner.bindToCurrentThread()
+            world.owner.runPending { logger.error(it) { "A task for world '${world.name}' failed" } }
             runCatching { world.state.tickItems() }
                 .onFailure { logger.error(it) { "Item tick failed in world '${world.name}'" } }
             runCatching { tickTime(world) }

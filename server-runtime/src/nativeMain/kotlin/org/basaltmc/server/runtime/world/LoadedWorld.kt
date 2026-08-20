@@ -5,6 +5,7 @@ import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldSettings
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.entity.EntityNbt
+import org.basaltmc.server.runtime.sched.Owner
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.FlatWorldGenerator
 import org.basaltmc.server.world.LeafDistances
@@ -45,6 +46,15 @@ public class LoadedWorld(
     private val normalGenerator: ((chunkX: Int, chunkZ: Int) -> Chunk)? = null,
 ) {
     public val name: String get() = declaration.name
+
+    /**
+     * Who owns this world's state: its chunks, its blocks and everything living in them.
+     *
+     * The tick thread claims it on its first turn, and from then on anybody else reaches it with
+     * [org.basaltmc.server.runtime.sched.Owner.submit] rather than by touching it. One world, one
+     * owner today; one per region when regions are turned on, with the same rule.
+     */
+    public val owner: Owner = Owner(declaration.name)
 
     /**
      * What the client calls this world: a `ResourceKey<Level>`, not a dimension type.
@@ -98,7 +108,8 @@ public class LoadedWorld(
     /** Where this world's portals are, including the ones in chunks nobody has loaded. */
     public val portals: PortalIndex = PortalIndex().also { it.load(worldRoot) }
 
-    public val state: WorldState = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
+    public val state: WorldState =
+        WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk).also { it.owner = owner }
 
     public val generationQueue: ChunkGenerationQueue =
         ChunkGenerationQueue(state, declaration.dimension.registryPath, workerCount = generationWorkers)
