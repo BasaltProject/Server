@@ -21,14 +21,21 @@ public object CactusFeature {
         origin: DecorationPos,
     ): Boolean {
         if (origin.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
-        val localX = origin.x and 15
-        val localZ = origin.z and 15
-        if (!Blocks.isAir(chunk.getBlockStateId(localX, origin.y, localZ))) return false
+        val region = ChunkCactusRegion(chunk)
+        if (!Blocks.isAir(region.get(origin))) return false
         if (origin.y - 1 < WorldHeight.MIN_Y ||
-            Blocks.isAir(chunk.getBlockStateId(localX, origin.y - 1, localZ))
+            Blocks.isAir(region.get(origin.copy(y = origin.y - 1)))
         ) {
             return false
         }
+        return placeColumn(region, random, origin)
+    }
+
+    internal fun placeColumn(
+        region: CactusFeatureRegion,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Boolean {
         // parity: BiasedToBottomInt.sample: min + nextInt(nextInt(max - min + 1) + 1); the flower
         // layer's WeightedListInt draws nextInt(4) with only the last slot blooming.
         val cactusHeight = 1 + random.nextInt(random.nextInt(3) + 1)
@@ -39,8 +46,8 @@ public object CactusFeature {
         // truncates the flower layer first, then the cactus body.
         var newHeight = totalHeight
         for (dy in 1..totalHeight) {
-            val y = origin.y + dy
-            if (y > WorldHeight.MAX_Y || !Blocks.isAir(chunk.getBlockStateId(localX, y, localZ))) {
+            val position = origin.copy(y = origin.y + dy)
+            if (position.y > WorldHeight.MAX_Y || !Blocks.isAir(region.get(position))) {
                 newHeight = dy - 1
                 break
             }
@@ -55,14 +62,34 @@ public object CactusFeature {
 
         var y = origin.y
         repeat(cacti) {
-            chunk.setBlockStateId(localX, y, localZ, cactusStateId)
+            region.set(origin.copy(y = y), cactusStateId)
             y++
         }
         repeat(flowers) {
-            chunk.setBlockStateId(localX, y, localZ, cactusFlowerStateId)
+            region.set(origin.copy(y = y), cactusFlowerStateId)
             y++
         }
         return true
+    }
+
+    private class ChunkCactusRegion(
+        private val chunk: Chunk,
+    ) : CactusFeatureRegion {
+        override fun get(position: DecorationPos): Int =
+            if (position.y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
+            } else {
+                Blocks.AIR.stateId
+            }
+
+        override fun set(
+            position: DecorationPos,
+            stateId: Int,
+        ) {
+            if (position.y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
+            }
+        }
     }
 
     private val cactusStateId =
@@ -79,4 +106,13 @@ public object CactusFeature {
                     .vanilla("cactus_flower"),
             )?.stateId
             ?: error("unknown block 'cactus_flower'")
+}
+
+internal interface CactusFeatureRegion {
+    fun get(position: DecorationPos): Int
+
+    fun set(
+        position: DecorationPos,
+        stateId: Int,
+    )
 }

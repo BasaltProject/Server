@@ -169,8 +169,8 @@ public object MelonPatchDecoration {
         )
     private val SPECS =
         listOf(
-            PatchSpec("patch_melon", 92, 6, setOf("bamboo_jungle", "jungle")),
-            PatchSpec("patch_melon_sparse", 93, 64, setOf("sparse_jungle")),
+            PatchSpec("patch_melon_sparse", 92, 64, setOf("sparse_jungle")),
+            PatchSpec("patch_melon", 93, 6, setOf("bamboo_jungle", "jungle")),
         )
     private const val VEGETAL_DECORATION_STEP = 9
 }

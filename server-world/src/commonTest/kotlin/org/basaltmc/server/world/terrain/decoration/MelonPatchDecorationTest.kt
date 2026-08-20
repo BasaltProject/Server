@@ -206,7 +206,7 @@ class MelonPatchDecorationTest {
                 Case(
                     "patch_melon",
                     "jungle",
-                    1L,
+                    0L,
                     intArrayOf(26624, 256, 71415, 9),
                     -5129564035390802870L,
                     84512005563536950L,
@@ -216,7 +216,7 @@ class MelonPatchDecorationTest {
                 Case(
                     "patch_melon_sparse",
                     "sparse_jungle",
-                    59L,
+                    60L,
                     intArrayOf(26624, 256, 71414, 10),
                     -1059605890604393077L,
                     -8516619041149079805L,

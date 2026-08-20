@@ -266,13 +266,11 @@ public object BiomeDecoration {
                     combine(
                         requireBase(id),
                         PlainsDecoration.FLOWERS,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "sunflower_plains" ->
                     combine(
                         requireBase(id),
                         PlainsDecoration.FLOWERS,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "ocean" -> oceanWithExtra(AquaticDecoration.OCEAN)
                 "deep_ocean" -> oceanWithExtra(AquaticDecoration.DEEP_OCEAN)
@@ -285,62 +283,46 @@ public object BiomeDecoration {
                     combine(
                         TreeDecoration.WATER,
                         requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "river" ->
                     combine(
                         TreeDecoration.WATER,
                         DefaultVegetationDecoration,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                         AquaticDecoration.RIVER,
                     )
                 "frozen_river" ->
                     combine(
                         TreeDecoration.WATER,
                         requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "swamp" ->
                     combine(
                         requireBase(id),
-                        ExtraVegetationDecoration.SWAMP_WITHOUT_PUMPKIN,
                         AquaticDecoration.SWAMP,
                     )
                 "mangrove_swamp" ->
-                    combine(requireBase(id), AquaticDecoration.SWAMP, ExtraVegetationDecoration.MANGROVE)
-                "desert" -> combine(requireBase(id), ExtraVegetationDecoration.DESERT_WITHOUT_PUMPKIN)
-                "badlands", "eroded_badlands", "wooded_badlands" ->
-                    combine(requireBase(id), ExtraVegetationDecoration.BADLANDS_WITHOUT_PUMPKIN)
-                "mushroom_fields" -> combine(requireBase(id), ExtraVegetationDecoration.NEAR_WATER)
+                    combine(requireBase(id), AquaticDecoration.SWAMP)
+                "desert" -> requireBase(id)
+                "badlands", "eroded_badlands", "wooded_badlands" -> requireBase(id)
+                "mushroom_fields" -> requireBase(id)
                 "jungle", "bamboo_jungle" ->
                     combine(
                         requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                         JungleVineDecoration,
                     )
                 "sparse_jungle" ->
                     combine(
                         requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                         JungleVineDecoration,
                     )
-                "savanna", "savanna_plateau" ->
-                    combine(
-                        requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
-                    )
-                "windswept_savanna" ->
-                    combine(
-                        requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
-                    )
+                "savanna", "savanna_plateau" -> requireBase(id)
+                "windswept_savanna" -> requireBase(id)
                 "forest" ->
                     combine(
                         ForestFlowerDecoration.NORMAL,
                         requireBase(id),
                         DefaultVegetationDecoration.FLOWERS,
                         ForestGroundDecoration.GRASS,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "birch_forest", "old_growth_birch_forest" ->
                     combine(
@@ -349,7 +331,6 @@ public object BiomeDecoration {
                         requireBase(id),
                         DefaultVegetationDecoration.FLOWERS,
                         ForestGroundDecoration.GRASS,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "dark_forest" ->
                     combine(
@@ -357,8 +338,6 @@ public object BiomeDecoration {
                         ForestFlowerDecoration.NORMAL,
                         DefaultVegetationDecoration.FLOWERS,
                         ForestGroundDecoration.GRASS,
-                        ForestFloorDecoration.LEAF_LITTER,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "pale_garden" ->
                     combine(
@@ -367,37 +346,21 @@ public object BiomeDecoration {
                         PaleGardenDecoration.FLOWER_PATCH,
                         PaleGardenDecoration.RARE_FLOWER,
                         ForestGroundDecoration.GRASS,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "flower_forest" ->
                     combine(
                         ForestFlowerDecoration.FLOWER_FOREST,
                         requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
                 "windswept_hills", "windswept_gravelly_hills", "windswept_forest" ->
                     combine(
                         requireBase(id),
                         DefaultVegetationDecoration,
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
                     )
-                in OLD_GROWTH_TAIGA_PATHS ->
-                    combine(
-                        requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
-                    )
-                "taiga" ->
-                    combine(
-                        requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
-                    )
-                "snowy_taiga" ->
-                    combine(
-                        requireBase(id),
-                        ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
-                    )
-                in DEFAULT_EXTRA_PATHS ->
-                    combine(requireBase(id), ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN)
+                in OLD_GROWTH_TAIGA_PATHS -> requireBase(id)
+                "taiga" -> requireBase(id)
+                "snowy_taiga" -> requireBase(id)
+                in DEFAULT_EXTRA_PATHS -> requireBase(id)
                 in PUMPKIN_ONLY_PATHS ->
                     requireBase(id)
                 else -> byBiome[id]
@@ -409,7 +372,6 @@ public object BiomeDecoration {
         combine(
             TreeDecoration.WATER,
             DefaultVegetationDecoration,
-            ExtraVegetationDecoration.DEFAULT_WITHOUT_PUMPKIN,
             aquatic,
         )
 
