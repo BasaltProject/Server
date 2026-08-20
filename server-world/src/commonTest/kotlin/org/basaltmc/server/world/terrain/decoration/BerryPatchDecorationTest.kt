@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -7,6 +9,7 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class BerryPatchDecorationTest {
     @Test
@@ -50,19 +53,37 @@ class BerryPatchDecorationTest {
         assertContentEquals(intArrayOf(26624, 256, 71424, 0), vector(chunk).counts)
     }
 
-    private fun flatChunk(): Chunk =
+    @Test
+    fun snowyGrassMatchesThePlacedFeatureBlockPredicate() {
+        val chunk = flatChunk(Blocks.GRASS_BLOCK.stateId - 1)
+
+        BerryPatchDecoration.placeAt(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(1234L)),
+            DecorationPos(8, 41, 8),
+        )
+
+        assertTrue(vector(chunk).counts[3] > 0)
+    }
+
+    private fun flatChunk(surfaceStateId: Int = Blocks.GRASS_BLOCK.stateId): Chunk =
         Chunk(0, 0).also { chunk ->
             for (z in 0 until 16) {
                 for (x in 0 until 16) {
-                    for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) chunk.setBlockStateId(x, y, z, flatState(y))
+                    for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                        chunk.setBlockStateId(x, y, z, flatState(y, surfaceStateId))
+                    }
                 }
             }
         }
 
-    private fun flatState(y: Int): Int =
+    private fun flatState(
+        y: Int,
+        surfaceStateId: Int = Blocks.GRASS_BLOCK.stateId,
+    ): Int =
         when {
             y < 40 -> Blocks.DIRT.stateId
-            y == 40 -> Blocks.GRASS_BLOCK.stateId
+            y == 40 -> surfaceStateId
             else -> Blocks.AIR.stateId
         }
 

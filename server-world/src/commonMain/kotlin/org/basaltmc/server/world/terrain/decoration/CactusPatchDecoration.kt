@@ -88,7 +88,9 @@ public object CactusPatchDecoration {
             val neighbour = region.get(position.copy(x = position.x + dx, z = position.z + dz))
             if (BlockShapes.isSolidState(neighbour) || neighbour in LAVA_STATE_IDS) return false
         }
-        if (position.y == WorldHeight.MIN_Y || region.get(position.copy(y = position.y - 1)) !in CACTUS_SUPPORT) {
+        if (position.y == WorldHeight.MIN_Y ||
+            Blocks.byStateId(region.get(position.copy(y = position.y - 1)))?.block?.path !in CACTUS_SUPPORT
+        ) {
             return false
         }
         return region.get(position.copy(y = position.y + 1)) !in LIQUID_BLOCK_STATES
@@ -136,10 +138,10 @@ public object CactusPatchDecoration {
 
     private val CACTUS_SUPPORT =
         setOf(
-            stateId("cactus"),
-            stateId("sand"),
-            stateId("red_sand"),
-            stateId("suspicious_sand"),
+            "cactus",
+            "sand",
+            "red_sand",
+            "suspicious_sand",
         )
     private val LAVA_STATE_IDS = Blocks.LAVA.stateId..Blocks.LAVA.stateId + 15
     private val LIQUID_BLOCK_STATES =

@@ -1,6 +1,8 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -69,7 +71,9 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         origin: DecorationPos,
     ): Boolean {
         val oldState = region.get(origin) ?: return false
-        if (!isAirWaterOrLichen(oldState)) return false
+        // MultifaceGrowthFeature's origin gate is narrower than its search-target gate: an
+        // existing lichen may be traversed during the directional search, but cannot be the origin.
+        if (!Blocks.isAir(oldState) && oldState != Blocks.WATER.stateId) return false
 
         val directions = VALID_DIRECTIONS.shuffled(random)
         if (placeOnFirstSupport(region, random, origin, oldState, directions)) return true
@@ -186,12 +190,18 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         fun hasSturdyFace(
             position: DecorationPos,
             face: Direction,
-        ): Boolean =
-            when (get(position)?.let(Blocks::byStateId)?.block?.path) {
-                "sculk_sensor", "sculk_shrieker" -> face == Direction.DOWN
-                in NON_STURDY_BLOCKS -> false
-                else -> get(position)?.let(Chunk.HeightmapType.OCEAN_FLOOR::matches) == true
-            }
+        ): Boolean {
+            val stateId = get(position) ?: return false
+            return BlockShapes.isFaceSturdy(stateId, face.blockFace) ||
+                BlockShapes.faceCovers(
+                    stateId,
+                    face.blockFace,
+                    0,
+                    BlockShapes.UNITS,
+                    0,
+                    BlockShapes.UNITS,
+                )
+        }
     }
 
     private fun <T> List<T>.shuffled(random: WorldgenRandom): List<T> {
@@ -221,13 +231,14 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         val dz: Int,
         val axis: Axis,
         val falseBit: Int,
+        val blockFace: BlockFace,
     ) {
-        DOWN(0, -1, 0, Axis.Y, 64),
-        UP(0, 1, 0, Axis.Y, 4),
-        NORTH(0, 0, -1, Axis.Z, 16),
-        SOUTH(0, 0, 1, Axis.Z, 8),
-        WEST(-1, 0, 0, Axis.X, 1),
-        EAST(1, 0, 0, Axis.X, 32),
+        DOWN(0, -1, 0, Axis.Y, 64, BlockFace.DOWN),
+        UP(0, 1, 0, Axis.Y, 4, BlockFace.UP),
+        NORTH(0, 0, -1, Axis.Z, 16, BlockFace.NORTH),
+        SOUTH(0, 0, 1, Axis.Z, 8, BlockFace.SOUTH),
+        WEST(-1, 0, 0, Axis.X, 1, BlockFace.WEST),
+        EAST(1, 0, 0, Axis.X, 32, BlockFace.EAST),
         ;
 
         val opposite: Direction
@@ -270,6 +281,4 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
     private val VALID_DIRECTIONS =
         listOf(Direction.UP, Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST)
     private val ALL_DIRECTIONS = Direction.entries
-    private val NON_STURDY_BLOCKS =
-        setOf("glow_lichen", "sculk_vein", "pointed_dripstone", "sulfur_spike", "snow")
 }

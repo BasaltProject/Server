@@ -52,7 +52,7 @@ public object PumpkinPatchDecoration {
                 )
             if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(target))) return@repeat
             if (target.y == WorldHeight.MIN_Y ||
-                region.get(target.copy(y = target.y - 1)) != Blocks.GRASS_BLOCK.stateId
+                Blocks.byStateId(region.get(target.copy(y = target.y - 1)))?.block != Blocks.GRASS_BLOCK.block
             ) {
                 return@repeat
             }

@@ -4,6 +4,7 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,5 +40,19 @@ class SimpleBlockFeatureTest {
         assertEquals(Blocks.GRASS_BLOCK.stateId, writes.single { it.y == 62 }.stateId)
         assertEquals(Blocks.OAK_LOG.stateId, writes.single { it.y == 63 }.stateId)
         assertTrue(writes.all { it.x == 16 && it.z == 4 })
+    }
+
+    @Test
+    fun flowersUseSupportsVegetationInsteadOfAnySolidGround() {
+        val flowerStateId =
+            Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dandelion"))?.stateId
+                ?: error("missing dandelion")
+        val feature = SimpleBlockFeature({ _, _ -> flowerStateId })
+        val random = WorldgenRandom(XoroshiroRandom(1L))
+        val stone = Chunk(0, 0).also { it.setBlockStateId(8, 39, 8, Blocks.STONE.stateId) }
+        val snowyGrass = Chunk(0, 0).also { it.setBlockStateId(8, 39, 8, Blocks.GRASS_BLOCK.stateId - 1) }
+
+        assertEquals(false, feature.place(stone, random, DecorationPos(8, 40, 8)))
+        assertTrue(feature.place(snowyGrass, random, DecorationPos(8, 40, 8)))
     }
 }

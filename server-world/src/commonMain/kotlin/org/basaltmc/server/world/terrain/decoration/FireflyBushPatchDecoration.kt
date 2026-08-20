@@ -6,7 +6,6 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
-import org.basaltmc.wire.common.Identifier
 
 /** Exact step-9 placement for the three Overworld firefly-bush patches. */
 public object FireflyBushPatchDecoration {
@@ -99,7 +98,7 @@ public object FireflyBushPatchDecoration {
         position: DecorationPos,
     ): Boolean =
         position.y > WorldHeight.MIN_Y &&
-            region.get(position.copy(y = position.y - 1)) in SUPPORTS_VEGETATION
+            Blocks.byStateId(region.get(position.copy(y = position.y - 1)))?.block?.path in SUPPORTS_VEGETATION
 
     private class PatchRegion(
         private val chunk: Chunk,
@@ -141,14 +140,8 @@ public object FireflyBushPatchDecoration {
         val biomes: Set<String>,
     )
 
-    private fun states(vararg names: String): Set<Int> =
-        names
-            .map { name ->
-                Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
-            }.toSet()
-
     private val SUPPORTS_VEGETATION =
-        states(
+        setOf(
             "dirt",
             "coarse_dirt",
             "rooted_dirt",

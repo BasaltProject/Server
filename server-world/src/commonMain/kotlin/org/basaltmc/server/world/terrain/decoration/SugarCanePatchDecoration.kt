@@ -6,7 +6,6 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
-import org.basaltmc.wire.common.Identifier
 
 /** Exact step-9 placement for the four Overworld sugar-cane patches. */
 public object SugarCanePatchDecoration {
@@ -85,11 +84,10 @@ public object SugarCanePatchDecoration {
         if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(position))) return false
         if (position.y == WorldHeight.MIN_Y) return false
         val below = region.get(position.copy(y = position.y - 1))
-        if (!isSugarCane(below) && below !in SUGAR_CANE_SUPPORT) return false
+        if (!isSugarCane(below) && Blocks.byStateId(below)?.block?.path !in SUGAR_CANE_SUPPORT) return false
         return HORIZONTAL_OFFSETS.any { (dx, dz) ->
-            Blocks.hasWaterFluid(
-                region.get(position.copy(x = position.x + dx, y = position.y - 1, z = position.z + dz)),
-            )
+            val adjacent = region.get(position.copy(x = position.x + dx, y = position.y - 1, z = position.z + dz))
+            Blocks.hasWaterFluid(adjacent) || Blocks.byStateId(adjacent)?.block?.path == "frosted_ice"
         }
     }
 
@@ -147,26 +145,23 @@ public object SugarCanePatchDecoration {
         val biomes: Set<String>,
     )
 
-    private fun stateId(path: String): Int =
-        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
-
     private fun isSugarCane(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "sugar_cane"
 
     private val SUGAR_CANE_SUPPORT =
         setOf(
-            stateId("dirt"),
-            stateId("coarse_dirt"),
-            stateId("rooted_dirt"),
-            stateId("mud"),
-            stateId("muddy_mangrove_roots"),
-            stateId("moss_block"),
-            stateId("pale_moss_block"),
-            stateId("grass_block"),
-            stateId("podzol"),
-            stateId("mycelium"),
-            stateId("sand"),
-            stateId("red_sand"),
-            stateId("suspicious_sand"),
+            "dirt",
+            "coarse_dirt",
+            "rooted_dirt",
+            "mud",
+            "muddy_mangrove_roots",
+            "moss_block",
+            "pale_moss_block",
+            "grass_block",
+            "podzol",
+            "mycelium",
+            "sand",
+            "red_sand",
+            "suspicious_sand",
         )
     private val HORIZONTAL_OFFSETS = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
     private val DEFAULT_BIOMES =

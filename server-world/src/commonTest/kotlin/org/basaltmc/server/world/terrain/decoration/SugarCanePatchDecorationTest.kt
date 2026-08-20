@@ -8,6 +8,7 @@ import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class SugarCanePatchDecorationTest {
     @Test
@@ -52,7 +53,7 @@ class SugarCanePatchDecorationTest {
     }
 
     @Test
-    fun nearWaterFilterStillRequiresWaterBesideFrostedIce() {
+    fun frostedIceSupportsSugarCaneAdjacently() {
         val frostedIce = stateId("frosted_ice")
         val chunk = checkerboardBank(frostedIce)
         val trace = Trace()
@@ -66,7 +67,7 @@ class SugarCanePatchDecorationTest {
             blockWriteObserver = trace::write,
         )
 
-        assertEquals(0, trace.writes)
+        assertTrue(trace.writes > 0)
     }
 
     private fun checkerboardBank(adjacentStateId: Int): Chunk =

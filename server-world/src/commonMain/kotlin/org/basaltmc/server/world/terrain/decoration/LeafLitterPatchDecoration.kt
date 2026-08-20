@@ -58,7 +58,7 @@ public object LeafLitterPatchDecoration {
     ): Boolean {
         if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(position))) return false
         if (position.y == WorldHeight.MIN_Y) return false
-        return region.get(position.copy(y = position.y - 1)) == Blocks.GRASS_BLOCK.stateId
+        return Blocks.byStateId(region.get(position.copy(y = position.y - 1)))?.block == Blocks.GRASS_BLOCK.block
     }
 
     private fun leafLitterStateId(choice: Int): Int {
