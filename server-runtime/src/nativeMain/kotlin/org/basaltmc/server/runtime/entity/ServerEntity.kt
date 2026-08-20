@@ -71,6 +71,14 @@ public class ServerEntity(
     /** parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss. */
     public var hurtCooldown: Int = 0
 
+    /**
+     * Ticks left of running away from whatever hurt it.
+     *
+     * parity: `PanicGoal.shouldPanic`, which reads `getLastDamageSource`: a source is only kept for
+     * as long as it matters, and this is that window.
+     */
+    public var panicTicks: Int = 0
+
     /** parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the rest of it. */
     public var lastHurt: Float = 0f
 
@@ -79,6 +87,9 @@ public class ServerEntity(
 
     /** parity: `AbstractArrow.isCritArrow`, set by a fully drawn bow and worth extra damage. */
     public var critical: Boolean = false
+
+    /** Who hit it last, waiting for `HurtByTargetGoal` to turn that into a target. */
+    public var hurtBy: Int? = null
 
     /** Who it is angry at, by entity id, or null when nothing has hit it. parity: `Mob.target`. */
     public var targetId: Int? = null
@@ -94,6 +105,74 @@ public class ServerEntity(
 
     /** parity: `MeleeAttackGoal.ticksUntilNextPathRecalculation`, so a chase does not repath a tick. */
     public var repathCooldown: Int = 0
+
+    /**
+     * Who tamed it, by player uuid, and what it has been told to do.
+     *
+     * parity: `TamableAnimal`: the owner, the sitting pose and the two targets a pet inherits from
+     * whoever owns it.
+     */
+    public var owner: String? = null
+    public var sitting: Boolean = false
+    public var begging: Boolean = false
+    public var ownerHurtBy: Int? = null
+    public var ownerHurt: Int? = null
+
+    /** Ticks of fire left on it. parity: `Entity.remainingFireTicks`, which the client draws too. */
+    public var fireTicks: Int = 0
+
+    /** How big a slime or a magma cube is. parity: `AbstractCubeMob`'s own size, which is everything. */
+    public var cubeSize: Int = 1
+
+    /** Whether it is winding up a shot. parity: `Ghast.setCharging`/`Blaze.setCharged`. */
+    public var charging: Boolean = false
+
+    /** parity: `Raider.getCurrentRaid`, kept here as the village this raider is walking to. */
+    public var raidCenter: IntArray? = null
+
+    /** parity: a villager in its bed, which is a pose rather than anything the mob does. */
+    public var sleeping: Boolean = false
+
+    /** What a thrown bottle leaves behind. parity: `ThrownSplashPotion`'s own contents. */
+    public var potionEffect: String? = null
+
+    /** How hard a fireball goes off where it lands. parity: `LargeFireball.explosionPower`. */
+    public var explosionPower: Float = 0f
+
+    /** How far a creeper's fuse has burned. parity: `Creeper.swell`, which goes off at thirty. */
+    public var swell: Int = 0
+
+    /** Ticks it has been alive for. parity: `Entity.tickCount`, which is what staggers the mobs. */
+    public var tickCount: Int = 0
+
+    /** What the goals decided it is doing. parity: `Mob.goalSelector`, one set of goals per mob. */
+    public var goals: org.basaltmc.server.runtime.entity.ai.GoalSelector? = null
+
+    /** parity: `MoveControl`'s own wanted position and speed modifier, and whether it wants to move. */
+    public var wantedX: Double = 0.0
+    public var wantedY: Double = 0.0
+    public var wantedZ: Double = 0.0
+    public var moveSpeed: Double = 1.0
+    public var moving: Boolean = false
+
+    /**
+     * Whether it is pushing straight ahead rather than at a point.
+     *
+     * parity: a cube mob has no wanted position at all: `CubeMobMoveControl` only sets the speed,
+     * and the direction is whatever the mob is facing.
+     */
+    public var movingForward: Boolean = false
+
+    /** parity: `LookControl`: where the head is pointed, and for how much longer. */
+    public var lookX: Double = 0.0
+    public var lookY: Double = 0.0
+    public var lookZ: Double = 0.0
+    public var lookTicks: Int = 0
+    public var lookYawSpeed: Float = 10f
+    public var lookPitchSpeed: Float = 40f
+
+    /** parity: `Mob.yHeadRot`, which is what the client draws the head with. */
+    public var headYaw: Float = 0f
 
     /** Where it is walking, as x/y/z, or null when it is standing still. parity: `MoveControl`'s wanted position. */
     public var walkTarget: DoubleArray? = null

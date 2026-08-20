@@ -31,6 +31,14 @@ public object Projectiles {
     public val SPECTRAL_ARROW: Kind =
         Kind(Identifier.vanilla("spectral_arrow"), gravity = 0.05, drag = 0.99, sticks = true)
 
+    /**
+     * parity: `AbstractHurtingProjectile`: a fireball does not fall at all, and keeps 0.95 of its
+     * speed a tick, which is why one crosses a room in a straight line.
+     */
+    public val FIREBALL: Kind = Kind(Identifier.vanilla("fireball"), gravity = 0.0, drag = 0.95, sticks = false)
+    public val SMALL_FIREBALL: Kind =
+        Kind(Identifier.vanilla("small_fireball"), gravity = 0.0, drag = 0.95, sticks = false)
+
     /** parity: `ThrowableProjectile.getDefaultGravity`, lighter than an arrow and gone on impact. */
     public val SNOWBALL: Kind = Kind(Identifier.vanilla("snowball"), gravity = 0.03, drag = 0.99, sticks = false)
     public val EGG: Kind = Kind(Identifier.vanilla("egg"), gravity = 0.03, drag = 0.99, sticks = false)
@@ -73,7 +81,17 @@ public object Projectiles {
     public fun kindOf(type: Identifier): Kind? = ALL.firstOrNull { it.type == type }
 
     private val ALL: List<Kind> =
-        listOf(ARROW, SPECTRAL_ARROW, SNOWBALL, EGG, ENDER_PEARL, EXPERIENCE_BOTTLE, SPLASH_POTION)
+        listOf(
+            ARROW,
+            SPECTRAL_ARROW,
+            SNOWBALL,
+            EGG,
+            ENDER_PEARL,
+            EXPERIENCE_BOTTLE,
+            SPLASH_POTION,
+            FIREBALL,
+            SMALL_FIREBALL,
+        )
 
     /** Puts a projectile in the world, aimed along [dirX]/[dirY]/[dirZ]. */
     public fun spawn(

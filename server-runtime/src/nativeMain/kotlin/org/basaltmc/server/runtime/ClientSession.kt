@@ -28,7 +28,9 @@ import org.basaltmc.server.runtime.entity.DamageSource
 import org.basaltmc.server.runtime.entity.EntityCombat
 import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.entity.Taming
 import org.basaltmc.server.runtime.entity.Villagers
+import org.basaltmc.server.runtime.entity.ai.Navigation
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.item.ItemDamageEffects
 import org.basaltmc.server.runtime.item.ItemWear
@@ -2260,6 +2262,19 @@ public class ClientSession(
         for (entity in world.entities()) {
             if (entity.removed) continue
             if (trackedEntities.add(entity.entityId)) {
+                if (Taming.isTamable(entity.type) && Taming.flagsOf(entity) != 0) {
+                    sendPlayPacket(SetEntityDataPacket.ID) {
+                        SetEntityDataPacket(
+                            entity.entityId,
+                            listOf(
+                                SetEntityDataPacket.Entry.Bytes(
+                                    Taming.FLAGS_INDEX,
+                                    Taming.flagsOf(entity).toByte(),
+                                ),
+                            ),
+                        ).write(it)
+                    }
+                }
                 sendPlayPacket(SpawnEntityPacket.ID) {
                     SpawnEntityPacket(
                         entityId = entity.entityId,
@@ -2289,10 +2304,17 @@ public class ClientSession(
                     abs(last[0] - entity.x) > POSITION_EPSILON ||
                     abs(last[1] - entity.y) > POSITION_EPSILON ||
                     abs(last[2] - entity.z) > POSITION_EPSILON ||
-                    abs(last[3] - entity.yaw.toDouble()) > ROTATION_EPSILON
+                    abs(last[3] - entity.yaw.toDouble()) > ROTATION_EPSILON ||
+                    abs(last[4] - entity.headYaw.toDouble()) > ROTATION_EPSILON
             if (!moved) continue
+            // parity: `ClientboundRotateHeadPacket`, which is the only thing that turns a mob's head.
+            if (last == null || abs(last[4] - entity.headYaw.toDouble()) > ROTATION_EPSILON) {
+                sendPlayPacket(RotateHeadPacket.ID) {
+                    RotateHeadPacket(entity.entityId, entity.headYaw).write(it)
+                }
+            }
             lastEntityPositions[entity.entityId] =
-                doubleArrayOf(entity.x, entity.y, entity.z, entity.yaw.toDouble())
+                doubleArrayOf(entity.x, entity.y, entity.z, entity.yaw.toDouble(), entity.headYaw.toDouble())
             // parity: the position *sync*, which carries the velocity so the client can interpolate:
             // a teleport every tick snaps, which is what made a falling block judder down.
             sendPlayPacket(EntityPositionSyncPacket.ID) {
@@ -3244,6 +3266,59 @@ public class ClientSession(
         vehicle.removed = true
     }
 
+    /**
+     * Taming an animal, and telling one that is already yours to sit.
+     *
+     * parity: `Wolf.mobInteract` and `Cat.mobInteract`: the food goes whether it takes or not, a
+     * wolf takes one bone in three, and a click with anything else on an animal that is already
+     * yours sits it down or stands it up.
+     */
+    private fun tameOrSit(
+        session: PlayerSession,
+        entity: ServerEntity,
+    ): Boolean {
+        if (!Taming.isTamable(entity.type)) return false
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot]
+        val item = held?.let { runCatching { Identifier.parse(it.id) }.getOrNull() }
+        val owner = entity.owner
+        if (owner != null) {
+            if (owner != session.uuid.toString()) return true
+            entity.sitting = !entity.sitting
+            Navigation.stop(entity)
+            broadcastTameFlags(entity)
+            return true
+        }
+        if (item == null || !Taming.tamedBy(entity.type, item)) return false
+        if (session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
+        }
+        if (Random.nextInt(Taming.TAME_ODDS) != 0) {
+            broadcastEntityEvent(entity.entityId, Taming.EVENT_TAMING_FAILED)
+            return true
+        }
+        entity.owner = session.uuid.toString()
+        entity.sitting = true
+        entity.targetId = null
+        Navigation.stop(entity)
+        broadcastEntityEvent(entity.entityId, Taming.EVENT_TAMING_SUCCEEDED)
+        broadcastTameFlags(entity)
+        return true
+    }
+
+    /** parity: `TamableAnimal`'s own flags byte, which is what draws a sitting pet. */
+    private fun broadcastTameFlags(entity: ServerEntity) {
+        val packet =
+            SetEntityDataPacket(
+                entity.entityId,
+                listOf(SetEntityDataPacket.Entry.Bytes(Taming.FLAGS_INDEX, Taming.flagsOf(entity).toByte())),
+            )
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        }
+    }
+
     /** parity: `Entity.startRiding`, which is the passenger list and the packet that carries it. */
     private fun mount(
         session: PlayerSession,
@@ -3345,7 +3420,14 @@ public class ClientSession(
         if (sweep) sweepAround(session, target, world, strength)
         broadcastDamageEvent(target, DamageTypes.PLAYER_ATTACK, session.entityId)
         broadcastMotion(target)
-        target.targetId = session.entityId
+        // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it: one
+        // sends a monster after whoever swung, the other sends an animal running.
+        target.hurtBy = session.entityId
+        target.panicTicks = PANIC_TICKS
+        // parity: `OwnerHurtTargetGoal`, which sends a pet after whatever its owner just hit.
+        for (pet in world.state.entities()) {
+            if (pet.owner == session.uuid.toString()) pet.ownerHurt = target.entityId
+        }
         if (critical) {
             broadcastSound(SOUND_ATTACK_CRIT, session.x, session.y, session.z, SoundSource.PLAYERS)
             // parity: `ServerPlayer.crit`, which is an animation on the target rather than particles.
@@ -3398,7 +3480,12 @@ public class ClientSession(
             if (!result.landed) continue
             broadcastDamageEvent(nearby, DamageTypes.PLAYER_ATTACK, session.entityId)
             broadcastMotion(nearby)
-            if (result.died) killEntity(nearby) else nearby.targetId = session.entityId
+            if (result.died) {
+                killEntity(nearby)
+            } else {
+                nearby.hurtBy = session.entityId
+                nearby.panicTicks = PANIC_TICKS
+            }
         }
         // parity: the sweep's own particle, a block ahead of where the player is looking.
         val yaw = session.yaw * PI.toFloat() / HALF_CIRCLE
@@ -3476,6 +3563,7 @@ public class ClientSession(
             mount(session, entity)
             return
         }
+        if (tameOrSit(session, entity)) return
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot] ?: return
         val item = Identifier.parse(held.id)
@@ -5332,6 +5420,18 @@ public class ClientSession(
         syncHeldAttributes()
     }
 
+    /** parity: `LivingEntity.addEffect`, for the effects a mob puts on somebody rather than a drink. */
+    internal fun addEffect(
+        effect: Identifier,
+        durationTicks: Int,
+        amplifier: Int,
+    ) {
+        val session = playerSession ?: return
+        val active = ActiveEffect(effect = effect, amplifier = amplifier, remainingTicks = durationTicks)
+        session.effects[effect] = active
+        sendEffect(active)
+    }
+
     /** Sends one effect, or its removal when it has run out. parity: the two mob effect packets. */
     internal fun sendEffect(effect: ActiveEffect) {
         val session = playerSession ?: return
@@ -6792,6 +6892,9 @@ public class ClientSession(
         /** parity: `VehicleEntity`, ten per point of damage and gone past forty. */
         const val VEHICLE_DAMAGE_PER_POINT = 10f
         const val VEHICLE_BREAK_DAMAGE = 40f
+
+        /** How long a hit keeps an animal running. parity: `PanicGoal`, which reads the last hit. */
+        const val PANIC_TICKS = 40
 
         /** parity: `EnderpearlItem.use`, which shoots at one and a half with a degree of spread. */
         const val ENDER_PEARL = "ender_pearl"

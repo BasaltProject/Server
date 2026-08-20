@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.entity
 import org.basaltmc.server.registry.BlockMovement
 import org.basaltmc.server.runtime.world.WorldState
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.sin
@@ -25,6 +26,12 @@ public object LivingMovement {
     /** parity: the 0.91 of air drag and the 0.98 the vertical keeps. */
     private const val AIR_DRAG = 0.91
     private const val VERTICAL_DRAG = 0.98
+
+    /** parity: `travelInWater`: a fiftieth of a block of input, and 0.8 of the speed kept. */
+    private const val WATER_INPUT = 0.02
+    private const val WATER_DRAG = 0.8
+    private const val VERTICAL_WATER_DRAG = 0.8
+    private const val SINK_SHARE = 16.0
 
     /** parity: `getFrictionInfluencedSpeed`'s own constant. */
     private const val FRICTION_SPEED = 0.21600002
@@ -71,11 +78,17 @@ public object LivingMovement {
         entity.x += movedX
         entity.y += movedY
         entity.z += movedZ
-        entity.onGround = movedY != entity.velocityY && entity.velocityY < 0.0
-        val blockedSideways = movedX != entity.velocityX || movedZ != entity.velocityZ
-        if (movedX != entity.velocityX) entity.velocityX = 0.0
-        if (movedZ != entity.velocityZ) entity.velocityZ = 0.0
-        if (movedY != entity.velocityY) entity.velocityY = 0.0
+        // parity: `Entity.move` compares with `Mth.equal`, which is a hundred-thousandth of slack.
+        // Comparing exactly called a stopped rounding error a wall, so every mob hopped its way
+        // across flat ground and spent its life in the air at flying speed.
+        val collidedX = !nearlyEqual(movedX, entity.velocityX)
+        val collidedZ = !nearlyEqual(movedZ, entity.velocityZ)
+        val collidedY = movedY != entity.velocityY
+        entity.onGround = collidedY && entity.velocityY < 0.0
+        val blockedSideways = collidedX || collidedZ
+        if (collidedX) entity.velocityX = 0.0
+        if (collidedZ) entity.velocityZ = 0.0
+        if (collidedY) entity.velocityY = 0.0
 
         // parity: gravity comes off after the move, and the drag after that.
         entity.velocityY -= gravity
@@ -84,6 +97,42 @@ public object LivingMovement {
         entity.velocityY *= VERTICAL_DRAG
         entity.velocityZ *= horizontalDrag
         entity.horizontallyBlocked = blockedSideways
+    }
+
+    /**
+     * One tick of swimming.
+     *
+     * parity: `LivingEntity.travelInWater`: the input is worth a fiftieth of a block, the water
+     * takes eight tenths of the speed back, and what is left of gravity is a slow sink.
+     */
+    public fun travelInWater(
+        world: WorldState,
+        entity: ServerEntity,
+        forward: Double,
+        strafe: Double,
+    ) {
+        addInput(entity, forward, strafe, WATER_INPUT)
+
+        val box = Aabb.of(entity.x, entity.y, entity.z, entity.width, entity.height)
+        EntityCollision.collide(world, box, entity.velocityX, entity.velocityY, entity.velocityZ, movement)
+        val movedX = movement[0]
+        val movedY = movement[1]
+        val movedZ = movement[2]
+        entity.x += movedX
+        entity.y += movedY
+        entity.z += movedZ
+        entity.onGround = movedY != entity.velocityY && entity.velocityY < 0.0
+        entity.horizontallyBlocked =
+            !nearlyEqual(movedX, entity.velocityX) ||
+            !nearlyEqual(movedZ, entity.velocityZ)
+        if (!nearlyEqual(movedX, entity.velocityX)) entity.velocityX = 0.0
+        if (!nearlyEqual(movedZ, entity.velocityZ)) entity.velocityZ = 0.0
+        if (movedY != entity.velocityY) entity.velocityY = 0.0
+
+        entity.velocityX *= WATER_DRAG
+        entity.velocityZ *= WATER_DRAG
+        // parity: `getFluidFallingAdjustedMovement`, a sixteenth of the gravity while sinking.
+        entity.velocityY = entity.velocityY * VERTICAL_WATER_DRAG - GRAVITY / SINK_SHARE
     }
 
     /** parity: `LivingEntity.jumpFromGround`, plus the block's own jump factor. */
@@ -139,4 +188,12 @@ public object LivingMovement {
         ) ?: 0
 
     private const val FRICTION_PROBE_DEPTH = 0.5
+
+    /** parity: `Mth.equal`, the slack every collision comparison in vanilla is made with. */
+    private const val EQUAL_EPSILON = 1.0e-5
+
+    private fun nearlyEqual(
+        a: Double,
+        b: Double,
+    ): Boolean = abs(b - a) < EQUAL_EPSILON
 }

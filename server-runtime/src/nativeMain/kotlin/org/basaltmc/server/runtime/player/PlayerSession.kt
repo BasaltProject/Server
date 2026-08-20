@@ -95,6 +95,9 @@ public class PlayerSession(
 
     /** Where this player is asleep, and for how many ticks. parity: `LivingEntity.sleepingPos`. */
     public var sleepingBed: Triple<Int, Int, Int>? = null
+
+    /** parity: `ServerPlayer.raidOmenPosition`, where the raid starts when the omen runs out. */
+    public var raidOmenPosition: IntArray? = null
     public var sleepTicks: Int = 0
 
     /** parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss. */

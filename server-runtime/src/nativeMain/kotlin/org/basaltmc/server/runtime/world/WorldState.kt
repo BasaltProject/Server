@@ -4,6 +4,7 @@ import org.basaltmc.server.registry.BlockMovement
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.entity.Aabb
+import org.basaltmc.server.runtime.entity.CubeMobs
 import org.basaltmc.server.runtime.entity.EntityCollision
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.world.Chunk
@@ -177,6 +178,9 @@ public class WorldState(
         z: Int,
     ): Int? {
         val chunk = loadedChunks.get(key(x shr 4, z shr 4)) ?: return null
+        // Above the sky or below the bedrock is not a block, which is what a mob that fell out of
+        // the world asks about: the chunk itself refuses the question rather than answering it.
+        if (y < chunk.verticalBounds.minY || y > chunk.verticalBounds.maxY) return null
         return chunk.getBlockStateId(x and 15, y, z and 15)
     }
 
@@ -484,6 +488,9 @@ public class WorldState(
 
     public fun spawnEntity(entity: ServerEntity): ServerEntity =
         mutex.withLock {
+            // parity: `finalizeSpawn`, of which the only part this build has is a cube's size: its
+            // speed, health and damage all come from it.
+            CubeMobs.applySize(entity)
             entities[entity.entityId] = entity
             entity
         }
