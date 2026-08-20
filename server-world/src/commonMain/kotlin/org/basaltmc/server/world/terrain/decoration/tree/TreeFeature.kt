@@ -740,9 +740,7 @@ public class UpwardsBranchingTrunkPlacer(
 
 /**
  * // parity: CherryTrunkPlacer: a trunk with one or two horizontal side branches, plus a middle
- * foliage attachment when the branch-count roll lands on 3. Axis-oriented log states are not
- * modeled (a single [trunkStateId] everywhere), the same documented simplification the rest of
- * this file already uses.
+ * foliage attachment when the branch-count roll lands on 3.
  */
 public class CherryTrunkPlacer(
     baseHeight: Int,
@@ -785,6 +783,7 @@ public class CherryTrunkPlacer(
         val attachments = mutableListOf<FoliageAttachment>()
         if (hasMiddleBranch) attachments.add(FoliageAttachment(originX, originY + trunkHeight, originZ, 0, false))
         val treeDirection = HORIZONTAL_DIRECTIONS[random.nextInt(4)]
+        val sidewaysStateId = horizontalAxisStateId(trunkStateId, treeDirection)
         attachments.add(
             generateBranch(
                 chunk,
@@ -794,6 +793,7 @@ public class CherryTrunkPlacer(
                 originY,
                 originZ,
                 trunkStateId,
+                sidewaysStateId,
                 treeDirection,
                 firstBranchOffset,
                 firstBranchOffset < trunkHeight - 1,
@@ -810,6 +810,7 @@ public class CherryTrunkPlacer(
                     originY,
                     originZ,
                     trunkStateId,
+                    sidewaysStateId,
                     opposite,
                     secondBranchOffset,
                     secondBranchOffset < trunkHeight - 1,
@@ -827,6 +828,7 @@ public class CherryTrunkPlacer(
         originY: Int,
         originZ: Int,
         trunkStateId: Int,
+        sidewaysStateId: Int,
         branchDirection: Pair<Int, Int>,
         offsetFromOrigin: Int,
         middleContinuesUpwards: Boolean,
@@ -843,7 +845,7 @@ public class CherryTrunkPlacer(
         repeat(if (extendAway) 2 else 1) {
             logX += branchDirection.first
             logZ += branchDirection.second
-            placeLog(chunk, logX, logY, logZ, trunkStateId)
+            placeLog(chunk, logX, logY, logZ, sidewaysStateId)
         }
         val verticalDirection = if (endY > logY) 1 else -1
         while (true) {
@@ -856,8 +858,17 @@ public class CherryTrunkPlacer(
                 logX += branchDirection.first
                 logZ += branchDirection.second
             }
-            placeLog(chunk, logX, logY, logZ, trunkStateId)
+            placeLog(chunk, logX, logY, logZ, if (growVertically) trunkStateId else sidewaysStateId)
         }
+    }
+
+    private fun horizontalAxisStateId(
+        stateId: Int,
+        direction: Pair<Int, Int>,
+    ): Int {
+        val state = Blocks.byStateId(stateId) ?: return stateId
+        val axis = if (direction.first != 0) "x" else "z"
+        return Blocks.stateIdOf(state.block, state.properties + ("axis" to axis)) ?: stateId
     }
 }
 
