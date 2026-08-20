@@ -3,6 +3,7 @@ package org.basaltmc.server.world
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 
 /** A 16-wide column of blocks at ([chunkX], [chunkZ]) in chunk coordinates. */
 public class Chunk(
@@ -19,6 +20,7 @@ public class Chunk(
 
     private val blockEntitiesByPosition = LinkedHashMap<Int, ChunkBlockEntity>()
     private val generatedEntitiesBacking = mutableListOf<ChunkGeneratedEntity>()
+    private var savedEntitiesBacking: List<NbtCompound> = emptyList()
     private val scheduledBlockTicksBacking = mutableListOf<ChunkScheduledTick>()
     private val scheduledFluidTicksBacking = mutableListOf<ChunkScheduledTick>()
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
@@ -166,6 +168,27 @@ public class Chunk(
         var bytes = heights.size.toLong() * 16 * 16 * Int.SIZE_BYTES
         for (section in sections) bytes += section.residentBytes
         return bytes
+    }
+
+    /**
+     * The entities this chunk carries in the region file, as opaque NBT.
+     *
+     * They are opaque on purpose: what an entity is made of belongs to the runtime, and this layer
+     * only has to keep it beside the blocks it stands on and hand it back when the chunk returns.
+     */
+    public fun savedEntities(): List<NbtCompound> = savedEntitiesBacking
+
+    public fun setSavedEntities(entities: List<NbtCompound>) {
+        if (savedEntitiesBacking.isEmpty() && entities.isEmpty()) return
+        savedEntitiesBacking = entities
+        isDirty = true
+    }
+
+    /** Hands them over once, which is what stops a chunk loaded twice spawning them twice. */
+    public fun takeSavedEntities(): List<NbtCompound> {
+        val taken = savedEntitiesBacking
+        savedEntitiesBacking = emptyList()
+        return taken
     }
 
     public fun addGeneratedEntity(entity: ChunkGeneratedEntity) {

@@ -74,6 +74,8 @@ public object ChunkNbt {
         tag["block_ticks"] = encodeTicks(chunk, chunk.scheduledBlockTicks())
         tag["fluid_ticks"] = encodeTicks(chunk, chunk.scheduledFluidTicks())
         tag[GENERATED_ENTITIES_KEY] = encodeGeneratedEntities(chunk)
+        val entities = chunk.savedEntities()
+        tag[ENTITIES_KEY] = NbtList(if (entities.isEmpty()) NbtType.END else NbtType.COMPOUND, entities)
         return tag
     }
 
@@ -102,6 +104,7 @@ public object ChunkNbt {
         decodeTicks(chunk, tag.getList("block_ticks")).forEach(chunk::scheduleBlockTick)
         decodeTicks(chunk, tag.getList("fluid_ticks")).forEach(chunk::scheduleFluidTick)
         decodeGeneratedEntities(tag.getList(GENERATED_ENTITIES_KEY)).forEach(chunk::addGeneratedEntity)
+        chunk.setSavedEntities(tag.getList(ENTITIES_KEY)?.filterIsInstance<NbtCompound>().orEmpty())
         return chunk
     }
 
@@ -418,4 +421,12 @@ public object ChunkNbt {
     }
 
     private const val GENERATED_ENTITIES_KEY = "basalt_generated_entities"
+
+    /**
+     * Where the entities standing in this chunk are kept.
+     *
+     * Vanilla moved them to a region folder of their own in 1.17; here they ride with the chunk,
+     * which is one file to read and one lock to take, and nothing outside this server reads it.
+     */
+    private const val ENTITIES_KEY = "basalt_entities"
 }
