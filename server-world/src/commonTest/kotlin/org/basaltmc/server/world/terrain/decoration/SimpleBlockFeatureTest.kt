@@ -7,6 +7,7 @@ import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SimpleBlockFeatureTest {
@@ -55,4 +56,75 @@ class SimpleBlockFeatureTest {
         assertEquals(false, feature.place(stone, random, DecorationPos(8, 40, 8)))
         assertTrue(feature.place(snowyGrass, random, DecorationPos(8, 40, 8)))
     }
+
+    @Test
+    fun paleMossCarpetBuildsTheExactTwoLayerWallState() {
+        val paleMossCarpet = stateId("pale_moss_carpet")
+        var result: Chunk? = null
+        for (seed in 0L..100L) {
+            val chunk = Chunk(0, 0)
+            chunk.setBlockStateId(8, 39, 8, Blocks.STONE.stateId)
+            chunk.setBlockStateId(8, 40, 7, Blocks.STONE.stateId)
+            chunk.setBlockStateId(8, 41, 7, Blocks.STONE.stateId)
+            SimpleBlockFeature({ _, _ -> paleMossCarpet })
+                .place(chunk, WorldgenRandom(XoroshiroRandom(seed)), DecorationPos(8, 40, 8))
+            if (Blocks.byStateId(chunk.getBlockStateId(8, 41, 8))?.block?.path == "pale_moss_carpet") {
+                result = chunk
+                break
+            }
+        }
+
+        val chunk = assertNotNull(result, "expected one seed to retain the eligible topper side")
+        val bottom = assertNotNull(Blocks.byStateId(chunk.getBlockStateId(8, 40, 8)))
+        val topper = assertNotNull(Blocks.byStateId(chunk.getBlockStateId(8, 41, 8)))
+        assertEquals("true", bottom.properties["bottom"])
+        assertEquals("tall", bottom.properties["north"])
+        assertEquals("false", topper.properties["bottom"])
+        assertEquals("low", topper.properties["north"])
+        assertTrue(listOf("east", "south", "west").all { bottom.properties[it] == "none" })
+        assertTrue(listOf("east", "south", "west").all { topper.properties[it] == "none" })
+    }
+
+    @Test
+    fun paleMossCarpetRejectsPartialAttachmentFaces() {
+        val paleMossCarpet = stateId("pale_moss_carpet")
+        val bottomSlab =
+            Blocks.stateIdOf(
+                Identifier.vanilla("stone_slab"),
+                mapOf("type" to "bottom", "waterlogged" to "false"),
+            ) ?: error("missing bottom stone slab")
+        val chunk = Chunk(0, 0)
+        chunk.setBlockStateId(8, 39, 8, Blocks.STONE.stateId)
+        chunk.setBlockStateId(8, 40, 7, bottomSlab)
+        chunk.setBlockStateId(8, 41, 7, bottomSlab)
+
+        assertTrue(
+            SimpleBlockFeature({ _, _ -> paleMossCarpet })
+                .place(chunk, WorldgenRandom(XoroshiroRandom(1L)), DecorationPos(8, 40, 8)),
+        )
+
+        val bottom = assertNotNull(Blocks.byStateId(chunk.getBlockStateId(8, 40, 8)))
+        assertEquals("none", bottom.properties["north"])
+        assertTrue(Blocks.isAir(chunk.getBlockStateId(8, 41, 8)))
+    }
+
+    @Test
+    fun paleMossTopperUsesTheWorldgenRegionRandomWithoutAdvancingTheFeatureRandom() {
+        val featureRandom = WorldgenRandom(XoroshiroRandom(91L))
+        val expectedFeatureRandom = WorldgenRandom(XoroshiroRandom(91L))
+        val regionRandom = XoroshiroRandom(7L)
+        val chunk = Chunk(0, 0)
+        chunk.setBlockStateId(8, 39, 8, Blocks.STONE.stateId)
+        chunk.setBlockStateId(8, 40, 7, Blocks.STONE.stateId)
+        chunk.setBlockStateId(8, 41, 7, Blocks.STONE.stateId)
+
+        SimpleBlockFeature({ _, _ -> stateId("pale_moss_carpet") })
+            .place(chunk, featureRandom, DecorationPos(8, 40, 8), regionRandom)
+
+        assertEquals(expectedFeatureRandom.nextLong(), featureRandom.nextLong())
+    }
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId
+            ?: error("missing $path")
 }

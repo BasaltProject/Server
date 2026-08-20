@@ -85,6 +85,22 @@ class PaleMossDecorationTest {
     }
 
     @Test
+    fun replacesSnowyGrassByBlockIdentity() {
+        val snowyGrass =
+            Blocks.stateIdOf(Identifier.vanilla("grass_block"), mapOf("snowy" to "true"))
+                ?: error("missing snowy grass")
+        val chunk = flatChunk(snowyGrass)
+
+        PaleMossDecoration.placePatchAt(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(9182L)),
+            DecorationPos(8, 63, 8),
+        )
+
+        assertTrue(countAt(chunk, 62, paleMossBlockStateId) > 0)
+    }
+
+    @Test
     fun isDeterministicForSameSeed() {
         val first = flatChunk(Blocks.GRASS_BLOCK.stateId)
         val second = flatChunk(Blocks.GRASS_BLOCK.stateId)
@@ -167,12 +183,24 @@ class PaleMossDecorationTest {
         return result
     }
 
-    private fun countPlants(chunk: Chunk): Int =
-        plantStateIds.sumOf { stateId -> countAt(chunk, 63, stateId) + countAt(chunk, 64, stateId) }
+    private fun countPlants(chunk: Chunk): Int {
+        var result = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 63..64) {
+                    if (Blocks.byStateId(chunk.getBlockStateId(x, y, z))?.block?.path in PLANT_PATHS) result++
+                }
+            }
+        }
+        return result
+    }
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     private val paleMossBlockStateId = stateId("pale_moss_block")
-    private val plantStateIds = setOf(stateId("pale_moss_carpet"), stateId("short_grass"), stateId("tall_grass"))
+
+    private companion object {
+        val PLANT_PATHS = setOf("pale_moss_carpet", "short_grass", "tall_grass")
+    }
 }
