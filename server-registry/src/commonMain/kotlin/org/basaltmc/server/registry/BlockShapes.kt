@@ -33,7 +33,8 @@ public enum class BlockFace(
  * No general `VoxelShape`, because nothing here needs one: the three questions asked of a shape all
  * answer from boxes in thirty-seconds, which is exact for every vanilla block.
  *
- * parity: `BlockBehaviour.BlockStateBase.getCollisionShape`, `isFaceSturdy` and `getLightDampening`.
+ * parity: `BlockBehaviour.BlockStateBase.getCollisionShape`, `isFaceSturdy`, `isSolidRender` and
+ * `getLightDampening`.
  */
 public object BlockShapes {
     /** A block is 32 units on a side here, the finest grid any vanilla shape needs. */
@@ -43,6 +44,7 @@ public object BlockShapes {
     private val motion: BooleanArray
     private val replaceable: BooleanArray
     private val solid: BooleanArray
+    private val solidRender: BooleanArray
     private val sturdy: IntArray
     private val centre: IntArray
     private val rigid: IntArray
@@ -60,6 +62,7 @@ public object BlockShapes {
         motion = BooleanArray(entries.size)
         replaceable = BooleanArray(entries.size)
         solid = BooleanArray(entries.size)
+        solidRender = BooleanArray(entries.size)
         sturdy = IntArray(entries.size)
         centre = IntArray(entries.size)
         rigid = IntArray(entries.size)
@@ -72,10 +75,11 @@ public object BlockShapes {
             motion[index] = parts[1] == "1"
             replaceable[index] = parts[2] == "1"
             solid[index] = parts[3] == "1"
-            sturdy[index] = faceBits(parts[4])
-            centre[index] = faceBits(parts[5])
-            rigid[index] = faceBits(parts[6])
-            val corners = parts[7].split(';').filter { it.isNotEmpty() }
+            solidRender[index] = parts[4] == "1"
+            sturdy[index] = faceBits(parts[5])
+            centre[index] = faceBits(parts[6])
+            rigid[index] = faceBits(parts[7])
+            val corners = parts[8].split(';').filter { it.isNotEmpty() }
             val flat = IntArray(corners.size * CORNERS)
             for ((box, text) in corners.withIndex()) {
                 for ((corner, value) in text.split(',').withIndex()) flat[box * CORNERS + corner] = value.toInt()
@@ -111,6 +115,9 @@ public object BlockShapes {
 
     /** parity: `BlockState.isSolid`, which is what a poured bucket asks before flooding a block. */
     public fun isSolidState(stateId: Int): Boolean = solid[shapeOf(stateId)]
+
+    /** Whether the state's occlusion shape fills the cube. parity: `BlockState.isSolidRender`. */
+    public fun isSolidRender(stateId: Int): Boolean = solidRender[shapeOf(stateId)]
 
     /** Whether the collision shape fills the whole cube, which is what stops a fluid dead. */
     public fun isFullCube(stateId: Int): Boolean = full[shapeOf(stateId)]

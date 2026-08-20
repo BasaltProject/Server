@@ -1,5 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -7,6 +8,7 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class LushCaveVegetationDecorationTest {
@@ -74,6 +76,20 @@ class LushCaveVegetationDecorationTest {
             if (found) break
         }
         assertTrue(found, "expected a sampled scan to place a spore blossom below the ceiling")
+    }
+
+    @Test
+    fun solidScanUsesBlockStateSolidRatherThanHeightmapMotionBlocking() {
+        val oakSapling = stateId("oak_sapling")
+
+        assertFalse(LushCaveVegetationDecoration.Target.SOLID.matches(oakSapling))
+        for (stateId in 0 until Blocks.stateCount) {
+            assertEquals(
+                BlockShapes.isSolidState(stateId),
+                LushCaveVegetationDecoration.Target.SOLID.matches(stateId),
+                "solid scan disagreed on state id $stateId",
+            )
+        }
     }
 
     private fun caveChunk(): Chunk =
@@ -151,6 +167,11 @@ class LushCaveVegetationDecorationTest {
         val SPORE_BLOSSOM_STATE_ID =
             Blocks.REGISTRY.byIdentifier(Identifier.vanilla("spore_blossom"))?.stateId
                 ?: error("unknown block 'spore_blossom'")
+
+        fun stateId(path: String): Int =
+            Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId
+                ?: error("unknown block '$path'")
+
         val EXPECTED_FEATURES =
             listOf(
                 FeatureShape(

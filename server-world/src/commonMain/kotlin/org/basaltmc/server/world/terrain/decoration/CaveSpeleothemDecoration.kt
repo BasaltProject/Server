@@ -3,6 +3,7 @@ package org.basaltmc.server.world.terrain.decoration
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -563,7 +564,7 @@ public object CaveSpeleothemDecoration {
 
         fun isSolid(position: DecorationPos): Boolean {
             val stateId = get(position) ?: return false
-            return Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId)
+            return BlockShapes.isSolidState(stateId)
         }
 
         fun isNeitherEmptyNorWater(position: DecorationPos): Boolean {

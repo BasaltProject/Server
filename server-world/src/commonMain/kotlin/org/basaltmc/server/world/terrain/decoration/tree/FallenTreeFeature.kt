@@ -1,6 +1,8 @@
 package org.basaltmc.server.world.terrain.decoration.tree
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -139,16 +141,14 @@ public object FallenTreeFeature {
         z: Int,
     ): Boolean =
         y > WorldHeight.MIN_Y &&
-            Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getDecorationBlockStateId(x, y - 1, z))
+            BlockShapes.isFaceSturdy(chunk.getDecorationBlockStateId(x, y - 1, z), BlockFace.UP)
 
     private fun isValidTreePos(
         chunk: Chunk,
         x: Int,
         y: Int,
         z: Int,
-    ): Boolean =
-        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-            Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
+    ): Boolean = TreeFeature.validTreePos(chunk, x, y, z)
 
     private fun isAir(
         chunk: Chunk,

@@ -2,6 +2,7 @@ package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -121,13 +122,10 @@ public object MushroomPatchDecoration {
                 origin.z + random.nextInt(8) - random.nextInt(8),
             )
         if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(target))) return
-        if (target.y == WorldHeight.MIN_Y || !isSolidRender(region.get(target.copy(y = target.y - 1)))) return
+        if (target.y == WorldHeight.MIN_Y || !BlockShapes.isSolidRender(region.get(target.copy(y = target.y - 1)))) {
+            return
+        }
         region.set(target, stateId)
-    }
-
-    private fun isSolidRender(stateId: Int): Boolean {
-        if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId) || Blocks.isLeavesState(stateId)) return false
-        return Blocks.byStateId(stateId)?.block?.path !in NON_SOLID_RENDER_BLOCKS
     }
 
     private class PatchRegion(
@@ -234,33 +232,6 @@ public object MushroomPatchDecoration {
             PatchSpec("red_mushroom_normal", 74, RED_MUSHROOM_STATE_ID, 512, 1, NORMAL_BIOMES),
             PatchSpec("brown_mushroom_taiga", 80, BROWN_MUSHROOM_STATE_ID, 4, 1, TAIGA_BIOMES),
             PatchSpec("red_mushroom_taiga", 81, RED_MUSHROOM_STATE_ID, 256, 1, TAIGA_BIOMES),
-        )
-    private val NON_SOLID_RENDER_BLOCKS =
-        setOf(
-            "snow",
-            "cactus",
-            "cactus_flower",
-            "sugar_cane",
-            "bamboo",
-            "bamboo_sapling",
-            "pointed_dripstone",
-            "lily_pad",
-            "brown_mushroom",
-            "red_mushroom",
-            "fern",
-            "large_fern",
-            "dead_bush",
-            "sweet_berry_bush",
-            "firefly_bush",
-            "wildflowers",
-            "pink_petals",
-            "pale_moss_carpet",
-            "closed_eyeblossom",
-            "open_eyeblossom",
-            "sunflower",
-            "lilac",
-            "rose_bush",
-            "peony",
         )
     private const val VEGETAL_DECORATION_STEP = 9
     private const val MUSHROOM_ISLAND_INDEX = 79

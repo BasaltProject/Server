@@ -1,12 +1,16 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
+import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MushroomPatchDecorationTest {
     @Test
@@ -48,6 +52,52 @@ class MushroomPatchDecorationTest {
 
         assertEquals(0, trace.writes)
         assertContentEquals(intArrayOf(26624, 256, 71424, 0, 0), vector(chunk).counts)
+    }
+
+    @Test
+    fun smallMushroomsRequireASolidRenderSurface() {
+        val stone = filledBelow(Blocks.STONE.stateId)
+        MushroomPatchDecoration.placeAt(
+            stone,
+            WorldgenRandom(XoroshiroRandom(1234L)),
+            DecorationPos(8, 41, 8),
+            "brown_mushroom_swamp",
+        )
+        assertTrue(count(stone, "brown_mushroom") > 0)
+
+        val glassState = requireNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("glass")))
+        val glass = filledBelow(glassState)
+        MushroomPatchDecoration.placeAt(
+            glass,
+            WorldgenRandom(XoroshiroRandom(1234L)),
+            DecorationPos(8, 41, 8),
+            "brown_mushroom_swamp",
+        )
+        assertEquals(0, count(glass, "brown_mushroom"))
+    }
+
+    private fun filledBelow(stateId: Int): Chunk =
+        Chunk(0, 0).also { chunk ->
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    for (y in WorldHeight.MIN_Y..40) chunk.setBlockStateId(x, y, z, stateId)
+                }
+            }
+        }
+
+    private fun count(
+        chunk: Chunk,
+        path: String,
+    ): Int {
+        var result = 0
+        for (z in 0 until 16) {
+            for (x in 0 until 16) {
+                for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                    if (Blocks.byStateId(chunk.getBlockStateId(x, y, z))?.block?.path == path) result++
+                }
+            }
+        }
+        return result
     }
 
     private fun flatChunk(): Chunk =

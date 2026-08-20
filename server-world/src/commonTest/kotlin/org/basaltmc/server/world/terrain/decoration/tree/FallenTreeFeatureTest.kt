@@ -94,6 +94,48 @@ class FallenTreeFeatureTest {
     }
 
     @Test
+    fun fallenLogsReplaceVegetationFromTheTreeTag() {
+        val chunk = flatChunk()
+        val shortGrass = stateId("short_grass")
+        for (x in 0 until 16) {
+            for (z in 0 until 16) chunk.setBlockStateId(x, 63, z, shortGrass)
+        }
+
+        FallenTreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(42L)), 8, 63, 8, FallenTreeConfigs.OAK)
+
+        val sidewaysStates = setOf(Blocks.OAK_LOG.stateId - 1, Blocks.OAK_LOG.stateId + 1)
+        assertTrue(count(chunk, sidewaysStates) > 0)
+    }
+
+    @Test
+    fun fallenLogsRequireASturdyUpperGroundFace() {
+        val bottomSlab = stateId("stone_slab")
+        val topSlab = bottomSlab - 2
+        val unsupported = slabGround(bottomSlab)
+        FallenTreeFeature.place(
+            unsupported,
+            WorldgenRandom(XoroshiroRandom(42L)),
+            8,
+            63,
+            8,
+            FallenTreeConfigs.OAK,
+        )
+        val sidewaysStates = setOf(Blocks.OAK_LOG.stateId - 1, Blocks.OAK_LOG.stateId + 1)
+        assertEquals(0, count(unsupported, sidewaysStates))
+
+        val supported = slabGround(topSlab)
+        FallenTreeFeature.place(
+            supported,
+            WorldgenRandom(XoroshiroRandom(42L)),
+            8,
+            63,
+            8,
+            FallenTreeConfigs.OAK,
+        )
+        assertTrue(count(supported, sidewaysStates) > 0)
+    }
+
+    @Test
     fun fallenLogsCrossTheBorderInsteadOfWrapping() {
         var foundExternalLog = false
         for (seed in 0L..64L) {
@@ -126,6 +168,13 @@ class FallenTreeFeatureTest {
         }
         return chunk
     }
+
+    private fun slabGround(stateId: Int): Chunk =
+        Chunk(0, 0).also { chunk ->
+            for (x in 0 until 16) {
+                for (z in 0 until 16) chunk.setBlockStateId(x, 62, z, stateId)
+            }
+        }
 
     private fun count(
         chunk: Chunk,
