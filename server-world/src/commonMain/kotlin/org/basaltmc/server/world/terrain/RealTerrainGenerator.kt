@@ -1,7 +1,5 @@
 package org.basaltmc.server.world.terrain
 
-import org.basaltmc.server.random.WorldgenRandom
-import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
@@ -13,11 +11,11 @@ import org.basaltmc.server.world.terrain.carver.OverworldCarvers
 import org.basaltmc.server.world.terrain.decoration.AquaticPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.BambooDecoration
 import org.basaltmc.server.world.terrain.decoration.BerryPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.BiomeDecoration
 import org.basaltmc.server.world.terrain.decoration.BushPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.CactusPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.CaveLocalModificationDecoration
 import org.basaltmc.server.world.terrain.decoration.CaveSpeleothemDecoration
+import org.basaltmc.server.world.terrain.decoration.CoralDecoration
 import org.basaltmc.server.world.terrain.decoration.DesertWellDecoration
 import org.basaltmc.server.world.terrain.decoration.DoublePlantPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.FireflyBushPatchDecoration
@@ -29,7 +27,9 @@ import org.basaltmc.server.world.terrain.decoration.GrassPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.GroundPlantPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.IceSpikesDecoration
 import org.basaltmc.server.world.terrain.decoration.LeafLitterPatchDecoration
+import org.basaltmc.server.world.terrain.decoration.LushCaveVegetationDecoration
 import org.basaltmc.server.world.terrain.decoration.MelonPatchDecoration
+import org.basaltmc.server.world.terrain.decoration.MushroomFieldsDecoration
 import org.basaltmc.server.world.terrain.decoration.MushroomPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldOreDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldSpringDecoration
@@ -49,7 +49,7 @@ import org.basaltmc.wire.common.Identifier
 
 /**
  * Chunk shape from an [OverworldNoiseRouter]'s `finalDensity` through [DensityChunkSampler], then
- * surface rules, structures and [BiomeDecoration], in that order.
+ * surface rules, structures and independently seeded decoration dispatchers, in that order.
  * // parity: ChunkGenerator.applyBiomeDecoration, whose decoration seed is the plain world seed.
  *
  * Build the router once per world: it is dozens of nested nodes. [environment] gets the chunk's
@@ -157,6 +157,7 @@ public object RealTerrainGenerator {
             OverworldSpringDecoration.decorate(chunk, seed, chunkEnvironment)
             GlowLichenDecoration.decorate(chunk, seed, chunkEnvironment)
             BambooDecoration.decorate(chunk, seed, chunkEnvironment)
+            LushCaveVegetationDecoration.decorate(chunk, seed, chunkEnvironment)
             TallGrassDecoration.decorate(chunk, seed, chunkEnvironment)
             DoublePlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             BushPatchDecoration.decorate(chunk, seed, chunkEnvironment)
@@ -170,16 +171,14 @@ public object RealTerrainGenerator {
             BerryPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             GrassPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             GroundPlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            MushroomPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            MushroomPatchDecoration.decorateBeforeMushroomIsland(chunk, seed, chunkEnvironment)
+            MushroomFieldsDecoration.decorate(chunk, seed, chunkEnvironment)
+            MushroomPatchDecoration.decorateAfterMushroomIsland(chunk, seed, chunkEnvironment)
             WaterlilyPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             TreePatchDecoration.decorate(chunk, seed, chunkEnvironment)
             PaleMossDecoration.decorate(chunk, seed, chunkEnvironment)
             FlowerPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
-            decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
-            val centerY = heightmap[8 + 8 * 16]
-            val biomeId = Identifier.parse(chunkEnvironment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
-            BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
+            CoralDecoration.decorate(chunk, seed, chunkEnvironment)
             AquaticPatchDecoration.decorate(chunk, seed, chunkEnvironment)
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_FREEZE) {

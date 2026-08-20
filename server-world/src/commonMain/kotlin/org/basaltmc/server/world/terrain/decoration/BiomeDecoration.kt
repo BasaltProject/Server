@@ -17,11 +17,9 @@ public fun combine(vararg steps: BiomeVegetalDecoration): BiomeVegetalDecoration
     BiomeVegetalDecoration { chunk, random -> steps.forEach { it.decorate(chunk, random) } }
 
 /**
- * Dispatches a biome identifier to its decoration, as `ChunkGenerator.applyBiomeDecoration` does.
- * [TreePatchDecoration] and [FlowerPatchDecoration] own the independently seeded tree and flower
- * features and filter each randomized origin by biome. This table retains the smaller legacy
- * tails that have not yet moved to global dispatchers; those tails are still selected from the
- * chunk's centre biome.
+ * Retains the biome-to-decoration reference table and direct APIs used by tests and `/place`.
+ * Production no longer consults one centre biome: every implemented step-9 surface feature has an
+ * independently seeded dispatcher that filters each randomized origin by biome.
  *
  * All 55 Overworld biomes are listed; an unknown one resolves to `null` rather than borrowing
  * another biome's features.
@@ -147,7 +145,7 @@ public object BiomeDecoration {
             // parity: OverworldBiomes.mushroomFields/addMushroomFieldVegetation: mushroom_island_vegetation
             // (huge red/brown 50/50, one attempt per chunk) + brown_mushroom_taiga (rarity 4) +
             // red_mushroom_taiga (rarity 256). Shared near-water vegetation is appended by forBiome.
-            Identifier.vanilla("mushroom_fields") to MushroomFieldsDecoration.HUGE_ONLY,
+            Identifier.vanilla("mushroom_fields") to noVegetalDecoration,
             // Seagrass, kelp and sea pickles are independently seeded by AquaticPatchDecoration.
             Identifier.vanilla("ocean") to noVegetalDecoration,
             Identifier.vanilla("deep_ocean") to noVegetalDecoration,
@@ -155,8 +153,7 @@ public object BiomeDecoration {
             Identifier.vanilla("deep_cold_ocean") to noVegetalDecoration,
             Identifier.vanilla("lukewarm_ocean") to noVegetalDecoration,
             Identifier.vanilla("deep_lukewarm_ocean") to noVegetalDecoration,
-            // Coral remains on the legacy path until its own exact global-index port.
-            Identifier.vanilla("warm_ocean") to CoralDecoration,
+            Identifier.vanilla("warm_ocean") to noVegetalDecoration,
             // parity: frozenOcean adds packed/blue icebergs in LOCAL_MODIFICATIONS, blue ice in
             // SURFACE_STRUCTURES, then water trees and the same default vegetation as beaches.
             Identifier.vanilla("frozen_ocean") to noVegetalDecoration,
@@ -171,7 +168,7 @@ public object BiomeDecoration {
                 "sunflower_plains" -> requireBase(id)
                 "ocean", "deep_ocean", "cold_ocean", "deep_cold_ocean", "lukewarm_ocean", "deep_lukewarm_ocean" ->
                     oceanWithExtra(noVegetalDecoration)
-                "warm_ocean" -> oceanWithExtra(CoralDecoration)
+                "warm_ocean" -> requireBase(id)
                 "frozen_ocean", "deep_frozen_ocean" -> requireBase(id)
                 "river" -> requireBase(id)
                 "frozen_river" -> requireBase(id)

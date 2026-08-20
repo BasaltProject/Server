@@ -44,7 +44,7 @@ class PaleMossDecorationTest {
     }
 
     @Test
-    fun configuredPatchUsesOfficialTwoToFourBlockRadius() {
+    fun configuredPatchAddsOneToTheOfficialTwoToFourRadiusProvider() {
         var reachedOuterRadius = false
         for (seed in 0L until 100L) {
             val chunk = flatChunk(Blocks.GRASS_BLOCK.stateId)
@@ -57,12 +57,12 @@ class PaleMossDecorationTest {
                 for (z in 0 until 16) {
                     if (chunk.getBlockStateId(x, 62, z) != paleMossBlockStateId) continue
                     val distance = maxOf(kotlin.math.abs(x - 8), kotlin.math.abs(z - 8))
-                    assertTrue(distance <= 4, "pale moss escaped official radius at ($x,62,$z)")
-                    if (distance == 4) reachedOuterRadius = true
+                    assertTrue(distance <= 5, "pale moss escaped effective radius at ($x,62,$z)")
+                    if (distance == 5) reachedOuterRadius = true
                 }
             }
         }
-        assertTrue(reachedOuterRadius, "expected some sampled patch to reach radius four")
+        assertTrue(reachedOuterRadius, "expected some sampled patch to reach effective radius five")
     }
 
     @Test

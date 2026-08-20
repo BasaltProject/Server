@@ -73,8 +73,9 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         random: WorldgenRandom,
         origin: DecorationPos,
     ) {
-        val xRadius = 2 + random.nextInt(3)
-        val zRadius = 2 + random.nextInt(3)
+        // VegetationPatchFeature adds one to each configured UniformInt(2..4) sample.
+        val xRadius = 3 + random.nextInt(3)
+        val zRadius = 3 + random.nextInt(3)
         val surface = ArrayList<DecorationPos>((xRadius * 2 + 1) * (zRadius * 2 + 1))
 
         for (dx in -xRadius..xRadius) {

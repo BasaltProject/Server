@@ -10,6 +10,22 @@ import org.basaltmc.wire.common.Identifier
 
 /** Exact step-9 placement for the eight small-mushroom placed features. */
 public object MushroomPatchDecoration {
+    internal fun decorateBeforeMushroomIsland(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        decorateSpecs(chunk, seed, environment, SPECS.filter { it.index < MUSHROOM_ISLAND_INDEX }, null, null)
+    }
+
+    internal fun decorateAfterMushroomIsland(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        decorateSpecs(chunk, seed, environment, SPECS.filter { it.index > MUSHROOM_ISLAND_INDEX }, null, null)
+    }
+
     public fun decorate(
         chunk: Chunk,
         seed: Long,
@@ -247,4 +263,5 @@ public object MushroomPatchDecoration {
             "peony",
         )
     private const val VEGETAL_DECORATION_STEP = 9
+    private const val MUSHROOM_ISLAND_INDEX = 79
 }

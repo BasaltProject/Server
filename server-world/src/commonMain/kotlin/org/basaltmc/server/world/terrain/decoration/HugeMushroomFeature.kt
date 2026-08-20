@@ -46,7 +46,7 @@ public object HugeMushroomFeature {
         kind: Kind,
     ): Boolean {
         if (originY < WorldHeight.MIN_Y + 1 || originY + treeHeight + 1 > WorldHeight.MAX_Y) return false
-        val belowStateId = chunk.getBlockStateId(originX and 15, originY - 1, originZ and 15)
+        val belowStateId = chunk.getDecorationBlockStateId(originX, originY - 1, originZ)
         val belowBlock = Blocks.byStateId(belowStateId)?.block ?: return false
         if (belowBlock !in canPlaceOnBlocks) return false
         // parity: the real isValidPosition passes treeHeight = -1 into getTreeRadiusForHeight, so
@@ -62,7 +62,7 @@ public object HugeMushroomFeature {
                 for (dz in -radius..radius) {
                     val y = originY + dy
                     if (y > WorldHeight.MAX_Y) return false
-                    val id = chunk.getBlockStateId((originX + dx) and 15, y, (originZ + dz) and 15)
+                    val id = chunk.getDecorationBlockStateId(originX + dx, y, originZ + dz)
                     if (!Blocks.isAir(id) && !Blocks.isLeavesState(id)) return false
                 }
             }
@@ -147,10 +147,10 @@ public object HugeMushroomFeature {
         stateId: Int,
     ) {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return
-        val current = chunk.getBlockStateId(x and 15, y, z and 15)
+        val current = chunk.getDecorationBlockStateId(x, y, z)
         val currentBlock = Blocks.byStateId(current)?.block
         if (Blocks.isAir(current) || currentBlock != null && currentBlock in replaceableBlocks) {
-            chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+            chunk.setDecorationBlockStateId(x, y, z, stateId)
         }
     }
 
