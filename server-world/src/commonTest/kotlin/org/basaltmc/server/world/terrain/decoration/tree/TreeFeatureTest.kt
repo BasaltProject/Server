@@ -1,8 +1,11 @@
 package org.basaltmc.server.world.terrain.decoration.tree
 
+import org.basaltmc.server.random.BitRandom
+import org.basaltmc.server.random.PositionalRandomFactory
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.terrain.decoration.IntProvider
 import org.basaltmc.server.world.terrain.decoration.TreeDecoration
 import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.test.Test
@@ -43,6 +46,19 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun fancyOakAcceptsItsConfiguredMinimumClippedHeight() {
+        val seed = 42L
+        val sampledHeight =
+            TreeConfigs.FANCY_OAK.trunkPlacer
+                .getTreeHeight(WorldgenRandom(XoroshiroRandom(seed)))
+        assertTrue(sampledHeight > 4)
+        val chunk = chunkWithFlatGround(0)
+        chunk.setBlockStateId(8, 7, 8, org.basaltmc.server.registry.Blocks.STONE.stateId)
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 8, 1, 8, TreeConfigs.FANCY_OAK))
+    }
+
+    @Test
     fun treePreflightAndTrunkReplaceVegetationFromTheVanillaTag() {
         val chunk = chunkWithFlatGround(0)
         val shortGrass =
@@ -55,6 +71,35 @@ class TreeFeatureTest {
 
         assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(42L)), 8, 1, 8, TreeConfigs.OAK))
         assertEquals(oakLogState, chunk.getBlockStateId(8, 1, 8))
+    }
+
+    @Test
+    fun foliageOnlyWaterlogsInSourceWater() {
+        val chunk = chunkWithFlatGround(0)
+        chunk.setBlockStateId(8, 4, 8, org.basaltmc.server.registry.Blocks.WATER.stateId + 1)
+        RandomSpreadFoliagePlacer(
+            IntProvider.of(1),
+            IntProvider.of(0),
+            IntProvider.of(1),
+            1,
+        ).createFoliage(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(1L)),
+            oakLeavesState,
+            FoliageAttachment(8, 4, 8, 0, false),
+            1,
+            1,
+            0,
+            mutableSetOf(),
+        )
+
+        assertEquals(
+            "false",
+            org.basaltmc.server.registry.Blocks
+                .byStateId(chunk.getBlockStateId(8, 4, 8))
+                ?.properties
+                ?.get("waterlogged"),
+        )
     }
 
     @Test
@@ -92,6 +137,33 @@ class TreeFeatureTest {
         }
         assertTrue(externalLogs.isNotEmpty(), "expected an acacia seed whose leaning trunk crosses east")
         assertTrue(externalLogs.all { it.x >= 16 })
+    }
+
+    @Test
+    fun acaciaBranchBudgetIsConsumedBeforeTheBranchReachesItsMinimumHeight() {
+        val random =
+            WorldgenRandom(
+                ScriptedBitRandom(
+                    0,
+                    1_610_612_736,
+                    0,
+                    536_870_912,
+                    1_073_741_824,
+                    0,
+                ),
+            )
+        val attachments =
+            ForkingTrunkPlacer(5, 0, 0).placeTrunk(
+                chunkWithFlatGround(0),
+                random,
+                5,
+                8,
+                1,
+                8,
+                acaciaLogState,
+            )
+
+        assertEquals(1, attachments.size, "the one-step secondary branch is spent below y=1")
     }
 
     @Test
@@ -397,6 +469,49 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun giantTaigaPodzolDecoratorReplacesSnowyGroundVariants() {
+        val chunk = chunkWithFlatGround(0)
+        val grass =
+            org.basaltmc.server.registry.Blocks
+                .byStateId(org.basaltmc.server.registry.Blocks.GRASS_BLOCK.stateId) ?: error("unknown grass")
+        val snowyGrass =
+            org.basaltmc.server.registry.Blocks
+                .stateIdOf(grass.block, grass.properties + ("snowy" to "true")) ?: error("unknown snowy grass")
+        for (x in 0 until 16) {
+            for (z in 0 until 16) chunk.setBlockStateId(x, 0, z, snowyGrass)
+        }
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(31L)), 7, 1, 7, TreeConfigs.MEGA_SPRUCE))
+        var podzol = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) if (chunk.getBlockStateId(x, 0, z) == podzolState) podzol++
+        }
+        assertTrue(podzol > 4, "the decorator must replace snowy substrate beyond the four trunk dirt blocks")
+    }
+
+    @Test
+    fun darkOakTrunkReplacesEveryLeafStateVariant() {
+        val chunk = chunkWithFlatGround(0)
+        val defaultLeaves =
+            org.basaltmc.server.registry.Blocks
+                .byStateId(oakLeavesState) ?: error("unknown oak leaves")
+        val distanceOneLeaves =
+            org.basaltmc.server.registry.Blocks
+                .stateIdOf(defaultLeaves.block, defaultLeaves.properties + ("distance" to "1"))
+                ?: error("unknown distance-one oak leaves")
+        chunk.setBlockStateId(8, 1, 8, distanceOneLeaves)
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(31L)), 8, 1, 8, TreeConfigs.DARK_OAK))
+        assertEquals(
+            "dark_oak_log",
+            org.basaltmc.server.registry.Blocks
+                .byStateId(chunk.getBlockStateId(8, 1, 8))
+                ?.block
+                ?.path,
+        )
+    }
+
+    @Test
     fun cherryPlacesLogsAndLeaves() {
         val chunk = chunkWithFlatGround(0)
         val random = WorldgenRandom(XoroshiroRandom(99L))
@@ -527,6 +642,40 @@ class TreeFeatureTest {
         }
         assertTrue(waterloggedRoots > 0, "expected submerged mangrove roots to retain water")
         assertTrue(waterloggedLeaves > 0, "expected submerged mangrove leaves to retain water")
+    }
+
+    @Test
+    fun mangroveRootKeepsMuddyProviderForEveryInputStateVariant() {
+        val chunk = chunkWithFlatGround(0)
+        val muddyDefault =
+            org.basaltmc.server.registry.Blocks
+                .byStateId(muddyMangroveRootsState) ?: error("unknown muddy mangrove roots")
+        val xAxisMuddy =
+            org.basaltmc.server.registry.Blocks
+                .stateIdOf(muddyDefault.block, muddyDefault.properties + ("axis" to "x"))
+                ?: error("unknown x-axis muddy mangrove roots")
+        chunk.setBlockStateId(8, 1, 8, xAxisMuddy)
+
+        assertTrue(
+            MangroveRootPlacer(
+                org.basaltmc.server.world.terrain.decoration.IntProvider
+                    .of(1),
+            ).placeRoots(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(11L)),
+                8,
+                1,
+                8,
+                2,
+            ),
+        )
+        assertEquals(
+            "muddy_mangrove_roots",
+            org.basaltmc.server.registry.Blocks
+                .byStateId(chunk.getBlockStateId(8, 1, 8))
+                ?.block
+                ?.path,
+        )
     }
 
     @Test
@@ -698,6 +847,22 @@ class TreeFeatureTest {
     ): Boolean = stateId in defaultStateId - 27..defaultStateId
 
     private companion object {
+        private class ScriptedBitRandom(
+            vararg values: Int,
+        ) : BitRandom {
+            private val values = values.toMutableList()
+
+            override fun next(bits: Int): Int = values.removeAt(0)
+
+            override fun fork(): ScriptedBitRandom = this
+
+            override fun forkPositional(): PositionalRandomFactory = error("not used")
+
+            override fun setSeed(seed: Long) = Unit
+
+            override fun nextGaussian(): Double = error("not used")
+        }
+
         val oakLogState =
             org.basaltmc.server.registry.Blocks.REGISTRY
                 .byIdentifier(
@@ -781,6 +946,12 @@ class TreeFeatureTest {
                 .byIdentifier(
                     org.basaltmc.wire.common.Identifier
                         .vanilla("mangrove_roots"),
+                )?.stateId ?: error("unknown block")
+        val muddyMangroveRootsState =
+            org.basaltmc.server.registry.Blocks.REGISTRY
+                .byIdentifier(
+                    org.basaltmc.wire.common.Identifier
+                        .vanilla("muddy_mangrove_roots"),
                 )?.stateId ?: error("unknown block")
         val podzolState = org.basaltmc.server.registry.Blocks.PODZOL.stateId
         val paleMossBlockState =
