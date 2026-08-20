@@ -124,6 +124,10 @@ public class ChunkGenerationQueue(
         // generated on this thread.
         var waited = 0L
         while (world.countMissing(positions) > 0 && waited < AWAIT_TIMEOUT_MILLIS) {
+            // Waiting on the owner's own thread would wait for ever: the workers hand their chunks
+            // to it, so it has to keep running what it is handed while it waits. That is the one
+            // reentrant point in the model, and it is here rather than anywhere a task can reach.
+            if (world.owner?.isCurrent == true) world.owner?.runPending()
             sleepMillis(AWAIT_POLL_MILLIS)
             waited += AWAIT_POLL_MILLIS
         }
@@ -178,9 +182,12 @@ public class ChunkGenerationQueue(
 
     private fun generate(key: Long) {
         try {
-            // A freshly generated chunk marks itself dirty as it is filled in, so persistence is
-            // driven from the chunks themselves rather than from a list kept here.
-            world.getOrGenerateChunk(unpackX(key), unpackZ(key))
+            // Generated here, installed by whoever owns the world: the set of chunks is that
+            // owner's state, and a worker that put its own chunk in it was the last thing keeping
+            // the world's lock in the hot path. A freshly generated chunk marks itself dirty as it
+            // is filled in, so persistence is still driven from the chunks themselves.
+            val chunk = world.generateDetached(unpackX(key), unpackZ(key)) ?: return
+            world.installLater(chunk)
         } finally {
             mutex.withLock { inProgress.remove(key) }
         }

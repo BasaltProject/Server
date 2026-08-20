@@ -602,6 +602,9 @@ public class ClientSession(
     /** Whether this player's turn is already waiting on the owner, so it is not asked for twice. */
     private val tickTaskPending = AtomicInt(0)
 
+    /** Set by a kick: this connection's own thread writes what is left and then closes the socket. */
+    private val closeWhenDrained = AtomicInt(0)
+
     // Until the client has told us: enough to fill a view distance in a few seconds, far below the
     // rate the server can produce at. Guessing high is what floods a client that then stops
     // draining its socket at all.
@@ -6950,11 +6953,14 @@ public class ClientSession(
     internal fun disconnect(reason: Component) {
         sendCompressed(PlayDisconnectPacket.ID) { PlayDisconnectPacket(reason).write(it) }
         // Everything queued has to be on the wire before the socket goes, or the client is left
-        // guessing why it was dropped. This is the one place that writes from whichever thread
-        // asked for the kick, and it is worth the wait: there is nothing after it.
-        flushOutbox()
-        outbox.close()
-        connection.close()
+        // guessing why it was dropped. Whoever asked for the kick is often the world's owner, and
+        // the owner must not park on a socket, so the closing is left to this connection's own
+        // thread: it flushes what is queued and then closes.
+        closeWhenDrained.value = 1
+        if (!outbox.isOpen) {
+            outbox.close()
+            connection.close()
+        }
     }
 
     private fun sendUncompressed(
@@ -7023,6 +7029,14 @@ public class ClientSession(
      * nobody will ever read.
      */
     private fun flushOutbox() {
+        if (closeWhenDrained.value == 1) {
+            sendMutex.withLock {
+                for (frame in outbox.drain()) writeFrame(frame)
+            }
+            outbox.close()
+            connection.close()
+            return
+        }
         if (outbox.hasOverflowed) {
             logger.debug { "Disconnecting a client that stopped draining its socket." }
             connection.close()
