@@ -73,7 +73,7 @@ instruction budget, so a broken plugin cannot take the server down.
 ```lua
 -- hello.lua
 basalt.on("player_join", function(event)
-    event.player:send("<gradient:#00c9ff:#92fe9d>Welcome to Basalt!</gradient>")
+    event.player:send("<gradient:aqua:green>Welcome to Basalt!</gradient>")
 end)
 ```
 

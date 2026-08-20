@@ -26,6 +26,7 @@ import org.basaltmc.server.runtime.command.timePacket
 import org.basaltmc.server.runtime.entity.Breeding
 import org.basaltmc.server.runtime.entity.DamageSource
 import org.basaltmc.server.runtime.entity.EntityCombat
+import org.basaltmc.server.runtime.entity.EntityPickResults
 import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.entity.Taming
@@ -241,6 +242,7 @@ import org.basaltmc.wire.protocol.play.RotateHeadPacket
 import org.basaltmc.wire.protocol.play.SelectTradePacket
 import org.basaltmc.wire.protocol.play.ServerboundContainerClickPacket
 import org.basaltmc.wire.protocol.play.ServerboundPickItemFromBlockPacket
+import org.basaltmc.wire.protocol.play.ServerboundPickItemFromEntityPacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerAbilitiesPacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.wire.protocol.play.ServerboundPositionLookPacket
@@ -1552,6 +1554,8 @@ public class ClientSession(
             SWING_PACKET_ID -> handleSwing(body.readVarInt())
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
             ServerboundUseItemPacket.ID -> handleUseItem(ServerboundUseItemPacket.read(body))
+            ServerboundPickItemFromEntityPacket.ID ->
+                handlePickItemFromEntity(ServerboundPickItemFromEntityPacket.read(body))
             ServerboundPickItemFromBlockPacket.ID ->
                 handlePickItemFromBlock(
                     ServerboundPickItemFromBlockPacket.read(body),
@@ -5066,8 +5070,37 @@ public class ClientSession(
         val block = Blocks.byStateId(stateId) ?: return
         // parity: `Block.asItem`, which is not the block's own name for dust, crops or cocoa.
         val item = Items.REGISTRY.byIdentifier(ItemBlocks.itemOf(block.block)) ?: return
+        pickItem(session, item.id.toString())
+    }
+
+    /**
+     * Middle-click "pick block" on an entity.
+     *
+     * parity: `handlePickItemFromEntity` over `Entity.getPickResult`: a mob answers with its own
+     * spawn egg, a boat or a minecart with the item it was placed from, and everything else with
+     * nothing at all. The control-click that copies the entity's data is ignored, as it is for a
+     * block: there are no item data components here yet.
+     */
+    private fun handlePickItemFromEntity(packet: ServerboundPickItemFromEntityPacket) {
+        val session = playerSession ?: return
+        val entity = currentWorld?.state?.entity(packet.entityId) ?: return
+        if (entity.removed) return
+        if (!withinAttackReach(session, entity)) return
+        val item = EntityPickResults.itemFor(entity.type) ?: return
+        pickItem(session, item.toString())
+    }
+
+    /**
+     * Puts [id] in the player's hand, however vanilla gets it there.
+     *
+     * parity: `tryPickItem`: already in the hotbar means only the selection moves, elsewhere in the
+     * inventory means a swap rather than a copy, and conjuring one from nothing is creative only.
+     */
+    private fun pickItem(
+        session: PlayerSession,
+        id: String,
+    ) {
         val inventory = session.inventory
-        val id = item.id.toString()
 
         val existing = inventory.indexOf(id)
         when {
