@@ -105,12 +105,18 @@ public object Blocks {
      * could see, and clicking it did nothing at all. The state definition knows every combination,
      * so it answers the rest.
      */
-    public fun byStateId(stateId: Int): BlockState? =
-        derivedStatesById[stateId]
-            ?: REGISTRY.byId(stateId)
-            ?: BlockStateDefinitions.blockOf(stateId)?.let {
+    public fun byStateId(stateId: Int): BlockState? {
+        derivedStatesById[stateId]?.let { return it }
+        // A registry entry is one block's default state and carries no properties with it, so a
+        // question about a property (`/execute if block ... redstone_torch[lit=true]`) was answered
+        // "no" for every block sitting in its own default state. The definition has them all.
+        val defined =
+            BlockStateDefinitions.blockOf(stateId)?.let {
                 BlockState(it, stateId, BlockStateDefinitions.propertiesOf(stateId))
             }
+        if (defined != null && defined.properties.isNotEmpty()) return defined
+        return REGISTRY.byId(stateId) ?: defined
+    }
 
     /**
      * Resolves a block plus its serialized vanilla properties back to a network state ID.

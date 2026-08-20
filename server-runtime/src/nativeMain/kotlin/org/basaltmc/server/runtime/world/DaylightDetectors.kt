@@ -68,24 +68,38 @@ public object DaylightDetectors {
         x: Int,
         y: Int,
         z: Int,
-    ): Int {
-        val light = WorldLight.skyLight(world, x, y + 1, z)
-        val darkened = if (world.weather.raining) light - RAIN_DARKEN else light
-        return darkened.coerceIn(0, MAX)
+    ): Int = (WorldLight.skyLight(world, x, y + 1, z) - skyDarken(world)).coerceIn(0, MAX)
+
+    /**
+     * How much of the sky light the time of day and the weather take away.
+     *
+     * parity: `Level.updateSkyBrightness`, which is what makes a detector read zero at night rather
+     * than the fifteen the sky light itself still says.
+     */
+    private fun skyDarken(world: LoadedWorld): Int {
+        val rain = if (world.weather.raining) RAIN_SHARE else 1.0
+        val thunder = if (world.weather.thundering) RAIN_SHARE else 1.0
+        val curve = 0.5 + 2.0 * cos(timeOfDay(world) * 2.0 * PI).coerceIn(-0.25, 0.25)
+        return ((1.0 - curve * rain * thunder) * DARKEN_RANGE).toInt()
     }
 
     /** parity: `Level.getSunAngle` in degrees, over the day's twenty-four thousand ticks. */
-    private fun sunAngle(world: LoadedWorld): Float {
+    private fun sunAngle(world: LoadedWorld): Float = timeOfDay(world) * DEGREES
+
+    /** parity: `DimensionType.timeOfDay`, the curved fraction of the day everything else reads. */
+    private fun timeOfDay(world: LoadedWorld): Float {
         val dayTime = (world.clock.totalTicks % DAY_TICKS).toFloat() / DAY_TICKS
         var fraction = dayTime - 0.25f
         if (fraction < 0f) fraction += 1f
-        val curved = fraction + (1f - (cos(fraction * PI.toFloat()) + 1f) / 2f - fraction) / 3f
-        return curved * 360f
+        return fraction + (1f - (cos(fraction * PI.toFloat()) + 1f) / 2f - fraction) / 3f
     }
 
     private const val MAX = 15
     private const val DAY_TICKS = 24000L
 
-    /** parity: the light rain takes off the sky, which is what makes a detector flicker in a storm. */
-    private const val RAIN_DARKEN = 3
+    private const val DEGREES = 360f
+
+    /** parity: `updateSkyBrightness`: rain and thunder each take five sixteenths off the daylight. */
+    private const val RAIN_SHARE = 1.0 - 5.0 / 16.0
+    private const val DARKEN_RANGE = 11.0
 }

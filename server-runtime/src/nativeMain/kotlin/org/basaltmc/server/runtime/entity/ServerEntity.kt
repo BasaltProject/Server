@@ -83,6 +83,12 @@ public class ServerEntity(
     /** Who it is angry at, by entity id, or null when nothing has hit it. parity: `Mob.target`. */
     public var targetId: Int? = null
 
+    /**
+     * What a vehicle has taken, times ten. parity: `VehicleEntity.getDamage`, which counts up by
+     * ten a point, falls by one a tick, and breaks the cart past forty.
+     */
+    public var vehicleDamage: Float = 0f
+
     /** parity: `Mob.attackTime`, the ticks a mob waits between swings. */
     public var attackCooldown: Int = 0
 

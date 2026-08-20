@@ -405,6 +405,36 @@ public object Redstone {
         )
 
     /**
+     * Every position a change here can be felt at: the six neighbours, and through any of them that
+     * conducts, its own six.
+     *
+     * parity: vanilla reaches the second ring because a lever, a button or a plate calls
+     * `updateNeighborsAt` on the block it is attached to as well as on itself. Pulled at read time
+     * as this build does, the same reach has to be walked here: a torch on the far side of the block
+     * a lever sits on is two steps away, and that is the commonest gate in the game.
+     */
+    public fun reachOf(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): List<IntArray> {
+        val reach = mutableListOf(intArrayOf(x, y, z))
+        for (face in BlockFace.entries) {
+            val nx = x + face.stepX
+            val ny = y + face.stepY
+            val nz = z + face.stepZ
+            reach += intArrayOf(nx, ny, nz)
+            val neighbour = world.state.getBlockState(nx, ny, nz) ?: continue
+            if (!BlockSupport.conductsRedstone(neighbour)) continue
+            for (second in BlockFace.entries) {
+                reach += intArrayOf(nx + second.stepX, ny + second.stepY, nz + second.stepZ)
+            }
+        }
+        return reach
+    }
+
+    /**
      * Settles the dust at these coordinates and every piece it reaches, answering what changed.
      *
      * parity: vanilla walks this out one neighbour update at a time, updating a wire and then the
@@ -419,12 +449,22 @@ public object Redstone {
         z: Int,
     ): List<BlockChange> {
         val changes = LinkedHashMap<Long, BlockChange>()
-        var pending = mutableListOf(intArrayOf(x, y, z))
+        // The block that changed is asked first, and so is every piece of dust that can see it: a
+        // lever, a torch or a block of redstone is not dust itself, so starting at it alone left
+        // the dust beside a new source dark. parity: `Level.updateNeighborsAt`, which tells the
+        // neighbours rather than the block itself.
+        val pending = mutableListOf<IntArray>()
+        for (position in reachOf(world, x, y, z)) {
+            pending += position
+            pending += intArrayOf(position[0], position[1] + 1, position[2])
+            pending += intArrayOf(position[0], position[1] - 1, position[2])
+        }
+        var queue = pending
         var rounds = 0
-        while (pending.isNotEmpty() && rounds < MAX_ROUNDS) {
+        while (queue.isNotEmpty() && rounds < MAX_ROUNDS) {
             rounds++
             val next = mutableListOf<IntArray>()
-            for (position in pending) {
+            for (position in queue) {
                 val moved = updateWire(world, position[0], position[1], position[2]) ?: continue
                 changes[packed(position[0], position[1], position[2])] = moved
                 // The dust that can see this one has to be asked again, which is the same set the
@@ -438,7 +478,7 @@ public object Redstone {
                     next += intArrayOf(nx, ny - 1, nz)
                 }
             }
-            pending = next
+            queue = next
         }
         return changes.values.toList()
     }

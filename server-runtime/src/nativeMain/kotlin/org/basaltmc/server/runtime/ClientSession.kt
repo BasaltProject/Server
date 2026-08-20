@@ -7,12 +7,14 @@ import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.ConsumeEffect
+import org.basaltmc.server.registry.CustomStats
 import org.basaltmc.server.registry.EntityAttributes
 import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.Fuels
 import org.basaltmc.server.registry.ItemArmour
 import org.basaltmc.server.registry.ItemBlocks
 import org.basaltmc.server.registry.ItemFood
+import org.basaltmc.server.registry.ItemStacking
 import org.basaltmc.server.registry.ItemTools
 import org.basaltmc.server.registry.ItemWeapons
 import org.basaltmc.server.registry.Items
@@ -62,6 +64,7 @@ import org.basaltmc.server.runtime.world.Containers
 import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.DecoratedPots
+import org.basaltmc.server.runtime.world.DetectorRails
 import org.basaltmc.server.runtime.world.DoubleBlocks
 import org.basaltmc.server.runtime.world.DoubleChests
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
@@ -167,6 +170,7 @@ import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
 import org.basaltmc.wire.protocol.play.AnimatePacket
 import org.basaltmc.wire.protocol.play.AttackPacket
+import org.basaltmc.wire.protocol.play.AwardStatsPacket
 import org.basaltmc.wire.protocol.play.BlockDestructionPacket
 import org.basaltmc.wire.protocol.play.BlockEntityDataPacket
 import org.basaltmc.wire.protocol.play.BlockEventPacket
@@ -194,6 +198,7 @@ import org.basaltmc.wire.protocol.play.ContainerClosePacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetDataPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
+import org.basaltmc.wire.protocol.play.CooldownPacket
 import org.basaltmc.wire.protocol.play.DamageEventPacket
 import org.basaltmc.wire.protocol.play.Direction
 import org.basaltmc.wire.protocol.play.EntityEventPacket
@@ -250,6 +255,7 @@ import org.basaltmc.wire.protocol.play.SetEquipmentPacket
 import org.basaltmc.wire.protocol.play.SetExperiencePacket
 import org.basaltmc.wire.protocol.play.SetHealthPacket
 import org.basaltmc.wire.protocol.play.SetHeldSlotPacket
+import org.basaltmc.wire.protocol.play.SetPassengersPacket
 import org.basaltmc.wire.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.protocol.play.SignUpdatePacket
@@ -259,6 +265,7 @@ import org.basaltmc.wire.protocol.play.SoundSource
 import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.SpawnInfo
 import org.basaltmc.wire.protocol.play.SpawnPositionPacket
+import org.basaltmc.wire.protocol.play.StatCounter
 import org.basaltmc.wire.protocol.play.StonecutterOption
 import org.basaltmc.wire.protocol.play.SystemChatPacket
 import org.basaltmc.wire.protocol.play.UpdateAttributesPacket
@@ -425,6 +432,9 @@ public class ClientSession(
     private var eatingSlot = -1
     private var eatingTicks = 0
 
+    /** What cannot be used again yet, by item name and the tick it frees up on. parity: `ItemCooldowns`. */
+    private val itemCooldowns = HashMap<String, Long>()
+
     /** The bow being drawn, and for how long. parity: `LivingEntity.useItem`/`useItemRemaining`. */
     private var drawingSlot = -1
     private var drawingTicks = 0
@@ -530,6 +540,9 @@ public class ClientSession(
 
     /** Which dropped items this client has been told about. See [syncItemEntities]. */
     private val trackedItems = HashSet<Int>()
+
+    /** The count each tracked item was last sent with, so a merge can correct it. */
+    private val trackedItemCounts = HashMap<Int, Int>()
 
     /** Summoned entities this client has been told about, so each is spawned once. */
     private val trackedEntities = HashSet<Int>()
@@ -1484,7 +1497,11 @@ public class ClientSession(
             // exactly like its unsigned form: documented gap, same as signed chat.
             SignedChatCommandPacket.ID -> runCommand(SignedChatCommandPacket.read(body).command)
             ClientCommandPacket.ID -> {
-                if (ClientCommandPacket.read(body).action == ClientCommandPacket.Action.PERFORM_RESPAWN) respawn()
+                when (ClientCommandPacket.read(body).action) {
+                    ClientCommandPacket.Action.PERFORM_RESPAWN -> respawn()
+                    ClientCommandPacket.Action.REQUEST_STATS -> sendStats()
+                    ClientCommandPacket.Action.REQUEST_GAMERULE_VALUES -> Unit
+                }
             }
             ServerboundPlayerAbilitiesPacket.ID -> {
                 // The client toggles its own flight and tells the server after the fact. Believed
@@ -1574,7 +1591,16 @@ public class ClientSession(
             // crafting table opens it or places against it.
             SERVERBOUND_PLAYER_INPUT_ID -> {
                 val inputs = body.readByte().toInt()
-                playerSession?.sneaking = (inputs and SNEAK_INPUT_FLAG) != 0
+                val session = playerSession
+                if (session != null) {
+                    session.sneaking = (inputs and SNEAK_INPUT_FLAG) != 0
+                    session.inputForward = (inputs and FORWARD_INPUT_FLAG) != 0
+                    session.inputBack = (inputs and BACK_INPUT_FLAG) != 0
+                    session.inputLeft = (inputs and LEFT_INPUT_FLAG) != 0
+                    session.inputRight = (inputs and RIGHT_INPUT_FLAG) != 0
+                    // parity: `Player.wantsToStopRiding`, which is the crouch key and nothing else.
+                    if (session.sneaking && session.vehicleId != null) dismount(session)
+                }
             }
         }
     }
@@ -1985,15 +2011,17 @@ public class ClientSession(
         // than dropping it on the player's own feet where they would instantly walk back into it.
         val yaw = session.yaw * PI / 180.0
         val pitch = session.pitch * PI / 180.0
+        val tossAngle = Random.nextDouble() * 2 * PI
+        val tossSpread = TOSS_SPREAD * Random.nextDouble()
         spawnDroppedItem(
             item = Identifier.parse(held.id),
             count = dropCount,
             x = session.x,
             y = session.y + THROW_EYE_HEIGHT,
             z = session.z,
-            velocityX = -sin(yaw) * cos(pitch) * THROW_SPEED,
-            velocityY = -sin(pitch) * THROW_SPEED + THROW_LIFT,
-            velocityZ = cos(yaw) * cos(pitch) * THROW_SPEED,
+            velocityX = -sin(yaw) * cos(pitch) * THROW_SPEED + cos(tossAngle) * tossSpread,
+            velocityY = -sin(pitch) * THROW_SPEED + THROW_LIFT + tossLift(),
+            velocityZ = cos(yaw) * cos(pitch) * THROW_SPEED + sin(tossAngle) * tossSpread,
         )
     }
 
@@ -2157,13 +2185,17 @@ public class ClientSession(
             // the ground up front, so a block broken in mid-air drops as it should.
             val components = NbtCompound()
             if (carried != null && stack.item == block) components[Shulkers.CONTAINER] = carried
+            // parity: `Block.popResource`, which scatters the stack inside the block it came from
+            // and pops it up, rather than dropping every stack on the same point.
             spawnDroppedItem(
                 item = stack.item,
                 count = stack.count,
-                x = pos.x + 0.5,
-                y = pos.y + 0.5,
-                z = pos.z + 0.5,
+                x = pos.x + 0.5 + popJitter(),
+                y = pos.y + 0.5 + popJitter() - ITEM_HALF_HEIGHT,
+                z = pos.z + 0.5 + popJitter(),
+                velocityX = Random.nextDouble() * POP_SPREAD - POP_SPREAD / 2.0,
                 velocityY = BREAK_DROP_LIFT,
+                velocityZ = Random.nextDouble() * POP_SPREAD - POP_SPREAD / 2.0,
                 pickupDelay = BREAK_DROP_PICKUP_DELAY,
                 components = components,
             )
@@ -2172,6 +2204,12 @@ public class ClientSession(
 
     private fun isAirLike(stateId: Int): Boolean =
         stateId == Blocks.AIR.stateId || stateId == Blocks.CAVE_AIR.stateId || stateId == Blocks.VOID_AIR.stateId
+
+    /** parity: `Block.popResource`'s own `Mth.nextDouble(random, -0.25, 0.25)`. */
+    private fun popJitter(): Double = Random.nextDouble() * 2 * POP_JITTER - POP_JITTER
+
+    /** parity: `createItemStackToDrop`, whose toss is never quite straight. */
+    private fun tossLift(): Double = (Random.nextDouble() - Random.nextDouble()) * TOSS_LIFT_SPREAD
 
     /** Puts a new item entity into the world and tells everyone who can currently see it. */
     private fun spawnDroppedItem(
@@ -2376,6 +2414,7 @@ public class ClientSession(
             val protocolId = Items.REGISTRY.byIdentifier(item.item)?.protocolId ?: continue
             visible += item.entityId
             if (trackedItems.add(item.entityId)) {
+                trackedItemCounts[item.entityId] = item.count
                 sendPlayPacket(SpawnEntityPacket.ID) {
                     SpawnEntityPacket(
                         entityId = item.entityId,
@@ -2389,6 +2428,13 @@ public class ClientSession(
                         velocityZ = item.velocityZ,
                     ).write(it)
                 }
+                sendPlayPacket(SetEntityDataPacket.ID) {
+                    SetEntityDataPacket.item(item.entityId, WireItemStack(protocolId, item.count)).write(it)
+                }
+            } else if (item.countChanged && trackedItemCounts[item.entityId] != item.count) {
+                // A merge changed the stack: the client draws the number it was told, so it has to
+                // hear the new one or two logs on the floor keep looking like one.
+                trackedItemCounts[item.entityId] = item.count
                 sendPlayPacket(SetEntityDataPacket.ID) {
                     SetEntityDataPacket.item(item.entityId, WireItemStack(protocolId, item.count)).write(it)
                 }
@@ -2412,6 +2458,7 @@ public class ClientSession(
 
         val gone = trackedItems.filterNot { it in visible }
         if (gone.isEmpty()) return
+        for (id in gone) trackedItemCounts.remove(id)
         trackedItems.removeAll(gone.toSet())
         settledItems.removeAll(gone.toSet())
         sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
@@ -2871,8 +2918,12 @@ public class ClientSession(
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot] ?: return
         val item = Identifier.parse(held.id)
+        // parity: `ItemCooldowns.isOnCooldown`, which refuses the use outright rather than
+        // letting it through and greying the slot afterwards.
+        if (onCooldown(item)) return
         if (startEating(session, item, heldSlot)) return
         if (startDrawing(session, item, heldSlot)) return
+        if (throwEnderPearl(session, item, heldSlot)) return
         if (!Buckets.isBucket(item)) return
 
         val result =
@@ -3172,6 +3223,59 @@ public class ClientSession(
     }
 
     /**
+     * Hitting a minecart.
+     *
+     * parity: `VehicleEntity.hurtServer` into `destroy`: the cart drops itself as an item, and a
+     * creative player's hit discards it without dropping anything at all.
+     */
+    private fun breakVehicle(
+        session: PlayerSession,
+        vehicle: ServerEntity,
+    ) {
+        broadcastDamageEvent(vehicle, DamageTypes.PLAYER_ATTACK, session.entityId)
+        if (session.gamemode != Gamemode.CREATIVE) {
+            vehicle.vehicleDamage += VEHICLE_DAMAGE_PER_POINT
+            if (vehicle.vehicleDamage <= VEHICLE_BREAK_DAMAGE) return
+            spawnDroppedItem(vehicle.type, 1, vehicle.x, vehicle.y, vehicle.z)
+        }
+        for (passenger in vehicle.passengerIds.toList()) {
+            playersInSameWorld().firstOrNull { it.entityId == passenger }?.let { it.connection.dismount(it) }
+        }
+        vehicle.removed = true
+    }
+
+    /** parity: `Entity.startRiding`, which is the passenger list and the packet that carries it. */
+    private fun mount(
+        session: PlayerSession,
+        vehicle: ServerEntity,
+    ) {
+        if (session.vehicleId != null) return
+        session.vehicleId = vehicle.entityId
+        vehicle.passengerIds += session.entityId
+        broadcastPassengers(vehicle)
+    }
+
+    /** parity: `Entity.stopRiding`: off the cart, standing where it left them. */
+    internal fun dismount(session: PlayerSession) {
+        val world = currentWorld ?: return
+        val vehicle = session.vehicleId?.let { world.state.entity(it) }
+        session.vehicleId = null
+        if (vehicle == null) return
+        vehicle.passengerIds -= session.entityId
+        broadcastPassengers(vehicle)
+        // The client puts itself back on the ground, but the server's own copy of where they are
+        // came from the cart, so it is told the same thing rather than left a tick behind.
+        teleportTo(session.x, session.y + DISMOUNT_LIFT, session.z, session.yaw, session.pitch)
+    }
+
+    private fun broadcastPassengers(vehicle: ServerEntity) {
+        val packet = SetPassengersPacket(vehicle.entityId, vehicle.passengerIds.toList())
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(SetPassengersPacket.ID) { packet.write(it) }
+        }
+    }
+
+    /**
      * A player hitting something.
      *
      * parity: `Player.attack`. The damage is the attribute plus whatever is in hand, scaled by how
@@ -3183,8 +3287,15 @@ public class ClientSession(
         if (session.dead || session.gamemode == Gamemode.SPECTATOR) return
         val world = currentWorld ?: return
         val target = world.state.entity(attack.entityId) ?: return
-        if (target.removed || !EntityAttributes.isLiving(target.type)) return
+        if (target.removed) return
         if (!withinAttackReach(session, target)) return
+        // parity: `VehicleEntity.hurtServer`, which is not health at all: a cart takes ten a point
+        // and comes apart past forty, or at once for a creative player.
+        if (DetectorRails.isMinecart(target.type)) {
+            breakVehicle(session, target)
+            return
+        }
+        if (!EntityAttributes.isLiving(target.type)) return
 
         val weapon = session.inventory.heldItem?.let { runCatching { Identifier.parse(it.id) }.getOrNull() }
         val stats = ItemWeapons.of(weapon)
@@ -3360,6 +3471,11 @@ public class ClientSession(
             openTrades(entity)
             return
         }
+        // parity: `AbstractMinecart.interact`, which seats whoever clicked it.
+        if (DetectorRails.isMinecart(entity.type)) {
+            mount(session, entity)
+            return
+        }
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot] ?: return
         val item = Identifier.parse(held.id)
@@ -3433,7 +3549,7 @@ public class ClientSession(
                 val result = Items.REGISTRY.byIdentifier(recipe.result.item) ?: return@mapNotNull null
                 val inputs = recipe.ingredient.items.mapNotNull { Items.REGISTRY.byIdentifier(it)?.protocolId }
                 if (inputs.isEmpty()) return@mapNotNull null
-                StonecutterOption(inputs, WireItemStack(result.protocolId, recipe.result.count))
+                StonecutterOption(inputs, result.protocolId, recipe.result.count)
             }
         logger.debug { "Sending ${options.size} stonecutter recipe(s)." }
         sendCompressed(UpdateRecipesPacket.ID) { UpdateRecipesPacket(options).write(it) }
@@ -4800,15 +4916,17 @@ public class ClientSession(
     ) {
         val yaw = session.yaw * PI / 180.0
         val pitch = session.pitch * PI / 180.0
+        val tossAngle = Random.nextDouble() * 2 * PI
+        val tossSpread = TOSS_SPREAD * Random.nextDouble()
         spawnDroppedItem(
             item = Identifier.parse(stack.id),
             count = stack.count,
             x = session.x,
             y = session.y + THROW_EYE_HEIGHT,
             z = session.z,
-            velocityX = -sin(yaw) * cos(pitch) * THROW_SPEED,
-            velocityY = -sin(pitch) * THROW_SPEED + THROW_LIFT,
-            velocityZ = cos(yaw) * cos(pitch) * THROW_SPEED,
+            velocityX = -sin(yaw) * cos(pitch) * THROW_SPEED + cos(tossAngle) * tossSpread,
+            velocityY = -sin(pitch) * THROW_SPEED + THROW_LIFT + tossLift(),
+            velocityZ = cos(yaw) * cos(pitch) * THROW_SPEED + sin(tossAngle) * tossSpread,
         )
     }
 
@@ -4935,6 +5053,13 @@ public class ClientSession(
         onGround: Boolean,
     ) {
         val session = playerSession ?: return
+        // parity: `ServerGamePacketListenerImpl.handleMovePlayer`, which takes only the rotation
+        // from somebody who is riding: where they are is the vehicle's business.
+        if (session.vehicleId != null) {
+            session.yaw = yaw
+            session.pitch = pitch
+            return
+        }
         val feet = world.getBlockState(floor(x).toInt(), floor(y).toInt(), floor(z).toInt())
         val inWater = feet != null && Fluids.of(feet) == Submersion.WATER
         session.food.addExhaustion(
@@ -5796,6 +5921,74 @@ public class ClientSession(
         drawingTicks++
     }
 
+    /**
+     * parity: `EnderpearlItem.use`: the pearl flies at one and a half, with a degree of spread, and
+     * one leaves the hand however far it gets.
+     */
+    private fun throwEnderPearl(
+        session: PlayerSession,
+        item: Identifier,
+        slot: Int,
+    ): Boolean {
+        if (item.path != ENDER_PEARL) return false
+        val world = currentWorld ?: return true
+        val entityId = playerRegistry?.allocateEntityId() ?: return true
+        val protocolType = EntityTypes[Projectiles.ENDER_PEARL.type]?.protocolId ?: return true
+        val pitch = session.pitch * PI.toFloat() / HALF_CIRCLE
+        val yaw = session.yaw * PI.toFloat() / HALF_CIRCLE
+        val pearl =
+            Projectiles.spawn(
+                world = world.state,
+                kind = Projectiles.ENDER_PEARL,
+                entityId = entityId,
+                protocolType = protocolType,
+                x = session.x,
+                y = session.y + THROW_EYE_HEIGHT,
+                z = session.z,
+                dirX = (-sin(yaw) * cos(pitch)).toDouble(),
+                dirY = (-sin(pitch)).toDouble(),
+                dirZ = (cos(yaw) * cos(pitch)).toDouble(),
+                power = PEARL_POWER,
+                uncertainty = PEARL_UNCERTAINTY,
+                random = LegacyRandom(Random.nextLong()),
+            )
+        pearl.ownerId = session.entityId
+        startCooldown(item)
+        broadcastSound(
+            SOUND_PEARL_THROW,
+            session.x,
+            session.y,
+            session.z,
+            SoundSource.NEUTRAL,
+            volume = 0.5f,
+            pitch = 0.4f / (Random.nextFloat() * 0.4f + 0.8f),
+        )
+        if (session.gamemode == Gamemode.CREATIVE) return true
+        val held = session.inventory[slot] ?: return true
+        session.inventory[slot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+        sendInventorySlot(slot)
+        return true
+    }
+
+    /** Whether this item is still greyed out. parity: `ItemCooldowns.isOnCooldown`. */
+    private fun onCooldown(item: Identifier): Boolean {
+        val until = itemCooldowns[item.path] ?: return false
+        if (until > playTimeTicks) return true
+        itemCooldowns.remove(item.path)
+        return false
+    }
+
+    /**
+     * Starts the wait an item's own `use_cooldown` component asks for, and tells the client so the
+     * slot greys out. parity: `UseCooldown.apply`.
+     */
+    private fun startCooldown(item: Identifier) {
+        val ticks = ItemStacking.cooldownTicks(item)
+        if (ticks <= 0) return
+        itemCooldowns[item.path] = playTimeTicks + ticks
+        sendPlayPacket(CooldownPacket.ID) { CooldownPacket(item.toString(), ticks).write(it) }
+    }
+
     /** parity: `BowItem.getPowerForTime`. */
     private fun bowPower(ticks: Int): Float {
         val drawn = ticks / BOW_DRAW_TICKS
@@ -6248,6 +6441,36 @@ public class ClientSession(
         sendPlayPacket(HurtAnimationPacket.ID) { HurtAnimationPacket(session.entityId, angle).write(it) }
     }
 
+    /**
+     * The statistics screen's contents.
+     *
+     * parity: `ServerStatsCounter.sendStats`, which answers the screen's own request. Only the
+     * counters this build keeps go out: the screen shows a zero for everything else, which is what
+     * vanilla shows for a counter nobody has moved either.
+     */
+    private fun sendStats() {
+        val session = playerSession ?: return
+        val counters = session.stats.snapshot(playTimeTicks).counters
+        val stats = mutableListOf<StatCounter>()
+        for ((key, value) in counters) {
+            val count = value.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            val counter =
+                when {
+                    key.startsWith(CUSTOM_STAT_PREFIX) ->
+                        CustomStats.idOf(key.removePrefix(CUSTOM_STAT_PREFIX))?.let {
+                            StatCounter(AwardStatsPacket.TYPE_CUSTOM, it, count)
+                        }
+                    key.startsWith(MINED_STAT_PREFIX) ->
+                        Blocks.REGISTRY
+                            .idOf(Identifier.parse(key.removePrefix(MINED_STAT_PREFIX)))
+                            ?.let { StatCounter(AwardStatsPacket.TYPE_MINED, it, count) }
+                    else -> null
+                }
+            counter?.let { stats += it }
+        }
+        sendCompressed(AwardStatsPacket.ID) { AwardStatsPacket(stats).write(it) }
+    }
+
     /** parity: absorption rides on the player's own entity data, not on `set_health`. */
     private fun syncAbsorption() {
         val session = playerSession ?: return
@@ -6533,6 +6756,10 @@ public class ClientSession(
         const val SOUND_ATTACK_WEAK = "entity.player.attack.weak"
         const val SOUND_ATTACK_SWEEP = "entity.player.attack.sweep"
 
+        /** How the stored counters name the two kinds of statistic this build keeps. */
+        const val CUSTOM_STAT_PREFIX = "minecraft:custom/minecraft:"
+        const val MINED_STAT_PREFIX = "minecraft:mined/"
+
         /** parity: `isSweepAttack`, whose limit is the walking speed times two and a half. */
         const val SWEEP_SPEED_LIMIT = 0.25
 
@@ -6558,6 +6785,19 @@ public class ClientSession(
         const val MIN_BOW_POWER = 0.1f
         const val HALF_CIRCLE = 180f
         const val SOUND_ARROW_SHOOT = "entity.arrow.shoot"
+
+        /** Where a rider ends up standing when they get off, clear of the cart's own box. */
+        const val DISMOUNT_LIFT = 0.5
+
+        /** parity: `VehicleEntity`, ten per point of damage and gone past forty. */
+        const val VEHICLE_DAMAGE_PER_POINT = 10f
+        const val VEHICLE_BREAK_DAMAGE = 40f
+
+        /** parity: `EnderpearlItem.use`, which shoots at one and a half with a degree of spread. */
+        const val ENDER_PEARL = "ender_pearl"
+        const val PEARL_POWER = 1.5f
+        const val PEARL_UNCERTAINTY = 1f
+        const val SOUND_PEARL_THROW = "entity.ender_pearl.throw"
 
         // parity: `DamageTypes.STARVE`'s message id, which the client renders as "<name> starved to death".
         const val DEATH_STARVE = "starve"
@@ -6619,6 +6859,15 @@ public class ClientSession(
         // parity: `Player.drop`'s own throw, and the small pop a broken block's drop gets.
         const val THROW_SPEED = 0.3
         const val THROW_LIFT = 0.1
+
+        /** parity: `createItemStackToDrop`, a fiftieth of a block of sideways spread and a tenth up. */
+        const val TOSS_SPREAD = 0.02
+        const val TOSS_LIFT_SPREAD = 0.1
+
+        /** parity: `Block.popResource`, the quarter block a popped stack lands within. */
+        const val POP_JITTER = 0.25
+        const val POP_SPREAD = 0.2
+        const val ITEM_HALF_HEIGHT = 0.125
 
         /**
          * How much ground is generated before the player is let in, in chunks around them.
@@ -6712,6 +6961,12 @@ private const val SERVERBOUND_PLAYER_INPUT_ID = 0x2b
 
 /** Bit 5 of that byte, `shift` in vanilla's own flag order (forward, back, left, right, jump, shift, sprint). */
 private const val SNEAK_INPUT_FLAG = 1 shl 5
+
+/** The rest of that byte, in the same order. */
+private const val FORWARD_INPUT_FLAG = 1 shl 0
+private const val BACK_INPUT_FLAG = 1 shl 1
+private const val LEFT_INPUT_FLAG = 1 shl 2
+private const val RIGHT_INPUT_FLAG = 1 shl 3
 
 /**
  * The 10 registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing sent elsewhere in

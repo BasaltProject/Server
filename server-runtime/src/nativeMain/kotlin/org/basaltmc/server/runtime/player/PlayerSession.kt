@@ -61,6 +61,20 @@ public class PlayerSession(
      */
     public var sneaking: Boolean = false
 
+    /** What they are riding, by entity id, or null. parity: `Entity.vehicle`. */
+    public var vehicleId: Int? = null
+
+    /**
+     * The movement keys held, as `player_input` sends them.
+     *
+     * parity: `ServerPlayer.getLastClientMoveIntent`, which is what nudges a minecart along when
+     * its rider leans on a key.
+     */
+    public var inputForward: Boolean = false
+    public var inputBack: Boolean = false
+    public var inputLeft: Boolean = false
+    public var inputRight: Boolean = false
+
     /**
      * The signed profile properties from the session server, carrying this player's skin and cape.
      * Empty in offline mode, where nothing signs them and every client draws the default skin.
@@ -171,6 +185,7 @@ public class PlayerSession(
         dead = false
         flying = gamemode == Gamemode.SPECTATOR
         sprinting = false
+        vehicleId = null
         // parity: `ServerPlayer.restoreFrom` on a respawn, which starts them breathing and unlit.
         airSupply = Fluids.MAX_AIR
         fireTicks = 0

@@ -86,7 +86,7 @@ import org.basaltmc.server.runtime.entity.Attribute
 import org.basaltmc.server.runtime.entity.Breeding
 import org.basaltmc.server.runtime.entity.DamageSource
 import org.basaltmc.server.runtime.entity.EntityCombat
-import org.basaltmc.server.runtime.entity.EntityPhysics
+import org.basaltmc.server.runtime.entity.EntityNbt
 import org.basaltmc.server.runtime.entity.Minecarts
 import org.basaltmc.server.runtime.entity.MobBrain
 import org.basaltmc.server.runtime.entity.MobCategory
@@ -1607,7 +1607,24 @@ public class BasaltServer(
                     entityId = playerRegistry.allocateEntityId(),
                     protocolType = protocolType,
                 )
+                // parity: `TntBlock.explode`, which is where the fuse is heard being lit.
+                sendEffects(
+                    watchers,
+                    position[0],
+                    position[1],
+                    position[2],
+                    Blocks.AIR.stateId,
+                    listOf(BlockEffect.Sound(SOUND_TNT_PRIMED, SoundSource.BLOCKS, 1f, 1f)),
+                )
             }
+        }
+        // The mobs a chunk brought back from disk: they wait for the tick loop because an entity id
+        // is the server's to hand out, and a chunk is loaded on a generation thread.
+        for (tag in world.state.takePendingEntities()) {
+            val type = runCatching { Identifier.parse(tag.getString("id")) }.getOrNull() ?: continue
+            val protocol = EntityTypes[type]?.protocolId ?: continue
+            val restored = EntityNbt.decode(tag, playerRegistry.allocateEntityId(), protocol) ?: continue
+            world.state.spawnEntity(restored)
         }
         // parity: `Entity.die`, which drops the entity's own loot table where it stood. Whatever was
         // killed since the last tick is dealt with here, once, before anything else moves.
@@ -1663,8 +1680,28 @@ public class BasaltServer(
             }
             // parity: `AbstractMinecart.tick`: on a rail it follows the track, and off one it falls.
             if (DetectorRails.isMinecart(entity.type)) {
-                if (!Minecarts.moveAlongTrack(world.state, entity)) {
-                    EntityPhysics.move(world.state, entity, gravity = minecartGravity)
+                // parity: `AbstractMinecart.tick`, where what a cart has taken heals a point a tick.
+                if (entity.vehicleDamage > 0f) entity.vehicleDamage -= 1f
+                val rider = watchers.firstOrNull { it.entityId in entity.passengerIds }
+                // parity: `AbstractMinecart.push`, the shove a cart takes from anybody stood in it.
+                for (player in watchers) {
+                    if (player.entityId == rider?.entityId) continue
+                    if (!touchesCart(entity, player)) continue
+                    Minecarts.pushedBy(entity, player.x, player.z)
+                }
+                val intent =
+                    rider?.let {
+                        Minecarts.intentOf(it.inputForward, it.inputBack, it.inputLeft, it.inputRight, it.yaw)
+                    } ?: EMPTY_INTENT
+                if (!Minecarts.moveAlongTrack(world.state, entity, intent[0], intent[1], rider != null)) {
+                    Minecarts.comeOffTrack(world.state, entity, minecartGravity)
+                }
+                // The rider's own copy of where they are comes from the cart: the client draws
+                // itself on the cart, and the server needs the same answer to load chunks around it.
+                rider?.let {
+                    it.x = entity.x
+                    it.y = entity.y
+                    it.z = entity.z
                 }
                 val pressed =
                     DetectorRails.check(
@@ -1737,6 +1774,16 @@ public class BasaltServer(
             DamageSource(mob.entityId, mob.x, mob.z),
         )
         return true
+    }
+
+    /** Whether somebody is stood close enough to a cart to shove it. parity: two boxes touching. */
+    private fun touchesCart(
+        cart: org.basaltmc.server.runtime.entity.ServerEntity,
+        player: PlayerSession,
+    ): Boolean {
+        val reach = (cart.width + EntityTypeShapes.widthOf(PLAYER_TYPE)) / 2.0
+        if (abs(player.x - cart.x) > reach || abs(player.z - cart.z) > reach) return false
+        return player.y <= cart.y + cart.height && player.y + EntityTypeShapes.heightOf(PLAYER_TYPE) >= cart.y
     }
 
     /** The light a mob is standing in, which is all the spiders need to know. */
@@ -1813,6 +1860,11 @@ public class BasaltServer(
         val fromY = entity.y
         val fromZ = entity.z
         val hit = Projectiles.tick(world.state, entity, kind)
+        if (kind == Projectiles.ENDER_PEARL) {
+            val target = targetAlong(watchers, living, entity, fromX, fromY, fromZ)
+            if (hit != null || target != null) landEnderPearl(world, watchers, entity)
+            return
+        }
         if (kind.sticks && hitEntityAlong(watchers, living, entity, fromX, fromY, fromZ)) return
         if (hit == null) return
         ProjectileHits.onHit(world, hit, byArrow = kind.sticks)?.let { change ->
@@ -1822,29 +1874,49 @@ public class BasaltServer(
     }
 
     /**
-     * Whatever the arrow passed through on its way, hurt.
+     * Where a thrown pearl puts whoever threw it.
      *
-     * parity: `ProjectileUtil.getEntityHitResult` for the picking and `AbstractArrow.onHitEntity`
-     * for the damage: it is the speed times the arrow's own two points, rounded up, and a fully
-     * drawn bow adds a roll on top of it.
+     * parity: `ThrownEnderpearl.onHit`: the owner lands where the pearl stopped, takes five points
+     * of fall damage, and both ends of the trip make the teleport sound.
      */
-    private fun hitEntityAlong(
+    private fun landEnderPearl(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        pearl: org.basaltmc.server.runtime.entity.ServerEntity,
+    ) {
+        pearl.removed = true
+        val owner = watchers.firstOrNull { it.entityId == pearl.ownerId } ?: return
+        if (owner.dead) return
+        sendEffects(
+            watchers,
+            floor(pearl.x).toInt(),
+            floor(pearl.y).toInt(),
+            floor(pearl.z).toInt(),
+            Blocks.AIR.stateId,
+            listOf(BlockEffect.Sound(SOUND_TELEPORT, SoundSource.PLAYERS, 1f, 1f)),
+        )
+        owner.connection.teleportTo(pearl.x, pearl.y, pearl.z, owner.yaw, owner.pitch)
+        owner.connection.hurt(ENDER_PEARL_DAMAGE, DEATH_FALL, DamageTypes.ENDER_PEARL)
+    }
+
+    /** The nearest thing a projectile passed through this tick, as a mob or as a player. */
+    private fun targetAlong(
         watchers: List<PlayerSession>,
         living: List<org.basaltmc.server.runtime.entity.ServerEntity>,
-        arrow: org.basaltmc.server.runtime.entity.ServerEntity,
+        projectile: org.basaltmc.server.runtime.entity.ServerEntity,
         fromX: Double,
         fromY: Double,
         fromZ: Double,
-    ): Boolean {
+    ): Pair<org.basaltmc.server.runtime.entity.ServerEntity?, PlayerSession?>? {
         var nearest = Double.MAX_VALUE
         var mob: org.basaltmc.server.runtime.entity.ServerEntity? = null
         var player: PlayerSession? = null
         for (candidate in living) {
-            if (candidate.entityId == arrow.entityId || candidate.entityId == arrow.ownerId) continue
+            if (candidate.entityId == projectile.entityId || candidate.entityId == projectile.ownerId) continue
             if (!EntityAttributes.isLiving(candidate.type)) continue
             val at =
                 clip(
-                    arrow,
+                    projectile,
                     fromX,
                     fromY,
                     fromZ,
@@ -1860,29 +1932,55 @@ public class BasaltServer(
             player = null
         }
         for (candidate in watchers) {
-            if (candidate.entityId == arrow.ownerId || candidate.dead) continue
+            if (candidate.entityId == projectile.ownerId || candidate.dead) continue
             if (candidate.gamemode == Gamemode.CREATIVE || candidate.gamemode == Gamemode.SPECTATOR) continue
-            val width = EntityTypeShapes.widthOf(PLAYER_TYPE)
-            val height = EntityTypeShapes.heightOf(PLAYER_TYPE)
-            val at = clip(arrow, fromX, fromY, fromZ, candidate.x, candidate.y, candidate.z, width, height)
+            val at =
+                clip(
+                    projectile,
+                    fromX,
+                    fromY,
+                    fromZ,
+                    candidate.x,
+                    candidate.y,
+                    candidate.z,
+                    EntityTypeShapes.widthOf(PLAYER_TYPE),
+                    EntityTypeShapes.heightOf(PLAYER_TYPE),
+                )
             if (at == null || at >= nearest) continue
             nearest = at
             mob = null
             player = candidate
         }
-        if (mob == null && player == null) return false
+        if (mob == null && player == null) return null
+        return mob to player
+    }
 
+    /**
+     * Whatever the arrow passed through on its way, hurt.
+     *
+     * parity: `AbstractArrow.onHitEntity`: the damage is the speed times the arrow's own two
+     * points, rounded up, and a fully drawn bow adds a roll on top of it.
+     */
+    private fun hitEntityAlong(
+        watchers: List<PlayerSession>,
+        living: List<org.basaltmc.server.runtime.entity.ServerEntity>,
+        arrow: org.basaltmc.server.runtime.entity.ServerEntity,
+        fromX: Double,
+        fromY: Double,
+        fromZ: Double,
+    ): Boolean {
+        val (mob, player) = targetAlong(watchers, living, arrow, fromX, fromY, fromZ) ?: return false
         val speed =
             sqrt(
-                arrow.velocityX * arrow.velocityX + arrow.velocityY * arrow.velocityY +
+                arrow.velocityX * arrow.velocityX +
+                    arrow.velocityY * arrow.velocityY +
                     arrow.velocityZ * arrow.velocityZ,
             )
         var damage = ceil(speed * ARROW_BASE_DAMAGE).toInt()
         if (arrow.critical) damage += Random.nextInt(damage / 2 + 2)
 
-        val target = mob
-        if (target != null) {
-            val result = EntityCombat.hurt(target, damage.toFloat(), fromX, fromZ)
+        if (mob != null) {
+            val result = EntityCombat.hurt(mob, damage.toFloat(), fromX, fromZ)
             if (!result.landed) {
                 // parity: an arrow that found somebody still inside their hurt cooldown bounces off.
                 arrow.velocityX *= ARROW_BOUNCE
@@ -1891,8 +1989,8 @@ public class BasaltServer(
                 return true
             }
             arrow.removed = true
-            arrow.ownerId?.let { target.targetId = it }
-            announceEntityHit(watchers, target, DamageTypes.ARROW, arrow.entityId, result.died)
+            arrow.ownerId?.let { mob.targetId = it }
+            announceEntityHit(watchers, mob, DamageTypes.ARROW, arrow.entityId, result.died)
             return true
         }
         arrow.removed = true
@@ -1996,6 +2094,10 @@ public class BasaltServer(
         power: Float,
     ) {
         val broken = Explosions.explode(world, x, y, z, power, LegacyRandom(Random.nextLong()))
+        // parity: `ServerExplosion.createDrops`, which gathers everything the blast broke and only
+        // then drops it: what an explosion leaves is a handful of merged stacks, not one item per
+        // block, and that is what a real client shows.
+        val drops = mutableListOf<ExplosionDrop>()
         // parity: `ServerLevel.explode`'s own packet, which is the flash, the smoke thrown off the
         // blocks and the bang. The blocks themselves go out as ordinary updates below, so without
         // this an explosion was a wall of stone silently turning into air.
@@ -2024,7 +2126,7 @@ public class BasaltServer(
                     ClientboundBlockUpdatePacket(at, Blocks.AIR.stateId).write(it)
                 }
             }
-            Blocks.byStateId(block.stateId)?.let { dropExplodedBlock(world, it.block, at, power) }
+            Blocks.byStateId(block.stateId)?.let { collectExplodedBlock(world, it.block, at, power, drops) }
         }
         for (block in broken) {
             NeighbourUpdates.afterChange(
@@ -2049,9 +2151,10 @@ public class BasaltServer(
                 }
                 // What the blast knocked loose afterwards falls as an ordinary break, not as part
                 // of the explosion: parity with `dropResources`, which carries no radius.
-                Blocks.byStateId(stateId)?.let { dropExplodedBlock(world, it.block, at, power = 0f) }
+                Blocks.byStateId(stateId)?.let { collectExplodedBlock(world, it.block, at, power = 0f, drops) }
             }
         }
+        for (drop in drops) popResource(world, drop)
         for (player in watchers) {
             val distance =
                 sqrt(
@@ -2063,33 +2166,69 @@ public class BasaltServer(
         }
     }
 
-    /** What a hole in the ground leaves behind, dropped where the block was. */
-    private fun dropExplodedBlock(
+    /** One stack the blast is holding on to until it decides where it lands. */
+    private class ExplosionDrop(
+        val item: Identifier,
+        var count: Int,
+        val x: Int,
+        val y: Int,
+        val z: Int,
+    )
+
+    /**
+     * What one exploded block leaves, merged into what the blast is already carrying.
+     *
+     * parity: `ServerExplosion.addOrAppendStack`, which merges into the first stack that will take
+     * it, up to sixteen, and only starts a new one when none will.
+     */
+    private fun collectExplodedBlock(
         world: LoadedWorld,
         block: Identifier,
         pos: BlockPos,
         power: Float,
+        drops: MutableList<ExplosionDrop>,
     ) {
         val table = lootTables.forBlock(block) ?: return
         // parity: `LootContextParams.EXPLOSION_RADIUS`, which `explosion_decay` turns into the one
         // in `power` chance each item has of surviving the blast.
         for (stack in table.generate(LegacyRandom(Random.nextLong()), explosionRadius = power)) {
             if (Items.REGISTRY.byIdentifier(stack.item) == null) continue
-            world.state.spawnItem(
-                WorldState.DroppedItem(
-                    entityId = playerRegistry.allocateEntityId(),
-                    uuid = Uuid.random(),
-                    item = stack.item,
-                    count = stack.count,
-                    x = pos.x + 0.5,
-                    y = pos.y + 0.5,
-                    z = pos.z + 0.5,
-                ),
-            )
+            var remaining = stack.count
+            for (drop in drops) {
+                if (drop.item != stack.item || drop.count >= EXPLOSION_MERGE_LIMIT) continue
+                val moved = minOf(remaining, EXPLOSION_MERGE_LIMIT - drop.count)
+                drop.count += moved
+                remaining -= moved
+                if (remaining <= 0) break
+            }
+            if (remaining > 0) drops += ExplosionDrop(stack.item, remaining, pos.x, pos.y, pos.z)
         }
     }
 
-    /** Moves whatever is in mid-air, and puts it back down as a block where it lands. */
+    /** parity: `Block.popResource`, which scatters the stack inside its own block and pops it up. */
+    private fun popResource(
+        world: LoadedWorld,
+        drop: ExplosionDrop,
+    ) {
+        world.state.spawnItem(
+            WorldState.DroppedItem(
+                entityId = playerRegistry.allocateEntityId(),
+                uuid = Uuid.random(),
+                item = drop.item,
+                count = drop.count,
+                x = drop.x + 0.5 + jitter(),
+                y = drop.y + 0.5 + jitter() - ITEM_HALF_HEIGHT,
+                z = drop.z + 0.5 + jitter(),
+                velocityX = Random.nextDouble() * POP_SPREAD - POP_SPREAD / 2.0,
+                velocityY = POP_LIFT,
+                velocityZ = Random.nextDouble() * POP_SPREAD - POP_SPREAD / 2.0,
+            ),
+        )
+    }
+
+    /** parity: `Mth.nextDouble(random, -0.25, 0.25)`, the quarter block a popped stack lands within. */
+    private fun jitter(): Double = Random.nextDouble() * 2 * POP_JITTER - POP_JITTER
+
     private fun tickFallingBlocks(world: LoadedWorld) {
         val falling = world.state.entities().filter { !it.removed && it.type == FallingBlocks.ENTITY_TYPE }
         if (falling.isEmpty()) return
@@ -2123,12 +2262,15 @@ public class BasaltServer(
         if (changes.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (change in changes) {
-            val pos = BlockPos(change.x, change.y, change.z)
-            for (player in watchers) {
-                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
-                    ClientboundBlockUpdatePacket(pos, change.stateId).write(it)
-                }
-            }
+            // parity: a block entity that changed its own state is a block change like any other,
+            // so its neighbours hear about it: a daylight detector that dropped to zero at dusk has
+            // to take the dust beside it down with it.
+            announceRedstone(
+                world,
+                watchers,
+                org.basaltmc.server.runtime.world
+                    .BlockChange(change.x, change.y, change.z, change.stateId),
+            )
         }
     }
 
@@ -2528,6 +2670,25 @@ public class BasaltServer(
 
         /** parity: `death.attack.mob`, the message a mob with no name kills you with. */
         const val DEATH_MOB = "mob"
+
+        /** What a cart with nobody in it is pushed by: nothing. */
+        val EMPTY_INTENT = doubleArrayOf(0.0, 0.0)
+
+        const val SOUND_TNT_PRIMED = "entity.tnt.primed"
+
+        /** parity: `ThrownEnderpearl.onHit`, five points of fall damage on arrival. */
+        const val ENDER_PEARL_DAMAGE = 5f
+        const val SOUND_TELEPORT = "entity.player.teleport"
+        const val DEATH_FALL = "fall"
+
+        /** parity: `ItemEntity.merge(stack, input, 16)`, the cap on what one blast stacks together. */
+        const val EXPLOSION_MERGE_LIMIT = 16
+
+        /** parity: `Block.popResource` and `ItemEntity`'s own opening movement. */
+        const val POP_JITTER = 0.25
+        const val POP_SPREAD = 0.2
+        const val POP_LIFT = 0.2
+        const val ITEM_HALF_HEIGHT = 0.125
 
         /** parity: `death.attack.arrow`, and `AbstractArrow`'s own two points of damage. */
         const val DEATH_ARROW = "arrow"
