@@ -423,9 +423,9 @@ public class StructureTemplate {
             val remapped = transformed.toMutableMap()
             directionalConnections.forEach(remapped::remove)
             for (directionName in directionalConnections) {
+                val direction = StructureDirection.fromName(directionName) ?: continue
                 val targetName =
-                    StructureDirection
-                        .fromName(directionName)!!
+                    direction
                         .mirror(mirror)
                         .rotate(rotation)
                         .name

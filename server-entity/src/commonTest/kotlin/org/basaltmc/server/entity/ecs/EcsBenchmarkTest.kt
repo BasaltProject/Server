@@ -9,13 +9,10 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
- * The prototype-and-measure step this project's own roadmap calls for before committing to ECS
- * itself: 10,000 entities, each with [Position] and [Velocity], run through [applyVelocity] for
- * enough ticks to get a stable per-tick timing, checked against the 20 TPS budget (50ms/tick) a
- * real tick loop needs. This only measures the storage/iteration overhead this module owns, not a
- * full server tick (chunk sending, pathfinding, redstone... aren't built yet); the number that
- * matters here is how much of that 50ms budget the ECS layer itself would spend, not the whole
- * budget.
+ * What the storage costs, measured rather than assumed: 10,000 entities with [Position] and
+ * [Velocity] run through [applyVelocity] for enough ticks to get a stable per-tick timing, against
+ * the 50ms a tick has at 20 TPS. It measures this module's iteration and nothing else, so the
+ * number to read is the share of that budget the storage itself takes.
  */
 class EcsBenchmarkTest {
     private val entityCount = 10_000

@@ -153,7 +153,8 @@ public object DoublePlantPatchDecoration {
         path: String,
     ): PatchSpec {
         val lower = stateId(path)
-        return PatchSpec(name, index, rarity, biomes, lower, Blocks.upperDoublePlantStateId(lower)!!)
+        val upper = Blocks.upperDoublePlantStateId(lower) ?: error("'$path' has no upper half")
+        return PatchSpec(name, index, rarity, biomes, lower, upper)
     }
 
     private val SUPPORTS_VEGETATION =

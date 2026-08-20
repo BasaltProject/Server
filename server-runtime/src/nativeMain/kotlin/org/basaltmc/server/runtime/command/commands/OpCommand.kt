@@ -57,7 +57,7 @@ public class DeopCommand : Command(name = "deop", permissionLevel = PermissionLe
 }
 
 /**
- * `group <jugador> <grupo>`: the general form the other two are shortcuts for.
+ * `group <player> <group>`: the general form the other two are shortcuts for.
  *
  * No vanilla counterpart, so no translation key. Without it the groups between `default` and
  * `operator` would be declarable in `groups.toml` and impossible to actually put anyone in.

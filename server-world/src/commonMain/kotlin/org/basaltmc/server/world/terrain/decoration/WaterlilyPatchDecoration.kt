@@ -92,7 +92,10 @@ public object WaterlilyPatchDecoration {
         }
     }
 
-    private val LILY_PAD_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("lily_pad"))!!.stateId
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    private val LILY_PAD_STATE_ID = stateId("lily_pad")
     private val BIOMES = setOf("mangrove_swamp", "swamp")
     private const val WATERLILY_INDEX = 65
     private const val VEGETAL_DECORATION_STEP = 9

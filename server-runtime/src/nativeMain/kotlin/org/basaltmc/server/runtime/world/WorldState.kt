@@ -26,23 +26,14 @@ import kotlin.uuid.Uuid
 /**
  * Shared view over the loaded chunks.
  *
- * **Who may touch what.** The owner ([owner]) writes blocks, entities and items, and does it
- * without any lock: it is the only writer, and it finds its chunk in the same lock-free snapshot a
- * read uses. What is left of the lock guards the *set* of chunks and the collections against the
- * two threads that are deliberately not the owner: the periodic save and the unload sweep, both of
- * which are slow I/O and cannot run inside a tick. A generation worker no longer takes it at all:
- * it generates detached and hands the result over with [installLater].
+ * The owner writes blocks, entities and items without any lock: it is the only writer, and it finds
+ * its chunk in the same lock-free snapshot a read uses. The lock is left for the two threads that
+ * are deliberately not the owner, the periodic save and the unload sweep, which are slow I/O.
  *
- * The remaining hole is that saving encodes a chunk's contents while the owner may be writing
- * blocks into it. Closing it means copying what is dirty on the owner and encoding the copy off
- * thread, which is not done yet.
+ * A known hole: saving encodes a chunk while the owner may be writing blocks into it.
  *
- * [getOrGenerateChunk] releases [mutex] around [loadOrGenerate], which can take over a second and
- * would freeze every other player behind the slowest chunk. Racing threads both generate and one
- * result is discarded: generation is deterministic, so that beats serializing every load.
- *
- * [loadOrGenerate] must read the region files first, or a visited chunk comes back regenerated
- * with the player's edits gone.
+ * [loadOrGenerate] must read the region files before generating, or a visited chunk comes back
+ * regenerated with the player's edits gone.
  */
 @OptIn(ExperimentalUuidApi::class)
 public class WorldState(

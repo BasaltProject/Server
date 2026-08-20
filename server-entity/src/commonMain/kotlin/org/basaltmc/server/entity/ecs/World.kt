@@ -5,7 +5,7 @@ package org.basaltmc.server.entity.ecs
  * index's generation on destroy so a stale [EntityId] compares dead even after its slot is recycled
  * for a new entity. Doesn't own or know about component data: that lives in whichever
  * [ComponentStore]s the caller composes alongside a [World], deliberately, so no single storage
- * shape is locked in before the entity architecture is actually decided.
+ * shape is locked in.
  */
 public class World {
     private var generations = IntArray(0)
