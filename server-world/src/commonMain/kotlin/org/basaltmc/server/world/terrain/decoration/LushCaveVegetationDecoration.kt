@@ -115,7 +115,8 @@ public object LushCaveVegetationDecoration {
 
     internal enum class Target {
         SOLID,
-        STURDY_DOWN;
+        STURDY_DOWN,
+        ;
 
         fun matches(stateId: Int): Boolean =
             when (this) {
@@ -139,10 +140,12 @@ public object LushCaveVegetationDecoration {
                 125,
                 UP_SOLID,
                 -1,
-                standalone("lush_caves_ceiling_vegetation"),
+                LushVegetationPatchFeature::placeCeilingMoss,
             ),
-            FeatureSpec("cave_vines", 28, 188, 188, UP_STURDY, -1, standalone("cave_vines")),
-            FeatureSpec("lush_caves_clay", 29, 62, 62, DOWN_SOLID, 1, standalone("lush_caves_clay")),
+            FeatureSpec("cave_vines", 28, 188, 188, UP_STURDY, -1) { chunk, random, origin ->
+                CaveVineColumnFeature.place(chunk, random, origin)
+            },
+            FeatureSpec("lush_caves_clay", 29, 62, 62, DOWN_SOLID, 1, LushVegetationPatchFeature::placeClay),
             FeatureSpec(
                 "lush_caves_vegetation",
                 30,
@@ -150,9 +153,11 @@ public object LushCaveVegetationDecoration {
                 125,
                 DOWN_SOLID,
                 1,
-                standalone("lush_caves_vegetation"),
+                LushVegetationPatchFeature::placeFloorMoss,
             ),
-            FeatureSpec("rooted_azalea_tree", 31, 1, 2, UP_SOLID, -1, standalone("rooted_azalea_tree")),
+            FeatureSpec("rooted_azalea_tree", 31, 1, 2, UP_SOLID, -1) { chunk, random, origin ->
+                RootedAzaleaFeature.place(chunk, random, origin)
+            },
             FeatureSpec("spore_blossom", 32, 25, 25, UP_SOLID, -1) { chunk, _, origin ->
                 placeSporeBlossom(chunk, origin)
             },

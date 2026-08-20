@@ -153,7 +153,15 @@ class LushCaveVegetationDecorationTest {
                 ?: error("unknown block 'spore_blossom'")
         val EXPECTED_FEATURES =
             listOf(
-                FeatureShape("lush_caves_ceiling_vegetation", 27, 125, 125, 1, LushCaveVegetationDecoration.Target.SOLID, -1),
+                FeatureShape(
+                    "lush_caves_ceiling_vegetation",
+                    27,
+                    125,
+                    125,
+                    1,
+                    LushCaveVegetationDecoration.Target.SOLID,
+                    -1,
+                ),
                 FeatureShape("cave_vines", 28, 188, 188, 1, LushCaveVegetationDecoration.Target.STURDY_DOWN, -1),
                 FeatureShape("lush_caves_clay", 29, 62, 62, -1, LushCaveVegetationDecoration.Target.SOLID, 1),
                 FeatureShape("lush_caves_vegetation", 30, 125, 125, -1, LushCaveVegetationDecoration.Target.SOLID, 1),

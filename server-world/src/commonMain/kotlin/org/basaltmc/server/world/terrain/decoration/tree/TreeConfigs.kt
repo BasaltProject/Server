@@ -9,8 +9,7 @@ import org.basaltmc.wire.common.Identifier
  * `net.minecraft.data.worldgen.features.TreeFeatures` (`createOak`/`createBirch`/
  * `createSuperBirch`/`createJungleTree`/`cherry`, and the inline `FANCY_OAK`/`SPRUCE`/`PINE`/`ACACIA` registrations).
  * Only the configs this project's currently-ported [org.basaltmc.server.world.terrain.decoration.tree.TrunkPlacer]/
- * [org.basaltmc.server.world.terrain.decoration.tree.FoliagePlacer] types can drive are included: no
- * azalea yet.
+ * [org.basaltmc.server.world.terrain.decoration.tree.FoliagePlacer] types can drive are included.
  */
 public object TreeConfigs {
     private fun state(name: String): Int =
@@ -34,6 +33,9 @@ public object TreeConfigs {
     private val MANGROVE_LEAVES = state("mangrove_leaves")
     private val CHERRY_LOG = state("cherry_log")
     private val CHERRY_LEAVES = state("cherry_leaves")
+    private val ROOTED_DIRT = state("rooted_dirt")
+    private val AZALEA_LEAVES = state("azalea_leaves")
+    private val FLOWERING_AZALEA_LEAVES = state("flowering_azalea_leaves")
 
     // parity: TreeFeatures.createOak/createStraightBlobTree(OAK_LOG, OAK_LEAVES, 4, 2, 0, 2).
     public val OAK: TreeConfiguration =
@@ -42,6 +44,22 @@ public object TreeConfigs {
             StraightTrunkPlacer(4, 2, 0),
             OAK_LEAVES,
             BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
+            FeatureSizeTwoLayers(1, 0, 1),
+        )
+
+    // parity: configured_feature/azalea_tree.
+    public val AZALEA: TreeConfiguration =
+        TreeConfiguration(
+            OAK_LOG,
+            BendingTrunkPlacer(4, 2, 0, 3, IntProvider.uniform(1, 2), ROOTED_DIRT),
+            AZALEA_LEAVES,
+            WeightedRandomSpreadFoliagePlacer(
+                IntProvider.of(3),
+                IntProvider.of(0),
+                IntProvider.of(2),
+                50,
+                listOf(AZALEA_LEAVES to 3, FLOWERING_AZALEA_LEAVES to 1),
+            ),
             FeatureSizeTwoLayers(1, 0, 1),
         )
 

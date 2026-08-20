@@ -147,7 +147,10 @@ class CoralDecorationTest {
         val CORAL_BLOCK_STATES =
             listOf("tube", "brain", "bubble", "fire", "horn")
                 .mapNotNull { name ->
-                    Blocks.REGISTRY.byIdentifier(org.basaltmc.wire.common.Identifier.vanilla("${name}_coral_block"))
+                    Blocks.REGISTRY.byIdentifier(
+                        org.basaltmc.wire.common.Identifier
+                            .vanilla("${name}_coral_block"),
+                    )
                 }.map { it.stateId }
                 .toSet()
     }
