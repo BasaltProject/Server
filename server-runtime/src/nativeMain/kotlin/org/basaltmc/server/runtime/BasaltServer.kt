@@ -431,12 +431,15 @@ public class BasaltServer(
             }
         }
 
+    /** The chunk-set version each world was last split on, so an unchanged world is not walked. */
+    private val lastChunkSetVersion = HashMap<String, Long>()
+
     /**
      * Who hands out regions and owns what belongs to no region.
      *
      * One per server, shared by every world: with `regional` off each world is one region and they
      * take turns on this thread, which is the order of tick vanilla has. Turning it on is what
-     * splits a world, and that is not implemented yet.
+     * splits a world into regions that tick at once.
      */
     private val regionScheduler: RegionScheduler =
         RegionScheduler(regional = config.regional, threads = config.regionThreads)
@@ -901,6 +904,11 @@ public class BasaltServer(
         // tick boundary, before any of them starts: a chunk changing hands mid-tick is the one
         // thing this model cannot survive. With regions off it does nothing.
         for (world in worlds.values) {
+            // Only when the world's chunks actually moved: the shape of a world is decided by them,
+            // and walking every loaded chunk on a tick where none arrived or left is pure cost.
+            val version = world.state.chunkSetVersion
+            if (version == lastChunkSetVersion[world.name]) continue
+            lastChunkSetVersion[world.name] = version
             regionScheduler.repartition(world.name, world.state.loadedChunkKeys()) { merged, split ->
                 logger.debug { "World '${world.name}': $merged region(s) merged, $split split" }
             }
@@ -2120,9 +2128,11 @@ public class BasaltServer(
         // One snapshot for the whole tick: `entities()` takes the world's lock and copies the list,
         // and asking for it per entity turned a pen of cows into a lock convoy.
         val living = world.state.entities().filter { !it.removed }
-        // parity: `TargetingConditions.forCombat`, which skips anybody a mob cannot fight.
+        // parity: `TargetingConditions.forCombat`, which skips anybody a mob cannot fight. Only the
+        // players in this region: anybody else is at least a section away, which is further than any
+        // mob's follow range, and building the list for every region was a hundred copies of it.
         val views =
-            watchers.map { player ->
+            watchers.filter { region.ownsPosition(it.x, it.z) }.map { player ->
                 PlayerView(
                     entityId = player.entityId,
                     uuid = player.uuid.toString(),
@@ -3389,6 +3399,11 @@ public class BasaltServer(
         val chunks = mutableListOf<IntArray>()
         for (player in playerRegistry.snapshot()) {
             if (player.worldName != world.name) continue
+            // Only the players this region owns: the chunks around a player are always in the same
+            // region as the player (a region is made of the sections that are loaded and touching,
+            // and a player loads the ones around them), so walking every player's square in every
+            // region was the same answer worked out a hundred times.
+            if (region != null && !region.ownsPosition(player.x, player.z)) continue
             val centreX = player.x.toInt() shr 4
             val centreZ = player.z.toInt() shr 4
             for (x in centreX - radius..centreX + radius) {
