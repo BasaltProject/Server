@@ -17,16 +17,28 @@ public object TallGrassDecoration {
         externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
         blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)? = null,
     ) {
+        decorateFeature(SAVANNA_INDEX, chunk, seed, environment, externalBlockState, blockWriteObserver)
+        decorateFeature(PLAIN_INDEX, chunk, seed, environment, externalBlockState, blockWriteObserver)
+    }
+
+    internal fun decorateFeature(
+        index: Int,
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
+        blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)? = null,
+    ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
         val region = TallGrassRegion(chunk, externalBlockState, blockWriteObserver)
-
-        random.setFeatureSeed(decorationSeed, SAVANNA_INDEX, VEGETAL_DECORATION_STEP)
         val context = PlacementContext(chunk)
-        placeSavanna(context, region, random, environment)
-
-        random.setFeatureSeed(decorationSeed, PLAIN_INDEX, VEGETAL_DECORATION_STEP)
-        placePlain(context, region, random, environment)
+        random.setFeatureSeed(decorationSeed, index, VEGETAL_DECORATION_STEP)
+        when (index) {
+            SAVANNA_INDEX -> placeSavanna(context, region, random, environment)
+            PLAIN_INDEX -> placePlain(context, region, random, environment)
+            else -> error("unknown tall-grass vegetal index $index")
+        }
     }
 
     private fun placeSavanna(

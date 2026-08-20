@@ -8,40 +8,17 @@ import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.densityfunction.DensityCache
 import org.basaltmc.server.world.densityfunction.Marker
 import org.basaltmc.server.world.terrain.carver.OverworldCarvers
-import org.basaltmc.server.world.terrain.decoration.AquaticPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.BambooDecoration
-import org.basaltmc.server.world.terrain.decoration.BerryPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.BushPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.CactusPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.CaveLocalModificationDecoration
 import org.basaltmc.server.world.terrain.decoration.CaveSpeleothemDecoration
-import org.basaltmc.server.world.terrain.decoration.CoralDecoration
 import org.basaltmc.server.world.terrain.decoration.DesertWellDecoration
-import org.basaltmc.server.world.terrain.decoration.DoublePlantPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.FireflyBushPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.FlowerPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.ForestRockDecoration
 import org.basaltmc.server.world.terrain.decoration.FrozenOceanDecoration
-import org.basaltmc.server.world.terrain.decoration.GlowLichenDecoration
-import org.basaltmc.server.world.terrain.decoration.GrassPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.GroundPlantPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.IceSpikesDecoration
-import org.basaltmc.server.world.terrain.decoration.LeafLitterPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.LushCaveVegetationDecoration
-import org.basaltmc.server.world.terrain.decoration.MelonPatchDecoration
-import org.basaltmc.server.world.terrain.decoration.MushroomFieldsDecoration
-import org.basaltmc.server.world.terrain.decoration.MushroomPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldOreDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldSpringDecoration
-import org.basaltmc.server.world.terrain.decoration.PaleMossDecoration
-import org.basaltmc.server.world.terrain.decoration.PumpkinPatchDecoration
+import org.basaltmc.server.world.terrain.decoration.OverworldVegetalDecoration
 import org.basaltmc.server.world.terrain.decoration.SculkDecoration
-import org.basaltmc.server.world.terrain.decoration.SugarCanePatchDecoration
 import org.basaltmc.server.world.terrain.decoration.SurfaceFreezingDecoration
-import org.basaltmc.server.world.terrain.decoration.TallGrassDecoration
-import org.basaltmc.server.world.terrain.decoration.TreePatchDecoration
-import org.basaltmc.server.world.terrain.decoration.VinePatchDecoration
-import org.basaltmc.server.world.terrain.decoration.WaterlilyPatchDecoration
 import org.basaltmc.server.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
@@ -155,31 +132,7 @@ public object RealTerrainGenerator {
             CaveSpeleothemDecoration.decorate(chunk, seed, chunkEnvironment)
             OverworldOreDecoration.decorateInfested(chunk, seed, chunkEnvironment)
             OverworldSpringDecoration.decorate(chunk, seed, chunkEnvironment)
-            GlowLichenDecoration.decorate(chunk, seed, chunkEnvironment)
-            BambooDecoration.decorate(chunk, seed, chunkEnvironment)
-            LushCaveVegetationDecoration.decorate(chunk, seed, chunkEnvironment)
-            TallGrassDecoration.decorate(chunk, seed, chunkEnvironment)
-            DoublePlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            BushPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            LeafLitterPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            SugarCanePatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            PumpkinPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            CactusPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            FireflyBushPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            VinePatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            MelonPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            BerryPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            GrassPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            GroundPlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            MushroomPatchDecoration.decorateBeforeMushroomIsland(chunk, seed, chunkEnvironment)
-            MushroomFieldsDecoration.decorate(chunk, seed, chunkEnvironment)
-            MushroomPatchDecoration.decorateAfterMushroomIsland(chunk, seed, chunkEnvironment)
-            WaterlilyPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            TreePatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            PaleMossDecoration.decorate(chunk, seed, chunkEnvironment)
-            FlowerPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            CoralDecoration.decorate(chunk, seed, chunkEnvironment)
-            AquaticPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            OverworldVegetalDecoration.decorate(chunk, seed, chunkEnvironment)
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_FREEZE) {
             SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
