@@ -25,12 +25,21 @@ public object BambooVegetationDecoration : BiomeVegetalDecoration {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }
         positions.forEach { position ->
-            when {
-                random.nextFloat() < 0.05f -> placeTree(chunk, random, position, TreeConfigs.FANCY_OAK)
-                random.nextFloat() < 0.15f -> placeTree(chunk, random, position, TreeConfigs.JUNGLE_BUSH)
-                random.nextFloat() < 0.7f -> placeTree(chunk, random, position, TreeConfigs.MEGA_JUNGLE)
-                else -> JungleGrassDecoration.placePatchAt(chunk, random, position, context)
-            }
+            placeAt(chunk, random, position, context)
+        }
+    }
+
+    internal fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        position: DecorationPos,
+        context: PlacementContext,
+    ) {
+        when {
+            random.nextFloat() < 0.05f -> placeTree(chunk, random, position, TreeConfigs.FANCY_OAK)
+            random.nextFloat() < 0.15f -> placeTree(chunk, random, position, TreeConfigs.JUNGLE_BUSH)
+            random.nextFloat() < 0.7f -> placeTree(chunk, random, position, TreeConfigs.MEGA_JUNGLE)
+            else -> JungleGrassDecoration.placePatchAt(chunk, random, position, context)
         }
     }
 

@@ -52,6 +52,14 @@ public object PaleGardenDecoration {
         ) { position -> feature.place(chunk, random, position) }
     }
 
+    internal fun placeSingleAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        SimpleBlockFeature({ _, _ -> closedEyeblossomStateId }).place(chunk, random, origin)
+    }
+
     private fun placed(modifiers: List<PlacementModifier>): BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             val context = PlacementContext(chunk)

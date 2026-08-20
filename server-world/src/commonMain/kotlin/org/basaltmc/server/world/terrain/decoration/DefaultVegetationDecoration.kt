@@ -57,6 +57,20 @@ public object DefaultVegetationDecoration : BiomeVegetalDecoration {
         ) { position -> feature.place(chunk, random, position) }
     }
 
+    internal fun placeDefaultPatchAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature = SimpleBlockFeature({ r, _ -> if (r.nextInt(3) < 2) poppyStateId else dandelionStateId })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(64), RandomOffsetPlacement(xzSpread = 7, ySpread = 3), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     private fun flowers(rarity: Int): BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             val feature = SimpleBlockFeature({ r, _ -> if (r.nextInt(3) < 2) poppyStateId else dandelionStateId })

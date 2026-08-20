@@ -1,13 +1,54 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
+import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.Identifier
 
 /** `pale_moss_patch`, including its ground replacement and nested vegetation. */
 public object PaleMossDecoration : BiomeVegetalDecoration {
+    public fun decorate(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        decorateFeature(chunk, seed, environment, null)
+    }
+
+    internal fun decorateFeature(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        placementObserver: ((DecorationPos) -> Unit)?,
+    ) {
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        random.setFeatureSeed(decorationSeed, PALE_MOSS_PATCH_INDEX, VEGETAL_DECORATION_STEP)
+        val context = PlacementContext(chunk)
+        var positions: Sequence<DecorationPos> =
+            sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
+        for (
+        modifier in
+        listOf(
+            CountPlacement(1),
+            InSquarePlacement,
+            HeightmapPlacement(Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES),
+        )
+        ) {
+            positions = positions.flatMap { modifier.getPositions(context, random, it) }
+        }
+        positions.forEach { origin ->
+            if (environment.biomeAt(origin.x, origin.y, origin.z).substringAfter(':') != "pale_garden") {
+                return@forEach
+            }
+            placementObserver?.invoke(origin)
+            placePatchAt(chunk, random, origin)
+        }
+    }
+
     override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
@@ -32,8 +73,8 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         random: WorldgenRandom,
         origin: DecorationPos,
     ) {
-        val xRadius = 3 + random.nextInt(3)
-        val zRadius = 3 + random.nextInt(3)
+        val xRadius = 2 + random.nextInt(3)
+        val zRadius = 2 + random.nextInt(3)
         val surface = ArrayList<DecorationPos>((xRadius * 2 + 1) * (zRadius * 2 + 1))
 
         for (dx in -xRadius..xRadius) {
@@ -141,6 +182,8 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
     private const val VERTICAL_RANGE = 5
     private const val VEGETATION_CHANCE = 0.3f
     private const val EXTRA_EDGE_COLUMN_CHANCE = 0.75f
+    private const val PALE_MOSS_PATCH_INDEX = 14
+    private const val VEGETAL_DECORATION_STEP = 9
 
     private val paleMossBlockStateId = stateId("pale_moss_block")
     private val paleMossCarpetStateId = stateId("pale_moss_carpet")
