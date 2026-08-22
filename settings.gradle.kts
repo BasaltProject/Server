@@ -13,6 +13,8 @@ pluginManagement {
 dependencyResolutionManagement {
     repositories {
         mavenCentral()
+        // Luak, the Lua runtime the plugin API runs on. Public, no authentication.
+        maven("https://repo.blueva.net/releases")
     }
     versionCatalogs {
         // One catalog for every repository that consumes Wire, so versions cannot drift apart.
