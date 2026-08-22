@@ -1,9 +1,11 @@
 package org.basaltmc.server.runtime
 
+import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.runtime.config.PingRequest
 import org.basaltmc.server.runtime.config.ServerListConfig
 import org.basaltmc.server.runtime.config.ServerListProfile
 import org.basaltmc.server.runtime.placeholder.PlaceholderSlots
+import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.placeholder.PlaceholderContext
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
@@ -13,6 +15,7 @@ import org.basaltmc.wire.io.FileIO
 import org.basaltmc.wire.protocol.status.ServerStatusPayload
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.MiniMessage
+import org.basaltmc.wire.text.PlainTextSerializer
 import kotlin.concurrent.AtomicReference
 
 /** One player, as the list's hover text names them. */
@@ -40,6 +43,8 @@ public class ServerListStatus(
     private val onlinePlayers: () -> List<ListedPlayer>,
     private val configRoot: String = "config",
     private val lookupPlayerByAddress: ((String) -> String?)? = null,
+    /** Where plugin events go, read late: the plugin host is built after this. */
+    private val pluginEvents: () -> org.basaltmc.server.plugins.PluginEventBus? = { null },
     private val logger: Logger = Logger("ServerList"),
 ) {
     private val icons = AtomicReference<Map<String, ByteArray?>>(emptyMap())
@@ -60,10 +65,25 @@ public class ServerListStatus(
         val players = onlinePlayers()
 
         val online = profile.onlinePlayers ?: players.size
-        val max = profile.maxPlayers ?: slots
+        var max = profile.maxPlayers ?: slots
+        var motd = render(profile.motd.orEmpty(), context)
+
+        // The last word on what a pinger sees, after the profile decided it: a plugin can change
+        // the line and the slots without the operator's file having to know about it.
+        val ping =
+            pluginEvents().emit(PluginEventTypes.SERVER_PING) { event ->
+                event.set(0, address)
+                event.set(1, PlainTextSerializer.serialize(motd))
+                event.set(2, online)
+                event.set(3, max)
+            }
+        if (ping != null) {
+            (ping.get("motd") as? String)?.let { motd = MiniMessage.parse(it) }
+            (ping.get("max_players") as? Long)?.let { max = it.toInt() }
+        }
 
         return ServerStatusPayload(
-            description = render(profile.motd.orEmpty(), context),
+            description = motd,
             players =
                 if (profile.hidePlayerCount == true) {
                     null

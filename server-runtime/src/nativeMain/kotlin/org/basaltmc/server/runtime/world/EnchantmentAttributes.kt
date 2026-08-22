@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.registry.AttributeIds
 import org.basaltmc.server.runtime.player.PlayerInventory
 import org.basaltmc.server.storage.StoredItemStack
 import org.basaltmc.wire.common.Identifier
@@ -15,16 +16,22 @@ import org.basaltmc.wire.protocol.play.UpdateAttributesPacket
  * plus `LivingEntity`, which adds the modifiers of what is equipped and syncs the attribute.
  */
 public object EnchantmentAttributes {
-    /** parity: the `minecraft:attribute` registry ids the enchantments of a held item can touch. */
+    /**
+     * parity: the `minecraft:attribute` registry ids the enchantments of a held item can touch.
+     *
+     * The numbers come from the registry rather than being written out here: one of them was wrong
+     * (`attack_speed` was going out as `attack_knockback`), which is the mistake a hand-copied table
+     * makes and nobody spots by reading.
+     */
     private val PROTOCOL_IDS: Map<String, Int> =
-        mapOf(
-            "minecraft:mining_efficiency" to 24,
-            "minecraft:block_break_speed" to 7,
-            "minecraft:attack_damage" to 3,
-            "minecraft:attack_speed" to 4,
-            "minecraft:submerged_mining_speed" to 34,
-            "minecraft:sweeping_damage_ratio" to 35,
-        )
+        listOf(
+            "minecraft:mining_efficiency",
+            "minecraft:block_break_speed",
+            "minecraft:attack_damage",
+            "minecraft:attack_speed",
+            "minecraft:submerged_mining_speed",
+            "minecraft:sweeping_damage_ratio",
+        ).associateWith { requireNotNull(AttributeIds.protocolId(it)) { "no attribute called '$it'" } }
 
     /** Every attribute a held stack modifies, as the snapshots the update packet carries. */
     public fun snapshotsFor(

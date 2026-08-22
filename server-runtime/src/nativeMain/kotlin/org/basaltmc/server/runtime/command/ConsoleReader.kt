@@ -1,5 +1,7 @@
 package org.basaltmc.server.runtime.command
 
+import org.basaltmc.server.plugins.PluginEventTypes
+import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.wire.common.logging.LogOutput
 import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.enableTerminalRawMode
@@ -79,11 +81,22 @@ public object ConsoleReader {
             // than on this thread. With nothing loaded there is nobody to ask, and it runs here.
             val source = ConsoleCommandSource(lang = dispatcher.environment.lang)
             val owner = dispatcher.environment.worlds[dispatcher.environment.defaultWorldName]?.owner
-            if (owner == null) {
-                dispatcher.execute(source, command)
-            } else {
-                owner.submit { dispatcher.execute(source, command) }
+            // The plugin is asked *inside* that, not here: a decider answers where plugins run, and
+            // this thread is the one reading stdin. Asking here meant no plugin ever saw a console
+            // command, which is exactly what the first live run of this showed.
+            val run: () -> Unit = {
+                val asked =
+                    dispatcher.environment.pluginEvents.emit(PluginEventTypes.SERVER_COMMAND) { event ->
+                        event.set(0, "console")
+                        event.set(1, command)
+                    }
+                if (asked?.cancelled == true) {
+                    asked.cancelMessage?.let { println(it) }
+                } else {
+                    dispatcher.execute(source, (asked?.get("command") as? String) ?: command)
+                }
             }
+            if (owner == null) run() else owner.submit(run)
         }
     }
 

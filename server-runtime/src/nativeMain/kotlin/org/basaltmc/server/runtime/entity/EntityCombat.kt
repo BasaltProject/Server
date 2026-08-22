@@ -1,5 +1,7 @@
 package org.basaltmc.server.runtime.entity
 
+import org.basaltmc.server.plugins.PluginEventBus
+import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.registry.EntityAttributes
 import org.basaltmc.server.runtime.player.Combat
 import org.basaltmc.wire.common.Identifier
@@ -44,8 +46,29 @@ public object EntityCombat {
         amount: Float,
         sourceX: Double = entity.x,
         sourceZ: Double = entity.z,
+        /** Where plugin events go, and what to tell them about this hit. Null means no plugins. */
+        events: PluginEventBus? = null,
+        worldName: String? = null,
+        cause: String = "attack",
+        attackerName: String? = null,
     ): Result {
         if (entity.removed || entity.health <= 0.0) return Result.MISSED
+        // Every hit a mob takes comes through here, so this is the one place that has to ask. A
+        // plugin may stop it or change how much it is worth; what it cannot do is see a hit that
+        // was never going to land, which is why this is below the checks above.
+        var amount = amount
+        if (events != null && events.listening(PluginEventTypes.ENTITY_DAMAGE)) {
+            val event = events.event(PluginEventTypes.ENTITY_DAMAGE)
+            event.set(0, entity.entityId)
+            event.set(1, entity.type.toString())
+            event.set(2, worldName)
+            event.set(3, cause)
+            event.set(4, amount.toDouble())
+            event.set(5, attackerName)
+            if (!events.fire(event)) return Result.MISSED
+            amount = ((event.get("amount") as? Double) ?: amount.toDouble()).toFloat()
+            if (amount <= 0f) return Result.MISSED
+        }
         var incoming = amount
         val cooling = entity.hurtCooldown > COOLDOWN_HALF_TICKS
         if (cooling) {
@@ -63,6 +86,17 @@ public object EntityCombat {
         if (died) entity.health = 0.0
         // parity: the 0.4 every hit is worth, taken before the attacker's own extra knockback.
         if (!cooling) knockback(entity, DEFAULT_KNOCKBACK, sourceX - entity.x, sourceZ - entity.z)
+        if (died && events != null && events.listening(PluginEventTypes.ENTITY_DEATH)) {
+            val event = events.event(PluginEventTypes.ENTITY_DEATH)
+            event.set(0, entity.entityId)
+            event.set(1, entity.type.toString())
+            event.set(2, worldName)
+            event.set(3, entity.x)
+            event.set(4, entity.y)
+            event.set(5, entity.z)
+            event.set(6, attackerName)
+            events.fire(event)
+        }
         return Result(landed = true, died = died, damage = reduced)
     }
 

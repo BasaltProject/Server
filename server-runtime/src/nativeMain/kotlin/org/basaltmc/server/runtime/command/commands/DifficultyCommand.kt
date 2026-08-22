@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
@@ -7,8 +8,10 @@ import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.player.Difficulty
+import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.wire.protocol.play.ChangeDifficultyPacket
 import org.basaltmc.wire.text.Component
+import org.basaltmc.wire.text.MiniMessage
 
 /**
  * parity: `DifficultyCommand`, including its refusal when the world is already on that difficulty.
@@ -45,6 +48,17 @@ public class DifficultyCommand : Command(name = "difficulty", permissionLevel = 
             throw CommandSyntaxException(
                 Component.translatable("commands.difficulty.failure", Component.text(name)),
             )
+        }
+        val change =
+            context.environment.pluginEvents.emit(PluginEventTypes.WORLD_DIFFICULTY_CHANGE) { event ->
+                event.set(0, world.name)
+                event.set(1, name)
+                event.set(2, world.difficulty)
+                event.set(3, context.source.name)
+            }
+        if (change?.cancelled == true) {
+            change.cancelMessage?.let { context.source.sendSystemMessage(MiniMessage.parse(it)) }
+            return 0
         }
         world.difficulty = name
         val packet = ChangeDifficultyPacket(difficulty.ordinal, world.difficultyLocked)

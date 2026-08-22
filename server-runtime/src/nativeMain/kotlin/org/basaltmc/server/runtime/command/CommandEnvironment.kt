@@ -38,6 +38,13 @@ import org.basaltmc.wire.text.resolvePlainText
 public class CommandEnvironment(
     public val players: PlayerRegistry,
     /**
+     * Where plugin events go, or null when there are no plugins.
+     *
+     * Read through a supplier, like the groups above: the plugin host is built after the command
+     * tree (it registers `/plugins` into it), so a captured value here would always be null.
+     */
+    private val pluginEventsProvider: () -> org.basaltmc.server.plugins.PluginEventBus? = { null },
+    /**
      * Read through a supplier, not stored: `/reload` swaps the groups under a running server and a
      * captured copy would keep answering with the permissions the server started with.
      */
@@ -97,6 +104,9 @@ public class CommandEnvironment(
     /** `commands.toml`: which permission each command asks for, which exist, and what they answer. */
     private val commandsProvider: () -> CommandsConfig = { CommandsConfig(emptyMap(), emptyList(), emptyMap()) },
 ) {
+    /** Where plugin events go right now, or null when there are none. */
+    public val pluginEvents: org.basaltmc.server.plugins.PluginEventBus? get() = pluginEventsProvider()
+
     /** A message every connected player sees, plus the console, the way vanilla's `broadcastSystemMessage` does. */
     public val groups: GroupsConfig get() = groupsProvider()
 

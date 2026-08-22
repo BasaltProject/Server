@@ -1,5 +1,7 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.plugins.PluginEventBus
+import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockConnections
 import org.basaltmc.server.registry.BlockShapes
@@ -48,14 +50,49 @@ public class RandomTicks {
      * parity: `randomTickSpeed` positions per section of each chunk near a player, and the section
      * is skipped altogether when nothing in it ticks.
      */
+    private var events: PluginEventBus? = null
+    private var world: LoadedWorld? = null
+
+    /**
+     * Asks before a random tick changes a block, and answers whether it may.
+     *
+     * One place rather than forty: everything a random tick does ends in a block becoming another
+     * block, so the question is asked where that happens and the reason says which kind it was.
+     */
+    private fun mayChange(
+        x: Int,
+        y: Int,
+        z: Int,
+        from: Int,
+        to: Int,
+        cause: String,
+    ): Boolean {
+        val bus = events ?: return true
+        val type = if (cause == "fade") PluginEventTypes.BLOCK_FADE else PluginEventTypes.BLOCK_GROW
+        if (!bus.listening(type)) return true
+        val event = bus.event(type)
+        event.set(0, world?.name)
+        event.set(1, x)
+        event.set(2, y)
+        event.set(3, z)
+        event.set(4, BlockStateDefinitions.blockOf(from)?.toString())
+        event.set(5, BlockStateDefinitions.blockOf(to)?.toString())
+        event.set(6, cause)
+        return bus.fire(event)
+    }
+
     public fun tick(
         world: LoadedWorld,
         chunks: List<IntArray>,
         speed: Int,
         random: LegacyRandom,
         allocateEntityId: (() -> Int)? = null,
+        /** Where plugin events go. Nobody listening costs one comparison for the whole sweep. */
+        events: PluginEventBus? = null,
     ): List<BlockChange> {
         this.allocateEntityId = allocateEntityId
+        this.events = events
+        this.world = world
         if (speed <= 0) return emptyList()
         val changes = mutableListOf<BlockChange>()
         for (position in chunks) {
@@ -518,8 +555,24 @@ public class RandomTicks {
         stateId: Int,
         changes: MutableList<BlockChange>,
     ) {
+        // Everything a random tick does ends here, so this is where a plugin gets asked: growing,
+        // melting, drying and spreading are all one block becoming another.
+        val from = world.state.getBlockState(x, y, z) ?: Blocks.AIR.stateId
+        val cause = if (stateId == Blocks.AIR.stateId || isFading(from, stateId)) "fade" else "grow"
+        if (!mayChange(x, y, z, from, stateId, cause)) return
         if (!world.state.setBlockState(x, y, z, stateId)) return
         changes += BlockChange(x, y, z, stateId)
+    }
+
+    /** Melting, drying and going out: the block is being taken away rather than moved on. */
+    private fun isFading(
+        from: Int,
+        to: Int,
+    ): Boolean {
+        val before = BlockStateDefinitions.blockOf(from)?.path ?: return false
+        val after = BlockStateDefinitions.blockOf(to)?.path ?: return false
+        return before != after &&
+            (before.endsWith("ice") || before.endsWith("snow") || before == "fire" || after == "air")
     }
 
     private companion object {

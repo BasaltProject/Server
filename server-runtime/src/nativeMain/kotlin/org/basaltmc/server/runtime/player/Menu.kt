@@ -107,6 +107,43 @@ public class Menu(
                     },
             )
 
+        /**
+         * A window of [rows] rows of nine, then the player's own 36: `minecraft:generic_9xN`.
+         *
+         * What a plugin's menu is drawn in. The slots above the player's are [MenuSlot.Block] like
+         * a chest's, because the *shape* is a chest's; what is behind them is not a block, which is
+         * the caller's business and not this class's.
+         */
+        public fun rows(
+            containerId: Int,
+            rows: Int,
+        ): Menu {
+            val own = rows * COLUMNS
+            return Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(own + PLAYER_SLOTS_IN_WINDOW) { slot ->
+                        when {
+                            slot < own -> MenuSlot.Block(slot)
+                            slot < own + STORAGE_SLOTS -> MenuSlot.Inventory(slot - own)
+                            else ->
+                                MenuSlot.Inventory(
+                                    slot - own - STORAGE_SLOTS + PlayerInventory.HOTBAR_START,
+                                )
+                        }
+                    },
+            )
+        }
+
+        /** Nine to a row, which is every window the client draws. */
+        public const val COLUMNS: Int = 9
+
+        /** The player's own storage and hotbar, tacked onto the bottom of every container window. */
+        private const val STORAGE_SLOTS = 27
+        private const val PLAYER_SLOTS_IN_WINDOW = 36
+
         /** parity: `ChestMenu.sixRows`, the double chest: 54 of its own, then the player's 36. */
         public const val DOUBLE_CHEST_SIZE: Int = 54
         private const val DOUBLE_CHEST_SLOT_COUNT = 90

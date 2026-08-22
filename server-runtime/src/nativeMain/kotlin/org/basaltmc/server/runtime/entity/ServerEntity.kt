@@ -222,6 +222,24 @@ public class ServerEntity(
 
     public var customName: String? = null
 
+    /**
+     * The text a `text_display` shows, as MiniMessage. Null for everything that is not one.
+     *
+     * A hologram is a real entity in 26.2 rather than a fake armour stand, so this is its text and
+     * not a trick: the client draws it because the entity is a text display, not because of any
+     * packet a plugin sent by hand.
+     */
+    public var displayText: String? = null
+
+    /**
+     * Who can see it, by uuid, or null for everybody.
+     *
+     * Per-player visibility lives here rather than in each connection because the entity is the
+     * thing that knows: a connection asking "should I draw this?" gets one answer, and a hologram
+     * shown to one player is not a different entity from the one nobody else sees.
+     */
+    public var visibleTo: Set<String>? = null
+
     /** Set when it has been killed or removed, so the sync pass tells clients to forget it. */
     public var removed: Boolean = false
 

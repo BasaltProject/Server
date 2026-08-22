@@ -89,6 +89,22 @@ public class PlayerSession(
 
     public var health: Float = MAX_HEALTH
 
+    /**
+     * What this player's health tops out at, which vanilla keeps as the `max_health` attribute.
+     *
+     * A field rather than the constant because a plugin can move it, and moving it has to mean
+     * something: every heal and every clamp reads this, so twenty hearts on the screen and twenty
+     * hearts in the damage arithmetic stay the same number.
+     */
+    public var maxHealth: Float = MAX_HEALTH
+        set(value) {
+            field = value.coerceAtLeast(1f)
+            if (health > field) health = field
+        }
+
+    /** Attribute bases a plugin set, by their registry name. Empty for almost every player. */
+    public val attributeBases: MutableMap<String, Double> = mutableMapOf()
+
     /** parity: `LivingEntity.getAbsorptionAmount`, the pool damage eats before health does. */
     public var absorption: Float = 0f
 
@@ -181,7 +197,7 @@ public class PlayerSession(
 
     /** Back to a freshly spawned player: full health, full food, no experience kept. */
     public fun resetForRespawn() {
-        health = MAX_HEALTH
+        health = maxHealth
         food.reset()
         experience.reset()
         dead = false

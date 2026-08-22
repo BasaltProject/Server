@@ -383,14 +383,26 @@ public class WorldState(
      */
     public var installOwner: Owner? = null
 
+    /**
+     * Told when a chunk arrives, which is where `world.chunk_load` is fired from.
+     *
+     * A hook rather than the bus itself: this module is below the plugin one, and a world knowing
+     * what a plugin is would be a flèche pointing the wrong way.
+     */
+    public var onChunkInstalled: ((Chunk) -> Unit)? = null
+
     /** Hands [chunk] over to be installed, or installs it here when nobody owns this world. */
     public fun installLater(chunk: Chunk) {
         val target = installOwner ?: owner
         if (target == null) {
             install(chunk)
+            onChunkInstalled?.invoke(chunk)
             return
         }
-        target.submit { install(chunk) }
+        target.submit {
+            install(chunk)
+            onChunkInstalled?.invoke(chunk)
+        }
     }
 
     public fun getBlockState(

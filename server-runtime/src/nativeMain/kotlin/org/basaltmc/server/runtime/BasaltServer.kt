@@ -1,6 +1,10 @@
 package org.basaltmc.server.runtime
 
 import org.basaltmc.server.assets.ServerJarAssets
+import org.basaltmc.server.lua.LuaLimits
+import org.basaltmc.server.plugins.PluginEventTypes
+import org.basaltmc.server.plugins.PluginHost
+import org.basaltmc.server.plugins.PluginSurface
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
@@ -80,6 +84,7 @@ import org.basaltmc.server.runtime.command.commands.WorldBorderCommand
 import org.basaltmc.server.runtime.command.registerVanillaCommands
 import org.basaltmc.server.runtime.config.BasaltConfig
 import org.basaltmc.server.runtime.config.LiveConfigs
+import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
@@ -120,6 +125,17 @@ import org.basaltmc.server.runtime.player.Combat
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.runtime.plugins.DatabasePluginStorage
+import org.basaltmc.server.runtime.plugins.LoadedWorlds
+import org.basaltmc.server.runtime.plugins.NpcRegistry
+import org.basaltmc.server.runtime.plugins.PluginsCommand
+import org.basaltmc.server.runtime.plugins.RegistryPlaceholders
+import org.basaltmc.server.runtime.plugins.RegistryPlayers
+import org.basaltmc.server.runtime.plugins.ServerPluginServices
+import org.basaltmc.server.runtime.plugins.SessionChannels
+import org.basaltmc.server.runtime.plugins.SessionMenus
+import org.basaltmc.server.runtime.plugins.SessionPackets
+import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.server.runtime.registry.VanillaRegistryData
 import org.basaltmc.server.runtime.sched.Region
 import org.basaltmc.server.runtime.sched.RegionScheduler
@@ -203,6 +219,7 @@ import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
 import org.basaltmc.wire.common.timings.TickDurations
 import org.basaltmc.wire.common.timings.Timings
 import org.basaltmc.wire.common.timings.time
+import org.basaltmc.wire.io.FileIO
 import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.ShutdownSignal
 import org.basaltmc.wire.io.TcpListener
@@ -268,6 +285,8 @@ public class BasaltServer(
     /** Where block-break drops are read from (see [RealLootTables]); `null` in tests that never break a block in survival. */
     private val serverJar: ServerJarAssets? = null,
     private val worldsConfig: WorldsConfig,
+    /** Where `plugins/` is. The working directory on a real server; under `build/` in a test. */
+    private val pluginsRoot: String = ".",
     /**
      * Everything `/reload` can swap under a running server, read through this rather than copied:
      * see [LiveConfigs] for where the line between reloadable and not is drawn and why.
@@ -281,10 +300,13 @@ public class BasaltServer(
      */
     defaultWorldMetadata: WorldMetadata? = null,
     playersDatabasePath: String = PLAYERS_DATABASE,
-    worldsRoot: String = WORLDS_ROOT,
+    private val worldsRoot: String = WORLDS_ROOT,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
+
+    /** Player-shaped entities a plugin made, drawn by every connection that may see them. */
+    private val npcs = NpcRegistry()
     private val cpuMeter = CpuMeter()
     private val lootTables = RealLootTables(serverJar)
 
@@ -445,38 +467,103 @@ public class BasaltServer(
         RegionScheduler(regional = config.regional, threads = config.regionThreads)
 
     /**
-     * Every world `worlds.toml` declares, each with its own chunks, region files, generation
-     * workers, settings and seed. Keyed by name, which is what a player's stored row refers to.
+     * Every world, each with its own chunks, region files, generation workers, settings and seed.
+     * Keyed by name, which is what a player's stored row refers to.
+     *
+     * Replaced rather than added to, and that is not a style choice: the tick loop walks these while
+     * a plugin can be making one, and inserting into a map somebody is iterating is a crash on the
+     * tick thread. Swapping the reference leaves whoever is mid-walk on the old one, which is
+     * exactly right: a world made this turn starts ticking the next.
      */
-    private val worlds: Map<String, LoadedWorld> =
+    private var worlds: Map<String, LoadedWorld> =
         worldsConfig.worlds.associate { declaration ->
-            val metadata = worldMetadata.getValue(declaration.name)
-            val generators =
-                if (declaration.type == WorldType.NORMAL || declaration.type == WorldType.AMPLIFIED) {
-                    worldGeneratorFactory?.create(declaration, metadata)
-                } else {
-                    null
-                }
-            declaration.name to
-                LoadedWorld(
-                    declaration = declaration,
-                    settings = worldsConfig.settingsFor(declaration),
-                    metadata = metadata,
-                    worldsRoot = worldsRoot,
-                    logger = logger,
-                    timings = timings,
-                    // One worker while measuring: GenerationMetrics counts without atomics on
-                    // purpose, so its numbers are only exact when a single thread is generating.
-                    generationWorkers = if (config.generationMetrics) 1 else ChunkGenerationQueue.DEFAULT_WORKERS,
-                    overworldRouter = overworldRouter,
-                    surfaceEnvironment = surfaceEnvironment,
-                    // The one generation itself uses, so `/place structure` and `/locate structure`
-                    // act on the same villages the world already has.
-                    villageGenerator = generators?.villages ?: villageGenerator,
-                    normalGenerator = generators?.generate,
-                    scheduler = regionScheduler,
-                )
+            declaration.name to buildWorld(declaration, worldMetadata.getValue(declaration.name))
         }
+
+    /**
+     * One world, built the same way whether it came from `worlds.toml` or from a plugin.
+     *
+     * Extracted so there is one place that knows what a world needs; a world made at runtime that
+     * skipped one of these would be subtly different from the ones declared in the file, and the
+     * difference would show up as a bug in generation months later.
+     */
+    private fun buildWorld(
+        declaration: WorldDeclaration,
+        metadata: WorldMetadata,
+    ): LoadedWorld {
+        val generators =
+            if (declaration.type == WorldType.NORMAL || declaration.type == WorldType.AMPLIFIED) {
+                worldGeneratorFactory?.create(declaration, metadata)
+            } else {
+                null
+            }
+        return LoadedWorld(
+            declaration = declaration,
+            settings = worldsConfig.settingsFor(declaration),
+            metadata = metadata,
+            worldsRoot = worldsRoot,
+            logger = logger,
+            timings = timings,
+            // One worker while measuring: GenerationMetrics counts without atomics on
+            // purpose, so its numbers are only exact when a single thread is generating.
+            generationWorkers = if (config.generationMetrics) 1 else ChunkGenerationQueue.DEFAULT_WORKERS,
+            overworldRouter = overworldRouter,
+            surfaceEnvironment = surfaceEnvironment,
+            // The one generation itself uses, so `/place structure` and `/locate structure`
+            // act on the same villages the world already has.
+            villageGenerator = generators?.villages ?: villageGenerator,
+            normalGenerator = generators?.generate,
+            scheduler = regionScheduler,
+        )
+    }
+
+    /**
+     * Makes a world that was not in `worlds.toml`, the way a plugin asks for one.
+     *
+     * It is a world like any other: its own folder, its own `settings.toml` inheriting the defaults,
+     * its own `level.nbt` with the seed it was given. Answers null if the name is taken or unusable,
+     * because a world that half exists is worse than one that does not.
+     *
+     * Unlike the worlds in `worlds.toml`, its spawn area is **not** generated up front. Those are
+     * built before the server is listening and nobody is waiting; this one is built inside a tick,
+     * and forty-nine chunks of generation there is a freeze every player would feel. The chunks come
+     * as somebody goes there, which is what happens everywhere else in the world anyway.
+     */
+    internal fun createWorld(
+        name: String,
+        dimension: WorldDimension,
+        type: WorldType,
+        seed: Long?,
+    ): LoadedWorld? {
+        if (name in worlds || !name.matches(WORLD_NAME_SHAPE)) return null
+        val declaration =
+            WorldDeclaration(
+                name = name,
+                dimension = dimension,
+                type = type,
+                seed = seed,
+                isDefault = false,
+            )
+        FileIO.createDirectories("$worldsRoot/$name")
+        val metadata =
+            WorldMetadata.loadOrCreate(
+                "$worldsRoot/$name",
+                seed ?: defaultWorld.metadata.seed,
+                WorldMetadata.DEFAULT_SPAWN,
+                logger,
+            )
+        val world = buildWorld(declaration, metadata)
+        worlds = worlds + (name to world)
+        logger.info { "Made world '$name' ($dimension, ${type.name.lowercase()}, seed ${metadata.seed})." }
+        world.saveDirty()
+        // Next turn, not now: this is usually called from inside a plugin's own handler, and firing
+        // an event there would re-enter the Lua state that is already running. One turn later it is
+        // an ordinary event like any other.
+        regionScheduler.global.schedule(0) {
+            plugins.events.emit(PluginEventTypes.WORLD_LOAD) { event -> event.set(0, name) }
+        }
+        return world
+    }
 
     private val defaultWorld: LoadedWorld = worlds.getValue(worldsConfig.default.name)
 
@@ -637,6 +724,7 @@ public class BasaltServer(
         CommandDispatcher(
             CommandEnvironment(
                 players = playerRegistry,
+                pluginEventsProvider = { plugins.events },
                 groupsProvider = { live.current.groups },
                 worldSeed = worldSeed,
                 maxPlayers = config.maxPlayers,
@@ -746,6 +834,81 @@ public class BasaltServer(
                 )
             }
 
+    /** The player handles a plugin holds, over the live registry and the server's own groups. */
+    private val pluginPlayers =
+        RegistryPlayers(
+            registry = playerRegistry,
+            groups = { live.current.groups },
+            worldFor = { name -> worlds[name] },
+        )
+
+    /** A plugin's placeholders, in the server's own registry rather than one of their own. */
+    private val pluginPlaceholders =
+        RegistryPlaceholders(placeholders, pluginPlayers).also { it.sessions = { playerRegistry.snapshot() } }
+
+    /**
+     * The seam the plugins see the server through.
+     *
+     * Everything they run goes on the global owner: it is the one owner that exists in both
+     * scheduler modes and is a single thread in both, which is what makes "one lane" true today
+     * rather than a promise. Lanes follow regions later, and that changes this line and nothing a
+     * plugin can see.
+     */
+    private val pluginServices: ServerPluginServices =
+        ServerPluginServices(
+            owner = regionScheduler.global,
+            dispatcher = commands,
+            currentTick = { tickLoop.ticksRun },
+            root = pluginsRoot,
+            players = pluginPlayers,
+            worlds =
+                LoadedWorlds(
+                    worlds = { worlds },
+                    defaultName = { defaultWorld.name },
+                    spawnMob = { world, type, x, y, z -> spawnMob(world, type, x, y, z, reason = "plugin") },
+                    make = { name, dimension, type, seed -> createWorld(name, dimension, type, seed) },
+                    npcs = npcs,
+                    nextEntityId = { playerRegistry.allocateEntityId() },
+                ),
+            placeholders = pluginPlaceholders,
+            storage = DatabasePluginStorage { playerStore },
+            menus = SessionMenus(playerRegistry),
+            packets = SessionPackets(playerRegistry),
+            channels = SessionChannels(playerRegistry),
+            // The owner of a position, which with regions off is the world's one.
+            ownerAt = { world, x, z ->
+                worlds[world]?.let { regionScheduler.regionFor(it.name, x.toInt() shr 4, z.toInt() shr 4).owner }
+            },
+        )
+
+    /**
+     * The plugins, with what `[plugins]` in `server.toml` lets them spend.
+     *
+     * Read once rather than on every use, and not part of what `/reload` swaps: the limits are
+     * baked into a plugin's state when it loads, so changing them under a running plugin would mean
+     * one thing for the code already running and another for the code about to. Reloading the
+     * plugin is what applies them.
+     */
+    public val plugins: PluginHost =
+        PluginHost(
+            pluginServices,
+            lanes = config.pluginLanes,
+            limits =
+                LuaLimits(
+                    instructionsPerTurn = config.pluginInstructionsPerTurn,
+                    memoryBytes = config.pluginMemoryBytes,
+                ),
+        ).also { host ->
+            commands.register(PluginsCommand(host))
+            // A decider answers where the question was asked, so it may only run on the owner
+            // plugins live on. With regions off that is every owner, because they all take turns on
+            // this one thread; with regions on and more than one thread it is not, and the host says
+            // so instead of running Lua on two threads at once.
+            // Unclaimed counts as ours, by the owner's own rule: before the first tick nothing else
+            // is running, and that is when the worlds announce themselves.
+            host.onPluginThread = { regionScheduler.global.isCurrent || !regionScheduler.global.isClaimed }
+        }
+
     /**
      * The server list, rebuilt per ping from `server_list.toml`.
      *
@@ -764,6 +927,7 @@ public class BasaltServer(
                 playerRegistry.snapshot().map { ListedPlayer(it.name, it.uuid.toString()) }
             },
             lookupPlayerByAddress = playerStore.players::findNameByAddress,
+            pluginEvents = { plugins.events },
         )
 
     /**
@@ -776,6 +940,7 @@ public class BasaltServer(
      */
     private fun onConfigsReloaded() {
         commands.rebuild()
+        pluginServices.refreshCommands()
         for (player in playerRegistry.snapshot()) {
             runCatching { player.connection.sendCommandTree() }
         }
@@ -864,7 +1029,24 @@ public class BasaltServer(
                     .snapshot()
                     .filter { it.worldName == world.name }
                     .map { (it.x.toInt() shr 4) to (it.z.toInt() shr 4) }
+            val before =
+                if (plugins.events.listening(PluginEventTypes.WORLD_CHUNK_UNLOAD)) {
+                    world.state.loadedChunkKeys()
+                } else {
+                    null
+                }
             unloaded += world.unloadUnreachable(positions, SPAWN_RADIUS_CHUNKS, RETAIN_MARGIN_CHUNKS)
+            if (before != null) {
+                val after = world.state.loadedChunkKeys()
+                for (key in before) {
+                    if (key in after) continue
+                    plugins.events.emit(PluginEventTypes.WORLD_CHUNK_UNLOAD) { event ->
+                        event.set(0, world.name)
+                        event.set(1, (key shr 32).toInt())
+                        event.set(2, key.toInt())
+                    }
+                }
+            }
             loaded += world.state.loadedChunkCount
         }
 
@@ -894,6 +1076,14 @@ public class BasaltServer(
      * telling clients what moved is each [ClientSession]'s own job.
      */
     private fun tickWorlds() {
+        // Told once a tick, and only if somebody asked: with no listener this is a boolean.
+        plugins.events.let { bus ->
+            if (bus.listening(PluginEventTypes.SERVER_TICK)) {
+                val event = bus.event(PluginEventTypes.SERVER_TICK)
+                event.set(0, tickLoop.ticksRun)
+                bus.fire(event)
+            }
+        }
         // Scheduled functions first, so one that changes the world does it before this tick's own
         // work reads it. parity: vanilla ticks its function timer before the levels.
         for (id in functionSchedule.tick()) {
@@ -997,8 +1187,20 @@ public class BasaltServer(
         x: Double,
         y: Double,
         z: Double,
+        /** Why it is being made, which is the one thing a plugin always wants to filter on. */
+        reason: String = "natural",
     ): org.basaltmc.server.runtime.entity.ServerEntity? {
         val protocolType = EntityTypes[type]?.protocolId ?: return null
+        val spawning =
+            plugins.events.emit(PluginEventTypes.ENTITY_SPAWN) { event ->
+                event.set(0, type.toString())
+                event.set(1, world.name)
+                event.set(2, x)
+                event.set(3, y)
+                event.set(4, z)
+                event.set(5, reason)
+            }
+        if (spawning?.cancelled == true) return null
         val entity =
             org.basaltmc.server.runtime.entity.ServerEntity(
                 entityId = playerRegistry.allocateEntityId(),
@@ -1031,6 +1233,14 @@ public class BasaltServer(
             tickRaid(world, players, raid)
             if (raid.status == RaidStatus.ONGOING || raid.celebrationTicks > 0) continue
             hideRaidBar(players, raid)
+            plugins.events.emit(PluginEventTypes.RAID_FINISH) { event ->
+                event.set(0, world.name)
+                event.set(1, raid.centerX)
+                event.set(2, raid.centerY)
+                event.set(3, raid.centerZ)
+                event.set(4, raid.groupsSpawned)
+                event.set(5, raid.status == RaidStatus.VICTORY)
+            }
             finished.add(raid)
         }
         manager.forget(finished)
@@ -1463,7 +1673,7 @@ public class BasaltServer(
         when (active.effect) {
             MobEffects.REGENERATION ->
                 if (onInterval(ticks, REGENERATION_INTERVAL, active.amplifier) &&
-                    player.health < PlayerSession.MAX_HEALTH
+                    player.health < player.maxHealth
                 ) {
                     player.connection.heal(1f)
                 }
@@ -1568,6 +1778,16 @@ public class BasaltServer(
             if (!region.owns(position[0] shr 4, position[2] shr 4)) continue
             // Fire acts on its own clock, and keeps asking for the next turn as it goes.
             if (Fires.isFire(world.state.getBlockState(position[0], position[1], position[2]) ?: 0)) {
+                val spreading =
+                    plugins.events.emit(PluginEventTypes.BLOCK_IGNITE) { event ->
+                        event.set(0, world.name)
+                        event.set(1, position[0])
+                        event.set(2, position[1])
+                        event.set(3, position[2])
+                        event.set(4, "spread")
+                        event.set(5, null)
+                    }
+                if (spreading?.cancelled == true) continue
                 for (change in Fires.tick(
                     world,
                     position[0],
@@ -1654,14 +1874,24 @@ public class BasaltServer(
             // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
             scheduled += finishPiston(world, position, watchers)
             val dispenserEffects = mutableListOf<BlockEffect>()
-            Dispensers.fire(
-                world,
-                position[0],
-                position[1],
-                position[2],
-                LegacyRandom(Random.nextLong()),
-                dispenserEffects,
-            ) { playerRegistry.allocateEntityId() }
+            val dispensing =
+                plugins.events.emit(PluginEventTypes.BLOCK_DISPENSE) { event ->
+                    event.set(0, world.name)
+                    event.set(1, position[0])
+                    event.set(2, position[1])
+                    event.set(3, position[2])
+                    event.set(4, null)
+                }
+            if (dispensing?.cancelled != true) {
+                Dispensers.fire(
+                    world,
+                    position[0],
+                    position[1],
+                    position[2],
+                    LegacyRandom(Random.nextLong()),
+                    dispenserEffects,
+                ) { playerRegistry.allocateEntityId() }
+            }
             if (dispenserEffects.isNotEmpty()) {
                 val stateId = world.state.getBlockState(position[0], position[1], position[2]) ?: 0
                 sendEffects(watchers, position[0], position[1], position[2], stateId, dispenserEffects)
@@ -1996,6 +2226,17 @@ public class BasaltServer(
             watchers
                 .filter { abs(it.x - position[0]) <= pistonReach && abs(it.z - position[2]) <= pistonReach }
                 .map { Pistons.PlayerPosition(it.uuid.toString(), it.x, it.y, it.z) }
+        val moving =
+            plugins.events.emit(PluginEventTypes.BLOCK_PISTON) { event ->
+                event.set(0, world.name)
+                event.set(1, position[0])
+                event.set(2, position[1])
+                event.set(3, position[2])
+                event.set(4, true)
+                event.set(5, null)
+                event.set(6, null)
+            }
+        if (moving?.cancelled == true) return emptyList()
         return Pistons.finish(world, position[0], position[1], position[2], nearby) { pushed ->
             val player = watchers.firstOrNull { it.uuid.toString() == pushed.uuid } ?: return@finish
             player.connection.teleportTo(pushed.x, pushed.y, pushed.z, player.yaw, player.pitch)
@@ -2183,6 +2424,8 @@ public class BasaltServer(
                     entity.y + PrimedTnt.EXPLOSION_OFFSET,
                     entity.z,
                     PrimedTnt.EXPLOSION_POWER,
+                    "tnt",
+                    entity.entityId,
                 )
                 // parity: `GameEvent.EXPLODE`, which is fifteen: the top of the scale.
                 val heard = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
@@ -2296,7 +2539,17 @@ public class BasaltServer(
                 damage: Float,
             ) {
                 val world = worlds.values.firstOrNull { it.state.entity(target.entityId) != null } ?: return
-                val result = EntityCombat.hurt(target, damage, mob.x, mob.z)
+                val result =
+                    EntityCombat.hurt(
+                        target,
+                        damage,
+                        mob.x,
+                        mob.z,
+                        events = plugins.events,
+                        worldName = world.name,
+                        cause = "mob_attack",
+                        attackerName = mob.type.toString(),
+                    )
                 if (!result.landed) return
                 target.hurtBy = mob.entityId
                 target.panicTicks = PANIC_TICKS
@@ -2579,7 +2832,7 @@ public class BasaltServer(
                 val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
                 val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
                 mob.removed = true
-                blowUp(world, watchers, mob.x, mob.y, mob.z, CREEPER_EXPLOSION_POWER)
+                blowUp(world, watchers, mob.x, mob.y, mob.z, CREEPER_EXPLOSION_POWER, "creeper", mob.entityId)
             }
 
             override fun shootArrow(
@@ -2691,13 +2944,28 @@ public class BasaltServer(
             val openSky = WorldLight.skyLight(world, blockX, blockY + 1, blockZ) >= SKY_LIGHT_MAX
             val inWater = Fluids.of(world.state.getBlockState(blockX, blockY, blockZ) ?: 0) == Submersion.WATER
             if (SunBurn.shouldBurn(mob.type, day, light, openSky, inWater, random)) {
-                mob.fireTicks = SunBurn.FIRE_TICKS
+                val burning =
+                    plugins.events.emit(PluginEventTypes.ENTITY_COMBUST) { event ->
+                        event.set(0, mob.entityId)
+                        event.set(1, mob.type.toString())
+                        event.set(2, world.name)
+                        event.set(3, SunBurn.FIRE_TICKS)
+                        event.set(4, "sunlight")
+                    }
+                if (burning?.cancelled != true) mob.fireTicks = SunBurn.FIRE_TICKS
             }
         }
         if (mob.fireTicks > 0) {
             mob.fireTicks--
             if (mob.fireTicks % SunBurn.DAMAGE_INTERVAL == 0) {
-                val result = EntityCombat.hurt(mob, SunBurn.FIRE_DAMAGE)
+                val result =
+                    EntityCombat.hurt(
+                        mob,
+                        SunBurn.FIRE_DAMAGE,
+                        events = plugins.events,
+                        worldName = world.name,
+                        cause = "fire",
+                    )
                 if (result.landed) announceEntityHit(watchers, mob, DamageTypes.ON_FIRE, -1, result.died)
             }
         }
@@ -2817,6 +3085,14 @@ public class BasaltServer(
         partner: org.basaltmc.server.runtime.entity.ServerEntity,
     ) {
         val protocolType = EntityTypes[animal.type]?.protocolId ?: return
+        val breeding =
+            plugins.events.emit(PluginEventTypes.ENTITY_BREED) { event ->
+                event.set(0, animal.entityId)
+                event.set(1, animal.type.toString())
+                event.set(2, world.name)
+                event.set(3, partner.entityId)
+            }
+        if (breeding?.cancelled == true) return
         val baby =
             org.basaltmc.server.runtime.entity.ServerEntity(
                 entityId = playerRegistry.allocateEntityId(),
@@ -2856,14 +3132,23 @@ public class BasaltServer(
             if (hit == null && target == null) return
             entity.removed = true
             if (kind == Projectiles.FIREBALL) {
-                blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower)
+                blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower, "tnt", entity.entityId)
                 return
             }
             // parity: a small fireball burns whoever it hits for five seconds and takes five off.
             val (mob, player) = target ?: return
             if (mob != null) {
                 mob.fireTicks = SMALL_FIREBALL_FIRE_TICKS
-                val result = EntityCombat.hurt(mob, SMALL_FIREBALL_DAMAGE, fromX, fromZ)
+                val result =
+                    EntityCombat.hurt(
+                        mob,
+                        SMALL_FIREBALL_DAMAGE,
+                        fromX,
+                        fromZ,
+                        events = plugins.events,
+                        worldName = world.name,
+                        cause = "fireball",
+                    )
                 if (result.landed) announceEntityHit(watchers, mob, DamageTypes.ON_FIRE, entity.entityId, result.died)
             }
             player?.connection?.hurt(
@@ -3033,7 +3318,16 @@ public class BasaltServer(
         if (arrow.critical) damage += Random.nextInt(damage / 2 + 2)
 
         if (mob != null) {
-            val result = EntityCombat.hurt(mob, damage.toFloat(), fromX, fromZ)
+            val result =
+                EntityCombat.hurt(
+                    mob,
+                    damage.toFloat(),
+                    fromX,
+                    fromZ,
+                    events = plugins.events,
+                    worldName = watchers.firstOrNull()?.worldName,
+                    cause = "projectile",
+                )
             if (!result.landed) {
                 // parity: an arrow that found somebody still inside their hurt cooldown bounces off.
                 arrow.velocityX *= ARROW_BOUNCE
@@ -3146,7 +3440,21 @@ public class BasaltServer(
         y: Double,
         z: Double,
         power: Float,
+        /** What blew up, for a plugin that lets creepers off and stops TNT. */
+        cause: String = "explosion",
+        sourceEntityId: Int? = null,
     ) {
+        val stopped =
+            plugins.events.emit(PluginEventTypes.BLOCK_EXPLODE) { event ->
+                event.set(0, world.name)
+                event.set(1, x)
+                event.set(2, y)
+                event.set(3, z)
+                event.set(4, power.toDouble())
+                event.set(5, cause)
+                event.set(6, sourceEntityId)
+            }
+        if (stopped?.cancelled == true) return
         val broken = Explosions.explode(world, x, y, z, power, LegacyRandom(Random.nextLong()))
         // parity: `ServerExplosion.createDrops`, which gathers everything the blast broke and only
         // then drops it: what an explosion leaves is a handful of merged stacks, not one item per
@@ -3319,9 +3627,14 @@ public class BasaltServer(
         val chunks = simulatedChunks(world, region)
         if (chunks.isEmpty()) return
         val changes =
-            randomTicks.tick(world, chunks, speed, LegacyRandom(Random.nextLong())) {
-                playerRegistry.allocateEntityId()
-            }
+            randomTicks.tick(
+                world,
+                chunks,
+                speed,
+                LegacyRandom(Random.nextLong()),
+                allocateEntityId = { playerRegistry.allocateEntityId() },
+                events = plugins.events,
+            )
         if (changes.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (change in changes) {
@@ -3370,6 +3683,7 @@ public class BasaltServer(
                         ),
                     )
                 },
+                events = plugins.events,
             )
         if (changes.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
@@ -3501,6 +3815,18 @@ public class BasaltServer(
             return
         }
         val exit = NetherPortals.exitFor(world, target, player.x, player.y, player.z, axis) ?: return
+        val travelling =
+            plugins.events.emit(PluginEventTypes.PLAYER_PORTAL) { event ->
+                event.set(0, player.name)
+                event.set(1, player.uuid.toString())
+                event.set(2, world.name)
+                event.set(3, target.name)
+                event.set(4, exit.x)
+                event.set(5, exit.y)
+                event.set(6, exit.z)
+                event.set(7, "nether")
+            }
+        if (travelling?.cancelled == true) return
         player.portalTicks = 0
         player.portalCooldown = NetherPortals.TRAVEL_COOLDOWN_TICKS
         player.connection.switchWorld(target, exit.x, exit.y, exit.z)
@@ -3535,6 +3861,18 @@ public class BasaltServer(
         val wasThundering = world.weather.thundering
         world.tickTime()
         if (world.weather.raining != wasRaining || world.weather.thundering != wasThundering) {
+            val change =
+                plugins.events.emit(PluginEventTypes.WORLD_WEATHER_CHANGE) { event ->
+                    event.set(0, world.name)
+                    event.set(1, world.weather.raining)
+                    event.set(2, world.weather.thundering)
+                    event.set(3, wasRaining)
+                    event.set(4, wasThundering)
+                }
+            if (change?.cancelled == true) {
+                world.weather.raining = wasRaining
+                world.weather.thundering = wasThundering
+            }
             commands.environment.syncWeather(world)
         }
         if (world.gameTime % TIME_SYNC_INTERVAL_TICKS == 0L) commands.environment.syncTime(world)
@@ -3557,6 +3895,14 @@ public class BasaltServer(
             val x = (chunk[0] shl 4) + random.nextInt(16)
             val z = (chunk[1] shl 4) + random.nextInt(16)
             val target = Lightning.targetFor(world, x, z) ?: continue
+            val struck =
+                plugins.events.emit(PluginEventTypes.WORLD_LIGHTNING) { event ->
+                    event.set(0, world.name)
+                    event.set(1, target[0])
+                    event.set(2, target[1])
+                    event.set(3, target[2])
+                }
+            if (struck?.cancelled == true) continue
             val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
             // parity: `LightningBolt.tick`, where fire is only lit on normal and hard.
             val lightFires = world.difficulty == "normal" || world.difficulty == "hard"
@@ -3623,10 +3969,14 @@ public class BasaltServer(
         }
 
         tickLoop.stop()
+        plugins.events.emit(PluginEventTypes.SERVER_STOP) { event -> event.set(0, players.size) }
+        // After the loop has stopped, for the same reason it loaded before it started.
+        runCatching { plugins.unloadAll() }.onFailure { logger.error(it) { "Failed to unload plugins" } }
         for (world in worlds.values) world.stopGenerating(SHUTDOWN_DRAIN_TIMEOUT_MILLIS)
 
         logger.info { "Saving ${worlds.size} world(s)." }
         for (world in worlds.values) {
+            plugins.events.emit(PluginEventTypes.WORLD_SAVE) { event -> event.set(0, world.name) }
             world.saveDirty()
             world.flushRegions()
             // Nothing else runs in this world: what was still queued is cancelled rather than run
@@ -3671,6 +4021,40 @@ public class BasaltServer(
                     "Ticking them at once uses ${regionScheduler.threads} thread(s)."
             }
         }
+        // Before the loop, while nothing else is running: a plugin's own code is the last thing to
+        // come up and the first to go down, so it never races the tick thread over its own state.
+        if (config.pluginsEnabled) {
+            plugins.loadAll()
+        } else {
+            logger.info { "Plugins are off in server.toml." }
+        }
+        // The worlds came up before the plugins did, so this says "these are the worlds" rather
+        // than announcing something they could have watched happen. Telling them earlier would mean
+        // telling nobody, which is what the first run of this did.
+        // On the owner, not on the thread that is still starting the server up: a decider only runs
+        // where the plugins do, so firing this here would have been telling nobody a second time.
+        // Queued rather than run, so it lands as the first thing the loop does.
+        regionScheduler.global.submit {
+            for (world in worlds.values) {
+                plugins.events.emit(PluginEventTypes.WORLD_LOAD) { event -> event.set(0, world.name) }
+            }
+        }
+        for (world in worlds.values) {
+            world.state.onChunkInstalled = { chunk ->
+                plugins.events.emit(PluginEventTypes.WORLD_CHUNK_LOAD) { event ->
+                    event.set(0, world.name)
+                    event.set(1, chunk.chunkX)
+                    event.set(2, chunk.chunkZ)
+                    event.set(3, true)
+                }
+            }
+        }
+        // After the plugins are up, so the first thing a plugin can be told is that everything is
+        // there. Nothing before this point is worth telling anyone about: half a server is not one.
+        plugins.events.emit(PluginEventTypes.SERVER_LOAD) { event ->
+            event.set(0, worlds.size)
+            event.set(1, plugins.statuses.size)
+        }
         tickLoop.start()
         val elapsedSeconds = (Clock.System.now() - startedAt).inWholeMilliseconds / 1000.0
         logger.info {
@@ -3711,6 +4095,23 @@ public class BasaltServer(
                     timelineTags = timelineTags,
                     damageTypeTags = damageTypeTags,
                     entityTypeTags = entityTags,
+                    pluginEvents = plugins.events,
+                    pluginPackets = plugins.packets,
+                    npcs = npcs,
+                    pluginChannel = { channel, uuid, bytes -> plugins.channelMessage(channel, uuid, bytes) },
+                    pluginListensOn = { channel -> plugins.listeningOnChannel(channel) },
+                    pluginHoldsSidebar = { _ -> plugins.surfaces.anyClaimOn(PluginSurface.SIDEBAR) },
+                    pluginSidebar = { uuid ->
+                        pluginServices.players.byUuid(uuid)?.let {
+                            plugins.surfaces.content(PluginSurface.SIDEBAR, it)?.second
+                        }
+                    },
+                    pluginHoldsBossBar = { plugins.surfaces.anyClaimOn(PluginSurface.BOSS_BAR) },
+                    pluginBossBar = { uuid ->
+                        pluginServices.players.byUuid(uuid)?.let {
+                            plugins.surfaces.content(PluginSurface.BOSS_BAR, it)?.second
+                        }
+                    },
                     itemTags = itemTags,
                 ).run()
             }
@@ -3757,6 +4158,9 @@ public class BasaltServer(
         // (confirmed directly by reading the saved region files back). 3 keeps startup bounded
         // while staying in the range a real client behaves normally at.
         const val SPAWN_RADIUS_CHUNKS = 3
+
+        /** What a world may be called: it becomes a folder name and a row in every player's file. */
+        val WORLD_NAME_SHAPE = Regex("[a-zA-Z0-9_-]{1,64}")
 
         /** parity: `EntityTypes.PLAYER`, whose box is what a mob's reach is measured against. */
         val PLAYER_TYPE: Identifier = Identifier.vanilla("player")
