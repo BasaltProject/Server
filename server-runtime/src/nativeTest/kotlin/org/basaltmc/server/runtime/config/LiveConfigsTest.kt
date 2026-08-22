@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.config
 
 import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.common.toml.TomlFormatException
 import org.basaltmc.wire.io.FileIO
 import kotlin.test.Test
 import kotlin.test.assertEquals

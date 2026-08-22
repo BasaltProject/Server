@@ -6,6 +6,7 @@ import org.basaltmc.server.runtime.placeholder.PlayerPlaceholders
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.placeholder.PlaceholderContext
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
+import org.basaltmc.wire.common.toml.TomlFormatException
 import org.basaltmc.wire.io.FileIO
 import kotlin.test.Test
 import kotlin.test.assertEquals

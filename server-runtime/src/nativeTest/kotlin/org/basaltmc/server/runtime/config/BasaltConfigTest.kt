@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.config
 
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.common.toml.TomlFormatException
 import org.basaltmc.wire.io.FileIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -115,6 +116,52 @@ class ConfigDirectoryTest {
         } finally {
             platform.posix.remove(path)
         }
+    }
+
+    /** Writes [contents] as the whole file (the generated default when omitted) and loads it. */
+    private fun load(
+        name: String,
+        contents: String = SERVER_DEFAULT_TOML,
+    ): BasaltConfig {
+        val directory = directoryFor(name)
+        FileIO.createDirectories(directory.root)
+        FileIO.writeText(directory.pathOf(BasaltConfig.FILE_NAME), contents)
+        return BasaltConfig.load(
+            directory = directory,
+            legacyPropertiesPath = "build/test-data/no_such_legacy.properties",
+        )
+    }
+
+    @Test
+    fun theGeneratedFileRunsPluginsOnOneLane() {
+        val config = load("plugins_defaults")
+        assertTrue(config.pluginsEnabled)
+        assertEquals(1, config.pluginLanes, "a server runs one copy of each plugin")
+        assertEquals(250_000L, config.pluginInstructionsPerTurn)
+        assertEquals(32L * 1024 * 1024, config.pluginMemoryBytes)
+    }
+
+    @Test
+    fun thePluginLimitsAreWhatTheFileSays() {
+        val config =
+            load(
+                "plugins_set",
+                "[plugins]\nenabled = false\ninstructions-per-turn = 40000\nmemory-mb = 8\ntest-lanes = 2\n",
+            )
+        assertFalse(config.pluginsEnabled)
+        assertEquals(40_000L, config.pluginInstructionsPerTurn)
+        assertEquals(8L * 1024 * 1024, config.pluginMemoryBytes)
+        assertEquals(2, config.pluginLanes)
+    }
+
+    @Test
+    fun nonsensePluginLimitsAreBroughtBackToSomethingRunnable() {
+        // A budget of five instructions is a typo, not a policy: it would stop every plugin on the
+        // server and read as "plugins are broken".
+        val config = load("plugins_silly", "[plugins]\ninstructions-per-turn = 5\nmemory-mb = 0\ntest-lanes = 0\n")
+        assertEquals(1_000L, config.pluginInstructionsPerTurn)
+        assertEquals(1L * 1024 * 1024, config.pluginMemoryBytes)
+        assertEquals(1, config.pluginLanes)
     }
 }
 

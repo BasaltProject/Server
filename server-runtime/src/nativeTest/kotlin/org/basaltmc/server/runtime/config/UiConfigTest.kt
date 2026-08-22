@@ -4,6 +4,7 @@ import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.placeholder.PlaceholderContext
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
 import org.basaltmc.wire.common.placeholder.PlaceholderValue
+import org.basaltmc.wire.common.toml.TomlFormatException
 import org.basaltmc.wire.io.FileIO
 import org.basaltmc.wire.protocol.play.BossBarColor
 import org.basaltmc.wire.protocol.play.BossBarOverlay

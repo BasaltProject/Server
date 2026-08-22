@@ -64,6 +64,12 @@ internal fun startTestServer(
     defaultPermissions: List<String> = listOf("basalt.command.help", "basalt.command.me"),
     /** A second, empty world, for a test about what crossing between two of them does. */
     withSecondWorld: Boolean = false,
+    /** Plugins to plant before the server starts, by id, with the contents of their `src/main.lua`. */
+    plugins: Map<String, String> = emptyMap(),
+    /** Ids that get `packets = true`, since watching packets is never granted by asking at runtime. */
+    pluginsWatchingPackets: Set<String> = emptySet(),
+    /** Channels each plugin declares, since a channel is never granted by asking at runtime either. */
+    pluginChannels: Map<String, List<String>> = emptyMap(),
 ): Int {
     // Ownership is enforced under test even with a single region: an access from the wrong thread
     // works by luck here, and luck is what stops working the day regions are turned on.
@@ -126,6 +132,33 @@ internal fun startTestServer(
                 defaults = WorldSettings(difficulty = "easy", viewDistance = 3, saveIntervalSeconds = 30),
                 worldsRoot = "$TEST_DATA_ROOT/worlds",
             )
+        // Plugins live under build/ like everything else a test writes, and are planted before the
+        // server starts because that is when it reads the folder.
+        val pluginsRoot = "$TEST_DATA_ROOT/server_$port"
+        deleteDirectory("$pluginsRoot/plugins")
+        for ((id, main) in plugins) {
+            val folder = "$pluginsRoot/plugins/$id"
+            FileIO.createDirectories("$folder/src")
+            val declared = pluginChannels[id].orEmpty()
+            val capabilities =
+                if (id in pluginsWatchingPackets || declared.isNotEmpty()) {
+                    buildString {
+                        append("\n[capabilities]\n")
+                        if (id in pluginsWatchingPackets) append("packets = true\n")
+                        if (declared.isNotEmpty()) {
+                            append("network = [${declared.joinToString(", ") { "\"$it\"" }}]\n")
+                        }
+                    }
+                } else {
+                    ""
+                }
+            FileIO.writeText(
+                "$folder/plugin.toml",
+                "id = \"$id\"\nversion = \"1.0.0\"\napi = 1\n$capabilities",
+            )
+            FileIO.writeText("$folder/src/main.lua", main)
+        }
+
         val startupFailed = AtomicInt(0)
         NativeThread.start {
             try {
@@ -133,6 +166,7 @@ internal fun startTestServer(
                     config,
                     onlineMode,
                     worldsConfig = worldsConfig,
+                    pluginsRoot = pluginsRoot,
                     live =
                         LiveConfigs(
                             ConfigSnapshot(
