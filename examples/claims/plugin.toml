@@ -1,0 +1,8 @@
+id = "claims"
+name = "Claims"
+version = "1.0.0"
+authors = ["Basalt"]
+api = 1
+
+[capabilities]
+players_data = true

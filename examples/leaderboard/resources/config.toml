@@ -1,0 +1,10 @@
+# How many places it shows and how often it is redrawn, in ticks.
+places = 5
+refresh = 200
+
+# Where the board floats. The world is the default one when empty.
+[board]
+world = ""
+x = 8.5
+y = 68.0
+z = 8.5

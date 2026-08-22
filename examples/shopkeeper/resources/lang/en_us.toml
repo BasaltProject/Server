@@ -1,0 +1,5 @@
+title = "<dark_gray>Shop"
+price = "<gray>{price} coins"
+bought = "<green>Bought {what}"
+poor = "<red>You cannot afford that"
+no_economy = "<red>The shop is closed: no economy is running"

@@ -130,6 +130,129 @@ class ReferencePluginsTest {
         }
     }
 
+    @Test
+    fun `every example in the folder loads`() {
+        // Whatever is in there, not a list kept beside it: an example that stopped loading is a
+        // broken promise, and one nobody runs is a snippet.
+        val names = FileIO.list(EXAMPLES).filter { FileIO.directoryExists("$EXAMPLES/$it") }.sorted()
+        assertTrue(names.size >= 8, "only found $names")
+        install(*names.toTypedArray())
+    }
+
+    @Test
+    fun `the menu example draws a warp per player`() {
+        install("warps")
+        services.commands.run("warps", by = casey)
+        val open = services.menus.open.getValue(casey.uuid)
+        assertEquals("<dark_gray>Warps", open.title)
+        assertEquals(3, open.rows)
+        assertEquals("minecraft:grass_block", open.items[10]?.id)
+
+        services.menus.click(casey, 10)
+        assertEquals("1", services.storage.rows[Triple("warps", casey.uuid, "visits_10")])
+        assertTrue(casey.received.any { it.contains("Off to") }, casey.received.toString())
+    }
+
+    @Test
+    fun `the npc example stands somebody up and answers a click`() {
+        install("guide")
+        host.events.fire(host.events.event(PluginEventTypes.SERVER_LOAD))
+        val guides =
+            services.worlds.list
+                .first()
+                .npcs
+        assertEquals(2, guides.size)
+        // By name and not by position: they come out of a Lua table, which has no order to promise.
+        val welcome = guides.first { it.name == "<yellow>Guide" }
+        assertEquals(180f, welcome.yaw)
+
+        welcome.click(casey)
+        assertEquals(listOf("<yellow>Welcome, Casey. Type /warps to get around."), casey.received)
+
+        services.commands.run("guides", by = casey)
+        assertEquals(emptyList(), welcome.audience, "hidden means shown to nobody")
+    }
+
+    @Test
+    fun `the hologram example keeps one entity and rewrites it`() {
+        install("leaderboard")
+        host.events.fire(host.events.event(PluginEventTypes.SERVER_LOAD))
+        val board =
+            services.worlds.list
+                .first()
+                .holograms
+                .single()
+        assertTrue(board.text.contains("Nobody has mined"), board.text)
+
+        breakBlock(casey)
+        services.tasks.advance(1)
+        services.tasks.advance(200)
+        assertTrue(board.text.contains("Casey"), board.text)
+        assertEquals(
+            1,
+            services.worlds.list
+                .first()
+                .holograms.size,
+            "it made a second hologram",
+        )
+    }
+
+    @Test
+    fun `the shopkeeper sells through the economy and refuses without it`() {
+        install("economy", "shopkeeper")
+        host.events.fire(host.events.event(PluginEventTypes.SERVER_LOAD))
+        assertEquals(
+            1,
+            services.worlds.list
+                .first()
+                .npcs.size,
+        )
+
+        services.commands.run("shop", by = casey)
+        val shop = services.menus.open.getValue(casey.uuid)
+        assertEquals("minecraft:golden_apple", shop.items[13]?.id)
+        services.menus.click(casey, 13)
+        // A hundred to start with, forty for the apple.
+        assertEquals("60", services.storage.rows[Triple("economy", casey.uuid, "balance")])
+        assertEquals(
+            listOf("minecraft:golden_apple"),
+            casey.inventory.slots
+                .filterNotNull()
+                .map { it.id },
+        )
+    }
+
+    @Test
+    fun `the countdown counts down without a state machine`() {
+        install("countdown")
+        services.commands.run("countdown", mapOf("seconds" to 3L), by = casey)
+        // It is waiting, so the bar is up and the last seconds are titles.
+        assertTrue(host.surfaces.anyClaimOn(PluginSurface.BOSS_BAR))
+        services.tasks.advance(20)
+        services.tasks.advance(20)
+        services.tasks.advance(20)
+        assertTrue(casey.titles.any { it.startsWith("<green><bold>GO") }, casey.titles.toString())
+        assertEquals(0, host.statuses.single().errors)
+    }
+
+    @Test
+    fun `the readme counts the lines it says it does`() {
+        // A table of line counts nobody checks is a table of line counts that is wrong.
+        val readme = FileIO.readText("$EXAMPLES/README.md").orEmpty()
+        for (line in readme.lines().filter { it.startsWith("| [") }) {
+            val name = line.substringAfter("| [").substringBefore("]")
+            val claimed = line.split('|')[2].trim().toIntOrNull() ?: continue
+            // Trimmed, so the trailing newline every file ends with is not counted as a line.
+            val actual =
+                FileIO
+                    .readText("$EXAMPLES/$name/src/main.lua")
+                    ?.trimEnd()
+                    ?.lines()
+                    ?.size ?: 0
+            assertEquals(actual, claimed, "the readme says $name is $claimed lines and it is $actual")
+        }
+    }
+
     private val broken = host.events.event(PluginEventTypes.BLOCK_BREAK)
 
     private fun breakBlock(

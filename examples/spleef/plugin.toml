@@ -1,0 +1,8 @@
+id = "spleef"
+name = "Spleef"
+version = "1.0.0"
+authors = ["Basalt"]
+api = 1
+
+[soft-depends]
+economy = "*"
