@@ -36,6 +36,9 @@ public class PlayerStore private constructor(
     /** Advancement criteria and recipe books, loaded at join and written as they change. */
     public val progress: ProgressRepository = ProgressRepository(database)
 
+    /** What plugins keep about players, each in its own namespace and unable to see another's. */
+    public val pluginData: PluginDataRepository = PluginDataRepository(database)
+
     /**
      * False once [close] has run. Callers that may still be winding down on their own threads check
      * it instead of finding out through the driver, which reports a use-after-close as a bare
