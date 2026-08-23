@@ -7,6 +7,8 @@ import org.basaltmc.server.storage.StoredPlayer
 import org.basaltmc.wire.auth.OfflineUuid
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.io.TcpConnection
+import org.basaltmc.wire.multiversion.ProtocolVersions
+import org.basaltmc.wire.multiversion.java.JavaTranslators
 import org.basaltmc.wire.protocol.configuration.BrandPacket
 import org.basaltmc.wire.protocol.configuration.FinishConfigurationPacket
 import org.basaltmc.wire.protocol.configuration.RegistryDataPacket
@@ -16,6 +18,7 @@ import org.basaltmc.wire.protocol.handshake.ClientIntent
 import org.basaltmc.wire.protocol.handshake.HandshakePacket
 import org.basaltmc.wire.protocol.login.LoginAcknowledgedPacket
 import org.basaltmc.wire.protocol.login.LoginCompressionPacket
+import org.basaltmc.wire.protocol.login.LoginDisconnectPacket
 import org.basaltmc.wire.protocol.login.LoginFinishedPacket
 import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.ChatCommandPacket
@@ -35,6 +38,7 @@ import org.basaltmc.wire.protocol.play.GameEventPacket
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
+import org.basaltmc.wire.protocol.play.PalettedContainer
 import org.basaltmc.wire.protocol.play.PlayerInfoRemovePacket
 import org.basaltmc.wire.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.wire.protocol.play.PlayerPositionPacket
@@ -56,6 +60,7 @@ import org.basaltmc.wire.protocol.play.SpawnPositionPacket
 import org.basaltmc.wire.protocol.play.SystemChatPacket
 import org.basaltmc.wire.protocol.play.UpdateLightPacket
 import org.basaltmc.wire.protocol.play.UpdateRecipesPacket
+import org.basaltmc.wire.protocol.readProtocolString
 import org.basaltmc.wire.protocol.readVarInt
 import org.basaltmc.wire.protocol.writeBoolean
 import org.basaltmc.wire.protocol.writeProtocolString
@@ -63,6 +68,7 @@ import org.basaltmc.wire.protocol.writeVarInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -100,17 +106,21 @@ class PlayFlowIntegrationTest {
         val entityId: Int,
         val name: String,
         val gamemode: Gamemode,
+        /** The first chunk this client was sent, kept so a test can look at what reached it. */
+        val firstChunk: MapChunkPacket,
     )
 
     private fun joinAsPlayer(
         name: String,
         onPort: Int = port,
+        /** What the client says it speaks. Anything but the native version is translated on the way out. */
+        protocol: Int = BuildInfo.PROTOCOL_VERSION,
     ): PlayerHandle {
         val connection = TcpConnection.connect("127.0.0.1", onPort)
         val incoming = ByteBuffer()
 
         sendUncompressed(connection, HandshakePacket.ID) {
-            HandshakePacket(776, "127.0.0.1", onPort, ClientIntent.LOGIN).write(it)
+            HandshakePacket(protocol, "127.0.0.1", onPort, ClientIntent.LOGIN).write(it)
         }
         sendUncompressed(connection, LoginStartPacket.ID) {
             LoginStartPacket(name, Uuid.fromLongs(0L, 0L)).write(it)
@@ -134,14 +144,24 @@ class PlayFlowIntegrationTest {
             SelectKnownPacksPacket(emptyList()).write(it)
         }
 
+        // Read until the tags rather than a fixed count: a translated client is not sent the
+        // registries its version does not have, so how many arrive depends on who is asking.
         val receivedRegistries = mutableListOf<String>()
         var dimensionTypeEntries = emptyList<String>()
-        repeat(registryCount) {
-            val registryBody = joinFrame(connection, incoming, RegistryDataPacket.ID)
-            val registry = RegistryDataPacket.read(registryBody)
-            receivedRegistries += registry.registryId
-            if (registry.registryId == "minecraft:dimension_type") {
-                dimensionTypeEntries = registry.entries.map { it.key }
+        var tagsBody: ByteBuffer? = null
+        repeat(registryCount + 1) {
+            if (tagsBody != null) return@repeat
+            val body = readFrame(connection, incoming, compressionEnabled = true)
+            when (val id = body.readVarInt()) {
+                RegistryDataPacket.ID -> {
+                    val registry = RegistryDataPacket.read(body)
+                    receivedRegistries += registry.registryId
+                    if (registry.registryId == "minecraft:dimension_type") {
+                        dimensionTypeEntries = registry.entries.map { it.key }
+                    }
+                }
+                TagsPacket.ID -> tagsBody = body
+                else -> fail("the join sequence arrived out of order: 0x${id.toString(16)}")
             }
         }
         assertTrue(receivedRegistries.contains("minecraft:dimension_type"))
@@ -165,17 +185,25 @@ class PlayFlowIntegrationTest {
             dimensionTypeEntries,
         )
 
-        val tagsBody = joinFrame(connection, incoming, TagsPacket.ID)
-        TagsPacket.read(tagsBody)
+        TagsPacket.read(checkNotNull(tagsBody) { "the tags never arrived" })
 
         val finishConfigBody = joinFrame(connection, incoming, FinishConfigurationPacket.ID)
 
         sendCompressed(connection, FinishConfigurationPacket.ID, threshold) { }
 
         val loginPlayBody = joinFrame(connection, incoming, LoginPlayPacket.ID)
-        val loginPlay = LoginPlayPacket.read(loginPlayBody)
-        assertEquals(0, loginPlay.spawnInfo.dimension)
-        assertEquals("minecraft:overworld", loginPlay.spawnInfo.dimensionName)
+        // An older client is sent a shorter packet (26.2 added the online-mode flag, and the sea
+        // level came in 1.21.2), so only a native one can be read with this server's own reader.
+        // What the other shapes look like is covered by the translation's own tests.
+        val loginPlay =
+            if (protocol == BuildInfo.PROTOCOL_VERSION) {
+                LoginPlayPacket.read(loginPlayBody).also {
+                    assertEquals(0, it.spawnInfo.dimension)
+                    assertEquals("minecraft:overworld", it.spawnInfo.dimensionName)
+                }
+            } else {
+                LoginPlayPacket.read(ByteBuffer.wrap(loginPlayBody.toByteArray() + ONLINE_MODE_FLAG))
+            }
 
         val abilitiesBody = joinFrame(connection, incoming, ClientboundPlayerAbilitiesPacket.ID)
         ClientboundPlayerAbilitiesPacket.read(abilitiesBody)
@@ -256,9 +284,11 @@ class PlayFlowIntegrationTest {
 
         val chunkBatchStartBody = joinFrame(connection, incoming, ChunkBatchStartPacket.ID)
 
+        var firstChunk: MapChunkPacket? = null
         repeat(chunkCount) {
             val chunkBody = joinFrame(connection, incoming, MapChunkPacket.ID)
-            MapChunkPacket.read(chunkBody)
+            val chunk = MapChunkPacket.read(chunkBody)
+            if (firstChunk == null) firstChunk = chunk
             val lightBody = joinFrame(connection, incoming, UpdateLightPacket.ID)
             UpdateLightPacket.read(lightBody)
         }
@@ -267,7 +297,15 @@ class PlayFlowIntegrationTest {
         assertEquals(chunkCount, ChunkBatchFinishedPacket.read(chunkBatchFinishedBody).batchSize)
         sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
 
-        return PlayerHandle(connection, incoming, threshold, loginPlay.entityId, name, loginPlay.spawnInfo.gamemode)
+        return PlayerHandle(
+            connection,
+            incoming,
+            threshold,
+            loginPlay.entityId,
+            name,
+            loginPlay.spawnInfo.gamemode,
+            checkNotNull(firstChunk) { "no chunk arrived" },
+        )
     }
 
     /** How many streamed chunks [readPastChunks] has skipped, so a test can still count them. */
@@ -325,6 +363,86 @@ class PlayFlowIntegrationTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun aClientOnTheVersionBeforeSeesTheSameWorldInItsOwnNumbers() {
+        port = startTestServer(18583)
+        val native = joinAsPlayer("Native")
+        val older = joinAsPlayer("Older", protocol = ProtocolVersions.V26_1)
+
+        // Same spawn, so both were sent the same column: what differs is only how it is numbered.
+        assertEquals(native.firstChunk.x, older.firstChunk.x)
+        assertEquals(native.firstChunk.z, older.firstChunk.z)
+
+        val nativeStates = blockStatesOf(native.firstChunk)
+        val olderStates = blockStatesOf(older.firstChunk)
+        assertEquals(nativeStates.size, olderStates.size, "the two chunks are not the same shape")
+        for (i in nativeStates.indices) {
+            assertEquals(
+                JavaTranslators.blockStateAs(ProtocolVersions.V26_1, nativeStates[i]),
+                olderStates[i],
+                "block $i went out with 26.2's number",
+            )
+        }
+        assertTrue(nativeStates.any { it != 0 }, "the chunk was all air, which proves nothing")
+
+        // And it is a working connection, not just a decodable one: it chats and is heard.
+        sendCompressed(older.connection, ChatMessagePacket.ID, older.threshold) {
+            it.writeProtocolString("hello from 26.1", 256)
+            it.writeLong(0L)
+            it.writeLong(0L)
+            it.writeBoolean(false)
+            it.writeVarInt(0)
+            it.writeBytes(byteArrayOf(0, 0, 0))
+            it.writeByte(0)
+        }
+        // The other player joining is on the same socket, so this reads until the chat rather than
+        // assuming it is the next thing.
+        var heard = false
+        repeat(20) {
+            if (heard) return@repeat
+            readPastChunks(native.connection, native.incoming, native.threshold)
+            if (lastPacketId == SystemChatPacket.ID &&
+                lastSystemChat?.content?.toString()?.contains("hello from 26.1") == true
+            ) {
+                heard = true
+            }
+        }
+        assertTrue(heard, "a 26.1 client's chat never reached the 26.2 one")
+    }
+
+    @Test
+    fun aClientFromTheFutureIsTurnedAwayWithAnExplanation() {
+        port = startTestServer(18584)
+        val connection = TcpConnection.connect("127.0.0.1", port)
+        val incoming = ByteBuffer()
+        sendUncompressed(connection, HandshakePacket.ID) {
+            HandshakePacket(999, "127.0.0.1", port, ClientIntent.LOGIN).write(it)
+        }
+        sendUncompressed(connection, LoginStartPacket.ID) {
+            LoginStartPacket("FromTheFuture", Uuid.fromLongs(0L, 0L)).write(it)
+        }
+        val body = readFrame(connection, incoming, compressionEnabled = false)
+        assertEquals(LoginDisconnectPacket.ID, body.readVarInt())
+        // The reason travels as the JSON a client renders; what matters is that it names the
+        // version instead of dropping the socket without a word.
+        val reason = body.readProtocolString(Short.MAX_VALUE.toInt())
+        assertTrue(reason.contains("26.2"), "the kick did not say what this server runs: " + reason)
+        connection.close()
+    }
+
+    /** Every block state of a chunk, section by section, as the client would expand them. */
+    private fun blockStatesOf(chunk: MapChunkPacket): IntArray {
+        val input = ByteBuffer().apply { writeBytes(chunk.chunkData) }
+        val states = mutableListOf<Int>()
+        while (input.readableBytes > 0) {
+            input.readShort()
+            input.readShort()
+            states += PalettedContainer.read(input, 4096, 8).toList()
+            PalettedContainer.read(input, 64, 3)
+        }
+        return states.toIntArray()
     }
 
     @Test
@@ -610,12 +728,23 @@ private fun joinFrame(
     error("no packet with id $expected arrived in the join sequence")
 }
 
-/** What the outbound loop sends about entities while the join is still going out. */
+/**
+ * What the world sends on its own while the join is still going out.
+ *
+ * Entity movement, and a block the world changed by itself: grass growing or water levelling out
+ * reaches whoever is nearby at whatever moment it happens, so its place in the stream is not
+ * something to assert. [readPastChunks] skips the same set for the same reason.
+ */
 private val ENTITY_SYNC_PACKETS =
     setOf(
         EntityTeleportPacket.ID,
         RotateHeadPacket.ID,
         EntityPositionSyncPacket.ID,
+        ClientboundBlockUpdatePacket.ID,
+        SectionBlocksUpdatePacket.ID,
     )
 
 private const val JOIN_FRAME_LIMIT = 200
+
+/** Put back so a translated login can be read by the native reader in the harness. */
+private val ONLINE_MODE_FLAG = byteArrayOf(1)
