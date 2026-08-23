@@ -84,6 +84,12 @@ final class InventoryEvents {
             }
             return view == null ? null : new InventoryCloseEvent(view, Windows.reasonOf(f.text("reason")));
         }, (e, f) -> Windows.closed(((InventoryCloseEvent) e).getPlayer()));
+        EventBridge.mapAlways("player.quit", f -> {
+            String id = f.text("player_uuid");
+            lastClick.remove(id);
+            anvilStates.remove(id);
+            Windows.forget(id);
+        });
         EventBridge.mapAlways("inventory.changed", f -> {
             Player player = f.player();
             if (player != null) {
