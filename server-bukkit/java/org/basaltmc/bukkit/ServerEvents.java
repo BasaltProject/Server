@@ -48,7 +48,7 @@ final class ServerEvents {
                 BasaltServer.instance().getMinecraftVersion(), 777, null);
         }, (e, f) -> {
             ServerListPingEvent ping = (ServerListPingEvent) e;
-            f.put("motd", PlainTextComponentSerializer.plainText().serialize(ping.motd()));
+            f.put("motd", net.kyori.adventure.text.minimessage.MiniMessage.miniMessage().serialize(ping.motd()));
             f.put("max_players", (long) ping.getMaxPlayers());
         });
         EventBridge.map("server.broadcast", org.bukkit.event.server.BroadcastMessageEvent.class, f -> {
