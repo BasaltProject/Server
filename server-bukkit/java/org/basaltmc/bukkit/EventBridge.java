@@ -358,7 +358,9 @@ final class EventBridge {
                 if (mapping.writeBack != null) {
                     mapping.writeBack.accept(event, fields);
                 }
-                result = event instanceof Cancellable cancellable && cancellable.isCancelled();
+                if (event instanceof Cancellable cancellable) {
+                    result = cancellable.isCancelled();
+                }
             } catch (Throwable failure) {
                 inFlight.remove(key);
                 if (failed.add(key)) {
