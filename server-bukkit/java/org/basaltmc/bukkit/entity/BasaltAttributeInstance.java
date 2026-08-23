@@ -78,7 +78,7 @@ public final class BasaltAttributeInstance implements AttributeInstance {
 
     @Override
     public AttributeModifier getModifier(UUID uuid) {
-        return null;
+        return getModifier(Key.key("minecraft", uuid.toString()));
     }
 
     @Override
@@ -111,7 +111,9 @@ public final class BasaltAttributeInstance implements AttributeInstance {
     }
 
     @Override
-    public void removeModifier(UUID uuid) {}
+    public void removeModifier(UUID uuid) {
+        removeModifier(Key.key("minecraft", uuid.toString()));
+    }
 
     @Override
     public void removeModifier(Key key) {

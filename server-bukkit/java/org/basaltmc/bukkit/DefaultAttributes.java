@@ -104,7 +104,7 @@ final class DefaultAttributes implements Attributable {
         @Override
         public AttributeModifier getModifier(net.kyori.adventure.key.Key key) {
             for (AttributeModifier modifier : modifiers) {
-                if (modifier.getKey().equals(key)) {
+                if (modifier.getKey().asString().equals(key.asString())) {
                     return modifier;
                 }
             }
@@ -113,16 +113,18 @@ final class DefaultAttributes implements Attributable {
 
         @Override
         public void removeModifier(net.kyori.adventure.key.Key key) {
-            modifiers.removeIf(modifier -> modifier.getKey().equals(key));
+            modifiers.removeIf(modifier -> modifier.getKey().asString().equals(key.asString()));
         }
 
         @Override
         public AttributeModifier getModifier(java.util.UUID id) {
-            return null;
+            return getModifier(net.kyori.adventure.key.Key.key("minecraft", id.toString()));
         }
 
         @Override
-        public void removeModifier(java.util.UUID id) {}
+        public void removeModifier(java.util.UUID id) {
+            removeModifier(net.kyori.adventure.key.Key.key("minecraft", id.toString()));
+        }
 
         @Override
         public void addTransientModifier(AttributeModifier modifier) {
