@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command
 
+import org.basaltmc.server.runtime.command.commands.VersionCommand
 import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldSettings
@@ -60,7 +61,11 @@ class PlayerAndMessageCommandsTest {
             },
         )
 
-    private val dispatcher = CommandDispatcher(environment).also(::registerVanillaCommands)
+    private val dispatcher =
+        CommandDispatcher(environment)
+            .also(::registerVanillaCommands)
+            // The running server registers this one, because only it knows which versions it lets in.
+            .also { it.register(VersionCommand()) }
     private val source = Console()
 
     @AfterTest

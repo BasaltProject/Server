@@ -32,7 +32,6 @@ import org.basaltmc.server.runtime.command.commands.TeleportCommand
 import org.basaltmc.server.runtime.command.commands.TellRawCommand
 import org.basaltmc.server.runtime.command.commands.TimeCommand
 import org.basaltmc.server.runtime.command.commands.TitleCommand
-import org.basaltmc.server.runtime.command.commands.VersionCommand
 import org.basaltmc.server.runtime.command.commands.WeatherCommand
 import org.basaltmc.server.runtime.command.commands.WorldCommand
 
@@ -69,7 +68,6 @@ public val VANILLA_COMMANDS: List<Command> =
         ClearCommand(),
         TellRawCommand(),
         MsgCommand(),
-        VersionCommand(),
         TitleCommand(),
         TagCommand(),
         PlaySoundCommand(),

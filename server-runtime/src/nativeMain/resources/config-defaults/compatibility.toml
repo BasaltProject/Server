@@ -1,0 +1,26 @@
+# Which clients may connect.
+#
+# Translating an old client happens at the edge: the world, the plugins and the
+# tick loop never learn that anyone is on an older version.
+
+[java]
+# Versions this server translates. "all" is everything this build knows how to
+# do, so updating the server adds versions without editing this file. A list of
+# protocol numbers fixes it to those: backwards = [775, 774].
+# An empty list leaves only the native version.
+backwards = "all"
+
+# A client newer than this server: "accept" lets it in, "warn" lets it in and
+# says so in the log, "refuse" turns it away with an explanation.
+#
+# It is "refuse" because a newer client cannot finish joining: measured between
+# 26.2 and the first 26.3 snapshot, ten packets of the configuration phase moved
+# and every block state number changed. Letting it in means it disconnects
+# halfway through with a decoding error instead of reading why. "accept" is
+# there for whoever wants to try their luck the day a version lands.
+future-protocols = "refuse"
+
+# Snapshots are recognised on their own (bit 30 of the protocol number) and get
+# their own answer, because a development version changes from one day to
+# the next.
+snapshots = "refuse"

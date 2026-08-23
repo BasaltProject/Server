@@ -9,6 +9,7 @@ import org.basaltmc.server.assets.VersionManifest
 import org.basaltmc.server.runtime.command.ConsoleReader
 import org.basaltmc.server.runtime.config.BasaltConfig
 import org.basaltmc.server.runtime.config.ColorMode
+import org.basaltmc.server.runtime.config.CompatibilityConfig
 import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.ServerListConfig
 import org.basaltmc.server.runtime.config.WorldsConfig
@@ -156,6 +157,7 @@ private fun buildServer(attachedToTerminal: Boolean): BasaltServer {
     // server.properties happens exactly once, here.
     ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
     val live = LiveConfigs(LiveConfigs.read(logger = Logger("Config")))
+    val compatibility = CompatibilityConfig.load(logger = Logger("Config"))
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
     // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
     // server.jar as everything else, so this costs no extra download.
@@ -166,12 +168,15 @@ private fun buildServer(attachedToTerminal: Boolean): BasaltServer {
         worldGeneratorFactory = VanillaWorldGeneratorFactory(serverJar),
         serverJar = serverJar,
         worldsConfig = worldsConfig,
+        compatibility = compatibility,
         live = live,
         lang = lang,
     )
 }
 
-private fun versionLine(): String = "Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})"
+private fun versionLine(): String =
+    "Basalt Server ${BuildInfo.VERSION} for Minecraft ${BuildInfo.MINECRAFT_VERSION} " +
+        "(protocol ${BuildInfo.PROTOCOL_VERSION})"
 
 private const val LOG_ROOT = "./.basalt/logs"
 
