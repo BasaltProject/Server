@@ -50,6 +50,9 @@ inline constexpr GameRule kLogAdminCommands = GameRule::boolean("log_admin_comma
 inline constexpr GameRule kShowDeathMessages = GameRule::boolean("show_death_messages", true);
 inline constexpr GameRule kRandomTickSpeed = GameRule::integer("random_tick_speed", 3, 0);
 
+/// parity: `max_snow_accumulation_height`.
+inline constexpr GameRule kMaxSnowAccumulationHeight = GameRule::integer("max_snow_accumulation_height", 1, 0, 8);
+
 inline constexpr GameRule kSpreadVines = GameRule::boolean("spread_vines", true);
 inline constexpr GameRule kMobGriefing = GameRule::boolean("mob_griefing", true);
 
