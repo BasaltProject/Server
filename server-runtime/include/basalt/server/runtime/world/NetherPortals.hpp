@@ -46,8 +46,9 @@ findClosestPortal(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32
 findClosestLoadedPortal(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t radius);
 
 /// parity: `PortalForcer.createPortal`.
-[[nodiscard]] std::array<std::int32_t, 3> createPortal(LoadedWorld& world, std::int32_t x, std::int32_t y,
-                                                       std::int32_t z, server::world::portal::PortalAxis axis);
+[[nodiscard]] std::optional<std::array<std::int32_t, 3>> createPortal(LoadedWorld& world, std::int32_t x,
+                                                                      std::int32_t y, std::int32_t z,
+                                                                      server::world::portal::PortalAxis axis);
 
 [[nodiscard]] std::int32_t minY(const LoadedWorld& world);
 
