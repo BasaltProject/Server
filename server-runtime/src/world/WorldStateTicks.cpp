@@ -253,6 +253,10 @@ bool WorldState::hurtItem(const std::int32_t entityId, const std::int32_t amount
     return itemPhysics_.hurtItem(entityId, amount);
 }
 
+bool WorldState::pushItem(const std::int32_t entityId, const double dx, const double dy, const double dz) {
+    return itemPhysics_.pushItem(entityId, dx, dy, dz);
+}
+
 bool WorldState::setItemCount(const std::int32_t entityId, const std::int32_t count) {
     mine("A dropped item");
     return itemPhysics_.setItemCount(entityId, count);

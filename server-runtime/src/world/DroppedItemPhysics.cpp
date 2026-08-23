@@ -148,16 +148,21 @@ bool DroppedItemPhysics::hurtItem(const std::int32_t entityId, const std::int32_
     if (at->health > 0) {
         return false;
     }
-    if (at->item.path().ends_with("shulker_box")) {
-        destroyed_.push_back(*at);
-    }
     droppedItems_.erase(at);
     return true;
 }
 
-std::vector<DroppedItem> DroppedItemPhysics::takeDestroyed() {
+bool DroppedItemPhysics::pushItem(const std::int32_t entityId, const double dx, const double dy, const double dz) {
     const WorldWriteLock lock{*mutex_};
-    return std::exchange(destroyed_, {});
+    const auto at =
+        std::ranges::find_if(droppedItems_, [entityId](const DroppedItem& item) { return item.entityId == entityId; });
+    if (at == droppedItems_.end()) {
+        return false;
+    }
+    at->velocityX += dx;
+    at->velocityY += dy;
+    at->velocityZ += dz;
+    return true;
 }
 
 bool DroppedItemPhysics::setItemCount(const std::int32_t entityId, const std::int32_t count) {
@@ -236,9 +241,6 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         // parity: `applyEffectsFromBlocks` runs on every tick of an item.
         item.health -= cactusDamage(blockAt_, item);
         if (item.health <= 0) {
-            if (item.item.path().ends_with("shulker_box")) {
-                destroyed_.push_back(item);
-            }
             despawned.push_back(item.entityId);
             droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
             continue;

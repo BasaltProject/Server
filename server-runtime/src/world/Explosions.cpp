@@ -1,13 +1,16 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <set>
+#include <unordered_map>
 
 namespace basalt::server::runtime::world::explosions {
 namespace {
@@ -217,12 +220,74 @@ std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t m
     return broken;
 }
 
-float damageAt(double distance, float power, float radius) {
-    if (distance >= static_cast<double>(radius)) {
+float damageAt(double distance, float doubleRadius, float exposure) {
+    const double reach = static_cast<double>(doubleRadius);
+    if (distance / reach > 1.0) {
         return 0.0F;
     }
-    const double nearness = 1.0 - (distance / static_cast<double>(radius));
-    return static_cast<float>(((((nearness * nearness) + nearness) / 2.0) * 7.0 * static_cast<double>(power)) + 1.0);
+    const double power = (1.0 - (distance / reach)) * static_cast<double>(exposure);
+    return static_cast<float>(((((power * power) + power) / 2.0) * 7.0 * reach) + 1.0);
+}
+
+float seenPercent(WorldState& world, const double centerX, const double centerY, const double centerZ, const Box& box) {
+    const double xs = 1.0 / (((box.maxX - box.minX) * 2.0) + 1.0);
+    const double ys = 1.0 / (((box.maxY - box.minY) * 2.0) + 1.0);
+    const double zs = 1.0 / (((box.maxZ - box.minZ) * 2.0) + 1.0);
+    const double xOffset = (1.0 - (std::floor(1.0 / xs) * xs)) / 2.0;
+    const double zOffset = (1.0 - (std::floor(1.0 / zs) * zs)) / 2.0;
+    if (xs < 0.0 || ys < 0.0 || zs < 0.0) {
+        return 0.0F;
+    }
+    std::int32_t hits = 0;
+    std::int32_t count = 0;
+    const entity::blockRay::ClipViewer viewer{.feetY = box.minY};
+    for (double xx = 0.0; xx <= 1.0; xx += xs) {
+        for (double yy = 0.0; yy <= 1.0; yy += ys) {
+            for (double zz = 0.0; zz <= 1.0; zz += zs) {
+                const double x = box.minX + (xx * (box.maxX - box.minX));
+                const double y = box.minY + (yy * (box.maxY - box.minY));
+                const double z = box.minZ + (zz * (box.maxZ - box.minZ));
+                if (!entity::blockRay::clips(world, x + xOffset, y, z + zOffset, centerX, centerY, centerZ,
+                                             entity::blockRay::ClipShape::Collider, viewer)) {
+                    ++hits;
+                }
+                ++count;
+            }
+        }
+    }
+    return static_cast<float>(hits) / static_cast<float>(count);
+}
+
+namespace {
+
+thread_local std::unordered_map<std::int32_t, float> gExposures;
+
+} // namespace
+
+void clearExposures() { gExposures.clear(); }
+
+void recordExposure(const std::int32_t entityId, const float exposure) { gExposures[entityId] = exposure; }
+
+float exposureOf(const std::int32_t entityId) {
+    const auto found = gExposures.find(entityId);
+    return found == gExposures.end() ? 0.0F : found->second;
+}
+
+std::array<double, 3> knockbackOf(const double centerX, const double centerY, const double centerZ,
+                                  const double originX, const double originY, const double originZ,
+                                  const double distance, const float exposure, const double resistance) {
+    double dx = originX - centerX;
+    double dy = originY - centerY;
+    double dz = originZ - centerZ;
+    const double length = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    if (length < 1.0E-5) {
+        return {0.0, 0.0, 0.0};
+    }
+    dx /= length;
+    dy /= length;
+    dz /= length;
+    const double power = (1.0 - distance) * static_cast<double>(exposure) * (1.0 - resistance);
+    return {dx * power, dy * power, dz * power};
 }
 
 } // namespace basalt::server::runtime::world::explosions

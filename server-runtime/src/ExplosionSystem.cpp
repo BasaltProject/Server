@@ -4,7 +4,9 @@
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
@@ -18,6 +20,7 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <utility>
@@ -41,6 +44,97 @@ constexpr double kPopJitter = 0.25;
 constexpr double kPopSpread = 0.2;
 constexpr double kPopLift = 0.2;
 constexpr double kItemHalfHeight = 0.125;
+
+[[nodiscard]] double playerHeightOf(const play::Pose pose) {
+    switch (pose) {
+    case play::Pose::Sleeping:
+        return 0.2;
+    case play::Pose::FallFlying:
+    case play::Pose::Swimming:
+    case play::Pose::SpinAttack:
+        return 0.6;
+    case play::Pose::Crouching:
+        return 1.5;
+    default:
+        return 1.8;
+    }
+}
+
+constexpr double kPlayerWidth = 0.6;
+/// parity: `Enchantments.BLAST_PROTECTION`'s `EXPLOSION_KNOCKBACK_RESISTANCE` per level.
+constexpr double kBlastResistancePerLevel = 0.15;
+
+[[nodiscard]] double eyeHeightOf(const player::PlayerSession& player) {
+    switch (player.pose) {
+    case play::Pose::Sleeping:
+        return 0.2;
+    case play::Pose::FallFlying:
+    case play::Pose::Swimming:
+    case play::Pose::SpinAttack:
+        return 0.4;
+    case play::Pose::Crouching:
+        return 1.27;
+    default:
+        return 1.62;
+    }
+}
+
+[[nodiscard]] double blastResistance(const player::PlayerSession& player) {
+    const Identifier blast = Identifier::vanilla("blast_protection");
+    std::int32_t levels = 0;
+    for (std::int32_t slot = player::PlayerInventory::kArmourStart;
+         slot < player::PlayerInventory::kArmourStart + player::PlayerInventory::kArmourSlots; slot++) {
+        const std::optional<storage::StoredItemStack> worn = player.inventory.at(slot);
+        if (!worn.has_value()) {
+            continue;
+        }
+        for (const auto& [id, level] : player::enchantmentLevels(*worn)) {
+            levels += id == blast ? level : 0;
+        }
+    }
+    return std::clamp(static_cast<double>(levels) * kBlastResistancePerLevel, 0.0, 1.0);
+}
+
+constexpr double kItemSize = 0.25;
+
+[[nodiscard]] world::explosions::Box boxAround(double x, double y, double z, double width, double height) {
+    return {x - (width / 2.0), y, z - (width / 2.0), x + (width / 2.0), y + height, z + (width / 2.0)};
+}
+
+/// parity: `ServerExplosion.hurtEntities` weighs every entity before `interactWithBlocks` breaks anything.
+void measureExposures(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
+                      double y, double z, float power) {
+    world::explosions::clearExposures();
+    const double doubleRadius = static_cast<double>(power) * 2.0;
+    const auto within = [&](double ex, double ey, double ez) {
+        return std::sqrt((ex - x) * (ex - x) + (ey - y) * (ey - y) + (ez - z) * (ez - z)) / doubleRadius <= 1.0;
+    };
+    for (const player::PlayerSession* player : watchers) {
+        if (within(player->x, player->y, player->z)) {
+            world::explosions::recordExposure(
+                player->entityId(),
+                world::explosions::seenPercent(
+                    world.state(), x, y, z,
+                    boxAround(player->x, player->y, player->z, kPlayerWidth, playerHeightOf(player->pose))));
+        }
+    }
+    for (const entity::ServerEntity* entity : world.state().entities()) {
+        if (entity->removed || !within(entity->x, entity->y, entity->z)) {
+            continue;
+        }
+        world::explosions::recordExposure(
+            entity->entityId(),
+            world::explosions::seenPercent(
+                world.state(), x, y, z, boxAround(entity->x, entity->y, entity->z, entity->width(), entity->height())));
+    }
+    for (const world::DroppedItem& item : world.state().items()) {
+        if (within(item.x, item.y, item.z)) {
+            world::explosions::recordExposure(
+                item.entityId, world::explosions::seenPercent(world.state(), x, y, z,
+                                                              boxAround(item.x, item.y, item.z, kItemSize, kItemSize)));
+        }
+    }
+}
 
 void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t x, std::int32_t y, std::int32_t z,
                std::int32_t stateId) {
@@ -72,6 +166,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     if (hooks_.allowed && !hooks_.allowed(world, x, y, z, power, cause, sourceEntityId)) {
         return;
     }
+    measureExposures(world, watchers, x, y, z, power);
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
     random::RandomSource random = random::RandomSource::legacy(seed);
@@ -99,13 +194,32 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
                                                    .scaling = play::ExplodePacket::kSmokeScaling,
                                                    .speed = 1.0F}},
         .playSound = !silent};
-    for (const player::PlayerSession* player : watchers) {
+    const double doubleRadius = static_cast<double>(power) * 2.0;
+    for (player::PlayerSession* player : watchers) {
+        play::ExplodePacket own = explode;
+        const double distance = std::sqrt((player->x - x) * (player->x - x) + (player->y - y) * (player->y - y) +
+                                          (player->z - z) * (player->z - z)) /
+                                doubleRadius;
+        if (distance <= 1.0 && !world.settings().rules.environment.disableExplosionKnockback) {
+            const std::array<double, 3> push = world::explosions::knockbackOf(
+                x, y, z, player->x, player->y + eyeHeightOf(*player), player->z, distance,
+                world::explosions::exposureOf(player->entityId()), blastResistance(*player));
+            player->deltaMovement[0] += push[0];
+            player->deltaMovement[1] += push[1];
+            player->deltaMovement[2] += push[2];
+            if (player->gamemode != play::Gamemode::Spectator &&
+                (player->gamemode != play::Gamemode::Creative || !player->flying)) {
+                own.knockbackX = push[0];
+                own.knockbackY = push[1];
+                own.knockbackZ = push[2];
+            }
+        }
         if (player->connection().sendExplosion) {
             player->connection().sendExplosion(x, y, z);
         }
         if (player->connection().sendPlayPacket) {
             player->connection().sendPlayPacket(play::ExplodePacket::kId,
-                                                [&explode](wire::io::ByteBuffer& buffer) { explode.write(buffer); });
+                                                [&own](wire::io::ByteBuffer& buffer) { own.write(buffer); });
         }
     }
 
@@ -113,9 +227,15 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     for (const world::DroppedItem& item : world.state().items()) {
         const double distance =
             std::sqrt((item.x - x) * (item.x - x) + (item.y - y) * (item.y - y) + (item.z - z) * (item.z - z));
-        const float damage = world::explosions::damageAt(distance, power, power * 2.0F);
-        if (damage <= 0.0F) {
+        if (distance / doubleRadius > 1.0) {
             continue;
+        }
+        const float exposure = world::explosions::exposureOf(item.entityId);
+        const float damage = world::explosions::damageAt(distance, static_cast<float>(doubleRadius), exposure);
+        if (!world.settings().rules.environment.disableExplosionKnockback) {
+            const std::array<double, 3> push = world::explosions::knockbackOf(
+                x, y, z, item.x, item.y + (kItemSize * 0.85), item.z, distance / doubleRadius, exposure, 0.0);
+            static_cast<void>(world.state().pushItem(item.entityId, push[0], push[1], push[2]));
         }
         static_cast<void>(world.state().hurtItem(item.entityId, static_cast<std::int32_t>(damage)));
     }
@@ -196,7 +316,10 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
             player->explosionImpact = std::array<double, 3>{player->x, player->y, player->z};
             player->explosionCause = sourceEntityId == 0 ? std::nullopt : std::optional{sourceEntityId};
         }
-        const float damage = world::explosions::damageAt(distance, power, power * 2.0F);
+        const float damage = distance / doubleRadius > 1.0
+                                 ? 0.0F
+                                 : world::explosions::damageAt(distance, static_cast<float>(doubleRadius),
+                                                               world::explosions::exposureOf(player->entityId()));
         if (damage > 0.0F && player->connection().hurt) {
             player->connection().hurt(damage, "explosion", world::damageTypes::kExplosion, std::nullopt);
         }

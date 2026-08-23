@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/config/GameplayRules.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -35,6 +36,7 @@
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -257,6 +259,24 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         if (distance > reach) {
             continue;
         }
+        const float exposure = world::explosions::exposureOf(entity->entityId());
+        // parity: `Entity.pushFromExplosion`, from the eyes out, or from where primed TNT stands.
+        if (!world.settings().rules.environment.disableExplosionKnockback) {
+            const bool living = server::registry::entityAttributes::isLiving(entity->type());
+            const double eyeY =
+                entity->type().path() == "tnt"
+                    ? entity->y
+                    : entity->y + (living ? entity::mobBreathing::eyeHeightOf(*entity) : entity->height() * 0.85);
+            const double resistance =
+                living
+                    ? std::clamp(entity->attributeWithModifiers("minecraft:explosion_knockback_resistance"), 0.0, 1.0)
+                    : 0.0;
+            const std::array<double, 3> push = world::explosions::knockbackOf(x, y, z, entity->x, eyeY, entity->z,
+                                                                              distance / reach, exposure, resistance);
+            entity->velocityX += push[0];
+            entity->velocityY += push[1];
+            entity->velocityZ += push[2];
+        }
         if (world::endCrystals::isCrystal(entity->type())) {
             hitCrystal(world, watchers, *entity, true);
             continue;
@@ -266,7 +286,8 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
             continue;
         }
         if (ExperienceOrbSystem::isOrb(*entity)) {
-            ExperienceOrbSystem::hurt(*entity, world::explosions::damageAt(distance, power, static_cast<float>(reach)));
+            ExperienceOrbSystem::hurt(*entity,
+                                      world::explosions::damageAt(distance, static_cast<float>(reach), exposure));
             continue;
         }
         // parity: a vehicle takes the blast like anything else, unless a mob set it off with griefing off.
@@ -275,7 +296,7 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
             const ServerEntity* behind =
                 source != nullptr && source->ownerId.has_value() ? world.state().entity(*source->ownerId) : source;
             const bool mobSource = behind != nullptr && server::registry::entityAttributes::isLiving(behind->type());
-            const float damage = world::explosions::damageAt(distance, power, static_cast<float>(reach));
+            const float damage = world::explosions::damageAt(distance, static_cast<float>(reach), exposure);
             if (options_.hurtVehicle && !VehicleSystem::ignoresExplosion(world, mobSource) && damage > 0.0F) {
                 static_cast<void>(options_.hurtVehicle(
                     world, *entity,
@@ -290,7 +311,7 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         if (!server::registry::entityAttributes::isLiving(entity->type())) {
             continue;
         }
-        const float damage = world::explosions::damageAt(distance, power, static_cast<float>(reach));
+        const float damage = world::explosions::damageAt(distance, static_cast<float>(reach), exposure);
         if (damage <= 0.0F) {
             continue;
         }
