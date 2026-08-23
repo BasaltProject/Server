@@ -1,5 +1,0 @@
-# How long a countdown runs when nobody says otherwise, in seconds.
-seconds = 10
-
-# Where the bar sits when another plugin wants it too. Higher wins.
-bar-priority = 60

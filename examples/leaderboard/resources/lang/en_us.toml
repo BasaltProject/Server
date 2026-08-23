@@ -1,3 +1,0 @@
-title = "<gold><bold>Top miners"
-row = "<gray>{rank}. <white>{name} <gray>{value}"
-empty = "<gray>Nobody has mined anything yet"

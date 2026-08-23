@@ -221,7 +221,9 @@ public interface PluginWorldRef {
     /**
      * A player-shaped entity standing here, which is what an NPC is.
      *
-     * [onClick] is called with the uuid of whoever right-clicked it.
+     * [name] may carry newlines: it is drawn as a display above its head rather than as its profile
+     * name, so it takes colour and as many lines as you like. [onClick] gets the uuid of whoever
+     * right-clicked it.
      */
     public fun npc(
         name: String,
@@ -303,10 +305,22 @@ public interface PluginNpcRef {
         signature: String?,
     )
 
+    /**
+     * Wears the skin of a player who is connected. Answers false if nobody by that name is.
+     *
+     * The way to give an NPC a face without pasting a signed blob into a config: the textures of a
+     * real profile are already here once somebody joins, and they are what a skin is.
+     */
+    public fun skinFrom(playerName: String): Boolean
+
+    /** Points it somewhere fixed, which also stops it following people. */
     public fun look(
         yaw: Float,
         pitch: Float,
     )
+
+    /** Whether its head turns toward whoever comes near, which it does unless told otherwise. */
+    public fun looksAtPlayers(follows: Boolean)
 
     public fun teleport(
         x: Double,

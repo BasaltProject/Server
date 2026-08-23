@@ -328,8 +328,29 @@ internal fun npcObject(npc: PluginNpcRef): LuaTable =
             mapOf(
                 "skin" to
                     HostFunction("npc.skin") { args ->
+                        // npc:skin(texture, signature) or npc:skin(player), which wears theirs.
                         val base = firstArgument(args)
+                        val first = args.arg(base)
+                        if (first.istable()) {
+                            val who =
+                                first
+                                    .field("name")
+                                    .takeIf { it.isstring() }
+                                    ?.tojstring()
+                                    .orEmpty()
+                            return@HostFunction Lua.of(npc.skinFrom(who))
+                        }
                         npc.skin(args.checkjstring(base), args.arg(base + 1).takeIf { it.isstring() }?.tojstring())
+                        Lua.of(true)
+                    },
+                "skin_from" to
+                    HostFunction("npc.skin_from") { args ->
+                        Lua.of(npc.skinFrom(args.checkjstring(firstArgument(args))))
+                    },
+                "looks_at_players" to
+                    HostFunction("npc.looks_at_players") { args ->
+                        val base = firstArgument(args)
+                        npc.looksAtPlayers(args.arg(base).isnil() || args.arg(base).toboolean())
                         Lua.NONE
                     },
                 "look" to
@@ -363,6 +384,20 @@ internal fun npcObject(npc: PluginNpcRef): LuaTable =
                     },
             ),
     ).table
+
+/**
+ * What goes over an NPC's head: one line or several.
+ *
+ * A list is joined with newlines, which is what a text display draws, so
+ * `name = { "<gold>Shop", "<gray>right click" }` is two lines with colour in both. It is not the
+ * profile name, which could hold neither.
+ */
+internal fun nameLines(value: LuaValue): String =
+    when {
+        value.isstring() -> value.tojstring()
+        value.istable() -> (1..value.length()).joinToString("\n") { (value.get(it) ?: Lua.NIL).tojstring() }
+        else -> ""
+    }
 
 /** Players or uuids, since a plugin has one or the other to hand. */
 internal fun uuidsFrom(list: LuaValue): List<String> {
@@ -427,6 +462,8 @@ internal fun worldObject(
     world: PluginWorldRef,
     /** How a click on an NPC gets back into the plugin's own state, mediated like every callback. */
     onNpcClick: (LuaValue, String) -> Unit = { _, _ -> },
+    /** `@key` and `{name}` work in a hologram and over an NPC's head, like anywhere else text goes. */
+    resolveText: (String) -> String = { it },
 ): LuaTable =
     LuaObject(
         kind = "world",
@@ -508,11 +545,7 @@ internal fun worldObject(
                         val handler = options.field("on_click").takeIf { it.isfunction() }
                         val made =
                             world.npc(
-                                options
-                                    .field("name")
-                                    .takeIf { it.isstring() }
-                                    ?.tojstring()
-                                    .orEmpty(),
+                                resolveText(nameLines(options.field("name"))),
                                 point.x,
                                 point.y,
                                 point.z,
@@ -532,7 +565,7 @@ internal fun worldObject(
                     HostFunction("world.hologram") { args ->
                         // w:hologram("<gold>Shop", pos) or w:hologram(text, x, y, z).
                         val base = firstArgument(args)
-                        val text = args.checkjstring(base)
+                        val text = resolveText(args.checkjstring(base))
                         val point = pointFrom(args.arg(base + 1))
                         val made =
                             if (point != null) {

@@ -31,6 +31,9 @@ public class Npc(
     /** Who can see it, by uuid, or null for everybody. Same rule as a hologram's. */
     public var visibleTo: Set<String>? = null
 
+    /** Whether its head turns toward whoever comes near. Off is a statue, which is sometimes right. */
+    public var looksAtPlayers: Boolean = true
+
     /** Bumped whenever something a client has already been told changes, so the sync re-sends it. */
     public var version: Int = 0
         private set
@@ -101,6 +104,15 @@ public class NpcRegistry {
 internal class NpcHandle(
     private val npc: Npc,
     private val registry: NpcRegistry,
+    /** Where a skin is copied from: the profiles of whoever is connected. */
+    private val profiles: (String) -> Pair<String, String?>? = { null },
+    /**
+     * The text over its head, as a text display rather than as its profile name.
+     *
+     * A profile name is a plain string of sixteen characters, so it holds neither colour nor a
+     * second line. A display holds both, so the NPC is nameless and this floats above it.
+     */
+    private val label: org.basaltmc.server.plugins.PluginHologramRef? = null,
 ) : PluginNpcRef {
     override val id: Int get() = npc.entityId
     override val uuid: String get() = npc.uuid.toString()
@@ -111,10 +123,14 @@ internal class NpcHandle(
     override val alive: Boolean get() = registry.of(npc.entityId) != null
 
     override var name: String
-        get() = npc.name
+        get() = label?.text ?: npc.name
         set(value) {
-            npc.name = value
-            npc.changed()
+            if (label != null) {
+                label.text = value
+            } else {
+                npc.name = value
+                npc.changed()
+            }
         }
 
     override fun skin(
@@ -126,12 +142,25 @@ internal class NpcHandle(
         npc.changed()
     }
 
+    override fun skinFrom(playerName: String): Boolean {
+        val (texture, signature) = profiles(playerName) ?: return false
+        skin(texture, signature)
+        return true
+    }
+
     override fun look(
         yaw: Float,
         pitch: Float,
     ) {
         npc.yaw = yaw
         npc.pitch = pitch
+        // Pointed somewhere on purpose, so it stops following people.
+        npc.looksAtPlayers = false
+        npc.changed()
+    }
+
+    override fun looksAtPlayers(follows: Boolean) {
+        npc.looksAtPlayers = follows
         npc.changed()
     }
 
@@ -144,22 +173,31 @@ internal class NpcHandle(
         npc.y = y
         npc.z = z
         npc.changed()
+        label?.teleport(x, y + LABEL_HEIGHT, z)
         return true
     }
 
     override fun showOnlyTo(uuids: List<String>) {
         npc.visibleTo = uuids.toSet()
         npc.changed()
+        label?.showOnlyTo(uuids)
     }
 
     override fun showToAll() {
         npc.visibleTo = null
         npc.changed()
+        label?.showToAll()
     }
 
     override val audience: List<String>? get() = npc.visibleTo?.toList()
 
     override fun remove() {
         npc.remove()
+        label?.remove()
+    }
+
+    internal companion object {
+        /** Just over a player's head, which is 1.8 blocks tall. */
+        const val LABEL_HEIGHT: Double = 2.0
     }
 }
