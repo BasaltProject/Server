@@ -83,6 +83,7 @@ struct TuningRules {
     bool keepSprintOnAttack = false;
     bool playerCollisions = true;
     double leashSnapDistance = 12.0;
+    bool disableEndCredits = false;
     std::int32_t mapMarkerLimit = 256;
     std::int32_t mapFrameInterval = 10;
     std::int32_t maxTntPerTick = -1;

@@ -248,6 +248,13 @@ public:
     void noteEffectSource(std::optional<std::int32_t> sourceId) { effectSources.push_back(sourceId); }
 
     world::wardenSpawnTracker::Tracker wardenTracker;
+    /// parity: `ServerPlayer.seenCredits`, saved with the player.
+    bool seenCredits = false;
+    /// parity: `ServerPlayer.wonGame`: the credits are rolling and the client will ask to respawn when they end.
+    bool wonGame = false;
+    /// Where leaving the End takes the player once the credits are over: the world and the spot.
+    std::string creditsExitWorld;
+    std::array<double, 3> creditsExit{};
 
     std::int32_t portalTicks = 0;
 

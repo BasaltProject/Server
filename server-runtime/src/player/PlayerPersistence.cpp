@@ -21,6 +21,7 @@ namespace {
 [[nodiscard]] wire::nbt::NbtCompound entityDataOf(const PlayerSession& session) {
     wire::nbt::NbtCompound data;
     data.putInt("Score", session.experience.score());
+    data.putBoolean("seenCredits", session.seenCredits);
     // parity: `Entity.saveWithoutId` and `LivingEntity.addAdditionalSaveData`.
     data.putShort("Air", static_cast<std::int16_t>(session.airSupply));
     data.putShort("Fire", static_cast<std::int16_t>(session.fireTicks));
@@ -125,6 +126,7 @@ void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
                                                                .warningLevel = stored.wardenSpawnTracker[1],
                                                                .cooldownTicks = stored.wardenSpawnTracker[2]};
     session.experience.setScore(stored.entityData.getInt("Score"));
+    session.seenCredits = stored.entityData.getBoolean("seenCredits");
     if (stored.entityData.contains("Air")) {
         session.airSupply = stored.entityData.getShort("Air");
     }

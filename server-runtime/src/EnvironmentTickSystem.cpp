@@ -34,6 +34,7 @@
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -585,6 +586,20 @@ void EnvironmentTickSystem::travelThroughEndPortal(world::LoadedWorld& world, Pl
     }
     player.portalTicks = 0;
     player.portalCooldown = world::netherPortals::kTravelCooldownTicks;
+    // parity: `EndPortalBlock.entityInside` and `ServerPlayer.showEndCredits`, once per player.
+    if (world.declaration().dimension == config::WorldDimension::End && !player.seenCredits &&
+        !world.settings().rules.tuning.disableEndCredits && player.connection().sendPlayPacket) {
+        constexpr std::uint8_t kWinGame = 4;
+        player.wonGame = true;
+        player.seenCredits = true;
+        player.creditsExitWorld = target->name();
+        player.creditsExit = {exit.x, exit.y, exit.z};
+        player.connection().sendPlayPacket(
+            wire::protocol::play::GameEventPacket::kId, [](wire::io::ByteBuffer& buffer) {
+                wire::protocol::play::GameEventPacket{.event = kWinGame, .param = 0.0F}.write(buffer);
+            });
+        return;
+    }
     if (player.connection().switchWorld) {
         static_cast<void>(player.connection().switchWorld(*target, exit.x, exit.y, exit.z));
     }
