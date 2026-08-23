@@ -55,11 +55,35 @@
 #include <cmath>
 #include <cstdint>
 #include <exception>
+#include <map>
+#include <mutex>
 #include <random>
 #include <set>
 #include <string>
 
 namespace basalt::server::runtime {
+
+namespace {
+
+/// Not vanilla: the most primed TNT a world lets go off in one tick, the rest waiting a tick.
+bool tntMayExplode(const world::LoadedWorld& world) {
+    const std::int32_t limit = world.settings().rules.tuning.maxTntPerTick;
+    if (limit < 0) {
+        return true;
+    }
+    static std::mutex guard;
+    static std::map<std::string, std::pair<std::int64_t, std::int32_t>> seen;
+    const std::scoped_lock lock{guard};
+    auto& [tick, count] = seen[world.name()];
+    if (tick != world.gameTime()) {
+        tick = world.gameTime();
+        count = 0;
+    }
+    return count++ < limit;
+}
+
+} // namespace
+
 using namespace basaltServerTick;
 
 void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& region) {
@@ -375,6 +399,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         if (entity->type() == entity::primedTnt::type()) {
             if (!entity::primedTnt::tick(world.state(), *entity)) {
+                continue;
+            }
+            if (!tntMayExplode(world)) {
+                entity->fuse = 1;
                 continue;
             }
             entity->removed = true;

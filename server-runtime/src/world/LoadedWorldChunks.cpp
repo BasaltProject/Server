@@ -248,8 +248,9 @@ std::vector<RegionStore::Snapshot>
 LoadedWorld::snapshotInBatches(const std::vector<std::pair<std::int32_t, std::int32_t>>& positions) {
     std::vector<RegionStore::Snapshot> snapshots;
     snapshots.reserve(positions.size());
-    for (std::size_t first = 0; first < positions.size(); first += kSnapshotBatch) {
-        const std::size_t last = std::min(positions.size(), first + kSnapshotBatch);
+    const auto batchSize = static_cast<std::size_t>(settings_.rules.tuning.autosaveChunksPerBatch);
+    for (std::size_t first = 0; first < positions.size(); first += batchSize) {
+        const std::size_t last = std::min(positions.size(), first + batchSize);
         std::vector<RegionStore::Snapshot> batch =
             sched::onOwner<std::vector<RegionStore::Snapshot>>(owner(), [this, &positions, first, last] {
                 std::vector<Chunk*> chunks;

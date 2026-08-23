@@ -250,7 +250,7 @@ void MobActionSystem::tickLeash(world::LoadedWorld& world, ServerEntity& leashed
         leashed.homePosition = std::array{mth::floor(holderBody.x), mth::floor(holderBody.y), mth::floor(holderBody.z)};
         leashed.homeRadius = static_cast<std::int32_t>(leashes::elasticDistance(leashed)) - 1;
     }
-    if (distance > leashes::snapDistance(leashed)) {
+    if (distance > leashes::snapDistance(leashed, world.settings().rules.tuning.leashSnapDistance)) {
         leashSound(world, "minecraft:entity.lead.break", holderBody.x, holderBody.y, holderBody.z);
         dropLeash(world, leashed, true, "distance");
         return;

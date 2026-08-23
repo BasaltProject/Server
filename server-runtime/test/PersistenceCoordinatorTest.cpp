@@ -83,8 +83,8 @@ TEST_CASE("saving the players writes everyone who has a snapshot and skips whoev
     Fixture fixture{scratch("persistence-players")};
     fixture.add("Steve", true);
     fixture.add("Alex", false);
-    const PersistenceCoordinator coordinator{fixture.hooks(),        fixture.registry, *fixture.store,
-                                             fixture.commandStorage, fixture.metrics,  {}};
+    const PersistenceCoordinator coordinator{fixture.hooks(), fixture.registry, *fixture.store, fixture.commandStorage,
+                                             fixture.metrics};
 
     coordinator.persistPlayers();
     CHECK(fixture.store->players().loadByName("Steve").has_value());
@@ -95,8 +95,8 @@ TEST_CASE("a full save writes the worlds and the players in one pass") {
     Fixture fixture{scratch("persistence-everything")};
     fixture.add("Steve", true);
     fixture.world->state().getOrGenerateChunk(0, 0);
-    const PersistenceCoordinator coordinator{fixture.hooks(),        fixture.registry, *fixture.store,
-                                             fixture.commandStorage, fixture.metrics,  {}};
+    const PersistenceCoordinator coordinator{fixture.hooks(), fixture.registry, *fixture.store, fixture.commandStorage,
+                                             fixture.metrics};
 
     coordinator.persistEverything();
     CHECK(fixture.store->players().loadByName("Steve").has_value());

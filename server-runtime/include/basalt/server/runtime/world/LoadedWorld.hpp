@@ -93,6 +93,7 @@ public:
     [[nodiscard]] const config::WorldSettings& settings() const noexcept { return settings_; }
 
     [[nodiscard]] const config::MobSettings& mobSettings() const noexcept { return settings_.mobs; }
+
     /// Null unless the world hides its ores.
     [[nodiscard]] const AntiXray* antiXray() const noexcept { return antiXray_.get(); }
 
@@ -409,7 +410,6 @@ private:
     std::optional<std::array<std::int32_t, 3>> spawnOverride_;
     bool movedSpawn_ = false;
     WorldClock clock_;
-    static constexpr std::size_t kSnapshotBatch = 8;
     static constexpr std::size_t kLightQueueLimit = 4096;
     static constexpr std::chrono::milliseconds kLightDebounce{80};
     std::mutex lightQueueMutex_;

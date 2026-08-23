@@ -249,7 +249,7 @@ const wire::common::Identifier& tickType() {
 }
 
 std::int32_t tickDelay(const WorldState& world, random::RandomSource& random) {
-    return world.rules().gameplay.fireTickDelay + random.nextInt(kDelaySpread);
+    return world.rules().tuning.fireTickDelay + random.nextInt(kDelaySpread);
 }
 
 bool isFire(std::int32_t stateId) {

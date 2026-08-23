@@ -247,7 +247,7 @@ void growStalk(const randomTicks::Context& context, std::int32_t x, std::int32_t
     while (pathOf(stateAt(context.world, x, y - height, z)) == block.path()) {
         height++;
     }
-    if (height >= context.world.rules().gameplay.sugarCaneMaxHeight) {
+    if (height >= context.world.rules().tuning.sugarCaneMaxHeight) {
         return;
     }
     const std::optional<std::int32_t> age = numberOf(stateId, "age");
@@ -300,21 +300,20 @@ void growCactus(const randomTicks::Context& context, std::int32_t x, std::int32_
     std::int32_t height = 1;
     while (pathOf(stateAt(context.world, x, y - height, z)) == block.path()) {
         height++;
-        if (height == context.world.rules().gameplay.cactusMaxHeight && *age == kStalkMaxAge) {
+        if (height == context.world.rules().tuning.cactusMaxHeight && *age == kStalkMaxAge) {
             return;
         }
     }
     const bool supported = blockSurvival::isSupported(context.world, x, y + 1, z, stateId, {}, context.hasSkylight);
     if (*age == kFlowerAge && supported) {
-        const double odds =
-            height >= context.world.rules().gameplay.cactusMaxHeight ? kTallFlowerOdds : kShortFlowerOdds;
+        const double odds = height >= context.world.rules().tuning.cactusMaxHeight ? kTallFlowerOdds : kShortFlowerOdds;
         if (random.nextDouble() <= odds) {
             const registry::BlockState* flower = registry::blocks::named("cactus_flower");
             if (flower != nullptr) {
                 set(context, x, y + 1, z, flower->stateId, changes);
             }
         }
-    } else if (*age == kStalkMaxAge && height < context.world.rules().gameplay.cactusMaxHeight) {
+    } else if (*age == kStalkMaxAge && height < context.world.rules().tuning.cactusMaxHeight) {
         const std::optional<std::int32_t> fresh =
             registry::blockStateDefinitions::stateIdOf(block, {{"age", "0"}}, stateId);
         if (!fresh.has_value()) {

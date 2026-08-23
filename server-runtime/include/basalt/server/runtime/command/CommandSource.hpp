@@ -140,7 +140,8 @@ private:
 class CommandBlockSource final : public CommandSource {
 public:
     CommandBlockSource(std::array<double, 3> at, std::string name, bool speaks, wire::common::Logger logger,
-                       wire::text::LangTable lang = wire::text::LangTable{});
+                       wire::text::LangTable lang = wire::text::LangTable{},
+                       std::int32_t level = permissionLevel::kGamemasters);
 
     [[nodiscard]] std::string name() const override { return name_; }
 
@@ -148,7 +149,7 @@ public:
 
     [[nodiscard]] wire::text::Component displayName() const override;
 
-    [[nodiscard]] std::int32_t permissionLevel() const override { return permissionLevel::kGamemasters; }
+    [[nodiscard]] std::int32_t permissionLevel() const override { return level_; }
 
     [[nodiscard]] std::array<double, 3> position() const override { return at_; }
 
@@ -159,6 +160,7 @@ public:
     [[nodiscard]] bool hasPermission(std::optional<std::string_view> node) const override;
 
 private:
+    std::int32_t level_;
     std::array<double, 3> at_;
     std::string name_;
     bool speaks_;
