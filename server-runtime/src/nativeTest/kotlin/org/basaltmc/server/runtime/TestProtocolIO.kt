@@ -87,6 +87,15 @@ internal fun startTestServer(
                 logKeepDays = 0,
                 logColor = ColorMode.NEVER,
                 generationMetrics = false,
+                // The operator of a test server grants exactly what its plugins asked for: the
+                // gate itself is covered by its own tests, not by every flow test tripping over it.
+                pluginAllowances =
+                    (pluginsWatchingPackets + pluginChannels.keys).associateWith { id ->
+                        buildSet {
+                            if (id in pluginsWatchingPackets) add("packets")
+                            if (id in pluginChannels) add("network")
+                        }
+                    },
             )
         // Everything a test server writes goes under build/: it is already gitignored, `clean`
         // wipes it, and writing into the module directory is how test worlds and databases ended up

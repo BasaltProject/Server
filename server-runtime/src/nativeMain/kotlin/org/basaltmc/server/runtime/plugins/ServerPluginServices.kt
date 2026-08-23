@@ -33,6 +33,8 @@ public class ServerPluginServices(
     private val owner: Owner,
     private val dispatcher: CommandDispatcher,
     private val currentTick: () -> Long,
+    /** Who a plugin's `run` acts as. */
+    private val console: (() -> org.basaltmc.server.runtime.command.CommandSource?)? = null,
     root: String = ".",
     override val players: org.basaltmc.server.plugins.PluginPlayers = NoPlayers,
     override val worlds: org.basaltmc.server.plugins.PluginWorlds = NoWorlds,
@@ -45,7 +47,7 @@ public class ServerPluginServices(
     private val ownerAt: (String, Double, Double) -> Owner? = { _, _, _ -> null },
 ) : PluginServices {
     override val tasks: PluginTasks = OwnerTasks(owner, currentTick)
-    override val commands: PluginCommands = DispatcherCommands(owner, dispatcher)
+    override val commands: PluginCommands = DispatcherCommands(owner, dispatcher, console)
 
     override fun at(
         world: String,
@@ -131,6 +133,8 @@ private class OwnerTasks(
 private class DispatcherCommands(
     private val owner: Owner,
     private val dispatcher: CommandDispatcher,
+    /** The console, for a plugin the operator granted `commands`. Null before there is one. */
+    private val console: (() -> org.basaltmc.server.runtime.command.CommandSource?)? = null,
 ) : PluginCommands {
     private class Entry(
         val pluginId: String,
@@ -141,6 +145,13 @@ private class DispatcherCommands(
     }
 
     private val entries = mutableListOf<Entry>()
+
+    override fun runAsConsole(command: String): Boolean {
+        val source = console?.invoke() ?: return false
+        // Trimmed of its slash, since a plugin writes the command the way an operator types it.
+        dispatcher.execute(source, command.removePrefix("/"))
+        return true
+    }
 
     override fun register(
         pluginId: String,

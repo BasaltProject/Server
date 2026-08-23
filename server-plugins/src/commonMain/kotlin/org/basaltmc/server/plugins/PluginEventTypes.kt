@@ -5,8 +5,7 @@ package org.basaltmc.server.plugins
  *
  * Names are dotted and read as `thing.happening`. There are far fewer of these than Bukkit has
  * classes, and on purpose: what Bukkit splits into a dozen subclasses is one event with a field
- * here (`entity.damage` with `cause`, not twelve `EntityDamageBy*Event`). Which Bukkit and Paper
- * event each one answers for is audited in `docs/plan/api-vs-bukkit.md`.
+ * here (`entity.damage` with `cause`, not twelve `EntityDamageBy*Event`).
  *
  * Two conventions worth knowing before reading the list. A player is carried as `player_name` and
  * `player_uuid` rather than as an object, because the object model is the next stage and the name

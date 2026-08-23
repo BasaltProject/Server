@@ -448,6 +448,19 @@ class TestNpc(
         skinTexture = texture
     }
 
+    var skinCopiedFrom: String? = null
+
+    override fun skinFrom(playerName: String): Boolean {
+        skinCopiedFrom = playerName
+        return true
+    }
+
+    var follows: Boolean = true
+
+    override fun looksAtPlayers(follows: Boolean) {
+        this.follows = follows
+    }
+
     override fun look(
         yaw: Float,
         pitch: Float,
@@ -641,6 +654,14 @@ class TestCommands : PluginCommands {
 
     val registered: MutableList<Registered> = mutableListOf()
     val replies: MutableList<String> = mutableListOf()
+
+    /** What a plugin ran as the console, for the tests about who may do that. */
+    val ranAsConsole: MutableList<String> = mutableListOf()
+
+    override fun runAsConsole(command: String): Boolean {
+        ranAsConsole += command
+        return true
+    }
 
     override fun register(
         pluginId: String,

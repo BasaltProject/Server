@@ -24,6 +24,14 @@ public data class PluginCapabilities(
      */
     val packets: Boolean = false,
 ) {
+    /** The ones an operator has to grant, of those this plugin asked for. */
+    public fun asks(): Set<PluginPermission> =
+        buildSet {
+            if (packets) add(PluginPermission.PACKETS)
+            if (network.isNotEmpty()) add(PluginPermission.NETWORK)
+            if (commands) add(PluginPermission.COMMANDS)
+        }
+
     public companion object {
         public val NONE: PluginCapabilities = PluginCapabilities()
     }
@@ -48,6 +56,26 @@ public data class PluginExports(
 
     public companion object {
         public val NONE: PluginExports = PluginExports()
+    }
+}
+
+/**
+ * What a plugin may reach that the operator has to say yes to.
+ *
+ * The rest of a plugin's capabilities stay inside its own sandbox: its folder, its own rows in the
+ * database. These three leave it. Watching packets is reading everyone's chat, a channel talks to
+ * whatever is in front of the client, and running a command as the console is being the console.
+ */
+public enum class PluginPermission(
+    public val permissionName: String,
+) {
+    PACKETS("packets"),
+    NETWORK("network"),
+    COMMANDS("commands"),
+    ;
+
+    public companion object {
+        public fun of(name: String): PluginPermission? = entries.firstOrNull { it.permissionName == name }
     }
 }
 

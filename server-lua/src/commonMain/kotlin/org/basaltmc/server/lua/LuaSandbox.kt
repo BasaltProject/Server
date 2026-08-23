@@ -109,6 +109,18 @@ public class LuaSandbox(
         for (name in REMOVED_GLOBALS) globals.set(name, Lua.NIL)
         val os = globals.get("os") ?: Lua.NIL
         if (os.istable()) for (name in REMOVED_OS) os.set(name, Lua.NIL)
+        // Taking the global away is not enough: `require("io")` hands back the same library from
+        // `package.loaded`, which is a door left open behind the one that was locked.
+        val loaded = (globals.get("package") ?: Lua.NIL).takeIf { it.istable() }?.get("loaded")
+        if (loaded != null && loaded.istable()) {
+            // `package` itself is in there too, so requiring it by name would hand back the map of
+            // doors a moment after the global was taken away.
+            for (name in REMOVED_GLOBALS + "package") loaded.set(name, Lua.NIL)
+        }
+        // And `package` itself goes, since it is the map of every other door: `loaded`, `preload`
+        // and the searchers that would put one back. `require` keeps working, because what it looks
+        // through is the finder this class installed, not this table.
+        globals.set("package", Lua.NIL)
         globals.set("print", PrintTo(printLine))
         globals.set("load", TextOnlyLoad(globals.get("load") ?: Lua.NIL))
     }
