@@ -406,6 +406,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     timingsReport_ = std::make_unique<timings::TimingsReport>(timings_, tickLoop_->durations(), std::move(sources));
     whitelistEnforced_ = config.whitelist;
     idleTimeoutMinutes_ = config.tuning.playerIdleTimeoutMinutes;
+    command::permissionLevel::setOperatorLevel(config.tuning.opPermissionLevel);
     world::neighbourUpdates::setChainedLimit(config.tuning.maxChainedNeighborUpdates);
 
     vanillaData_.lootTables.useScoreboard(&scoreboard_);
@@ -483,6 +484,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.fetchMojangUuid = [](const std::string& name) { return wire::auth::mojangUuidOf(name); };
     wiring.whitelistEnforced = [this] { return whitelistEnforced_; };
     wiring.setWhitelistEnforced = [this](bool value) { whitelistEnforced_ = value; };
+    wiring.broadcastConsoleToOps = config.tuning.broadcastConsoleToOps;
+    wiring.broadcastRconToOps = config.tuning.broadcastRconToOps;
     wiring.kickUnlistedPlayers = [this] { kickUnlistedPlayers(); };
     wiring.setIdleTimeout = [this](std::int32_t minutes) { idleTimeoutMinutes_ = minutes; };
     wired_ = buildCommands(wiring);
@@ -875,7 +878,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     plugins::worldEventHooks::spawning(spawningHooks, eventSink_);
     spawning_ = std::make_unique<NaturalSpawningSystem>(
         playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, std::move(spawningHooks),
-        NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+        NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                       .biomeTag = [loader = std::make_shared<world::BiomeTagLoader>(jar.readText)](
+                                                       const std::string& tag) { return loader->biomesIn(tag); }});
     // parity: the biome tags a spawner's rules ask, read once: `BiomeTagLoader` caches as it goes.
     auto spawnerBiomes = std::make_shared<std::map<std::string, std::set<std::string>, std::less<>>>();
     world::BiomeTagLoader biomeTags{jar.readText};
@@ -969,6 +974,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                             .numbers = {{"signal_strength", signal}}});
                 },
             .advancementTriggers = advancementTriggers_.get(),
+            .spawnMob =
+                [this](world::LoadedWorld& world, const wire::common::Identifier& type, double x, double y, double z,
+                       float yaw) {
+                    if (spawning_ != nullptr) {
+                        static_cast<void>(spawning_->spawnMob(world, type, x, y, z, yaw, "triggered"));
+                    }
+                },
             .crystalDestroyed =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {
@@ -1037,9 +1049,12 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             if (dispatcher == nullptr) {
                 return 0;
             }
-            const command::CommandBlockSource source{
-                {x + 0.5, y + 0.5, z + 0.5}, "@",  true, wire::common::Logger{"CommandBlock"},
-                wire::text::LangTable{},     level};
+            const command::CommandBlockSource source{{x + 0.5, y + 0.5, z + 0.5},
+                                                     "@",
+                                                     !live_->current()->commands.options().silentCommandBlockConsole,
+                                                     wire::common::Logger{"CommandBlock"},
+                                                     wire::text::LangTable{},
+                                                     level};
             std::int32_t successes = 0;
             static_cast<void>(dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));
             return successes;
@@ -1365,12 +1380,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     if (dispatcher == nullptr) {
                         return 0;
                     }
-                    const command::CommandBlockSource source{{cart.x, cart.y, cart.z},
-                                                             "@",
-                                                             true,
-                                                             wire::common::Logger{"CommandBlock"},
-                                                             wire::text::LangTable{},
-                                                             world.settings().rules.tuning.commandBlockPermissionLevel};
+                    const command::CommandBlockSource source{
+                        {cart.x, cart.y, cart.z},
+                        "@",
+                        !live_->current()->commands.options().silentCommandBlockConsole,
+                        wire::common::Logger{"CommandBlock"},
+                        wire::text::LangTable{},
+                        world.settings().rules.tuning.commandBlockPermissionLevel};
                     std::int32_t successes = 0;
                     static_cast<void>(
                         dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));

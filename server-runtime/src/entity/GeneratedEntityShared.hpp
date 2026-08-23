@@ -19,6 +19,8 @@ constexpr std::uint8_t kWolfAngerEndDataIndex = 22;
 constexpr std::uint8_t kEndermanCreepyDataIndex = 17;
 constexpr std::uint8_t kEndermanStaredAtDataIndex = 18;
 constexpr std::uint8_t kStingerCountDataIndex = 13;
+/// parity: `Fox.DATA_TYPE_ID`, before the byte-valued `DATA_FLAGS_ID` at 19.
+constexpr std::uint8_t kFoxVariantDataIndex = 18;
 
 /// parity: `ExperienceOrb.DATA_VALUE`.
 constexpr std::uint8_t kOrbValueDataIndex = 8;
