@@ -99,7 +99,8 @@ class WorldControlCommandsTest {
         run("worldborder set 50 10")
         assertEquals(100.0, world.border.size)
         assertEquals(50.0, world.border.targetSize)
-        assertEquals(500L, world.border.lerpTimeMillis)
+        // Ticks, which is what 26.2 counts in: it used to be told 500, fifty times too many.
+        assertEquals(10L, world.border.lerpTimeTicks)
     }
 
     @Test

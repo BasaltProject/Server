@@ -21,7 +21,7 @@ public class WorldBorder {
     public var targetSize: Double = DEFAULT_SIZE
         private set
 
-    public var lerpTimeMillis: Long = 0L
+    public var lerpTimeTicks: Long = 0L
         private set
 
     public var warningBlocks: Int = 5
@@ -40,16 +40,20 @@ public class WorldBorder {
     public fun setSize(newSize: Double) {
         size = newSize
         targetSize = newSize
-        lerpTimeMillis = 0L
+        lerpTimeTicks = 0L
     }
 
-    /** parity: `WorldBorder.lerpSizeBetween`, which reports the old size while it moves. */
+    /**
+     * parity: `WorldBorder.lerpSizeBetween`, which reports the old size while it moves, and counts
+     * in ticks. It used to be told milliseconds here, which made every moving border crawl at a
+     * fiftieth of the speed the command asked for.
+     */
     public fun moveSize(
         newSize: Double,
-        overMillis: Long,
+        overTicks: Long,
     ) {
         targetSize = newSize
-        lerpTimeMillis = overMillis
+        lerpTimeTicks = overTicks
     }
 
     public fun initializePacket(): InitializeBorderPacket =
@@ -58,7 +62,7 @@ public class WorldBorder {
             centerZ = centerZ,
             oldSize = size,
             newSize = targetSize,
-            lerpTimeMillis = lerpTimeMillis,
+            lerpTimeTicks = lerpTimeTicks,
             absoluteMaxSize = InitializeBorderPacket.ABSOLUTE_MAX_SIZE,
             warningBlocks = warningBlocks,
             warningSeconds = warningSeconds,
@@ -98,7 +102,7 @@ public class WorldBorder {
     /** Called when a move finishes, so the stored size stops being the one it started from. */
     public fun settle() {
         size = targetSize
-        lerpTimeMillis = 0L
+        lerpTimeTicks = 0L
     }
 
     public companion object {
