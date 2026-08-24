@@ -103,6 +103,7 @@ import org.basaltmc.server.runtime.entity.MobBrain
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.runtime.entity.MobCombat
 import org.basaltmc.server.runtime.entity.MobDespawn
+import org.basaltmc.server.runtime.entity.MobPersistence
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.PrimedTnt
 import org.basaltmc.server.runtime.entity.Projectiles
@@ -2348,7 +2349,9 @@ public class BasaltServer(
         val chunks = simulatedChunks(world).filter { localCaps.isSpawnCandidate(it[0], it[1]) }
         if (chunks.isEmpty()) return
 
-        val alive = world.state.entities().filter { !it.removed && !it.persistent }
+        // parity: NaturalSpawner.createState excludes both PersistenceRequired and each mob's
+        // requiresCustomPersistence override before global caps, local caps and spawn costs.
+        val alive = world.state.entities().filter { !it.removed && !MobPersistence.keeps(it) }
         val random = LegacyRandom(Random.nextLong())
         val categories = NaturalSpawner.categoriesFor(world.difficulty, world.gameTime)
         val cappedCategories = MobCategory.entries.filter { it != MobCategory.MISC }

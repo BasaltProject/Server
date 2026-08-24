@@ -8,29 +8,29 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-/** Official 26.2 vectors for the common `AgeableMob`/`AbstractCubeMob` finalizers. */
+/** Official 26.2 vectors for the common `AgeableMob`/`Mob`/`AbstractCubeMob` finalizers. */
 class MobSpawnFinalizationTest {
     @Test
     fun onlyLaterAcceptedPackMembersRollForBeingBabies() {
         val cow = Identifier.vanilla("cow")
-        val untouched = LegacyRandom(0L)
         val firstMemberRandom = LegacyRandom(0L)
 
-        assertEquals(
-            0,
-            MobSpawnFinalization
-                .stateFor(cow, groupIndex = 0, random = firstMemberRandom, specialMultiplier = 0f)
-                .age,
-        )
-        assertEquals(untouched.nextFloat(), firstMemberRandom.nextFloat(), "the first member consumes no baby roll")
+        val first =
+            MobSpawnFinalization.stateFor(
+                cow,
+                groupIndex = 0,
+                random = firstMemberRandom,
+                specialMultiplier = 0f,
+            )
+        assertEquals(0, first.age)
+        assertEquals(0.056326043040338905, first.followRangeBonus, 1e-15)
+        assertEquals(false, first.leftHanded)
 
         val babySeed = (0L..10_000L).first { LegacyRandom(it).nextFloat() <= 0.05f }
-        assertEquals(
-            AgeableMobs.BABY_START_AGE,
-            MobSpawnFinalization
-                .stateFor(cow, groupIndex = 1, random = LegacyRandom(babySeed), specialMultiplier = 0f)
-                .age,
-        )
+        val baby = MobSpawnFinalization.stateFor(cow, 1, LegacyRandom(babySeed), 0f)
+        assertEquals(4_640L, babySeed)
+        assertEquals(AgeableMobs.BABY_START_AGE, baby.age)
+        assertEquals(0.012703759813200509, baby.followRangeBonus, 1e-15)
         assertTrue(AgeableMobs.isAgeable("squid"), "26.2 moved squid under AgeableWaterCreature")
         assertTrue(AgeableMobs.isAgeable("slime"), "26.2 cube mobs inherit AgeableMob")
     }
@@ -39,14 +39,19 @@ class MobSpawnFinalizationTest {
     fun cubeSizeUsesTheOfficialJavaRandomSequenceAndDifficultyPromotion() {
         val slime = Identifier.vanilla("slime")
 
-        assertEquals(1, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(1L), 0f).cubeSize)
-        assertEquals(2, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(1L), 1f).cubeSize)
-        assertEquals(4, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(2L), 1f).cubeSize)
-        assertEquals(4, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(3L), 0f).cubeSize)
+        assertEquals(2, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(1L), 0f).cubeSize)
+        assertEquals(4, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(1L), 1f).cubeSize)
+        assertEquals(1, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(2L), 1f).cubeSize)
+        assertEquals(2, MobSpawnFinalization.stateFor(slime, 0, LegacyRandom(11L), 1f).cubeSize)
 
         val generated = NbtCompound()
-        MobSpawnFinalization.writeGenerated(generated, slime, 0, LegacyRandom(2L), 1f)
+        MobSpawnFinalization.writeGenerated(generated, slime, 0, LegacyRandom(1L), 1f)
         assertEquals(3, generated.getInt("Size"), "cube NBT stores live size minus one")
+        assertEquals(1, generated.getList("attributes")?.size)
+
+        val leftHanded = NbtCompound()
+        MobSpawnFinalization.writeGenerated(leftHanded, Identifier.vanilla("zombie"), 0, LegacyRandom(38L))
+        assertTrue(leftHanded.getBoolean("LeftHanded"))
     }
 
     @Test

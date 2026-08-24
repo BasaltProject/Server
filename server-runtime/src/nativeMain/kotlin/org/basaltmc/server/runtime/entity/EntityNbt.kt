@@ -117,6 +117,7 @@ public object EntityNbt {
         entity.sitting = tag.numericBoolean("Sitting")
         tag.getString("CustomName").takeIf { it.isNotEmpty() }?.let { entity.customName = it }
         (tag["Tags"] as? NbtList)?.filterIsInstance<NbtString>()?.forEach { entity.tags += it.value }
+        readAttributes(tag, entity)
         entity.sourceNbt = tag.deepCopy()
         return entity
     }
@@ -137,6 +138,28 @@ public object EntityNbt {
     private fun doubles(vararg values: Double): NbtList = NbtList(NbtType.DOUBLE, values.map { NbtDouble(it) })
 
     private fun floats(vararg values: Float): NbtList = NbtList(NbtType.FLOAT, values.map { NbtFloat(it) })
+
+    /** Reads Minecraft 26.2's `AttributeInstance.Packed.LIST_CODEC` representation. */
+    private fun readAttributes(
+        tag: NbtCompound,
+        entity: ServerEntity,
+    ) {
+        val attributes = (tag["attributes"] as? NbtList)?.filterIsInstance<NbtCompound>().orEmpty()
+        for (attribute in attributes) {
+            val id = attribute.getString("id")
+            if (id.isEmpty()) continue
+            if ("base" in attribute) entity.attributeValues[id] = attribute.numericDouble("base")
+            val modifiers =
+                (attribute["modifiers"] as? NbtList)?.filterIsInstance<NbtCompound>().orEmpty()
+            for (packed in modifiers) {
+                val modifierId = packed.getString("id")
+                val operation = AttributeOperation.byName(packed.getString("operation"))
+                if (modifierId.isEmpty() || operation == null) continue
+                entity.attributeModifiers.getOrPut(id) { mutableMapOf() }[modifierId] =
+                    AttributeModifier(modifierId, packed.numericDouble("amount"), operation)
+            }
+        }
+    }
 
     /** Vanilla uses byte/int/float tags while this server's older saves used doubles for the same fields. */
     private fun NbtCompound.numericDouble(key: String): Double =

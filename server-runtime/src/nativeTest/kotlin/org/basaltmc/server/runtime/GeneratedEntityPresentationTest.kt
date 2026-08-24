@@ -14,6 +14,31 @@ import kotlin.uuid.Uuid
 
 class GeneratedEntityPresentationTest {
     @Test
+    fun mobFlagsPreserveNoAiAndLeftHandedState() {
+        val data =
+            NbtCompound().apply {
+                putBoolean("NoAI", true)
+                putBoolean("LeftHanded", true)
+            }
+
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Bytes(15, 3)),
+            generatedEntityMetadata("zombie", data),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Bytes(15, 4)),
+            generatedEntityMetadata(
+                "armor_stand",
+                NbtCompound().apply {
+                    putBoolean("NoAI", true)
+                    putBoolean("ShowArms", true)
+                },
+            ),
+            "NoAI is not a mob flag on furniture whose index 15 belongs to another class",
+        )
+    }
+
+    @Test
     fun materializesArmorStandFlagsPoseAndEquipment() {
         val pose = NbtCompound()
         pose["Head"] =

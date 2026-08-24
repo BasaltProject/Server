@@ -2,7 +2,9 @@ package org.basaltmc.server.runtime
 
 import org.basaltmc.server.runtime.entity.AgeableMobs
 import org.basaltmc.server.runtime.entity.CubeMobs
+import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtFloat
 import org.basaltmc.wire.protocol.play.SetEntityDataPacket
@@ -20,6 +22,13 @@ internal fun generatedEntityMetadata(
         if (data.getBoolean("NoGravity")) add(SetEntityDataPacket.Entry.Booleans(5, true))
 
         if ("Health" in data) add(SetEntityDataPacket.Entry.Floats(9, data.getFloat("Health")))
+
+        if (Mobs.isMob(Identifier.vanilla(type))) {
+            var mobFlags = 0
+            if (data.getBoolean("NoAI")) mobFlags = mobFlags or 1
+            if (data.getBoolean("LeftHanded")) mobFlags = mobFlags or 2
+            if (mobFlags != 0) add(SetEntityDataPacket.Entry.Bytes(MOB_FLAGS_DATA_INDEX, mobFlags.toByte()))
+        }
 
         if (AgeableMobs.isAgeable(type) && data.getInt("Age") < 0) {
             add(SetEntityDataPacket.Entry.Booleans(AgeableMobs.BABY_DATA_INDEX, true))
@@ -144,6 +153,7 @@ internal fun runtimeEntityMetadata(entity: ServerEntity): RuntimeEntityMetadata 
 
 /** `AbstractCubeMob.ID_SIZE`: two `AgeableMob` fields follow the common index 16. */
 private const val CUBE_SIZE_DATA_INDEX = 18
+private const val MOB_FLAGS_DATA_INDEX = 15
 
 private val ARMOR_STAND_POSES =
     listOf(

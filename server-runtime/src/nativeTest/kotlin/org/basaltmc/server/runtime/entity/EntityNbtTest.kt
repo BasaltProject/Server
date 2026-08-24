@@ -1,5 +1,7 @@
 package org.basaltmc.server.runtime.entity
 
+import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.runtime.world.MobSpawnFinalization
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
@@ -69,6 +71,20 @@ class EntityNbtTest {
         val tag = EntityNbt.encode(slime)
         assertEquals(3, tag.getInt("Size"))
         assertEquals(4, assertNotNull(EntityNbt.decode(tag, entityId = 9, protocolType = 1)).cubeSize)
+    }
+
+    @Test
+    fun generatedMobAttributesUseAndReloadVanillasPackedShape() {
+        val zombie = zombie()
+        MobSpawnFinalization.apply(zombie, groupIndex = 0, LegacyRandom(0L), specialMultiplier = 0f)
+
+        val tag = EntityNbt.encode(zombie)
+        assertEquals(1, tag.getList("attributes")?.size)
+        val restored = assertNotNull(EntityNbt.decode(tag, entityId = 9, protocolType = 151))
+        val modifier =
+            restored.attributeModifiers["minecraft:follow_range"]?.get("minecraft:random_spawn_bonus")
+        assertEquals(0.056326043040338905, assertNotNull(modifier).amount, 1e-15)
+        assertEquals(AttributeOperation.ADD_MULTIPLIED_BASE, modifier.operation)
     }
 
     @Test
