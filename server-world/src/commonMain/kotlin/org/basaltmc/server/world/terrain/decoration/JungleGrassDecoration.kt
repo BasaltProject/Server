@@ -53,7 +53,6 @@ public object JungleGrassDecoration : BiomeVegetalDecoration {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_grass"))?.stateId ?: error("unknown block 'short_grass'")
     private val fernStateId =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla("fern"))?.stateId ?: error("unknown block 'fern'")
-    private val podzolStateId = Blocks.PODZOL.stateId
     private val AIR_NOT_ON_PODZOL =
         PlacementFilter { context, _, position ->
             if (position.y <= org.basaltmc.server.world.WorldHeight.MIN_Y ||
@@ -61,10 +60,9 @@ public object JungleGrassDecoration : BiomeVegetalDecoration {
             ) {
                 false
             } else {
-                val x = position.x and 15
-                val z = position.z and 15
-                Blocks.isAir(context.chunk.getBlockStateId(x, position.y, z)) &&
-                    context.chunk.getBlockStateId(x, position.y - 1, z) != podzolStateId
+                val target = context.chunk.getDecorationBlockStateId(position.x, position.y, position.z)
+                val below = context.chunk.getDecorationBlockStateId(position.x, position.y - 1, position.z)
+                Blocks.isAir(target) && Blocks.byStateId(below)?.block?.path != "podzol"
             }
         }
 }

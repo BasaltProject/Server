@@ -19,13 +19,45 @@ class BambooVegetationDecorationTest {
 
     @Test
     fun jungleGrassPatchRejectsPodzolSubstrate() {
-        val chunk = flatChunk(Blocks.PODZOL.stateId)
-        JungleGrassDecoration.placePatchAt(
-            chunk,
-            WorldgenRandom(XoroshiroRandom(11L)),
-            DecorationPos(8, 63, 8),
+        val snowyPodzol =
+            Blocks.stateIdOf(Identifier.vanilla("podzol"), mapOf("snowy" to "true"))
+                ?: error("missing snowy podzol")
+        for (surface in listOf(Blocks.PODZOL.stateId, snowyPodzol)) {
+            val chunk = flatChunk(surface)
+            JungleGrassDecoration.placePatchAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(11L)),
+                DecorationPos(8, 63, 8),
+            )
+            assertEquals(0, count(chunk, grassStates))
+        }
+    }
+
+    @Test
+    fun denseSelectorAppliesTheChosenTreesNestedSaplingFilter() {
+        val seed =
+            (0L..1_000L).first { candidate ->
+                WorldgenRandom(XoroshiroRandom(candidate)).nextFloat() < 0.05f
+            }
+        val stone = flatChunk(Blocks.STONE.stateId)
+        val grass = flatChunk(Blocks.GRASS_BLOCK.stateId)
+        val origin = DecorationPos(8, 63, 8)
+
+        BambooVegetationDecoration.placeAt(
+            stone,
+            WorldgenRandom(XoroshiroRandom(seed)),
+            origin,
+            PlacementContext(stone),
         )
-        assertEquals(0, count(chunk, grassStates))
+        BambooVegetationDecoration.placeAt(
+            grass,
+            WorldgenRandom(XoroshiroRandom(seed)),
+            origin,
+            PlacementContext(grass),
+        )
+
+        assertEquals(0, count(stone, generatedStates))
+        assertTrue(count(grass, generatedStates) > 0)
     }
 
     private fun flatChunk(surfaceState: Int): Chunk {

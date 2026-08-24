@@ -2,12 +2,8 @@ package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
-import org.basaltmc.server.registry.BlockSupport
-import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
-import org.basaltmc.wire.common.Identifier
 
 /**
  * Global step-9 placement for the large tree/forest features.
@@ -69,7 +65,7 @@ public object TreePatchDecoration {
             positions.forEach { position ->
                 val biome = environment.biomeAt(position.x, position.y, position.z).substringAfter(':')
                 if (biome !in spec.biomes) return@forEach
-                if (!survivesPlacementPredicate(chunk, position, spec.survivalSapling)) return@forEach
+                if (!TreeDecoration.survivesPlacementPredicate(chunk, position, spec.survivalSapling)) return@forEach
                 placementObserver?.invoke(spec.name, position)
                 if (spec.name == BAMBOO_VEGETATION) {
                     BambooVegetationDecoration.placeAt(chunk, random, position, context)
@@ -88,35 +84,6 @@ public object TreePatchDecoration {
         val maxWaterDepth: Int = 0,
         val survivalSapling: String? = null,
     )
-
-    /** The optional outer `would_survive` filters use an actual stage-zero sapling state. */
-    private fun survivesPlacementPredicate(
-        chunk: Chunk,
-        position: DecorationPos,
-        sapling: String?,
-    ): Boolean {
-        if (sapling == null) return true
-        if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
-        val stateId =
-            Blocks.REGISTRY.byIdentifier(Identifier.vanilla(sapling))?.stateId
-                ?: error("unknown sapling '$sapling'")
-
-        fun get(
-            dx: Int,
-            dy: Int,
-            dz: Int,
-        ): Int = chunk.getDecorationBlockStateId(position.x + dx, position.y + dy, position.z + dz)
-
-        return BlockSupport.canSurvive(
-            stateId,
-            down = get(0, -1, 0),
-            up = get(0, 1, 0),
-            north = get(0, 0, -1),
-            south = get(0, 0, 1),
-            west = get(-1, 0, 0),
-            east = get(1, 0, 0),
-        )
-    }
 
     private fun countExtra(
         count: Int,
