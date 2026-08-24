@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
+import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -74,6 +75,40 @@ class CoralDecorationTest {
         assertTrue(foundExternal, "expected a sampled coral shape to cross the east chunk edge")
     }
 
+    @Test
+    fun coralAcceptsEveryStateOfTheWaterBlock() {
+        val chunk = Chunk(0, 0)
+        val origin = DecorationPos(8, 41, 8)
+        chunk.setBlockStateId(origin.x, origin.y, origin.z, Blocks.WATER.stateId + 1)
+        chunk.setBlockStateId(origin.x, origin.y + 1, origin.z, Blocks.WATER.stateId + 1)
+
+        CoralDecoration.placeAt(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(seedSelectingShape(1))),
+            origin,
+        )
+
+        val placedPath = Blocks.byStateId(chunk.getBlockStateId(origin.x, origin.y, origin.z))?.block?.path
+        assertTrue(placedPath?.endsWith("_coral_block") == true)
+    }
+
+    @Test
+    fun coralDoesNotTreatWallFansAsMembersOfTheCoralsTag() {
+        val chunk = Chunk(0, 0)
+        val origin = DecorationPos(8, 41, 8)
+        val wallFan = stateId("tube_coral_wall_fan")
+        chunk.setBlockStateId(origin.x, origin.y, origin.z, wallFan)
+        chunk.setBlockStateId(origin.x, origin.y + 1, origin.z, Blocks.WATER.stateId)
+
+        CoralDecoration.placeAt(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(seedSelectingShape(1))),
+            origin,
+        )
+
+        assertEquals(wallFan, chunk.getBlockStateId(origin.x, origin.y, origin.z))
+    }
+
     private fun oceanChunk(chunkX: Int): Chunk =
         Chunk(chunkX, 0).also { chunk ->
             for (x in 0 until 16) {
@@ -93,6 +128,12 @@ class CoralDecorationTest {
                     DecorationPos(candidate * 16, 0, 0),
                 ).any()
         }
+
+    private fun seedSelectingShape(index: Int): Long =
+        (0L..1_000L).first { seed -> WorldgenRandom(XoroshiroRandom(seed)).nextInt(3) == index }
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     private fun environment(biomeAtX: (Int) -> String): SurfaceRuleEnvironment =
         object : SurfaceRuleEnvironment {
