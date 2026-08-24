@@ -204,6 +204,35 @@ class MobSpawnFinalizationTest {
     }
 
     @Test
+    fun hoglinRollsItsConcreteBabyChanceBeforeInheritedGroupFinalization() {
+        val first = MobSpawnFinalization.stateFor(Identifier.vanilla("hoglin"), 0, LegacyRandom(4_096L), 0f)
+        assertEquals(AgeableMobs.BABY_START_AGE, first.age)
+        assertEquals(0.06345894752592666, first.followRangeBonus, 1e-15)
+
+        val later = MobSpawnFinalization.stateFor(Identifier.vanilla("hoglin"), 1, LegacyRandom(4_096L), 0f)
+        assertEquals(AgeableMobs.BABY_START_AGE, later.age)
+        assertEquals(
+            0.01005054895577005,
+            later.followRangeBonus,
+            1e-15,
+            "AgeableMob still consumes its own baby roll when Hoglin already made itself a baby",
+        )
+    }
+
+    @Test
+    fun nautilusInitializesItsNonPlayerAttackCooldownBeforeSuper() {
+        val nautilus = MobSpawnFinalization.stateFor(Identifier.vanilla("nautilus"), 0, LegacyRandom(0L), 0f)
+        assertEquals(
+            3_132,
+            nautilus.typeData
+                .getCompound("Brain")
+                .getCompound("memories")
+                .getCompound("minecraft:attack_target_cooldown")
+                .getInt("value"),
+        )
+    }
+
+    @Test
     fun horseVariantsAndAttributesUseConcreteSuperclassOrder() {
         val group = MobSpawnGroupData()
         val first = MobSpawnFinalization.stateFor(Identifier.vanilla("horse"), 0, LegacyRandom(1L), 0f, group)
