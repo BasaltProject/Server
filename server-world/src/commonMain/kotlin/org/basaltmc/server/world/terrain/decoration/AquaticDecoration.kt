@@ -1,6 +1,8 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -132,7 +134,7 @@ public object AquaticDecoration {
         if (!chunk.isWater(x, y, z)) return
 
         val tall = random.nextDouble() < tallProbability
-        if (!canAquaticPlantSurvive(chunk, x, y, z)) return
+        if (!canSeagrassSurvive(chunk, x, y, z)) return
         if (tall) {
             if (!chunk.isWater(x, y + 1, z)) return
             chunk.setLocalBlock(x, y, z, Blocks.TALL_SEAGRASS.stateId)
@@ -189,7 +191,7 @@ public object AquaticDecoration {
             val z = origin.z + random.nextInt(8) - random.nextInt(8)
             val y = oceanFloor[(x and 15) + (z and 15) * 16]
             val stateId = Blocks.SEA_PICKLE.stateId + random.nextInt(4) * 2
-            if (chunk.isWater(x, y, z) && canAquaticPlantSurvive(chunk, x, y, z)) {
+            if (chunk.isWater(x, y, z) && canSeaPickleSurvive(chunk, x, y, z)) {
                 chunk.setLocalBlock(x, y, z, stateId)
             }
         }
@@ -207,7 +209,7 @@ public object AquaticDecoration {
         positions.forEach(place)
     }
 
-    private fun canAquaticPlantSurvive(
+    private fun canSeagrassSurvive(
         chunk: Chunk,
         x: Int,
         y: Int,
@@ -215,7 +217,20 @@ public object AquaticDecoration {
     ): Boolean {
         if (y <= WorldHeight.MIN_Y) return false
         val below = chunk.getLocalBlock(x, y - 1, z)
-        return !Blocks.isAir(below) && below != Blocks.WATER.stateId
+        return Blocks.byStateId(below)?.block?.path != "magma_block" &&
+            BlockShapes.isFaceSturdy(below, BlockFace.UP)
+    }
+
+    private fun canSeaPickleSurvive(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        if (y <= WorldHeight.MIN_Y) return false
+        val below = chunk.getLocalBlock(x, y - 1, z)
+        val hasTopCollision = BlockShapes.collisionBoxes(below).any { box -> box[4] == BlockShapes.UNITS }
+        return hasTopCollision || BlockShapes.isFaceSturdy(below, BlockFace.UP)
     }
 
     private fun canKelpSurvive(
@@ -226,14 +241,19 @@ public object AquaticDecoration {
     ): Boolean {
         if (y <= WorldHeight.MIN_Y) return false
         val below = chunk.getLocalBlock(x, y - 1, z)
-        return !Blocks.isAir(below) && below != Blocks.WATER.stateId && !Blocks.isKelpState(below)
+        if (Blocks.byStateId(below)?.block?.path == "magma_block") return false
+        return below == Blocks.KELP_PLANT.stateId ||
+            Blocks.isKelpState(below) ||
+            BlockShapes.isFaceSturdy(below, BlockFace.UP)
     }
 
     private fun Chunk.isWater(
         worldX: Int,
         y: Int,
         worldZ: Int,
-    ): Boolean = y in WorldHeight.MIN_Y..WorldHeight.MAX_Y && getLocalBlock(worldX, y, worldZ) == Blocks.WATER.stateId
+    ): Boolean =
+        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
+            Blocks.byStateId(getLocalBlock(worldX, y, worldZ))?.block?.path == "water"
 
     private fun Chunk.getLocalBlock(
         worldX: Int,

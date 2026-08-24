@@ -89,7 +89,7 @@ public object AquaticPatchDecoration {
         val x = origin.x + random.nextInt(8) - random.nextInt(8)
         val z = origin.z + random.nextInt(8) - random.nextInt(8)
         val target = DecorationPos(x, region.oceanFloor(x, z), z)
-        if (region.get(target) != Blocks.WATER.stateId) return
+        if (!isWaterBlock(region.get(target))) return
         val tall = random.nextDouble() < tallProbability.toDouble()
         if (!canSeagrassSurvive(region, target)) return
         if (!tall) {
@@ -97,7 +97,7 @@ public object AquaticPatchDecoration {
             return
         }
         val above = target.copy(y = target.y + 1)
-        if (region.get(above) != Blocks.WATER.stateId) return
+        if (!isWaterBlock(region.get(above))) return
         region.set(target, Blocks.TALL_SEAGRASS.stateId)
         region.set(above, TALL_SEAGRASS_UPPER_STATE_ID)
     }
@@ -112,7 +112,7 @@ public object AquaticPatchDecoration {
             val z = origin.z + random.nextInt(8) - random.nextInt(8)
             val target = DecorationPos(x, region.oceanFloor(x, z), z)
             val stateId = Blocks.SEA_PICKLE.stateId + random.nextInt(4) * 2
-            if (region.get(target) == Blocks.WATER.stateId && canSeaPickleSurvive(region, target)) {
+            if (isWaterBlock(region.get(target)) && canSeaPickleSurvive(region, target)) {
                 region.set(target, stateId)
             }
         }
@@ -124,13 +124,13 @@ public object AquaticPatchDecoration {
         origin: DecorationPos,
     ) {
         var position = origin.copy(y = region.oceanFloor(origin.x, origin.z))
-        if (region.get(position) != Blocks.WATER.stateId) return
+        if (!isWaterBlock(region.get(position))) return
         val height = 1 + random.nextInt(10)
         for (level in 0..height) {
             val above = position.copy(y = position.y + 1)
             if (
-                region.get(position) == Blocks.WATER.stateId &&
-                region.get(above) == Blocks.WATER.stateId &&
+                isWaterBlock(region.get(position)) &&
+                isWaterBlock(region.get(above)) &&
                 canKelpSurvive(region, position)
             ) {
                 if (level == height) {
@@ -241,6 +241,8 @@ public object AquaticPatchDecoration {
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    private fun isWaterBlock(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "water"
 
     private val MAGMA_BLOCK_STATE_ID = stateId("magma_block")
     private val TALL_SEAGRASS_UPPER_STATE_ID =
