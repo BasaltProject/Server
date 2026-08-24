@@ -73,6 +73,26 @@ class GlowLichenDecorationTest {
     }
 
     @Test
+    fun flowingWaterIsEligibleButDoesNotWaterlogThePlacedLichen() {
+        val chunk = Chunk(0, 0)
+        val origin = DecorationPos(8, 40, 8)
+        chunk.setBlockStateId(origin.x, origin.y, origin.z, Blocks.WATER.stateId + 1)
+        chunk.setBlockStateId(origin.x + 1, origin.y, origin.z, Blocks.STONE.stateId)
+
+        val placed =
+            GlowLichenDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(1234L)),
+                origin,
+            )
+
+        val stateId = chunk.getBlockStateId(origin.x, origin.y, origin.z)
+        assertTrue(placed)
+        assertTrue(Blocks.isGlowLichenState(stateId))
+        assertEquals(false, Blocks.hasWaterFluid(stateId))
+    }
+
+    @Test
     fun existingLichenIsNotAValidFeatureOrigin() {
         val chunk = Chunk(0, 0)
         val origin = DecorationPos(8, 40, 8)

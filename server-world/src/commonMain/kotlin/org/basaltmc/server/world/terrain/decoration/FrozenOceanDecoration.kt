@@ -148,8 +148,8 @@ internal object BlueIceFeature {
         origin: DecorationPos,
     ): Boolean {
         if (origin.y > 62) return false
-        if (region.get(origin) != Blocks.WATER.stateId &&
-            region.get(origin.down()) != Blocks.WATER.stateId
+        if (!isFrozenWater(region.get(origin)) &&
+            !isFrozenWater(region.get(origin.down()))
         ) {
             return false
         }
@@ -169,7 +169,7 @@ internal object BlueIceFeature {
                     )
                 val stateId = region.get(target)
                 if (Blocks.isAir(stateId) ||
-                    stateId == Blocks.WATER.stateId ||
+                    isFrozenWater(stateId) ||
                     stateId == Blocks.PACKED_ICE.stateId ||
                     stateId == Blocks.ICE.stateId
                 ) {
@@ -212,3 +212,5 @@ internal fun DecorationPos.offset(direction: DirectionOffset): DecorationPos =
 internal fun DecorationPos.down(): DecorationPos = offset(0, -1, 0)
 
 internal fun DecorationPos.up(): DecorationPos = offset(0, 1, 0)
+
+internal fun isFrozenWater(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "water"
