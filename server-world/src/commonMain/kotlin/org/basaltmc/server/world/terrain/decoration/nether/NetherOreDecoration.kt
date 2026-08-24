@@ -154,14 +154,17 @@ public object NetherOreDecoration {
                             x - xStart +
                                 (y - yStart) * sizeXZ +
                                 (z - zStart) * sizeXZ * sizeY
-                        if (!tested.add(testedIndex) ||
-                            !isInChunk(chunk, x, z) ||
-                            y <= chunk.verticalBounds.minY
-                        ) {
+                        if (!tested.add(testedIndex) || y <= chunk.verticalBounds.minY) {
                             continue
                         }
                         if (canPlace(chunk, x, y, z, config.target, discardOnAirExposure = false)) {
-                            chunk.setBlockStateId(x and 15, y, z and 15, config.stateId)
+                            chunk.setDecorationBlockStateId(
+                                x,
+                                y,
+                                z,
+                                config.stateId,
+                                expectedExternalStateId = Blocks.NETHERRACK.stateId,
+                            )
                             placed++
                         }
                     }
@@ -227,7 +230,13 @@ public object NetherOreDecoration {
         target: Target,
         discardOnAirExposure: Boolean,
     ): Boolean {
-        val stateId = chunk.getBlockStateId(worldX and 15, y, worldZ and 15)
+        val stateId =
+            if (isInChunk(chunk, worldX, worldZ)) {
+                chunk.getBlockStateId(worldX and 15, y, worldZ and 15)
+            } else {
+                if (target != Target.NETHERRACK || discardOnAirExposure) return false
+                Blocks.NETHERRACK.stateId
+            }
         val blockPath = Blocks.byStateId(stateId)?.block?.path ?: return false
         val targetMatches =
             when (target) {
