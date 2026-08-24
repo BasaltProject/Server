@@ -1214,6 +1214,7 @@ public class BasaltServer(
         x: Double,
         y: Double,
         z: Double,
+        yaw: Float = 0f,
         /** Why it is being made, which is the one thing a plugin always wants to filter on. */
         reason: String = "natural",
     ): org.basaltmc.server.runtime.entity.ServerEntity? {
@@ -1237,6 +1238,7 @@ public class BasaltServer(
                 x = x,
                 y = y,
                 z = z,
+                yaw = yaw,
             )
         world.state.spawnEntity(entity)
         return entity
@@ -2330,46 +2332,49 @@ public class BasaltServer(
         val chunks = simulatedChunks(world, region)
         if (chunks.isEmpty()) return
 
-        val alive = world.state.entities().filter { !it.removed }
+        val alive = world.state.entities().filter { !it.removed && !it.persistent }
         val random = LegacyRandom(Random.nextLong())
-        // parity: `NaturalSpawner`'s own order, monsters first: the caps are counted per category.
-        for (category in listOf(MobCategory.MONSTER, MobCategory.CREATURE, MobCategory.AMBIENT)) {
-            val cap = NaturalSpawner.capFor(category, chunks.size)
-            val living = alive.count { Mobs.categoryOf(it.type) == category.categoryName }
-            if (living >= cap) continue
-            // parity: one position per chunk per tick, rather than a sweep of the whole world.
-            val chunk = chunks[random.nextInt(chunks.size)]
-            val requests =
-                NaturalSpawner.spawnForChunk(
-                    world,
-                    chunk[0],
-                    chunk[1],
-                    category,
-                    entriesFor = { biome -> biomeSpawns.listFor(biome, category.categoryName) },
-                    playerDistanceSquared = { x, y, z ->
-                        watchers.minOfOrNull { player ->
-                            val dx = player.x - x
-                            val dy = player.y - y
-                            val dz = player.z - z
-                            dx * dx + dy * dy + dz * dz
-                        }
-                    },
-                    random = random,
-                )
-            for (request in requests) {
-                val protocolType = EntityTypes[request.type]?.protocolId ?: continue
-                world.state.spawnEntity(
-                    org.basaltmc.server.runtime.entity.ServerEntity(
-                        entityId = playerRegistry.allocateEntityId(),
-                        uuid = Uuid.random(),
-                        type = request.type,
-                        protocolType = protocolType,
-                        x = request.x,
-                        y = request.y,
-                        z = request.z,
-                        yaw = request.yaw,
-                    ),
-                )
+        val categories = NaturalSpawner.categoriesFor(world.difficulty, world.gameTime)
+        val caps = categories.associateWith { NaturalSpawner.capFor(it, chunks.size) }
+        val counts =
+            categories.associateWithTo(mutableMapOf()) { category ->
+                alive.count { Mobs.categoryOf(it.type) == category.categoryName }
+            }
+        val shuffled = chunks.toMutableList()
+        for (index in shuffled.lastIndex downTo 1) {
+            val swap = random.nextInt(index + 1)
+            val held = shuffled[index]
+            shuffled[index] = shuffled[swap]
+            shuffled[swap] = held
+        }
+        // parity: ServerChunkCache shuffles once, then gives every spawning chunk every category.
+        for (chunk in shuffled) {
+            for (category in categories) {
+                val cap = caps.getValue(category)
+                if (counts.getValue(category) >= cap) continue
+                val requests =
+                    NaturalSpawner.spawnForChunk(
+                        world,
+                        chunk[0],
+                        chunk[1],
+                        category,
+                        entriesFor = { biome -> biomeSpawns.listFor(biome, category.categoryName) },
+                        playerDistanceSquared = { x, y, z ->
+                            watchers.minOfOrNull { player ->
+                                val dx = player.x - x
+                                val dy = player.y - y
+                                val dz = player.z - z
+                                dx * dx + dy * dy + dz * dz
+                            }
+                        },
+                        random = random,
+                    )
+                for (request in requests) {
+                    if (counts.getValue(category) >= cap) break
+                    if (spawnMob(world, request.type, request.x, request.y, request.z, request.yaw) != null) {
+                        counts[category] = counts.getValue(category) + 1
+                    }
+                }
             }
         }
     }

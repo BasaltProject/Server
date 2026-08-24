@@ -28,19 +28,31 @@ public class RealBiomeSpawns(
     @Volatile
     private var cache: Map<String, Map<String, List<SpawnerEntry>>> = emptyMap()
 
+    @Volatile
+    private var creatureProbabilities: Map<String, Float> = emptyMap()
+
     /** The spawn list of [biome] for [category], empty when the biome offers nothing of that kind. */
     public fun listFor(
         biome: Identifier,
         category: String,
     ): List<SpawnerEntry> = of(biome)[category].orEmpty()
 
+    /** parity: `MobSpawnSettings.creatureGenerationProbability`, defaulting to 0.1. */
+    public fun creatureProbabilityFor(biome: Identifier): Float {
+        of(biome)
+        return creatureProbabilities[biome.path] ?: DEFAULT_CREATURE_PROBABILITY
+    }
+
     public fun of(biome: Identifier): Map<String, List<SpawnerEntry>> {
         val key = biome.path
         cache[key]?.let { return it }
         val jar = serverJar ?: return emptyMap()
         val parsed =
-            runCatching { parse(jar.readText("data/minecraft/worldgen/biome/$key.json")) }
-                .onFailure { logger.debug { "No spawn list for biome '$key': ${it.message}" } }
+            runCatching {
+                val json = jar.readText("data/minecraft/worldgen/biome/$key.json")
+                creatureProbabilities = creatureProbabilities + (key to creatureProbability(json))
+                parse(json)
+            }.onFailure { logger.debug { "No spawn list for biome '$key': ${it.message}" } }
                 .getOrDefault(emptyMap())
         cache = cache + (key to parsed)
         return parsed
@@ -132,9 +144,23 @@ public class RealBiomeSpawns(
         return digits.toIntOrNull()
     }
 
+    private fun creatureProbability(json: String): Float {
+        val at = json.indexOf("\"creature_spawn_probability\"")
+        if (at < 0) return DEFAULT_CREATURE_PROBABILITY
+        val colon = json.indexOf(':', at)
+        if (colon < 0) return DEFAULT_CREATURE_PROBABILITY
+        val number = json.drop(colon + 1).takeWhile { it.isDigit() || it == ' ' || it == '-' || it == '.' }.trim()
+        return number.toFloatOrNull() ?: DEFAULT_CREATURE_PROBABILITY
+    }
+
     public companion object {
+        private const val DEFAULT_CREATURE_PROBABILITY = 0.1f
+
         /** The parser on its own, so it can be tested without a jar to read from. */
         internal fun parseForTest(json: String): Map<String, List<SpawnerEntry>> =
             RealBiomeSpawns(serverJar = null).parse(json)
+
+        internal fun creatureProbabilityForTest(json: String): Float =
+            RealBiomeSpawns(serverJar = null).creatureProbability(json)
     }
 }

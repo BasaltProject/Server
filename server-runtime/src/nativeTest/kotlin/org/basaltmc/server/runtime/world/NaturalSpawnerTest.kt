@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.config.WorldDeclaration
@@ -49,6 +50,47 @@ class NaturalSpawnerTest {
         assertEquals(10, NaturalSpawner.capFor(MobCategory.CREATURE, 289))
         assertEquals(0, NaturalSpawner.capFor(MobCategory.MONSTER, 0), "nothing simulated, nothing spawned")
         assertEquals(140, NaturalSpawner.capFor(MobCategory.MONSTER, 578), "twice the chunks, twice the mobs")
+    }
+
+    @Test
+    fun randomStartRangeUsesWorldSurfacePlusOneAndClusterLimitsComeFromTheMob() {
+        val chunk = assertNotNull(world.state.chunkIfLoaded(0, 0))
+        chunk.setBlockStateId(2, 70, 2, state("glass"))
+
+        assertEquals(72, NaturalSpawner.spawnTopY(chunk, 2, 2))
+        assertEquals(1, NaturalSpawner.maxClusterSize(Identifier.vanilla("ghast")))
+        assertEquals(5, NaturalSpawner.maxClusterSize(Identifier.vanilla("salmon")))
+        assertEquals(6, NaturalSpawner.maxClusterSize(Identifier.vanilla("horse")))
+        assertEquals(8, NaturalSpawner.maxClusterSize(Identifier.vanilla("cod")))
+        assertEquals(4, NaturalSpawner.maxClusterSize(Identifier.vanilla("cow")))
+    }
+
+    @Test
+    fun everyNonMiscCategoryParticipatesAndCreaturesKeepTheirFourHundredTickInterval() {
+        val ordinaryTick = NaturalSpawner.categoriesFor("easy", gameTime = 1)
+        val persistentTick = NaturalSpawner.categoriesFor("easy", gameTime = 400)
+
+        assertEquals(MobCategory.entries.filter { it != MobCategory.MISC && !it.persistent }, ordinaryTick)
+        assertEquals(MobCategory.entries.filter { it != MobCategory.MISC }, persistentTick)
+        assertTrue(MobCategory.WATER_CREATURE in ordinaryTick)
+        assertTrue(MobCategory.WATER_AMBIENT in ordinaryTick)
+        assertTrue(MobCategory.UNDERGROUND_WATER_CREATURE in ordinaryTick)
+        assertTrue(MobCategory.AXOLOTLS in ordinaryTick)
+        assertFalse(MobCategory.MONSTER in NaturalSpawner.categoriesFor("peaceful", 1))
+    }
+
+    @Test
+    fun biomeLookupUsesTheLoadedChunkSoNetherAndFlatWorldsCanSpawn() {
+        val chunk = assertNotNull(world.state.chunkIfLoaded(0, 0))
+        val netherWastesId = assertNotNull(Biomes.REGISTRY.idOf(Biomes.NETHER_WASTES.id))
+        chunk.setBiomeId(
+            quartX = 1,
+            quartY = (64 - chunk.verticalBounds.minY) shr 2,
+            quartZ = 1,
+            biomeId = netherWastesId,
+        )
+
+        assertEquals(Biomes.NETHER_WASTES.id, NaturalSpawner.biomeAt(world, 4, 64, 4))
     }
 
     /** parity: `WeightedRandomList.getRandom`: the heavier entry comes up more often. */
@@ -115,6 +157,56 @@ class NaturalSpawnerTest {
         assertTrue(
             NaturalSpawner.canSpawnAt(world, MobCategory.MONSTER, 9, 71, 9, LegacyRandom(1)),
             "under a ceiling with no light, a monster fits",
+        )
+    }
+
+    @Test
+    fun waterMobsUseWaterPlacementRatherThanTheGroundRule() {
+        for (y in 58..61) world.state.setBlockState(12, y, 12, state("water"))
+
+        assertTrue(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("cod"),
+                MobCategory.WATER_AMBIENT,
+                12,
+                60,
+                12,
+                LegacyRandom(1),
+            ),
+        )
+        assertFalse(
+            NaturalSpawner.canSpawnAt(world, MobCategory.WATER_AMBIENT, 12, 60, 12, LegacyRandom(1)),
+            "the legacy ground placement cannot accidentally accept a water cell",
+        )
+    }
+
+    @Test
+    fun stridersUseTheLavaColumnAndItsAirSurface() {
+        for (y in 30..32) world.state.setBlockState(13, y, 13, state("lava"))
+
+        assertTrue(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("strider"),
+                MobCategory.CREATURE,
+                13,
+                30,
+                13,
+                LegacyRandom(1),
+            ),
+        )
+        world.state.setBlockState(13, 33, 13, Blocks.STONE.stateId)
+        assertFalse(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("strider"),
+                MobCategory.CREATURE,
+                13,
+                30,
+                13,
+                LegacyRandom(1),
+            ),
         )
     }
 }

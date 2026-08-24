@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
@@ -18,6 +19,7 @@ import org.basaltmc.server.world.terrain.NoiseRouterData
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
+import org.basaltmc.wire.common.Identifier
 
 /** Builds one correctly seeded normal-terrain generator for each loaded world. */
 public class VanillaWorldGeneratorFactory(
@@ -71,12 +73,15 @@ public class VanillaWorldGeneratorFactory(
         metadata: WorldMetadata,
     ): Generators =
         when (declaration.dimension) {
-            WorldDimension.OVERWORLD -> overworld(metadata.seed)
-            WorldDimension.NETHER -> Generators(nether(metadata.seed))
+            WorldDimension.OVERWORLD -> overworld(metadata.seed, metadata.gameRules[GameRuleRegistry.SPAWN_MOBS])
+            WorldDimension.NETHER -> Generators(nether(metadata.seed, metadata.gameRules[GameRuleRegistry.SPAWN_MOBS]))
             WorldDimension.END -> Generators(end(metadata.seed))
         }
 
-    private fun overworld(seed: Long): Generators {
+    private fun overworld(
+        seed: Long,
+        spawnMobs: Boolean,
+    ): Generators {
         val positional = XoroshiroRandom(seed).forkPositional()
         val noises = RealNoiseParameters(serverJar, positional)
         // parity: RandomState wires BlendedNoise from random.fromHashOf("minecraft:terrain").
@@ -94,18 +99,35 @@ public class VanillaWorldGeneratorFactory(
                 poolLookup = villageLoader.poolLookup,
                 templateLoader = villageLoader.templateLoader,
             ).also(villages::add)
+        val biomeSpawns = RealBiomeSpawns(serverJar)
         return Generators(
             generate = {
                 chunkX,
                 chunkZ,
                 ->
-                RealTerrainGenerator.generate(router, surface, chunkX, chunkZ, seed, village)
+                RealTerrainGenerator.generate(router, surface, chunkX, chunkZ, seed, village).also { chunk ->
+                    if (spawnMobs) {
+                        val biome =
+                            Identifier.parse(surface.biomeAt(chunkX shl 4, chunk.verticalBounds.maxY, chunkZ shl 4))
+                        val random = WorldgenRandom(LegacyRandom(0L))
+                        random.setDecorationSeed(seed, chunkX shl 4, chunkZ shl 4)
+                        OriginalMobSpawner.spawnInto(
+                            chunk,
+                            biomeSpawns.listFor(biome, "creature"),
+                            biomeSpawns.creatureProbabilityFor(biome),
+                            random,
+                        )
+                    }
+                }
             },
             villages = village,
         )
     }
 
-    private fun nether(seed: Long): (Int, Int) -> Chunk {
+    private fun nether(
+        seed: Long,
+        spawnMobs: Boolean,
+    ): (Int, Int) -> Chunk {
         // parity: noise_settings/nether.json has legacy_random_source=true.
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.375, 80.0, 60.0, 8.0)
         val router =
@@ -123,16 +145,31 @@ public class VanillaWorldGeneratorFactory(
                 structureLoader.templateLoader,
                 structureLoader.poolLookup,
             )
+        val biomeSpawns = RealBiomeSpawns(serverJar)
         return { chunkX, chunkZ ->
-            DimensionTerrainGenerator.nether(
-                router,
-                biomes,
-                chunkX,
-                chunkZ,
-                surfaceEnvironment = surface,
-                seed = seed,
-                structureGenerator = structures,
-            )
+            val chunk =
+                DimensionTerrainGenerator.nether(
+                    router,
+                    biomes,
+                    chunkX,
+                    chunkZ,
+                    surfaceEnvironment = surface,
+                    seed = seed,
+                    structureGenerator = structures,
+                )
+            if (spawnMobs) {
+                val biome = biomes.biomeAt(chunkX shl 4, chunk.verticalBounds.maxY, chunkZ shl 4).id
+                val random = WorldgenRandom(LegacyRandom(0L))
+                random.setDecorationSeed(seed, chunkX shl 4, chunkZ shl 4)
+                OriginalMobSpawner.spawnInto(
+                    chunk,
+                    biomeSpawns.listFor(biome, "creature"),
+                    biomeSpawns.creatureProbabilityFor(biome),
+                    random,
+                    hasCeiling = true,
+                )
+            }
+            chunk
         }
     }
 
