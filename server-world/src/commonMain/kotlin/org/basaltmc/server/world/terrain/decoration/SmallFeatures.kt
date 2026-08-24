@@ -1,6 +1,8 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -37,7 +39,7 @@ public object SmallFeatures {
         chunk: Chunk,
         random: WorldgenRandom,
         origin: DecorationPos,
-        states: List<Int>,
+        stateProvider: (WorldgenRandom) -> Int,
     ): Boolean {
         var placed = false
         repeat(PATCH_TRIES) {
@@ -47,12 +49,10 @@ public object SmallFeatures {
                     origin.y + random.nextInt(4) - random.nextInt(4),
                     origin.z + random.nextInt(8) - random.nextInt(8),
                 )
-            val stateId = states[random.nextInt(states.size)]
+            val stateId = stateProvider(random)
             if (!isAir(chunk, target)) return@repeat
             if (target.y <= WorldHeight.MIN_Y) return@repeat
-            if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(stateAt(chunk, target.copy(y = target.y - 1)))) return@repeat
-            set(chunk, target, stateId)
-            placed = true
+            if (SimpleBlockFeature({ _, _ -> stateId }).place(chunk, random, target)) placed = true
         }
         return placed
     }
@@ -62,11 +62,11 @@ public object SmallFeatures {
         chunk: Chunk,
         random: WorldgenRandom,
         origin: DecorationPos,
-        states: List<Int>,
+        stateProvider: (WorldgenRandom) -> Int,
     ): Boolean {
         if (!isAir(chunk, origin) || origin.y + 1 > WorldHeight.MAX_Y) return false
-        if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(stateAt(chunk, origin.copy(y = origin.y + 1)))) return false
-        set(chunk, origin, states[random.nextInt(states.size)])
+        if (!BlockShapes.supportsCentre(stateAt(chunk, origin.copy(y = origin.y + 1)), BlockFace.DOWN)) return false
+        set(chunk, origin, stateProvider(random))
         return true
     }
 
@@ -97,19 +97,19 @@ public object SmallFeatures {
         chunk: Chunk,
         random: WorldgenRandom,
         origin: DecorationPos,
-        states: List<Int>,
+        stateProvider: (WorldgenRandom) -> Int,
     ): Boolean {
         if (origin.y < WorldHeight.MIN_Y + 5) return false
         val radiusX = 2 + random.nextInt(2)
         val radiusZ = 2 + random.nextInt(2)
-        for (x in origin.x - radiusX..origin.x + radiusX) {
+        for (z in origin.z - radiusZ..origin.z + radiusZ) {
             for (y in origin.y..origin.y + 1) {
-                for (z in origin.z - radiusZ..origin.z + radiusZ) {
+                for (x in origin.x - radiusX..origin.x + radiusX) {
                     val dx = origin.x - x
                     val dz = origin.z - z
                     val inside = dx * dx + dz * dz <= random.nextFloat() * 10.0f - random.nextFloat() * 6.0f
                     if (inside || random.nextFloat() < STRAY_BLOCK_CHANCE) {
-                        tryPlacePile(chunk, random, DecorationPos(x, y, z), states)
+                        tryPlacePile(chunk, random, DecorationPos(x, y, z), stateProvider)
                     }
                 }
             }
@@ -121,7 +121,7 @@ public object SmallFeatures {
         chunk: Chunk,
         random: WorldgenRandom,
         target: DecorationPos,
-        states: List<Int>,
+        stateProvider: (WorldgenRandom) -> Int,
     ) {
         if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !isAir(chunk, target)) return
         val below = stateAt(chunk, target.copy(y = target.y - 1))
@@ -133,10 +133,10 @@ public object SmallFeatures {
             ) {
                 random.nextBoolean()
             } else {
-                Chunk.HeightmapType.OCEAN_FLOOR.matches(below)
+                BlockShapes.isFaceSturdy(below, BlockFace.UP)
             }
         if (!holds) return
-        set(chunk, target, states[random.nextInt(states.size)])
+        set(chunk, target, stateProvider(random))
     }
 
     private fun isAir(
@@ -172,24 +172,47 @@ public object SmallFeatures {
     private fun state(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: Blocks.AIR.stateId
 
-    /** The four facings of a block that has one, in the registry's own order. */
-    private fun facings(path: String): List<Int> =
-        listOf("north", "east", "south", "west")
-            .mapNotNull { facing ->
-                Blocks.stateIdOf(Identifier.vanilla(path), mapOf("facing" to facing))
-            }.ifEmpty { listOf(state(path)) }
+    private fun uniformStates(
+        path: String,
+        property: String,
+        values: List<String>,
+    ): (WorldgenRandom) -> Int {
+        val states =
+            values.map { value ->
+                Blocks.stateIdOf(Identifier.vanilla(path), mapOf(property to value)) ?: state(path)
+            }
+        return { random -> states[random.nextInt(states.size)] }
+    }
 
-    private val SINGLE_BLOCKS: Map<String, List<Int>> =
+    private fun flowerBedStates(
+        path: String,
+        amountProperty: String,
+        maxAmount: Int,
+    ): (WorldgenRandom) -> Int {
+        val states =
+            (1..maxAmount).flatMap { amount ->
+                listOf("north", "east", "south", "west").map { facing ->
+                    Blocks.stateIdOf(
+                        Identifier.vanilla(path),
+                        mapOf("facing" to facing, amountProperty to amount.toString()),
+                    ) ?: error("unknown $path state $facing/$amount")
+                }
+            }
+        return { random -> states[random.nextInt(states.size)] }
+    }
+
+    private val SINGLE_BLOCKS: Map<String, (WorldgenRandom) -> Int> =
         mapOf(
-            "patch_leaf_litter" to facings("leaf_litter"),
-            "wildflowers_birch_forest" to facings("wildflowers"),
-            "wildflowers_meadow" to facings("wildflowers"),
-            "patch_firefly_bush_near_water" to listOf(state("firefly_bush")),
-            "patch_firefly_bush_near_water_swamp" to listOf(state("firefly_bush")),
-            "patch_firefly_bush_swamp" to listOf(state("firefly_bush")),
+            "patch_leaf_litter" to flowerBedStates("leaf_litter", "segment_amount", 3),
+            "wildflowers_birch_forest" to flowerBedStates("wildflowers", "flower_amount", 4),
+            "wildflowers_meadow" to flowerBedStates("wildflowers", "flower_amount", 4),
+            "patch_firefly_bush_near_water" to { _ -> state("firefly_bush") },
+            "patch_firefly_bush_near_water_swamp" to { _ -> state("firefly_bush") },
+            "patch_firefly_bush_swamp" to { _ -> state("firefly_bush") },
         )
 
-    private val CEILING_BLOCKS: Map<String, List<Int>> = mapOf("spore_blossom" to listOf(state("spore_blossom")))
+    private val CEILING_BLOCKS: Map<String, (WorldgenRandom) -> Int> =
+        mapOf("spore_blossom" to { _ -> state("spore_blossom") })
 
     private val COLUMNS: Map<String, Column> =
         buildMap {
@@ -211,14 +234,13 @@ public object SmallFeatures {
             }
         }
 
-    private val PILES: Map<String, List<Int>> =
+    private val PILES: Map<String, (WorldgenRandom) -> Int> =
         mapOf(
-            "pile_hay" to listOf(state("hay_block")),
-            "pile_snow" to listOf(state("snow")),
-            "pile_melon" to listOf(state("melon")),
-            // parity: the weighted providers, expanded so a draw over the list has the same odds.
-            "pile_ice" to List(5) { state("packed_ice") } + state("blue_ice"),
-            "pile_pumpkin" to List(19) { state("pumpkin") } + state("jack_o_lantern"),
+            "pile_hay" to uniformStates("hay_block", "axis", listOf("x", "y", "z")),
+            "pile_snow" to { _ -> state("snow") },
+            "pile_melon" to { _ -> state("melon") },
+            "pile_ice" to { random -> if (random.nextInt(6) == 0) state("blue_ice") else state("packed_ice") },
+            "pile_pumpkin" to { random -> if (random.nextInt(20) == 19) state("jack_o_lantern") else state("pumpkin") },
         )
 
     private const val PATCH_TRIES = 96

@@ -73,8 +73,19 @@ class VillageFeaturesTest {
 
         VillageFeatures.place("minecraft:pile_ice", chunk, 15, 64, 8, WorldgenRandom(XoroshiroRandom(2L)))
 
-        assertTrue((0..2).all { x -> (64..65).all { y -> chunk.getBlockStateId(x, y, 8) !in pileStates } })
-        assertTrue((12..15).any { x -> (64..65).any { y -> chunk.getBlockStateId(x, y, 8) in pileStates } })
+        var wrapped = 0
+        var local = 0
+        for (x in 0..15) {
+            for (y in 64..65) {
+                for (z in 5..11) {
+                    if (chunk.getBlockStateId(x, y, z) !in pileStates) continue
+                    if (x <= 2) wrapped++
+                    if (x >= 12) local++
+                }
+            }
+        }
+        assertEquals(0, wrapped)
+        assertTrue(local > 0)
     }
 
     @Test

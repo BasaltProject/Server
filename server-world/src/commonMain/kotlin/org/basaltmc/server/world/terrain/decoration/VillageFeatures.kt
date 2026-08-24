@@ -139,9 +139,9 @@ public object VillageFeatures {
         val xr = 2 + random.nextInt(2)
         val zr = 2 + random.nextInt(2)
         val dirtPathId = state("dirt_path")
-        for (bx in x - xr..x + xr) {
+        for (bz in z - zr..z + zr) {
             for (by in y..y + 1) {
-                for (bz in z - zr..z + zr) {
+                for (bx in x - xr..x + xr) {
                     val xd = x - bx
                     val zd = z - bz
                     val near = xd * xd + zd * zd <= random.nextFloat() * 10.0f - random.nextFloat() * 6.0f
