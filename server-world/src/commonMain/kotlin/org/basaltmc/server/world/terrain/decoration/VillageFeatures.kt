@@ -1,6 +1,8 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -14,9 +16,7 @@ import org.basaltmc.wire.common.Identifier
  * count plus trapezoid offset, no in-square spread, since a village element scatters around its
  * own piece rather than the chunk corner.
  *
- * // parity: BlockPileFeature for the five piles. `mayPlaceOn`'s `isFaceSturdy` keeps this
- * package's "not air" stand-in, and hay's `rotated_block_provider` draws nothing, axis properties
- * being unmodelled.
+ * // parity: BlockPileFeature for the five piles, including hay's `rotated_block_provider`.
  */
 public object VillageFeatures {
     public fun place(
@@ -28,7 +28,7 @@ public object VillageFeatures {
         random: WorldgenRandom,
     ) {
         when (feature) {
-            "minecraft:pile_hay" -> placeBlockPile(chunk, random, x, y, z) { state("hay_block") }
+            "minecraft:pile_hay" -> placeBlockPile(chunk, random, x, y, z, ::rotatedHayState)
             "minecraft:pile_melon" -> placeBlockPile(chunk, random, x, y, z) { state("melon") }
             "minecraft:pile_snow" -> placeBlockPile(chunk, random, x, y, z) { state("snow") }
             // parity: pile_ice's real weighted_state_provider: blue_ice weight 1, packed_ice weight 5.
@@ -132,7 +132,7 @@ public object VillageFeatures {
         return true
     }
 
-    /** // parity: BlockPileFeature.tryPlaceBlock/mayPlaceOn (face-sturdy check approximated, see this file's KDoc). */
+    /** // parity: BlockPileFeature.tryPlaceBlock/mayPlaceOn. */
     private fun tryPlacePileBlock(
         chunk: Chunk,
         random: WorldgenRandom,
@@ -146,9 +146,20 @@ public object VillageFeatures {
         if (!Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))) return
         if (y - 1 < WorldHeight.MIN_Y) return
         val below = chunk.getBlockStateId(x and 15, y - 1, z and 15)
-        val mayPlace = if (below == dirtPathId) random.nextBoolean() else !Blocks.isAir(below)
+        val mayPlace = mayPlacePileOn(below, dirtPathId, random)
         if (mayPlace) chunk.setBlockStateId(x and 15, y, z and 15, stateProvider(random))
     }
+
+    internal fun mayPlacePileOn(
+        belowStateId: Int,
+        dirtPathStateId: Int,
+        random: WorldgenRandom,
+    ): Boolean =
+        if (belowStateId == dirtPathStateId) {
+            random.nextBoolean()
+        } else {
+            BlockShapes.isFaceSturdy(belowStateId, BlockFace.UP)
+        }
 
     /**
      * The shared shape of the three patch features: [count] attempts at the piece position with a
@@ -185,6 +196,15 @@ public object VillageFeatures {
 
     private fun state(name: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
+
+    /** // parity: RotatedBlockProvider.getState/Direction.Axis.getRandom, whose enum order is X, Y, Z. */
+    private fun rotatedHayState(random: WorldgenRandom): Int = HAY_AXIS_STATES[random.nextInt(HAY_AXIS_STATES.size)]
+
+    private val HAY_AXIS_STATES =
+        listOf("x", "y", "z").map { axis ->
+            Blocks.stateIdOf(Identifier.vanilla("hay_block"), mapOf("axis" to axis))
+                ?: error("unknown hay_block axis '$axis'")
+        }
 
     private val SUPPORTS_VEGETATION_PATHS =
         setOf(
