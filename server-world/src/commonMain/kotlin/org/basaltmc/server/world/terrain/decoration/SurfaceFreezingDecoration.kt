@@ -18,24 +18,27 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
  * Snow placement also updates the `snowy` property of grass block, podzol, and mycelium below it.
  */
 public object SurfaceFreezingDecoration {
-    /** parity: `freeze_top_layer` over one column rather than the whole chunk. */
+    /** parity: one complete 16x16 `freeze_top_layer` body at the supplied origin. */
     public fun placeAt(
         chunk: Chunk,
         environment: SurfaceRuleEnvironment,
         x: Int,
         z: Int,
     ) {
-        freezeColumn(chunk, environment, x and 15, z and 15)
+        for (dx in 0 until 16) {
+            for (dz in 0 until 16) {
+                val worldX = x + dx
+                val worldZ = z + dz
+                if (worldX shr 4 != chunk.chunkX || worldZ shr 4 != chunk.chunkZ) continue
+                freezeColumn(chunk, environment, worldX and 15, worldZ and 15)
+            }
+        }
     }
 
     public fun decorate(
         chunk: Chunk,
         environment: SurfaceRuleEnvironment,
-    ) {
-        for (localX in 0 until 16) {
-            for (localZ in 0 until 16) freezeColumn(chunk, environment, localX, localZ)
-        }
-    }
+    ): Unit = placeAt(chunk, environment, chunk.chunkX * 16, chunk.chunkZ * 16)
 
     /** One column: ice on exposed water, snow on top of what can hold it. */
     private fun freezeColumn(
@@ -74,7 +77,7 @@ public object SurfaceFreezingDecoration {
         worldZ: Int,
     ): Boolean =
         BiomeTemperature.coldEnoughToSnow(biomeId, worldX, y, worldZ) &&
-            chunk.getBlockStateId(localX, y, localZ) == Blocks.WATER.stateId
+            blockPath(chunk.getBlockStateId(localX, y, localZ)) == "water"
 
     private fun shouldSnow(
         chunk: Chunk,

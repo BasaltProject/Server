@@ -57,6 +57,28 @@ class SurfaceFreezingDecorationTest {
     }
 
     @Test
+    fun frozenRiverAlsoFreezesExposedFlowingWater() {
+        val chunk = flatChunk(Blocks.WATER.stateId + 1)
+
+        SurfaceFreezingDecoration.decorate(chunk, environment("minecraft:frozen_river"))
+
+        for (x in 0 until 16) {
+            for (z in 0 until 16) assertEquals(Blocks.ICE.stateId, chunk.getBlockStateId(x, 62, z))
+        }
+    }
+
+    @Test
+    fun directFreezeFeatureRunsItsCompleteSixteenBySixteenBody() {
+        val chunk = flatChunk(Blocks.WATER.stateId)
+
+        SurfaceFreezingDecoration.placeAt(chunk, environment("minecraft:frozen_river"), 0, 0)
+
+        for (x in 0 until 16) {
+            for (z in 0 until 16) assertEquals(Blocks.ICE.stateId, chunk.getBlockStateId(x, 62, z))
+        }
+    }
+
+    @Test
     fun warmBiomeLeavesTheSameSurfaceUntouched() {
         val chunk = flatChunk(Blocks.GRASS_BLOCK.stateId)
 

@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration.nether
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
@@ -34,6 +36,22 @@ class NetherSurfaceStructuresDecorationTest {
         assertEquals(0, count(wastes, "basalt"))
     }
 
+    @Test
+    fun basaltColumnsReplaceFlowingLavaOceanStates() {
+        val chunk = flowingLavaFloorChunk()
+
+        NetherSurfaceStructuresDecoration.placeAt(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(99L)),
+            8,
+            32,
+            8,
+            "small_basalt_columns",
+        )
+
+        assertTrue(count(chunk, "basalt") > 0)
+    }
+
     private fun layeredChunk(): Chunk =
         Chunk(0, 0, ChunkHeight.NETHER).also { chunk ->
             for (y in 0..127) {
@@ -54,6 +72,16 @@ class NetherSurfaceStructuresDecorationTest {
             for (y in 0..40) {
                 for (z in 0 until 16) {
                     for (x in 0 until 16) chunk.setBlockStateId(x, y, z, Blocks.NETHERRACK.stateId)
+                }
+            }
+        }
+
+    private fun flowingLavaFloorChunk(): Chunk =
+        Chunk(0, 0, ChunkHeight.NETHER).also { chunk ->
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    for (y in 0..31) chunk.setBlockStateId(x, y, z, Blocks.NETHERRACK.stateId)
+                    chunk.setBlockStateId(x, 32, z, Blocks.LAVA.stateId + 1)
                 }
             }
         }
