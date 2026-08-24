@@ -3,6 +3,7 @@ package org.basaltmc.server.world.terrain.decoration
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
+import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -81,6 +82,22 @@ class SurfaceFreezingDecorationTest {
         }
     }
 
+    @Test
+    fun snowUsesCollisionTopFaceAndSupportOverrideTags() {
+        val chunk = flatChunk(Blocks.DIRT.stateId)
+        chunk.setBlockStateId(0, 62, 0, stateId("stone_slab", mapOf("type" to "top", "waterlogged" to "false")))
+        chunk.setBlockStateId(1, 62, 0, stateId("stone_slab", mapOf("type" to "bottom", "waterlogged" to "false")))
+        chunk.setBlockStateId(2, 62, 0, stateId("honey_block"))
+        chunk.setBlockStateId(3, 62, 0, Blocks.ICE.stateId)
+
+        SurfaceFreezingDecoration.decorate(chunk, environment("minecraft:snowy_plains"))
+
+        assertEquals(Blocks.SNOW.stateId, chunk.getBlockStateId(0, 63, 0))
+        assertEquals(Blocks.AIR.stateId, chunk.getBlockStateId(1, 63, 0))
+        assertEquals(Blocks.SNOW.stateId, chunk.getBlockStateId(2, 63, 0))
+        assertEquals(Blocks.AIR.stateId, chunk.getBlockStateId(3, 63, 0))
+    }
+
     private fun flatChunk(surfaceStateId: Int): Chunk =
         Chunk(0, 0).also { chunk ->
             for (x in 0 until 16) {
@@ -92,11 +109,14 @@ class SurfaceFreezingDecorationTest {
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY
-            .byIdentifier(
-                org.basaltmc.wire.common.Identifier
-                    .vanilla(path),
-            )?.stateId
+            .byIdentifier(Identifier.vanilla(path))
+            ?.stateId
             ?: error("unknown block '$path'")
+
+    private fun stateId(
+        path: String,
+        properties: Map<String, String>,
+    ): Int = Blocks.stateIdOf(Identifier.vanilla(path), properties) ?: error("unknown state '$path$properties'")
 
     private fun environment(biomeForX: (Int) -> String): SurfaceRuleEnvironment =
         object : SurfaceRuleEnvironment {

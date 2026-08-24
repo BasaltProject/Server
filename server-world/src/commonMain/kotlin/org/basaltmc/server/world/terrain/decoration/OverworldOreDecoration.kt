@@ -3,6 +3,8 @@ package org.basaltmc.server.world.terrain.decoration
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -331,18 +333,27 @@ public object OverworldOreDecoration {
         z: Int,
     ): Boolean {
         val current = region.getBlockStateId(x, y, z)
-        if (current == null || Blocks.isAir(current) || current == Blocks.WATER.stateId) return false
-        if (!isFullCube(region.getBlockStateId(x, y - 1, z))) return false
-        return isFullCube(region.getBlockStateId(x + 1, y, z)) &&
-            isFullCube(region.getBlockStateId(x - 1, y, z)) &&
-            isFullCube(region.getBlockStateId(x, y, z + 1)) &&
-            isFullCube(region.getBlockStateId(x, y, z - 1))
+        if (current == null || Blocks.isAir(current) || Blocks.byStateId(current)?.block?.path == "water") return false
+        if (!hasFullMagmaCover(region.getBlockStateId(x, y - 1, z), BlockFace.UP)) return false
+        return hasFullMagmaCover(region.getBlockStateId(x + 1, y, z), BlockFace.WEST) &&
+            hasFullMagmaCover(region.getBlockStateId(x - 1, y, z), BlockFace.EAST) &&
+            hasFullMagmaCover(region.getBlockStateId(x, y, z + 1), BlockFace.NORTH) &&
+            hasFullMagmaCover(region.getBlockStateId(x, y, z - 1), BlockFace.SOUTH)
     }
 
-    private fun isFullCube(stateId: Int?): Boolean =
-        stateId != null &&
-            Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId) &&
-            Blocks.byStateId(stateId)?.block?.path !in NON_FULL_CUBE_PATHS
+    internal fun hasFullMagmaCover(
+        stateId: Int?,
+        coveredFace: BlockFace,
+    ): Boolean = stateId != null && BlockShapes.isFaceOcclusionFull(stateId, coveredFace)
+
+    internal fun grassDiskStateForAbove(aboveStateId: Int?): Int =
+        if (aboveStateId != null &&
+            (BlockShapes.isSolidState(aboveStateId) || Blocks.hasWaterFluid(aboveStateId))
+        ) {
+            Blocks.DIRT.stateId
+        } else {
+            Blocks.GRASS_BLOCK.stateId
+        }
 
     private fun placeDiskGrass(
         region: PlacementRegion,
@@ -699,14 +710,6 @@ public object OverworldOreDecoration {
             Triple(0, 0, 1),
             Triple(0, 0, -1),
         )
-    private val NON_FULL_CUBE_PATHS =
-        setOf(
-            "snow",
-            "pointed_dripstone",
-            "iron_bars",
-            "glass_pane",
-        )
-
     private val magmaStateId = stateId("magma_block")
     private val sandStateId = stateId("sand")
     private val sandstoneStateId = stateId("sandstone")
@@ -723,14 +726,7 @@ public object OverworldOreDecoration {
         DiskConfig(2, 5, 2, setOf(Blocks.DIRT.stateId, Blocks.GRASS_BLOCK.stateId)) { _, _, _, _ -> gravelStateId }
     private val GRASS_DISK =
         DiskConfig(2, 6, 2, setOf(Blocks.DIRT.stateId, mudStateId)) { region, x, y, z ->
-            val above = region.getBlockStateId(x, y + 1, z)
-            if (!isFullCube(above) &&
-                above?.let(Blocks::hasWaterFluid) != true
-            ) {
-                Blocks.GRASS_BLOCK.stateId
-            } else {
-                Blocks.DIRT.stateId
-            }
+            grassDiskStateForAbove(region.getBlockStateId(x, y + 1, z))
         }
 
     // parity: FeatureSorter global indexes for the 55 Overworld biome feature lists in 26.2.

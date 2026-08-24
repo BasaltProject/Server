@@ -1,12 +1,13 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.BiomeClimateData
 import org.basaltmc.server.world.terrain.BiomeTemperature
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
-import org.basaltmc.wire.common.Identifier
 
 /**
  * // parity: `SnowAndFreezeFeature`, the global Overworld `freeze_top_layer` feature. Vanilla runs
@@ -88,14 +89,15 @@ public object SurfaceFreezingDecoration {
         val climate = BiomeClimateData.forBiomeId(biomeId)
         if (!climate.hasPrecipitation || !BiomeTemperature.coldEnoughToSnow(biomeId, worldX, y, worldZ)) return false
         val stateId = chunk.getBlockStateId(localX, y, localZ)
-        if (!Blocks.isAir(stateId) && stateId != Blocks.SNOW.stateId) return false
+        if (!Blocks.isAir(stateId) && blockPath(stateId) != "snow") return false
         val belowStateId = chunk.getBlockStateId(localX, y - 1, localZ)
-        return belowStateId !in cannotSupportSnowStateIds &&
-            Chunk.HeightmapType.OCEAN_FLOOR.matches(belowStateId)
+        val belowPath = blockPath(belowStateId)
+        return belowPath !in CANNOT_SUPPORT_SNOW_LAYER &&
+            (belowPath in SUPPORT_OVERRIDE_SNOW_LAYER || BlockShapes.isCollisionFaceFull(belowStateId, BlockFace.UP))
     }
 
-    private val cannotSupportSnowStateIds: Set<Int> =
-        listOf("ice", "packed_ice", "barrier")
-            .mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }
-            .toSet()
+    private fun blockPath(stateId: Int): String? = Blocks.byStateId(stateId)?.block?.path
+
+    private val CANNOT_SUPPORT_SNOW_LAYER = setOf("ice", "packed_ice", "barrier")
+    private val SUPPORT_OVERRIDE_SNOW_LAYER = setOf("honey_block", "soul_sand", "mud")
 }

@@ -48,6 +48,7 @@ public object BlockShapes {
     private val sturdy: IntArray
     private val centre: IntArray
     private val rigid: IntArray
+    private val occlusionFull: IntArray
     private val boxes: Array<IntArray>
     private val full: BooleanArray
 
@@ -66,6 +67,7 @@ public object BlockShapes {
         sturdy = IntArray(entries.size)
         centre = IntArray(entries.size)
         rigid = IntArray(entries.size)
+        occlusionFull = IntArray(entries.size)
         boxes = Array(entries.size) { IntArray(0) }
         full = BooleanArray(entries.size)
         faces = arrayOfNulls(entries.size * BlockFace.entries.size)
@@ -79,7 +81,8 @@ public object BlockShapes {
             sturdy[index] = faceBits(parts[5])
             centre[index] = faceBits(parts[6])
             rigid[index] = faceBits(parts[7])
-            val corners = parts[8].split(';').filter { it.isNotEmpty() }
+            occlusionFull[index] = faceBits(parts[8])
+            val corners = parts[9].split(';').filter { it.isNotEmpty() }
             val flat = IntArray(corners.size * CORNERS)
             for ((box, text) in corners.withIndex()) {
                 for ((corner, value) in text.split(',').withIndex()) flat[box * CORNERS + corner] = value.toInt()
@@ -137,6 +140,12 @@ public object BlockShapes {
         face: BlockFace,
     ): Boolean = sturdy[shapeOf(stateId)] and (1 shl face.ordinal) != 0
 
+    /** Whether this collision shape completely covers [face]. parity: `Block.isFaceFull`. */
+    public fun isCollisionFaceFull(
+        stateId: Int,
+        face: BlockFace,
+    ): Boolean = faceCovers(stateId, face, 0, UNITS, 0, UNITS)
+
     /** parity: `SupportType.CENTER`, the middle of a face, which is all a torch or a rail asks for. */
     public fun supportsCentre(
         stateId: Int,
@@ -148,6 +157,12 @@ public object BlockShapes {
         stateId: Int,
         face: BlockFace,
     ): Boolean = rigid[shapeOf(stateId)] and (1 shl face.ordinal) != 0
+
+    /** parity: whether `BlockState.getFaceOcclusionShape(face)` fills the entire face. */
+    public fun isFaceOcclusionFull(
+        stateId: Int,
+        face: BlockFace,
+    ): Boolean = occlusionFull[shapeOf(stateId)] and (1 shl face.ordinal) != 0
 
     private fun faceBits(flags: String): Int {
         var mask = 0
