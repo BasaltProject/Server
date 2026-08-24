@@ -12,12 +12,12 @@ import kotlin.test.assertTrue
 class MobSpawnFinalizationTest {
     @Test
     fun onlyLaterAcceptedPackMembersRollForBeingBabies() {
-        val cow = Identifier.vanilla("cow")
+        val squid = Identifier.vanilla("squid")
         val firstMemberRandom = LegacyRandom(0L)
 
         val first =
             MobSpawnFinalization.stateFor(
-                cow,
+                squid,
                 groupIndex = 0,
                 random = firstMemberRandom,
                 specialMultiplier = 0f,
@@ -27,7 +27,7 @@ class MobSpawnFinalizationTest {
         assertEquals(false, first.leftHanded)
 
         val babySeed = (0L..10_000L).first { LegacyRandom(it).nextFloat() <= 0.05f }
-        val baby = MobSpawnFinalization.stateFor(cow, 1, LegacyRandom(babySeed), 0f)
+        val baby = MobSpawnFinalization.stateFor(squid, 1, LegacyRandom(babySeed), 0f)
         assertEquals(4_640L, babySeed)
         assertEquals(AgeableMobs.BABY_START_AGE, baby.age)
         assertEquals(0.012703759813200509, baby.followRangeBonus, 1e-15)
@@ -103,6 +103,104 @@ class MobSpawnFinalizationTest {
                 biome = Identifier.vanilla("savanna"),
             )
         assertEquals(12, warmSheep.typeData.getByte("Color").toInt())
+    }
+
+    @Test
+    fun registryBackedAnimalVariantsConsumeTheirExactPreSuperclassDraws() {
+        val chicken =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("chicken"),
+                0,
+                LegacyRandom(0L),
+                0f,
+                biome = Identifier.vanilla("savanna"),
+            )
+        assertEquals("minecraft:warm", chicken.typeData.getString("variant"))
+        assertEquals("minecraft:picky", chicken.typeData.getString("sound_variant"))
+
+        val cow =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("cow"),
+                0,
+                LegacyRandom(0L),
+                0f,
+                biome = Identifier.vanilla("snowy_taiga"),
+            )
+        assertEquals("minecraft:cold", cow.typeData.getString("variant"))
+        assertEquals("minecraft:moody", cow.typeData.getString("sound_variant"))
+
+        val pig =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("pig"),
+                0,
+                LegacyRandom(0L),
+                0f,
+                biome = Identifier.vanilla("plains"),
+            )
+        assertEquals("minecraft:temperate", pig.typeData.getString("variant"))
+        assertEquals("minecraft:big", pig.typeData.getString("sound_variant"))
+
+        val frog =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("frog"),
+                0,
+                LegacyRandom(0L),
+                0f,
+                biome = Identifier.vanilla("warm_ocean"),
+            )
+        assertEquals("minecraft:warm", frog.typeData.getString("variant"))
+        assertEquals(
+            123,
+            frog.typeData
+                .getCompound("Brain")
+                .getCompound("memories")
+                .getCompound("minecraft:long_jump_cooldown_ticks")
+                .getInt("value"),
+        )
+    }
+
+    @Test
+    fun wolfPackSharesItsBiomeVariantButRollsSoundsPerMember() {
+        val group = MobSpawnGroupData()
+        val first =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("wolf"),
+                0,
+                LegacyRandom(0L),
+                0f,
+                group,
+                Identifier.vanilla("savanna"),
+            )
+        assertEquals("minecraft:spotted", first.typeData.getString("variant"))
+        assertEquals("minecraft:sad", first.typeData.getString("sound_variant"))
+
+        val later =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("wolf"),
+                1,
+                LegacyRandom(0L),
+                0f,
+                group,
+                Identifier.vanilla("snowy_taiga"),
+            )
+        assertEquals("minecraft:spotted", later.typeData.getString("variant"))
+        assertEquals("minecraft:big", later.typeData.getString("sound_variant"))
+        assertEquals(0, later.age, "WolfPackData disables inherited baby rolls")
+    }
+
+    @Test
+    fun goatInitializesBothCooldownsBeforeScreamingAndHornRolls() {
+        val goat = MobSpawnFinalization.stateFor(Identifier.vanilla("goat"), 0, LegacyRandom(38L), 0f)
+        val memories = goat.typeData.getCompound("Brain").getCompound("memories")
+
+        assertEquals(
+            829,
+            memories.getCompound("minecraft:long_jump_cooldown_ticks").getInt("value"),
+        )
+        assertEquals(2_833, memories.getCompound("minecraft:ram_cooldown_ticks").getInt("value"))
+        assertEquals(true, goat.typeData.getBoolean("IsScreamingGoat"))
+        assertEquals(true, goat.typeData.getBoolean("HasLeftHorn"))
+        assertEquals(false, goat.typeData.getBoolean("HasRightHorn"))
     }
 
     @Test
@@ -187,6 +285,33 @@ class MobSpawnFinalizationTest {
         assertEquals("lazy", lazy.typeData.getString("MainGene"))
         assertEquals("brown", lazy.typeData.getString("HiddenGene"))
         assertEquals(0.07000000029802322, lazy.attributeBases["minecraft:movement_speed"])
+    }
+
+    @Test
+    fun tropicalFishChoosesItsSchoolVariantAfterCommonMobFinalization() {
+        val school = MobSpawnGroupData()
+        val common =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("tropical_fish"),
+                0,
+                LegacyRandom(0L),
+                0f,
+                school,
+            )
+        assertEquals(50_660_352, common.typeData.getInt("Variant"), "common index 13 is brinely/lime/light-blue")
+        assertEquals(50_660_352, school.variant)
+
+        val rareSchool = MobSpawnGroupData()
+        val rare =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("tropical_fish"),
+                0,
+                LegacyRandom(5L),
+                0f,
+                rareSchool,
+            )
+        assertEquals(118_293_505, rare.typeData.getInt("Variant"), "betty/green/gray from the exact rare draws")
+        assertEquals(null, rareSchool.variant, "a rare fish does not create a school variant")
     }
 
     @Test

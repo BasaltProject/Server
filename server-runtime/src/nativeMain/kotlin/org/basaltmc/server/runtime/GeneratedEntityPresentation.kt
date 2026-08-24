@@ -44,10 +44,61 @@ internal fun generatedEntityMetadata(
                     add(SetEntityDataPacket.Entry.Ints(17, it))
                 }
             "cat" -> addCatMetadata(data)
+            "chicken" -> {
+                addRegistryMetadata(
+                    data,
+                    "variant",
+                    18,
+                    CHICKEN_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.CHICKEN_VARIANT,
+                )
+                addRegistryMetadata(
+                    data,
+                    "sound_variant",
+                    19,
+                    CHICKEN_SOUND_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.CHICKEN_SOUND_VARIANT,
+                )
+            }
+            "cow" -> {
+                addRegistryMetadata(
+                    data,
+                    "variant",
+                    18,
+                    COW_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.COW_VARIANT,
+                )
+                addRegistryMetadata(
+                    data,
+                    "sound_variant",
+                    19,
+                    COW_SOUND_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.COW_SOUND_VARIANT,
+                )
+            }
             "fox" ->
                 if (data.getString("Type") == "snow") {
                     add(SetEntityDataPacket.Entry.Ints(19, 1))
                 }
+            "frog" ->
+                addRegistryMetadata(
+                    data,
+                    "variant",
+                    18,
+                    FROG_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.FROG_VARIANT,
+                )
+            "goat" -> {
+                if (data.getBoolean("IsScreamingGoat")) {
+                    add(SetEntityDataPacket.Entry.Booleans(18, true))
+                }
+                if (!data.getBoolean("HasLeftHorn", true)) {
+                    add(SetEntityDataPacket.Entry.Booleans(19, false))
+                }
+                if (!data.getBoolean("HasRightHorn", true)) {
+                    add(SetEntityDataPacket.Entry.Booleans(20, false))
+                }
+            }
             "horse" ->
                 data.getInt("Variant").takeIf { it != 0 }?.let {
                     add(SetEntityDataPacket.Entry.Ints(19, it))
@@ -72,6 +123,22 @@ internal fun generatedEntityMetadata(
                     add(SetEntityDataPacket.Entry.Bytes(20, it.toByte()))
                 }
             }
+            "pig" -> {
+                addRegistryMetadata(
+                    data,
+                    "variant",
+                    19,
+                    PIG_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.PIG_VARIANT,
+                )
+                addRegistryMetadata(
+                    data,
+                    "sound_variant",
+                    20,
+                    PIG_SOUND_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.PIG_SOUND_VARIANT,
+                )
+            }
             "rabbit" ->
                 data.getInt("RabbitType").takeIf { it != 0 }?.let {
                     add(SetEntityDataPacket.Entry.Ints(18, it))
@@ -84,13 +151,44 @@ internal fun generatedEntityMetadata(
                 val wool = (data.getByte("Color").toInt() and 0x0F) or if (data.getBoolean("Sheared")) 0x10 else 0
                 if (wool != 0) add(SetEntityDataPacket.Entry.Bytes(18, wool.toByte()))
             }
+            "tropical_fish" ->
+                data.getInt("Variant").takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Ints(17, it))
+                }
             "villager" -> addVillagerMetadata(data, dataIndex = 19, finalizedIndex = 20)
             "zombie_villager" -> {
                 if (data.getBoolean("IsBaby")) add(SetEntityDataPacket.Entry.Booleans(16, true))
                 addVillagerMetadata(data, dataIndex = 20, finalizedIndex = 21)
             }
+            "wolf" -> {
+                addRegistryMetadata(
+                    data,
+                    "variant",
+                    23,
+                    WOLF_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.WOLF_VARIANT,
+                )
+                addRegistryMetadata(
+                    data,
+                    "sound_variant",
+                    24,
+                    WOLF_SOUND_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.WOLF_SOUND_VARIANT,
+                )
+            }
         }
     }
+
+private fun MutableList<SetEntityDataPacket.Entry>.addRegistryMetadata(
+    data: NbtCompound,
+    key: String,
+    index: Int,
+    ids: Map<String, Int>,
+    registry: SetEntityDataPacket.RegistryHolder,
+) {
+    val id = ids[data.getString(key)] ?: return
+    if (id != 0) add(SetEntityDataPacket.Entry.RegistryId(index, id, registry))
+}
 
 private fun MutableList<SetEntityDataPacket.Entry>.addArmorStandMetadata(data: NbtCompound) {
     var flags = 0
@@ -234,6 +332,20 @@ private val CAT_VARIANT_IDS =
         "minecraft:jellie" to 9,
         "minecraft:all_black" to 10,
     )
+
+private val CHICKEN_VARIANT_IDS = registryIds("temperate", "warm", "cold")
+private val CHICKEN_SOUND_VARIANT_IDS = registryIds("classic", "picky")
+private val COW_VARIANT_IDS = registryIds("temperate", "warm", "cold")
+private val COW_SOUND_VARIANT_IDS = registryIds("classic", "moody")
+private val FROG_VARIANT_IDS = registryIds("temperate", "warm", "cold")
+private val PIG_VARIANT_IDS = registryIds("temperate", "warm", "cold")
+private val PIG_SOUND_VARIANT_IDS = registryIds("classic", "big", "mini")
+private val WOLF_VARIANT_IDS =
+    registryIds("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped")
+private val WOLF_SOUND_VARIANT_IDS = registryIds("classic", "puglin", "sad", "angry", "grumpy", "big", "cute")
+
+private fun registryIds(vararg paths: String): Map<String, Int> =
+    paths.mapIndexed { index, path -> "minecraft:$path" to index }.toMap()
 
 private val VILLAGER_TYPE_IDS =
     mapOf(

@@ -113,6 +113,7 @@ public object MobSpawnFinalization {
         val followRangeBonus = random.triangle(0.0, FOLLOW_RANGE_BONUS_SPREAD)
         val leftHanded = random.nextFloat() < LEFT_HANDED_CHANCE
         if (!CubeMobs.isCube(type)) {
+            writePostCommonTypeState(type.path, group, random, typeData)
             return CommonSpawnState(
                 age,
                 CubeMobs.DEFAULT_SIZE,
@@ -131,6 +132,42 @@ public object MobSpawnFinalization {
         return CommonSpawnState(age, 1 shl sizeScale, followRangeBonus, leftHanded, true, typeData, attributeBases)
     }
 
+    /** Concrete finalizers that run after their superclass has consumed the common mob RNG. */
+    private fun writePostCommonTypeState(
+        type: String,
+        group: MobSpawnGroupData,
+        random: BasaltRandom,
+        data: NbtCompound,
+    ) {
+        if (type != "tropical_fish") return
+        val existing = group.variant
+        val packed =
+            when {
+                existing != null -> existing
+                random.nextFloat().toDouble() < TROPICAL_COMMON_CHANCE ->
+                    TROPICAL_COMMON_VARIANTS[random.nextInt(TROPICAL_COMMON_VARIANTS.size)].also {
+                        group.variant = it
+                    }
+                else -> {
+                    val pattern = random.nextInt(TROPICAL_PATTERNS)
+                    val baseColor = random.nextInt(DYE_COLORS)
+                    val patternColor = random.nextInt(DYE_COLORS)
+                    packTropicalFish(pattern, baseColor, patternColor)
+                }
+            }
+        data.putInt("Variant", packed)
+    }
+
+    private fun packTropicalFish(
+        pattern: Int,
+        baseColor: Int,
+        patternColor: Int,
+    ): Int {
+        val large = if (pattern >= TROPICAL_SMALL_PATTERNS) 1 else 0
+        val patternIndex = pattern % TROPICAL_SMALL_PATTERNS
+        return large or (patternIndex shl 8) or (baseColor shl 16) or (patternColor shl 24)
+    }
+
     /** Concrete finalizers whose observable state and RNG happen before their superclass call. */
     private fun writePreCommonTypeState(
         type: String,
@@ -147,11 +184,59 @@ public object MobSpawnFinalization {
                         ?: random.nextInt(COMMON_AXOLOTL_VARIANTS).also { group.secondaryVariant = it }
                 data.putInt("Variant", if (random.nextInt(2) == 0) first else second)
             }
+            "chicken" -> {
+                data.putString(
+                    "variant",
+                    registryKey(selectTemperatureVariant(biome, random, WARM_FARM_BIOMES, COLD_FARM_BIOMES)),
+                )
+                data.putString(
+                    "sound_variant",
+                    registryKey(CHICKEN_SOUND_VARIANTS[random.nextInt(CHICKEN_SOUND_VARIANTS.size)]),
+                )
+            }
+            "cow" -> {
+                data.putString(
+                    "variant",
+                    registryKey(selectTemperatureVariant(biome, random, WARM_FARM_BIOMES, COLD_FARM_BIOMES)),
+                )
+                data.putString(
+                    "sound_variant",
+                    registryKey(COW_SOUND_VARIANTS[random.nextInt(COW_SOUND_VARIANTS.size)]),
+                )
+            }
             "fox" -> {
                 val biomeVariant = if (biome in WHITE_RABBIT_BIOMES) FOX_SNOW else FOX_RED
                 val variant = group.variant ?: biomeVariant.also { group.variant = it }
                 data.putString("Type", if (variant == FOX_SNOW) "snow" else "red")
                 writeFoxEquipment(random, data)
+            }
+            "frog" -> {
+                data.putString(
+                    "variant",
+                    registryKey(selectTemperatureVariant(biome, random, WARM_FROG_BIOMES, COLD_FROG_BIOMES)),
+                )
+                writeBrainMemories(
+                    data,
+                    "minecraft:long_jump_cooldown_ticks" to
+                        FROG_MIN_LONG_JUMP_COOLDOWN + random.nextInt(FROG_LONG_JUMP_COOLDOWN_RANGE),
+                )
+            }
+            "goat" -> {
+                writeBrainMemories(
+                    data,
+                    "minecraft:long_jump_cooldown_ticks" to
+                        GOAT_MIN_LONG_JUMP_COOLDOWN + random.nextInt(GOAT_LONG_JUMP_COOLDOWN_RANGE),
+                    "minecraft:ram_cooldown_ticks" to
+                        GOAT_MIN_RAM_COOLDOWN + random.nextInt(GOAT_RAM_COOLDOWN_RANGE),
+                )
+                data.putBoolean("IsScreamingGoat", random.nextDouble() < GOAT_SCREAMING_CHANCE)
+                var hasLeftHorn = true
+                var hasRightHorn = true
+                if (random.nextFloat() < GOAT_UNIHORN_CHANCE) {
+                    if (random.nextBoolean()) hasLeftHorn = false else hasRightHorn = false
+                }
+                data.putBoolean("HasLeftHorn", hasLeftHorn)
+                data.putBoolean("HasRightHorn", hasRightHorn)
             }
             "horse" -> {
                 val variant = group.variant ?: random.nextInt(HORSE_VARIANTS).also { group.variant = it }
@@ -168,6 +253,16 @@ public object MobSpawnFinalization {
             "panda" -> {
                 data.putString("MainGene", pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName)
                 data.putString("HiddenGene", pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName)
+            }
+            "pig" -> {
+                data.putString(
+                    "variant",
+                    registryKey(selectTemperatureVariant(biome, random, WARM_FARM_BIOMES, COLD_FARM_BIOMES)),
+                )
+                data.putString(
+                    "sound_variant",
+                    registryKey(PIG_SOUND_VARIANTS[random.nextInt(PIG_SOUND_VARIANTS.size)]),
+                )
             }
             "rabbit" -> {
                 val rolled = rabbitVariant(biome, random.nextInt(100))
@@ -186,7 +281,65 @@ public object MobSpawnFinalization {
                 )
             }
             "sheep" -> data.putByte("Color", sheepColor(biome, random).toByte())
+            "wolf" -> {
+                val variant =
+                    group.variant
+                        ?: selectWolfVariant(biome, random).also { group.variant = it }
+                data.putString("variant", registryKey(WOLF_VARIANTS[variant]))
+                data.putString(
+                    "sound_variant",
+                    registryKey(WOLF_SOUND_VARIANTS[random.nextInt(WOLF_SOUND_VARIANTS.size)]),
+                )
+            }
         }
+    }
+
+    private fun selectTemperatureVariant(
+        biome: String?,
+        random: BasaltRandom,
+        warmBiomes: Set<String>,
+        coldBiomes: Set<String>,
+    ): String {
+        // PriorityProvider.pick still calls nextInt(1) after reducing the registry to one match.
+        random.nextInt(1)
+        return when (biome) {
+            in warmBiomes -> "warm"
+            in coldBiomes -> "cold"
+            else -> "temperate"
+        }
+    }
+
+    private fun selectWolfVariant(
+        biome: String?,
+        random: BasaltRandom,
+    ): Int {
+        random.nextInt(1)
+        return when {
+            biome in SAVANNA_BIOMES -> 1
+            biome == "grove" -> 2
+            biome == "old_growth_pine_taiga" -> 3
+            biome == "snowy_taiga" -> 4
+            biome in JUNGLE_BIOMES -> 5
+            biome == "forest" -> 6
+            biome == "old_growth_spruce_taiga" -> 7
+            biome in BADLANDS_BIOMES -> 8
+            else -> 0
+        }
+    }
+
+    private fun registryKey(path: String): String = "minecraft:$path"
+
+    private fun writeBrainMemories(
+        data: NbtCompound,
+        vararg values: Pair<String, Int>,
+    ) {
+        val memories =
+            NbtCompound().apply {
+                values.forEach { (key, value) ->
+                    this[key] = NbtCompound().apply { putInt("value", value) }
+                }
+            }
+        data["Brain"] = NbtCompound().apply { this["memories"] = memories }
     }
 
     private fun writeFoxEquipment(
@@ -431,6 +584,18 @@ public object MobSpawnFinalization {
     private const val PANDA_GENE_ROLLS = 16
     private const val PANDA_WEAK_HEALTH = 10.0
     private const val PANDA_LAZY_SPEED = 0.07000000029802322
+    private const val FROG_MIN_LONG_JUMP_COOLDOWN = 100
+    private const val FROG_LONG_JUMP_COOLDOWN_RANGE = 41
+    private const val GOAT_MIN_LONG_JUMP_COOLDOWN = 600
+    private const val GOAT_LONG_JUMP_COOLDOWN_RANGE = 601
+    private const val GOAT_MIN_RAM_COOLDOWN = 600
+    private const val GOAT_RAM_COOLDOWN_RANGE = 5_401
+    private const val GOAT_SCREAMING_CHANCE = 0.02
+    private const val GOAT_UNIHORN_CHANCE = 0.1f
+    private const val TROPICAL_COMMON_CHANCE = 0.9
+    private const val TROPICAL_PATTERNS = 12
+    private const val TROPICAL_SMALL_PATTERNS = 6
+    private const val DYE_COLORS = 16
     private const val LLAMA_MAX_STRENGTH_CHANCE = 0.04f
     private const val LLAMA_VARIANTS = 4
     private const val PARROT_VARIANTS = 5
@@ -472,6 +637,39 @@ public object MobSpawnFinalization {
     }
 
     private val PANDA_GENES_BY_NAME = PandaGene.entries.associateBy(PandaGene::serializedName)
+
+    private val CHICKEN_SOUND_VARIANTS = listOf("classic", "picky")
+    private val COW_SOUND_VARIANTS = listOf("classic", "moody")
+    private val PIG_SOUND_VARIANTS = listOf("classic", "big", "mini")
+    private val WOLF_VARIANTS =
+        listOf("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped")
+    private val WOLF_SOUND_VARIANTS = listOf("classic", "puglin", "sad", "angry", "grumpy", "big", "cute")
+
+    private val TROPICAL_COMMON_VARIANTS =
+        listOf(
+            packTropicalFish(7, 1, 7),
+            packTropicalFish(6, 7, 7),
+            packTropicalFish(6, 7, 11),
+            packTropicalFish(11, 0, 7),
+            packTropicalFish(1, 11, 7),
+            packTropicalFish(0, 1, 0),
+            packTropicalFish(5, 6, 3),
+            packTropicalFish(9, 10, 4),
+            packTropicalFish(11, 0, 14),
+            packTropicalFish(5, 0, 4),
+            packTropicalFish(8, 0, 7),
+            packTropicalFish(11, 0, 1),
+            packTropicalFish(3, 9, 6),
+            packTropicalFish(4, 5, 3),
+            packTropicalFish(10, 14, 0),
+            packTropicalFish(2, 7, 14),
+            packTropicalFish(9, 14, 0),
+            packTropicalFish(6, 0, 4),
+            packTropicalFish(0, 14, 0),
+            packTropicalFish(1, 7, 0),
+            packTropicalFish(3, 9, 4),
+            packTropicalFish(6, 4, 4),
+        )
 
     private val WHITE_RABBIT_BIOMES =
         setOf(
@@ -539,4 +737,50 @@ public object MobSpawnFinalization {
             "windswept_gravelly_hills",
             "windswept_hills",
         )
+
+    private val WARM_FROG_BIOMES =
+        setOf(
+            "badlands",
+            "bamboo_jungle",
+            "basalt_deltas",
+            "crimson_forest",
+            "desert",
+            "eroded_badlands",
+            "jungle",
+            "mangrove_swamp",
+            "nether_wastes",
+            "savanna",
+            "savanna_plateau",
+            "soul_sand_valley",
+            "sparse_jungle",
+            "warm_ocean",
+            "warped_forest",
+            "windswept_savanna",
+            "wooded_badlands",
+        )
+
+    private val COLD_FROG_BIOMES =
+        setOf(
+            "deep_dark",
+            "deep_frozen_ocean",
+            "end_barrens",
+            "end_highlands",
+            "end_midlands",
+            "frozen_ocean",
+            "frozen_peaks",
+            "frozen_river",
+            "grove",
+            "ice_spikes",
+            "jagged_peaks",
+            "small_end_islands",
+            "snowy_beach",
+            "snowy_plains",
+            "snowy_slopes",
+            "snowy_taiga",
+            "the_end",
+        )
+
+    private val SAVANNA_BIOMES = setOf("savanna", "savanna_plateau", "windswept_savanna")
+    private val JUNGLE_BIOMES = setOf("bamboo_jungle", "jungle", "sparse_jungle")
+    private val BADLANDS_BIOMES = setOf("badlands", "eroded_badlands", "wooded_badlands")
 }

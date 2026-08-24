@@ -1171,11 +1171,46 @@ public class ClientSession(
         // The registries a real client needs non-empty (see VanillaRegistryData). The entry names
         // matter, not only their presence: a spawn egg resolves each registry's own `DEFAULT` key,
         // and a client looking up `minecraft:temperate` in an empty chicken_variant crashes.
-        sendRegistry("minecraft:wolf_variant", "minecraft:pale", VanillaRegistryData.wolfVariant())
-        sendRegistry("minecraft:wolf_sound_variant", "minecraft:classic", VanillaRegistryData.wolfSoundVariant())
-        sendRegistry("minecraft:pig_variant", "minecraft:temperate", VanillaRegistryData.pigVariant())
-        sendRegistry("minecraft:pig_sound_variant", "minecraft:classic", VanillaRegistryData.pigSoundVariant())
-        sendRegistry("minecraft:frog_variant", "minecraft:cold", VanillaRegistryData.frogVariant())
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:wolf_variant",
+                VanillaRegistryData.wolfVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.wolfVariant(id))
+                },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:wolf_sound_variant",
+                VanillaRegistryData.wolfSoundVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.wolfSoundVariant(id))
+                },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:pig_variant",
+                VanillaRegistryData.pigVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.pigVariant(id))
+                },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:pig_sound_variant",
+                VanillaRegistryData.pigSoundVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.pigSoundVariant(id))
+                },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:frog_variant",
+                VanillaRegistryData.frogVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.frogVariant(id))
+                },
+            ).write(it)
+        }
         // All eleven, not just one: structure cats send their variant id in set_entity_data, and a
         // registry with fewer entries than the id makes the client drop the connection on decode.
         // The numeric id of each variant is its index in this packet, which is what
@@ -1189,16 +1224,37 @@ public class ClientSession(
             ).write(it)
         }
         sendRegistry("minecraft:cat_sound_variant", "minecraft:classic", VanillaRegistryData.catSoundVariant())
-        sendRegistry("minecraft:cow_sound_variant", "minecraft:classic", VanillaRegistryData.cowSoundVariant())
-        sendRegistry("minecraft:cow_variant", "minecraft:temperate", VanillaRegistryData.cowVariant())
-        sendRegistry("minecraft:chicken_sound_variant", "minecraft:classic", VanillaRegistryData.chickenSoundVariant())
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:cow_sound_variant",
+                VanillaRegistryData.cowSoundVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.cowSoundVariant(id))
+                },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:cow_variant",
+                VanillaRegistryData.cowVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.cowVariant(id))
+                },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:chicken_sound_variant",
+                VanillaRegistryData.chickenSoundVariants.map { id ->
+                    RegistryEntry("minecraft:$id", VanillaRegistryData.chickenSoundVariant(id))
+                },
+            ).write(it)
+        }
         // egg/blue_egg/brown_egg each reference a distinct chicken variant directly, not just
         // DEFAULT (confirmed live: minecraft:chicken_variant/minecraft:cold failed after temperate
         // alone was fixed): see VanillaRegistryData.chickenVariant's KDoc.
         sendCompressed(RegistryDataPacket.ID) {
             RegistryDataPacket(
                 "minecraft:chicken_variant",
-                listOf("temperate", "cold", "warm").map { id ->
+                VanillaRegistryData.chickenVariants.map { id ->
                     RegistryEntry("minecraft:$id", VanillaRegistryData.chickenVariant(id))
                 },
             ).write(it)

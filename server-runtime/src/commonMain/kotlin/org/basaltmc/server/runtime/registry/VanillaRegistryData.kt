@@ -233,10 +233,17 @@ public object VanillaRegistryData {
 
     // The 13 registries below are the ones `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` marks with
     // `nonEmpty()`, which a client needs to finish Configuration. Their NETWORK_CODEC drops
-    // `spawn_conditions`, so only asset references are needed, and one real entry each is enough:
-    // the full set across all 29 synced registries is `server-datagen`'s job.
+    // `spawn_conditions`; registries referenced by natural entity metadata are nevertheless sent
+    // in full and in bootstrap order so their numeric holder ids remain exact. Filling every other
+    // synchronized registry is still `server-datagen`'s job.
 
-    public fun wolfVariant(): NbtCompound {
+    /** Vanilla bootstrap order; these indices are also sent by wolf entity metadata. */
+    public val wolfVariants: List<String> =
+        listOf("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped")
+
+    public fun wolfVariant(id: String): NbtCompound {
+        val fileName = if (id == "pale") "wolf" else "wolf_$id"
+
         fun assets(
             wild: String,
             tame: String,
@@ -249,20 +256,25 @@ public object VanillaRegistryData {
         return NbtCompound().apply {
             this["assets"] =
                 assets(
-                    "minecraft:entity/wolf/wolf_black",
-                    "minecraft:entity/wolf/wolf_black_tame",
-                    "minecraft:entity/wolf/wolf_black_angry",
+                    "minecraft:entity/wolf/$fileName",
+                    "minecraft:entity/wolf/${fileName}_tame",
+                    "minecraft:entity/wolf/${fileName}_angry",
                 )
             this["baby_assets"] =
                 assets(
-                    "minecraft:entity/wolf/wolf_black_baby",
-                    "minecraft:entity/wolf/wolf_black_tame_baby",
-                    "minecraft:entity/wolf/wolf_black_angry_baby",
+                    "minecraft:entity/wolf/${fileName}_baby",
+                    "minecraft:entity/wolf/${fileName}_tame_baby",
+                    "minecraft:entity/wolf/${fileName}_angry_baby",
                 )
         }
     }
 
-    public fun wolfSoundVariant(): NbtCompound {
+    /** Vanilla bootstrap order; every natural wolf picks one independently. */
+    public val wolfSoundVariants: List<String> = listOf("classic", "puglin", "sad", "angry", "grumpy", "big", "cute")
+
+    public fun wolfSoundVariant(id: String): NbtCompound {
+        val adultPrefix = if (id == "classic") "wolf" else "wolf_$id"
+
         fun sounds(prefix: String) =
             NbtCompound().apply {
                 putString("ambient_sound", "minecraft:entity.$prefix.ambient")
@@ -271,37 +283,46 @@ public object VanillaRegistryData {
                 putString("hurt_sound", "minecraft:entity.$prefix.hurt")
                 putString("pant_sound", "minecraft:entity.$prefix.pant")
                 putString("whine_sound", "minecraft:entity.$prefix.whine")
-                putString("step_sound", "minecraft:entity.$prefix.step")
+                putString("step_sound", "minecraft:entity.${if (prefix == "baby_wolf") "baby_wolf" else "wolf"}.step")
             }
         return NbtCompound().apply {
-            this["adult_sounds"] = sounds("wolf")
+            this["adult_sounds"] = sounds(adultPrefix)
             this["baby_sounds"] = sounds("baby_wolf")
         }
     }
 
-    public fun pigVariant(): NbtCompound =
+    public val pigVariants: List<String> = listOf("temperate", "warm", "cold")
+
+    public fun pigVariant(id: String): NbtCompound =
         NbtCompound().apply {
-            putString("asset_id", "minecraft:entity/pig/pig_temperate")
-            putString("baby_asset_id", "minecraft:entity/pig/pig_temperate_baby")
+            putString("asset_id", "minecraft:entity/pig/pig_$id")
+            putString("baby_asset_id", "minecraft:entity/pig/pig_${id}_baby")
+            if (id == "cold") putString("model", "cold")
         }
 
-    public fun pigSoundVariant(): NbtCompound {
+    public val pigSoundVariants: List<String> = listOf("classic", "big", "mini")
+
+    public fun pigSoundVariant(id: String): NbtCompound {
+        val adultPrefix = if (id == "classic") "pig" else "pig_$id"
+
         fun sounds(prefix: String) =
             NbtCompound().apply {
                 putString("ambient_sound", "minecraft:entity.$prefix.ambient")
                 putString("death_sound", "minecraft:entity.$prefix.death")
                 putString("eat_sound", "minecraft:entity.$prefix.eat")
                 putString("hurt_sound", "minecraft:entity.$prefix.hurt")
-                putString("step_sound", "minecraft:entity.$prefix.step")
+                putString("step_sound", "minecraft:entity.${if (prefix == "baby_pig") "baby_pig" else "pig"}.step")
             }
         return NbtCompound().apply {
-            this["adult_sounds"] = sounds("pig")
+            this["adult_sounds"] = sounds(adultPrefix)
             this["baby_sounds"] = sounds("baby_pig")
         }
     }
 
-    public fun frogVariant(): NbtCompound =
-        NbtCompound().apply { putString("asset_id", "minecraft:entity/frog/frog_cold") }
+    public val frogVariants: List<String> = listOf("temperate", "warm", "cold")
+
+    public fun frogVariant(id: String): NbtCompound =
+        NbtCompound().apply { putString("asset_id", "minecraft:entity/frog/frog_$id") }
 
     /**
      * All eleven variants, in `CatVariants.bootstrap` order. The full set matters, not just one
@@ -348,30 +369,41 @@ public object VanillaRegistryData {
         }
     }
 
-    public fun cowSoundVariant(): NbtCompound =
+    public val cowSoundVariants: List<String> = listOf("classic", "moody")
+
+    public fun cowSoundVariant(id: String): NbtCompound =
         NbtCompound().apply {
-            putString("ambient_sound", "minecraft:entity.cow.ambient")
-            putString("death_sound", "minecraft:entity.cow.death")
-            putString("hurt_sound", "minecraft:entity.cow.hurt")
-            putString("step_sound", "minecraft:entity.cow.step")
+            val prefix = if (id == "classic") "cow" else "cow_$id"
+            putString("ambient_sound", "minecraft:entity.$prefix.ambient")
+            putString("death_sound", "minecraft:entity.$prefix.death")
+            putString("hurt_sound", "minecraft:entity.$prefix.hurt")
+            putString("step_sound", "minecraft:entity.$prefix.step")
         }
 
-    public fun cowVariant(): NbtCompound =
+    public val cowVariants: List<String> = listOf("temperate", "warm", "cold")
+
+    public fun cowVariant(id: String): NbtCompound =
         NbtCompound().apply {
-            putString("asset_id", "minecraft:entity/cow/cow_temperate")
-            putString("baby_asset_id", "minecraft:entity/cow/cow_temperate_baby")
+            putString("asset_id", "minecraft:entity/cow/cow_$id")
+            putString("baby_asset_id", "minecraft:entity/cow/cow_${id}_baby")
+            if (id != "temperate") putString("model", id)
         }
 
-    public fun chickenSoundVariant(): NbtCompound {
+    public val chickenSoundVariants: List<String> = listOf("classic", "picky")
+
+    public fun chickenSoundVariant(id: String): NbtCompound {
+        val adultPrefix = if (id == "classic") "chicken" else "chicken_$id"
+
         fun sounds(prefix: String) =
             NbtCompound().apply {
+                val stepPrefix = if (prefix == "baby_chicken") "baby_chicken" else "chicken"
                 putString("ambient_sound", "minecraft:entity.$prefix.ambient")
                 putString("death_sound", "minecraft:entity.$prefix.death")
                 putString("hurt_sound", "minecraft:entity.$prefix.hurt")
-                putString("step_sound", "minecraft:entity.$prefix.step")
+                putString("step_sound", "minecraft:entity.$stepPrefix.step")
             }
         return NbtCompound().apply {
-            this["adult_sounds"] = sounds("chicken")
+            this["adult_sounds"] = sounds(adultPrefix)
             this["baby_sounds"] = sounds("baby_chicken")
         }
     }
@@ -379,10 +411,13 @@ public object VanillaRegistryData {
     // Unlike the other animal variants, chicken_variant needs three entries, not just DEFAULT: the
     // egg item, blue_egg, and brown_egg items each carry a default component resolving a distinct
     // ChickenVariants key (temperate, cold, warm respectively) directly, confirmed live.
+    public val chickenVariants: List<String> = listOf("temperate", "warm", "cold")
+
     public fun chickenVariant(id: String): NbtCompound =
         NbtCompound().apply {
             putString("asset_id", "minecraft:entity/chicken/chicken_$id")
             putString("baby_asset_id", "minecraft:entity/chicken/chicken_${id}_baby")
+            if (id == "cold") putString("model", "cold")
         }
 
     public fun zombieNautilusVariant(): NbtCompound =
