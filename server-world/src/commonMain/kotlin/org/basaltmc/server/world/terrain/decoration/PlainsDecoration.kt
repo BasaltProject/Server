@@ -10,8 +10,8 @@ import org.basaltmc.wire.common.Identifier
 /**
  * The Plains `vegetal_decoration` entries, as literal values like the rest of the named vanilla
  * reference data in `VanillaRegistryData`. [BiomeDecoration] appends the shared glow lichen,
- * mushroom, pumpkin, sugar-cane and firefly-bush features; mushrooms use the surface survival
- * approximation until the light engine exists.
+ * mushroom, pumpkin, sugar-cane and firefly-bush features. Mushrooms use their exact worldgen-stage
+ * solid-render survival rule in [MushroomPatchDecoration].
  *
  * The draws must come from [WorldgenRandom] over xoroshiro, not the legacy LCG: getting that wrong
  * is a whole different RNG family, and it was wrong here once. [FLOWER_NOISE] is the exception,

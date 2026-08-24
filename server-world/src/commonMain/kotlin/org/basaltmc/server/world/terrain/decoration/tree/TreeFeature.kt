@@ -2910,8 +2910,9 @@ private fun tryPlaceLeaf(
         val current = chunk.getDecorationBlockStateId(x, y, z)
         val selected = Blocks.byStateId(foliageStateId)
         val placedStateId =
-            if (selected?.properties?.containsKey("waterlogged") == true && hasSourceWaterFluid(current)) {
-                Blocks.stateIdOf(selected.block, selected.properties + ("waterlogged" to "true")) ?: foliageStateId
+            if (selected?.properties?.containsKey("waterlogged") == true) {
+                val waterlogged = hasSourceWaterFluid(current).toString()
+                Blocks.stateIdOf(selected.block, selected.properties + ("waterlogged" to waterlogged)) ?: foliageStateId
             } else {
                 foliageStateId
             }

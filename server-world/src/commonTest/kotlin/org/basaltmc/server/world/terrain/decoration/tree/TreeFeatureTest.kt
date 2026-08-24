@@ -212,6 +212,27 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun foliageClearsProviderWaterloggingOutsideSourceWater() {
+        val selected = Blocks.byStateId(oakLeavesState) ?: error("unknown oak leaves")
+        val waterloggedLeaves =
+            Blocks.stateIdOf(selected.block, selected.properties + ("waterlogged" to "true"))
+                ?: error("unknown waterlogged oak leaves")
+        val config =
+            TreeConfiguration(
+                oakLogState,
+                StraightTrunkPlacer(1, 0, 0),
+                waterloggedLeaves,
+                BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 0),
+                FeatureSizeTwoLayers(0, 0, 0),
+                ignoreVines = true,
+            )
+        val chunk = chunkWithFlatGround(0)
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(0L)), 8, 1, 8, config))
+        assertEquals("false", Blocks.byStateId(chunk.getBlockStateId(8, 2, 8))?.properties?.get("waterlogged"))
+    }
+
+    @Test
     fun canopyCrossingAChunkBorderKeepsItsWorldCoordinates() {
         val chunk = chunkWithFlatGround(0)
         assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(42L)), 15, 1, 8, TreeConfigs.OAK))

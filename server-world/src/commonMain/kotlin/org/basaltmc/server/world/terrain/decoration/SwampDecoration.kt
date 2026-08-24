@@ -9,11 +9,10 @@ import org.basaltmc.wire.common.Identifier
  * Real Swamp `addSwampVegetation` ground cover beyond trees (already ported separately, see
  * `BiomeDecoration`): `flower_swamp` (blue orchid), `patch_grass_normal`, `patch_dead_bush`,
  * `patch_waterlily`, all ported from the real jar's own decompiled `VegetationPlacements`.
- * [MushroomDecoration.SWAMP] supplies the later swamp mushrooms, using the shared surface survival
- * approximation until a light engine exists. [ExtraVegetationDecoration.SWAMP] supplies the later
- * sugar-cane, pumpkin, and firefly-bush features. Lily pads are placed the same simplified
- * way as every other single-block feature here (air target only, no "must be over water" check,
- * see [SimpleBlockFeature]'s own KDoc).
+ * [MushroomDecoration.SWAMP] supplies the later swamp mushrooms and
+ * [ExtraVegetationDecoration.SWAMP] supplies the later sugar-cane, pumpkin, and firefly-bush
+ * features. Lily pads use [SimpleBlockFeature]'s exact water-or-ice survival dispatch here; the
+ * production step-9 path uses the dedicated [WaterlilyPatchDecoration].
  */
 public object SwampDecoration : BiomeVegetalDecoration {
     /** `patch_waterlily` only, for the exact world pipeline after dead-bush seeding. */
