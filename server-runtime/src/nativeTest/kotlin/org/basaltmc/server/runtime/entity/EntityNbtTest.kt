@@ -1,6 +1,8 @@
 package org.basaltmc.server.runtime.entity
 
+import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -69,5 +71,64 @@ class EntityNbtTest {
         val tag = EntityNbt.encode(zombie())
         tag.remove("Pos")
         assertNull(EntityNbt.decode(tag, entityId = 1, protocolType = 1))
+    }
+
+    @Test
+    fun aGeneratedVillagerBecomesALiveEntityWithoutLosingItsStructureNbt() {
+        val villagerData =
+            NbtCompound().apply {
+                putString("type", "minecraft:taiga")
+                putString("profession", "minecraft:nitwit")
+                putInt("level", 2)
+            }
+        val data =
+            NbtCompound().apply {
+                putString("id", "minecraft:villager")
+                putBoolean("NoAI", false)
+                putInt("Age", -1200)
+                this["VillagerData"] = villagerData
+                putInt("Xp", 17)
+            }
+        val descriptor =
+            ChunkGeneratedEntity(
+                Identifier.vanilla("villager"),
+                8.5,
+                64.0,
+                9.5,
+                90f,
+                5f,
+                data,
+            )
+
+        val entity = assertNotNull(EntityNbt.decodeGenerated(descriptor, entityId = 44, protocolType = 140))
+
+        assertEquals(Identifier.vanilla("villager"), entity.type)
+        assertEquals(8.5, entity.x)
+        assertEquals(90f, entity.yaw)
+        assertEquals(-1200, entity.age)
+        assertEquals("nitwit", entity.profession)
+        assertEquals(2, entity.villagerLevel)
+        assertEquals(17, entity.villagerExperience)
+        assertEquals("minecraft:taiga", entity.sourceNbt?.getCompound("VillagerData")?.getString("type"))
+        assertTrue(!entity.noAi, "the absence of NoAI=true must leave structure villagers able to think")
+    }
+
+    @Test
+    fun anExplicitGeneratedNoAiFlagSurvivesMaterializationAndSave() {
+        val descriptor =
+            ChunkGeneratedEntity(
+                Identifier.vanilla("villager"),
+                0.5,
+                64.0,
+                0.5,
+                0f,
+                0f,
+                NbtCompound().apply { putBoolean("NoAI", true) },
+            )
+
+        val entity = assertNotNull(EntityNbt.decodeGenerated(descriptor, entityId = 4, protocolType = 140))
+
+        assertTrue(entity.noAi)
+        assertTrue(EntityNbt.decode(EntityNbt.encode(entity), entityId = 5, protocolType = 140)!!.noAi)
     }
 }

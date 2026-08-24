@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.entity.Aabb
 import org.basaltmc.server.runtime.entity.CubeMobs
 import org.basaltmc.server.runtime.entity.EntityCollision
+import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.sched.Owner
 import org.basaltmc.server.runtime.sched.Region
@@ -97,6 +98,7 @@ public class WorldState(
     private var loadedChunks: Long2ObjectMap<Chunk> = snapshotOf(chunksByPos)
 
     private val generatedEntitiesByKey = mutableMapOf<GeneratedEntityKey, GeneratedWorldEntity>()
+    private val pendingGeneratedEntities = mutableListOf<ChunkGeneratedEntity>()
     private val pendingGeneratedBlockWrites = HashMap<Long, MutableList<ChunkGeneratedBlockWrite>>()
     private val pendingGeneratedBlockEntityWrites = HashMap<Long, MutableList<ChunkGeneratedBlockEntityWrite>>()
     private val pendingGeneratedBlockTicks = HashMap<Long, MutableList<ChunkGeneratedBlockTick>>()
@@ -105,6 +107,7 @@ public class WorldState(
         // Tests and embedders may seed a world with detached generated chunks. Production starts
         // empty, but those chunks still deserve the same cross-border handoff as [install].
         for (chunk in initialChunks) {
+            pendingGeneratedEntities += chunk.takeGeneratedEntitiesMatching { Mobs.isMob(it.type) }
             applyPendingGeneratedBlockWrites(chunk)
             applyPendingGeneratedBlockEntityWrites(chunk)
             applyPendingGeneratedBlockTicks(chunk)
@@ -267,6 +270,7 @@ public class WorldState(
                 loadedChunks = snapshotOf(chunksByPos)
                 chunkVersion.addAndGet(1)
                 pendingEntities += chunk.takeSavedEntities()
+                pendingGeneratedEntities += chunk.takeGeneratedEntitiesMatching { Mobs.isMob(it.type) }
                 // The neighbours were lit without this chunk, so their light let the sky in through
                 // where it now stands. parity: vanilla relights a chunk's neighbourhood on load.
                 for (offsetZ in -1..1) {
@@ -719,6 +723,22 @@ public class WorldState(
             } else {
                 val taken = pendingEntities.toList()
                 pendingEntities.clear()
+                taken
+            }
+        }
+
+    /**
+     * Mobs emitted by structure templates, waiting for the server tick to allocate runtime ids.
+     * Taking them removes the only pending copy; their chunk descriptor was removed at install so
+     * the live entity saved with the chunk cannot be duplicated on the next load.
+     */
+    public fun takePendingGeneratedEntities(): List<ChunkGeneratedEntity> =
+        mutex.withLock {
+            if (pendingGeneratedEntities.isEmpty()) {
+                emptyList()
+            } else {
+                val taken = pendingGeneratedEntities.toList()
+                pendingGeneratedEntities.clear()
                 taken
             }
         }

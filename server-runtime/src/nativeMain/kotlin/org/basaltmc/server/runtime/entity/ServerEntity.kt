@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.entity
 import org.basaltmc.server.registry.EntityAttributes
 import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -202,6 +203,15 @@ public class ServerEntity(
 
     /** Whether it is here to stay. parity: `Mob.isPersistenceRequired`, set by naming or by a command. */
     public var persistent: Boolean = false
+
+    /** parity: `Mob.isNoAi`, preserving an explicit structure/summon NBT `NoAI` flag. */
+    public var noAi: Boolean = false
+
+    /**
+     * NBT presentation state inherited from a structure or save, such as villager biome, cat
+     * variant and equipment. Runtime-owned fields are overlaid by [EntityNbt] whenever it is saved.
+     */
+    public var sourceNbt: NbtCompound? = null
 
     /** Attribute base values that were changed from their default. parity: `AttributeMap`, without modifiers. */
     public val attributeValues: MutableMap<String, Double> = mutableMapOf()
