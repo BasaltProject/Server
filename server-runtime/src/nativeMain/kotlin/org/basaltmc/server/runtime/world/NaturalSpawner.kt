@@ -20,6 +20,10 @@ public class SpawnRequest(
     public val yaw: Float,
     /** Accepted members already finalized in this one pack; zero means the pack's first mob. */
     public val groupIndex: Int = 0,
+    /** Concrete `SpawnGroupData`, shared only by accepted members of this outer pack attempt. */
+    public val group: MobSpawnGroupData = MobSpawnGroupData(),
+    /** Biome at this member's actual block position, used by variant spawn rules. */
+    public val biome: Identifier? = null,
 )
 
 /**
@@ -101,6 +105,7 @@ public object NaturalSpawner {
         val requests = mutableListOf<SpawnRequest>()
         var clusterSize = 0
         for (attempt in 0 until ATTEMPTS) {
+            val group = MobSpawnGroupData()
             var x = startX
             var z = startZ
             var chosen: SpawnerEntry? = null
@@ -134,6 +139,8 @@ public object NaturalSpawner {
                         centreZ,
                         random.nextFloat() * 360f,
                         groupIndex = spawned,
+                        group = group,
+                        biome = biomeAt(world, x, startY, z),
                     )
                 if (requestAccepted != null && !requestAccepted(request)) continue
                 requests += request

@@ -88,6 +88,28 @@ class EntityNbtTest {
     }
 
     @Test
+    fun generatedHorseReloadsRandomBasesAndClampsConstructionHealth() {
+        val data = NbtCompound()
+        MobSpawnFinalization.writeGenerated(data, Identifier.vanilla("horse"), 0, LegacyRandom(1L))
+        val descriptor =
+            ChunkGeneratedEntity(
+                Identifier.vanilla("horse"),
+                0.5,
+                64.0,
+                0.5,
+                0f,
+                0f,
+                data,
+            )
+
+        val restored = assertNotNull(EntityNbt.decodeGenerated(descriptor, entityId = 10, protocolType = 66))
+        assertEquals(24.0, restored.attribute("minecraft:max_health"))
+        assertEquals(24.0, restored.health, "the constructor's default 53 health must follow the randomized maximum")
+        assertEquals(0.22561408252176893, restored.attribute("minecraft:movement_speed"), 1e-15)
+        assertEquals(0.7819374795746402, restored.attribute("minecraft:jump_strength"), 1e-15)
+    }
+
+    @Test
     fun aVillagerKeepsItsTrade() {
         val villager = zombie()
         villager.profession = "librarian"

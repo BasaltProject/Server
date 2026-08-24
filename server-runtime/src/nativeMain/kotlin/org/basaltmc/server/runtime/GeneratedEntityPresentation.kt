@@ -44,6 +44,26 @@ internal fun generatedEntityMetadata(
                 data.getInt("Variant").takeIf { it != 0 }?.let {
                     add(SetEntityDataPacket.Entry.Ints(19, it))
                 }
+            "llama", "trader_llama" -> {
+                data.getInt("Strength").takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Ints(20, it))
+                }
+                data.getInt("Variant").takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Ints(21, it))
+                }
+            }
+            "parrot" ->
+                data.getInt("Variant").takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Ints(20, it))
+                }
+            "rabbit" ->
+                data.getInt("RabbitType").takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Ints(18, it))
+                }
+            "salmon" -> {
+                val variant = SALMON_VARIANTS[data.getString("type")] ?: SALMON_MEDIUM
+                if (variant != SALMON_MEDIUM) add(SetEntityDataPacket.Entry.Ints(17, variant))
+            }
             "sheep" -> {
                 val wool = (data.getByte("Color").toInt() and 0x0F) or if (data.getBoolean("Sheared")) 0x10 else 0
                 if (wool != 0) add(SetEntityDataPacket.Entry.Bytes(18, wool.toByte()))
@@ -215,3 +235,6 @@ private val VILLAGER_PROFESSION_IDS =
         "minecraft:none" to 0,
         "minecraft:nitwit" to 11,
     )
+
+private const val SALMON_MEDIUM = 1
+private val SALMON_VARIANTS = mapOf("small" to 0, "medium" to SALMON_MEDIUM, "large" to 2)

@@ -36,6 +36,107 @@ class MobSpawnFinalizationTest {
     }
 
     @Test
+    fun concreteGroupDataControlsBabyRolls() {
+        assertEquals(null, MobSpawnFinalization.babySpawnChance("slime"))
+        assertEquals(null, MobSpawnFinalization.babySpawnChance("wolf"))
+        assertEquals(0.1f, MobSpawnFinalization.babySpawnChance("dolphin"))
+        assertEquals(0.2f, MobSpawnFinalization.babySpawnChance("donkey"))
+        assertEquals(1f, MobSpawnFinalization.babySpawnChance("rabbit"))
+
+        val adultSlime = MobSpawnFinalization.stateFor(Identifier.vanilla("slime"), 3, LegacyRandom(4640L), 0f)
+        assertEquals(0, adultSlime.age, "SlimeGroupData explicitly disables inherited baby rolls")
+
+        val rabbit = MobSpawnFinalization.stateFor(Identifier.vanilla("rabbit"), 1, LegacyRandom(0L), 0f)
+        assertEquals(AgeableMobs.BABY_START_AGE, rabbit.age)
+
+        val foxSecond = MobSpawnFinalization.stateFor(Identifier.vanilla("fox"), 1, LegacyRandom(0L), 0f)
+        val foxThird = MobSpawnFinalization.stateFor(Identifier.vanilla("fox"), 2, LegacyRandom(0L), 0f)
+        assertEquals(0, foxSecond.age)
+        assertEquals(AgeableMobs.BABY_START_AGE, foxThird.age)
+    }
+
+    @Test
+    fun primitiveAnimalVariantsRunBeforeTheirCommonSuperclass() {
+        val parrot = MobSpawnFinalization.stateFor(Identifier.vanilla("parrot"), 0, LegacyRandom(2L), 0f)
+        assertEquals(3, parrot.typeData.getInt("Variant"))
+
+        val llama = MobSpawnFinalization.stateFor(Identifier.vanilla("llama"), 0, LegacyRandom(1L), 0f)
+        assertEquals(2, llama.typeData.getInt("Strength"))
+        assertEquals(1, llama.typeData.getInt("Variant"))
+
+        val group = MobSpawnGroupData()
+        val rabbitRandom = LegacyRandom(1L)
+        val firstRabbit =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("rabbit"),
+                0,
+                rabbitRandom,
+                0f,
+                group,
+                Identifier.vanilla("plains"),
+            )
+        val secondRabbit =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("rabbit"),
+                1,
+                rabbitRandom,
+                0f,
+                group,
+                Identifier.vanilla("frozen_peaks"),
+            )
+        assertEquals(5, firstRabbit.typeData.getInt("RabbitType"), "plains roll 85 selects salt")
+        assertEquals(
+            5,
+            secondRabbit.typeData.getInt("RabbitType"),
+            "the first rabbit's variant belongs to its whole pack",
+        )
+        assertEquals(AgeableMobs.BABY_START_AGE, secondRabbit.age)
+
+        val salmon = MobSpawnFinalization.stateFor(Identifier.vanilla("salmon"), 0, LegacyRandom(0L), 0f)
+        assertEquals("small", salmon.typeData.getString("type"))
+        val warmSheep =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("sheep"),
+                0,
+                LegacyRandom(0L),
+                0f,
+                biome = Identifier.vanilla("savanna"),
+            )
+        assertEquals(12, warmSheep.typeData.getByte("Color").toInt())
+    }
+
+    @Test
+    fun horseVariantsAndAttributesUseConcreteSuperclassOrder() {
+        val group = MobSpawnGroupData()
+        val first = MobSpawnFinalization.stateFor(Identifier.vanilla("horse"), 0, LegacyRandom(1L), 0f, group)
+
+        assertEquals(772, first.typeData.getInt("Variant"), "variant 4 plus markings 3 in the high byte")
+        assertEquals(24.0, first.attributeBases["minecraft:max_health"])
+        assertEquals(0.22561408252176893, first.attributeBases["minecraft:movement_speed"]!!, 1e-15)
+        assertEquals(0.7819374795746402, first.attributeBases["minecraft:jump_strength"]!!, 1e-15)
+
+        val later = MobSpawnFinalization.stateFor(Identifier.vanilla("horse"), 1, LegacyRandom(2L), 0f, group)
+        assertEquals(4, later.typeData.getInt("Variant") and 0xFF, "the coat variant belongs to the pack")
+
+        val llama = MobSpawnFinalization.stateFor(Identifier.vanilla("llama"), 0, LegacyRandom(1L), 0f)
+        assertEquals(26.0, llama.attributeBases["minecraft:max_health"])
+
+        val generated = NbtCompound()
+        MobSpawnFinalization.writeGenerated(generated, Identifier.vanilla("horse"), 0, LegacyRandom(1L))
+        assertEquals(4, generated.getList("attributes")?.size, "three randomized bases plus follow range")
+    }
+
+    @Test
+    fun caveSpiderOverrideSkipsMobFinalizerAndItsRandomDraws() {
+        val random = LegacyRandom(7L)
+        val untouched = LegacyRandom(7L)
+        val state = MobSpawnFinalization.stateFor(Identifier.vanilla("cave_spider"), 0, random, 1f)
+
+        assertEquals(false, state.ranMobFinalizer)
+        assertEquals(untouched.nextLong(), random.nextLong())
+    }
+
+    @Test
     fun cubeSizeUsesTheOfficialJavaRandomSequenceAndDifficultyPromotion() {
         val slime = Identifier.vanilla("slime")
 

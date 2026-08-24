@@ -118,6 +118,13 @@ public object EntityNbt {
         tag.getString("CustomName").takeIf { it.isNotEmpty() }?.let { entity.customName = it }
         (tag["Tags"] as? NbtList)?.filterIsInstance<NbtString>()?.forEach { entity.tags += it.value }
         readAttributes(tag, entity)
+        val hasPackedMaxHealth =
+            (tag["attributes"] as? NbtList)?.any {
+                (it as? NbtCompound)?.getString("id") == MAX_HEALTH_ATTRIBUTE
+            } == true
+        if (hasPackedMaxHealth) {
+            entity.health = minOf(entity.health, entity.attributeWithModifiers(MAX_HEALTH_ATTRIBUTE))
+        }
         entity.sourceNbt = tag.deepCopy()
         return entity
     }
@@ -176,4 +183,6 @@ public object EntityNbt {
     private fun NbtCompound.numericInt(key: String): Int = numericDouble(key).toInt()
 
     private fun NbtCompound.numericBoolean(key: String): Boolean = numericDouble(key) != 0.0
+
+    private const val MAX_HEALTH_ATTRIBUTE = "minecraft:max_health"
 }
