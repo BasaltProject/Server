@@ -5,6 +5,7 @@ import org.basaltmc.server.random.BitRandom
 import org.basaltmc.server.random.PositionalRandomFactory
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.terrain.decoration.IntProvider
 import org.basaltmc.server.world.terrain.decoration.TreeDecoration
@@ -12,6 +13,7 @@ import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class TreeFeatureTest {
@@ -48,6 +50,56 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun treeConfigurationsMatchOfficialIgnoreVinesFlags() {
+        val ignoreVines =
+            listOf(
+                TreeConfigs.OAK,
+                TreeConfigs.BIRCH,
+                TreeConfigs.SUPER_BIRCH,
+                TreeConfigs.FANCY_OAK,
+                TreeConfigs.JUNGLE_TREE,
+                TreeConfigs.SPRUCE,
+                TreeConfigs.PINE,
+                TreeConfigs.ACACIA,
+                TreeConfigs.DARK_OAK,
+                TreeConfigs.PALE_OAK,
+                TreeConfigs.PALE_OAK_CREAKING,
+                TreeConfigs.MANGROVE,
+                TreeConfigs.TALL_MANGROVE,
+                TreeConfigs.CHERRY,
+                TreeConfigs.OAK_LEAF_LITTER,
+                TreeConfigs.FANCY_OAK_BEES,
+            )
+        val vinesBlockGrowth =
+            listOf(
+                TreeConfigs.AZALEA,
+                TreeConfigs.SWAMP_OAK,
+                TreeConfigs.JUNGLE_BUSH,
+                TreeConfigs.MEGA_JUNGLE,
+                TreeConfigs.MEGA_SPRUCE,
+                TreeConfigs.MEGA_PINE,
+            )
+
+        assertTrue(ignoreVines.all(TreeConfiguration::ignoreVines))
+        assertTrue(vinesBlockGrowth.none(TreeConfiguration::ignoreVines))
+    }
+
+    @Test
+    fun vineOnlyBlocksTreesWhoseConfigurationDoesNotIgnoreIt() {
+        val ignored = chunkWithFlatGround(0)
+        val blocking = chunkWithFlatGround(0)
+        val vine =
+            org.basaltmc.server.registry.Blocks.REGISTRY
+                .byIdentifier(Identifier.vanilla("vine"))
+                ?.stateId ?: error("unknown vine")
+        ignored.setBlockStateId(8, 2, 8, vine)
+        blocking.setBlockStateId(8, 2, 8, vine)
+
+        assertTrue(TreeFeature.place(ignored, WorldgenRandom(XoroshiroRandom(42L)), 8, 1, 8, TreeConfigs.OAK))
+        assertFalse(TreeFeature.place(blocking, WorldgenRandom(XoroshiroRandom(42L)), 8, 1, 8, TreeConfigs.SWAMP_OAK))
+    }
+
+    @Test
     fun fancyOakAcceptsItsConfiguredMinimumClippedHeight() {
         val seed = 42L
         val sampledHeight =
@@ -73,6 +125,43 @@ class TreeFeatureTest {
 
         assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(42L)), 8, 1, 8, TreeConfigs.OAK))
         assertEquals(oakLogState, chunk.getBlockStateId(8, 1, 8))
+    }
+
+    @Test
+    fun unchangedFoliageStillFeedsDecoratorContext() {
+        val config =
+            TreeConfiguration(
+                oakLogState,
+                StraightTrunkPlacer(1, 0, 0),
+                oakLeavesState,
+                BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 0),
+                FeatureSizeTwoLayers(0, 0, 0),
+                decorators = listOf(TreeDecoratorConfiguration.LeafVines(1.0f)),
+                ignoreVines = true,
+            )
+        val chunk = chunkWithFlatGround(0)
+        chunk.setBlockStateId(8, 0, 8, org.basaltmc.server.registry.Blocks.DIRT.stateId)
+        for (x in 7..9) {
+            for (z in 7..9) chunk.setBlockStateId(x, 2, z, oakLeavesState)
+        }
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(0L)), 8, 1, 8, config))
+        val perimeter =
+            buildList {
+                for (offset in 6..10) {
+                    add(6 to offset)
+                    add(10 to offset)
+                    add(offset to 6)
+                    add(offset to 10)
+                }
+            }
+        assertTrue(
+            perimeter.any { (x, z) ->
+                val stateId = chunk.getBlockStateId(x, 2, z)
+                Blocks.isVineState(stateId)
+            },
+            "same-state foliage placements must remain visible to decorators",
+        )
     }
 
     @Test
