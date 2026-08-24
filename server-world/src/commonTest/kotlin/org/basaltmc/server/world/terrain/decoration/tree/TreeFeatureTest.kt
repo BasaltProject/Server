@@ -165,6 +165,24 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun treeWithNoPlacedLogsOrLeavesReportsFailure() {
+        val chunk = chunkWithFlatGround(0)
+        chunk.setBlockStateId(8, 0, 8, Blocks.DIRT.stateId)
+        chunk.setBlockStateId(8, 1, 8, oakLogState)
+        val emptyTree =
+            TreeConfiguration(
+                oakLogState,
+                StraightTrunkPlacer(1, 0, 0),
+                oakLeavesState,
+                BlobFoliagePlacer(IntProvider.of(0), IntProvider.of(0), 0),
+                FeatureSizeTwoLayers(0, 0, 0),
+                ignoreVines = true,
+            )
+
+        assertFalse(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(0L)), 8, 1, 8, emptyTree))
+    }
+
+    @Test
     fun foliageOnlyWaterlogsInSourceWater() {
         val chunk = chunkWithFlatGround(0)
         chunk.setBlockStateId(8, 4, 8, org.basaltmc.server.registry.Blocks.WATER.stateId + 1)
