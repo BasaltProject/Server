@@ -16,6 +16,7 @@ import org.basaltmc.wire.nbt.NbtType
 /** Mutable concrete `SpawnGroupData` shared by accepted members of one natural pack. */
 public class MobSpawnGroupData {
     internal var variant: Int? = null
+    internal var secondaryVariant: Int? = null
 }
 
 /** Minecraft 26.2 spawn finalization, including concrete pre/post layers around shared mob state. */
@@ -97,6 +98,7 @@ public object MobSpawnFinalization {
         val attributeBases = mutableMapOf<String, Double>()
         writePreCommonTypeState(type.path, biome?.path, group, random, typeData)
         writeHorseAttributes(type.path, random, attributeBases)
+        writePandaAttributes(type.path, typeData, attributeBases)
         val babyChance = babySpawnChance(type.path)
         val age =
             when {
@@ -138,6 +140,19 @@ public object MobSpawnFinalization {
         data: NbtCompound,
     ) {
         when (type) {
+            "axolotl" -> {
+                val first = group.variant ?: random.nextInt(COMMON_AXOLOTL_VARIANTS).also { group.variant = it }
+                val second =
+                    group.secondaryVariant
+                        ?: random.nextInt(COMMON_AXOLOTL_VARIANTS).also { group.secondaryVariant = it }
+                data.putInt("Variant", if (random.nextInt(2) == 0) first else second)
+            }
+            "fox" -> {
+                val biomeVariant = if (biome in WHITE_RABBIT_BIOMES) FOX_SNOW else FOX_RED
+                val variant = group.variant ?: biomeVariant.also { group.variant = it }
+                data.putString("Type", if (variant == FOX_SNOW) "snow" else "red")
+                writeFoxEquipment(random, data)
+            }
             "horse" -> {
                 val variant = group.variant ?: random.nextInt(HORSE_VARIANTS).also { group.variant = it }
                 val markings = random.nextInt(HORSE_MARKINGS)
@@ -150,6 +165,10 @@ public object MobSpawnFinalization {
                 data.putInt("Variant", variant)
             }
             "parrot" -> data.putInt("Variant", random.nextInt(PARROT_VARIANTS))
+            "panda" -> {
+                data.putString("MainGene", pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName)
+                data.putString("HiddenGene", pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName)
+            }
             "rabbit" -> {
                 val rolled = rabbitVariant(biome, random.nextInt(100))
                 val variant = group.variant ?: rolled.also { group.variant = it }
@@ -168,6 +187,29 @@ public object MobSpawnFinalization {
             }
             "sheep" -> data.putByte("Color", sheepColor(biome, random).toByte())
         }
+    }
+
+    private fun writeFoxEquipment(
+        random: BasaltRandom,
+        data: NbtCompound,
+    ) {
+        if (random.nextFloat() >= FOX_EQUIPMENT_CHANCE) return
+        val roll = random.nextFloat()
+        val item =
+            when {
+                roll < 0.05f -> "emerald"
+                roll < 0.2f -> "egg"
+                roll < 0.4f -> if (random.nextInt(2) == 0) "rabbit_foot" else "rabbit_hide"
+                roll < 0.6f -> "wheat"
+                roll < 0.8f -> "leather"
+                else -> "feather"
+            }
+        val stack =
+            NbtCompound().apply {
+                putString("id", "minecraft:$item")
+                putInt("count", 1)
+            }
+        data["equipment"] = NbtCompound().apply { this["mainhand"] = stack }
     }
 
     /** `AbstractHorse.randomizeAttributes`, dispatched through each concrete override. */
@@ -196,6 +238,33 @@ public object MobSpawnFinalization {
 
     private fun horseJumpStrength(random: BasaltRandom): Double =
         0.4f + random.nextDouble() * 0.2 + random.nextDouble() * 0.2 + random.nextDouble() * 0.2
+
+    private fun writePandaAttributes(
+        type: String,
+        data: NbtCompound,
+        attributes: MutableMap<String, Double>,
+    ) {
+        if (type != "panda") return
+        val main = PANDA_GENES_BY_NAME[data.getString("MainGene")] ?: PandaGene.NORMAL
+        val hidden = PANDA_GENES_BY_NAME[data.getString("HiddenGene")] ?: PandaGene.NORMAL
+        val expressed = if (main.recessive && main != hidden) PandaGene.NORMAL else main
+        when (expressed) {
+            PandaGene.WEAK -> attributes[MAX_HEALTH_ATTRIBUTE] = PANDA_WEAK_HEALTH
+            PandaGene.LAZY -> attributes[MOVEMENT_SPEED_ATTRIBUTE] = PANDA_LAZY_SPEED
+            else -> Unit
+        }
+    }
+
+    private fun pandaGene(roll: Int): PandaGene =
+        when (roll) {
+            0 -> PandaGene.LAZY
+            1 -> PandaGene.WORRIED
+            2 -> PandaGene.PLAYFUL
+            4 -> PandaGene.AGGRESSIVE
+            in 0..8 -> PandaGene.WEAK
+            9, 10 -> PandaGene.BROWN
+            else -> PandaGene.NORMAL
+        }
 
     private fun rabbitVariant(
         biome: String?,
@@ -355,6 +424,13 @@ public object MobSpawnFinalization {
     private const val HORSE_BASE_HEALTH = 15
     private const val HORSE_VARIANTS = 7
     private const val HORSE_MARKINGS = 5
+    private const val COMMON_AXOLOTL_VARIANTS = 4
+    private const val FOX_RED = 0
+    private const val FOX_SNOW = 1
+    private const val FOX_EQUIPMENT_CHANCE = 0.2f
+    private const val PANDA_GENE_ROLLS = 16
+    private const val PANDA_WEAK_HEALTH = 10.0
+    private const val PANDA_LAZY_SPEED = 0.07000000029802322
     private const val LLAMA_MAX_STRENGTH_CHANCE = 0.04f
     private const val LLAMA_VARIANTS = 4
     private const val PARROT_VARIANTS = 5
@@ -380,6 +456,22 @@ public object MobSpawnFinalization {
     private const val BASE_SCALE = 0.75f
     private const val GLOBAL_TIME_WEIGHT = 0.25f
     private const val MOON_WEIGHT = 0.25f
+
+    private enum class PandaGene(
+        val serializedName: String,
+        val id: Int,
+        val recessive: Boolean = false,
+    ) {
+        NORMAL("normal", 0),
+        LAZY("lazy", 1),
+        WORRIED("worried", 2),
+        PLAYFUL("playful", 3),
+        BROWN("brown", 4, true),
+        WEAK("weak", 5, true),
+        AGGRESSIVE("aggressive", 6),
+    }
+
+    private val PANDA_GENES_BY_NAME = PandaGene.entries.associateBy(PandaGene::serializedName)
 
     private val WHITE_RABBIT_BIOMES =
         setOf(
