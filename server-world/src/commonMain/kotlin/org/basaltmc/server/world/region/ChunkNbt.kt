@@ -56,7 +56,7 @@ public object ChunkNbt {
         tag.putInt("yPos", chunk.verticalBounds.minSection)
         tag.putInt("zPos", chunk.chunkZ)
         tag.putLong("LastUpdate", 0L)
-        tag.putLong("InhabitedTime", 0L)
+        tag.putLong("InhabitedTime", chunk.inhabitedTime)
         tag.putString("Status", "minecraft:full")
 
         val scratch = PaletteScratch()
@@ -83,7 +83,10 @@ public object ChunkNbt {
         tag: NbtCompound,
         verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
     ): Chunk {
-        val chunk = Chunk(tag.getInt("xPos"), tag.getInt("zPos"), verticalBounds)
+        val chunk =
+            Chunk(tag.getInt("xPos"), tag.getInt("zPos"), verticalBounds).also {
+                it.restoreInhabitedTime(tag.getLong("InhabitedTime"))
+            }
         val sections = tag.getList("sections") ?: throw ChunkNbtException("missing sections list")
         for (sectionEntry in sections) {
             val sectionTag = sectionEntry as? NbtCompound ?: throw ChunkNbtException("section entry is not a compound")

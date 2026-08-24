@@ -1,5 +1,7 @@
 package org.basaltmc.server.runtime
 
+import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtFloat
 import org.basaltmc.wire.nbt.NbtList
@@ -8,6 +10,7 @@ import org.basaltmc.wire.protocol.play.SetEntityDataPacket
 import org.basaltmc.wire.protocol.play.SetEquipmentPacket
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.Uuid
 
 class GeneratedEntityPresentationTest {
     @Test
@@ -89,6 +92,28 @@ class GeneratedEntityPresentationTest {
         assertEquals(
             listOf(SetEntityDataPacket.Entry.Bytes(18, 0x1F)),
             generatedEntityMetadata("sheep", sheep),
+        )
+    }
+
+    @Test
+    fun liveBabiesAndCubeSizesSendInitialAndBoundaryMetadata() {
+        val slime = ServerEntity(1, Uuid.random(), Identifier.vanilla("slime"), 1, 0.0, 64.0, 0.0)
+        slime.age = -24_000
+        slime.cubeSize = 4
+        val baby = runtimeEntityMetadata(slime)
+
+        assertEquals(
+            listOf(
+                SetEntityDataPacket.Entry.Booleans(16, true),
+                SetEntityDataPacket.Entry.Ints(18, 4),
+            ),
+            baby.changesFrom(null),
+        )
+
+        slime.age = 0
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Booleans(16, false)),
+            runtimeEntityMetadata(slime).changesFrom(baby),
         )
     }
 }

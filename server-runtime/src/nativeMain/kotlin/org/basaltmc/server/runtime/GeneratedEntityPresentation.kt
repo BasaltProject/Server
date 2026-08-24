@@ -1,5 +1,8 @@
 package org.basaltmc.server.runtime
 
+import org.basaltmc.server.runtime.entity.AgeableMobs
+import org.basaltmc.server.runtime.entity.CubeMobs
+import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtFloat
 import org.basaltmc.wire.protocol.play.SetEntityDataPacket
@@ -18,8 +21,11 @@ internal fun generatedEntityMetadata(
 
         if ("Health" in data) add(SetEntityDataPacket.Entry.Floats(9, data.getFloat("Health")))
 
-        if (type in AGEABLE_TYPES && data.getInt("Age") < 0) {
-            add(SetEntityDataPacket.Entry.Booleans(16, true))
+        if (AgeableMobs.isAgeable(type) && data.getInt("Age") < 0) {
+            add(SetEntityDataPacket.Entry.Booleans(AgeableMobs.BABY_DATA_INDEX, true))
+        }
+        if (CubeMobs.isCube(type) && data.getInt("Size") != 0) {
+            add(SetEntityDataPacket.Entry.Ints(CUBE_SIZE_DATA_INDEX, data.getInt("Size") + 1))
         }
 
         when (type) {
@@ -109,7 +115,35 @@ internal fun generatedEntityEquipment(data: NbtCompound): List<GeneratedEquipmen
     }
 }
 
-private val AGEABLE_TYPES = setOf("camel", "cat", "cow", "horse", "pig", "sheep", "villager")
+/** The live synchronized fields this server mutates after an entity has spawned. */
+internal data class RuntimeEntityMetadata(
+    val baby: Boolean?,
+    val cubeSize: Int?,
+) {
+    /** Initial non-default fields, or every field whose live value changed since [previous]. */
+    fun changesFrom(previous: RuntimeEntityMetadata?): List<SetEntityDataPacket.Entry> =
+        buildList {
+            if (baby != null && (previous?.baby != baby) && (previous != null || baby)) {
+                add(SetEntityDataPacket.Entry.Booleans(AgeableMobs.BABY_DATA_INDEX, baby))
+            }
+            if (
+                cubeSize != null &&
+                previous?.cubeSize != cubeSize &&
+                (previous != null || cubeSize != CubeMobs.DEFAULT_SIZE)
+            ) {
+                add(SetEntityDataPacket.Entry.Ints(CUBE_SIZE_DATA_INDEX, cubeSize))
+            }
+        }
+}
+
+internal fun runtimeEntityMetadata(entity: ServerEntity): RuntimeEntityMetadata =
+    RuntimeEntityMetadata(
+        baby = (entity.age < 0).takeIf { AgeableMobs.isAgeable(entity.type) },
+        cubeSize = entity.cubeSize.takeIf { CubeMobs.isCube(entity.type) },
+    )
+
+/** `AbstractCubeMob.ID_SIZE`: two `AgeableMob` fields follow the common index 16. */
+private const val CUBE_SIZE_DATA_INDEX = 18
 
 private val ARMOR_STAND_POSES =
     listOf(

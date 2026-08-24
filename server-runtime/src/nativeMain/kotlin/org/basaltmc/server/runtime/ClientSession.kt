@@ -653,6 +653,9 @@ public class ClientSession(
     /** Where each of them was last reported, so a mob standing still costs nothing. */
     private val lastEntityPositions = HashMap<Int, DoubleArray>()
 
+    /** Baby/size metadata last sent for each live entity, including transitions while stationary. */
+    private val lastRuntimeEntityMetadata = HashMap<Int, RuntimeEntityMetadata>()
+
     /** Which other players this client currently has as entities, kept by [syncPlayers]. */
     private val trackedPlayers = HashSet<Int>()
 
@@ -2656,6 +2659,7 @@ public class ClientSession(
             if (!visible) {
                 if (trackedEntities.remove(entity.entityId)) {
                     lastEntityPositions.remove(entity.entityId)
+                    lastRuntimeEntityMetadata.remove(entity.entityId)
                     sendPlayPacket(RemoveEntitiesPacket.ID) {
                         RemoveEntitiesPacket(listOf(entity.entityId)).write(it)
                     }
@@ -2694,13 +2698,19 @@ public class ClientSession(
                         velocityZ = entity.velocityZ,
                     ).write(it)
                 }
-                entity.sourceNbt?.let { data ->
-                    val metadata = generatedEntityMetadata(entity.type.path, data)
-                    if (metadata.isNotEmpty()) {
-                        sendPlayPacket(SetEntityDataPacket.ID) {
-                            SetEntityDataPacket(entity.entityId, metadata).write(it)
-                        }
+                val liveMetadata = runtimeEntityMetadata(entity)
+                lastRuntimeEntityMetadata[entity.entityId] = liveMetadata
+                val metadata =
+                    (
+                        entity.sourceNbt?.let { generatedEntityMetadata(entity.type.path, it) }.orEmpty() +
+                            liveMetadata.changesFrom(null)
+                    ).associateBy { it.index }.values.toList()
+                if (metadata.isNotEmpty()) {
+                    sendPlayPacket(SetEntityDataPacket.ID) {
+                        SetEntityDataPacket(entity.entityId, metadata).write(it)
                     }
+                }
+                entity.sourceNbt?.let { data ->
                     val equipment =
                         generatedEntityEquipment(data).mapNotNull { slot ->
                             val item =
@@ -2715,6 +2725,14 @@ public class ClientSession(
                 }
                 entity.displayText?.let { text -> sendDisplayText(entity.entityId, text) }
                 continue
+            }
+            val liveMetadata = runtimeEntityMetadata(entity)
+            val metadataChanges = liveMetadata.changesFrom(lastRuntimeEntityMetadata[entity.entityId])
+            lastRuntimeEntityMetadata[entity.entityId] = liveMetadata
+            if (metadataChanges.isNotEmpty()) {
+                sendPlayPacket(SetEntityDataPacket.ID) {
+                    SetEntityDataPacket(entity.entityId, metadataChanges).write(it)
+                }
             }
             // parity: `ServerEntity.sendChanges`, which sends nothing at all for an entity that has
             // not moved. A pen of animals standing still is free to watch; without this every one of
@@ -2754,7 +2772,10 @@ public class ClientSession(
             }
         }
         val gone = world.collectRemovedEntities().filter { trackedEntities.remove(it) }
-        for (entityId in gone) lastEntityPositions.remove(entityId)
+        for (entityId in gone) {
+            lastEntityPositions.remove(entityId)
+            lastRuntimeEntityMetadata.remove(entityId)
+        }
         if (gone.isNotEmpty()) {
             sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
         }
@@ -2904,6 +2925,7 @@ public class ClientSession(
         lastNpcLook.clear()
         trackedEquipment.clear()
         lastEntityPositions.clear()
+        lastRuntimeEntityMetadata.clear()
     }
 
     /**

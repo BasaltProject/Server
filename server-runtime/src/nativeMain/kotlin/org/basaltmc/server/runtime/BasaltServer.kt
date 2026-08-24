@@ -174,6 +174,7 @@ import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.LocalMobCaps
 import org.basaltmc.server.runtime.world.MobCapPlayer
 import org.basaltmc.server.runtime.world.MobEffects
+import org.basaltmc.server.runtime.world.MobSpawnFinalization
 import org.basaltmc.server.runtime.world.NaturalSpawner
 import org.basaltmc.server.runtime.world.NeighbourUpdates
 import org.basaltmc.server.runtime.world.NetherPortals
@@ -1178,6 +1179,8 @@ public class BasaltServer(
                 runCatching { tickFootsteps(world) }
                     .onFailure { logger.error(it) { "Footstep tick failed in world '${world.name}'" } }
             }
+            runCatching { tickInhabitedTime(world, region) }
+                .onFailure { logger.error(it) { "Inhabited-time tick failed in world '${world.name}'" } }
             runCatching { tickFluids(world, region) }
                 .onFailure { logger.error(it) { "Fluid tick failed in world '${world.name}'" } }
             runCatching { tickRandomBlocks(world, region) }
@@ -1220,6 +1223,8 @@ public class BasaltServer(
         yaw: Float = 0f,
         /** Why it is being made, which is the one thing a plugin always wants to filter on. */
         reason: String = "natural",
+        /** Common/type-specific birth state, applied before the entity becomes visible to the world. */
+        initialize: ((org.basaltmc.server.runtime.entity.ServerEntity) -> Unit)? = null,
     ): org.basaltmc.server.runtime.entity.ServerEntity? {
         val protocolType = EntityTypes[type]?.protocolId ?: return null
         val spawning =
@@ -1243,6 +1248,7 @@ public class BasaltServer(
                 z = z,
                 yaw = yaw,
             )
+        initialize?.invoke(entity)
         world.state.spawnEntity(entity)
         return entity
     }
@@ -2403,7 +2409,39 @@ public class BasaltServer(
                         if (cost != null && !spawnPotential.allows(blockX, blockY, blockZ, cost)) {
                             false
                         } else if (
-                            spawnMob(world, request.type, request.x, request.y, request.z, request.yaw) == null
+                            spawnMob(
+                                world,
+                                request.type,
+                                request.x,
+                                request.y,
+                                request.z,
+                                request.yaw,
+                                initialize = { entity ->
+                                    val inhabitedTime =
+                                        world.state
+                                            .chunkIfLoaded(blockX shr 4, blockZ shr 4)
+                                            ?.inhabitedTime ?: 0L
+                                    val moonBrightness =
+                                        if (world.declaration.dimension.hasClock) {
+                                            NaturalSpawner.surfaceSlimeChance(world.clock.totalTicks) * 2f
+                                        } else {
+                                            0f
+                                        }
+                                    val specialMultiplier =
+                                        MobSpawnFinalization.specialMultiplier(
+                                            world.difficulty,
+                                            world.gameTime,
+                                            inhabitedTime,
+                                            moonBrightness,
+                                        )
+                                    MobSpawnFinalization.apply(
+                                        entity,
+                                        request.groupIndex,
+                                        random,
+                                        specialMultiplier,
+                                    )
+                                },
+                            ) == null
                         ) {
                             false
                         } else {
@@ -3846,6 +3884,16 @@ public class BasaltServer(
             }
         }
         return chunks
+    }
+
+    /** parity: every loaded chunk inside simulation distance advances its own local-difficulty age. */
+    private fun tickInhabitedTime(
+        world: LoadedWorld,
+        region: Region,
+    ) {
+        for (position in simulatedChunks(world, region)) {
+            world.state.chunkIfLoaded(position[0], position[1])?.increaseInhabitedTime()
+        }
     }
 
     /**

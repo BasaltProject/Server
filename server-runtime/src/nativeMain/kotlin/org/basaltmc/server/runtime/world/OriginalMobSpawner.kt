@@ -7,6 +7,7 @@ import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
+import org.basaltmc.wire.nbt.NbtCompound
 
 /**
  * Passive packs created by the chunk-generation SPAWN status.
@@ -33,6 +34,7 @@ public object OriginalMobSpawner {
             var z = minZ + random.nextInt(16)
             val startX = x
             val startZ = z
+            var groupSize = 0
             repeat(count) {
                 var success = false
                 var attempts = 0
@@ -45,17 +47,22 @@ public object OriginalMobSpawner {
                     val blockX = entityX.toInt()
                     val blockZ = entityZ.toInt()
                     if (canSpawnAt(chunk, entry.type.path, blockX, y, blockZ)) {
+                        val yaw = random.nextFloat() * 360f
+                        val data = NbtCompound()
+                        MobSpawnFinalization.writeGenerated(data, entry.type, groupSize, random)
                         chunk.addGeneratedEntity(
                             ChunkGeneratedEntity(
                                 type = entry.type,
                                 x = entityX,
                                 y = y.toDouble(),
                                 z = entityZ,
-                                yaw = random.nextFloat() * 360f,
+                                yaw = yaw,
                                 pitch = 0f,
+                                data = data,
                             ),
                         )
                         added++
+                        groupSize++
                         success = true
                     }
                     x += random.nextInt(PACK_SPREAD) - random.nextInt(PACK_SPREAD)

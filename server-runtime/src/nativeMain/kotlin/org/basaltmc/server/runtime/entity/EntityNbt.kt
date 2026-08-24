@@ -35,7 +35,7 @@ public object EntityNbt {
         tag["Health"] = NbtDouble(entity.health)
         tag["Age"] = NbtDouble(entity.age.toDouble())
         tag["Fuse"] = NbtDouble(entity.fuse.toDouble())
-        tag["Size"] = NbtDouble(entity.cubeSize.toDouble())
+        if (CubeMobs.isCube(entity.type)) tag["Size"] = NbtInt(entity.cubeSize.coerceAtLeast(1) - 1)
         tag["PersistenceRequired"] = NbtDouble(if (entity.persistent) 1.0 else 0.0)
         tag.putBoolean("NoAI", entity.noAi)
         tag["LoveTicks"] = NbtDouble(entity.loveTicks.toDouble())
@@ -94,7 +94,12 @@ public object EntityNbt {
         entity.health = tag.numericDouble("Health").takeIf { it > 0.0 } ?: entity.health
         entity.age = tag.numericInt("Age")
         entity.fuse = tag.numericInt("Fuse")
-        entity.cubeSize = tag.numericInt("Size").coerceAtLeast(1)
+        entity.cubeSize =
+            if (CubeMobs.isCube(type)) {
+                (tag.numericInt("Size") + 1).coerceIn(1, 127)
+            } else {
+                CubeMobs.DEFAULT_SIZE
+            }
         entity.persistent = tag.numericBoolean("PersistenceRequired")
         entity.noAi = tag.numericBoolean("NoAI")
         entity.loveTicks = tag.numericInt("LoveTicks")

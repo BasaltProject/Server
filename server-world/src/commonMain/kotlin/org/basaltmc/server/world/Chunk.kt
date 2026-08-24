@@ -64,6 +64,29 @@ public class Chunk(
 
     public val sectionCount: Int get() = sections.size
 
+    /**
+     * How long this chunk has actually been simulated.
+     *
+     * parity: `ChunkAccess.inhabitedTime`, used by `DifficultyInstance`'s
+     * local difficulty rather than the world's total age. A newly generated chunk in an old world
+     * therefore still begins at zero.
+     */
+    public var inhabitedTime: Long = 0L
+        private set
+
+    /** Advances the local difficulty clock and makes the persisted chunk reflect it. */
+    public fun increaseInhabitedTime(delta: Long = 1L) {
+        require(delta >= 0L) { "inhabited time cannot move backwards" }
+        if (delta == 0L) return
+        inhabitedTime += delta
+        isDirty = true
+    }
+
+    /** Restores the disk value without making a freshly loaded chunk dirty. */
+    public fun restoreInhabitedTime(value: Long) {
+        inhabitedTime = value.coerceAtLeast(0L)
+    }
+
     public fun section(index: Int): ChunkSection = sections[index]
 
     public fun getBlockStateId(
