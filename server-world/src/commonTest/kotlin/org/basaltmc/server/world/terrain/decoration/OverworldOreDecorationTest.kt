@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
@@ -311,6 +313,35 @@ class OverworldOreDecorationTest {
         assertFalse(OverworldOreDecoration.hasFullMagmaCover(bottom, BlockFace.UP))
         assertFalse(OverworldOreDecoration.hasFullMagmaCover(top, BlockFace.DOWN))
         assertTrue(OverworldOreDecoration.hasFullMagmaCover(top, BlockFace.UP))
+    }
+
+    @Test
+    fun configuredUnderwaterMagmaScansFlowingWaterAndPlacesTheFloorBody() {
+        val chunk = solidChunk(Blocks.STONE.stateId)
+        for (x in 7..9) {
+            for (z in 7..9) {
+                for (y in 41..44) chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId + 1)
+            }
+        }
+
+        val placed =
+            OverworldOreDecoration.placeUnderwaterMagmaAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(99L)),
+                8,
+                43,
+                8,
+            )
+
+        assertTrue(placed)
+        assertEquals(Blocks.WATER.stateId + 1, chunk.getBlockStateId(8, 43, 8))
+        assertTrue(
+            (7..9).any { z ->
+                (7..9).any { x ->
+                    (39..40).any { y -> Blocks.byStateId(chunk.getBlockStateId(x, y, z))?.block?.path == "magma_block" }
+                }
+            },
+        )
     }
 
     @Test

@@ -7,6 +7,8 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class CaveLocalModificationDecorationTest {
     @Test
@@ -68,6 +70,17 @@ class CaveLocalModificationDecorationTest {
             externalBlockState = { x, y, z -> cavePatternState(x, y, z) },
         )
         assertContentEquals(intArrayOf(32768, 65536, 0, 0, 0, 0, 0, 0, 0, 0, 0), vector(dripstone).counts)
+    }
+
+    @Test
+    fun amethystClusterDistinguishesFullAndSourceWater() {
+        assertTrue(CaveLocalModificationDecoration.canAmethystClusterGrowAtState(Blocks.AIR.stateId))
+        assertTrue(CaveLocalModificationDecoration.canAmethystClusterGrowAtState(Blocks.WATER.stateId))
+        assertTrue(CaveLocalModificationDecoration.canAmethystClusterGrowAtState(Blocks.WATER.stateId + 8))
+        assertFalse(CaveLocalModificationDecoration.canAmethystClusterGrowAtState(Blocks.WATER.stateId + 1))
+
+        assertTrue(CaveLocalModificationDecoration.isSourceAmethystWater(Blocks.WATER.stateId))
+        assertFalse(CaveLocalModificationDecoration.isSourceAmethystWater(Blocks.WATER.stateId + 8))
     }
 
     private fun solidStoneChunk(): Chunk =

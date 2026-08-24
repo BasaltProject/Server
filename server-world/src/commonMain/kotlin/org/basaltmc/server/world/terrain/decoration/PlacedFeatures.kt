@@ -385,7 +385,9 @@ public object PlacedFeatures {
             }
             put(
                 Identifier.vanilla("underwater_magma"),
-                Placement { chunk, _, x, y, z -> OverworldOreDecoration.placeUnderwaterMagmaAt(chunk, x, y, z) },
+                Placement { chunk, random, x, y, z ->
+                    OverworldOreDecoration.placeUnderwaterMagmaAt(chunk, random, x, y, z)
+                },
             )
             for (name in DefaultVegetationDecoration.PLACED_IDS) {
                 put(

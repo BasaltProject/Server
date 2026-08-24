@@ -174,8 +174,8 @@ public object CaveLocalModificationDecoration {
             for (direction in DIRECTIONS) {
                 val placePosition = crystalPosition.offset(direction)
                 val placeState = region.get(placePosition)
-                if (placeState != null && (Blocks.isAir(placeState) || placeState == Blocks.WATER.stateId)) {
-                    val stateId = amethystPlacementState(block, direction.name, placeState == Blocks.WATER.stateId)
+                if (placeState != null && canAmethystClusterGrowAtState(placeState)) {
+                    val stateId = amethystPlacementState(block, direction.name, isSourceAmethystWater(placeState))
                     region.safeSet(placePosition, stateId)
                     break
                 }
@@ -436,6 +436,17 @@ public object CaveLocalModificationDecoration {
             linkedMapOf("facing" to facing, "waterlogged" to waterlogged.toString()),
         ) ?: error("missing state for minecraft:$block facing=$facing waterlogged=$waterlogged")
 
+    internal fun canAmethystClusterGrowAtState(stateId: Int): Boolean =
+        Blocks.isAir(stateId) || amethystWaterLevel(stateId) in FULL_WATER_LEVELS
+
+    internal fun isSourceAmethystWater(stateId: Int): Boolean = amethystWaterLevel(stateId) == SOURCE_WATER_LEVEL
+
+    private fun amethystWaterLevel(stateId: Int): Int? {
+        val state = Blocks.byStateId(stateId) ?: return null
+        if (state.block.path != "water") return null
+        return state.properties["level"]?.toIntOrNull()
+    }
+
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId
             ?: error("missing vanilla block minecraft:$path")
@@ -453,6 +464,8 @@ public object CaveLocalModificationDecoration {
     private val GEODE_CANNOT_REPLACE =
         setOf("bedrock", "spawner", "chest", "end_portal_frame", "reinforced_deepslate", "trial_spawner", "vault")
     private val GEODE_INVALID_BLOCKS = setOf("bedrock", "water", "lava", "ice", "packed_ice", "blue_ice")
+    private val FULL_WATER_LEVELS = setOf(0, 8)
+    private const val SOURCE_WATER_LEVEL = 0
     private val BASE_STONE_OVERWORLD = setOf("stone", "granite", "diorite", "andesite", "tuff", "deepslate")
     private val DIRECTIONS =
         listOf(

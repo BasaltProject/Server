@@ -59,17 +59,16 @@ public object OverworldOreDecoration {
         }
     }
 
-    /** parity: `underwater_magma`, one block at one position rather than scattered over the chunk. */
+    /** parity: one complete configured `underwater_magma` body at the supplied placement origin. */
     public fun placeUnderwaterMagmaAt(
         chunk: Chunk,
+        random: WorldgenRandom,
         x: Int,
         y: Int,
         z: Int,
     ): Boolean {
         val region = PlacementRegion(chunk, null, null)
-        if (region.getBlockStateId(x, y, z) != Blocks.WATER.stateId) return false
-        region.setBlockStateId(x, y, z, magmaStateId)
-        return true
+        return placeUnderwaterMagmaBody(region, random, x, y, z)
     }
 
     /** The vanilla placed feature names of the disks this step runs. */
@@ -294,20 +293,31 @@ public object OverworldOreDecoration {
             val y = WorldHeight.MIN_Y + random.nextInt(321)
             val oceanFloor = region.oceanFloorHeight(x, z) ?: return@repeat
             if (y > oceanFloor - 2 || environment.biomeAt(x, y, z).substringAfter(':') !in ALL_BIOMES) return@repeat
-            val floorY = findWaterColumnFloor(region, x, y, z) ?: return@repeat
-            for (placedZ in z - 1..z + 1) {
-                for (placedY in floorY - 1..floorY + 1) {
-                    for (placedX in x - 1..x + 1) {
-                        if (random.nextFloat() >= 0.5f ||
-                            !isValidMagmaPlacement(region, placedX, placedY, placedZ)
-                        ) {
-                            continue
-                        }
-                        region.setBlockStateId(placedX, placedY, placedZ, magmaStateId)
+            placeUnderwaterMagmaBody(region, random, x, y, z)
+        }
+    }
+
+    private fun placeUnderwaterMagmaBody(
+        region: PlacementRegion,
+        random: WorldgenRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val floorY = findWaterColumnFloor(region, x, y, z) ?: return false
+        var placed = false
+        for (placedZ in z - 1..z + 1) {
+            for (placedY in floorY - 1..floorY + 1) {
+                for (placedX in x - 1..x + 1) {
+                    if (random.nextFloat() >= 0.5f || !isValidMagmaPlacement(region, placedX, placedY, placedZ)) {
+                        continue
                     }
+                    region.setBlockStateId(placedX, placedY, placedZ, magmaStateId)
+                    placed = true
                 }
             }
         }
+        return placed
     }
 
     private fun findWaterColumnFloor(
@@ -316,15 +326,18 @@ public object OverworldOreDecoration {
         y: Int,
         z: Int,
     ): Int? {
-        if (region.getBlockStateId(x, y, z) != Blocks.WATER.stateId) return null
+        if (!isUnderwaterMagmaWater(region.getBlockStateId(x, y, z))) return null
         var scanY = y
         var distance = 1
-        while (distance < 5 && region.getBlockStateId(x, scanY, z) == Blocks.WATER.stateId) {
+        while (distance < 5 && isUnderwaterMagmaWater(region.getBlockStateId(x, scanY, z))) {
             scanY--
             distance++
         }
-        return if (region.getBlockStateId(x, scanY, z) != Blocks.WATER.stateId) scanY else null
+        return if (!isUnderwaterMagmaWater(region.getBlockStateId(x, scanY, z))) scanY else null
     }
+
+    private fun isUnderwaterMagmaWater(stateId: Int?): Boolean =
+        stateId != null && Blocks.byStateId(stateId)?.block?.path == "water"
 
     private fun isValidMagmaPlacement(
         region: PlacementRegion,
