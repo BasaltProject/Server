@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -8,6 +10,7 @@ import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class SculkDecorationTest {
     @Test
@@ -124,6 +127,28 @@ class SculkDecorationTest {
                 SCULK_PATHS,
             ).counts,
         )
+    }
+
+    @Test
+    fun sculkVeinAcceptsAllWaterBlocksButOnlySourceWaterlogs() {
+        for ((waterLevel, expectedWaterlogged) in listOf(0 to "true", 1 to "false")) {
+            val chunk = Chunk(0, 0)
+            chunk.setBlockStateId(8, 49, 8, Blocks.STONE.stateId)
+            chunk.setBlockStateId(8, 50, 8, Blocks.WATER.stateId + waterLevel)
+
+            val placed =
+                SculkDecoration.placeAt(
+                    chunk,
+                    WorldgenRandom(XoroshiroRandom(99L)),
+                    DecorationPos(8, 50, 8),
+                    "sculk_vein",
+                )
+
+            assertTrue(placed)
+            val state = Blocks.byStateId(chunk.getBlockStateId(8, 50, 8))
+            assertEquals("sculk_vein", state?.block?.path)
+            assertEquals(expectedWaterlogged, state?.properties?.get("waterlogged"))
+        }
     }
 
     private fun patternedChunk(): Chunk =
