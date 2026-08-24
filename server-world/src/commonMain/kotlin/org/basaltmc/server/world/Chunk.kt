@@ -13,6 +13,8 @@ public data class ChunkGeneratedBlockWrite(
     public val z: Int,
     public val expectedStateId: Int,
     public val stateId: Int,
+    /** Templates replace every state at their destination; ordinary decorations remain conditional. */
+    public val replaceAnyState: Boolean = false,
 )
 
 /** A generated block entity whose target lies outside the chunk that produced it. */
@@ -147,6 +149,7 @@ public class Chunk(
         worldZ: Int,
         stateId: Int,
         expectedExternalStateId: Int = Blocks.AIR.stateId,
+        replaceAnyExternalState: Boolean = false,
     ) {
         if (y !in verticalBounds.minY..verticalBounds.maxY) return
         if (worldX shr 4 == chunkX && worldZ shr 4 == chunkZ) {
@@ -167,6 +170,7 @@ public class Chunk(
                 worldZ,
                 previous?.expectedStateId ?: expectedExternalStateId,
                 stateId,
+                previous?.replaceAnyState == true || replaceAnyExternalState,
             )
         blockWriteObserver?.invoke(worldX - chunkX * 16, y, worldZ - chunkZ * 16, oldStateId, stateId)
     }

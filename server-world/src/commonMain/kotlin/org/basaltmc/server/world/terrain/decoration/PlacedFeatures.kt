@@ -461,15 +461,17 @@ public object PlacedFeatures {
      * What a feature needs beyond its chunk: the world's seed, its noise routers, its surface rules
      * and its structure templates.
      *
-     * Five vanilla features cannot be run from a chunk alone (the End's spikes and chorus plants,
-     * the fossils, the freeze pass), and this is how they are handed the rest. A caller that has
-     * none of it gets a refusal by name rather than a half-placed feature.
+     * Some vanilla features cannot be run from a chunk alone (the End's spikes and chorus plants,
+     * fossils, the freeze pass and template-backed sulfur springs), and this is how they are handed
+     * the rest. A caller that has none of it gets a refusal rather than a half-placed feature.
      */
     public class FeatureContext(
         public val seed: Long = 0L,
         public val endRouter: EndNoiseRouter? = null,
         public val surface: SurfaceRuleEnvironment? = null,
         public val templates: ((Identifier) -> StructureTemplate?)? = null,
+        /** Loaded world-state view for configured features whose predicates cross chunk borders. */
+        public val blockStateAt: ((Int, Int, Int) -> Int)? = null,
     )
 
     /** A feature that needs [FeatureContext] as well as a position. */
@@ -503,6 +505,18 @@ public object PlacedFeatures {
                 },
             Identifier.vanilla("fossil_lower") to fossil(FOSSIL_LOWER),
             Identifier.vanilla("fossil_upper") to fossil(FOSSIL_UPPER),
+            Identifier.vanilla("rooted_sulfur_spring") to
+                ContextualPlacement { chunk, random, x, y, z, context ->
+                    val loader = context.templates ?: return@ContextualPlacement false
+                    val blockStateAt = context.blockStateAt ?: return@ContextualPlacement false
+                    RootedSulfurSpringFeature.place(
+                        chunk,
+                        random,
+                        DecorationPos(chunk.chunkX * 16 + (x and 15), y, chunk.chunkZ * 16 + (z and 15)),
+                        loader,
+                        { position -> blockStateAt(position.x, position.y, position.z) },
+                    )
+                },
         )
 
     /**
@@ -528,7 +542,7 @@ public object PlacedFeatures {
             true
         }
 
-    /** Every id that needs a [FeatureContext], which is the five that cannot run from a chunk alone. */
+    /** Every id that needs a [FeatureContext] and therefore cannot run from a chunk alone. */
     public val contextualIds: Set<Identifier> get() = byIdWithContext.keys
 
     public fun contextual(id: Identifier): ContextualPlacement? = byIdWithContext[id]

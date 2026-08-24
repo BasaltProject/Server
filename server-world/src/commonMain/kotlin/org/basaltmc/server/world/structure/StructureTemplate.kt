@@ -271,9 +271,60 @@ public class StructureTemplate {
             chunk.setBlockStateId(localX, worldPos.y, localZ, stateId)
             placeBlockEntity(chunk, blockInfo, stateId, worldPos, random)
         }
+        placeEntities(chunk, position, rotation, mirror, pivot, clipTo)
+    }
+
+    /**
+     * Places a configured-feature template from one owning chunk without wrapping the part that
+     * crosses its border. Unlike structure pieces, a configured feature is invoked only once, so
+     * its out-of-chunk blocks have to travel as deferred decoration writes rather than relying on
+     * the neighbouring chunk to replay the same template.
+     *
+     * parity: `TemplateFeature` -> `StructureTemplate.placeInWorld`, with no processors, mirror or
+     * clipping. Template blocks deliberately overwrite any destination state, including explicit
+     * air in the template.
+     */
+    public fun placeDecorationInto(
+        chunk: Chunk,
+        position: StructurePos,
+        rotation: StructureRotation,
+        random: WorldgenRandom,
+    ): Boolean {
+        if (size.x < 1 || size.y < 1 || size.z < 1 || blocksBacking.isEmpty() && entitiesBacking.isEmpty()) {
+            return false
+        }
+        // StructurePlaceSettings.getRandomPalette draws even for vanilla's single retained palette.
+        random.nextInt(1)
+        val mirror = StructureMirror.NONE
+        val pivot = StructurePos(0, 0, 0)
+        for (blockInfo in blocksBacking) {
+            val worldPos = StructureTransform.transform(blockInfo.pos, mirror, rotation, pivot) + position
+            if (worldPos.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) continue
+            val stateId = transformedStateId(blockInfo.stateId, blockInfo.properties, mirror, rotation)
+            chunk.setDecorationBlockStateId(
+                worldPos.x,
+                worldPos.y,
+                worldPos.z,
+                stateId,
+                replaceAnyExternalState = true,
+            )
+            placeDecorationBlockEntity(chunk, blockInfo, stateId, worldPos, random)
+        }
+        placeEntities(chunk, position, rotation, mirror, pivot, clipTo = null)
+        return true
+    }
+
+    private fun placeEntities(
+        chunk: Chunk,
+        position: StructurePos,
+        rotation: StructureRotation,
+        mirror: StructureMirror,
+        pivot: StructurePos,
+        clipTo: StructureBoundingBox?,
+    ) {
         for (entityInfo in entitiesBacking) {
             val ownerPos = StructureTransform.transform(entityInfo.blockPos, mirror, rotation, pivot) + position
-            if (!clipTo.isInside(ownerPos)) continue
+            if (clipTo != null && !clipTo.isInside(ownerPos)) continue
             val transformed = transformEntityPosition(entityInfo.x, entityInfo.y, entityInfo.z, mirror, rotation, pivot)
             val worldX = transformed.first + position.x
             val worldY = transformed.second + position.y
@@ -287,17 +338,13 @@ public class StructureTemplate {
                 )
             val sourceRotation = data.getList("Rotation")
             val sourceYaw =
-                if (sourceRotation != null &&
-                    sourceRotation.size > 0
-                ) {
+                if (sourceRotation != null && sourceRotation.size > 0) {
                     (sourceRotation[0] as? NbtFloat)?.value ?: 0f
                 } else {
                     0f
                 }
             val pitch =
-                if (sourceRotation != null &&
-                    sourceRotation.size > 1
-                ) {
+                if (sourceRotation != null && sourceRotation.size > 1) {
                     (sourceRotation[1] as? NbtFloat)?.value ?: 0f
                 } else {
                     0f
@@ -528,6 +575,31 @@ public class StructureTemplate {
                 Identifier.parse(typeName),
                 data,
             ),
+        )
+    }
+
+    private fun placeDecorationBlockEntity(
+        chunk: Chunk,
+        blockInfo: StructureBlockInfo,
+        stateId: Int,
+        worldPos: StructurePos,
+        random: WorldgenRandom,
+    ) {
+        val source = blockInfo.blockEntityNbt ?: return
+        val finalPath = Blocks.byStateId(stateId)?.block?.path ?: return
+        if (finalPath !in BLOCK_ENTITY_BLOCKS) return
+        val typeName = source.getString("id")
+        if (typeName.isEmpty() || typeName == "minecraft:jigsaw") return
+        val data = source.deepCopy()
+        if ("components" !in data) data.putCompound("components", NbtCompound())
+        if (finalPath in RANDOMIZABLE_CONTAINER_BLOCKS) data.putLong("LootTableSeed", random.nextLong())
+        chunk.setDecorationBlockEntity(
+            worldPos.x,
+            worldPos.y,
+            worldPos.z,
+            stateId,
+            Identifier.parse(typeName),
+            data,
         )
     }
 

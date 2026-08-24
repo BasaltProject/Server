@@ -309,7 +309,7 @@ public class WorldState(
         val localX = write.x and 15
         val localZ = write.z and 15
         val current = chunk.getBlockStateId(localX, write.y, localZ)
-        if (current == write.expectedStateId) {
+        if (write.replaceAnyState || current == write.expectedStateId) {
             chunk.setBlockStateId(localX, write.y, localZ, write.stateId)
         }
     }
