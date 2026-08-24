@@ -13,6 +13,18 @@ public class SpawnerEntry(
     public val maxCount: Int,
 )
 
+/** How strongly one mob repels another of the same biome-defined cost family. */
+public class MobSpawnCost(
+    public val energyBudget: Double,
+    public val charge: Double,
+)
+
+private class BiomeSpawnSettings(
+    val spawners: Map<String, List<SpawnerEntry>>,
+    val creatureProbability: Float,
+    val costs: Map<Identifier, MobSpawnCost>,
+)
+
 /**
  * What each biome can spawn, out of the operator's own `server.jar`.
  *
@@ -26,10 +38,7 @@ public class RealBiomeSpawns(
     private val logger: Logger = Logger("BiomeSpawns"),
 ) {
     @Volatile
-    private var cache: Map<String, Map<String, List<SpawnerEntry>>> = emptyMap()
-
-    @Volatile
-    private var creatureProbabilities: Map<String, Float> = emptyMap()
+    private var cache: Map<String, BiomeSpawnSettings> = emptyMap()
 
     /** The spawn list of [biome] for [category], empty when the biome offers nothing of that kind. */
     public fun listFor(
@@ -38,22 +47,30 @@ public class RealBiomeSpawns(
     ): List<SpawnerEntry> = of(biome)[category].orEmpty()
 
     /** parity: `MobSpawnSettings.creatureGenerationProbability`, defaulting to 0.1. */
-    public fun creatureProbabilityFor(biome: Identifier): Float {
-        of(biome)
-        return creatureProbabilities[biome.path] ?: DEFAULT_CREATURE_PROBABILITY
-    }
+    public fun creatureProbabilityFor(biome: Identifier): Float = settingsOf(biome).creatureProbability
 
-    public fun of(biome: Identifier): Map<String, List<SpawnerEntry>> {
+    /** parity: `MobSpawnSettings.getMobSpawnCost`, absent for almost every biome and entity. */
+    public fun costFor(
+        biome: Identifier,
+        type: Identifier,
+    ): MobSpawnCost? = settingsOf(biome).costs[type]
+
+    public fun of(biome: Identifier): Map<String, List<SpawnerEntry>> = settingsOf(biome).spawners
+
+    private fun settingsOf(biome: Identifier): BiomeSpawnSettings {
         val key = biome.path
         cache[key]?.let { return it }
-        val jar = serverJar ?: return emptyMap()
+        val jar = serverJar ?: return EMPTY_SETTINGS
         val parsed =
             runCatching {
                 val json = jar.readText("data/minecraft/worldgen/biome/$key.json")
-                creatureProbabilities = creatureProbabilities + (key to creatureProbability(json))
-                parse(json)
+                BiomeSpawnSettings(
+                    spawners = parse(json),
+                    creatureProbability = creatureProbability(json),
+                    costs = parseCosts(json),
+                )
             }.onFailure { logger.debug { "No spawn list for biome '$key': ${it.message}" } }
-                .getOrDefault(emptyMap())
+                .getOrDefault(EMPTY_SETTINGS)
         cache = cache + (key to parsed)
         return parsed
     }
@@ -63,23 +80,7 @@ public class RealBiomeSpawns(
      * flat objects, and everything else in a biome file is worldgen's business rather than this one's.
      */
     private fun parse(json: String): Map<String, List<SpawnerEntry>> {
-        val start = json.indexOf("\"spawners\"")
-        if (start < 0) return emptyMap()
-        val open = json.indexOf('{', start)
-        if (open < 0) return emptyMap()
-        var depth = 0
-        var end = open
-        while (end < json.length) {
-            when (json[end]) {
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) break
-                }
-            }
-            end++
-        }
-        val body = json.substring(open + 1, end)
+        val body = objectBody(json, "spawners") ?: return emptyMap()
         val lists = mutableMapOf<String, List<SpawnerEntry>>()
         var cursor = 0
         while (true) {
@@ -96,6 +97,61 @@ public class RealBiomeSpawns(
             cursor = arrayEnd + 1
         }
         return lists
+    }
+
+    private fun parseCosts(json: String): Map<Identifier, MobSpawnCost> {
+        val body = objectBody(json, "spawn_costs") ?: return emptyMap()
+        val costs = mutableMapOf<Identifier, MobSpawnCost>()
+        var cursor = 0
+        while (true) {
+            val nameStart = body.indexOf('"', cursor)
+            if (nameStart < 0) break
+            val nameEnd = body.indexOf('"', nameStart + 1)
+            if (nameEnd < 0) break
+            val type = runCatching { Identifier.parse(body.substring(nameStart + 1, nameEnd)) }.getOrNull()
+            val nestedOpen = body.indexOf('{', nameEnd)
+            if (nestedOpen < 0) break
+            val nestedClose = matchingBrace(body, nestedOpen) ?: break
+            val fields = body.substring(nestedOpen + 1, nestedClose)
+            val energyBudget = doubleField(fields, "energy_budget")
+            val charge = doubleField(fields, "charge")
+            if (type != null && energyBudget != null && charge != null) {
+                costs[type] = MobSpawnCost(energyBudget, charge)
+            }
+            cursor = nestedClose + 1
+        }
+        return costs
+    }
+
+    private fun objectBody(
+        json: String,
+        name: String,
+    ): String? {
+        val start = json.indexOf("\"$name\"")
+        if (start < 0) return null
+        val open = json.indexOf('{', start)
+        if (open < 0) return null
+        val end = matchingBrace(json, open) ?: return null
+        return json.substring(open + 1, end)
+    }
+
+    private fun matchingBrace(
+        text: String,
+        open: Int,
+    ): Int? {
+        var depth = 0
+        var end = open
+        while (end < text.length) {
+            when (text[end]) {
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return end
+                }
+            }
+            end++
+        }
+        return null
     }
 
     private fun entriesOf(body: String): List<SpawnerEntry> {
@@ -144,6 +200,23 @@ public class RealBiomeSpawns(
         return digits.toIntOrNull()
     }
 
+    private fun doubleField(
+        body: String,
+        name: String,
+    ): Double? {
+        val at = body.indexOf("\"$name\"")
+        if (at < 0) return null
+        val colon = body.indexOf(':', at)
+        if (colon < 0) return null
+        val number =
+            body
+                .drop(colon + 1)
+                .takeWhile {
+                    it.isDigit() || it == ' ' || it == '-' || it == '+' || it == '.' || it == 'e' || it == 'E'
+                }.trim()
+        return number.toDoubleOrNull()
+    }
+
     private fun creatureProbability(json: String): Float {
         val at = json.indexOf("\"creature_spawn_probability\"")
         if (at < 0) return DEFAULT_CREATURE_PROBABILITY
@@ -155,6 +228,8 @@ public class RealBiomeSpawns(
 
     public companion object {
         private const val DEFAULT_CREATURE_PROBABILITY = 0.1f
+        private val EMPTY_SETTINGS =
+            BiomeSpawnSettings(emptyMap(), DEFAULT_CREATURE_PROBABILITY, emptyMap())
 
         /** The parser on its own, so it can be tested without a jar to read from. */
         internal fun parseForTest(json: String): Map<String, List<SpawnerEntry>> =
@@ -162,5 +237,8 @@ public class RealBiomeSpawns(
 
         internal fun creatureProbabilityForTest(json: String): Float =
             RealBiomeSpawns(serverJar = null).creatureProbability(json)
+
+        internal fun spawnCostsForTest(json: String): Map<Identifier, MobSpawnCost> =
+            RealBiomeSpawns(serverJar = null).parseCosts(json)
     }
 }

@@ -4,6 +4,7 @@ import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
@@ -74,6 +75,8 @@ public object NaturalSpawner {
         entriesFor: (Identifier) -> List<SpawnerEntry>,
         playerDistanceSquared: (Double, Double, Double) -> Double?,
         random: BasaltRandom,
+        /** Runs at the exact attempt, so rejected plugin/cost spawns do not consume the pack. */
+        requestAccepted: ((SpawnRequest) -> Boolean)? = null,
     ): List<SpawnRequest> {
         val chunk = world.state.chunkIfLoaded(chunkX, chunkZ) ?: return emptyList()
         val localX = random.nextInt(16)
@@ -120,8 +123,10 @@ public object NaturalSpawner {
                     pack = chosen.minCount + random.nextInt((1 + chosen.maxCount - chosen.minCount).coerceAtLeast(1))
                 }
                 if (!canSpawnAt(world, chosen.type, category, x, startY, z, random)) continue
-                requests +=
+                val request =
                     SpawnRequest(chosen.type, centreX, startY.toDouble(), centreZ, random.nextFloat() * 360f)
+                if (requestAccepted != null && !requestAccepted(request)) continue
+                requests += request
                 spawned++
                 clusterSize++
                 if (clusterSize >= maxClusterSize(chosen.type)) return requests
@@ -183,21 +188,74 @@ public object NaturalSpawner {
         val feet = world.state.getBlockState(x, y, z) ?: return false
         val head = world.state.getBlockState(x, y + 1, z) ?: return false
         if (!BlockShapes.isEmptyShape(feet) || !BlockShapes.isEmptyShape(head)) return false
+        if (typePath == "ocelot") {
+            return y >= world.declaration.dimension.seaLevel &&
+                (BlockStateDefinitions.blockOf(ground)?.path == "grass_block" || Blocks.isLeavesState(ground)) &&
+                random.nextInt(3) != 0
+        }
+        if (typePath == "bat") return canSpawnBat(world, ground, x, y, z, random)
 
         return when (category) {
             // parity: `Monster.isDarkEnoughToSpawn`: the sky has to be dark where it stands, and the
             // block light under the dimension's own limit, which is zero in the overworld.
-            MobCategory.MONSTER ->
-                typePath in MONSTERS_IGNORING_LIGHT ||
-                    (
-                        WorldLight.skyLight(world, x, y, z) <= random.nextInt(32) &&
-                            WorldLight.blockLight(world, x, y, z) <= 0
-                    )
+            MobCategory.MONSTER -> {
+                val dark =
+                    typePath in MONSTERS_IGNORING_LIGHT ||
+                        (
+                            WorldLight.skyLight(world, x, y, z) <= random.nextInt(32) &&
+                                WorldLight.blockLight(world, x, y, z) <= 0
+                        )
+                dark && monsterTypeRule(typePath, ground, world, x, y, z, random)
+            }
             MobCategory.CREATURE ->
-                (typePath != null && typePath !in GENERAL_ANIMAL_TYPES || isAnimalGround(ground)) &&
-                    maxOf(WorldLight.skyLight(world, x, y, z), WorldLight.blockLight(world, x, y, z)) > ANIMAL_LIGHT
+                animalGroundAllows(typePath, ground) &&
+                    WorldLight.rawBrightness(world, x, y, z) > ANIMAL_LIGHT &&
+                    (typePath != "turtle" || y < world.declaration.dimension.seaLevel + 4)
             else -> true
         }
+    }
+
+    private fun monsterTypeRule(
+        type: String?,
+        ground: Int,
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        random: BasaltRandom,
+    ): Boolean {
+        val groundPath = BlockStateDefinitions.blockOf(ground)?.path
+        return when (type) {
+            "ghast" -> random.nextInt(20) == 0
+            "hoglin", "piglin", "zombified_piglin" -> groundPath != "nether_wart_block"
+            "husk", "parched", "stray" -> canSeeSky(world, x, y, z)
+            else -> true
+        }
+    }
+
+    private fun canSeeSky(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return false
+        return y >= chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.WORLD_SURFACE)
+    }
+
+    private fun canSpawnBat(
+        world: LoadedWorld,
+        ground: Int,
+        x: Int,
+        y: Int,
+        z: Int,
+        random: BasaltRandom,
+    ): Boolean {
+        val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return false
+        if (y >= chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.WORLD_SURFACE)) return false
+        if (random.nextBoolean()) return false
+        if (WorldLight.rawBrightness(world, x, y, z) > random.nextInt(4)) return false
+        return BlockStateDefinitions.blockOf(ground)?.path in BAT_GROUND
     }
 
     /** parity: `SpawnPlacementTypes.IN_WATER` plus the common water-animal predicates. */
@@ -262,7 +320,32 @@ public object NaturalSpawner {
     }
 
     /** parity: 26.2 `BlockTags.ANIMALS_SPAWNABLE_ON`. */
-    private fun isAnimalGround(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path in ANIMAL_GROUND
+    private fun animalGroundAllows(
+        type: String?,
+        stateId: Int,
+    ): Boolean {
+        val ground = BlockStateDefinitions.blockOf(stateId)?.path ?: return false
+        return when (type) {
+            "armadillo" ->
+                ground in ARMADILLO_GROUND ||
+                    ("glazed" !in ground && (ground == "terracotta" || ground.endsWith("_terracotta")))
+            "camel" -> ground in SAND_GROUND
+            "fox" -> ground in FOX_WOLF_GROUND
+            "frog" -> ground in FROG_GROUND
+            "goat" -> ground in GOAT_GROUND
+            "mooshroom" -> ground == "mycelium"
+            "parrot" ->
+                ground in PARROT_GROUND ||
+                    ground.endsWith("_log") ||
+                    ground.endsWith("_wood") ||
+                    Blocks.isLeavesState(stateId)
+            "polar_bear" -> ground == "grass_block" || ground == "ice"
+            "rabbit" -> ground in RABBIT_GROUND
+            "turtle" -> ground in SAND_GROUND
+            "wolf" -> ground in FOX_WOLF_GROUND
+            else -> ground == "grass_block"
+        }
+    }
 
     private fun isWaterBlock(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "water"
 
@@ -303,10 +386,14 @@ public object NaturalSpawner {
         return world.biomeSource?.biomeAt(x, y, z)?.id
     }
 
-    private val ANIMAL_GROUND = setOf("grass_block")
-
-    private val GENERAL_ANIMAL_TYPES =
-        setOf("chicken", "cow", "donkey", "happy_ghast", "horse", "mule", "pig", "sheep", "cat")
+    private val ARMADILLO_GROUND = setOf("grass_block", "red_sand", "coarse_dirt")
+    private val SAND_GROUND = setOf("sand", "red_sand", "suspicious_sand")
+    private val FOX_WOLF_GROUND = setOf("grass_block", "snow", "snow_block", "podzol", "coarse_dirt")
+    private val FROG_GROUND = setOf("grass_block", "mud", "mangrove_roots", "muddy_mangrove_roots")
+    private val GOAT_GROUND = setOf("grass_block", "stone", "snow", "snow_block", "packed_ice", "gravel")
+    private val PARROT_GROUND = setOf("grass_block", "air")
+    private val RABBIT_GROUND = setOf("grass_block", "snow", "snow_block", "sand")
+    private val BAT_GROUND = setOf("stone", "granite", "diorite", "andesite", "tuff", "deepslate")
 
     private val WATER_TYPES =
         setOf(

@@ -40,6 +40,11 @@ class RealBiomeSpawnsTest {
             0.03f,
             RealBiomeSpawns.creatureProbabilityForTest("""{"creature_spawn_probability":0.03,"spawners":{}}"""),
         )
+
+        val costs = RealBiomeSpawns.spawnCostsForTest(SAMPLE)
+        assertEquals(1, costs.size)
+        assertEquals(0.12, costs.getValue(Identifier.vanilla("enderman")).energyBudget)
+        assertEquals(1.0, costs.getValue(Identifier.vanilla("enderman")).charge)
     }
 
     private companion object {
@@ -48,6 +53,9 @@ class RealBiomeSpawnsTest {
             """
             {
               "downfall": 0.4,
+              "spawn_costs": {
+                "minecraft:enderman": { "charge": 1.0, "energy_budget": 0.12 }
+              },
               "spawners": {
                 "axolotls": [],
                 "creature": [
