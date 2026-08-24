@@ -53,13 +53,22 @@ public object VillageFeatures {
                         state("pumpkin")
                     }
                 }
-            "minecraft:acacia" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.ACACIA)
+            "minecraft:acacia" ->
+                if (supportsVegetation(chunk, x, y - 1, z)) {
+                    TreeFeature.place(chunk, random, x, y, z, TreeConfigs.ACACIA)
+                }
             "minecraft:oak" ->
                 if (supportsVegetation(chunk, x, y - 1, z)) {
                     TreeFeature.place(chunk, random, x, y, z, TreeConfigs.OAK)
                 }
-            "minecraft:spruce" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.SPRUCE)
-            "minecraft:pine" -> TreeFeature.place(chunk, random, x, y, z, TreeConfigs.PINE)
+            "minecraft:spruce" ->
+                if (supportsVegetation(chunk, x, y - 1, z)) {
+                    TreeFeature.place(chunk, random, x, y, z, TreeConfigs.SPRUCE)
+                }
+            "minecraft:pine" ->
+                if (supportsVegetation(chunk, x, y - 1, z)) {
+                    TreeFeature.place(chunk, random, x, y, z, TreeConfigs.PINE)
+                }
             "minecraft:flower_plain" -> PlainsDecoration.placeFlowerPlainAt(chunk, random, x, y, z)
             "minecraft:patch_cactus" ->
                 placePatch(
@@ -69,6 +78,7 @@ public object VillageFeatures {
                     y,
                     z,
                     10,
+                    predicate = CactusFeature::canPlace,
                 ) { c, r, pos -> CactusFeature.place(c, r, pos) }
             "minecraft:patch_taiga_grass" ->
                 // parity: taiga_grass's real weighted_state_provider: short_grass weight 1, fern weight 4.
@@ -84,8 +94,20 @@ public object VillageFeatures {
                     }).place(c, r, pos)
                 }
             "minecraft:patch_berry_bush" ->
-                placePatch(chunk, random, x, y, z, 96, requireGrassBelow = true) { c, r, pos ->
-                    SimpleBlockFeature({ _, _ -> state("sweet_berry_bush") }).place(c, r, pos)
+                placePatch(
+                    chunk,
+                    random,
+                    x,
+                    y,
+                    z,
+                    96,
+                    predicate = { c, pos ->
+                        Blocks.isAir(c.getDecorationBlockStateId(pos.x, pos.y, pos.z)) &&
+                            Blocks.byStateId(c.getDecorationBlockStateId(pos.x, pos.y - 1, pos.z))?.block?.path ==
+                            "grass_block"
+                    },
+                ) { c, r, pos ->
+                    SimpleBlockFeature({ _, _ -> SWEET_BERRY_AGE_3_STATE_ID }).place(c, r, pos)
                 }
             // Village pools only reference the features above; an unknown name places nothing.
             else -> Unit
@@ -100,7 +122,7 @@ public object VillageFeatures {
         z: Int,
     ): Boolean {
         if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
-        val path = Blocks.byStateId(chunk.getBlockStateId(x and 15, y, z and 15))?.block?.path
+        val path = Blocks.byStateId(chunk.getDecorationBlockStateId(x, y, z))?.block?.path
         return path in SUPPORTS_VEGETATION_PATHS
     }
 
@@ -143,11 +165,11 @@ public object VillageFeatures {
         stateProvider: (WorldgenRandom) -> Int,
     ) {
         if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
-        if (!Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))) return
+        if (!Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))) return
         if (y - 1 < WorldHeight.MIN_Y) return
-        val below = chunk.getBlockStateId(x and 15, y - 1, z and 15)
+        val below = chunk.getDecorationBlockStateId(x, y - 1, z)
         val mayPlace = mayPlacePileOn(below, dirtPathId, random)
-        if (mayPlace) chunk.setBlockStateId(x and 15, y, z and 15, stateProvider(random))
+        if (mayPlace) chunk.setDecorationBlockStateId(x, y, z, stateProvider(random))
     }
 
     internal fun mayPlacePileOn(
@@ -173,7 +195,9 @@ public object VillageFeatures {
         y: Int,
         z: Int,
         count: Int,
-        requireGrassBelow: Boolean = false,
+        predicate: (Chunk, DecorationPos) -> Boolean = { c, pos ->
+            Blocks.isAir(c.getDecorationBlockStateId(pos.x, pos.y, pos.z))
+        },
         place: (Chunk, WorldgenRandom, DecorationPos) -> Unit,
     ) {
         val context = PlacementContext(chunk)
@@ -183,14 +207,7 @@ public object VillageFeatures {
                 count,
             ).getPositions(context, random, DecorationPos(x, y, z))
         positions = positions.flatMap { offset.getPositions(context, random, it) }
-        if (requireGrassBelow) {
-            val grassId = state("grass_block")
-            positions =
-                positions.filter { pos ->
-                    pos.y - 1 >= WorldHeight.MIN_Y &&
-                        chunk.getBlockStateId(pos.x and 15, pos.y - 1, pos.z and 15) == grassId
-                }
-        }
+        positions = positions.filter { pos -> predicate(chunk, pos) }
         positions.forEach { pos -> place(chunk, random, pos) }
     }
 
@@ -205,6 +222,9 @@ public object VillageFeatures {
             Blocks.stateIdOf(Identifier.vanilla("hay_block"), mapOf("axis" to axis))
                 ?: error("unknown hay_block axis '$axis'")
         }
+    private val SWEET_BERRY_AGE_3_STATE_ID =
+        Blocks.stateIdOf(Identifier.vanilla("sweet_berry_bush"), mapOf("age" to "3"))
+            ?: error("unknown mature sweet berry bush")
 
     private val SUPPORTS_VEGETATION_PATHS =
         setOf(

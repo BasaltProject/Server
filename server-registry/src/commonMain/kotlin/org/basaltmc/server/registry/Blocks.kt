@@ -172,7 +172,7 @@ public object Blocks {
         if (coralStateStart != null) return (stateId - coralStateStart) and 1 == 0
         val wallCoralStateStart = CORAL_WALL_FAN_DEFAULT_STATE_IDS.firstOrNull { stateId in it..it + 7 }
         if (wallCoralStateStart != null) return (stateId - wallCoralStateStart) and 1 == 0
-        return derivedStatesById[stateId]?.properties?.get("waterlogged") == "true"
+        return stateId in WATERLOGGED_STATE_TABLE.indices && WATERLOGGED_STATE_TABLE[stateId]
     }
 
     /** Whether this state exposes any non-empty fluid state. */
@@ -1179,6 +1179,13 @@ public object Blocks {
 
     private val derivedStateIds: Map<StateKey, Int> by lazy {
         derivedStatesById.values.associate { StateKey(it.block, it.properties) to it.stateId }
+    }
+
+    /** Every ordinary waterlogged state, decoded once from the authoritative generated definitions. */
+    private val WATERLOGGED_STATE_TABLE: BooleanArray by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        BooleanArray(stateCount) { stateId ->
+            BlockStateDefinitions.propertiesOf(stateId)["waterlogged"] == "true"
+        }
     }
 
     private fun booleanProperty(value: Boolean): String = if (value) "true" else "false"

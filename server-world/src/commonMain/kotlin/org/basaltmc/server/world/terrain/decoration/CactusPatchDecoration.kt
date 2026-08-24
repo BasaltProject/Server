@@ -93,7 +93,7 @@ public object CactusPatchDecoration {
         ) {
             return false
         }
-        return region.get(position.copy(y = position.y + 1)) !in LIQUID_BLOCK_STATES
+        return !Blocks.hasFluid(region.get(position.copy(y = position.y + 1)))
     }
 
     private class PatchRegion(
@@ -144,10 +144,6 @@ public object CactusPatchDecoration {
             "suspicious_sand",
         )
     private val LAVA_STATE_IDS = Blocks.LAVA.stateId..Blocks.LAVA.stateId + 15
-    private val LIQUID_BLOCK_STATES =
-        (Blocks.WATER.stateId..Blocks.WATER.stateId + 15).toSet() +
-            LAVA_STATE_IDS.toSet() +
-            stateId("bubble_column")
     private val HORIZONTAL_OFFSETS = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
     private val SPECS =
         listOf(

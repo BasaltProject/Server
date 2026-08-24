@@ -7,6 +7,7 @@ import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PlacementTest {
@@ -23,6 +24,19 @@ class PlacementTest {
                 DecorationPos(3, 200, 4),
             ),
         )
+    }
+
+    @Test
+    fun airTargetReadsExternalDecorationPositionsWithoutWrapping() {
+        val chunk = Chunk(0, 0)
+        val context = PlacementContext(chunk)
+        val random = WorldgenRandom(LegacyRandom(0L))
+        chunk.setBlockStateId(0, 64, 0, Blocks.STONE.stateId)
+
+        assertTrue(AirTargetFilter().shouldPlace(context, random, DecorationPos(16, 64, 0)))
+
+        chunk.setDecorationBlockStateId(16, 64, 0, Blocks.STONE.stateId)
+        assertFalse(AirTargetFilter().shouldPlace(context, random, DecorationPos(16, 64, 0)))
     }
 
     @Test
