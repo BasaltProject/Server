@@ -129,8 +129,8 @@ public object NetherLocalDecoration {
         y: Int,
         z: Int,
     ): Boolean =
-        if (isInChunk(chunk, x, z) && y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
-            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
         } else {
             false
         }
@@ -142,16 +142,10 @@ public object NetherLocalDecoration {
         z: Int,
         stateId: Int,
     ) {
-        if (isInChunk(chunk, x, z) && y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
-            chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            chunk.setDecorationBlockStateId(x, y, z, stateId)
         }
     }
-
-    private fun isInChunk(
-        chunk: Chunk,
-        x: Int,
-        z: Int,
-    ): Boolean = x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId
