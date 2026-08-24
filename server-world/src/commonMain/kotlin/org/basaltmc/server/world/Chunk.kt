@@ -95,29 +95,34 @@ public class Chunk(
         y: Int,
         z: Int,
         stateId: Int,
-    ) {
+    ): Boolean {
         val section = sectionFor(y)
         val observer = blockWriteObserver
+        val changed: Boolean
         if (observer == null) {
             if (blockEntitiesByPosition.isNotEmpty() &&
                 changesBlock(section.getBlockStateId(x, y and 15, z), stateId)
             ) {
                 blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
             }
-            if (section.setBlockStateId(x, y and 15, z, stateId)) {
+            changed = section.setBlockStateId(x, y and 15, z, stateId)
+            if (changed) {
                 isDirty = true
                 updateHeights(x, y, z, stateId)
             }
         } else {
             val oldStateId = section.getBlockStateId(x, y and 15, z)
             section.setBlockStateId(x, y and 15, z, stateId)
-            if (oldStateId != stateId) {
+            changed = oldStateId != stateId
+            if (changed) {
                 isDirty = true
                 updateHeights(x, y, z, stateId)
                 if (changesBlock(oldStateId, stateId)) blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
             }
             observer(x, y, z, oldStateId, stateId)
         }
+        if (changed) invalidateLight()
+        return changed
     }
 
     /**
