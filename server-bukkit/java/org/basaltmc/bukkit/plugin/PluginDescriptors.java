@@ -77,7 +77,7 @@ public final class PluginDescriptors {
             Map<?, ?> options = each.getValue() instanceof Map<?, ?> map ? map : Map.of();
             boolean required = !Boolean.FALSE.equals(options.get("required"));
             String load = String.valueOf(options.containsKey("load") ? options.get("load") : "OMIT");
-            if (load.equalsIgnoreCase("BEFORE")) {
+            if (load.equalsIgnoreCase("AFTER")) {
                 before.add(name);
             } else if (required) {
                 depend.add(name);
