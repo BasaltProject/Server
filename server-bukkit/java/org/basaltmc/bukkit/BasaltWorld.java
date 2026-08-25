@@ -110,6 +110,7 @@ public final class BasaltWorld extends WorldEntities {
         return new BasaltChunkSnapshot(this, x, z, false);
     }
 
+    private volatile int prunePoint = 8192;
     private final java.util.concurrent.ConcurrentHashMap<Integer, Entity> entityObjects =
         new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -121,8 +122,9 @@ public final class BasaltWorld extends WorldEntities {
         }
         Entity made = org.basaltmc.bukkit.entity.EntityCore.make(this, entityId);
         if (made != null) {
-            if (entityObjects.size() > 8192) {
+            if (entityObjects.size() > prunePoint) {
                 entityObjects.values().removeIf(entity -> entity.isDead());
+                prunePoint = Math.max(8192, entityObjects.size() * 2);
             }
             entityObjects.put(entityId, made);
         }
