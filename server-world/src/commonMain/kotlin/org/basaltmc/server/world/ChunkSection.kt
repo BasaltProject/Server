@@ -1,6 +1,7 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hasFluid
 
 /** One 16x16x16 slice of a [Chunk]. Block state IDs default to 0, which is [Blocks.AIR]'s ID. */
 public class ChunkSection {

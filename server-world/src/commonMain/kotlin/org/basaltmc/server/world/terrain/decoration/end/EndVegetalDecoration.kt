@@ -5,6 +5,8 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.chorusFlowerStateId
+import org.basaltmc.server.registry.chorusPlantStateId
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.terrain.DensityChunkSampler
 import org.basaltmc.server.world.terrain.EndNoiseRouter

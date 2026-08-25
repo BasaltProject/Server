@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.isLeavesState
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier

@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.world
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hasWaterFluid
 import org.basaltmc.wire.common.Identifier
 import kotlin.random.Random
 

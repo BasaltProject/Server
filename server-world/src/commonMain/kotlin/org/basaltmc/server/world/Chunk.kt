@@ -3,6 +3,8 @@ package org.basaltmc.server.world
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hasFluid
+import org.basaltmc.server.registry.isLeavesState
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 
