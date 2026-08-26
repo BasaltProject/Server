@@ -25,6 +25,8 @@ import org.basaltmc.wire.common.Identifier
 public class VanillaWorldGeneratorFactory(
     private val serverJar: ServerJarAssets,
 ) {
+    private val spawnEquipment = SpawnEquipmentFinalizer(serverJar)
+
     // Tracked so the timings report can put a size on the worldgen caches, which live inside the
     // per-world closures and would otherwise be unreachable from any diagnostic.
     private val loaders = mutableListOf<VillageDataLoader>()
@@ -64,7 +66,7 @@ public class VanillaWorldGeneratorFactory(
      * second one built from the same seed would still be a second one.
      */
     public class Generators(
-        public val generate: (chunkX: Int, chunkZ: Int, gameTime: Long) -> Chunk,
+        public val generate: (chunkX: Int, chunkZ: Int, gameTime: Long, difficulty: String) -> Chunk,
         public val villages: VillageStructureGenerator? = null,
     )
 
@@ -105,6 +107,7 @@ public class VanillaWorldGeneratorFactory(
                 chunkX,
                 chunkZ,
                 gameTime,
+                difficulty,
                 ->
                 RealTerrainGenerator.generate(router, surface, chunkX, chunkZ, seed, village).also { chunk ->
                     if (spawnMobs) {
@@ -118,6 +121,8 @@ public class VanillaWorldGeneratorFactory(
                             biomeSpawns.creatureProbabilityFor(biome),
                             random,
                             gameTime = gameTime,
+                            difficulty = difficulty,
+                            equipmentFinalizer = spawnEquipment,
                         )
                     }
                 }
@@ -129,7 +134,7 @@ public class VanillaWorldGeneratorFactory(
     private fun nether(
         seed: Long,
         spawnMobs: Boolean,
-    ): (Int, Int, Long) -> Chunk {
+    ): (Int, Int, Long, String) -> Chunk {
         // parity: noise_settings/nether.json has legacy_random_source=true.
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.375, 80.0, 60.0, 8.0)
         val router =
@@ -148,7 +153,7 @@ public class VanillaWorldGeneratorFactory(
                 structureLoader.poolLookup,
             )
         val biomeSpawns = RealBiomeSpawns(serverJar)
-        return { chunkX, chunkZ, gameTime ->
+        return { chunkX, chunkZ, gameTime, difficulty ->
             val chunk =
                 DimensionTerrainGenerator.nether(
                     router,
@@ -170,20 +175,22 @@ public class VanillaWorldGeneratorFactory(
                     random,
                     hasCeiling = true,
                     gameTime = gameTime,
+                    difficulty = difficulty,
+                    equipmentFinalizer = spawnEquipment,
                 )
             }
             chunk
         }
     }
 
-    private fun end(seed: Long): (Int, Int, Long) -> Chunk {
+    private fun end(seed: Long): (Int, Int, Long, String) -> Chunk {
         // parity: noise_settings/end.json has legacy_random_source=true.
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.25, 80.0, 160.0, 4.0)
         val router = NoiseRouterData.end(base3d, seed)
         val biomes = TheEndBiomeSource(router.erosion)
         val structureLoader = VillageDataLoader(serverJar).also(loaders::add)
         val structures = EndCityStructureGenerator(router, biomes, structureLoader.templateLoader)
-        return { chunkX, chunkZ, _ ->
+        return { chunkX, chunkZ, _, _ ->
             DimensionTerrainGenerator.end(router, biomes, chunkX, chunkZ, seed, structures)
         }
     }

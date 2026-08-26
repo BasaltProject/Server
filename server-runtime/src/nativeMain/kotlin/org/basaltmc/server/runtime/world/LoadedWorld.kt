@@ -45,7 +45,7 @@ public class LoadedWorld(
     private val overworldRouter: OverworldNoiseRouter? = null,
     public val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     public val villageGenerator: VillageStructureGenerator? = null,
-    private val normalGenerator: ((chunkX: Int, chunkZ: Int, gameTime: Long) -> Chunk)? = null,
+    private val normalGenerator: ((chunkX: Int, chunkZ: Int, gameTime: Long, difficulty: String) -> Chunk)? = null,
     /**
      * Who hands out the regions this world is ticked in.
      *
@@ -299,7 +299,7 @@ public class LoadedWorld(
                 val router = overworldRouter
                 val environment = surfaceEnvironment
                 if (generator != null) {
-                    generator(chunkX, chunkZ, gameTime)
+                    generator(chunkX, chunkZ, gameTime, difficulty)
                 } else if (router != null && environment != null) {
                     RealTerrainGenerator.generate(
                         router,

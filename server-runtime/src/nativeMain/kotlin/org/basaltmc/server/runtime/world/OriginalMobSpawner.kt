@@ -25,6 +25,8 @@ public object OriginalMobSpawner {
         random: BasaltRandom,
         hasCeiling: Boolean = false,
         gameTime: Long = 0L,
+        difficulty: String = "easy",
+        equipmentFinalizer: SpawnEquipmentFinalizer? = null,
     ): Int {
         if (entries.isEmpty()) return 0
         val minX = chunk.chunkX shl 4
@@ -53,18 +55,25 @@ public object OriginalMobSpawner {
                     if (canSpawnAt(chunk, entry.type.path, blockX, y, blockZ)) {
                         val yaw = random.nextFloat() * 360f
                         val data = NbtCompound()
-                        MobSpawnFinalization.writeGenerated(
-                            data,
-                            entry.type,
-                            groupSize,
-                            random,
-                            group = group,
-                            biome = biomeAt(chunk, blockX, y, blockZ),
-                            blockX = blockX,
-                            blockY = y,
-                            blockZ = blockZ,
-                            gameTime = gameTime,
-                        )
+                        val passengers =
+                            MobSpawnFinalization.writeGenerated(
+                                data,
+                                entry.type,
+                                groupSize,
+                                random,
+                                group = group,
+                                biome = biomeAt(chunk, blockX, y, blockZ),
+                                blockX = blockX,
+                                blockY = y,
+                                blockZ = blockZ,
+                                gameTime = gameTime,
+                                difficulty = difficulty,
+                                equipmentFinalizer = equipmentFinalizer,
+                                entityX = entityX,
+                                entityY = y.toDouble(),
+                                entityZ = entityZ,
+                                entityYaw = yaw,
+                            )
                         chunk.addGeneratedEntity(
                             ChunkGeneratedEntity(
                                 type = entry.type,
@@ -74,6 +83,7 @@ public object OriginalMobSpawner {
                                 yaw = yaw,
                                 pitch = 0f,
                                 data = data,
+                                passengers = passengers,
                             ),
                         )
                         added++
