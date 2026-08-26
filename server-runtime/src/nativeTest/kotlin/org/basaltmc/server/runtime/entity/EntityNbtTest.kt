@@ -37,6 +37,8 @@ class EntityNbtTest {
         zombie.velocityX = 0.25
         zombie.velocityZ = -0.5
         zombie.persistent = true
+        zombie.airSupply = 117
+        zombie.canPickUpLoot = true
         zombie.customName = "Bob"
         zombie.tags += "friendly"
 
@@ -51,6 +53,8 @@ class EntityNbtTest {
         assertEquals(42, restored.age)
         assertEquals(0.25, restored.velocityX)
         assertTrue(restored.persistent)
+        assertEquals(117, restored.airSupply)
+        assertTrue(restored.canPickUpLoot)
         assertEquals("Bob", restored.customName)
         assertTrue("friendly" in restored.tags)
     }

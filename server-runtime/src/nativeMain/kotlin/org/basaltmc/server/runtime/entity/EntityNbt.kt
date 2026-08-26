@@ -35,9 +35,11 @@ public object EntityNbt {
         tag["Health"] = NbtDouble(entity.health)
         tag["Age"] = NbtDouble(entity.age.toDouble())
         tag["Fuse"] = NbtDouble(entity.fuse.toDouble())
+        tag.putShort("Air", entity.airSupply.toShort())
         if (CubeMobs.isCube(entity.type)) tag["Size"] = NbtInt(entity.cubeSize.coerceAtLeast(1) - 1)
         tag["PersistenceRequired"] = NbtDouble(if (entity.persistent) 1.0 else 0.0)
         tag.putBoolean("NoAI", entity.noAi)
+        tag.putBoolean("CanPickUpLoot", entity.canPickUpLoot)
         tag["LoveTicks"] = NbtDouble(entity.loveTicks.toDouble())
         tag["BreedCooldown"] = NbtDouble(entity.breedCooldown.toDouble())
         tag["VillagerProfession"] = NbtString(entity.profession)
@@ -94,6 +96,7 @@ public object EntityNbt {
         entity.health = tag.numericDouble("Health").takeIf { it > 0.0 } ?: entity.health
         entity.age = tag.numericInt("Age")
         entity.fuse = tag.numericInt("Fuse")
+        if ("Air" in tag) entity.airSupply = tag.getShort("Air").toInt()
         entity.cubeSize =
             if (CubeMobs.isCube(type)) {
                 (tag.numericInt("Size") + 1).coerceIn(1, 127)
@@ -102,6 +105,7 @@ public object EntityNbt {
             }
         entity.persistent = tag.numericBoolean("PersistenceRequired")
         entity.noAi = tag.numericBoolean("NoAI")
+        entity.canPickUpLoot = tag.getBoolean("CanPickUpLoot")
         entity.loveTicks = tag.numericInt("LoveTicks")
         entity.breedCooldown = tag.numericInt("BreedCooldown")
         tag.getString("VillagerProfession").takeIf { it.isNotEmpty() }?.let { entity.profession = it }

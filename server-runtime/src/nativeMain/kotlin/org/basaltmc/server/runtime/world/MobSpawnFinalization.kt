@@ -68,6 +68,7 @@ public object MobSpawnFinalization {
                 gameTime,
             )
         entity.age = state.age
+        if (entity.type.path == "dolphin") entity.pitch = 0f
         entity.attributeValues.putAll(state.attributeBases)
         state.attributeBases[MAX_HEALTH_ATTRIBUTE]?.let { entity.health = minOf(entity.health, it) }
         if (state.ranMobFinalizer) {
@@ -81,6 +82,10 @@ public object MobSpawnFinalization {
         }
         val data = entity.sourceNbt ?: NbtCompound().also { entity.sourceNbt = it }
         writeTypeState(data, state)
+        if ("Air" in state.typeData) entity.airSupply = state.typeData.getShort("Air").toInt()
+        if ("CanPickUpLoot" in state.typeData) {
+            entity.canPickUpLoot = state.typeData.getBoolean("CanPickUpLoot")
+        }
         writeMobState(data, entity.type, state)
         CubeMobs.applySize(entity, state.cubeSize)
     }
@@ -276,6 +281,10 @@ public object MobSpawnFinalization {
                     "sound_variant",
                     registryKey(COW_SOUND_VARIANTS[random.nextInt(COW_SOUND_VARIANTS.size)]),
                 )
+            }
+            "dolphin" -> {
+                data.putShort("Air", DOLPHIN_MAX_AIR.toShort())
+                data.putBoolean("CanPickUpLoot", true)
             }
             "fox" -> {
                 val biomeVariant = if (biome in WHITE_RABBIT_BIOMES) FOX_SNOW else FOX_RED
@@ -672,6 +681,7 @@ public object MobSpawnFinalization {
     private const val HORSE_MARKINGS = 5
     private const val COMMON_AXOLOTL_VARIANTS = 4
     private const val CAMEL_FULL_STAND_TICKS = 53L
+    private const val DOLPHIN_MAX_AIR = 4_800
     private const val FOX_RED = 0
     private const val FOX_SNOW = 1
     private const val FOX_EQUIPMENT_CHANCE = 0.2f
