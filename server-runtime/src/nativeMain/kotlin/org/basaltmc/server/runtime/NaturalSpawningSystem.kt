@@ -17,12 +17,16 @@ import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.LocalMobCaps
 import org.basaltmc.server.runtime.world.MobCapPlayer
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
+import org.basaltmc.server.runtime.world.MobSpawnForest
 import org.basaltmc.server.runtime.world.NaturalSpawner
 import org.basaltmc.server.runtime.world.RealBiomeSpawns
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.runtime.world.SpawnPotential
+import org.basaltmc.server.runtime.world.SpawnRequest
+import org.basaltmc.server.runtime.world.writeGeneratedForest
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.protocol.play.Gamemode
 import kotlin.math.floor
 import kotlin.random.Random
@@ -157,52 +161,10 @@ public class NaturalSpawningSystem(
                         if (cost != null && !spawnPotential.allows(blockX, blockY, blockZ, cost)) {
                             false
                         } else {
-                            var passengers: List<ChunkGeneratedEntity> = emptyList()
-                            val spawned =
-                                spawnMob(
-                                    world,
-                                    request.type,
-                                    request.x,
-                                    request.y,
-                                    request.z,
-                                    request.yaw,
-                                    initialize = { entity ->
-                                        val inhabitedTime =
-                                            world.state
-                                                .chunkIfLoaded(blockX shr 4, blockZ shr 4)
-                                                ?.inhabitedTime ?: 0L
-                                        val moonBrightness =
-                                            if (world.declaration.dimension.hasClock) {
-                                                NaturalSpawner.surfaceSlimeChance(world.clock.totalTicks) * 2f
-                                            } else {
-                                                0f
-                                            }
-                                        val specialMultiplier =
-                                            MobSpawnFinalization.specialMultiplier(
-                                                world.difficulty,
-                                                world.gameTime,
-                                                inhabitedTime,
-                                                moonBrightness,
-                                            )
-                                        passengers =
-                                            MobSpawnFinalization.apply(
-                                                entity,
-                                                request.groupIndex,
-                                                random,
-                                                specialMultiplier,
-                                                group = request.group,
-                                                biome = request.biome,
-                                                gameTime = world.gameTime,
-                                                difficulty = world.difficulty,
-                                                equipmentFinalizer = equipmentFinalizer,
-                                                entityRandom = LegacyRandom(Random.nextLong()),
-                                            )
-                                    },
-                                )
+                            val spawned = materializeNaturalForest(world, request, blockX, blockY, blockZ, random)
                             if (spawned == null) {
                                 false
                             } else {
-                                materializePassengers(world, spawned, passengers)
                                 if (cost != null) spawnPotential.add(blockX, blockY, blockZ, cost.charge)
                                 val actualCategory = MobCategory.byName(Mobs.categoryOf(request.type)) ?: category
                                 counts[actualCategory] = counts.getValue(actualCategory) + 1
@@ -216,25 +178,89 @@ public class NaturalSpawningSystem(
         }
     }
 
-    private fun materializePassengers(
+    private fun materializeNaturalForest(
         world: LoadedWorld,
-        vehicle: ServerEntity,
-        passengers: List<ChunkGeneratedEntity>,
-    ) {
-        for (descriptor in passengers) {
-            val protocolType = EntityTypes[descriptor.type]?.protocolId ?: continue
-            if (!spawnAllowed(world, descriptor.type, descriptor.x, descriptor.y, descriptor.z, "jockey")) continue
-            val passenger =
+        request: SpawnRequest,
+        blockX: Int,
+        blockY: Int,
+        blockZ: Int,
+        random: LegacyRandom,
+    ): ServerEntity? {
+        if (!spawnAllowed(world, request.type, request.x, request.y, request.z, "natural")) return null
+        val inhabitedTime =
+            world.state
+                .chunkIfLoaded(blockX shr 4, blockZ shr 4)
+                ?.inhabitedTime ?: 0L
+        val moonBrightness =
+            if (world.declaration.dimension.hasClock) {
+                NaturalSpawner.surfaceSlimeChance(world.clock.totalTicks) * 2f
+            } else {
+                0f
+            }
+        val specialMultiplier =
+            MobSpawnFinalization.specialMultiplier(
+                world.difficulty,
+                world.gameTime,
+                inhabitedTime,
+                moonBrightness,
+            )
+        val forest =
+            writeGeneratedForest(
+                NbtCompound(),
+                request.type,
+                request.groupIndex,
+                random,
+                specialMultiplier,
+                group = request.group,
+                biome = request.biome,
+                blockX = blockX,
+                blockY = blockY,
+                blockZ = blockZ,
+                gameTime = world.gameTime,
+                difficulty = world.difficulty,
+                equipmentFinalizer = equipmentFinalizer,
+                entityX = request.x,
+                entityY = request.y,
+                entityZ = request.z,
+                entityYaw = request.yaw,
+                entityRandom = LegacyRandom(Random.nextLong()),
+            )
+        return materializeForest(world, forest)
+    }
+
+    private fun materializeForest(
+        world: LoadedWorld,
+        forest: MobSpawnForest,
+    ): ServerEntity? {
+        var main: ServerEntity? = null
+
+        fun materialize(
+            descriptor: ChunkGeneratedEntity,
+            vehicle: ServerEntity?,
+        ) {
+            if (descriptor !== forest.main &&
+                !spawnAllowed(world, descriptor.type, descriptor.x, descriptor.y, descriptor.z, "jockey")
+            ) {
+                return
+            }
+            val protocolType = EntityTypes[descriptor.type]?.protocolId ?: return
+            val entity =
                 EntityNbt.decodeGenerated(
                     descriptor,
                     playerRegistry.allocateEntityId(),
                     protocolType,
-                ) ?: continue
-            passenger.vehicleId = vehicle.entityId
-            vehicle.passengerIds += passenger.entityId
-            world.state.spawnEntity(passenger)
-            materializePassengers(world, passenger, descriptor.passengers)
+                ) ?: return
+            if (vehicle != null) {
+                entity.vehicleId = vehicle.entityId
+                vehicle.passengerIds += entity.entityId
+            }
+            world.state.spawnEntity(entity)
+            if (descriptor === forest.main) main = entity
+            descriptor.passengers.forEach { passenger -> materialize(passenger, entity) }
         }
+
+        forest.roots.forEach { root -> materialize(root, null) }
+        return main
     }
 
     private fun spawnAllowed(
