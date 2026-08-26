@@ -19,6 +19,10 @@ public object AgeableMobs {
 
     public fun isAgeable(typePath: String): Boolean = typePath in TYPES
 
+    public fun hasBabyMetadata(typePath: String): Boolean = isAgeable(typePath) || typePath in BOOLEAN_BABY_TYPES
+
+    public fun usesBooleanBabyFlag(typePath: String): Boolean = typePath in BOOLEAN_BABY_TYPES
+
     private val TYPES =
         setOf(
             "armadillo",
@@ -63,5 +67,15 @@ public object AgeableMobs {
             "wolf",
             "zombie_horse",
             "zombie_nautilus",
+        )
+
+    private val BOOLEAN_BABY_TYPES =
+        setOf(
+            "drowned",
+            "husk",
+            "piglin",
+            "zombie",
+            "zombie_villager",
+            "zombified_piglin",
         )
 }

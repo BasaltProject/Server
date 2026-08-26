@@ -1,7 +1,6 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.random.BasaltRandom
-import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtList
@@ -11,42 +10,49 @@ import kotlin.math.floor
 /** Passenger trees and pack effects created by concrete mob finalizers after their superclass. */
 internal object MobJockeyFinalization {
     fun afterCommon(
-        data: NbtCompound,
-        type: Identifier,
+        builder: MobSpawnForestBuilder,
+        node: MobSpawnNode,
         groupIndex: Int,
         group: MobSpawnGroupData,
         random: BasaltRandom,
         specialMultiplier: Float,
         difficulty: String,
-        equipmentFinalizer: SpawnEquipmentFinalizer?,
+        equipmentFinalizer: SpawnEquipmentFinalizer,
         biome: Identifier?,
-        x: Double,
-        y: Double,
-        z: Double,
-        yaw: Float,
         gameTime: Long,
-    ): List<ChunkGeneratedEntity> {
-        if (type.path != "spider") return emptyList()
-        val passengers =
-            if (random.nextInt(SPIDER_JOCKEY_BOUND) == 0) {
-                listOf(
-                    finalizedPassenger(
-                        Identifier.vanilla("skeleton"),
-                        random,
-                        specialMultiplier,
-                        difficulty,
-                        equipmentFinalizer,
-                        biome,
-                        x,
-                        y,
-                        z,
-                        yaw,
-                        gameTime,
-                    ),
+        entityRandomFactory: () -> BasaltRandom,
+    ) {
+        if (node.type.path != "spider") return
+        if (random.nextInt(SPIDER_JOCKEY_BOUND) == 0) {
+            val passenger =
+                builder.create(
+                    Identifier.vanilla("skeleton"),
+                    node.x,
+                    node.y,
+                    node.z,
+                    node.yaw,
+                    data = NbtCompound(),
                 )
-            } else {
-                emptyList()
-            }
+            MobSpawnFinalization.writeGeneratedNode(
+                builder,
+                passenger,
+                groupIndex = 0,
+                random = random,
+                specialMultiplier = specialMultiplier,
+                group = MobSpawnGroupData(),
+                biome = biome,
+                blockX = floor(node.x).toInt(),
+                blockY = floor(node.y).toInt(),
+                blockZ = floor(node.z).toInt(),
+                gameTime = gameTime,
+                difficulty = difficulty,
+                equipmentFinalizer = equipmentFinalizer,
+                reason = MobSpawnReason.JOCKEY,
+                entityRandom = entityRandomFactory(),
+                entityRandomFactory = entityRandomFactory,
+            )
+            builder.mount(passenger, node, force = true)
+        }
         if (groupIndex == 0) {
             group.spiderEffect =
                 if (difficulty == "hard" && random.nextFloat() < SPIDER_EFFECT_CHANCE * specialMultiplier) {
@@ -55,53 +61,7 @@ internal object MobJockeyFinalization {
                     null
                 }
         }
-        group.spiderEffect?.let { writeInfiniteEffect(data, it) }
-        return passengers
-    }
-
-    private fun finalizedPassenger(
-        type: Identifier,
-        random: BasaltRandom,
-        specialMultiplier: Float,
-        difficulty: String,
-        equipmentFinalizer: SpawnEquipmentFinalizer?,
-        biome: Identifier?,
-        x: Double,
-        y: Double,
-        z: Double,
-        yaw: Float,
-        gameTime: Long,
-    ): ChunkGeneratedEntity {
-        val data = NbtCompound()
-        val passengers =
-            MobSpawnFinalization.writeGenerated(
-                data,
-                type,
-                groupIndex = 0,
-                random = random,
-                specialMultiplier = specialMultiplier,
-                biome = biome,
-                blockX = floor(x).toInt(),
-                blockY = floor(y).toInt(),
-                blockZ = floor(z).toInt(),
-                gameTime = gameTime,
-                difficulty = difficulty,
-                equipmentFinalizer = equipmentFinalizer,
-                entityX = x,
-                entityY = y,
-                entityZ = z,
-                entityYaw = yaw,
-            )
-        return ChunkGeneratedEntity(
-            type = type,
-            x = x,
-            y = y,
-            z = z,
-            yaw = yaw,
-            pitch = 0f,
-            data = data,
-            passengers = passengers,
-        )
+        group.spiderEffect?.let { writeInfiniteEffect(node.data, it) }
     }
 
     private fun writeInfiniteEffect(

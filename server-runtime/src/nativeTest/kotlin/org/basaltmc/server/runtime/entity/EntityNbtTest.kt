@@ -4,8 +4,11 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.runtime.EntityRiding
 import org.basaltmc.server.runtime.generatedEntityMetadata
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
+import org.basaltmc.server.runtime.world.MobSpawnForest
 import org.basaltmc.server.runtime.world.MobSpawnGroupData
+import org.basaltmc.server.runtime.world.MobSpawnReason
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
+import org.basaltmc.server.runtime.world.writeGeneratedForest
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
@@ -328,6 +331,103 @@ class EntityNbtTest {
             generatedEntityMetadata("piglin", babyData).any { entry ->
                 entry is SetEntityDataPacket.Entry.Booleans && entry.index == 16 && entry.value
             },
+        )
+    }
+
+    @Test
+    fun generatedZombieFamiliesKeepFinalizedVehicleForests() {
+        fun forest(
+            type: String,
+            seed: Long,
+            biome: String = "plains",
+        ): MobSpawnForest {
+            var entitySeed = seed + 10_000L
+            return writeGeneratedForest(
+                NbtCompound(),
+                Identifier.vanilla(type),
+                groupIndex = 0,
+                random = LegacyRandom(seed),
+                specialMultiplier = 1f,
+                biome = Identifier.vanilla(biome),
+                blockY = 64,
+                difficulty = "hard",
+                reason = MobSpawnReason.NATURAL,
+                entityRandom = LegacyRandom(entitySeed++),
+                entityRandomFactory = { LegacyRandom(entitySeed++) },
+            )
+        }
+
+        val chickenJockey =
+            assertNotNull(
+                (0L..10_000L).firstNotNullOfOrNull { seed ->
+                    forest("zombie", seed).takeIf { result ->
+                        result.roots.any { it.type.path == "chicken" && result.main in it.passengers }
+                    }
+                },
+            )
+        val chicken = assertNotNull(chickenJockey.roots.firstOrNull { it.type.path == "chicken" })
+        assertTrue(chicken.data.getBoolean("IsChickenJockey"))
+        assertTrue(chickenJockey.main.data.getBoolean("IsBaby"))
+        val entityIds = generateSequence(1) { it + 1 }.iterator()
+        val jockeyEntities =
+            EntityNbt.decodeGeneratedTree(
+                chicken,
+                allocateEntityId = entityIds::next,
+                protocolTypeOf = { 1 },
+            )
+        assertEquals(AgeableMobs.BABY_START_AGE, jockeyEntities.single { it.type.path == "zombie" }.age)
+        assertEquals(jockeyEntities[0].entityId, jockeyEntities[1].vehicleId)
+
+        val drownedRider =
+            assertNotNull(
+                (0L..1_000L).firstNotNullOfOrNull { seed ->
+                    forest("drowned", seed, biome = "ocean").takeIf { result ->
+                        result.roots.any { it.type.path == "zombie_nautilus" && result.main in it.passengers }
+                    }
+                },
+            )
+        val zombieNautilus = assertNotNull(drownedRider.roots.firstOrNull { it.type.path == "zombie_nautilus" })
+        assertEquals(
+            "minecraft:trident",
+            drownedRider.main.data
+                .getCompound("equipment")
+                .getCompound("mainhand")
+                .getString("id"),
+        )
+        assertEquals("minecraft:temperate", zombieNautilus.data.getString("variant"))
+        assertTrue(
+            zombieNautilus.data
+                .getCompound("Brain")
+                .getCompound("memories")
+                .getCompound("minecraft:attack_target_cooldown")
+                .size > 0,
+        )
+
+        val camelPatrol =
+            assertNotNull(
+                (0L..1_000L).firstNotNullOfOrNull { seed ->
+                    forest("husk", seed, biome = "desert").takeIf { result ->
+                        result.roots.any { root -> root.type.path == "camel_husk" && result.main in root.passengers }
+                    }
+                },
+            )
+        val camel = assertNotNull(camelPatrol.roots.firstOrNull { it.type.path == "camel_husk" })
+        assertEquals(listOf("husk", "parched"), camel.passengers.map { it.type.path })
+        assertEquals(
+            "minecraft:iron_spear",
+            camelPatrol.main.data
+                .getCompound("equipment")
+                .getCompound("mainhand")
+                .getString("id"),
+        )
+        assertEquals(0L, camel.data.getLong("LastPoseTick"))
+        assertEquals(
+            "minecraft:bow",
+            camel.passengers[1]
+                .data
+                .getCompound("equipment")
+                .getCompound("mainhand")
+                .getString("id"),
         )
     }
 
