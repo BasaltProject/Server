@@ -41,6 +41,22 @@ class EntityNbtTest {
         zombie.canPickUpLoot = true
         zombie.customName = "Bob"
         zombie.tags += "friendly"
+        zombie.sourceNbt =
+            NbtCompound().apply {
+                this["equipment"] =
+                    NbtCompound().apply {
+                        this["mainhand"] =
+                            NbtCompound().apply {
+                                putString("id", "minecraft:bow")
+                                putInt("count", 1)
+                                this["components"] =
+                                    NbtCompound().apply {
+                                        this["minecraft:enchantments"] =
+                                            NbtCompound().apply { putInt("minecraft:power", 2) }
+                                    }
+                            }
+                    }
+            }
 
         val restored = assertNotNull(EntityNbt.decode(EntityNbt.encode(zombie), entityId = 9, protocolType = 151))
         assertEquals(9, restored.entityId)
@@ -57,6 +73,15 @@ class EntityNbtTest {
         assertTrue(restored.canPickUpLoot)
         assertEquals("Bob", restored.customName)
         assertTrue("friendly" in restored.tags)
+        assertEquals(
+            2,
+            restored.sourceNbt
+                ?.getCompound("equipment")
+                ?.getCompound("mainhand")
+                ?.getCompound("components")
+                ?.getCompound("minecraft:enchantments")
+                ?.getInt("minecraft:power"),
+        )
     }
 
     @Test

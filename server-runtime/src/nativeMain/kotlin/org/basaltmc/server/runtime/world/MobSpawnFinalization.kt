@@ -53,6 +53,8 @@ public object MobSpawnFinalization {
         group: MobSpawnGroupData = MobSpawnGroupData(),
         biome: Identifier? = null,
         gameTime: Long = 0L,
+        difficulty: String = "easy",
+        equipmentFinalizer: SpawnEquipmentFinalizer? = null,
     ) {
         val state =
             stateFor(
@@ -82,9 +84,10 @@ public object MobSpawnFinalization {
         }
         val data = entity.sourceNbt ?: NbtCompound().also { entity.sourceNbt = it }
         writeTypeState(data, state)
+        equipmentFinalizer?.finalizeAfterCommon(data, entity.type.path, random, specialMultiplier, difficulty)
         if ("Air" in state.typeData) entity.airSupply = state.typeData.getShort("Air").toInt()
-        if ("CanPickUpLoot" in state.typeData) {
-            entity.canPickUpLoot = state.typeData.getBoolean("CanPickUpLoot")
+        if ("CanPickUpLoot" in data) {
+            entity.canPickUpLoot = data.getBoolean("CanPickUpLoot")
         }
         writeMobState(data, entity.type, state)
         CubeMobs.applySize(entity, state.cubeSize)
@@ -103,6 +106,8 @@ public object MobSpawnFinalization {
         blockY: Int = 0,
         blockZ: Int = 0,
         gameTime: Long = 0L,
+        difficulty: String = "easy",
+        equipmentFinalizer: SpawnEquipmentFinalizer? = null,
     ) {
         val state =
             stateFor(
@@ -120,6 +125,7 @@ public object MobSpawnFinalization {
         if (state.age != 0) data.putInt("Age", state.age)
         writeTypeState(data, state)
         writeMobState(data, type, state)
+        equipmentFinalizer?.finalizeAfterCommon(data, type.path, random, specialMultiplier, difficulty)
         // parity: AbstractCubeMob saves one less than its live size, so absent/zero means size one.
         if (CubeMobs.isCube(type)) data.putInt("Size", state.cubeSize - 1)
     }

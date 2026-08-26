@@ -18,6 +18,7 @@ import org.basaltmc.server.runtime.world.MobCapPlayer
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
 import org.basaltmc.server.runtime.world.NaturalSpawner
 import org.basaltmc.server.runtime.world.RealBiomeSpawns
+import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.runtime.world.SpawnPotential
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.play.Gamemode
@@ -34,6 +35,7 @@ public class NaturalSpawningSystem(
     private val pluginEvents: PluginEventBus,
     private val biomeSpawns: RealBiomeSpawns,
     private val chunkSimulation: ChunkSimulationView,
+    private val equipmentFinalizer: SpawnEquipmentFinalizer,
 ) {
     /** One mob of this type where it was asked for, or null when the type is not one this build has. */
     public fun spawnMob(
@@ -195,6 +197,8 @@ public class NaturalSpawningSystem(
                                         group = request.group,
                                         biome = request.biome,
                                         gameTime = world.gameTime,
+                                        difficulty = world.difficulty,
+                                        equipmentFinalizer = equipmentFinalizer,
                                     )
                                 },
                             ) == null
