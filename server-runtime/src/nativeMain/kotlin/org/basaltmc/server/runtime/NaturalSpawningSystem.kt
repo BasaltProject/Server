@@ -194,6 +194,7 @@ public class NaturalSpawningSystem(
                                         specialMultiplier,
                                         group = request.group,
                                         biome = request.biome,
+                                        gameTime = world.gameTime,
                                     )
                                 },
                             ) == null

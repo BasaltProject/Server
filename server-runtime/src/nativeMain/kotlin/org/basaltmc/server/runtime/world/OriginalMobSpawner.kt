@@ -24,6 +24,7 @@ public object OriginalMobSpawner {
         creatureProbability: Float,
         random: BasaltRandom,
         hasCeiling: Boolean = false,
+        gameTime: Long = 0L,
     ): Int {
         if (entries.isEmpty()) return 0
         val minX = chunk.chunkX shl 4
@@ -59,6 +60,10 @@ public object OriginalMobSpawner {
                             random,
                             group = group,
                             biome = biomeAt(chunk, blockX, y, blockZ),
+                            blockX = blockX,
+                            blockY = y,
+                            blockZ = blockZ,
+                            gameTime = gameTime,
                         )
                         chunk.addGeneratedEntity(
                             ChunkGeneratedEntity(
