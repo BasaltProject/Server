@@ -420,8 +420,20 @@ public object VanillaRegistryData {
             if (id == "cold") putString("model", "cold")
         }
 
-    public fun zombieNautilusVariant(): NbtCompound =
-        NbtCompound().apply { putString("asset_id", "minecraft:entity/nautilus/zombie_nautilus_coral") }
+    public val zombieNautilusVariants: List<String> = listOf("temperate", "warm")
+
+    public fun zombieNautilusVariant(id: String): NbtCompound =
+        NbtCompound().apply {
+            putString(
+                "asset_id",
+                if (id == "warm") {
+                    "minecraft:entity/nautilus/zombie_nautilus_coral"
+                } else {
+                    "minecraft:entity/nautilus/zombie_nautilus"
+                },
+            )
+            if (id == "warm") putString("model", "warm")
+        }
 
     public fun paintingVariant(): NbtCompound =
         NbtCompound().apply {

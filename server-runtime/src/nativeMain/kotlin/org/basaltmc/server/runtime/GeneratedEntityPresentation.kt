@@ -176,6 +176,14 @@ internal fun generatedEntityMetadata(
                     SetEntityDataPacket.RegistryHolder.WOLF_SOUND_VARIANT,
                 )
             }
+            "zombie_nautilus" ->
+                addRegistryMetadata(
+                    data,
+                    "variant",
+                    21,
+                    ZOMBIE_NAUTILUS_VARIANT_IDS,
+                    SetEntityDataPacket.RegistryHolder.ZOMBIE_NAUTILUS_VARIANT,
+                )
         }
     }
 
@@ -343,6 +351,7 @@ private val PIG_SOUND_VARIANT_IDS = registryIds("classic", "big", "mini")
 private val WOLF_VARIANT_IDS =
     registryIds("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped")
 private val WOLF_SOUND_VARIANT_IDS = registryIds("classic", "puglin", "sad", "angry", "grumpy", "big", "cute")
+private val ZOMBIE_NAUTILUS_VARIANT_IDS = registryIds("temperate", "warm")
 
 private fun registryIds(vararg paths: String): Map<String, Int> =
     paths.mapIndexed { index, path -> "minecraft:$path" to index }.toMap()

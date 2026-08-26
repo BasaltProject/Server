@@ -7,6 +7,21 @@ import org.basaltmc.server.runtime.entity.AttributeModifier
 import org.basaltmc.server.runtime.entity.AttributeOperation
 import org.basaltmc.server.runtime.entity.CubeMobs
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.BADLANDS_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.CHICKEN_SOUND_VARIANTS
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.COLD_FARM_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.COLD_FROG_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.COW_SOUND_VARIANTS
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.JUNGLE_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.PANDA_GENES_BY_NAME
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.PIG_SOUND_VARIANTS
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.SAVANNA_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.TROPICAL_COMMON_VARIANTS
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.WARM_FARM_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.WARM_FROG_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.WHITE_RABBIT_BIOMES
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.WOLF_SOUND_VARIANTS
+import org.basaltmc.server.runtime.world.MobSpawnVariantData.WOLF_VARIANTS
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtDouble
@@ -153,7 +168,12 @@ public object MobSpawnFinalization {
                 babyChance != null -> random.nextFloat() <= babyChance
                 else -> false
             }
-        val age = if (concreteBaby || inheritedBaby) AgeableMobs.BABY_START_AGE else 0
+        val age =
+            if ((concreteBaby || inheritedBaby) && type.path != "zombie_nautilus") {
+                AgeableMobs.BABY_START_AGE
+            } else {
+                0
+            }
         // parity: Mob.finalizeSpawn. RandomSource.triangle consumes two doubles before the
         // left-handed float, even though neither result usually changes what the client draws.
         val followRangeBonus = random.triangle(0.0, FOLLOW_RANGE_BONUS_SPREAD)
@@ -351,6 +371,16 @@ public object MobSpawnFinalization {
                 data.putString(
                     "sound_variant",
                     registryKey(WOLF_SOUND_VARIANTS[random.nextInt(WOLF_SOUND_VARIANTS.size)]),
+                )
+            }
+            "zombie_nautilus" -> {
+                // PriorityProvider still consumes nextInt(1) after choosing the highest-priority match.
+                random.nextInt(1)
+                data.putString("variant", registryKey(if (biome == "warm_ocean") "warm" else "temperate"))
+                writeBrainMemories(
+                    data,
+                    "minecraft:attack_target_cooldown" to
+                        NAUTILUS_MIN_ATTACK_COOLDOWN + random.nextInt(NAUTILUS_ATTACK_COOLDOWN_RANGE),
                 )
             }
         }
@@ -688,166 +718,4 @@ public object MobSpawnFinalization {
     private const val BASE_SCALE = 0.75f
     private const val GLOBAL_TIME_WEIGHT = 0.25f
     private const val MOON_WEIGHT = 0.25f
-
-    private enum class PandaGene(
-        val serializedName: String,
-        val id: Int,
-        val recessive: Boolean = false,
-    ) {
-        NORMAL("normal", 0),
-        LAZY("lazy", 1),
-        WORRIED("worried", 2),
-        PLAYFUL("playful", 3),
-        BROWN("brown", 4, true),
-        WEAK("weak", 5, true),
-        AGGRESSIVE("aggressive", 6),
-    }
-
-    private val PANDA_GENES_BY_NAME = PandaGene.entries.associateBy(PandaGene::serializedName)
-
-    private val CHICKEN_SOUND_VARIANTS = listOf("classic", "picky")
-    private val COW_SOUND_VARIANTS = listOf("classic", "moody")
-    private val PIG_SOUND_VARIANTS = listOf("classic", "big", "mini")
-    private val WOLF_VARIANTS =
-        listOf("pale", "spotted", "snowy", "black", "ashen", "rusty", "woods", "chestnut", "striped")
-    private val WOLF_SOUND_VARIANTS = listOf("classic", "puglin", "sad", "angry", "grumpy", "big", "cute")
-
-    private val TROPICAL_COMMON_VARIANTS =
-        listOf(
-            packTropicalFish(7, 1, 7),
-            packTropicalFish(6, 7, 7),
-            packTropicalFish(6, 7, 11),
-            packTropicalFish(11, 0, 7),
-            packTropicalFish(1, 11, 7),
-            packTropicalFish(0, 1, 0),
-            packTropicalFish(5, 6, 3),
-            packTropicalFish(9, 10, 4),
-            packTropicalFish(11, 0, 14),
-            packTropicalFish(5, 0, 4),
-            packTropicalFish(8, 0, 7),
-            packTropicalFish(11, 0, 1),
-            packTropicalFish(3, 9, 6),
-            packTropicalFish(4, 5, 3),
-            packTropicalFish(10, 14, 0),
-            packTropicalFish(2, 7, 14),
-            packTropicalFish(9, 14, 0),
-            packTropicalFish(6, 0, 4),
-            packTropicalFish(0, 14, 0),
-            packTropicalFish(1, 7, 0),
-            packTropicalFish(3, 9, 4),
-            packTropicalFish(6, 4, 4),
-        )
-
-    private val WHITE_RABBIT_BIOMES =
-        setOf(
-            "frozen_ocean",
-            "frozen_peaks",
-            "frozen_river",
-            "grove",
-            "ice_spikes",
-            "jagged_peaks",
-            "snowy_beach",
-            "snowy_plains",
-            "snowy_slopes",
-            "snowy_taiga",
-        )
-
-    private val WARM_FARM_BIOMES =
-        setOf(
-            "badlands",
-            "bamboo_jungle",
-            "basalt_deltas",
-            "crimson_forest",
-            "deep_lukewarm_ocean",
-            "desert",
-            "eroded_badlands",
-            "jungle",
-            "lukewarm_ocean",
-            "mangrove_swamp",
-            "nether_wastes",
-            "savanna",
-            "savanna_plateau",
-            "soul_sand_valley",
-            "sparse_jungle",
-            "warm_ocean",
-            "warped_forest",
-            "windswept_savanna",
-            "wooded_badlands",
-        )
-
-    private val COLD_FARM_BIOMES =
-        setOf(
-            "cold_ocean",
-            "deep_cold_ocean",
-            "deep_dark",
-            "deep_frozen_ocean",
-            "end_barrens",
-            "end_highlands",
-            "end_midlands",
-            "frozen_ocean",
-            "frozen_peaks",
-            "frozen_river",
-            "grove",
-            "ice_spikes",
-            "jagged_peaks",
-            "old_growth_pine_taiga",
-            "old_growth_spruce_taiga",
-            "small_end_islands",
-            "snowy_beach",
-            "snowy_plains",
-            "snowy_slopes",
-            "snowy_taiga",
-            "stony_peaks",
-            "taiga",
-            "the_end",
-            "windswept_forest",
-            "windswept_gravelly_hills",
-            "windswept_hills",
-        )
-
-    private val WARM_FROG_BIOMES =
-        setOf(
-            "badlands",
-            "bamboo_jungle",
-            "basalt_deltas",
-            "crimson_forest",
-            "desert",
-            "eroded_badlands",
-            "jungle",
-            "mangrove_swamp",
-            "nether_wastes",
-            "savanna",
-            "savanna_plateau",
-            "soul_sand_valley",
-            "sparse_jungle",
-            "warm_ocean",
-            "warped_forest",
-            "windswept_savanna",
-            "wooded_badlands",
-        )
-
-    private val COLD_FROG_BIOMES =
-        setOf(
-            "deep_dark",
-            "deep_frozen_ocean",
-            "end_barrens",
-            "end_highlands",
-            "end_midlands",
-            "frozen_ocean",
-            "frozen_peaks",
-            "frozen_river",
-            "grove",
-            "ice_spikes",
-            "jagged_peaks",
-            "small_end_islands",
-            "snowy_beach",
-            "snowy_plains",
-            "snowy_slopes",
-            "snowy_taiga",
-            "the_end",
-        )
-
-    private val SAVANNA_BIOMES = setOf("savanna", "savanna_plateau", "windswept_savanna")
-    private val JUNGLE_BIOMES = setOf("bamboo_jungle", "jungle", "sparse_jungle")
-    private val BADLANDS_BIOMES = setOf("badlands", "eroded_badlands", "wooded_badlands")
 }
