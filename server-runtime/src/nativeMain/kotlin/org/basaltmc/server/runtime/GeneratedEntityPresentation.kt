@@ -230,6 +230,13 @@ private fun MutableList<SetEntityDataPacket.Entry>.addCatMetadata(data: NbtCompo
     if (variant != null && variant != CAT_VARIANT_BLACK) add(SetEntityDataPacket.Entry.RegistryId(20, variant))
     val collarColor = data.getByte("CollarColor", 14).toInt() and 0xFF
     if (collarColor != 14) add(SetEntityDataPacket.Entry.Ints(23, collarColor))
+    addRegistryMetadata(
+        data,
+        "sound_variant",
+        24,
+        CAT_SOUND_VARIANT_IDS,
+        SetEntityDataPacket.RegistryHolder.CAT_SOUND_VARIANT,
+    )
 }
 
 private fun MutableList<SetEntityDataPacket.Entry>.addVillagerMetadata(
@@ -331,7 +338,7 @@ private val EQUIPMENT_SLOTS =
 
 /**
  * Indices into the `minecraft:cat_variant` registry exactly as this server syncs it (see
- * `ClientSession.sendRegistriesThenFinish` and `VanillaRegistryData.catVariants`): the client
+ * `VanillaConfigurationRegistries` and `VanillaRegistryData.catVariants`): the client
  * resolves the id against that packet's entry order, nothing else.
  */
 private const val CAT_VARIANT_BLACK = 1
@@ -350,6 +357,7 @@ private val CAT_VARIANT_IDS =
         "minecraft:jellie" to 9,
         "minecraft:all_black" to 10,
     )
+private val CAT_SOUND_VARIANT_IDS = registryIds("classic", "royal")
 
 private val CHICKEN_VARIANT_IDS = registryIds("temperate", "warm", "cold")
 private val CHICKEN_SOUND_VARIANT_IDS = registryIds("classic", "picky")

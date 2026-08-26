@@ -350,7 +350,9 @@ public object VanillaRegistryData {
             putString("baby_asset_id", "minecraft:entity/cat/cat_${id}_baby")
         }
 
-    public fun catSoundVariant(): NbtCompound {
+    public val catSoundVariants: List<String> = listOf("classic", "royal")
+
+    public fun catSoundVariant(id: String): NbtCompound {
         fun sounds(prefix: String) =
             NbtCompound().apply {
                 putString("ambient_sound", "minecraft:entity.$prefix.ambient")
@@ -364,7 +366,7 @@ public object VanillaRegistryData {
                 putString("stray_ambient_sound", "minecraft:entity.$prefix.stray_ambient")
             }
         return NbtCompound().apply {
-            this["adult_sounds"] = sounds("cat")
+            this["adult_sounds"] = sounds(if (id == "royal") "cat_royal" else "cat")
             this["baby_sounds"] = sounds("baby_cat")
         }
     }

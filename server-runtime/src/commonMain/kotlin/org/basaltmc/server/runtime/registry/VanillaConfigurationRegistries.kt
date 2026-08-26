@@ -38,10 +38,10 @@ internal object VanillaConfigurationRegistries {
             ),
             variants("minecraft:frog_variant", VanillaRegistryData.frogVariants, VanillaRegistryData::frogVariant),
             variants("minecraft:cat_variant", VanillaRegistryData.catVariants, VanillaRegistryData::catVariant),
-            single(
+            variants(
                 "minecraft:cat_sound_variant",
-                "classic",
-                VanillaRegistryData.catSoundVariant(),
+                VanillaRegistryData.catSoundVariants,
+                VanillaRegistryData::catSoundVariant,
             ),
             variants(
                 "minecraft:cow_sound_variant",
