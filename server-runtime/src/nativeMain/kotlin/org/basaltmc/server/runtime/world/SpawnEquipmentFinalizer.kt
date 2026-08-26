@@ -164,6 +164,15 @@ public class SpawnEquipmentFinalizer(
         slot: String,
     ): String? = item(data, slot).getString("id").takeIf(String::isNotEmpty)
 
+    internal fun setGuaranteedDrop(
+        data: NbtCompound,
+        slot: String,
+    ) {
+        val chances = data.getCompound("drop_chances")
+        chances[slot] = NbtFloat(GUARANTEED_DROP_CHANCE)
+        data["drop_chances"] = chances
+    }
+
     internal fun setItem(
         data: NbtCompound,
         slot: String,
@@ -207,6 +216,7 @@ public class SpawnEquipmentFinalizer(
         const val ZOMBIFIED_PIGLIN_SPEAR_ODDS = 20
         const val HALLOWEEN_HEAD_CHANCE = 0.25f
         const val JACK_O_LANTERN_CHANCE = 0.1f
+        const val GUARANTEED_DROP_CHANCE = 2f
 
         val ABSTRACT_SKELETON_TYPES = setOf("skeleton", "stray", "bogged", "parched", "wither_skeleton")
         val ARMOR_POPULATION_ORDER = listOf("head", "chest", "legs", "feet")
