@@ -24,18 +24,12 @@ import org.basaltmc.server.runtime.config.CompatibilityConfig
 import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldsConfig
-import org.basaltmc.server.runtime.entity.Breeding
-import org.basaltmc.server.runtime.entity.EntityCombat
 import org.basaltmc.server.runtime.entity.EntityNbt
 import org.basaltmc.server.runtime.entity.Minecarts
-import org.basaltmc.server.runtime.entity.MobBrain
-import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.runtime.entity.MobCombat
-import org.basaltmc.server.runtime.entity.MobDespawn
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.PrimedTnt
 import org.basaltmc.server.runtime.entity.Projectiles
-import org.basaltmc.server.runtime.entity.Wardens
 import org.basaltmc.server.runtime.entity.ai.PlayerView
 import org.basaltmc.server.runtime.function.FunctionLibrary
 import org.basaltmc.server.runtime.placeholder.AnimationPlaceholders
@@ -615,6 +609,8 @@ public class BasaltServer(
             { worldRegistry.worlds },
         )
 
+    private val mobTicks = MobTickSystem(mobActionSystem)
+
     /**
      * The server list, rebuilt per ping from `server_list.toml`.
      *
@@ -905,6 +901,7 @@ public class BasaltServer(
         val random = LegacyRandom(Random.nextLong())
         for (entity in living) {
             if (entity.removed) continue
+            if (mobTicks.hasActiveVehicle(world, entity)) continue
             // An entity is ticked by whoever owns the ground it is standing on. It may walk out of
             // this region during its own turn: that is fine, the next tick asks again, and the
             // repartition that could change the answer only happens between ticks.
@@ -967,29 +964,14 @@ public class BasaltServer(
                         living,
                     )
                 pressed?.let { broadcaster.announceRedstone(world, watchers, it) }
+                mobTicks.tickPassengers(world, entity, watchers, views, living, random)
                 continue
             }
             // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.
             if (Mobs.isMob(entity.type)) {
-                entity.idleTicks++
-                entity.tickCount++
-                EntityCombat.tick(entity)
-                if (Wardens.isWarden(entity.type)) {
-                    Wardens.tick(entity)
-                    if (entity.touchCooldown > 0) entity.touchCooldown--
-                }
-                if (entity.panicTicks > 0) entity.panicTicks--
-                mobActionSystem.tickFire(world, watchers, entity, random)
-                if (!entity.noAi) {
-                    mobActionSystem.tickMobAi(world, entity, views, living, random)
-                    // parity: `Animal.aiStep` and `BreedGoal`, which is where a calf comes from.
-                    val partner = Breeding.tick(entity, living)
-                    if (partner != null) mobActionSystem.breed(world, entity, partner)
-                }
-                // parity: `Mob.checkDespawn`, which vanilla runs on the same tick as the AI.
-                val category = MobCategory.byName(Mobs.categoryOf(entity.type)) ?: MobCategory.MISC
-                val nearest = watchers.minOfOrNull { MobBrain.distanceTo(entity, it.x, it.y, it.z) }
-                if (MobDespawn.shouldDespawn(entity, category, nearest, random)) entity.removed = true
+                mobTicks.tickTree(world, entity, watchers, views, living, random)
+            } else {
+                mobTicks.tickPassengers(world, entity, watchers, views, living, random)
             }
         }
     }

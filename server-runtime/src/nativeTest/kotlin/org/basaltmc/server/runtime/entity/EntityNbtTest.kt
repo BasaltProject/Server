@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.entity
 
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.runtime.EntityRiding
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
 import org.basaltmc.server.runtime.world.MobSpawnGroupData
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
@@ -193,6 +194,8 @@ class EntityNbtTest {
         assertEquals(30, restored[1].vehicleId)
         assertEquals(Identifier.vanilla("skeleton"), restored[1].type)
         assertEquals(-0.25, restored[1].x)
+        EntityRiding.position(restored[0], restored[1])
+        assertEquals(64.065, restored[1].y, 1e-12)
         assertEquals(
             "minecraft:bow",
             restored[1]
