@@ -90,7 +90,13 @@ internal object ZombieSpawnFinalizer {
     ) {
         if (!group.zombieCanSpawnJockey) return
         val reuseNearbyChicken = random.nextFloat() < CHICKEN_JOCKEY_CHANCE
-        if (reuseNearbyChicken || random.nextFloat() >= CHICKEN_JOCKEY_CHANCE) return
+        if (reuseNearbyChicken) {
+            builder.environment.nearbyUnriddenChicken(zombie)?.let { chickenId ->
+                builder.mountExternal(zombie, chickenId, force = false)
+            }
+            return
+        }
+        if (random.nextFloat() >= CHICKEN_JOCKEY_CHANCE) return
 
         val chicken = builder.create(Identifier.vanilla("chicken"), zombie.x, zombie.y, zombie.z, zombie.yaw)
         finalizeChild(
@@ -173,6 +179,18 @@ internal object ZombieSpawnFinalizer {
     ) {
         husk.data.putBoolean("CanPickUpLoot", random.nextFloat() < PICKUP_CHANCE * specialMultiplier)
         if (reason != MobSpawnReason.NATURAL) return
+        val blockX = floor(husk.x).toInt()
+        val blockY = floor(husk.y).toInt()
+        val blockZ = floor(husk.z).toInt()
+        if (!builder.environment.canSpawnEntity(
+                Identifier.vanilla("camel_husk"),
+                blockX + 0.5,
+                blockY.toDouble(),
+                blockZ + 0.5,
+            )
+        ) {
+            return
+        }
         if (random.nextFloat() >= CAMEL_HUSK_CHANCE) return
 
         equipment.setItem(husk.data, "mainhand", "iron_spear")

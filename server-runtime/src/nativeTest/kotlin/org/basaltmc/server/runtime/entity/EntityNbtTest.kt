@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.entity
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.runtime.EntityRiding
 import org.basaltmc.server.runtime.generatedEntityMetadata
+import org.basaltmc.server.runtime.world.MobSpawnEnvironment
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
 import org.basaltmc.server.runtime.world.MobSpawnForest
 import org.basaltmc.server.runtime.world.MobSpawnGroupData
@@ -340,6 +341,7 @@ class EntityNbtTest {
             type: String,
             seed: Long,
             biome: String = "plains",
+            environment: MobSpawnEnvironment = MobSpawnEnvironment.EMPTY,
         ): MobSpawnForest {
             var entitySeed = seed + 10_000L
             return writeGeneratedForest(
@@ -354,6 +356,7 @@ class EntityNbtTest {
                 reason = MobSpawnReason.NATURAL,
                 entityRandom = LegacyRandom(entitySeed++),
                 entityRandomFactory = { LegacyRandom(entitySeed++) },
+                environment = environment,
             )
         }
 
@@ -377,6 +380,24 @@ class EntityNbtTest {
             )
         assertEquals(AgeableMobs.BABY_START_AGE, jockeyEntities.single { it.type.path == "zombie" }.age)
         assertEquals(jockeyEntities[0].entityId, jockeyEntities[1].vehicleId)
+        assertTrue(MobPersistence.keeps(jockeyEntities.single { it.type.path == "chicken" }))
+
+        val reusedChicken =
+            assertNotNull(
+                (0L..10_000L).firstNotNullOfOrNull { seed ->
+                    forest(
+                        "zombie",
+                        seed,
+                        environment =
+                            MobSpawnEnvironment(
+                                nearbyUnriddenChicken = { 99 },
+                                canSpawnEntity = { _, _, _, _ -> true },
+                            ),
+                    ).takeIf { it.externalVehicleLinks.singleOrNull()?.vehicleId == 99 }
+                },
+            )
+        assertTrue(reusedChicken.main.data.getBoolean("IsBaby"))
+        assertTrue(reusedChicken.externalVehicleLinks.single().passenger === reusedChicken.main)
 
         val drownedRider =
             assertNotNull(
@@ -429,6 +450,20 @@ class EntityNbtTest {
                 .getCompound("mainhand")
                 .getString("id"),
         )
+        val blockedCamel =
+            forest(
+                "husk",
+                (0L..1_000L).first { seed ->
+                    forest("husk", seed, biome = "desert").roots.any { it.type.path == "camel_husk" }
+                },
+                biome = "desert",
+                environment =
+                    MobSpawnEnvironment(
+                        nearbyUnriddenChicken = { null },
+                        canSpawnEntity = { _, _, _, _ -> false },
+                    ),
+            )
+        assertTrue(blockedCamel.roots.none { it.type.path == "camel_husk" })
 
         val piglinJockey =
             assertNotNull(

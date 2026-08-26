@@ -3,7 +3,10 @@ package org.basaltmc.server.runtime
 import org.basaltmc.server.plugins.PluginEventBus
 import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.server.registry.EntityTypes
+import org.basaltmc.server.runtime.entity.Aabb
+import org.basaltmc.server.runtime.entity.EntityCollision
 import org.basaltmc.server.runtime.entity.EntityNbt
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.runtime.entity.MobPersistence
@@ -12,11 +15,13 @@ import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.server.runtime.sched.Region
+import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.LocalMobCaps
 import org.basaltmc.server.runtime.world.MobCapPlayer
 import org.basaltmc.server.runtime.world.MobLocalDifficulty
+import org.basaltmc.server.runtime.world.MobSpawnEnvironment
 import org.basaltmc.server.runtime.world.MobSpawnForest
 import org.basaltmc.server.runtime.world.MobSpawnReason
 import org.basaltmc.server.runtime.world.NaturalSpawner
@@ -227,6 +232,7 @@ public class NaturalSpawningSystem(
                 entityRandom = LegacyRandom(Random.nextLong()),
                 reason = MobSpawnReason.NATURAL,
                 entityRandomFactory = { LegacyRandom(Random.nextLong()) },
+                environment = spawnEnvironment(world),
             )
         return materializeForest(world, forest)
     }
@@ -253,9 +259,16 @@ public class NaturalSpawningSystem(
                     playerRegistry.allocateEntityId(),
                     protocolType,
                 ) ?: return
-            if (vehicle != null) {
-                entity.vehicleId = vehicle.entityId
-                vehicle.passengerIds += entity.entityId
+            val externalVehicleId =
+                forest.externalVehicleLinks.firstOrNull { it.passenger === descriptor }?.vehicleId
+            val resolvedVehicle = vehicle ?: externalVehicleId?.let(world.state::entity)
+            if (resolvedVehicle != null) {
+                entity.vehicleId = resolvedVehicle.entityId
+                resolvedVehicle.passengerIds += entity.entityId
+                if (resolvedVehicle.type.path == "chicken") {
+                    val vehicleData = resolvedVehicle.sourceNbt ?: NbtCompound().also { resolvedVehicle.sourceNbt = it }
+                    vehicleData.putBoolean("IsChickenJockey", true)
+                }
             }
             world.state.spawnEntity(entity)
             if (descriptor === forest.main) main = entity
@@ -264,6 +277,65 @@ public class NaturalSpawningSystem(
 
         forest.roots.forEach { root -> materialize(root, null) }
         return main
+    }
+
+    private fun spawnEnvironment(world: LoadedWorld): MobSpawnEnvironment =
+        MobSpawnEnvironment(
+            nearbyUnriddenChicken = { zombie ->
+                val scale = if (zombie.data.getBoolean("IsBaby")) 0.5 else 1.0
+                val source =
+                    Aabb.of(
+                        zombie.x,
+                        zombie.y,
+                        zombie.z,
+                        EntityTypeShapes.widthOf(zombie.type) * scale,
+                        EntityTypeShapes.heightOf(zombie.type) * scale,
+                    )
+                val search =
+                    Aabb(
+                        source.minX - CHICKEN_SEARCH_HORIZONTAL,
+                        source.minY - CHICKEN_SEARCH_VERTICAL,
+                        source.minZ - CHICKEN_SEARCH_HORIZONTAL,
+                        source.maxX + CHICKEN_SEARCH_HORIZONTAL,
+                        source.maxY + CHICKEN_SEARCH_VERTICAL,
+                        source.maxZ + CHICKEN_SEARCH_HORIZONTAL,
+                    )
+                world.state
+                    .entities()
+                    .firstOrNull { candidate ->
+                        !candidate.removed &&
+                            candidate.health > 0.0 &&
+                            candidate.type.path == "chicken" &&
+                            candidate.vehicleId == null &&
+                            candidate.passengerIds.isEmpty() &&
+                            entityBox(candidate).intersects(search)
+                    }?.entityId
+            },
+            canSpawnEntity = { type, x, y, z ->
+                val box = Aabb.of(x, y, z, EntityTypeShapes.widthOf(type), EntityTypeShapes.heightOf(type))
+                !EntityCollision.collides(world.state, box) &&
+                    world.state.entities().none { candidate ->
+                        !candidate.removed && entityBox(candidate).intersects(box)
+                    } &&
+                    playerRegistry.snapshot().none { player ->
+                        player.worldName == world.name &&
+                            player.gamemode != Gamemode.SPECTATOR &&
+                            playerBox(player.x, player.y, player.z, player.sneaking).intersects(box)
+                    }
+            },
+        )
+
+    private fun entityBox(entity: ServerEntity): Aabb =
+        Aabb.of(entity.x, entity.y, entity.z, entity.width, entity.height)
+
+    private fun playerBox(
+        x: Double,
+        y: Double,
+        z: Double,
+        sneaking: Boolean,
+    ): Aabb {
+        val packed = BlockPlacement.playerBox(x, y, z, sneaking)
+        return Aabb(packed[0], packed[1], packed[2], packed[3], packed[4], packed[5])
     }
 
     private fun spawnAllowed(
@@ -284,5 +356,10 @@ public class NaturalSpawningSystem(
                 spawning.set(5, reason)
             }
         return event?.cancelled != true
+    }
+
+    private companion object {
+        const val CHICKEN_SEARCH_HORIZONTAL = 5.0
+        const val CHICKEN_SEARCH_VERTICAL = 3.0
     }
 }
