@@ -130,21 +130,30 @@ git clone --recurse-submodules https://github.com/BasaltProject/Server.git
 In an existing clone, `git submodule update --init` does the same. Without it the
 build fails immediately: half the modules are missing.
 
-Kotlin/Native tasks carry the target in their name; replace `MacosArm64` with the
-one you are building for. Gradle orchestrates the build and is not part of the
-runtime; it needs JDK 25, which the server itself does not.
+Then one command, the same on macOS, Linux and Windows:
 
 ```bash
-# Native binary for the current host
-./gradlew :server-runtime:linkReleaseExecutableMacosArm64
-
-# Debug build and run
-./gradlew :server-runtime:runDebugExecutableMacosArm64
+./gradlew build
 ```
 
-Supported targets: `macosArm64`, `macosX64`, `linuxX64`, `linuxArm64`, `mingwX64`.
-Kotlin/Native does not cross-compile between host families, so each one is built
-on its own.
+It builds and tests a release binary for the machine it runs on and leaves it in
+`build/`, named for what it is:
+
+```
+build/BasaltServer-26.2.0-dev-macOS-arm64
+build/BasaltServer-26.2.14-Linux-x64
+build/BasaltServer-26.2.14-Windows-x64.exe
+```
+
+A build made outside the CI has no build number, so it is `.0-dev`. Gradle
+orchestrates the build and needs JDK 25; the server it produces needs no Java at
+all.
+
+Kotlin/Native does not cross-compile between host families, so a machine builds
+its own: `macosArm64` and `macosX64` on macOS, `linuxX64` and `linuxArm64` on
+Linux, `mingwX64` on Windows. Of those, the build makes the one it is running on.
+For the rest there is `-Pbasalt.targets`, and for a debug binary in the same
+place, `-Pbasalt.debug`.
 
 ## Related repositories
 

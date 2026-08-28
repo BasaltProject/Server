@@ -1,3 +1,9 @@
+// The root project builds nothing itself, but the host binary is copied into its build directory,
+// so it needs the lifecycle tasks: without them `clean` skips the one thing anyone can run.
+plugins {
+    base
+}
+
 /**
  * The version is `<minecraft>.<build>`: what a server owner needs to know is which Minecraft this
  * speaks, and the build number is how far along that line it is. The CI passes the number; anything
