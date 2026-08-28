@@ -20,6 +20,8 @@ public class CompatibilityConfig(
     public val backwards: BackwardsSelection,
     public val futureProtocols: UnknownProtocolPolicy,
     public val snapshots: UnknownProtocolPolicy,
+    /** Whether what stands in for content a client is too old for says what it really is. */
+    public val nameSubstitutes: Boolean = true,
 ) {
     /**
      * The door, built from what this build can actually translate.
@@ -73,8 +75,9 @@ public class CompatibilityConfig(
 
             val future = policy(java?.stringOrNull("future-protocols"), "future-protocols", path)
             val snapshots = policy(java?.stringOrNull("snapshots"), "snapshots", path)
+            val nameSubstitutes = java?.boolOrNull("name-substitutes") ?: true
             logger.debug { "Loaded $path." }
-            return CompatibilityConfig(backwards, future, snapshots)
+            return CompatibilityConfig(backwards, future, snapshots, nameSubstitutes)
         }
 
         private fun policy(

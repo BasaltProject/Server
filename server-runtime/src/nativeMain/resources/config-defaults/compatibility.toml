@@ -24,3 +24,11 @@ future-protocols = "refuse"
 # their own answer, because a development version changes from one day to
 # the next.
 snapshots = "refuse"
+
+# What to do about content this server has and the client's version never had.
+#
+# It is shown something similar instead, which is all that client can draw. With
+# this on, what stands in is also renamed to what it really is, so a 26.2 block
+# reads "Cinnabar (26.2)" in the inventory rather than "Red Sandstone". An item
+# somebody named themselves keeps that name.
+name-substitutes = true

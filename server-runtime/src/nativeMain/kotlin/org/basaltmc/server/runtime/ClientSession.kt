@@ -76,6 +76,7 @@ import org.basaltmc.wire.multiversion.ProtocolChain
 import org.basaltmc.wire.multiversion.ProtocolGate
 import org.basaltmc.wire.multiversion.ProtocolVerdict
 import org.basaltmc.wire.multiversion.ProtocolVersions
+import org.basaltmc.wire.multiversion.SubstitutionLabels
 import org.basaltmc.wire.multiversion.UnknownProtocolPolicy
 import org.basaltmc.wire.multiversion.java.JavaTranslators
 import org.basaltmc.wire.nbt.NbtCompound
@@ -270,6 +271,8 @@ public class ClientSession(
             UnknownProtocolPolicy.WARN,
             UnknownProtocolPolicy.REFUSE,
         ),
+    /** What to call content this client's version never had. Null leaves the stand-in unnamed. */
+    private val substitutionLabels: SubstitutionLabels? = null,
 ) {
     internal val logger = Logger("Session")
 
@@ -755,7 +758,7 @@ public class ClientSession(
         val packet = HandshakePacket.read(body)
         handshake = packet
         verdict = protocolGate.verdictFor(packet.protocolVersion)
-        translation = JavaTranslators.chainFor(packet.protocolVersion)
+        translation = JavaTranslators.chainFor(packet.protocolVersion, substitutionLabels)
         state =
             when (packet.intent) {
                 ClientIntent.STATUS -> ProtocolState.STATUS
