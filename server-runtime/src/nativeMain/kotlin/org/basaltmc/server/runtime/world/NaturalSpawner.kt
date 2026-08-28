@@ -438,6 +438,11 @@ public object NaturalSpawner {
         y: Int,
         z: Int,
     ): Identifier? {
+        world.biomeZoomer
+            .biomeAt(x, y, z) { quartX, quartY, quartZ ->
+                noiseBiomeAt(world, quartX, quartY, quartZ)
+            }?.let { return it }
+
         val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4)
         if (chunk != null) {
             val clampedY = y.coerceIn(chunk.verticalBounds.minY, chunk.verticalBounds.maxY)
@@ -445,7 +450,24 @@ public object NaturalSpawner {
             val biomeId = chunk.getBiomeId((x and 15) shr 2, quartY, (z and 15) shr 2)
             Biomes.REGISTRY.byId(biomeId)?.let { return it.id }
         }
-        return world.biomeSource?.biomeAt(x, y, z)?.id
+        return world.biomeSource?.blockBiomeAt(x, y, z)?.id
+    }
+
+    private fun noiseBiomeAt(
+        world: LoadedWorld,
+        quartX: Int,
+        quartY: Int,
+        quartZ: Int,
+    ): Identifier? {
+        val chunk = world.state.chunkIfLoaded(quartX shr 2, quartZ shr 2)
+        if (chunk != null) {
+            val localQuartY =
+                (quartY - (chunk.verticalBounds.minY shr 2))
+                    .coerceIn(0, chunk.verticalBounds.height / 4 - 1)
+            val biomeId = chunk.getBiomeId(quartX and 3, localQuartY, quartZ and 3)
+            Biomes.REGISTRY.byId(biomeId)?.let { return it.id }
+        }
+        return world.biomeSource?.biomeAtQuart(quartX, quartY, quartZ)?.id
     }
 
     private val ARMADILLO_GROUND = setOf("grass_block", "red_sand", "coarse_dirt")

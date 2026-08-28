@@ -3,17 +3,17 @@ package org.basaltmc.server.world.terrain.decoration.nether
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 
 internal fun NetherVegetalDecoration.placeHugeFungi(
     chunk: Chunk,
     random: BasaltRandom,
-    biomeSource: NetherBiomeSource,
+    biomeSource: NetherBiomeLookup,
     config: HugeFungus,
 ) {
     val origins = positionsOnEveryLayer(chunk, random, 8)
     for (origin in origins) {
-        if (biomeSource.biomeAt(origin.x, origin.y, origin.z).id.path == config.biome) {
+        if (biomeSource.blockBiomeAt(origin.x, origin.y, origin.z).id.path == config.biome) {
             placeHugeFungus(chunk, random, origin, config)
         }
     }

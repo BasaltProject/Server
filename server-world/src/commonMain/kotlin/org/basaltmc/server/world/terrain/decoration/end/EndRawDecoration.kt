@@ -26,7 +26,7 @@ public object EndRawDecoration {
             val x = chunk.chunkX * 16 + random.nextInt(16)
             val z = chunk.chunkZ * 16 + random.nextInt(16)
             val y = END_ISLAND_MIN_Y + random.nextInt(END_ISLAND_MAX_Y - END_ISLAND_MIN_Y + 1)
-            if (biomeSource.biomeAtQuart(x shr 2, y shr 2, z shr 2) == Biomes.SMALL_END_ISLANDS) {
+            if (biomeSource.blockBiomeAt(x, y, z) == Biomes.SMALL_END_ISLANDS) {
                 placeIsland(chunk, random, x, y, z)
             }
         }

@@ -11,7 +11,7 @@ public object EndTopLayerDecoration {
         chunk: Chunk,
         biomeSource: TheEndBiomeSource,
     ) {
-        if (biomeSource.biomeAtQuart(ORIGIN_X shr 2, ORIGIN_Y shr 2, ORIGIN_Z shr 2) != Biomes.THE_END) return
+        if (biomeSource.blockBiomeAt(ORIGIN_X, ORIGIN_Y, ORIGIN_Z) != Biomes.THE_END) return
         if (chunk.chunkX != ORIGIN_X.floorDiv(16) || chunk.chunkZ !in AFFECTED_CHUNK_Z) return
 
         for (z in maxOf(chunk.chunkZ * 16, ORIGIN_Z - RADIUS)..minOf(chunk.chunkZ * 16 + 15, ORIGIN_Z + RADIUS)) {

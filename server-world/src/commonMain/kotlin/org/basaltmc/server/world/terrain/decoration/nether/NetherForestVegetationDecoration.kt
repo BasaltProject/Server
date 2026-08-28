@@ -2,7 +2,7 @@ package org.basaltmc.server.world.terrain.decoration.nether
 
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 
 /** The vegetation patch itself, without the layer scan that chooses where the step puts one. */
 internal fun NetherVegetalDecoration.placeVegetationAt(
@@ -26,12 +26,12 @@ internal fun NetherVegetalDecoration.placeVegetationAt(
 internal fun NetherVegetalDecoration.placeForestVegetation(
     chunk: Chunk,
     random: BasaltRandom,
-    biomeSource: NetherBiomeSource,
+    biomeSource: NetherBiomeLookup,
     config: ForestVegetation,
 ) {
     val origins = positionsOnEveryLayer(chunk, random, config.layerCount)
     for (origin in origins) {
-        if (biomeSource.biomeAt(origin.x, origin.y, origin.z).id.path != config.biome) continue
+        if (biomeSource.blockBiomeAt(origin.x, origin.y, origin.z).id.path != config.biome) continue
         if (blockPathAt(chunk, origin.x, origin.y - 1, origin.z) !in NYLIUM) continue
         if (origin.y < chunk.verticalBounds.minY + 1 || origin.y + 1 > chunk.verticalBounds.maxY) continue
         repeat(64) {

@@ -2,12 +2,12 @@ package org.basaltmc.server.world.terrain.decoration.nether
 
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 
 internal fun NetherVegetalDecoration.placeNormalMushroom(
     chunk: Chunk,
     random: BasaltRandom,
-    biomeSource: NetherBiomeSource,
+    biomeSource: NetherBiomeLookup,
     rarity: Int,
     mushroom: String,
 ) {
@@ -15,7 +15,7 @@ internal fun NetherVegetalDecoration.placeNormalMushroom(
     val baseX = chunk.chunkX * 16 + random.nextInt(16)
     val baseZ = chunk.chunkZ * 16 + random.nextInt(16)
     val baseY = chunk.heightAt(baseX and 15, baseZ and 15, Chunk.HeightmapType.MOTION_BLOCKING)
-    if (biomeSource.biomeAt(baseX, baseY, baseZ).id.path !in NORMAL_MUSHROOM_BIOMES) return
+    if (biomeSource.blockBiomeAt(baseX, baseY, baseZ).id.path !in NORMAL_MUSHROOM_BIOMES) return
     val mushroomState = stateId(mushroom)
     repeat(PATCH_ATTEMPTS) {
         val x = baseX + triangle(random, 7)

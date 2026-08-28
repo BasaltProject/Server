@@ -84,18 +84,19 @@ public class VanillaWorldGeneratorFactory(
         seed: Long,
         spawnMobs: Boolean,
     ): Generators {
+        val biomeZoomSeed = obfuscateBiomeSeed(seed)
         val positional = XoroshiroRandom(seed).forkPositional()
         val noises = RealNoiseParameters(serverJar, positional)
         // parity: RandomState wires BlendedNoise from random.fromHashOf("minecraft:terrain").
         val base3d = BlendedNoise(positional.fromHashOf("minecraft:terrain"), 0.25, 0.125, 80.0, 160.0, 8.0)
         val router = NoiseRouterData.overworld(noises::get, base3d)
-        val surface = RealSurfaceEnvironment(serverJar, positional, router)
+        val surface = RealSurfaceEnvironment(serverJar, positional, router, biomeZoomSeed)
         val villageLoader = VillageDataLoader(serverJar).also(loaders::add)
         val village =
             VillageStructureGenerator(
                 router,
                 StructurePlacementGrid(spacing = 34, separation = 8, salt = 10387312),
-                biomeAt = surface::biomeAt,
+                biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
                 maxDepth = 6,
                 maxDistanceFromCenter = 80,
                 poolLookup = villageLoader.poolLookup,
@@ -135,6 +136,7 @@ public class VanillaWorldGeneratorFactory(
         seed: Long,
         spawnMobs: Boolean,
     ): (Int, Int, Long, String) -> Chunk {
+        val biomeZoomSeed = obfuscateBiomeSeed(seed)
         // parity: noise_settings/nether.json has legacy_random_source=true.
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.375, 80.0, 60.0, 8.0)
         val router =
@@ -142,8 +144,9 @@ public class VanillaWorldGeneratorFactory(
                 noise = { id -> legacyNetherNoise(id, seed + if (id == "nether/vegetation") 1L else 0L) },
                 base3d = base3d,
             )
-        val biomes = NetherBiomeSource(router.temperature, router.vegetation)
-        val surface = NetherSurfaceEnvironment(serverJar, LegacyRandom(seed).forkPositional(), router, biomes)
+        val biomes = NetherBiomeSource(router.temperature, router.vegetation, biomeZoomSeed)
+        val surface =
+            NetherSurfaceEnvironment(serverJar, LegacyRandom(seed).forkPositional(), router, biomes, biomeZoomSeed)
         val structureLoader = VillageDataLoader(serverJar).also(loaders::add)
         val structures =
             NetherStructureGenerator(
@@ -184,10 +187,11 @@ public class VanillaWorldGeneratorFactory(
     }
 
     private fun end(seed: Long): (Int, Int, Long, String) -> Chunk {
+        val biomeZoomSeed = obfuscateBiomeSeed(seed)
         // parity: noise_settings/end.json has legacy_random_source=true.
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.25, 80.0, 160.0, 4.0)
         val router = NoiseRouterData.end(base3d, seed)
-        val biomes = TheEndBiomeSource(router.erosion)
+        val biomes = TheEndBiomeSource(router.erosion, biomeZoomSeed)
         val structureLoader = VillageDataLoader(serverJar).also(loaders::add)
         val structures = EndCityStructureGenerator(router, biomes, structureLoader.templateLoader)
         return { chunkX, chunkZ, _, _ ->

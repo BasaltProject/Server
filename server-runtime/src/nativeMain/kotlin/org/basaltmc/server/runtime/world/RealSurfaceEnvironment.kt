@@ -25,8 +25,9 @@ public class RealSurfaceEnvironment(
     serverJar: ServerJarAssets,
     private val random: PositionalRandomFactory,
     private val router: OverworldNoiseRouter,
+    override val biomeZoomSeed: Long,
 ) : SurfaceRuleEnvironment {
-    private val biomeSource = OverworldBiomeSource(router)
+    private val biomeSource = OverworldBiomeSource(router, biomeZoomSeed)
     private val noises = RealNoiseParameters(serverJar, random)
     private val clayBands = BadlandsClayBands(random.fromHashOf("minecraft:clay_bands"))
 
@@ -118,14 +119,21 @@ public class RealSurfaceEnvironment(
         x: Int,
         y: Int,
         z: Int,
-    ): String = biomeSource.biomeAt(x, y, z).id.toString()
+    ): String = biomeSource.blockBiomeAt(x, y, z).id.toString()
 
     override fun biomeAt(
         x: Int,
         y: Int,
         z: Int,
         cache: DensityCache?,
-    ): String = biomeSource.biomeAt(x, y, z, cache).id.toString()
+    ): String = biomeSource.blockBiomeAt(x, y, z, cache).id.toString()
+
+    override fun noiseBiomeAt(
+        quartX: Int,
+        quartY: Int,
+        quartZ: Int,
+        cache: DensityCache?,
+    ): String = biomeSource.biomeAtQuart(quartX, quartY, quartZ, cache).id.toString()
 
     override fun isSteep(
         x: Int,

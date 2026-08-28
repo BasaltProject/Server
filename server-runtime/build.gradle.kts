@@ -26,6 +26,8 @@ kotlin {
             api(project(":server-assets"))
             api(project(":wire-auth"))
             api(project(":server-plugins"))
+            implementation(libs.cryptography.core)
+            implementation(libs.cryptography.provider.optimal)
         }
         nativeTest.dependencies {
             // Only to play the client side of the online-mode handshake in ServerIntegrationTest.

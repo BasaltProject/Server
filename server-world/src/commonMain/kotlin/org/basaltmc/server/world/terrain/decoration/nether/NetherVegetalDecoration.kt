@@ -5,7 +5,7 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 import org.basaltmc.wire.common.Identifier
 
 /** // parity: Nether placed features in the VEGETAL_DECORATION step. */
@@ -13,7 +13,7 @@ public object NetherVegetalDecoration {
     public fun decorate(
         chunk: Chunk,
         seed: Long,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
@@ -26,7 +26,7 @@ public object NetherVegetalDecoration {
     internal fun decorateFeature(
         chunk: Chunk,
         seed: Long,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         globalIndex: Int,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
@@ -38,7 +38,7 @@ public object NetherVegetalDecoration {
     private fun placeFeature(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         globalIndex: Int,
     ) {
         when (globalIndex) {

@@ -13,6 +13,7 @@ import org.basaltmc.server.world.FlatWorldGenerator
 import org.basaltmc.server.world.LeafDistances
 import org.basaltmc.server.world.NoiseWorldGenerator
 import org.basaltmc.server.world.VoidWorldGenerator
+import org.basaltmc.server.world.terrain.BiomeZoomer
 import org.basaltmc.server.world.terrain.OverworldBiomeSource
 import org.basaltmc.server.world.terrain.OverworldNoiseRouter
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
@@ -208,8 +209,15 @@ public class LoadedWorld(
      * Null for flat, void and generator-less worlds, where "the biome at a position" is whatever
      * the chunk was written with rather than something a sampler can answer.
      */
+    private val biomeZoomSeed = obfuscateBiomeSeed(metadata.seed)
+
     public val biomeSource: OverworldBiomeSource? =
-        overworldRouter?.takeIf { declaration.dimension == WorldDimension.OVERWORLD }?.let { OverworldBiomeSource(it) }
+        overworldRouter
+            ?.takeIf { declaration.dimension == WorldDimension.OVERWORLD }
+            ?.let { OverworldBiomeSource(it, biomeZoomSeed) }
+
+    /** Seeded block-biome zoom over the raw quart palettes held by loaded chunks. */
+    internal val biomeZoomer: BiomeZoomer = BiomeZoomer(biomeZoomSeed)
 
     /** This world's border. Not persisted yet, so it starts at vanilla's default size each run. */
     public val border: WorldBorder = WorldBorder()

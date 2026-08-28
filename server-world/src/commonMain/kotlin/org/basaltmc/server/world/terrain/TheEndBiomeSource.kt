@@ -13,7 +13,10 @@ import org.basaltmc.server.world.densityfunction.FunctionContext
  */
 public class TheEndBiomeSource(
     private val erosion: DensityFunction,
+    biomeZoomSeed: Long? = null,
 ) {
+    private val zoomer = biomeZoomSeed?.let(::BiomeZoomer)
+
     public fun biomeAtQuart(
         quartX: Int,
         quartY: Int,
@@ -38,6 +41,13 @@ public class TheEndBiomeSource(
             else -> Biomes.END_BARRENS
         }
     }
+
+    /** // parity: BiomeManager.getBiome, used by placed-feature biome filters. */
+    public fun blockBiomeAt(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Biome = zoomer?.biomeAt(x, y, z, ::biomeAtQuart) ?: biomeAtQuart(x shr 2, y shr 2, z shr 2)
 
     private companion object {
         const val ISLAND_CHUNK_DISTANCE_SQUARED = 4096L
