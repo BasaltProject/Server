@@ -44,7 +44,7 @@ internal fun generatedEntityMetadata(
             "armor_stand" -> addArmorStandMetadata(data)
             "axolotl" ->
                 data.getInt("Variant").takeIf { it != 0 }?.let {
-                    add(SetEntityDataPacket.Entry.Ints(17, it))
+                    add(SetEntityDataPacket.Entry.Ints(18, it))
                 }
             "cat" -> addCatMetadata(data)
             "chicken" -> {
