@@ -7,6 +7,8 @@ import org.basaltmc.server.world.ChunkGeneratedBlockTick
 import org.basaltmc.server.world.ChunkGeneratedBlockWrite
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
+import org.basaltmc.server.world.GeneratedBlockWritePolicy
+import org.basaltmc.server.world.terrain.decoration.tree.TreeBlockRules
 import org.basaltmc.wire.io.NativeMutex
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -80,8 +82,19 @@ internal class PendingChunkDecorations(
         val localX = write.x and 15
         val localZ = write.z and 15
         val current = chunk.getBlockStateId(localX, write.y, localZ)
-        if (write.replaceAnyState || current == write.expectedStateId) {
-            chunk.setBlockStateId(localX, write.y, localZ, write.stateId)
+        val canReplace =
+            write.replaceAnyState ||
+                current == write.expectedStateId ||
+                write.policy == GeneratedBlockWritePolicy.TREE &&
+                TreeBlockRules.canReplaceDeferred(current, write.stateId)
+        if (canReplace) {
+            val stateId =
+                if (write.policy == GeneratedBlockWritePolicy.TREE) {
+                    TreeBlockRules.resolveDeferredState(current, write.stateId)
+                } else {
+                    write.stateId
+                }
+            chunk.setBlockStateId(localX, write.y, localZ, stateId)
         }
     }
 

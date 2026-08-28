@@ -5,6 +5,7 @@ import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.GeneratedBlockWritePolicy
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.decoration.IntProvider
 import org.basaltmc.wire.common.Identifier
@@ -35,6 +36,18 @@ public object FallenTreeConfigs {
 /** // parity: FallenTreeFeature shape, validation, stump vines, and attached mushrooms. */
 public object FallenTreeFeature {
     public fun place(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        originX: Int,
+        originY: Int,
+        originZ: Int,
+        config: FallenTreeConfiguration,
+    ): Boolean =
+        chunk.withGeneratedBlockWritePolicy(GeneratedBlockWritePolicy.TREE) {
+            placeConfigured(chunk, random, originX, originY, originZ, config)
+        }
+
+    private fun placeConfigured(
         chunk: Chunk,
         random: WorldgenRandom,
         originX: Int,
