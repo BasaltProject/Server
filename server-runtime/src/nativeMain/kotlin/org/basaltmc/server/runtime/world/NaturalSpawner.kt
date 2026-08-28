@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.server.registry.hasFluid
 import org.basaltmc.server.registry.isLeavesState
 import org.basaltmc.server.runtime.entity.MobCategory
@@ -206,10 +207,7 @@ public object NaturalSpawner {
         if (!BlockShapes.isFaceSturdy(ground, org.basaltmc.server.registry.BlockFace.UP)) return false
         val feet = world.state.getBlockState(x, y, z) ?: return false
         val head = world.state.getBlockState(x, y + 1, z) ?: return false
-        if (!BlockShapes.isEmptyShape(feet) || !BlockShapes.isEmptyShape(head)) return false
-        // parity: `NaturalSpawner.isValidEmptySpawnBlock` rejects any fluid. Water has no collision
-        // shape of its own, so without this every land monster spawns on the ocean floor.
-        if (Blocks.hasFluid(feet) || Blocks.hasFluid(head)) return false
+        if (!canStandIn(feet, typePath) || !canStandIn(head, typePath)) return false
         if (typePath == "ocelot") {
             return y >= world.declaration.dimension.seaLevel &&
                 (BlockStateDefinitions.blockOf(ground)?.path == "grass_block" || Blocks.isLeavesState(ground)) &&
@@ -236,6 +234,34 @@ public object NaturalSpawner {
                     (typePath != "turtle" || y < world.declaration.dimension.seaLevel + 4)
             else -> true
         }
+    }
+
+    // parity: NaturalSpawner.isValidEmptySpawnBlock, all four of its answers.
+    private fun canStandIn(
+        stateId: Int,
+        typePath: String?,
+    ): Boolean {
+        if (BlockShapes.isFullCube(stateId)) return false
+        if (Redstone.isSignalSource(stateId)) return false
+        if (Blocks.hasFluid(stateId)) return false
+        val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return false
+        // parity: `BlockTags.PREVENT_MOB_SPAWNING_INSIDE`, which is the rails and nothing else.
+        if (path in RAILS) return false
+        return !isDangerous(stateId, path, typePath)
+    }
+
+    /** parity: `EntityType.isBlockDangerous`, whose burning half a fire-immune mob walks through. */
+    private fun isDangerous(
+        stateId: Int,
+        path: String,
+        typePath: String?,
+    ): Boolean {
+        val burning =
+            path in BURNING_BLOCKS ||
+                (path == "campfire" && BlockStateDefinitions.propertiesOf(stateId)["lit"] == "true")
+        val immune = typePath != null && EntityTypeShapes.isFireImmune(Identifier.vanilla(typePath))
+        if (burning && !immune) return true
+        return path in HURTS_ON_CONTACT
     }
 
     private fun monsterTypeRule(
@@ -482,6 +508,15 @@ public object NaturalSpawner {
     private val PARROT_GROUND = setOf("grass_block", "air")
     private val RABBIT_GROUND = setOf("grass_block", "snow", "snow_block", "sand")
     private val BAT_GROUND = setOf("stone", "granite", "diorite", "andesite", "tuff", "deepslate")
+
+    /** parity: `BlockTags.RAILS`, the whole of `PREVENT_MOB_SPAWNING_INSIDE`. */
+    private val RAILS = setOf("rail", "powered_rail", "detector_rail", "activator_rail")
+
+    /** parity: `NodeEvaluator.isBurningBlock`, minus the lit campfire, which needs its state. */
+    private val BURNING_BLOCKS = setOf("fire", "soul_fire", "lava", "magma_block", "lava_cauldron")
+
+    /** parity: the rest of `EntityType.isBlockDangerous`, which no mob is immune to. */
+    private val HURTS_ON_CONTACT = setOf("wither_rose", "sweet_berry_bush", "cactus", "powder_snow")
 
     private val WATER_TYPES =
         setOf(
