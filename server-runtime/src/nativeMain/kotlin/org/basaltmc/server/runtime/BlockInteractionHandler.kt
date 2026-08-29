@@ -1906,6 +1906,7 @@ internal class BlockInteractionHandler(
         }
         session.sleepingBed = Triple(head.x, head.y, head.z)
         session.sleepTicks = 0
+        session.stats.reset(StoredStats.TIME_SINCE_REST)
         val packet = SetEntityDataPacket.sleeping(session.entityId, head)
         owner.sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
         for (other in owner.playersInSameWorld()) {

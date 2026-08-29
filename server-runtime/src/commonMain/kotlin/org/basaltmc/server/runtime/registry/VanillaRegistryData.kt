@@ -9,9 +9,9 @@ import org.basaltmc.wire.text.ComponentNbt
 import org.basaltmc.wire.text.TextColor
 
 /**
- * Hand-authored NBT for the 15 registries a real 26.2 client needs during Configuration to reach
- * Play at all: `dimension_type`/`worldgen/biome` (parsed content, not just present) plus the 13
- * registries the client hard-requires non-empty (see the block below). Field shapes come from
+ * Hand-authored NBT for the static registries a real 26.2 client needs during Configuration:
+ * `dimension_type`/`worldgen/biome`, the registries the client hard-requires non-empty, and the
+ * full variant/banner registries referenced by entity metadata or item components. Field shapes come from
  * decompiling the real 26.2 server jar's codecs and bootstrap data, not guessed from memory (the
  * schemas changed substantially from older, widely-known Minecraft versions). The full 29-registry
  * synced set (`damage_type`, `chat_type`, `enchantment`, and the rest) and every real entry per
@@ -236,6 +236,60 @@ public object VanillaRegistryData {
     // `spawn_conditions`; registries referenced by natural entity metadata are nevertheless sent
     // in full and in bootstrap order so their numeric holder ids remain exact. Filling every other
     // synchronized registry is still `server-datagen`'s job.
+
+    /** parity: `BannerPatterns.bootstrap`, including the holder ids used by banner item components. */
+    public val bannerPatterns: List<String> =
+        listOf(
+            "base",
+            "square_bottom_left",
+            "square_bottom_right",
+            "square_top_left",
+            "square_top_right",
+            "stripe_bottom",
+            "stripe_top",
+            "stripe_left",
+            "stripe_right",
+            "stripe_center",
+            "stripe_middle",
+            "stripe_downright",
+            "stripe_downleft",
+            "small_stripes",
+            "cross",
+            "straight_cross",
+            "triangle_bottom",
+            "triangle_top",
+            "triangles_bottom",
+            "triangles_top",
+            "diagonal_left",
+            "diagonal_up_right",
+            "diagonal_up_left",
+            "diagonal_right",
+            "circle",
+            "rhombus",
+            "half_vertical",
+            "half_horizontal",
+            "half_vertical_right",
+            "half_horizontal_bottom",
+            "border",
+            "gradient",
+            "gradient_up",
+            "bricks",
+            "curly_border",
+            "globe",
+            "creeper",
+            "skull",
+            "flower",
+            "mojang",
+            "piglin",
+            "flow",
+            "guster",
+        )
+
+    public fun bannerPattern(id: String): NbtCompound =
+        NbtCompound().apply {
+            putString("asset_id", "minecraft:$id")
+            putString("translation_key", "block.minecraft.banner.$id")
+        }
 
     /** Vanilla bootstrap order; these indices are also sent by wolf entity metadata. */
     public val wolfVariants: List<String> =

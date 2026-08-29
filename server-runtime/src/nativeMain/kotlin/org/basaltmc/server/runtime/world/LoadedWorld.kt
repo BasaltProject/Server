@@ -203,6 +203,14 @@ public class LoadedWorld(
 
     public val gameRules: GameRuleValues = metadata.gameRules
 
+    /** Runtime-only custom-spawner cadence, owned and ticked with this world. */
+    internal val phantomSpawner: PhantomSpawner = PhantomSpawner()
+    internal val patrolSpawner: PatrolSpawner = PatrolSpawner()
+    internal val catSpawner: CatSpawner = CatSpawner()
+    internal val villageSiegeSpawner: VillageSiegeSpawner = VillageSiegeSpawner()
+    internal val wanderingTraderSpawner: WanderingTraderSpawner =
+        WanderingTraderSpawner(metadata.wanderingTraderSpawnDelay, metadata.wanderingTraderSpawnChance)
+
     /**
      * The biome source, when this world has a real one: what `/locate biome` searches with.
      *
@@ -254,6 +262,7 @@ public class LoadedWorld(
     /** Rewrites `level.nbt` with the state as it stands now. */
     public fun saveMetadata() {
         val (spawnX, spawnY, spawnZ) = spawnOverride ?: Triple(metadata.spawnX, metadata.spawnY, metadata.spawnZ)
+        val wanderingTrader = wanderingTraderSpawner.savedState()
         metadata
             .copy(
                 spawnX = spawnX,
@@ -272,6 +281,8 @@ public class LoadedWorld(
                 difficulty = difficulty,
                 difficultyLocked = difficultyLocked,
                 defaultGamemode = defaultGamemode,
+                wanderingTraderSpawnDelay = wanderingTrader.spawnDelay,
+                wanderingTraderSpawnChance = wanderingTrader.spawnChance,
             ).writeTo(worldRoot)
     }
 

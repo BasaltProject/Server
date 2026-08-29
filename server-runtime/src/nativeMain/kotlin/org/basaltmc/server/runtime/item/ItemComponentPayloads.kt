@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.item
 
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.Items
+import org.basaltmc.server.runtime.registry.VanillaRegistryData
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.nbt.NbtByte
@@ -94,6 +95,35 @@ public object ItemComponentPayloads {
             put("minecraft:tooltip_style", identifierEncoder())
             put("minecraft:note_block_sound", identifierEncoder())
             put("minecraft:glider") { _, _ -> true }
+
+            // parity: BannerPatternLayers.STREAM_CODEC. Reference holders use registry id + 1;
+            // zero is reserved for a direct, inline pattern.
+            put("minecraft:banner_patterns") { buffer, value ->
+                val layers = value as? NbtList ?: return@put false
+                buffer.writeVarInt(layers.size)
+                for (index in 0 until layers.size) {
+                    val layer = layers[index] as? NbtCompound ?: return@put false
+                    val pattern = layer.getString("pattern").substringAfter(':')
+                    val patternId = VanillaRegistryData.bannerPatterns.indexOf(pattern)
+                    val colorId = DYE_COLOURS.indexOf(layer.getString("color"))
+                    if (patternId < 0 || colorId < 0) return@put false
+                    buffer.writeVarInt(patternId + 1)
+                    buffer.writeVarInt(colorId)
+                }
+                true
+            }
+            put("minecraft:tooltip_display") { buffer, value ->
+                val display = value as? NbtCompound ?: return@put false
+                buffer.writeBoolean(boolField(display, "hide_tooltip") ?: false)
+                val hidden = display["hidden_components"] as? NbtList
+                buffer.writeVarInt(hidden?.size ?: 0)
+                for (index in 0 until (hidden?.size ?: 0)) {
+                    val name = (hidden?.get(index) as? NbtString)?.value ?: return@put false
+                    val component = componentId(name) ?: return@put false
+                    buffer.writeVarInt(component)
+                }
+                true
+            }
 
             // parity: the `idMapper` enums, written as their own ordinal.
             put("minecraft:dye", enumEncoder(DYE_COLOURS))

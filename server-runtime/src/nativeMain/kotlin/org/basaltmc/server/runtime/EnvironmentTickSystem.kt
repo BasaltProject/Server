@@ -17,6 +17,7 @@ import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.Lightning
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.NetherPortals
+import org.basaltmc.server.runtime.world.SkeletonHorseTrap
 import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.Vibrations
 import org.basaltmc.server.world.portal.PortalAxis
@@ -39,6 +40,7 @@ public class EnvironmentTickSystem(
     private val chunkSimulation: ChunkSimulationView,
     private val broadcaster: BlockChangeBroadcaster,
     private val environment: CommandEnvironment,
+    private val spawning: NaturalSpawningSystem,
 ) {
     /**
      * Skips the night when enough of the world's players have held a bed for five seconds.
@@ -308,6 +310,7 @@ public class EnvironmentTickSystem(
      * lightning rod within 128 blocks takes the strike, which is the whole point of putting one up.
      */
     private fun strikeLightning(world: LoadedWorld) {
+        if (!world.weather.raining) return
         val chunks = chunkSimulation.simulatedChunks(world)
         if (chunks.isEmpty()) return
         val random = LegacyRandom(Random.nextLong())
@@ -325,9 +328,11 @@ public class EnvironmentTickSystem(
                     event.set(3, target[2])
                 }
             if (struck?.cancelled == true) continue
+            val isTrap = SkeletonHorseTrap.shouldCreateFromThunder(world, target[0], target[1], target[2], random)
+            if (isTrap) spawning.spawnSkeletonTrap(world, target[0], target[1], target[2])
             val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
             // parity: `LightningBolt.tick`, where fire is only lit on normal and hard.
-            val lightFires = world.difficulty == "normal" || world.difficulty == "hard"
+            val lightFires = !isTrap && (world.difficulty == "normal" || world.difficulty == "hard")
             Lightning.strike(world, target[0], target[1], target[2], lightFires, changes)
             // parity: `GameEvent.LIGHTNING_STRIKE`, which a sculk sensor hears as fourteen.
             Vibrations.emit(

@@ -766,6 +766,7 @@ internal class CombatHandler(
         // parity: `LivingEntity.die` empties the absorption pool, so respawning starts without it.
         session.absorption = 0f
         session.stats.increment(StoredStats.DEATHS)
+        session.stats.reset(StoredStats.TIME_SINCE_REST)
         owner.uiState.syncHealth()
         val message = Component.translatable("death.attack.$deathMessageId", Component.text(session.name))
         owner.sendCompressed(PlayerCombatKillPacket.ID) {

@@ -33,6 +33,7 @@ import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.Submersion
+import org.basaltmc.server.runtime.world.Vibrations
 import org.basaltmc.server.runtime.world.WorldLight
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.wire.common.Identifier
@@ -69,6 +70,18 @@ public class MobActionSystem(
     private val lootTables: RealLootTables,
     private val worlds: () -> Map<String, LoadedWorld>,
 ) : MobActions {
+    internal fun activateSkeletonTrap(
+        world: LoadedWorld,
+        horse: org.basaltmc.server.runtime.entity.ServerEntity,
+        random: LegacyRandom,
+    ) {
+        if (!spawning.activateSkeletonTrap(world, horse, random)) return
+        val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+        Vibrations.emit(world, "lightning_strike", horse.x, horse.y, horse.z, changes)
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        for (change in changes) broadcaster.announceRedstone(world, watchers, change)
+    }
+
     override fun swing(mob: org.basaltmc.server.runtime.entity.ServerEntity) {
         val world = worlds().values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
         for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
@@ -583,6 +596,7 @@ public class MobActionSystem(
                 light = lightAt(world, MobCombat.blockPosition(mob)),
                 night = Beds.isNight(world.clock.totalTicks),
                 dayTime = world.clock.totalTicks,
+                gameTime = world.gameTime,
                 raidNearby = raids.raidManagers[world.name]?.nearby(mob.x, mob.y, mob.z) != null,
                 speed = mob.attributeWithModifiers(Attribute.MOVEMENT_SPEED),
             )

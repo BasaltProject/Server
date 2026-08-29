@@ -1,8 +1,10 @@
 package org.basaltmc.server.runtime.entity
 
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.DataComponents
 import org.basaltmc.server.runtime.EntityRiding
 import org.basaltmc.server.runtime.generatedEntityMetadata
+import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.world.MobSpawnEnvironment
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
 import org.basaltmc.server.runtime.world.MobSpawnForest
@@ -242,6 +244,71 @@ class EntityNbtTest {
             restored.attributeModifiers["minecraft:follow_range"]?.get("minecraft:random_spawn_bonus")
         assertEquals(0.056326043040338905, assertNotNull(modifier).amount, 1e-15)
         assertEquals(AttributeOperation.ADD_MULTIPLIED_BASE, modifier.operation)
+
+        val phantomData = NbtCompound()
+        MobSpawnFinalization.writeGenerated(
+            phantomData,
+            Identifier.vanilla("phantom"),
+            groupIndex = 0,
+            random = LegacyRandom(1L),
+            blockX = 4,
+            blockY = 90,
+            blockZ = -3,
+        )
+        assertTrue(phantomData.getIntArray("anchor_pos").contentEquals(intArrayOf(4, 95, -3)))
+        assertEquals(0, phantomData.getInt("size"))
+    }
+
+    @Test
+    fun generatedPatrolLeaderKeepsRouteRoleAndEquipment() {
+        val group = MobSpawnGroupData().also { it.patrolLeader = true }
+        val forest =
+            writeGeneratedForest(
+                NbtCompound(),
+                Identifier.vanilla("pillager"),
+                groupIndex = 0,
+                random = LegacyRandom(1L),
+                specialMultiplier = 0f,
+                group = group,
+                blockX = 96,
+                blockY = 70,
+                blockZ = -48,
+                difficulty = "normal",
+                entityX = 96.0,
+                entityY = 70.0,
+                entityZ = -48.0,
+                entityRandom = LegacyRandom(2L),
+                reason = MobSpawnReason.PATROL,
+            )
+        val data = forest.main.data
+        assertTrue(data.getBoolean("PatrolLeader"))
+        assertTrue(data.getBoolean("Patrolling"))
+        assertTrue(data.getBoolean("CanJoinRaid"))
+        // PatrolSpawner calls findPatrolTarget before setPos, so this is relative to (0, 0, 0).
+        assertTrue(data.getIntArray("patrol_target").contentEquals(intArrayOf(-392, 0, -128)))
+        assertEquals("minecraft:crossbow", data.getCompound("equipment").getCompound("mainhand").getString("id"))
+        val banner = data.getCompound("equipment").getCompound("head")
+        assertEquals("minecraft:white_banner", banner.getString("id"))
+        assertEquals(2f, data.getCompound("drop_chances").getFloat("head"))
+        assertEquals(8, banner.getCompound("components").getList("minecraft:banner_patterns")?.size)
+        val sentComponents =
+            ItemComponentCodecs
+                .toWire(banner.getCompound("components")) { null }
+                .mapNotNull { DataComponents.nameOf(it.id)?.path }
+                .toSet()
+        assertTrue("banner_patterns" in sentComponents)
+        assertTrue("tooltip_display" in sentComponents)
+        assertTrue("item_name" in sentComponents)
+        assertTrue("rarity" in sentComponents)
+
+        val live = assertNotNull(EntityNbt.decodeGenerated(forest.main, entityId = 14, protocolType = 103))
+        assertTrue(live.patrolLeader)
+        assertTrue(live.patrolling)
+        assertTrue(live.patrolTarget?.contentEquals(intArrayOf(-392, 0, -128)) == true)
+        val restored = assertNotNull(EntityNbt.decode(EntityNbt.encode(live), entityId = 15, protocolType = 103))
+        assertTrue(restored.patrolLeader)
+        assertTrue(restored.patrolling)
+        assertTrue(restored.patrolTarget?.contentEquals(intArrayOf(-392, 0, -128)) == true)
     }
 
     @Test

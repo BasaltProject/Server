@@ -28,9 +28,15 @@ public object MobDespawn {
             mob.idleTicks = 0
             return false
         }
+        if (mob.type.path == "wandering_trader") return false
+        // SkeletonHorse inherits Animal.removeWhenFarAway(false); an armed trap gets its own
+        // eighteen-thousand-tick expiry instead of either generic distance rule.
+        if (mob.type.path == "skeleton_horse") return false
         // parity: `removeWhenFarAway` answers false for the mobs that live in the misc category, a
         // villager and an iron golem among them, so a village does not empty when you walk away.
         if (category == MobCategory.MISC) return false
+        // Cat.removeWhenFarAway protects every newly spawned stray for its first two minutes.
+        if (mob.type.path == "cat" && mob.tickCount <= CAT_DESPAWN_GRACE_TICKS) return false
         val distance = nearestDistance ?: return false
         val distanceSquared = distance * distance
         val despawn = category.despawnDistance.toDouble() * category.despawnDistance
@@ -41,6 +47,12 @@ public object MobDespawn {
             mob.idleTicks = 0
             return false
         }
+        // parity: PatrollingMonster.removeWhenFarAway. A patrol may leave the player but does not
+        // take the ordinary random-despawn roll until it crosses the hard 128-block boundary.
+        if (mob.patrolling && distanceSquared <= PATROL_HARD_DESPAWN_SQUARED) return false
         return mob.idleTicks > IDLE_BEFORE_RANDOM && random.nextInt(RANDOM_ODDS) == 0
     }
+
+    private const val PATROL_HARD_DESPAWN_SQUARED = 16_384.0
+    private const val CAT_DESPAWN_GRACE_TICKS = 2_400
 }

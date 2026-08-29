@@ -148,6 +148,31 @@ public class ServerEntity(
     /** parity: `Raider.getCurrentRaid`, kept here as the village this raider is walking to. */
     public var raidCenter: IntArray? = null
 
+    /** parity: `PatrollingMonster`'s persisted route and role. */
+    public var patrolTarget: IntArray? = null
+    public var patrolLeader: Boolean = false
+    public var patrolling: Boolean = false
+
+    /** Periodic trader state set after EVENT finalization. */
+    public var despawnDelay: Int = if (type.path == "trader_llama") 47_999 else 0
+    public var wanderTarget: IntArray? = null
+    public var homePosition: IntArray? = null
+    public var homeRadius: Int = 0
+
+    /** Runtime and save identities of the entity holding this mob's leash. */
+    public var leashHolderId: Int? = null
+    public var leashHolderUuid: String? = null
+
+    /** Skeleton-horse thunder trap state, including its persisted eighteen-thousand-tick lifetime. */
+    public var skeletonTrap: Boolean = false
+    public var skeletonTrapTime: Int = 0
+
+    /** parity: `AbstractHorse.isTamed`; distinct from a tamable animal's owner UUID. */
+    public var tamedHorse: Boolean = false
+
+    /** Runtime-only `LongDistancePatrolGoal.cooldownUntil`. */
+    public var patrolCooldownUntil: Long = -1L
+
     /** parity: a villager in its bed, which is a pose rather than anything the mob does. */
     public var sleeping: Boolean = false
 

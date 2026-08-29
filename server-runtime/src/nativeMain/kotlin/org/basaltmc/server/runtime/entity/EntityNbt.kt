@@ -46,6 +46,25 @@ public object EntityNbt {
         tag["VillagerProfession"] = NbtString(entity.profession)
         tag.putInt("VillagerLevel", entity.villagerLevel)
         tag.putInt("VillagerExperience", entity.villagerExperience)
+        if (entity.type.path in PATROLLING_TYPES) {
+            entity.patrolTarget?.let { tag.putIntArray("patrol_target", it) } ?: tag.remove("patrol_target")
+            tag.putBoolean("PatrolLeader", entity.patrolLeader)
+            tag.putBoolean("Patrolling", entity.patrolling)
+        }
+        if (entity.type.path == "wandering_trader" || entity.type.path == "trader_llama") {
+            tag.putInt("DespawnDelay", entity.despawnDelay)
+        }
+        if (entity.type.path == "wandering_trader") {
+            entity.wanderTarget?.let { tag.putIntArray("wander_target", it) } ?: tag.remove("wander_target")
+        }
+        if (entity.type.path == "skeleton_horse") {
+            tag.putBoolean("SkeletonTrap", entity.skeletonTrap)
+            tag.putInt("SkeletonTrapTime", entity.skeletonTrapTime)
+            tag.putBoolean("Tame", entity.tamedHorse)
+        }
+        entity.leashHolderUuid?.let { uuid ->
+            tag["leash"] = NbtCompound().apply { putString("UUID", uuid) }
+        }
         if (entity.type.path == "villager" || entity.type.path == "zombie_villager") {
             val villagerData = tag.getCompound("VillagerData")
             if (villagerData.getString("type").isEmpty()) villagerData.putString("type", "minecraft:plains")
@@ -143,6 +162,25 @@ public object EntityNbt {
         tag.getString("VillagerProfession").takeIf { it.isNotEmpty() }?.let { entity.profession = it }
         entity.villagerLevel = tag.numericInt("VillagerLevel").coerceAtLeast(1)
         entity.villagerExperience = tag.numericInt("VillagerExperience")
+        if (type.path in PATROLLING_TYPES) {
+            tag.getIntArray("patrol_target").takeIf { it.size >= 3 }?.let { entity.patrolTarget = it.copyOf(3) }
+            entity.patrolLeader = tag.numericBoolean("PatrolLeader")
+            entity.patrolling = tag.numericBoolean("Patrolling")
+        }
+        if ((type.path == "wandering_trader" || type.path == "trader_llama") && "DespawnDelay" in tag) {
+            entity.despawnDelay = tag.getInt("DespawnDelay")
+        }
+        if (type.path == "wandering_trader") {
+            tag.getIntArray("wander_target").takeIf { it.size >= 3 }?.let { entity.wanderTarget = it.copyOf(3) }
+        }
+        if (type.path == "skeleton_horse") {
+            entity.skeletonTrap = tag.numericBoolean("SkeletonTrap")
+            entity.skeletonTrapTime = tag.numericInt("SkeletonTrapTime")
+            entity.tamedHorse = tag.numericBoolean("Tame")
+        }
+        tag.getCompound("leash").getString("UUID").takeIf { it.isNotEmpty() }?.let {
+            entity.leashHolderUuid = it
+        }
         val villagerData = tag.getCompound("VillagerData")
         villagerData.getString("profession").takeIf { it.isNotEmpty() }?.let {
             entity.profession = it.substringAfter(':')
@@ -268,6 +306,7 @@ public object EntityNbt {
     }
 
     private const val MAX_HEALTH_ATTRIBUTE = "minecraft:max_health"
+    private val PATROLLING_TYPES = setOf("pillager", "vindicator", "evoker", "illusioner", "witch", "ravager")
 }
 
 /** Vanilla uses byte/int/float tags while this server's older saves used doubles for the same fields. */

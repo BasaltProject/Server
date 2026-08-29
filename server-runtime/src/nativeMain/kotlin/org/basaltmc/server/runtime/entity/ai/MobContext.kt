@@ -151,6 +151,8 @@ public class MobContext(
     public val night: Boolean,
     /** parity: the villager schedule reads the day's own time rather than the total. */
     public val dayTime: Long = 0L,
+    /** parity: `Level.getGameTime`, used by absolute AI cooldown deadlines. */
+    public val gameTime: Long = 0L,
     /** parity: `Raid`, which is what puts a village in its hide activity. */
     public val raidNearby: Boolean = false,
     /** parity: `Attributes.MOVEMENT_SPEED` for this mob, with its modifiers. */

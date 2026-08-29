@@ -13,6 +13,7 @@ public object MobPersistence {
     public fun requiresCustomPersistence(entity: ServerEntity): Boolean {
         // Base Mob: a rider and a leashed mob cannot vanish out from under their relationship.
         if (entity.vehicleId != null) return true
+        if (entity.leashHolderId != null || entity.leashHolderUuid != null) return true
         val data = entity.sourceNbt
         if (data != null && ("leash" in data || "Leash" in data)) return true
 

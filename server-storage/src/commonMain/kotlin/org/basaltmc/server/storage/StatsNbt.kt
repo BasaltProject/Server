@@ -42,6 +42,7 @@ public data class StoredStats(
         // the systems that make them observable, not before.
         public val DEATHS: String = custom("deaths")
         public val PLAY_TIME: String = custom("play_time")
+        public val TIME_SINCE_REST: String = custom("time_since_rest")
         public val WALK_ONE_CM: String = custom("walk_one_cm")
         public val DAMAGE_TAKEN: String = custom("damage_taken")
         public val DAMAGE_DEALT: String = custom("damage_dealt")

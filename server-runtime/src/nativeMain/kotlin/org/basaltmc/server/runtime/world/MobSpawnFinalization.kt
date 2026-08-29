@@ -22,6 +22,8 @@ public class MobSpawnGroupData {
     internal var spiderEffect: String? = null
     internal var zombieBaby: Boolean? = null
     internal var zombieCanSpawnJockey: Boolean = true
+    internal var patrolLeader: Boolean = false
+    internal var catSpawnContext: CatSpawnContext = CatSpawnContext.DEFAULT
 }
 
 /** Minecraft 26.2 spawn finalization, including concrete pre/post layers around shared mob state. */

@@ -29,6 +29,11 @@ public class PlayerStats {
 
     public operator fun get(key: String): Long = lock.withLock { counters[key] ?: 0L }
 
+    /** parity: `ServerStatsCounter.setValue`, used when sleep or death resets a timer stat. */
+    public fun reset(key: String) {
+        lock.withLock { counters.remove(key) }
+    }
+
     /**
      * Adds a distance in blocks, counted in centimetres as vanilla does.
      *

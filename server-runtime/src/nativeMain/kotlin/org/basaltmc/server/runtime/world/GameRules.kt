@@ -63,6 +63,15 @@ public object GameRuleRegistry {
     /** parity: `spawn_mobs`, which vanilla renamed from `doMobSpawning`. */
     public val SPAWN_MOBS: GameRule.Bool = GameRule.Bool("spawn_mobs", true)
 
+    /** parity: the custom phantom spawner's independent switch. */
+    public val SPAWN_PHANTOMS: GameRule.Bool = GameRule.Bool("spawn_phantoms", true)
+
+    /** parity: the custom pillager patrol spawner's independent switch. */
+    public val SPAWN_PATROLS: GameRule.Bool = GameRule.Bool("spawn_patrols", true)
+
+    /** parity: the periodic trader spawner's independent switch. */
+    public val SPAWN_WANDERING_TRADERS: GameRule.Bool = GameRule.Bool("spawn_wandering_traders", true)
+
     /** parity: what makes two water sources next to each other fill the block between them. */
     public val WATER_SOURCE_CONVERSION: GameRule.Bool = GameRule.Bool("water_source_conversion", true)
 
@@ -129,9 +138,9 @@ public object GameRuleRegistry {
             GameRule.Bool("spawner_blocks_work", true),
             SPAWN_MOBS,
             SPAWN_MONSTERS,
-            GameRule.Bool("spawn_patrols", true),
-            GameRule.Bool("spawn_phantoms", true),
-            GameRule.Bool("spawn_wandering_traders", true),
+            SPAWN_PATROLS,
+            SPAWN_PHANTOMS,
+            SPAWN_WANDERING_TRADERS,
             GameRule.Bool("spawn_wardens", true),
             GameRule.Bool("spectators_generate_chunks", true),
             SPREAD_VINES,
