@@ -73,6 +73,7 @@ public object EntityNbt {
             tag["VillagerData"] = villagerData
             tag.putInt("Xp", entity.villagerExperience)
         }
+        if (entity.type.path == "villager") writeVillagerGolemMemories(tag, entity)
         entity.owner?.let { tag["Owner"] = NbtString(it) }
         tag.putBoolean("Sitting", entity.sitting)
         entity.customName?.let { tag["CustomName"] = NbtString(it) }
@@ -187,6 +188,7 @@ public object EntityNbt {
         }
         if (villagerData.size > 0) entity.villagerLevel = villagerData.getInt("level", 1).coerceAtLeast(1)
         if ("Xp" in tag) entity.villagerExperience = tag.getInt("Xp")
+        if (type.path == "villager") readVillagerGolemMemories(tag, entity)
         tag.getString("Owner").takeIf { it.isNotEmpty() }?.let { entity.owner = it }
         entity.sitting = tag.numericBoolean("Sitting")
         tag.getString("CustomName").takeIf { it.isNotEmpty() }?.let { entity.customName = it }
@@ -283,6 +285,40 @@ public object EntityNbt {
 
     private fun floats(vararg values: Float): NbtList = NbtList(NbtType.FLOAT, values.map { NbtFloat(it) })
 
+    private fun writeVillagerGolemMemories(
+        tag: NbtCompound,
+        entity: ServerEntity,
+    ) {
+        val brain = tag.getCompound("Brain")
+        val memories = brain.getCompound("memories")
+        if (entity.lastSleptGameTime != Long.MIN_VALUE) {
+            memories[LAST_SLEPT_MEMORY] =
+                NbtCompound().apply { this["value"] = NbtLong(entity.lastSleptGameTime) }
+        }
+        if (entity.golemDetectedTicks > 0) {
+            memories[GOLEM_DETECTED_MEMORY] =
+                NbtCompound().apply {
+                    putBoolean("value", true)
+                    this["ttl"] = NbtLong(entity.golemDetectedTicks.toLong())
+                }
+        } else {
+            memories.remove(GOLEM_DETECTED_MEMORY)
+        }
+        brain["memories"] = memories
+        tag["Brain"] = brain
+    }
+
+    private fun readVillagerGolemMemories(
+        tag: NbtCompound,
+        entity: ServerEntity,
+    ) {
+        val memories = tag.getCompound("Brain").getCompound("memories")
+        val slept = memories.getCompound(LAST_SLEPT_MEMORY)
+        if ("value" in slept) entity.lastSleptGameTime = slept.numericDouble("value").toLong()
+        val detected = memories.getCompound(GOLEM_DETECTED_MEMORY)
+        if (detected.numericBoolean("value")) entity.golemDetectedTicks = detected.numericInt("ttl")
+    }
+
     /** Reads Minecraft 26.2's `AttributeInstance.Packed.LIST_CODEC` representation. */
     private fun readAttributes(
         tag: NbtCompound,
@@ -306,6 +342,8 @@ public object EntityNbt {
     }
 
     private const val MAX_HEALTH_ATTRIBUTE = "minecraft:max_health"
+    private const val LAST_SLEPT_MEMORY = "minecraft:last_slept"
+    private const val GOLEM_DETECTED_MEMORY = "minecraft:golem_detected_recently"
     private val PATROLLING_TYPES = setOf("pillager", "vindicator", "evoker", "illusioner", "witch", "ravager")
 }
 

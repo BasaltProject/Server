@@ -176,6 +176,13 @@ public class ServerEntity(
     /** parity: a villager in its bed, which is a pose rather than anything the mob does. */
     public var sleeping: Boolean = false
 
+    /** Villager Brain memories involved in social iron-golem summoning. */
+    public var lastSleptGameTime: Long = Long.MIN_VALUE
+    public var golemDetectedTicks: Int = 0
+
+    /** Runtime-only cadence of the villager gossip path that asks five neighbours to agree. */
+    public var lastGossipTime: Long = Long.MIN_VALUE
+
     /** What a thrown bottle leaves behind. parity: `ThrownSplashPotion`'s own contents. */
     public var potionEffect: String? = null
 
