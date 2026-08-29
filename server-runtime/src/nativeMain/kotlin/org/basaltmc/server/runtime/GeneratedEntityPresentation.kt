@@ -396,7 +396,20 @@ private val VILLAGER_TYPE_IDS =
 private val VILLAGER_PROFESSION_IDS =
     mapOf(
         "minecraft:none" to 0,
+        "minecraft:armorer" to 1,
+        "minecraft:butcher" to 2,
+        "minecraft:cartographer" to 3,
+        "minecraft:cleric" to 4,
+        "minecraft:farmer" to 5,
+        "minecraft:fisherman" to 6,
+        "minecraft:fletcher" to 7,
+        "minecraft:leatherworker" to 8,
+        "minecraft:librarian" to 9,
+        "minecraft:mason" to 10,
         "minecraft:nitwit" to 11,
+        "minecraft:shepherd" to 12,
+        "minecraft:toolsmith" to 13,
+        "minecraft:weaponsmith" to 14,
     )
 
 private const val SALMON_MEDIUM = 1

@@ -30,7 +30,7 @@ internal class MobSpawnForestBuilder(
         if (passenger === vehicle || vehicle.hasVehicle(passenger)) return false
         val previous = passenger.vehicle
         if (previous === vehicle) return true
-        if ((previous != null || passenger.externalVehicleId != null) && !force) return false
+        // parity: Entity.startRiding detaches the old vehicle after its checks, which `force` skips.
         previous?.passengers?.remove(passenger)
         passenger.vehicle = vehicle
         passenger.externalVehicleId = null
@@ -44,7 +44,6 @@ internal class MobSpawnForestBuilder(
         force: Boolean,
     ): Boolean {
         val previous = passenger.vehicle
-        if ((previous != null || passenger.externalVehicleId != null) && !force) return false
         previous?.passengers?.remove(passenger)
         passenger.vehicle = null
         passenger.externalVehicleId = vehicleId

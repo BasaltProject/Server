@@ -360,6 +360,45 @@ class EntityNbtTest {
             )
         }
 
+        val zombieHorse = forest("zombie_horse", 0L)
+        val zombieHorseRider = zombieHorse.main.passengers.single()
+        assertEquals("zombie", zombieHorseRider.type.path)
+        assertEquals(
+            "minecraft:iron_spear",
+            zombieHorseRider.data
+                .getCompound("equipment")
+                .getCompound("mainhand")
+                .getString("id"),
+        )
+        val reparentedZombieHorse =
+            assertNotNull(
+                (0L..10_000L).firstNotNullOfOrNull { seed ->
+                    forest("zombie_horse", seed).takeIf { result ->
+                        result.roots.any { it.type.path == "chicken" }
+                    }
+                },
+            )
+        val abandonedChicken = reparentedZombieHorse.roots.single { it.type.path == "chicken" }
+        assertTrue(abandonedChicken.passengers.isEmpty())
+        assertEquals(
+            "zombie",
+            reparentedZombieHorse.main.passengers
+                .single()
+                .type.path,
+        )
+
+        val zombieVillager = forest("zombie_villager", 0L, biome = "snowy_plains").main
+        val villagerData = zombieVillager.data.getCompound("VillagerData")
+        assertEquals("minecraft:snow", villagerData.getString("type"))
+        assertEquals("minecraft:cartographer", villagerData.getString("profession"))
+        assertTrue(zombieVillager.data.getBoolean("VillagerDataFinalized"))
+        val villagerMetadata =
+            generatedEntityMetadata("zombie_villager", zombieVillager.data)
+                .filterIsInstance<SetEntityDataPacket.Entry.VillagerData>()
+                .single()
+        assertEquals(4, villagerMetadata.typeId)
+        assertEquals(3, villagerMetadata.professionId)
+
         val chickenJockey =
             assertNotNull(
                 (0L..10_000L).firstNotNullOfOrNull { seed ->
