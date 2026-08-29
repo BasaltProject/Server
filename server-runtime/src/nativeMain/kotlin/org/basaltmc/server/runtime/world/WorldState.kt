@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.runtime.entity.Aabb
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.sched.Owner
@@ -509,6 +510,11 @@ public class WorldState(
 
     /** Everything `/summon` put here, alive or just removed and not yet forgotten by clients. */
     public fun entities(): List<ServerEntity> = entityRegistry.entities()
+
+    internal fun hasNaturalSpawnEntityObstruction(
+        spawnBox: Aabb,
+        entityBox: Aabb,
+    ): Boolean = entityRegistry.hasNaturalSpawnObstruction(spawnBox, entityBox)
 
     /** The live entities standing in this chunk, which is what gets written beside its blocks. */
     public fun entitiesIn(

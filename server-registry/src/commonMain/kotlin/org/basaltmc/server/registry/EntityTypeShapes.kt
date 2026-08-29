@@ -30,14 +30,30 @@ public object EntityTypeShapes {
 
     public fun heightOf(type: Identifier): Double = (byEntity[type]?.height ?: DEFAULT_SIZE).toDouble()
 
+    /** Width of `EntityType.getSpawnAABB`, including the cube mobs' builder-only safety scale. */
+    public fun spawnWidthOf(type: Identifier): Double = widthOf(type) * spawnDimensionsScale(type)
+
+    /** Height of `EntityType.getSpawnAABB`, including the cube mobs' builder-only safety scale. */
+    public fun spawnHeightOf(type: Identifier): Double = heightOf(type) * spawnDimensionsScale(type)
+
     /** parity: `MobCategory`, which is what a spawn cap counts and what despawn rules read. */
     public fun categoryOf(type: Identifier): String = byEntity[type]?.category ?: "misc"
 
     public fun isFireImmune(type: Identifier): Boolean = byEntity[type]?.fireImmune ?: false
+
+    /** parity: `EntityType.canSpawnFarFromPlayer`, true by default for unknown/custom MISC types. */
+    public fun canSpawnFarFromPlayer(type: Identifier): Boolean = byEntity[type]?.farFromPlayer ?: true
 
     /** Every type there is, for the tests that walk the whole registry. */
     public val all: List<EntityTypeShape> get() = ALL_ENTITY_TYPE_SHAPES
 
     /** What an unknown type is assumed to fill, which is the size of a slime ball of nothing. */
     private const val DEFAULT_SIZE = 1.0f
+
+    private fun spawnDimensionsScale(type: Identifier): Double =
+        when (type.path) {
+            "magma_cube", "slime" -> 4.0
+            "sulfur_cube" -> 2.0
+            else -> 1.0
+        }
 }

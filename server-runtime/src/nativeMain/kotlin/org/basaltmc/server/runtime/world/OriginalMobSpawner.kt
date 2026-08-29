@@ -5,7 +5,9 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.EntityTypeShapes
+import org.basaltmc.server.registry.isLeavesState
 import org.basaltmc.server.runtime.registry.VanillaBiomes
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
@@ -53,7 +55,27 @@ public object OriginalMobSpawner {
                     val entityZ = z.toDouble().coerceIn(minZ + width, minZ + 16.0 - width)
                     val blockX = entityX.toInt()
                     val blockZ = entityZ.toInt()
-                    if (canSpawnAt(chunk, entry.type.path, blockX, y, blockZ)) {
+                    val biome = biomeAt(chunk, blockX, y, blockZ)
+                    if (
+                        canSpawnAt(chunk, entry.type.path, blockX, y, blockZ, biome?.path) &&
+                        NaturalSpawnObstruction.blocksAllow(
+                            entry.type,
+                            entityX,
+                            y.toDouble(),
+                            entityZ,
+                            blockAt = { wx, wy, wz ->
+                                if (
+                                    wx shr 4 == chunk.chunkX &&
+                                    wz shr 4 == chunk.chunkZ &&
+                                    wy in chunk.verticalBounds.minY..chunk.verticalBounds.maxY
+                                ) {
+                                    chunk.getBlockStateId(wx and 15, wy, wz and 15)
+                                } else {
+                                    null
+                                }
+                            },
+                        )
+                    ) {
                         val yaw = random.nextFloat() * 360f
                         val data = NbtCompound()
                         val forest =
@@ -63,7 +85,7 @@ public object OriginalMobSpawner {
                                 groupSize,
                                 random,
                                 group = group,
-                                biome = biomeAt(chunk, blockX, y, blockZ),
+                                biome = biome,
                                 blockX = blockX,
                                 blockY = y,
                                 blockZ = blockZ,
@@ -127,20 +149,22 @@ public object OriginalMobSpawner {
         worldX: Int,
         y: Int,
         worldZ: Int,
+        biome: String?,
     ): Boolean {
         if (y <= chunk.verticalBounds.minY || y >= chunk.verticalBounds.maxY) return false
         if (type == "strider") return canSpawnStrider(chunk, worldX, y, worldZ)
         val ground = chunk.getBlockStateId(worldX and 15, y - 1, worldZ and 15)
-        if (!BlockShapes.isFaceSturdy(ground, BlockFace.UP)) return false
+        if (
+            NaturalSpawnPredicates.usesGroundPlacement(type) &&
+            !BlockShapes.isFaceSturdy(ground, BlockFace.UP)
+        ) {
+            return false
+        }
         val feet = chunk.getBlockStateId(worldX and 15, y, worldZ and 15)
         val head = chunk.getBlockStateId(worldX and 15, y + 1, worldZ and 15)
         if (!BlockShapes.isEmptyShape(feet) || !BlockShapes.isEmptyShape(head)) return false
-        val groundPath = BlockStateDefinitions.blockOf(ground)?.path
-        return when (type) {
-            in GENERAL_ANIMALS -> groundPath == "grass_block"
-            "mooshroom" -> groundPath == "mycelium"
-            else -> true
-        }
+        val groundPath = BlockStateDefinitions.blockOf(ground)?.path ?: return false
+        return NaturalSpawnPredicates.allows(type, groundPath, Blocks.isLeavesState(ground), biome, y, SEA_LEVEL)
     }
 
     private fun canSpawnStrider(
@@ -181,6 +205,5 @@ public object OriginalMobSpawner {
 
     private const val POSITION_ATTEMPTS = 4
     private const val PACK_SPREAD = 5
-
-    private val GENERAL_ANIMALS = setOf("cat", "chicken", "cow", "donkey", "horse", "mule", "pig", "sheep")
+    private const val SEA_LEVEL = 63
 }
