@@ -65,7 +65,9 @@ internal object LushVegetationPatchFeature {
         val vegetationSurface =
             if (config.waterlogged) waterlogEnclosedSurface(chunk, surface) else surface
         for (ground in javaHashSetOrder(vegetationSurface)) {
-            if (random.nextFloat() >= config.vegetationChance) continue
+            // parity: vanilla short-circuits on a zero chance, so it makes no draw at all there.
+            // No patch in 26.2 uses zero, but matching the jar keeps that from mattering later.
+            if (config.vegetationChance <= 0.0f || random.nextFloat() >= config.vegetationChance) continue
             val vegetationOrigin =
                 if (config.waterlogged) ground else ground.copy(y = ground.y - config.inwards)
             when (config.vegetation) {

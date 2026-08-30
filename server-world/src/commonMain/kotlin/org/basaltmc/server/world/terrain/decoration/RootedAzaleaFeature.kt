@@ -25,9 +25,9 @@ internal object RootedAzaleaFeature {
             if (aboveSearchLimit(chunk, position)) return true
             if (!allowedTreePosition(chunk, position) || !spaceForTree(chunk, position)) continue
             val below = blockAt(chunk, position.copy(y = position.y - 1))
-            if (Blocks.byStateId(below)?.block == LAVA_BLOCK ||
-                !BlockShapes.isFaceSturdy(below, BlockFace.UP)
-            ) {
+            // parity: the test is `BlockState.isSolid`, not a sturdy top face. A fence passes the
+            // first and fails the second, so the two disagree on where an azalea may root.
+            if (Blocks.byStateId(below)?.block == LAVA_BLOCK || !BlockShapes.isSolidState(below)) {
                 return true
             }
             if (!TreeFeature.place(chunk, random, position.x, position.y, position.z, TreeConfigs.AZALEA)) continue
@@ -42,9 +42,10 @@ internal object RootedAzaleaFeature {
         chunk: Chunk,
         position: DecorationPos,
     ): Boolean =
+        // heightAt, not heightmap: the latter hands back a fresh copy of all 256 columns, and this
+        // runs once per step of a hundred-step climb.
         position.y > WorldHeight.MAX_Y ||
-            position.y >
-            chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)[(position.x and 15) + (position.z and 15) * 16]
+            position.y > chunk.heightAt(position.x and 15, position.z and 15, Chunk.HeightmapType.WORLD_SURFACE)
 
     private fun allowedTreePosition(
         chunk: Chunk,
