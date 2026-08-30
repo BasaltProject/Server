@@ -470,7 +470,7 @@ public class NetherStructureGenerator(
         val pieces: List<NetherFortressPieces.Piece>,
     )
 
-    private companion object {
+    internal companion object {
         const val NETHER_SEA_LEVEL = 32
         const val NETHER_GENERATION_DEPTH = 128
         const val FOSSIL_MIN_Y = 32

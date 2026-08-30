@@ -118,6 +118,12 @@ public class StructureProcessorList(
     public val rules: List<StructureProcessorRule>,
     public val rot: BlockRot? = null,
 ) {
+    /**
+     * Whether this list does anything at all. A caller must ask this and not `rules.isEmpty()`: a
+     * list can carry only a `block_rot`, which has no rules and still drops most of the blocks.
+     */
+    public val isEmpty: Boolean get() = rules.isEmpty() && rot == null
+
     public fun process(
         inputStateId: Int,
         worldStateId: Int,

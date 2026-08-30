@@ -259,7 +259,7 @@ public class StructureTemplate {
                         blockInfo.blockEntityNbt?.getString("final_state", "minecraft:air") ?: "minecraft:air"
                     if (Identifier.parse(finalStateName.substringBefore('[')).path == "structure_void") continue
                     parsedAndTransformedStateId(finalStateName, mirror, rotation)
-                } else if (processors.rules.isNotEmpty()) {
+                } else if (!processors.isEmpty) {
                     val worldStateId = chunk.getBlockStateId(processorLocalX, processorPos.y, processorLocalZ)
                     val processedStateId =
                         processors.processAt(blockInfo.stateId, worldStateId, processorPos) ?: continue

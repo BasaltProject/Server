@@ -197,7 +197,7 @@ public class TrialChamberStructureGenerator(
         val chunkZ: Int,
     )
 
-    private companion object {
+    internal companion object {
         const val START_POOL = "minecraft:trial_chambers/chamber/end"
         const val MIN_START_Y = -40
         const val MAX_START_Y = -20
