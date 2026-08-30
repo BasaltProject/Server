@@ -15,6 +15,9 @@ public class StructurePlacementGrid(
     public val separation: Int,
     public val salt: Int,
     public val spreadType: SpreadType = SpreadType.LINEAR,
+    /** Below 1, the share of candidate chunks that actually get the structure. */
+    public val frequency: Float = 1.0f,
+    public val frequencyReduction: FrequencyReduction = FrequencyReduction.DEFAULT,
 ) {
     init {
         require(spacing > separation) { "spacing must be larger than separation" }
@@ -44,6 +47,67 @@ public class StructurePlacementGrid(
     ): Boolean {
         val (candidateX, candidateZ) = candidateChunk(seed, chunkX, chunkZ)
         return candidateX == chunkX && candidateZ == chunkZ
+    }
+
+    /**
+     * Whether ([chunkX], [chunkZ]) really gets the structure: its own cell's candidate, and then
+     * the frequency roll. // parity: StructurePlacement.isStructureChunk, minus the exclusion zone,
+     * which no structure wired here declares.
+     */
+    public fun isStructureChunk(
+        seed: Long,
+        chunkX: Int,
+        chunkZ: Int,
+    ): Boolean =
+        isPlacementChunk(seed, chunkX, chunkZ) &&
+            frequencyReduction.shouldGenerate(seed, salt, chunkX, chunkZ, frequency)
+
+    /**
+     * // parity: StructurePlacement.FrequencyReductionMethod. Four ways of rolling the same
+     * probability, kept apart because each seeds its random differently and vanilla still names
+     * every one of them in a datapack.
+     */
+    public enum class FrequencyReduction {
+        DEFAULT,
+        LEGACY_TYPE_1,
+        LEGACY_TYPE_2,
+        LEGACY_TYPE_3,
+        ;
+
+        internal fun shouldGenerate(
+            seed: Long,
+            salt: Int,
+            chunkX: Int,
+            chunkZ: Int,
+            frequency: Float,
+        ): Boolean {
+            if (frequency >= 1.0f) return true
+            val random = WorldgenRandom(LegacyRandom(0L))
+            return when (this) {
+                DEFAULT -> {
+                    random.setLargeFeatureWithSalt(seed, chunkX, chunkZ, salt)
+                    random.nextFloat() < frequency
+                }
+                // The pillager outpost roll, which reads the chunk coordinates as block ones.
+                LEGACY_TYPE_1 -> {
+                    random.setSeed((chunkX shr 4).toLong() xor ((chunkZ shr 4).toLong() shl 4) xor seed)
+                    random.nextInt()
+                    random.nextInt((1.0f / frequency).toInt()) == 0
+                }
+                LEGACY_TYPE_2 -> {
+                    random.setLargeFeatureWithSalt(seed, chunkX, chunkZ, LEGACY_TYPE_2_SALT)
+                    random.nextFloat() < frequency
+                }
+                LEGACY_TYPE_3 -> {
+                    random.setLargeFeatureSeed(seed, chunkX, chunkZ)
+                    random.nextDouble() < frequency
+                }
+            }
+        }
+
+        private companion object {
+            const val LEGACY_TYPE_2_SALT = 10387320
+        }
     }
 
     public enum class SpreadType {
