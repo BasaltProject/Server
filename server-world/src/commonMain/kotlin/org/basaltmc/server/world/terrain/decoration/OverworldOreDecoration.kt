@@ -233,15 +233,20 @@ public object OverworldOreDecoration {
             val maxX = maxOf(Mth.floor(centerX + radius), minX)
             val maxY = maxOf(Mth.floor(centerY + radius), minY)
             val maxZ = maxOf(Mth.floor(centerZ + radius), minZ)
+            // parity: the comparison is against the squared radius, not a distance divided by it.
+            // The two agree on paper and not in floating point, and a blob this size is mostly edge.
+            val radiusSquared = radius * radius
             for (x in minX..maxX) {
-                val xd = (x + 0.5 - centerX) / radius
-                if (xd * xd >= 1.0) continue
+                val xd = x + 0.5 - centerX
+                if (xd * xd >= radiusSquared) continue
                 for (y in minY..maxY) {
-                    val yd = (y + 0.5 - centerY) / radius
-                    if (xd * xd + yd * yd >= 1.0) continue
+                    val yd = y + 0.5 - centerY
+                    if (xd * xd + yd * yd >= radiusSquared) continue
                     for (z in minZ..maxZ) {
-                        val zd = (z + 0.5 - centerZ) / radius
-                        if (xd * xd + yd * yd + zd * zd >= 1.0 || y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                        val zd = z + 0.5 - centerZ
+                        if (xd * xd + yd * yd + zd * zd >= radiusSquared ||
+                            y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y
+                        ) {
                             continue
                         }
                         val testedIndex =

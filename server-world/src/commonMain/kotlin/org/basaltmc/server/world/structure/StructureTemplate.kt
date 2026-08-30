@@ -202,6 +202,12 @@ public class StructureTemplate {
         pivot: StructurePos,
         clipTo: StructureBoundingBox,
         processors: StructureProcessorList = StructureProcessorList.EMPTY,
+        /**
+         * Runs after [processors] and may drop a block outright, which a rule list cannot do.
+         * // parity: the processors added after `RuleProcessor`, such as `BlockAgeProcessor` and
+         * `ProtectedBlockProcessor`.
+         */
+        blockProcessor: TemplateBlockProcessor? = null,
         random: WorldgenRandom? = null,
         ignoreStructureBlocks: Boolean = false,
         ignoreAir: Boolean = false,
@@ -266,10 +272,17 @@ public class StructureTemplate {
                 } else {
                     transformedStateId(blockInfo.stateId, blockInfo.properties, mirror, rotation)
                 }
+            val finalStateId =
+                if (blockProcessor == null) {
+                    stateId
+                } else {
+                    val worldStateId = chunk.getBlockStateId(processorLocalX, processorPos.y, processorLocalZ)
+                    blockProcessor.process(stateId, worldStateId, processorPos) ?: continue
+                }
             val localX = worldPos.x and 15
             val localZ = worldPos.z and 15
-            chunk.setBlockStateId(localX, worldPos.y, localZ, stateId)
-            placeBlockEntity(chunk, blockInfo, stateId, worldPos, random)
+            chunk.setBlockStateId(localX, worldPos.y, localZ, finalStateId)
+            placeBlockEntity(chunk, blockInfo, finalStateId, worldPos, random)
         }
         placeEntities(chunk, position, rotation, mirror, pivot, clipTo)
     }

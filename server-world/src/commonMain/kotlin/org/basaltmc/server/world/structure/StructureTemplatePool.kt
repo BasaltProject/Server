@@ -145,7 +145,7 @@ public class LegacySinglePoolElement(
             StructurePos(0, 0, 0),
             clipTo,
             processors,
-            random,
+            random = random,
             ignoreStructureBlocks = true,
             ignoreAir = ignoreAir,
             gravityOffset = if (projection == StructureProjection.TERRAIN_MATCHING) -1 else null,
