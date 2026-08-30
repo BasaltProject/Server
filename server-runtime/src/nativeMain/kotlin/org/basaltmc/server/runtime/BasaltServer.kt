@@ -392,7 +392,8 @@ public class BasaltServer(
     private val functionSchedule = FunctionSchedule()
 
     /** Who a scheduled function runs as: the console, which is what vanilla uses for the same job. */
-    private val consoleSource = ConsoleCommandSource(logger, lang)
+    private val consoleSource =
+        ConsoleCommandSource(logger, lang) { worldRegistry.defaultWorld.spawn }
 
     /** Named stopwatches `/stopwatch` keeps, in wall-clock time as vanilla counts them. */
     private val stopwatches = Stopwatches { serverClock.elapsedNow().inWholeMilliseconds }

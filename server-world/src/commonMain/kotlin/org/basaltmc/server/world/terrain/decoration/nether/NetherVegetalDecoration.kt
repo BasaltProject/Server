@@ -17,7 +17,7 @@ public object NetherVegetalDecoration {
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
-        for (globalIndex in 0..9) {
+        for (globalIndex in FEATURE_ORDER.indices) {
             random.setFeatureSeed(decorationSeed, globalIndex, VEGETAL_DECORATION_STEP)
             placeFeature(chunk, random, biomeSource, globalIndex)
         }
@@ -41,19 +41,40 @@ public object NetherVegetalDecoration {
         biomeSource: NetherBiomeLookup,
         globalIndex: Int,
     ) {
-        when (globalIndex) {
-            0 -> placeLavaSprings(chunk, random, biomeSource)
-            1 -> placeNormalMushroom(chunk, random, biomeSource, 256, "brown_mushroom")
-            2 -> placeNormalMushroom(chunk, random, biomeSource, 512, "red_mushroom")
-            3 -> placeHugeFungi(chunk, random, biomeSource, HugeFungus.CRIMSON)
-            4 -> placeForestVegetation(chunk, random, biomeSource, ForestVegetation.WARPED)
-            5 -> placeForestVegetation(chunk, random, biomeSource, ForestVegetation.SPROUTS)
-            6 -> placeTwistingVines(chunk, random, biomeSource)
-            7 -> placeWeepingVines(chunk, random, biomeSource)
-            8 -> placeHugeFungi(chunk, random, biomeSource, HugeFungus.WARPED)
-            9 -> placeForestVegetation(chunk, random, biomeSource, ForestVegetation.CRIMSON)
+        // Dispatch by name: an index on its own says nothing about which fungus it is, and the
+        // crimson and warped ones were crossed here for exactly that reason.
+        when (FEATURE_ORDER.getOrNull(globalIndex)) {
+            "spring_lava" -> placeLavaSprings(chunk, random, biomeSource)
+            "brown_mushroom_normal" -> placeNormalMushroom(chunk, random, biomeSource, 256, "brown_mushroom")
+            "red_mushroom_normal" -> placeNormalMushroom(chunk, random, biomeSource, 512, "red_mushroom")
+            "warped_fungi" -> placeHugeFungi(chunk, random, biomeSource, HugeFungus.WARPED)
+            "warped_forest_vegetation" -> placeForestVegetation(chunk, random, biomeSource, ForestVegetation.WARPED)
+            "nether_sprouts" -> placeForestVegetation(chunk, random, biomeSource, ForestVegetation.SPROUTS)
+            "twisting_vines" -> placeTwistingVines(chunk, random, biomeSource)
+            "weeping_vines" -> placeWeepingVines(chunk, random, biomeSource)
+            "crimson_fungi" -> placeHugeFungi(chunk, random, biomeSource, HugeFungus.CRIMSON)
+            "crimson_forest_vegetation" -> placeForestVegetation(chunk, random, biomeSource, ForestVegetation.CRIMSON)
         }
     }
+
+    /**
+     * // parity: the order `FeatureSorter` gives this step, which is what each feature is seeded
+     * with. Derived from the five Nether biomes in parameter-list order, so crimson_forest's
+     * features are numbered before warped_forest's even though the warped ones sort first.
+     */
+    internal val FEATURE_ORDER: List<String> =
+        listOf(
+            "spring_lava",
+            "brown_mushroom_normal",
+            "red_mushroom_normal",
+            "warped_fungi",
+            "warped_forest_vegetation",
+            "nether_sprouts",
+            "twisting_vines",
+            "weeping_vines",
+            "crimson_fungi",
+            "crimson_forest_vegetation",
+        )
 
     /** The vanilla placed feature names this step draws. */
     public val PLACED_IDS: Set<String> =

@@ -79,8 +79,12 @@ public object ConsoleReader {
             }
             // A command from the console reaches the world, so it runs on whoever owns it rather
             // than on this thread. With nothing loaded there is nobody to ask, and it runs here.
-            val source = ConsoleCommandSource(lang = dispatcher.environment.lang)
-            val owner = dispatcher.environment.worlds[dispatcher.environment.defaultWorldName]?.owner
+            val defaultWorld = dispatcher.environment.worlds[dispatcher.environment.defaultWorldName]
+            val source =
+                ConsoleCommandSource(lang = dispatcher.environment.lang) {
+                    defaultWorld?.spawn ?: Triple(0.0, 0.0, 0.0)
+                }
+            val owner = defaultWorld?.owner
             // The plugin is asked *inside* that, not here: a decider answers where plugins run, and
             // this thread is the one reading stdin. Asking here meant no plugin ever saw a console
             // command, which is exactly what the first live run of this showed.

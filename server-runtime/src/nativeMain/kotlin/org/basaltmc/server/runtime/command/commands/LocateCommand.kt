@@ -37,7 +37,9 @@ public class LocateCommand : Command(name = "locate", permissionLevel = Permissi
         }
         root.literal("structure") {
             argument("structure", RegistryArgument.orTagKey("minecraft:worldgen/structure")) {
-                suggestsFromServer { context -> context.matchingIds(VillageStructureGenerator.STRUCTURE_IDS) }
+                suggestsFromServer { context ->
+                    context.matchingIds(VillageStructureGenerator.STRUCTURE_IDS + STRONGHOLD)
+                }
                 executes { context -> locateStructure(context) }
             }
         }
@@ -134,6 +136,7 @@ public class LocateCommand : Command(name = "locate", permissionLevel = Permissi
     private fun locateStructure(context: CommandContext): Int {
         val world = context.world()
         val wanted = context.get<Identifier>("structure")
+        if (wanted == STRONGHOLD) return locateStronghold(context)
         val villages =
             world.villageGenerator
                 ?: throw CommandSyntaxException(
@@ -155,14 +158,56 @@ public class LocateCommand : Command(name = "locate", permissionLevel = Permissi
                 ?: throw CommandSyntaxException(
                     Component.translatable("commands.locate.structure.not_found", Component.text(wanted.toString())),
                 )
-        val x = found.chunkX * 16 + 8
-        val z = found.chunkZ * 16 + 8
+        // parity: StructurePlacement.getLocatePos, which names the chunk's minimum corner plus the
+        // set's own `locate_offset`; every set that has one leaves it at zero.
+        val x = found.chunkX * 16
+        val z = found.chunkZ * 16
         val distance =
             sqrt(((x - startX).toDouble() * (x - startX) + (z - startZ).toDouble() * (z - startZ))).roundToInt()
         context.success(
             Component.translatable(
                 "commands.locate.structure.success",
                 Component.text(wanted.toString()),
+                Component.text("$x, ~, $z"),
+                Component.text(distance.toString()),
+            ),
+        )
+        return distance
+    }
+
+    /**
+     * // parity: the concentric rings path of `findNearestMapStructure`, which is not a search: the
+     * whole ring list is walked and the nearest chunk centre wins.
+     */
+    private fun locateStronghold(context: CommandContext): Int {
+        val world = context.world()
+        val strongholds =
+            world.strongholdGenerator
+                ?: throw CommandSyntaxException(
+                    Component.translatable(
+                        "commands.locate.structure.not_found",
+                        Component.text(STRONGHOLD.toString()),
+                    ),
+                )
+        val (originX, _, originZ) = context.source.position
+        val startX = originX.roundToInt()
+        val startZ = originZ.roundToInt()
+        val found =
+            strongholds.locate(startX, startZ)
+                ?: throw CommandSyntaxException(
+                    Component.translatable(
+                        "commands.locate.structure.not_found",
+                        Component.text(STRONGHOLD.toString()),
+                    ),
+                )
+        val x = found.first * 16
+        val z = found.second * 16
+        val distance =
+            sqrt(((x - startX).toDouble() * (x - startX) + (z - startZ).toDouble() * (z - startZ))).roundToInt()
+        context.success(
+            Component.translatable(
+                "commands.locate.structure.success",
+                Component.text(STRONGHOLD.toString()),
                 Component.text("$x, ~, $z"),
                 Component.text(distance.toString()),
             ),
@@ -222,5 +267,8 @@ public class LocateCommand : Command(name = "locate", permissionLevel = Permissi
         /** parity: `PoiManager.findClosestWithType`'s own radius, in blocks. */
         const val POI_RADIUS = 256
         const val SECTION_HEIGHT = 16
+
+        /** The one structure that is not placed on a grid, so it answers from its own ring list. */
+        val STRONGHOLD: Identifier = Identifier.vanilla("stronghold")
     }
 }

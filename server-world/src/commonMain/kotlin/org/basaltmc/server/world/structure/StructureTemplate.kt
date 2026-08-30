@@ -294,9 +294,14 @@ public class StructureTemplate {
                         // parity: Projection.TERRAIN_MATCHING appends
                         // GravityProcessor(WORLD_SURFACE_WG, -1). It uses the unrotated template Y,
                         // not the piece origin or transformed Y.
+                        //
+                        // And it reads the **frozen** map: the processor swaps `_WG` for the live
+                        // heightmap only when the level is a `ServerLevel`, and during generation it
+                        // is a `WorldGenRegion`, which is not one. Reading the live map instead let
+                        // an earlier piece of the same village raise the ground the next one lands on.
                         originalWorldPos.copy(
                             y =
-                                chunk.heightAt(localX, localZ, Chunk.HeightmapType.WORLD_SURFACE) +
+                                chunk.worldgenHeightAt(localX, localZ, Chunk.HeightmapType.WORLD_SURFACE) +
                                     gravityOffset + blockInfo.pos.y,
                         )
                     } else {

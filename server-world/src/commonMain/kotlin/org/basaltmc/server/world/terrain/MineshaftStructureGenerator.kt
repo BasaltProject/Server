@@ -2,6 +2,7 @@ package org.basaltmc.server.world.terrain
 
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.structure.MineshaftBlocks
@@ -43,7 +44,6 @@ public class MineshaftStructureGenerator(
     public fun generateInto(
         chunk: Chunk,
         seed: Long,
-        oceanFloorHeight: (x: Int, z: Int) -> Int,
     ) {
         val clip =
             StructureBoundingBox(
@@ -54,17 +54,24 @@ public class MineshaftStructureGenerator(
                 WorldHeight.MAX_Y,
                 chunk.chunkZ * 16 + 15,
             )
-        for (startX in chunk.chunkX - REACH_CHUNKS..chunk.chunkX + REACH_CHUNKS) {
-            for (startZ in chunk.chunkZ - REACH_CHUNKS..chunk.chunkZ + REACH_CHUNKS) {
-                val type = typeAt(seed, startX, startZ) ?: continue
-                val pieces = piecesOf(seed, startX, startZ, type)
-                val blocks = MineshaftBlocks(type)
-                // One random per chunk written, the way vanilla gives each chunk its own.
-                val random = WorldgenRandom(LegacyRandom(0L))
-                random.setLargeFeatureSeed(seed, chunk.chunkX, chunk.chunkZ)
-                for (piece in pieces) {
-                    if (!piece.box.intersects(clip)) continue
-                    MineshaftFill.place(piece, blocks, chunk, clip, random, oceanFloorHeight)
+        // parity: the two mineshafts are separate entries of `underground_structures`, so each gets
+        // its own feature seed and one random shared by every start of that entry in this chunk.
+        // Seeding per start, or off `setLargeFeatureSeed`, puts every roll inside the shaft (rails,
+        // cobwebs, torches) on a stream vanilla never uses.
+        for ((index, wanted) in ENTRIES) {
+            val random = WorldgenRandom(XoroshiroRandom(seed))
+            val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+            random.setFeatureSeed(decorationSeed, index, UNDERGROUND_STRUCTURES_STEP)
+            for (startX in chunk.chunkX - REACH_CHUNKS..chunk.chunkX + REACH_CHUNKS) {
+                for (startZ in chunk.chunkZ - REACH_CHUNKS..chunk.chunkZ + REACH_CHUNKS) {
+                    val type = typeAt(seed, startX, startZ) ?: continue
+                    if (type != wanted) continue
+                    val pieces = piecesOf(seed, startX, startZ, type)
+                    val blocks = MineshaftBlocks(type)
+                    for (piece in pieces) {
+                        if (!piece.box.intersects(clip)) continue
+                        MineshaftFill.place(piece, blocks, chunk, clip, random, biomeAt)
+                    }
                 }
             }
         }
@@ -115,6 +122,11 @@ public class MineshaftStructureGenerator(
     private companion object {
         const val FREQUENCY = 0.004f
         const val SEA_LEVEL = 63
+
+        const val UNDERGROUND_STRUCTURES_STEP = 3
+
+        /** Second and third of the five structures of `underground_structures`, in registry order. */
+        val ENTRIES = listOf(1 to MineshaftType.NORMAL, 2 to MineshaftType.MESA)
 
         /** A shaft reaches 80 blocks from its room, so five chunks out covers every piece. */
         const val REACH_CHUNKS = 6

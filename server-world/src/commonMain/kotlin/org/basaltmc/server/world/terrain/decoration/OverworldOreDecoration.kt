@@ -5,6 +5,7 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.GeneratedBlockWritePolicy
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.Identifier
@@ -281,7 +282,7 @@ public object OverworldOreDecoration {
                 else -> random.nextFloat() >= config.discardChanceOnAirExposure
             }
         if (!skipAirCheck && isAdjacentToAir(region, x, y, z)) return false
-        region.setBlockStateId(x, y, z, target.stateId)
+        region.setBlockStateId(x, y, z, target.stateId, target.replaceable)
         return true
     }
 
@@ -355,7 +356,7 @@ internal class PlacementRegion(
         z: Int,
     ): Int? =
         if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
-            chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)
+            chunk.worldgenHeightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)
         } else {
             externalSurfaceHeight?.invoke(x, z)
         }
@@ -374,7 +375,7 @@ internal class PlacementRegion(
         val localMaxZ = minOf(zStart + sizeXZ, chunkMinZ + 15)
         for (x in localMinX..localMaxX) {
             for (z in localMinZ..localMaxZ) {
-                if (yStart <= chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)) return true
+                if (yStart <= chunk.worldgenHeightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)) return true
             }
         }
         val outsideHeight = externalSurfaceHeight ?: return false
@@ -410,6 +411,7 @@ internal class PlacementRegion(
         y: Int,
         z: Int,
         stateId: Int,
+        replaceable: Set<String>? = null,
     ) {
         if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
@@ -418,7 +420,10 @@ internal class PlacementRegion(
         val position = BlockPosition(x, y, z)
         val observed = externalWrites[position] ?: externalBlockState?.invoke(x, y, z) ?: Blocks.AIR.stateId
         externalWrites[position] = stateId
-        chunk.setDecorationBlockStateId(x, y, z, stateId, expectedExternalStateId = observed)
+        val policy = replaceable?.let(OreBlockRules::policyFor) ?: GeneratedBlockWritePolicy.EXACT
+        chunk.withGeneratedBlockWritePolicy(policy) {
+            chunk.setDecorationBlockStateId(x, y, z, stateId, expectedExternalStateId = observed)
+        }
     }
 }
 

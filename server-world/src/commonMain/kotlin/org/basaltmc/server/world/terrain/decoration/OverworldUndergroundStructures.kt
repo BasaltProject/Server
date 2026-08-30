@@ -62,7 +62,9 @@ public object OverworldUndergroundStructures {
             templates,
         ) { columnX, columnZ ->
             if (columnX shr 4 == chunk.chunkX && columnZ shr 4 == chunk.chunkZ) {
-                chunk.heightAt(columnX and 15, columnZ and 15, Chunk.HeightmapType.OCEAN_FLOOR)
+                // parity: FossilFeature reads `OCEAN_FLOOR_WG`, the frozen map, not the live one:
+                // an ore blob or another fossil placed first must not raise the floor it buries to.
+                chunk.worldgenHeightAt(columnX and 15, columnZ and 15, Chunk.HeightmapType.OCEAN_FLOOR)
             } else {
                 externalOceanFloorHeight?.invoke(columnX, columnZ)
             }

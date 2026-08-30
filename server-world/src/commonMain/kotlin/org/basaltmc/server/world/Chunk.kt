@@ -13,6 +13,11 @@ import org.basaltmc.wire.nbt.NbtCompound
 public enum class GeneratedBlockWritePolicy {
     EXACT,
     TREE,
+
+    /** An ore or stone blob, guarded by its own target predicate rather than by one exact block. */
+    ORE_BASE_STONE,
+    ORE_STONE,
+    ORE_DEEPSLATE,
 }
 
 /** A generated decoration write whose target lies outside the chunk that produced it. */
@@ -60,6 +65,13 @@ public class Chunk(
     // cost 2.6 million block reads per generated chunk, decoration alone asking for 10000 columns.
     private val heights = Array(HEIGHTMAP_TYPES.size) { IntArray(16 * 16) { verticalBounds.minY } }
     private var heightsValid = true
+
+    /**
+     * // parity: the `_WG` heightmaps, frozen at the end of the carvers and never touched by a feature.
+     * That is the point of having two sets: an ore's probe must see bare terrain, not what earlier
+     * features piled on top.
+     */
+    private var worldgenHeights: Array<IntArray>? = null
 
     private val blockEntitiesByPosition = LinkedHashMap<Int, ChunkBlockEntity>()
     private val generatedEntitiesBacking = mutableListOf<ChunkGeneratedEntity>()
@@ -588,6 +600,22 @@ public class Chunk(
         if (!heightsValid) rebuildHeights()
         return heights[type.ordinal][x + z * 16]
     }
+
+    /** Takes the `_WG` snapshot. Called once, between the carvers and the first feature. */
+    public fun freezeWorldgenHeights() {
+        if (!heightsValid) rebuildHeights()
+        worldgenHeights = Array(heights.size) { heights[it].copyOf() }
+    }
+
+    /**
+     * The height as it was when the carvers finished. Falls back to the live map for a chunk that
+     * was never frozen, so a detached or test-built chunk still answers something sensible.
+     */
+    public fun worldgenHeightAt(
+        x: Int,
+        z: Int,
+        type: HeightmapType = HeightmapType.OCEAN_FLOOR,
+    ): Int = worldgenHeights?.get(type.ordinal)?.get(x + z * 16) ?: heightAt(x, z, type)
 
     /**
      * // parity: Heightmap.update. A block at or above the recorded height raises it; removing the
