@@ -12,6 +12,7 @@ import org.basaltmc.server.world.noise.NoiseParametersJson
 import org.basaltmc.server.world.noise.NormalNoise
 import org.basaltmc.server.world.structure.StructurePlacementGrid
 import org.basaltmc.server.world.terrain.AncientCityStructureGenerator
+import org.basaltmc.server.world.terrain.BuriedTreasureStructureGenerator
 import org.basaltmc.server.world.terrain.DimensionTerrainGenerator
 import org.basaltmc.server.world.terrain.EndCityStructureGenerator
 import org.basaltmc.server.world.terrain.MineshaftStructureGenerator
@@ -23,6 +24,7 @@ import org.basaltmc.server.world.terrain.NoiseRouterData
 import org.basaltmc.server.world.terrain.PillagerOutpostStructureGenerator
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
 import org.basaltmc.server.world.terrain.RuinedPortalStructureGenerator
+import org.basaltmc.server.world.terrain.ShipwreckStructureGenerator
 import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
 import org.basaltmc.server.world.terrain.TrailRuinsStructureGenerator
@@ -164,6 +166,21 @@ public class VanillaWorldGeneratorFactory(
                 poolLookup = villageLoader.poolLookup,
                 templateLoader = villageLoader.templateLoader,
             )
+        val buriedTreasures =
+            BuriedTreasureStructureGenerator(
+                biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
+                beachBiomes = biomeTags.biomesIn("minecraft:has_structure/buried_treasure"),
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+            )
+        val shipwrecks =
+            ShipwreckStructureGenerator(
+                biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
+                oceanBiomes = biomeTags.biomesIn("minecraft:has_structure/shipwreck"),
+                beachBiomes = biomeTags.biomesIn("minecraft:has_structure/shipwreck_beached"),
+                templateOf = { name -> villageLoader.templateLoader(name) },
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+                oceanFloorAt = { x, z -> columns.oceanFloorHeight(x, z) },
+            )
         val ancientCities =
             AncientCityStructureGenerator(
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
@@ -195,6 +212,8 @@ public class VanillaWorldGeneratorFactory(
                         swampHuts,
                         pillagerOutposts,
                         trailRuins,
+                        buriedTreasures,
+                        shipwrecks,
                         ancientCities,
                         trialChambers,
                     ).chunk
@@ -220,6 +239,8 @@ public class VanillaWorldGeneratorFactory(
                         swampHuts,
                         pillagerOutposts,
                         trailRuins,
+                        buriedTreasures,
+                        shipwrecks,
                         ancientCities,
                         trialChambers,
                         villageLoader.templateLoader,

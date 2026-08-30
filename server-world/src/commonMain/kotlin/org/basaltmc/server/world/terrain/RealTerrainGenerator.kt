@@ -61,6 +61,8 @@ public object RealTerrainGenerator {
         swampHutGenerator: SwampHutStructureGenerator? = null,
         pillagerOutpostGenerator: PillagerOutpostStructureGenerator? = null,
         trailRuinsGenerator: TrailRuinsStructureGenerator? = null,
+        buriedTreasureGenerator: BuriedTreasureStructureGenerator? = null,
+        shipwreckGenerator: ShipwreckStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
         templates: TemplateLoader? = null,
@@ -78,6 +80,8 @@ public object RealTerrainGenerator {
                 swampHutGenerator,
                 pillagerOutpostGenerator,
                 trailRuinsGenerator,
+                buriedTreasureGenerator,
+                shipwreckGenerator,
                 ancientCityGenerator,
                 trialChamberGenerator,
             )
@@ -102,6 +106,8 @@ public object RealTerrainGenerator {
         swampHutGenerator: SwampHutStructureGenerator? = null,
         pillagerOutpostGenerator: PillagerOutpostStructureGenerator? = null,
         trailRuinsGenerator: TrailRuinsStructureGenerator? = null,
+        buriedTreasureGenerator: BuriedTreasureStructureGenerator? = null,
+        shipwreckGenerator: ShipwreckStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): GeneratedTerrain {
@@ -184,6 +190,7 @@ public object RealTerrainGenerator {
         GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) {
             villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
             // Step 3, underground_structures, which is before every decoration step.
+            buriedTreasureGenerator?.generateInto(chunk, seed)
             trailRuinsGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
             trialChamberGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
             mineshaftGenerator?.generateInto(chunk, seed) { x, z ->
@@ -192,6 +199,7 @@ public object RealTerrainGenerator {
             // Step 4, surface_structures, alongside the villages above.
             ruinedPortalGenerator?.generateInto(chunk, seed)
             swampHutGenerator?.generateInto(chunk, seed)
+            shipwreckGenerator?.generateInto(chunk, seed)
             pillagerOutpostGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         }
         return GeneratedTerrain(chunk, chunkEnvironment)

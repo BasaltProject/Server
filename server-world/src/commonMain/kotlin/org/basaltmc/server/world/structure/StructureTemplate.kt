@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.structure
 
+import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.random.PositionalHashing
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
@@ -30,6 +32,16 @@ public class StructureTemplate {
         private set
 
     private val blocksBacking: MutableList<StructureBlockInfo> = mutableListOf()
+
+    /** Every palette's blocks. One entry for a plain `palette`, several for `palettes`. */
+    private var palettesBacking: List<List<StructureBlockInfo>> = emptyList()
+
+    /** How many palettes this template offers, which is what the placement draw picks between. */
+    public val paletteCount: Int get() = palettesBacking.size
+
+    internal fun paletteBlocks(index: Int): List<StructureBlockInfo> =
+        palettesBacking.getOrElse(index) { blocksBacking }
+
     private val entitiesBacking: MutableList<StructureEntityInfo> = mutableListOf()
 
     public val blocks: List<StructureBlockInfo> get() = blocksBacking
@@ -38,6 +50,7 @@ public class StructureTemplate {
 
     public fun load(nbt: NbtCompound) {
         blocksBacking.clear()
+        palettesBacking = emptyList()
         entitiesBacking.clear()
         val sizeList = nbt.getList("size")
         size =
@@ -47,65 +60,22 @@ public class StructureTemplate {
                 (sizeList?.get(2) as? NbtInt)?.value ?: 0,
             )
 
-        val paletteList = nbt.getList("palette") ?: return
+        // parity: a template carries either one `palette` or several `palettes`; the shipwreck and
+        // the ocean ruins carry eight. The positions in `blocks` are shared and only the state
+        // index resolves differently, which is why `getRandomPalette` draws at placement time.
         val blockList = nbt.getList("blocks") ?: return
-        val paletteProperties =
-            Array(paletteList.size) { i ->
-                val entry = paletteList[i] as NbtCompound
-                val properties = entry["Properties"] as? NbtCompound ?: return@Array emptyMap()
-                properties.mapNotNull { (name, value) -> (value as? NbtString)?.value?.let { name to it } }.toMap()
+        val paletteLists =
+            nbt.getList("palettes")?.mapNotNull { it as? NbtList }
+                ?: listOfNotNull(nbt.getList("palette"))
+        if (paletteLists.isEmpty()) return
+        palettesBacking =
+            paletteLists.map { paletteList ->
+                val target = mutableListOf<StructureBlockInfo>()
+                readPalette(paletteList, blockList, target)
+                target
             }
-        val paletteStateIds =
-            IntArray(paletteList.size) { i ->
-                val entry = paletteList[i] as NbtCompound
-                val name = entry.getString("Name")
-                val identifier = Identifier.parse(name)
-                Blocks.stateIdOf(identifier, paletteProperties[i])
-                    ?: Blocks.REGISTRY.byIdentifier(identifier)?.stateId
-                    ?: Blocks.AIR.stateId
-            }
-        // parity: JigsawBlock's `orientation` blockstate property (`front_top`, front first):
-        // the one block property this project reads, since jigsaw assembly cannot work without it.
-        val paletteFrontFacing =
-            Array(paletteList.size) { i ->
-                val entry = paletteList[i] as NbtCompound
-                if (entry.getString("Name") != "minecraft:jigsaw") return@Array null
-                val orientation = (entry["Properties"] as? NbtCompound)?.getString("orientation") ?: return@Array null
-                StructureDirection.fromName(orientation.substringBefore('_'))
-            }
-        val paletteTopFacing =
-            Array(paletteList.size) { i ->
-                val entry = paletteList[i] as NbtCompound
-                if (entry.getString("Name") != "minecraft:jigsaw") return@Array null
-                val orientation = (entry["Properties"] as? NbtCompound)?.getString("orientation") ?: return@Array null
-                StructureDirection.fromName(orientation.substringAfter('_'))
-            }
+        blocksBacking += palettesBacking.first()
 
-        for (i in 0 until blockList.size) {
-            val blockTag = blockList[i] as NbtCompound
-            val posList = blockTag.getList("pos") ?: continue
-            val pos =
-                StructurePos(
-                    (posList[0] as NbtInt).value,
-                    (posList[1] as NbtInt).value,
-                    (posList[2] as NbtInt).value,
-                )
-            val paletteIndex = blockTag.getInt("state")
-            val stateId = paletteStateIds.getOrElse(paletteIndex) { Blocks.AIR.stateId }
-            val blockEntityNbt = blockTag["nbt"] as? NbtCompound
-            val frontFacing = paletteFrontFacing.getOrNull(paletteIndex)
-            val topFacing = paletteTopFacing.getOrNull(paletteIndex)
-            blocksBacking.add(
-                StructureBlockInfo(
-                    pos,
-                    stateId,
-                    blockEntityNbt,
-                    frontFacing,
-                    topFacing,
-                    paletteProperties.getOrElse(paletteIndex) { emptyMap() },
-                ),
-            )
-        }
         val entityList = nbt.getList("entities")
         if (entityList != null) {
             for (entry in entityList) {
@@ -156,6 +126,73 @@ public class StructureTemplate {
                 selectionPriority = nbt.getInt("selection_priority", 0),
             )
         }
+
+    /** Resolves one palette's states against the shared block positions. */
+    private fun readPalette(
+        paletteList: NbtList,
+        blockList: NbtList,
+        target: MutableList<StructureBlockInfo>,
+    ) {
+        val paletteProperties =
+            Array(paletteList.size) { i ->
+                val entry = paletteList[i] as NbtCompound
+                val properties = entry["Properties"] as? NbtCompound ?: return@Array emptyMap()
+                properties.mapNotNull { (name, value) -> (value as? NbtString)?.value?.let { name to it } }.toMap()
+            }
+        val paletteStateIds =
+            IntArray(paletteList.size) { i ->
+                val entry = paletteList[i] as NbtCompound
+                val name = entry.getString("Name")
+                val identifier = Identifier.parse(name)
+                Blocks.stateIdOf(identifier, paletteProperties[i])
+                    ?: Blocks.REGISTRY.byIdentifier(identifier)?.stateId
+                    ?: Blocks.AIR.stateId
+            }
+        // parity: JigsawBlock's `orientation` blockstate property (`front_top`, front first):
+        // the one block property this project reads, since jigsaw assembly cannot work without it.
+        val paletteFrontFacing =
+            Array(paletteList.size) { i ->
+                val entry = paletteList[i] as NbtCompound
+                if (entry.getString("Name") != "minecraft:jigsaw") return@Array null
+                val orientation =
+                    (entry["Properties"] as? NbtCompound)?.getString("orientation") ?: return@Array null
+                StructureDirection.fromName(orientation.substringBefore('_'))
+            }
+        val paletteTopFacing =
+            Array(paletteList.size) { i ->
+                val entry = paletteList[i] as NbtCompound
+                if (entry.getString("Name") != "minecraft:jigsaw") return@Array null
+                val orientation =
+                    (entry["Properties"] as? NbtCompound)?.getString("orientation") ?: return@Array null
+                StructureDirection.fromName(orientation.substringAfter('_'))
+            }
+
+        for (i in 0 until blockList.size) {
+            val blockTag = blockList[i] as NbtCompound
+            val posList = blockTag.getList("pos") ?: continue
+            val pos =
+                StructurePos(
+                    (posList[0] as NbtInt).value,
+                    (posList[1] as NbtInt).value,
+                    (posList[2] as NbtInt).value,
+                )
+            val paletteIndex = blockTag.getInt("state")
+            val stateId = paletteStateIds.getOrElse(paletteIndex) { Blocks.AIR.stateId }
+            val blockEntityNbt = blockTag["nbt"] as? NbtCompound
+            val frontFacing = paletteFrontFacing.getOrNull(paletteIndex)
+            val topFacing = paletteTopFacing.getOrNull(paletteIndex)
+            target.add(
+                StructureBlockInfo(
+                    pos,
+                    stateId,
+                    blockEntityNbt,
+                    frontFacing,
+                    topFacing,
+                    paletteProperties.getOrElse(paletteIndex) { emptyMap() },
+                ),
+            )
+        }
+    }
 
     /** // parity: TemplateStructurePiece's transformed DATA-mode structure-block markers. */
     public fun dataMarkers(
@@ -220,11 +257,25 @@ public class StructureTemplate {
         ignoreAir: Boolean = false,
         gravityOffset: Int? = null,
     ) {
-        // parity: `getRandomPalette` draws even for the single palette every template here has.
-        settingsRandom?.nextInt(1)
+        // parity: `getRandomPalette` draws whether there is one palette or eight, and the draw
+        // comes out of the placement's own stream when it has one. The shipwreck templates carry
+        // eight; everything else here carries one, where the draw still happens and picks it.
+        val paletteIndex =
+            if (paletteCount <= 1) {
+                settingsRandom?.nextInt(1)
+                0
+            } else {
+                val chooser =
+                    settingsRandom
+                        ?: WorldgenRandom(
+                            LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z)),
+                        )
+                chooser.nextInt(paletteCount)
+            }
+        val paletteBlocks = paletteBlocks(paletteIndex)
         val wholePiece = processors.capped.isNotEmpty()
         val processedBlocks =
-            blocksBacking.mapNotNull { blockInfo ->
+            paletteBlocks.mapNotNull { blockInfo ->
                 if (
                     (ignoreAir && Blocks.isAir(blockInfo.stateId)) ||
                     (ignoreStructureBlocks && Blocks.byStateId(blockInfo.stateId)?.block?.path == "structure_block")
