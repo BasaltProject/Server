@@ -6,35 +6,32 @@ import kotlin.concurrent.AtomicReference
 import kotlin.math.abs
 
 /**
- * The undecorated terrain around the chunk being decorated.
- *
- * A configured feature whose body reaches past the chunk edge reads through this instead of taking
- * the outside for air, which is what made a `LakeFeature` preflight reject every volume that was
- * not perfectly centred. World coordinates throughout: nothing here wraps or clips to the origin
- * chunk.
+ * The undecorated terrain around the chunk being decorated, so a feature reaching past the edge does
+ * not take the outside for air. World coordinates throughout.
  */
-public fun interface NeighbourTerrain {
+public interface NeighbourTerrain {
     /** The pre-decoration block at a world position, or null when that position is out of reach. */
     public fun blockStateIdAt(
         worldX: Int,
         y: Int,
         worldZ: Int,
     ): Int?
+
+    /**
+     * The `OCEAN_FLOOR` height of a column outside the chunk, or null when out of reach. // parity: an ore
+     * blob asks for every column its box covers, and a stricter preflight also skips the draws it would
+     * have made.
+     */
+    public fun oceanFloorHeightAt(
+        worldX: Int,
+        worldZ: Int,
+    ): Int?
 }
 
 /**
- * Generates a neighbour the first time a feature reads into it and keeps it while the generator is
- * still working nearby, so a chunk's terrain is paid for once and read by the decorations around
- * it rather than once per reader.
- *
- * [generateTerrain] must stop before decoration, or reading a neighbour would decorate it and
- * recurse.
- *
- * Chunks generate concurrently, so one cache really is reached from several threads at once. It
- * holds an immutable map behind an [AtomicReference] and swaps it, the same trade-off
- * `VillageStructureGenerator` makes for its assemblies: a thread that loses the race discards its
- * own copy and takes the winner's, because generating the same neighbour twice is wasted work and
- * never a different result.
+ * Generates a neighbour the first time a feature reads into it, then keeps it. [generateTerrain] must
+ * stop before decoration or reading a neighbour recurses. Reached from several threads at once, so it
+ * swaps an immutable map behind an [AtomicReference]: the loser of a race takes the winner's copy.
  */
 public class NeighbourTerrainCache(
     private val radius: Int = 1,
@@ -49,19 +46,46 @@ public class NeighbourTerrainCache(
         chunkX: Int,
         chunkZ: Int,
     ): NeighbourTerrain =
-        NeighbourTerrain { worldX, y, worldZ ->
-            val neighbourX = worldX shr 4
-            val neighbourZ = worldZ shr 4
-            if (maxOf(abs(neighbourX - chunkX), abs(neighbourZ - chunkZ)) > radius) {
-                null
-            } else {
-                blockAt(neighbourX, neighbourZ, worldX, y, worldZ)
+        object : NeighbourTerrain {
+            override fun blockStateIdAt(
+                worldX: Int,
+                y: Int,
+                worldZ: Int,
+            ): Int? = inReach(worldX, worldZ)?.let { (nx, nz) -> blockAt(nx, nz, worldX, y, worldZ) }
+
+            override fun oceanFloorHeightAt(
+                worldX: Int,
+                worldZ: Int,
+            ): Int? =
+                inReach(worldX, worldZ)?.let { (nx, nz) ->
+                    oceanFloorAt(nx, nz, worldX, worldZ)
+                }
+
+            private fun inReach(
+                worldX: Int,
+                worldZ: Int,
+            ): Pair<Int, Int>? {
+                val neighbourX = worldX shr 4
+                val neighbourZ = worldZ shr 4
+                if (maxOf(abs(neighbourX - chunkX), abs(neighbourZ - chunkZ)) > radius) return null
+                return neighbourX to neighbourZ
             }
         }
 
     /** Forgets everything held, for an owner that is done generating. */
     public fun clear() {
         terrain.value = emptyMap()
+    }
+
+    private fun oceanFloorAt(
+        neighbourX: Int,
+        neighbourZ: Int,
+        worldX: Int,
+        worldZ: Int,
+    ): Int {
+        val key = key(neighbourX, neighbourZ)
+        val chunk = terrain.value[key] ?: generateAndKeep(key, neighbourX, neighbourZ)
+        return chunk.heightAt(worldX and 15, worldZ and 15, Chunk.HeightmapType.OCEAN_FLOOR)
     }
 
     private fun blockAt(
