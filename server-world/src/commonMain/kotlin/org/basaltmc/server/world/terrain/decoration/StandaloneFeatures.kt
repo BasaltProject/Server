@@ -408,7 +408,7 @@ public object StandaloneFeatures {
 
         forEachLakeCell { x, y, z ->
             if (!isLakeBoundary(grid, x, y, z)) return@forEachLakeCell
-            val stateId = stateAt(chunk, base.offset(x, y, z))
+            val stateId = regionalStateAt(chunk, base.offset(x, y, z))
             if (y >= LAKE_FLUID_HEIGHT && isLiquidBlock(stateId)) return false
             if (y < LAKE_FLUID_HEIGHT && !BlockShapes.isSolidState(stateId) && stateId != fluid) return false
             if (forbiddenBoundaryBlock != null && path(stateId) == forbiddenBoundaryBlock) return false
@@ -417,8 +417,9 @@ public object StandaloneFeatures {
         forEachLakeCell { x, y, z ->
             if (!grid[lakeIndex(x, y, z)]) return@forEachLakeCell
             val position = base.offset(x, y, z)
-            if (canReplaceLakeBody(stateAt(chunk, position))) {
-                set(chunk, position, if (y >= LAKE_FLUID_HEIGHT) Blocks.CAVE_AIR.stateId else fluid)
+            val stateId = regionalStateAt(chunk, position)
+            if (canReplaceLakeBody(stateId)) {
+                regionalSet(chunk, position, if (y >= LAKE_FLUID_HEIGHT) Blocks.CAVE_AIR.stateId else fluid, stateId)
             }
         }
 
@@ -428,8 +429,10 @@ public object StandaloneFeatures {
                     return@forEachLakeCell
                 }
                 val position = base.offset(x, y, z)
-                val stateId = stateAt(chunk, position)
-                if (BlockShapes.isSolidState(stateId) && canReplaceLakeBarrier(stateId)) set(chunk, position, barrier)
+                val stateId = regionalStateAt(chunk, position)
+                if (BlockShapes.isSolidState(stateId) && canReplaceLakeBarrier(stateId)) {
+                    regionalSet(chunk, position, barrier, stateId)
+                }
             }
         }
 
@@ -447,10 +450,11 @@ public object StandaloneFeatures {
         if (!placeLake(chunk, random, origin, waterStateId, state("sulfur"), "sulfur_spike")) return false
         var position = origin
         repeat(SULFUR_VENT_SCAN_STEPS + 1) { step ->
-            if (BlockShapes.isSolidState(stateAt(chunk, position)) &&
-                hasSourceWaterFluid(stateAt(chunk, position.copy(y = position.y + 1)))
+            val stateId = regionalStateAt(chunk, position)
+            if (BlockShapes.isSolidState(stateId) &&
+                hasSourceWaterFluid(regionalStateAt(chunk, position.copy(y = position.y + 1)))
             ) {
-                set(chunk, position, wetPotentSulfurStateId)
+                regionalSet(chunk, position, wetPotentSulfurStateId, stateId)
                 return true
             }
             if (step < SULFUR_VENT_SCAN_STEPS) {
@@ -570,6 +574,33 @@ public object StandaloneFeatures {
     ): String? = path(stateAt(chunk, position))
 
     private fun path(stateId: Int): String? = Blocks.byStateId(stateId)?.block?.path
+
+    /**
+     * The lake volume is 16 wide, so it all but always crosses a chunk edge. These two read and
+     * write in world coordinates through the chunk's own decoration view: reads see the neighbour's
+     * undecorated terrain when a regional reader is installed, and writes outside the chunk are
+     * deferred with [observedStateId], the very state the preflight and the replace check accepted,
+     * as their delivery guard.
+     */
+    private fun regionalStateAt(
+        chunk: Chunk,
+        position: DecorationPos,
+    ): Int = chunk.getDecorationBlockStateId(position.x, position.y, position.z)
+
+    private fun regionalSet(
+        chunk: Chunk,
+        position: DecorationPos,
+        stateId: Int,
+        observedStateId: Int,
+    ) {
+        chunk.setDecorationBlockStateId(
+            position.x,
+            position.y,
+            position.z,
+            stateId,
+            expectedExternalStateId = observedStateId,
+        )
+    }
 
     private fun stateAt(
         chunk: Chunk,

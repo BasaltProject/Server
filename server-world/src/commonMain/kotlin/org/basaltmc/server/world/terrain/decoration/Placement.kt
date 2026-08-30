@@ -4,6 +4,7 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.noise.SimplexNoise
 import kotlin.math.ceil
 
@@ -134,6 +135,54 @@ public class RandomOffsetPlacement(
         val y = origin.y + trapezoid(ySpread)
         val z = origin.z + trapezoid(xzSpread)
         return sequenceOf(DecorationPos(x, y, z))
+    }
+}
+
+/**
+ * // parity: RandomOffsetPlacement built from `ConstantInt` providers, which sample without
+ * touching the random. Kept apart from [RandomOffsetPlacement] because that one is the trapezoid
+ * case and always draws.
+ */
+public class ConstantOffsetPlacement(
+    private val xzOffset: Int,
+    private val yOffset: Int,
+) : PlacementModifier {
+    override fun getPositions(
+        context: PlacementContext,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Sequence<DecorationPos> = sequenceOf(DecorationPos(origin.x + xzOffset, origin.y + yOffset, origin.z + xzOffset))
+}
+
+/**
+ * // parity: EnvironmentScanPlacement. Walks [directionY] until [target] matches, giving up when a
+ * step leaves the world or stops matching [allowed], and testing [target] once more where it broke.
+ * Reads go through the chunk's decoration view, so a scan may cross into a neighbour.
+ */
+public class EnvironmentScanPlacement(
+    private val directionY: Int,
+    private val maxSteps: Int,
+    private val target: (stateId: Int, position: DecorationPos) -> Boolean,
+    private val allowed: ((stateId: Int, position: DecorationPos) -> Boolean)? = null,
+) : PlacementModifier {
+    override fun getPositions(
+        context: PlacementContext,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Sequence<DecorationPos> {
+        val chunk = context.chunk
+
+        fun stateAt(position: DecorationPos) = chunk.getDecorationBlockStateId(position.x, position.y, position.z)
+        if (allowed != null && !allowed.invoke(stateAt(origin), origin)) return emptySequence()
+        var position = origin
+        for (step in 0 until maxSteps) {
+            if (target(stateAt(position), position)) return sequenceOf(position)
+            position = position.copy(y = position.y + directionY)
+            if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return emptySequence()
+            // Vanilla breaks here and still tests the target once at the block it stopped on.
+            if (allowed != null && !allowed.invoke(stateAt(position), position)) break
+        }
+        return if (target(stateAt(position), position)) sequenceOf(position) else emptySequence()
     }
 }
 
