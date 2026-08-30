@@ -555,6 +555,16 @@ public class StructureTemplate {
                 }
             transformed = transformed + ("rotation" to rotated.toString())
         }
+        // parity: DoorBlock.mirror cycles HINGE for *any* mirror, whether or not the facing's axis
+        // matches. That is unlike the stair's shape below, which only swaps when the axis does, and
+        // the difference is the jar's.
+        if (mirror != StructureMirror.NONE) {
+            when (properties["hinge"]) {
+                "left" -> transformed = transformed + ("hinge" to "right")
+                "right" -> transformed = transformed + ("hinge" to "left")
+                else -> Unit
+            }
+        }
         properties["shape"]?.let { shape ->
             val transformedShape =
                 rotateRailShape(shape, mirror, rotation)
@@ -743,8 +753,36 @@ public class StructureTemplate {
                     "trial_spawner",
                     "vault",
                     "bell",
+                    // The four the 26.2 templates carry that this list used to miss: the ancient
+                    // city's comparators and sculk sensors, and the End city's ender chest. Their
+                    // blocks were placed and their block entity was not, so a sensor was inert and
+                    // a comparator lost its stored signal.
+                    "comparator",
+                    "sculk_sensor",
+                    "calibrated_sculk_sensor",
+                    "ender_chest",
                 ).plus(DYE_COLORS.flatMap { color -> listOf("${color}_banner", "${color}_wall_banner") })
                     .plus(
+                        // Every head shares the `minecraft:skull` block entity. The templates use
+                        // `skeleton_skull` and `dragon_wall_head`; the rest come along because the
+                        // block entity is the same and leaving them out would be an arbitrary line.
+                        listOf(
+                            "skeleton_skull",
+                            "skeleton_wall_skull",
+                            "wither_skeleton_skull",
+                            "wither_skeleton_wall_skull",
+                            "zombie_head",
+                            "zombie_wall_head",
+                            "player_head",
+                            "player_wall_head",
+                            "creeper_head",
+                            "creeper_wall_head",
+                            "dragon_head",
+                            "dragon_wall_head",
+                            "piglin_head",
+                            "piglin_wall_head",
+                        ),
+                    ).plus(
                         listOf(
                             "oak",
                             "spruce",

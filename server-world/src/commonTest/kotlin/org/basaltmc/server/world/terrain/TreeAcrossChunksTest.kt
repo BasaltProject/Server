@@ -11,18 +11,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * A tree grown next to a chunk edge must be the same tree as one grown in the middle, delivered
- * partly to a neighbour. Each family is placed at the centre of a chunk and at its four corners
- * over identical ground, and what it writes is compared in coordinates relative to the trunk.
- *
- * The comparison is split on purpose. Trunk, foliage and roots come out of the placers, which never
- * read an absolute coordinate, so they have to match exactly: that is what catches a body clipped
- * at the edge or wrapped back with `and 15`.
- *
- * Decorators cannot be compared that way, and demanding it would be wrong rather than strict.
- * // parity: `TreeDecorator.Context` fills its lists from a `HashSet` and only then stable-sorts
- * them by Y, so inside one layer a decorator walks the tree in `BlockPos.hashCode()` order, which
- * is a function of the world position. Vanilla grows different vines for the same tree moved one
+ * A tree at a chunk edge must be the same tree as one in the middle, delivered partly to a neighbour.
+ * Trunk, foliage and roots must match exactly; decorators cannot. // parity: `TreeDecorator.Context`
+ * walks in `BlockPos.hashCode()` order, so vanilla grows different vines for the same tree moved one
  * block. All that must hold for them is that nothing is dropped for landing outside the chunk.
  */
 class TreeAcrossChunksTest {
@@ -65,6 +56,19 @@ class TreeAcrossChunksTest {
             ?.path
             ?.endsWith("_leaves") == true
 
+    /**
+     * A leaf compared without its `distance`, which is not translation invariant either. // parity:
+     * `TreeFeature.updateLeaves` walks `HashSet` buckets, so the jar re-writes a leaf it already settled.
+     */
+    private fun comparable(stateId: Int): Int =
+        if (!isLeaves(stateId)) {
+            stateId
+        } else {
+            val block = Blocks.byStateId(stateId)?.block ?: return stateId
+            val properties = Blocks.byStateId(stateId)?.properties.orEmpty() - "distance"
+            Blocks.stateIdOf(block, properties) ?: stateId
+        }
+
     private fun isSkeleton(stateId: Int): Boolean {
         val path = Blocks.byStateId(stateId)?.block?.path ?: return false
         return isLog(stateId) ||
@@ -98,7 +102,7 @@ class TreeAcrossChunksTest {
             stateId: Int,
         ) {
             val offset = Triple(worldX - originX, y - originY, worldZ - originZ)
-            if (isSkeleton(stateId)) skeleton[offset] = stateId else decorations[offset] = stateId
+            if (isSkeleton(stateId)) skeleton[offset] = comparable(stateId) else decorations[offset] = stateId
         }
 
         val untouched = groundChunk(chunk.chunkX, chunk.chunkZ)

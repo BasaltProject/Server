@@ -3,17 +3,14 @@ package org.basaltmc.server.world.structure
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.ChunkGeneratedEntity
+import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 
 /**
- * // parity: the block-writing half of net.minecraft.world.level.levelgen.structure.StructurePiece.
- *
- * A procedural piece is written in its own coordinates, with x running across it, z along it and y
- * up from its floor, and this turns those into world ones for the orientation it was placed with.
- * Every write is clipped to [clip], which is how vanilla lets one piece span several chunks and
- * still be written once per chunk.
- *
- * Templates do not come through here: they carry their own blocks and go through
- * [StructureTemplate]. This is for the pieces that are shaped in code, like a mineshaft's.
+ * // parity: the block-writing half of `StructurePiece`. A procedural piece is written in its own
+ * coordinates and turned into world ones; every write is clipped to [clip], which is how one piece
+ * spans several chunks and is still written once per chunk. Templates go through [StructureTemplate].
  */
 public class StructurePieceFill(
     private val box: StructureBoundingBox,
@@ -76,7 +73,64 @@ public class StructurePieceFill(
         if (!clip.isInside(StructurePos(worldX, worldY, worldZ))) return
         val existing = chunk.getDecorationBlockStateId(worldX, worldY, worldZ)
         if (!canBeReplaced(existing)) return
-        chunk.setDecorationBlockStateId(worldX, worldY, worldZ, stateId, expectedExternalStateId = existing)
+        chunk.setDecorationBlockStateId(worldX, worldY, worldZ, oriented(stateId), expectedExternalStateId = existing)
+    }
+
+    /**
+     * // parity: `StructurePiece.placeBlock` turns the state by the piece's orientation, exactly as it
+     * turns the coordinates: a piece is written facing north and then rotated whole.
+     */
+    private fun oriented(stateId: Int): Int {
+        if (orientation == null || orientation == StructureDirection.NORTH) return stateId
+        val properties = Blocks.byStateId(stateId)?.properties ?: return stateId
+        if (properties.isEmpty()) return stateId
+        return TEMPLATE.transformedStateId(stateId, properties, mirror, rotation)
+    }
+
+    /** // parity: the mirror and rotation `setOrientation` derives from a piece's facing. */
+    private val mirror =
+        when (orientation) {
+            StructureDirection.SOUTH, StructureDirection.WEST -> StructureMirror.LEFT_RIGHT
+            else -> StructureMirror.NONE
+        }
+
+    private val rotation =
+        when (orientation) {
+            StructureDirection.WEST, StructureDirection.EAST -> StructureRotation.CLOCKWISE_90
+            else -> StructureRotation.NONE
+        }
+
+    private companion object {
+        val TEMPLATE = StructureTemplate()
+    }
+
+    /**
+     * Adds a generated entity at the centre of a piece-local block, if this chunk owns it.
+     * // parity: the structures that call `addFreshEntity` while placing, such as the mineshaft's
+     * chest minecart, which rides the rail it just put down.
+     */
+    public fun placeEntity(
+        type: Identifier,
+        x: Int,
+        y: Int,
+        z: Int,
+        data: NbtCompound,
+    ) {
+        val worldX = worldX(x, z)
+        val worldY = worldY(y)
+        val worldZ = worldZ(x, z)
+        if (!clip.isInside(StructurePos(worldX, worldY, worldZ))) return
+        chunk.addGeneratedEntity(
+            ChunkGeneratedEntity(
+                type = type,
+                x = worldX + 0.5,
+                y = worldY + 0.5,
+                z = worldZ + 0.5,
+                yaw = 0.0f,
+                pitch = 0.0f,
+                data = data,
+            ),
+        )
     }
 
     /** Whether the block above this one is still below the surface, so the piece is buried. */

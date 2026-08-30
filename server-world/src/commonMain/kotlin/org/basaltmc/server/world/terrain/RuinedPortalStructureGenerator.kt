@@ -2,6 +2,7 @@ package org.basaltmc.server.world.terrain
 
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
@@ -47,11 +48,8 @@ public class RuinedPortalVariant(
 )
 
 /**
- * Overworld ruined portals.
- *
- * // parity: the `ruined_portals` set is a plain `random_spread` with `spacing 40`,
- * `separation 15` and salt 34222645, no frequency, so one lands in most 40x40 chunk cells. The
- * seven variants share the cell by weight and the first whose biome accepts it wins.
+ * Overworld ruined portals. // parity: the `ruined_portals` set is a plain `random_spread`, spacing
+ * 40, separation 15, salt 34222645. The seven variants share the cell by weight, first accepted wins.
  */
 public class RuinedPortalStructureGenerator(
     private val variants: List<RuinedPortalVariant>,
@@ -110,6 +108,12 @@ public class RuinedPortalStructureGenerator(
                 add(TemplateBlockProcessors.LAVA_SUBMERGED)
                 if (setup.replaceWithBlackstone) add(TemplateBlockProcessors.BLACKSTONE_REPLACE)
             }
+        // parity: `RuinedPortalPiece.postProcess` takes the decoration random it is handed, not one of its
+        // own, and passes it to `placeInWorld`, the netherrack, the drip columns and the vines. Each of the
+        // seven variants owns its index within `surface_structures`, so the stream depends on which was drawn.
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        random.setFeatureSeed(decorationSeed, structureIndexOf(portal.variantName), SURFACE_STRUCTURES_STEP)
         portal.template.placeInto(
             chunk = chunk,
             position = portal.origin,
@@ -118,9 +122,8 @@ public class RuinedPortalStructureGenerator(
             pivot = portal.pivot,
             clipTo = clip,
             blockProcessor = TemplateBlockProcessorChain(processors),
+            random = random,
         )
-        val random = WorldgenRandom(LegacyRandom(0L))
-        random.setLargeFeatureSeed(seed, portal.chunkX, portal.chunkZ)
         spreadNetherrack(portal, chunk, clip, random)
         dripColumnsBelowPortal(portal, chunk, clip, random)
         if (setup.vines || setup.overgrown) {
@@ -294,11 +297,9 @@ public class RuinedPortalStructureGenerator(
     }
 
     /**
-     * // parity: ChunkGenerator's retry loop over the set, and this is the part that is easy to get
-     * backwards. A variant is drawn by weight, its whole generation point is computed, and only
-     * **then** is the biome checked, at the position that came out, not at the chunk. A variant
-     * whose biome refuses it is dropped and the next one is drawn, each attempt starting from the
-     * same random state.
+     * // parity: ChunkGenerator's retry loop. A variant is drawn by weight, its whole generation point
+     * computed, and only then is the biome checked, at that point rather than at the chunk. A refused
+     * variant is dropped and the next drawn, each attempt starting from the same random state.
      */
     private fun assemble(
         seed: Long,
@@ -350,6 +351,7 @@ public class RuinedPortalStructureGenerator(
         return Portal(
             chunkX,
             chunkZ,
+            variant.name,
             setup,
             template,
             origin,
@@ -446,6 +448,8 @@ public class RuinedPortalStructureGenerator(
     private class Portal(
         val chunkX: Int,
         val chunkZ: Int,
+        /** Which of the seven variants this is, which decides its index within the step. */
+        val variantName: String,
         val setup: RuinedPortalSetup,
         val template: StructureTemplate,
         val origin: StructurePos,
@@ -457,8 +461,27 @@ public class RuinedPortalStructureGenerator(
         val cold: Boolean,
     )
 
+    /**
+     * // parity: the position of each variant among the 26 structures of `surface_structures`, in
+     * registry order. They share a structure set but not an index, so they do not share a stream.
+     */
+    private fun structureIndexOf(name: String): Int = STRUCTURE_INDICES[name] ?: DEFAULT_STRUCTURE_INDEX
+
     private companion object {
         const val SALT = 34222645
+        const val SURFACE_STRUCTURES_STEP = 4
+        const val DEFAULT_STRUCTURE_INDEX = 10
+
+        val STRUCTURE_INDICES =
+            mapOf(
+                "ruined_portal" to 10,
+                "ruined_portal_desert" to 11,
+                "ruined_portal_jungle" to 12,
+                "ruined_portal_mountain" to 13,
+                "ruined_portal_nether" to 14,
+                "ruined_portal_ocean" to 15,
+                "ruined_portal_swamp" to 16,
+            )
         const val GIANT_CHANCE = 0.05f
         const val MIN_Y_INDEX = 15
         const val MAX_Y_DIFFERENCE = 3

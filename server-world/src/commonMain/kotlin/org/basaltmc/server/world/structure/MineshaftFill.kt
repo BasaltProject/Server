@@ -7,6 +7,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.hasFluid
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 
 /**
  * // parity: the four `postProcess` bodies of MineshaftPieces, which turn an assembled shaft into
@@ -226,9 +227,8 @@ public object MineshaftFill {
     }
 
     /**
-     * // parity: MineShaftCorridor.createChest, minus the minecart itself. The rail it sits on and
-     * both of its draws are reproduced, because they are part of the shaft's stream; the chest
-     * minecart and its loot table are still missing.
+     * // parity: MineShaftCorridor.createChest: a rail with a random axis, and a chest minecart
+     * riding it with the shaft's loot table and its own seed.
      */
     private fun placeChestRail(
         fill: StructurePieceFill,
@@ -241,8 +241,17 @@ public object MineshaftFill {
         if (Blocks.isAir(fill.blockAt(x, y - 1, z))) return
         val shape = if (random.nextBoolean()) RAIL_NORTH_SOUTH else RAIL_EAST_WEST
         fill.place(shape, x, y, z)
-        // The loot seed, drawn even though nothing carries it yet.
-        random.nextLong()
+        val lootSeed = random.nextLong()
+        fill.placeEntity(
+            Identifier.vanilla("chest_minecart"),
+            x,
+            y,
+            z,
+            NbtCompound().apply {
+                putString("LootTable", "minecraft:chests/abandoned_mineshaft")
+                putLong("LootTableSeed", lootSeed)
+            },
+        )
     }
 
     /** A piece never overwrites another piece's frame. // parity: MineShaftPiece.canBeReplaced. */
