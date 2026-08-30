@@ -44,25 +44,15 @@ internal fun setExternalDecorationBlockStateId(
 public class PlacementContext(
     public val chunk: Chunk,
 ) {
-    private val worldSurfaceHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)
-    private val oceanFloorHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
-    private val motionBlockingHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING)
-    private val motionBlockingNoLeavesHeightmap: IntArray =
-        chunk.heightmap(
-            Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES,
-        )
-
+    /**
+     * // parity: `PlacementContext.getHeight` asks the level, so it sees what decoration already placed. A
+     * snapshot lets every attempt of a `count(16)` land on bare ground and overfills the chunk with trees.
+     */
     public fun height(
         localX: Int,
         localZ: Int,
         type: Chunk.HeightmapType = Chunk.HeightmapType.MOTION_BLOCKING,
-    ): Int =
-        when (type) {
-            Chunk.HeightmapType.WORLD_SURFACE -> worldSurfaceHeightmap
-            Chunk.HeightmapType.OCEAN_FLOOR -> oceanFloorHeightmap
-            Chunk.HeightmapType.MOTION_BLOCKING -> motionBlockingHeightmap
-            Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES -> motionBlockingNoLeavesHeightmap
-        }[localX + localZ * 16]
+    ): Int = chunk.heightAt(localX, localZ, type)
 }
 
 /** // parity: net.minecraft.world.level.levelgen.placement.PlacementModifier. Each modifier turns one position into zero or more. */
