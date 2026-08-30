@@ -79,9 +79,23 @@ public class AncientCityStructureGenerator(
                 chunkZ * 16 + 15 + BEARD_RADIUS,
             )
         val rigids = mutableListOf<StructureBeardifier.Rigid>()
-        for (pieces in nearbyStarts(chunkX, chunkZ, seed, chunkClip(chunkX, chunkZ))) {
+        val junctions = mutableListOf<StructureBeardifier.Junction>()
+        // The starts are filtered with the inflated box, not the chunk itself: a chunk with no
+        // piece of its own still gets the beard of the pieces within twelve blocks of it, and
+        // asking for the strict chunk dropped those starts before the beard could look at them.
+        for (pieces in nearbyStarts(chunkX, chunkZ, seed, nearClip)) {
             for (piece in pieces) {
                 if (!piece.boundingBox.intersects(nearClip)) continue
+                // parity: a junction contributes whatever the piece's own projection is, so these
+                // are collected before the rigid-only test below, not after it.
+                for (junction in piece.junctions) {
+                    if (junction.sourceX <= chunkX * 16 - BEARD_RADIUS) continue
+                    if (junction.sourceX >= chunkX * 16 + 15 + BEARD_RADIUS) continue
+                    if (junction.sourceZ <= chunkZ * 16 - BEARD_RADIUS) continue
+                    if (junction.sourceZ >= chunkZ * 16 + 15 + BEARD_RADIUS) continue
+                    junctions +=
+                        StructureBeardifier.Junction(junction.sourceX, junction.sourceGroundY, junction.sourceZ)
+                }
                 if (piece.element.projection != StructureProjection.RIGID) continue
                 rigids +=
                     StructureBeardifier.Rigid(
@@ -91,8 +105,8 @@ public class AncientCityStructureGenerator(
                     )
             }
         }
-        if (rigids.isEmpty()) return base
-        return DensityFunctions.add(base, StructureBeardifier(rigids))
+        if (rigids.isEmpty() && junctions.isEmpty()) return base
+        return DensityFunctions.add(base, StructureBeardifier(rigids, junctions))
     }
 
     private fun chunkClip(

@@ -59,6 +59,25 @@ class StructureBeardifierTest {
     }
 
     @Test
+    fun `encapsulating fills rock in instead of carving it out`() {
+        for (y in box.minY..box.maxY) {
+            assertTrue(
+                densityAt(TerrainAdjustment.ENCAPSULATE, y) > 0.0,
+                "at y=$y encapsulating should be adding density, not removing it",
+            )
+        }
+        // Inside the piece the vertical distance is zero and so is the horizontal one, so the
+        // falloff is at its maximum: 0.8 of a contribution that starts at 1.
+        assertEquals(0.8, densityAt(TerrainAdjustment.ENCAPSULATE, box.minY), 1e-9)
+    }
+
+    @Test
+    fun `an encapsulated casing runs out twelve blocks above the piece`() {
+        assertTrue(densityAt(TerrainAdjustment.ENCAPSULATE, box.maxY + 11) > 0.0)
+        assertEquals(0.0, densityAt(TerrainAdjustment.ENCAPSULATE, box.maxY + 12))
+    }
+
+    @Test
     fun `no adjustment contributes nothing anywhere`() {
         for (y in box.minY..box.maxY) assertEquals(0.0, densityAt(TerrainAdjustment.NONE, y))
     }

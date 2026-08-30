@@ -58,6 +58,7 @@ public object RealTerrainGenerator {
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
+        trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): Chunk {
         val terrain =
             generateTerrain(
@@ -70,6 +71,7 @@ public object RealTerrainGenerator {
                 mineshaftGenerator,
                 ruinedPortalGenerator,
                 ancientCityGenerator,
+                trialChamberGenerator,
             )
         decorate(terrain, seed, neighbours?.around(chunkX, chunkZ), ancientCityGenerator)
         return terrain.chunk
@@ -90,6 +92,7 @@ public object RealTerrainGenerator {
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
+        trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): GeneratedTerrain {
         val chunk = Chunk(chunkX, chunkZ)
         // One cache for the whole chunk, shared by terrain shape, surface rules and biome filling:
@@ -98,7 +101,8 @@ public object RealTerrainGenerator {
         val sampler =
             DensityChunkSampler(
                 (villageGenerator?.finalDensityForChunk(chunkX, chunkZ, seed) ?: router.finalDensity)
-                    .let { ancientCityGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it },
+                    .let { ancientCityGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it }
+                    .let { trialChamberGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it },
                 chunkX,
                 chunkZ,
                 WorldHeight.MIN_Y,
@@ -167,6 +171,7 @@ public object RealTerrainGenerator {
         GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) {
             villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
             // Step 3, underground_structures, which is before every decoration step.
+            trialChamberGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
             mineshaftGenerator?.generateInto(chunk, seed) { x, z ->
                 chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)
             }
