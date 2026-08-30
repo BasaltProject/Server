@@ -196,9 +196,11 @@ public object AquaticPatchDecoration {
                 position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y -> Blocks.AIR.stateId
                 position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ ->
                     chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
+                // Not air: the neighbouring terrain. Reading the outside as air left `oceanFloor`
+                // without a floor to find, so a seagrass patch at the edge planted nothing.
                 else ->
                     externalWrites[position] ?: externalBlockState?.invoke(position.x, position.y, position.z)
-                        ?: Blocks.AIR.stateId
+                        ?: chunk.getDecorationBlockStateId(position.x, position.y, position.z)
             }
 
         fun oceanFloor(

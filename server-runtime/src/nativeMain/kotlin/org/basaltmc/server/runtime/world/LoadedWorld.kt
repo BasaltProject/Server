@@ -14,6 +14,7 @@ import org.basaltmc.server.world.LeafDistances
 import org.basaltmc.server.world.NoiseWorldGenerator
 import org.basaltmc.server.world.VoidWorldGenerator
 import org.basaltmc.server.world.terrain.BiomeZoomer
+import org.basaltmc.server.world.terrain.NeighbourTerrainCache
 import org.basaltmc.server.world.terrain.OverworldBiomeSource
 import org.basaltmc.server.world.terrain.OverworldNoiseRouter
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
@@ -286,6 +287,25 @@ public class LoadedWorld(
             ).writeTo(worldRoot)
     }
 
+    // Without this the step-1 bodies read the outside as air, and a LakeFeature preflight then
+    // rejects every volume that is not perfectly centred, so no lake would ever generate here.
+    private var fallbackNeighbourCache: NeighbourTerrainCache? = null
+
+    private fun fallbackNeighbours(
+        router: OverworldNoiseRouter,
+        environment: SurfaceRuleEnvironment,
+    ): NeighbourTerrainCache =
+        fallbackNeighbourCache ?: NeighbourTerrainCache { neighbourX, neighbourZ ->
+            RealTerrainGenerator
+                .generateTerrain(
+                    router,
+                    environment,
+                    neighbourX,
+                    neighbourZ,
+                    villageGenerator = villageGenerator,
+                ).chunk
+        }.also { fallbackNeighbourCache = it }
+
     /**
      * Terrain for one chunk, by the world's declared type.
      *
@@ -326,6 +346,7 @@ public class LoadedWorld(
                         chunkX,
                         chunkZ,
                         villageGenerator = villageGenerator,
+                        neighbours = fallbackNeighbours(router, environment),
                     )
                 } else {
                     check(declaration.dimension == org.basaltmc.server.runtime.config.WorldDimension.OVERWORLD) {

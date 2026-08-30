@@ -199,10 +199,12 @@ public class Chunk(
         }
         val position = GeneratedWorldPos(worldX, y, worldZ)
         val previous = generatedExternalBlockWrites[position]
-        val oldStateId =
-            previous?.stateId
-                ?: externalDecorationBlockState?.invoke(worldX, y, worldZ)
-                ?: expectedExternalStateId
+        // What is really out there beats what the caller assumed. A feature that replaces stone
+        // rather than air used to defer its write with an air guard, so the delivery refused it and
+        // the body came out short; the caller's value is now only the fallback for a chunk that has
+        // no regional reader installed.
+        val observedStateId = externalDecorationBlockState?.invoke(worldX, y, worldZ)
+        val oldStateId = previous?.stateId ?: observedStateId ?: expectedExternalStateId
         if (oldStateId == stateId) {
             blockWriteObserver?.invoke(worldX - chunkX * 16, y, worldZ - chunkZ * 16, oldStateId, stateId)
             return
@@ -212,7 +214,7 @@ public class Chunk(
                 worldX,
                 y,
                 worldZ,
-                previous?.expectedStateId ?: expectedExternalStateId,
+                previous?.expectedStateId ?: observedStateId ?: expectedExternalStateId,
                 stateId,
                 previous?.replaceAnyState == true || replaceAnyExternalState,
                 generatedBlockWritePolicy,
