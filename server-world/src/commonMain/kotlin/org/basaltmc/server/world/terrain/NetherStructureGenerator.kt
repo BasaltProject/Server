@@ -14,6 +14,7 @@ import org.basaltmc.server.world.structure.StructureMirror
 import org.basaltmc.server.world.structure.StructurePlacementGrid
 import org.basaltmc.server.world.structure.StructurePos
 import org.basaltmc.server.world.structure.StructureRotation
+import org.basaltmc.server.world.structure.StructureStartRecord
 import org.basaltmc.server.world.structure.StructureTemplate
 import org.basaltmc.server.world.structure.StructureTemplatePool
 import org.basaltmc.server.world.structure.TemplateLoader
@@ -195,6 +196,7 @@ public class NetherStructureGenerator(
                 references += FortressReference(candidateX, candidateZ, pieces)
             }
         }
+        for (reference in references) recordFortress(chunk, clip, reference)
         val referencesByChunk = references.associateBy { it.chunkX to it.chunkZ }
         val insertionOrder = references.sortedWith(compareBy(FortressReference::chunkX, FortressReference::chunkZ))
         for (position in vanillaStructureReferenceChunkOrder(insertionOrder.map { it.chunkX to it.chunkZ })) {
@@ -203,6 +205,29 @@ public class NetherStructureGenerator(
                 if (piece.boundingBox.intersects(clip)) piece.place(chunk, clip, placementRandom)
             }
         }
+    }
+
+    /**
+     * Records the slice of a fortress that reaches [chunk]. The monster override tests piece
+     * bounds, so only the pieces this chunk holds are kept; the full bounds serve the separate
+     * nether-brick gate, which tests the fortress as a whole.
+     */
+    private fun recordFortress(
+        chunk: Chunk,
+        clip: StructureBoundingBox,
+        reference: FortressReference,
+    ) {
+        val here = reference.pieces.filter { it.boundingBox.intersects(clip) }
+        if (here.isEmpty()) return
+        chunk.structures.add(
+            StructureStartRecord(
+                FORTRESS_NAME,
+                reference.chunkX,
+                reference.chunkZ,
+                reference.pieces.fortressBoundingBox(),
+                here.map { it.boundingBox },
+            ),
+        )
     }
 
     private fun selectsFortress(
@@ -455,6 +480,7 @@ public class NetherStructureGenerator(
         const val FORTRESS_START_Y = 64
         const val FORTRESS_WEIGHT = 2
         const val NETHER_COMPLEX_TOTAL_WEIGHT = 5
+        const val FORTRESS_NAME = "fortress"
         const val FORTRESS_STRUCTURE_INDEX = 1
         const val BASTION_STRUCTURE_INDEX = 0
         const val SURFACE_STRUCTURES_STEP = 4

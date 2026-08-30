@@ -13,6 +13,7 @@ import org.basaltmc.server.world.structure.StructureBoundingBox
 import org.basaltmc.server.world.structure.StructurePlacementGrid
 import org.basaltmc.server.world.structure.StructurePos
 import org.basaltmc.server.world.structure.StructureProjection
+import org.basaltmc.server.world.structure.StructureStartRecord
 import org.basaltmc.server.world.structure.StructureTemplatePool
 import org.basaltmc.server.world.structure.TemplateLoader
 import kotlin.concurrent.AtomicReference
@@ -52,6 +53,7 @@ public class AncientCityStructureGenerator(
         val decorationSeed = random.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
         random.setFeatureSeed(decorationSeed, STRUCTURE_INDEX, UNDERGROUND_DECORATION_STEP)
         for (pieces in starts) {
+            recordStart(chunk, pieces)
             for (piece in pieces) {
                 if (!piece.boundingBox.intersects(clip)) continue
                 piece.element.place(templateLoader, chunk, piece.position, piece.rotation, clip, random)
@@ -107,6 +109,29 @@ public class AncientCityStructureGenerator(
         }
         if (rigids.isEmpty() && junctions.isEmpty()) return base
         return DensityFunctions.add(base, StructureBeardifier(rigids, junctions))
+    }
+
+    /**
+     * Records the slice of this start that reaches [chunk], for later position queries. The full
+     * bounds come from every piece, the piece list only from the ones this chunk holds.
+     */
+    private fun recordStart(
+        chunk: Chunk,
+        pieces: List<PlacedStructurePiece>,
+    ) {
+        val chunkBox = chunkClip(chunk.chunkX, chunk.chunkZ)
+        val here = pieces.filter { it.boundingBox.intersects(chunkBox) }
+        if (here.isEmpty()) return
+        val whole = StructureStartRecord.of(NAME, 0, 0, pieces.map { it.boundingBox }) ?: return
+        chunk.structures.add(
+            StructureStartRecord(
+                NAME,
+                pieces[0].position.x shr 4,
+                pieces[0].position.z shr 4,
+                whole.fullBounds,
+                here.map { it.boundingBox },
+            ),
+        )
     }
 
     private fun chunkClip(
@@ -205,6 +230,7 @@ public class AncientCityStructureGenerator(
         const val CACHE_CAPACITY = 16
 
         /** First of `underground_decoration`'s three structures, ahead of the fortress and the fossil. */
+        const val NAME = "ancient_city"
         const val STRUCTURE_INDEX = 0
         const val UNDERGROUND_DECORATION_STEP = 7
 

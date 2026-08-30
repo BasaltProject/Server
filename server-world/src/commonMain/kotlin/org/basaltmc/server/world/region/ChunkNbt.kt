@@ -9,6 +9,9 @@ import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkHeight
 import org.basaltmc.server.world.ChunkScheduledTick
 import org.basaltmc.server.world.ChunkSection
+import org.basaltmc.server.world.structure.ChunkStructures
+import org.basaltmc.server.world.structure.StructureBoundingBox
+import org.basaltmc.server.world.structure.StructureStartRecord
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtDouble
@@ -76,6 +79,7 @@ public object ChunkNbt {
         tag[GENERATED_ENTITIES_KEY] = encodeGeneratedEntities(chunk)
         val entities = chunk.savedEntities()
         tag[ENTITIES_KEY] = NbtList(if (entities.isEmpty()) NbtType.END else NbtType.COMPOUND, entities)
+        if (!chunk.structures.isEmpty) tag["structures"] = encodeStructures(chunk.structures)
         return tag
     }
 
@@ -108,8 +112,73 @@ public object ChunkNbt {
         decodeTicks(chunk, tag.getList("fluid_ticks")).forEach(chunk::scheduleFluidTick)
         decodeGeneratedEntities(tag.getList(GENERATED_ENTITIES_KEY)).forEach(chunk::addGeneratedEntity)
         chunk.setSavedEntities(tag.getList(ENTITIES_KEY)?.filterIsInstance<NbtCompound>().orEmpty())
+        decodeStructures(tag["structures"] as? NbtCompound, chunk.structures)
         return chunk
     }
+
+    /**
+     * The chunk's structure slices. The key names are vanilla's (`starts`, `ChunkX`, `ChunkZ`,
+     * `Children`, `BB`) but `starts` is a list, not a map: a chunk can hold two slices of the same
+     * structure, and only the boxes are kept because that is all a position query reads.
+     */
+    private fun encodeStructures(structures: ChunkStructures): NbtCompound {
+        val out = NbtCompound()
+        val starts = mutableListOf<NbtTag>()
+        for (start in structures.starts()) {
+            val startTag = NbtCompound()
+            startTag.putString("id", Identifier.vanilla(start.structure).toString())
+            startTag.putInt("ChunkX", start.chunkX)
+            startTag.putInt("ChunkZ", start.chunkZ)
+            startTag.putIntArray("BB", boxToArray(start.fullBounds))
+            startTag["Children"] =
+                NbtList(
+                    if (start.pieces.isEmpty()) NbtType.END else NbtType.COMPOUND,
+                    start.pieces.map { piece ->
+                        NbtCompound().also { it.putIntArray("BB", boxToArray(piece)) }
+                    },
+                )
+            starts += startTag
+        }
+        out["starts"] = NbtList(if (starts.isEmpty()) NbtType.END else NbtType.COMPOUND, starts)
+        return out
+    }
+
+    private fun decodeStructures(
+        tag: NbtCompound?,
+        into: ChunkStructures,
+    ) {
+        if (tag == null) return
+        val starts = mutableListOf<StructureStartRecord>()
+        for (entry in tag.getList("starts") ?: NbtList(NbtType.END)) {
+            val startTag = entry as? NbtCompound ?: continue
+            val bounds = arrayToBox(startTag.getIntArray("BB")) ?: continue
+            val pieces =
+                startTag
+                    .getList("Children")
+                    ?.mapNotNull { child ->
+                        arrayToBox((child as? NbtCompound)?.getIntArray("BB") ?: IntArray(0))
+                    }.orEmpty()
+            starts +=
+                StructureStartRecord(
+                    Identifier.parse(startTag.getString("id")).path,
+                    startTag.getInt("ChunkX"),
+                    startTag.getInt("ChunkZ"),
+                    bounds,
+                    pieces,
+                )
+        }
+        into.restore(starts)
+    }
+
+    private fun boxToArray(box: StructureBoundingBox): IntArray =
+        intArrayOf(box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ)
+
+    private fun arrayToBox(values: IntArray): StructureBoundingBox? =
+        if (values.size != 6) {
+            null
+        } else {
+            StructureBoundingBox(values[0], values[1], values[2], values[3], values[4], values[5])
+        }
 
     private fun encodeGeneratedEntities(chunk: Chunk): NbtList =
         NbtList(
