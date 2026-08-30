@@ -57,6 +57,7 @@ public object RealTerrainGenerator {
         neighbours: NeighbourTerrainCache? = null,
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
+        ancientCityGenerator: AncientCityStructureGenerator? = null,
     ): Chunk {
         val terrain =
             generateTerrain(
@@ -68,8 +69,9 @@ public object RealTerrainGenerator {
                 villageGenerator,
                 mineshaftGenerator,
                 ruinedPortalGenerator,
+                ancientCityGenerator,
             )
-        decorate(terrain, seed, neighbours?.around(chunkX, chunkZ))
+        decorate(terrain, seed, neighbours?.around(chunkX, chunkZ), ancientCityGenerator)
         return terrain.chunk
     }
 
@@ -87,6 +89,7 @@ public object RealTerrainGenerator {
         villageGenerator: VillageStructureGenerator? = null,
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
+        ancientCityGenerator: AncientCityStructureGenerator? = null,
     ): GeneratedTerrain {
         val chunk = Chunk(chunkX, chunkZ)
         // One cache for the whole chunk, shared by terrain shape, surface rules and biome filling:
@@ -94,7 +97,8 @@ public object RealTerrainGenerator {
         val cache = DensityCache(chunkX, chunkZ, Marker.slotCount)
         val sampler =
             DensityChunkSampler(
-                villageGenerator?.finalDensityForChunk(chunkX, chunkZ, seed) ?: router.finalDensity,
+                (villageGenerator?.finalDensityForChunk(chunkX, chunkZ, seed) ?: router.finalDensity)
+                    .let { ancientCityGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it },
                 chunkX,
                 chunkZ,
                 WorldHeight.MIN_Y,
@@ -177,6 +181,7 @@ public object RealTerrainGenerator {
         terrain: GeneratedTerrain,
         seed: Long = 0L,
         neighbours: NeighbourTerrain? = null,
+        ancientCityGenerator: AncientCityStructureGenerator? = null,
     ) {
         val chunk = terrain.chunk
         val chunkEnvironment = terrain.environment
@@ -203,6 +208,10 @@ public object RealTerrainGenerator {
                     chunkEnvironment,
                     externalBlockState = { x, y, z -> neighbours?.blockStateIdAt(x, y, z) },
                 )
+                // Step 7 opens with its structures, and the ancient city is the first of the
+                // three, so the sculk features below decorate a chunk that already has the city in
+                // it rather than the bare deepslate it would otherwise see.
+                ancientCityGenerator?.generateInto(chunk, chunk.chunkX, chunk.chunkZ, seed)
                 SculkDecoration.decorate(chunk, seed, chunkEnvironment)
                 CaveSpeleothemDecoration.decorate(chunk, seed, chunkEnvironment)
                 OverworldOreDecoration.decorateInfested(

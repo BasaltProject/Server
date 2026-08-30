@@ -7,7 +7,18 @@ import org.basaltmc.wire.common.Mth
 import kotlin.math.E
 import kotlin.math.pow
 
-/** // parity: Beardifier's BEARD_THIN rigid-piece contribution, used by Nether fossils. */
+/**
+ * // parity: TerrainAdjustment, narrowed to the kinds a structure this server generates asks for.
+ * `bury` (stronghold, trail ruins) and `encapsulate` (trial chambers) go in with their structures.
+ */
+internal enum class TerrainAdjustment {
+    NONE,
+    BEARD_THIN,
+    BEARD_BOX,
+}
+
+/** // parity: Beardifier's rigid-piece and junction contributions. */
+
 internal class StructureBeardifier(
     private val pieces: List<Rigid>,
     private val junctions: List<Junction> = emptyList(),
@@ -18,8 +29,17 @@ internal class StructureBeardifier(
             val box = rigid.box
             val dx = maxOf(0, maxOf(box.minX - context.blockX, context.blockX - box.maxX))
             val dz = maxOf(0, maxOf(box.minZ - context.blockZ, context.blockZ - box.maxZ))
-            val dyToGround = context.blockY - (box.minY + rigid.groundLevelDelta)
-            density += beardContribution(dx, dyToGround, dz, dyToGround) * 0.8
+            val groundY = box.minY + rigid.groundLevelDelta
+            val dyToGround = context.blockY - groundY
+            val dy =
+                when (rigid.adjustment) {
+                    TerrainAdjustment.NONE -> continue
+                    TerrainAdjustment.BEARD_THIN -> dyToGround
+                    // A box clears the piece's whole height instead of bearding up from its floor,
+                    // which is what lets the ancient city sit in a hollow rather than in solid rock.
+                    TerrainAdjustment.BEARD_BOX -> maxOf(0, maxOf(groundY - context.blockY, context.blockY - box.maxY))
+                }
+            density += beardContribution(dx, dy, dz, dyToGround) * 0.8
         }
         for (junction in junctions) {
             val dx = context.blockX - junction.x
@@ -37,6 +57,7 @@ internal class StructureBeardifier(
     internal data class Rigid(
         val box: StructureBoundingBox,
         val groundLevelDelta: Int = 0,
+        val adjustment: TerrainAdjustment = TerrainAdjustment.BEARD_THIN,
     )
 
     internal data class Junction(

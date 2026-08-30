@@ -46,19 +46,39 @@ public class JigsawAssembly(
         maxDistanceFromCenter: Int,
         maxVerticalDistanceFromCenter: Int = Int.MAX_VALUE,
         useExpansionHack: Boolean = false,
+        startJigsawName: String? = null,
     ): List<PlacedStructurePiece> {
         val startPool = poolLookup(startPoolName) ?: return emptyList()
         val centerRotation = StructureRotations.random(random)
         val centerElement = startPool.getRandomTemplate(random)
         if (centerElement === EmptyPoolElement) return emptyList()
 
-        val rawBox = centerElement.getBoundingBox(templateLoader, startPosition, centerRotation)
+        // parity: a structure that names a starting jigsaw (the ancient city's `city_anchor`) is
+        // shifted so that block lands on the chosen position instead of the template's own origin.
+        // The lookup shuffles, so naming one costs a draw that a structure without a name never makes.
+        val anchoredPosition =
+            if (startJigsawName == null) {
+                startPosition
+            } else {
+                centerElement
+                    .getShuffledJigsawBlocks(templateLoader, startPosition, centerRotation, random)
+                    .firstOrNull { it.name == startJigsawName }
+                    ?.pos ?: return emptyList()
+            }
+        val adjustedPosition =
+            StructurePos(
+                startPosition.x - (anchoredPosition.x - startPosition.x),
+                startPosition.y - (anchoredPosition.y - startPosition.y),
+                startPosition.z - (anchoredPosition.z - startPosition.z),
+            )
+
+        val rawBox = centerElement.getBoundingBox(templateLoader, adjustedPosition, centerRotation)
         val centerX = (rawBox.maxX + rawBox.minX) / 2
         val centerZ = (rawBox.maxZ + rawBox.minZ) / 2
-        val bottomY = if (projectStartToHeightmap) heightAt(centerX, centerZ) else startPosition.y
+        val bottomY = if (projectStartToHeightmap) heightAt(centerX, centerZ) else adjustedPosition.y
         val oldGroundY = rawBox.minY + centerElement.groundLevelDelta
         val moveY = bottomY - oldGroundY
-        val centerPosition = StructurePos(startPosition.x, startPosition.y + moveY, startPosition.z)
+        val centerPosition = StructurePos(adjustedPosition.x, adjustedPosition.y + moveY, adjustedPosition.z)
         val centerBox = rawBox.move(StructurePos(0, moveY, 0))
 
         val pieces = mutableListOf(PlacedStructurePiece(centerElement, centerPosition, centerRotation, centerBox))

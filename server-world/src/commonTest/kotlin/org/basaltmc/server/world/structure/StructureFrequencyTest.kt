@@ -61,8 +61,33 @@ class StructureFrequencyTest {
         }
     }
 
+    /**
+     * The ancient city grid, whose spacing and separation are both larger than the ruined portal's,
+     * so it exercises a different corner of the spread than either vector above.
+     */
+    @Test
+    fun `ancient cities land on the chunks a real server put them on`() {
+        val cities = StructurePlacementGrid(spacing = 24, separation = 8, salt = 20083232)
+        for ((cellX, cellZ, expected) in ANCIENT_CITY_CELLS) {
+            val found = mutableListOf<Pair<Int, Int>>()
+            for (chunkX in cellX * 24 until cellX * 24 + 24) {
+                for (chunkZ in cellZ * 24 until cellZ * 24 + 24) {
+                    if (cities.isStructureChunk(SEED, chunkX, chunkZ)) found += chunkX to chunkZ
+                }
+            }
+            assertEquals(listOf(expected), found, "cell ($cellX, $cellZ) no longer matches 26.2")
+        }
+    }
+
     private companion object {
         const val SEED = 12345L
+
+        /** The two ancient cities seed 12345 really has, read back from their `structures.starts`. */
+        val ANCIENT_CITY_CELLS =
+            listOf(
+                Triple(0, -1, 11 to -11),
+                Triple(-1, -1, -18 to -18),
+            )
 
         /** One cell of the ruined portal grid each, as `cellX, cellZ, the chunk vanilla chose`. */
         val RUINED_PORTAL_CELLS =

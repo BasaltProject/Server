@@ -11,6 +11,7 @@ import org.basaltmc.server.world.densityfunction.BlendedNoise
 import org.basaltmc.server.world.noise.NoiseParametersJson
 import org.basaltmc.server.world.noise.NormalNoise
 import org.basaltmc.server.world.structure.StructurePlacementGrid
+import org.basaltmc.server.world.terrain.AncientCityStructureGenerator
 import org.basaltmc.server.world.terrain.DimensionTerrainGenerator
 import org.basaltmc.server.world.terrain.EndCityStructureGenerator
 import org.basaltmc.server.world.terrain.MineshaftStructureGenerator
@@ -126,6 +127,13 @@ public class VanillaWorldGeneratorFactory(
                 surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
                 isSolidAt = { x, y, z -> columns.isSolid(x, y, z) },
             )
+        val ancientCities =
+            AncientCityStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                poolLookup = villageLoader.poolLookup,
+                templateLoader = villageLoader.templateLoader,
+                cityBiomes = biomeTags.biomesIn("minecraft:has_structure/ancient_city"),
+            )
         // Step 1's bodies read past the chunk edge, so decoration needs the neighbours' undecorated
         // terrain. One cache per world: a neighbour generated for one chunk is read by the next.
         val neighbours =
@@ -140,6 +148,7 @@ public class VanillaWorldGeneratorFactory(
                         village,
                         mineshafts,
                         ruinedPortals,
+                        ancientCities,
                     ).chunk
             }
         return Generators(
@@ -160,6 +169,7 @@ public class VanillaWorldGeneratorFactory(
                         neighbours,
                         mineshafts,
                         ruinedPortals,
+                        ancientCities,
                     ).also { chunk ->
                         if (spawnMobs) {
                             val biome =
