@@ -17,6 +17,7 @@ import org.basaltmc.server.world.terrain.decoration.IceSpikesDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldLakeDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldOreDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldSpringDecoration
+import org.basaltmc.server.world.terrain.decoration.OverworldUndergroundStructures
 import org.basaltmc.server.world.terrain.decoration.OverworldVegetalDecoration
 import org.basaltmc.server.world.terrain.decoration.SculkDecoration
 import org.basaltmc.server.world.terrain.decoration.SurfaceFreezingDecoration
@@ -179,6 +180,7 @@ public object RealTerrainGenerator {
                 ForestRockDecoration.decorate(chunk, seed, chunkEnvironment)
                 IceSpikesDecoration.decorate(chunk, seed, chunkEnvironment)
                 DesertWellDecoration.decorate(chunk, seed, chunkEnvironment)
+                OverworldUndergroundStructures.decorate(chunk, seed, chunkEnvironment)
                 FrozenOceanDecoration.decorateSurfaceStructures(chunk, seed, chunkEnvironment)
                 // Ore and stone blobs are spheres around their origin, so most cross a chunk edge. The
                 // part outside is deferred, and its guard has to be the block actually out there.
