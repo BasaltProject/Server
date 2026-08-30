@@ -25,6 +25,7 @@ import org.basaltmc.server.world.terrain.RealTerrainGenerator
 import org.basaltmc.server.world.terrain.RuinedPortalStructureGenerator
 import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
+import org.basaltmc.server.world.terrain.TrailRuinsStructureGenerator
 import org.basaltmc.server.world.terrain.TrialChamberStructureGenerator
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.wire.common.Identifier
@@ -154,6 +155,15 @@ public class VanillaWorldGeneratorFactory(
                 poolLookup = villageLoader.poolLookup,
                 templateLoader = villageLoader.templateLoader,
             )
+        val trailRuins =
+            TrailRuinsStructureGenerator(
+                router,
+                StructurePlacementGrid(spacing = 34, separation = 8, salt = 83469867),
+                biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
+                ruinBiomes = biomeTags.biomesIn("minecraft:has_structure/trail_ruins"),
+                poolLookup = villageLoader.poolLookup,
+                templateLoader = villageLoader.templateLoader,
+            )
         val ancientCities =
             AncientCityStructureGenerator(
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
@@ -184,6 +194,7 @@ public class VanillaWorldGeneratorFactory(
                         ruinedPortals,
                         swampHuts,
                         pillagerOutposts,
+                        trailRuins,
                         ancientCities,
                         trialChambers,
                     ).chunk
@@ -208,6 +219,7 @@ public class VanillaWorldGeneratorFactory(
                         ruinedPortals,
                         swampHuts,
                         pillagerOutposts,
+                        trailRuins,
                         ancientCities,
                         trialChambers,
                         villageLoader.templateLoader,

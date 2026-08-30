@@ -210,18 +210,19 @@ public class StructureTemplate {
         blockProcessor: TemplateBlockProcessor? = null,
         random: WorldgenRandom? = null,
         /**
-         * // parity: `StructurePlaceSettings.setRandom`, which only two callers in the jar use
-         * (`TemplateFeature` and `FossilFeature`). Setting it makes `getRandom(pos)` hand back this
-         * stream instead of building a positional one, so the palette pick and every processor draw
-         * come from here, in template order. A jigsaw piece sets none and stays positional.
+         * // parity: `StructurePlaceSettings.setRandom`, used only by `TemplateFeature` and `FossilFeature`:
+         * the palette pick and every processor draw then come in template order.
          */
         settingsRandom: WorldgenRandom? = null,
+        /** The world's seed, which a `capped` processor forks positionally to pick its blocks. */
+        worldSeed: Long? = null,
         ignoreStructureBlocks: Boolean = false,
         ignoreAir: Boolean = false,
         gravityOffset: Int? = null,
     ) {
         // parity: `getRandomPalette` draws even for the single palette every template here has.
         settingsRandom?.nextInt(1)
+        val wholePiece = processors.capped.isNotEmpty()
         val processedBlocks =
             blocksBacking.mapNotNull { blockInfo ->
                 if (
@@ -231,9 +232,10 @@ public class StructureTemplate {
                     return@mapNotNull null
                 }
                 val originalWorldPos = StructureTransform.transform(blockInfo.pos, mirror, rotation, pivot) + position
-                // parity: processBlockInfos first rejects blocks outside chunkBb, before any processor
-                // (including GravityProcessor) gets to move them.
-                if (!clipTo.isInside(originalWorldPos)) return@mapNotNull null
+                // parity: processBlockInfos rejects blocks outside chunkBb before any processor,
+                // *unless* one of them evaluates the entire piece state. Only `capped` does, and it
+                // needs the whole piece to choose from; the write below still clips.
+                if (!wholePiece && !clipTo.isInside(originalWorldPos)) return@mapNotNull null
                 val localX = originalWorldPos.x and 15
                 val localZ = originalWorldPos.z and 15
                 val worldPos =
@@ -249,15 +251,17 @@ public class StructureTemplate {
                     } else {
                         originalWorldPos
                     }
-                if (!clipTo.isInside(worldPos) || worldPos.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-                    return@mapNotNull null
-                }
+                if (worldPos.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return@mapNotNull null
+                if (!wholePiece && !clipTo.isInside(worldPos)) return@mapNotNull null
                 ProcessedBlock(blockInfo, originalWorldPos, worldPos)
             }
 
         // `processBlockInfos` completes the whole list before `placeInWorld` writes the first block.
         // In particular, one projected block cannot raise the height sampled by another block in
         // the same template.
+        // The capped pass has to see every final state before it picks, so the states are resolved
+        // first and written after. Without it this stays a single walk.
+        val resolved = ArrayList<Triple<StructureBlockInfo, StructurePos, Int>>(processedBlocks.size)
         for ((blockInfo, processorPos, worldPos) in processedBlocks) {
             val processorLocalX = processorPos.x and 15
             val processorLocalZ = processorPos.z and 15
@@ -290,6 +294,24 @@ public class StructureTemplate {
                     val worldStateId = chunk.getBlockStateId(processorLocalX, processorPos.y, processorLocalZ)
                     blockProcessor.process(stateId, worldStateId, processorPos) ?: continue
                 }
+            resolved += Triple(blockInfo, worldPos, finalStateId)
+        }
+
+        // Each capped pass sees what the previous one left, which is why the states are carried
+        // forward rather than every pass reading the same original list.
+        val cappedStates = resolved.map { it.third }.toMutableList()
+        if (worldSeed != null) {
+            for (capped in processors.capped) {
+                for ((index, rule) in capped.choose(cappedStates, worldSeed, position)) {
+                    cappedStates[index] = rule.outputStateId
+                }
+            }
+        }
+
+        for ((index, entry) in resolved.withIndex()) {
+            val (blockInfo, worldPos, _) = entry
+            val finalStateId = cappedStates[index]
+            if (wholePiece && !clipTo.isInside(worldPos)) continue
             if (worldPos.x shr 4 == chunk.chunkX && worldPos.z shr 4 == chunk.chunkZ) {
                 chunk.setBlockStateId(worldPos.x and 15, worldPos.y, worldPos.z and 15, finalStateId)
             } else {
@@ -545,13 +567,9 @@ public class StructureTemplate {
     private fun signedRotation(rotation: Int): Int = if (rotation > 8) rotation - 16 else rotation
 
     /**
-     * // parity: StairBlock.mirror. A corner stair does not follow its facing under a mirror: the
-     * left and right halves of the shape swap, and only when the mirror crosses the facing's own
-     * axis. Rotation leaves the shape alone, which is why this takes no rotation.
-     *
-     * The two mirrors are not symmetric, and that asymmetry is the jar's: `LEFT_RIGHT` swaps both
-     * the inner and the outer pair, `FRONT_BACK` swaps only the outer one and leaves `inner_left`
-     * and `inner_right` where they are.
+     * // parity: StairBlock.mirror. A corner stair's shape halves swap, and only when the mirror crosses
+     * the facing's own axis. The asymmetry is the jar's: `LEFT_RIGHT` swaps both pairs, `FRONT_BACK` only
+     * the outer one.
      */
     private fun mirrorStairShape(
         shape: String,

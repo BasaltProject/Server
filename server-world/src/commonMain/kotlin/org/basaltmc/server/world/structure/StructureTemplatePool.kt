@@ -64,6 +64,8 @@ public sealed class StructurePoolElement(
         rotation: StructureRotation,
         clipTo: StructureBoundingBox,
         random: WorldgenRandom,
+        /** The world seed, which only a `capped` processor needs. // parity: CappedProcessor. */
+        worldSeed: Long? = null,
     )
 }
 
@@ -93,6 +95,7 @@ public object EmptyPoolElement : StructurePoolElement(StructureProjection.RIGID)
         rotation: StructureRotation,
         clipTo: StructureBoundingBox,
         random: WorldgenRandom,
+        worldSeed: Long?,
     ) {
     }
 }
@@ -135,6 +138,7 @@ public class LegacySinglePoolElement(
         rotation: StructureRotation,
         clipTo: StructureBoundingBox,
         random: WorldgenRandom,
+        worldSeed: Long?,
     ) {
         val template = loader(location) ?: return
         template.placeInto(
@@ -146,6 +150,7 @@ public class LegacySinglePoolElement(
             clipTo,
             processors,
             random = random,
+            worldSeed = worldSeed,
             ignoreStructureBlocks = true,
             ignoreAir = ignoreAir,
             gravityOffset = if (projection == StructureProjection.TERRAIN_MATCHING) -1 else null,
@@ -188,8 +193,9 @@ public class ListPoolElement(
         rotation: StructureRotation,
         clipTo: StructureBoundingBox,
         random: WorldgenRandom,
+        worldSeed: Long?,
     ) {
-        for (element in elements) element.place(loader, chunk, position, rotation, clipTo, random)
+        for (element in elements) element.place(loader, chunk, position, rotation, clipTo, random, worldSeed)
     }
 }
 
@@ -240,6 +246,7 @@ public class FeaturePoolElement(
         rotation: StructureRotation,
         clipTo: StructureBoundingBox,
         random: WorldgenRandom,
+        worldSeed: Long?,
     ) {
         org.basaltmc.server.world.terrain.decoration.VillageFeatures.place(
             feature,

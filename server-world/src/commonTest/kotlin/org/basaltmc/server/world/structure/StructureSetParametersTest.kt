@@ -3,17 +3,16 @@ package org.basaltmc.server.world.structure
 import org.basaltmc.server.world.terrain.AncientCityStructureGenerator
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
 import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
+import org.basaltmc.server.world.terrain.TrailRuinsStructureGenerator
 import org.basaltmc.server.world.terrain.TrialChamberStructureGenerator
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
- * The three numbers of a structure set decide where every one of that structure in the world ends
- * up. A wrong salt still produces a world full of the structure, just not the same world, and
- * nothing else in the build notices. These are the jar's own `structure_set` values, copied here so
- * a stray edit has to disagree with something.
- *
- * // parity: data/minecraft/worldgen/structure_set, 26.2.
+ * A wrong salt still produces a world full of the structure, just not the same world, and nothing else
+ * notices. These are the jar's own `structure_set` values, copied here so a stray edit has to disagree
+ * with something. // parity: data/minecraft/worldgen/structure_set, 26.2.
  */
 class StructureSetParametersTest {
     private fun assertGrid(
@@ -35,6 +34,23 @@ class StructureSetParametersTest {
         assertGrid(TrialChamberStructureGenerator.GRID, 34, 12, 94251327, "trial_chambers")
         assertGrid(NetherStructureGenerator.NETHER_FOSSIL_GRID, 2, 1, 14357921, "nether_fossils")
         assertGrid(NetherStructureGenerator.NETHER_COMPLEX_GRID, 27, 4, 30084232, "nether_complexes")
+    }
+
+    @Test
+    fun `the trail ruins land where the official server says`() {
+        // The jar answered [1456, ~, -1440] on seed 12345, the minimum corner of chunk (91, -90).
+        val grid = StructurePlacementGrid(spacing = 34, separation = 8, salt = 83469867)
+        assertTrue(grid.isStructureChunk(12345L, 91, -90))
+        for (dx in -1..1) {
+            for (dz in -1..1) {
+                if (dx == 0 && dz == 0) continue
+                assertTrue(
+                    !grid.isStructureChunk(12345L, 91 + dx, -90 + dz),
+                    "chunk (${91 + dx}, ${-90 + dz}) should not hold trail ruins",
+                )
+            }
+        }
+        assertEquals(3, TrailRuinsStructureGenerator.STRUCTURE_INDEX, "fourth of underground_structures")
     }
 
     @Test

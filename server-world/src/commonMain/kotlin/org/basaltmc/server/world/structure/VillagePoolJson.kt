@@ -113,6 +113,8 @@ public object VillagePoolJson {
         val processors = root["processors"]?.jsonArray ?: return StructureProcessorList.EMPTY
         val rules = mutableListOf<StructureProcessorRule>()
         var rot: BlockRot? = null
+        var protectedBlocks: Set<Int>? = null
+        val capped = mutableListOf<CappedRules>()
         for (processor in processors) {
             val processorObj = processor.jsonObject
             when (processorObj["processor_type"]?.jsonPrimitive?.content) {
@@ -126,12 +128,31 @@ public object VillagePoolJson {
                             processorObj["integrity"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 1.0f,
                             processorObj["rottable_blocks"]?.jsonPrimitive?.content?.let(resolveTag),
                         )
+                "minecraft:capped" -> {
+                    val delegate = processorObj["delegate"]?.jsonObject
+                    val delegateRules =
+                        delegate
+                            ?.get("rules")
+                            ?.jsonArray
+                            ?.map { parseRule(it.jsonObject, resolveTag) }
+                            .orEmpty()
+                    // `limit` is an IntProvider in the codec; every list in 26.2 uses a constant.
+                    val limit = processorObj["limit"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                    if (delegateRules.isNotEmpty()) capped += CappedRules(delegateRules, limit)
+                }
+                "minecraft:protected_blocks" ->
+                    protectedBlocks =
+                        processorObj["value"]
+                            ?.jsonPrimitive
+                            ?.content
+                            ?.removePrefix("#")
+                            ?.let(resolveTag)
                 // Everything else is either a no-op here or belongs to a structure that does not
                 // read this yet; a processor list is data, so an unknown one is skipped, not fatal.
                 else -> Unit
             }
         }
-        return StructureProcessorList(rules, rot)
+        return StructureProcessorList(rules, rot, protectedBlocks, capped)
     }
 
     private fun parseRule(
@@ -141,10 +162,18 @@ public object VillagePoolJson {
         val input = parseRuleTest(json["input_predicate"]?.jsonObject, resolveTag)
         val location = parseRuleTest(json["location_predicate"]?.jsonObject, resolveTag)
         val output = json["output_state"]?.jsonObject
+        val loot =
+            json["block_entity_modifier"]
+                ?.jsonObject
+                ?.takeIf { it["type"]?.jsonPrimitive?.content == "minecraft:append_loot" }
+                ?.get("loot_table")
+                ?.jsonPrimitive
+                ?.content
         return StructureProcessorRule(
             input ?: StructureRuleTest.BlockMatch(Blocks.AIR.stateId),
             location,
             output?.let(::blockStateIdOf) ?: Blocks.AIR.stateId,
+            loot,
         )
     }
 

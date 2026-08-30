@@ -76,6 +76,8 @@ public class StructureProcessorRule(
     public val inputTest: StructureRuleTest,
     public val locationTest: StructureRuleTest?,
     public val outputStateId: Int,
+    /** // parity: `block_entity_modifier: append_loot`, the loot table the output block gets. */
+    public val appendLootTable: String? = null,
 ) {
     public fun apply(
         inputStateId: Int,
@@ -111,21 +113,68 @@ public class BlockRot(
 }
 
 /**
- * // parity: RuleProcessor, applied top-to-bottom, first matching rule wins, optionally preceded by
- * a BlockRotProcessor. The rot goes first because that is where every list this reads puts it.
- *
- * Each of the two takes its own random from the same positional seed rather than sharing a stream:
- * vanilla's `StructurePlaceSettings.getRandom(pos)` builds a fresh source per call.
+ * // parity: `CappedProcessor`, a second pass converting at most [limit] blocks. It evaluates the
+ * piece's whole list rather than the part inside the chunk, and its random is a positional fork of
+ * the world seed, so it neither consumes from the feature stream nor depends on it.
+ */
+public class CappedRules(
+    public val delegate: List<StructureProcessorRule>,
+    public val limit: Int,
+) {
+    /**
+     * The indices of [candidates] this converts, in the order the shuffle offers them, stopping at
+     * [limit] actual conversions. // parity: `finalizeProcessing`, which counts only the blocks the
+     * delegate really changed, not the ones it looked at.
+     */
+    public fun choose(
+        candidates: List<Int>,
+        worldSeed: Long,
+        position: StructurePos,
+    ): Map<Int, StructureProcessorRule> {
+        if (limit == 0 || candidates.isEmpty()) return emptyMap()
+        val factorySeed = LegacyRandom(worldSeed).nextLong()
+        val random =
+            WorldgenRandom(
+                LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z) xor factorySeed),
+            )
+        val maxToReplace = minOf(limit, candidates.size)
+        val order = shuffledCopy(candidates.indices.toList(), random)
+        val chosen = mutableMapOf<Int, StructureProcessorRule>()
+        for (index in order) {
+            if (chosen.size >= maxToReplace) break
+            val stateId = candidates[index]
+            val rule = delegate.firstOrNull { it.inputTest.test(stateId, random) && it.outputStateId != stateId }
+            if (rule != null) chosen[index] = rule
+        }
+        return chosen
+    }
+}
+
+/**
+ * // parity: RuleProcessor, first matching rule wins, preceded by a BlockRotProcessor. Each takes its
+ * own random from the same positional seed rather than sharing a stream.
  */
 public class StructureProcessorList(
     public val rules: List<StructureProcessorRule>,
     public val rot: BlockRot? = null,
+    /**
+     * // parity: ProtectedBlockProcessor. Whatever the world already holds here and lists in the
+     * tag survives: a structure never eats another one's chest, spawner, vault or bedrock. It is
+     * last in all seven of the jar's lists that carry it, and it draws nothing.
+     */
+    public val protectedBlocks: Set<Int>? = null,
+    /**
+     * // parity: the CappedProcessors of the list, in order. A list can carry more than one, and
+     * `trail_ruins_houses_archaeology` does: six blocks of common loot and then three more of rare,
+     * the second choosing from what the first left alone.
+     */
+    public val capped: List<CappedRules> = emptyList(),
 ) {
     /**
      * Whether this list does anything at all. A caller must ask this and not `rules.isEmpty()`: a
      * list can carry only a `block_rot`, which has no rules and still drops most of the blocks.
      */
-    public val isEmpty: Boolean get() = rules.isEmpty() && rot == null
+    public val isEmpty: Boolean get() = rules.isEmpty() && rot == null && protectedBlocks == null && capped.isEmpty()
 
     public fun process(
         inputStateId: Int,
@@ -151,14 +200,13 @@ public class StructureProcessorList(
         worldStateId: Int,
         position: StructurePos,
         /**
-         * The placement's own stream, for a caller that set one. // parity:
-         * `StructurePlaceSettings.getRandom` hands back the settings' random when there is one and
-         * only falls back to a fresh positional source when there is not, so a feature that sets
-         * its own (the fossil does) rots in template order rather than by position.
+         * The placement's own stream, for a caller that set one. // parity: `StructurePlaceSettings.getRandom`
+         * only falls back to a fresh positional source when there is none.
          */
         shared: WorldgenRandom? = null,
     ): Int? {
         if (rot?.keeps(inputStateId, position, shared) == false) return null
+        if (protectedBlocks != null && worldStateId in protectedBlocks) return null
         return process(
             inputStateId,
             worldStateId,

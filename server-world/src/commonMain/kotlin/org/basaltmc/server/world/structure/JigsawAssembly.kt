@@ -75,7 +75,11 @@ public class JigsawAssembly(
         val rawBox = centerElement.getBoundingBox(templateLoader, adjustedPosition, centerRotation)
         val centerX = (rawBox.maxX + rawBox.minX) / 2
         val centerZ = (rawBox.maxZ + rawBox.minZ) / 2
-        val bottomY = if (projectStartToHeightmap) heightAt(centerX, centerZ) else adjustedPosition.y
+        // parity: the projected floor is `position.getY() + getFirstFreeHeight(...)`, not the
+        // heightmap alone. Every caller until the trail ruins started at y 0, where the two
+        // agree; the ruins start at -15 and are meant to end up that far under the surface.
+        val bottomY =
+            if (projectStartToHeightmap) startPosition.y + heightAt(centerX, centerZ) else adjustedPosition.y
         val oldGroundY = rawBox.minY + centerElement.groundLevelDelta
         val moveY = bottomY - oldGroundY
         val centerPosition = StructurePos(adjustedPosition.x, adjustedPosition.y + moveY, adjustedPosition.z)
