@@ -88,9 +88,35 @@ public class StructureProcessorRule(
     }
 }
 
-/** // parity: net.minecraft.world.level.levelgen.structure.templatesystem.RuleProcessor, applied top-to-bottom, first matching rule wins. */
+/**
+ * // parity: BlockRotProcessor. Drops a share of the blocks it is allowed to rot, which is what
+ * makes a ruin look ruined. It draws only for a block the tag covers, so a wall of something else
+ * costs no randomness at all.
+ */
+public class BlockRot(
+    public val integrity: Float,
+    public val rottable: Set<Int>?,
+) {
+    public fun keeps(
+        stateId: Int,
+        position: StructurePos,
+    ): Boolean {
+        if (rottable != null && stateId !in rottable) return true
+        val random = WorldgenRandom(LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z)))
+        return random.nextFloat() <= integrity
+    }
+}
+
+/**
+ * // parity: RuleProcessor, applied top-to-bottom, first matching rule wins, optionally preceded by
+ * a BlockRotProcessor. The rot goes first because that is where every list this reads puts it.
+ *
+ * Each of the two takes its own random from the same positional seed rather than sharing a stream:
+ * vanilla's `StructurePlaceSettings.getRandom(pos)` builds a fresh source per call.
+ */
 public class StructureProcessorList(
     public val rules: List<StructureProcessorRule>,
+    public val rot: BlockRot? = null,
 ) {
     public fun process(
         inputStateId: Int,
@@ -105,19 +131,24 @@ public class StructureProcessorList(
     }
 
     /**
+     * The state to place, or null when the rot dropped this block.
+     *
      * // parity: RuleProcessor creates a fresh LegacyRandom from Mth.getSeed at the transformed
      * world position for every block. Structure placement's shared random stream is not consumed.
      */
+
     public fun processAt(
         inputStateId: Int,
         worldStateId: Int,
         position: StructurePos,
-    ): Int =
-        process(
+    ): Int? {
+        if (rot?.keeps(inputStateId, position) == false) return null
+        return process(
             inputStateId,
             worldStateId,
             WorldgenRandom(LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z))),
         )
+    }
 
     public companion object {
         public val EMPTY: StructureProcessorList = StructureProcessorList(emptyList())

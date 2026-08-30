@@ -261,7 +261,8 @@ public class StructureTemplate {
                     parsedAndTransformedStateId(finalStateName, mirror, rotation)
                 } else if (processors.rules.isNotEmpty()) {
                     val worldStateId = chunk.getBlockStateId(processorLocalX, processorPos.y, processorLocalZ)
-                    val processedStateId = processors.processAt(blockInfo.stateId, worldStateId, processorPos)
+                    val processedStateId =
+                        processors.processAt(blockInfo.stateId, worldStateId, processorPos) ?: continue
                     val properties =
                         if (processedStateId == blockInfo.stateId) {
                             blockInfo.properties

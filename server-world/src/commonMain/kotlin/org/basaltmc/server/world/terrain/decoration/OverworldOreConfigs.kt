@@ -290,5 +290,18 @@ internal val INFESTED_ORE: PlacedOre =
         fixedCount(14),
         uniformHeight(-64, 63),
         pairedTarget(9, 0.0f, "infested_stone", "infested_deepslate"),
-        setOf("windswept_hills", "windswept_gravelly_hills", "windswept_forest"),
+        // parity: the ten biomes that really list `ore_infested`. Only the three windswept ones
+        // were here, so a mountain never got a single infested block.
+        setOf(
+            "cherry_grove",
+            "frozen_peaks",
+            "grove",
+            "jagged_peaks",
+            "meadow",
+            "snowy_slopes",
+            "stony_peaks",
+            "windswept_forest",
+            "windswept_gravelly_hills",
+            "windswept_hills",
+        ),
     )

@@ -112,14 +112,26 @@ public object VillagePoolJson {
     ): StructureProcessorList {
         val processors = root["processors"]?.jsonArray ?: return StructureProcessorList.EMPTY
         val rules = mutableListOf<StructureProcessorRule>()
+        var rot: BlockRot? = null
         for (processor in processors) {
             val processorObj = processor.jsonObject
-            if (processorObj["processor_type"]?.jsonPrimitive?.content != "minecraft:rule") continue
-            for (rule in processorObj["rules"]?.jsonArray ?: JsonArray(emptyList())) {
-                rules.add(parseRule(rule.jsonObject, resolveTag))
+            when (processorObj["processor_type"]?.jsonPrimitive?.content) {
+                "minecraft:rule" ->
+                    for (rule in processorObj["rules"]?.jsonArray ?: JsonArray(emptyList())) {
+                        rules.add(parseRule(rule.jsonObject, resolveTag))
+                    }
+                "minecraft:block_rot" ->
+                    rot =
+                        BlockRot(
+                            processorObj["integrity"]?.jsonPrimitive?.content?.toFloatOrNull() ?: 1.0f,
+                            processorObj["rottable_blocks"]?.jsonPrimitive?.content?.let(resolveTag),
+                        )
+                // Everything else is either a no-op here or belongs to a structure that does not
+                // read this yet; a processor list is data, so an unknown one is skipped, not fatal.
+                else -> Unit
             }
         }
-        return StructureProcessorList(rules)
+        return StructureProcessorList(rules, rot)
     }
 
     private fun parseRule(
