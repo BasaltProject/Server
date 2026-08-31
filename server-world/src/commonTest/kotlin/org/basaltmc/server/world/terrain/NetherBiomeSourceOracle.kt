@@ -17,7 +17,12 @@ class NetherBiomeSourceOracle {
                         DensityFunctions.constant(temperatureStep / 10.0),
                         DensityFunctions.constant(vegetationStep / 10.0),
                     )
-                grid.append(source.biomeAt(0, 64, 0).id.path.first())
+                grid.append(
+                    source
+                        .biomeAt(0, 64, 0)
+                        .id.path
+                        .first(),
+                )
             }
             grid.append('|')
         }
@@ -40,7 +45,12 @@ class NetherBiomeSourceOracle {
             val x = index * 37 - 900
             val y = 20 + index / 4
             val z = index * -53 + 400
-            walk.append(zoomed.blockBiomeAt(x, y, z).id.path.first())
+            walk.append(
+                zoomed
+                    .blockBiomeAt(x, y, z)
+                    .id.path
+                    .first(),
+            )
         }
         println("ORACLE zoomed=$walk")
     }

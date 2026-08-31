@@ -13,8 +13,15 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the Nether vegetal decoration step. */
 class NetherVegetalOracle {
-    private class FixedBiome(private val biome: Biome) : NetherBiomeLookup {
-        override fun blockBiomeAt(x: Int, y: Int, z: Int, cache: DensityCache?): Biome = biome
+    private class FixedBiome(
+        private val biome: Biome,
+    ) : NetherBiomeLookup {
+        override fun blockBiomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+            cache: DensityCache?,
+        ): Biome = biome
     }
 
     private fun stateId(path: String): Int =
@@ -25,7 +32,12 @@ class NetherVegetalOracle {
      * pocketed stone slab: the Nether lava spring reuses the overworld rock list, so netherrack on
      * its own never satisfies it.
      */
-    private fun netherChunk(chunkX: Int, chunkZ: Int, nylium: String, thin: Boolean = false): Chunk {
+    private fun netherChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        nylium: String,
+        thin: Boolean = false,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         if (thin) {
             // A mushroom needs a surface and a support below it and nothing else, and it is rare
@@ -47,7 +59,10 @@ class NetherVegetalOracle {
         return chunk
     }
 
-    private fun fold(chunk: Chunk, thin: Boolean = false): Pair<Long, Int> {
+    private fun fold(
+        chunk: Chunk,
+        thin: Boolean = false,
+    ): Pair<Long, Int> {
         var checksum = -3750763034362895579L
         var placed = 0
         for (y in (if (thin) 36 else 0)..(if (thin) 46 else 80)) {
@@ -56,8 +71,12 @@ class NetherVegetalOracle {
                     val id = chunk.getBlockStateId(x, y, z)
                     checksum = (checksum xor id.toLong()) * 1099511628211L
                     val path = Blocks.byStateId(id)?.block?.path
-                    if (path != null && path != "netherrack" && path != "air" && path != "stone" &&
-                        path != "crimson_nylium" && path != "warped_nylium"
+                    if (path != null &&
+                        path != "netherrack" &&
+                        path != "air" &&
+                        path != "stone" &&
+                        path != "crimson_nylium" &&
+                        path != "warped_nylium"
                     ) {
                         placed++
                     }
@@ -94,7 +113,13 @@ class NetherVegetalOracle {
         println("ORACLE $name placed=$placed deferred=$deferred checksum=$checksum")
     }
 
-    private fun reportAt(name: String, feature: String, nylium: String, originY: Int, count: Int = 12) {
+    private fun reportAt(
+        name: String,
+        feature: String,
+        nylium: String,
+        originY: Int,
+        count: Int = 12,
+    ) {
         var checksum = -3750763034362895579L
         var placed = 0
         val placedFlags = StringBuilder()

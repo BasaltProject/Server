@@ -13,7 +13,10 @@ class TreeFeatureOracle {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** Grass over stone, with one obstacle column so the free-height clip can bite. */
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -29,7 +32,10 @@ class TreeFeatureOracle {
      * The same ground with a neighbouring trunk already standing: a creaking heart needs a log with
      * logs on all six sides, which one tree on its own can never produce.
      */
-    private fun creakingChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun creakingChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = groundChunk(chunkX, chunkZ)
         for (x in 6..7) {
             for (z in 7..8) {
@@ -40,7 +46,10 @@ class TreeFeatureOracle {
     }
 
     /** Mud under shallow water, which is the only ground a mangrove will take. */
-    private fun swampChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun swampChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -63,9 +72,16 @@ class TreeFeatureOracle {
                     if (TreeBlockRules.isLogState(id)) logs++
                     val path = Blocks.byStateId(id)?.block?.path ?: continue
                     if (path.endsWith("leaves")) leaves++
-                    if (path == "vine" || path == "cocoa" || path == "podzol" || path == "bee_nest" ||
-                        path == "leaf_litter" || path == "pale_hanging_moss" || path == "creaking_heart" ||
-                        path == "mangrove_propagule" || path == "pale_moss_block" || path == "pale_moss_carpet"
+                    if (path == "vine" ||
+                        path == "cocoa" ||
+                        path == "podzol" ||
+                        path == "bee_nest" ||
+                        path == "leaf_litter" ||
+                        path == "pale_hanging_moss" ||
+                        path == "creaking_heart" ||
+                        path == "mangrove_propagule" ||
+                        path == "pale_moss_block" ||
+                        path == "pale_moss_carpet"
                     ) {
                         decorations++
                     }

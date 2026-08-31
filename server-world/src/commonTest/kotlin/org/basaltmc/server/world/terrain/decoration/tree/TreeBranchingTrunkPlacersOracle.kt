@@ -14,7 +14,10 @@ class TreeBranchingTrunkPlacersOracle {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** Grass over stone, with an obstacle column so the trunk probes can fail. */
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -27,7 +30,10 @@ class TreeBranchingTrunkPlacersOracle {
     }
 
     /** A mangrove swamp: mud under shallow water, which is what the roots grow through. */
-    private fun swampChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun swampChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -74,7 +80,15 @@ class TreeBranchingTrunkPlacersOracle {
         val detail = StringBuilder()
         var trailing = 0
         for ((index, seed) in seeds.withIndex()) {
-            val chunk = if (swamp) swampChunk(index * 5 - 30, index * -3 + 12) else groundChunk(index * 5 - 30, index * -3 + 12)
+            val chunk =
+                if (swamp) {
+                    swampChunk(index * 5 - 30, index * -3 + 12)
+                } else {
+                    groundChunk(
+                        index * 5 - 30,
+                        index * -3 + 12,
+                    )
+                }
             val random = WorldgenRandom(LegacyRandom(seed))
             detail.append(body(chunk, random, chunk.chunkX * 16 + localX, chunk.chunkZ * 16 + localZ)).append('|')
             val (chunkChecksum, chunkLogs, chunkRoots) = fold(chunk)
@@ -99,12 +113,27 @@ class TreeBranchingTrunkPlacersOracle {
         placer: TrunkPlacer,
     ) = report(name, localX, localZ, swamp) { chunk, random, originX, originZ ->
         val treeHeight = placer.getTreeHeight(random)
-        val attachments = placer.placeTrunk(chunk, random, treeHeight, originX, originY, originZ, stateId("mangrove_log"))
+        val attachments =
+            placer.placeTrunk(
+                chunk,
+                random,
+                treeHeight,
+                originX,
+                originY,
+                originZ,
+                stateId("mangrove_log"),
+            )
         buildString {
             append(treeHeight).append(';')
             for (a in attachments) {
-                append(a.x - originX).append(':').append(a.y - originY).append(':')
-                    .append(a.z - originZ).append(':').append(a.radiusOffset).append(' ')
+                append(a.x - originX)
+                    .append(':')
+                    .append(a.y - originY)
+                    .append(':')
+                    .append(a.z - originZ)
+                    .append(':')
+                    .append(a.radiusOffset)
+                    .append(' ')
             }
         }
     }

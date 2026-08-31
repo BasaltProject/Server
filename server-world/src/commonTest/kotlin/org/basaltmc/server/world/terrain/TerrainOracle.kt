@@ -12,8 +12,10 @@ import kotlin.test.Test
  * decimal hides the last few and terrain notices them.
  */
 class TerrainOracle {
-    private fun axis(from: Double, to: Double): DensityFunction =
-        DensityFunctions.yClampedGradient(-64, 320, from, to)
+    private fun axis(
+        from: Double,
+        to: Double,
+    ): DensityFunction = DensityFunctions.yClampedGradient(-64, 320, from, to)
 
     @Test
     fun dump() {
@@ -37,7 +39,9 @@ class TerrainOracle {
             println("ORACLE factor[$i]=" + factor.sample(context).toRawBits())
             println("ORACLE jagged[$i]=" + jaggedness.sample(context).toRawBits())
         }
-        println("ORACLE pav=" + TerrainProvider.peaksAndValleys(0.4f).toRawBits() +
-            " " + TerrainProvider.peaksAndValleys(0.56666666f).toRawBits())
+        println(
+            "ORACLE pav=" + TerrainProvider.peaksAndValleys(0.4f).toRawBits() +
+                " " + TerrainProvider.peaksAndValleys(0.56666666f).toRawBits(),
+        )
     }
 }

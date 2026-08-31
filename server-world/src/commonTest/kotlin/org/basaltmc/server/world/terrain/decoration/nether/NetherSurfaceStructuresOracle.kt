@@ -13,15 +13,25 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the basalt deltas surface features. */
 class NetherSurfaceStructuresOracle {
-    private class FixedBiome(private val biome: Biome) : NetherBiomeLookup {
-        override fun blockBiomeAt(x: Int, y: Int, z: Int, cache: DensityCache?): Biome = biome
+    private class FixedBiome(
+        private val biome: Biome,
+    ) : NetherBiomeLookup {
+        override fun blockBiomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+            cache: DensityCache?,
+        ): Biome = biome
     }
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** An uneven netherrack floor with a lava sea below the Nether sea level and open air over it. */
-    private fun deltaChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun deltaChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -55,7 +65,12 @@ class NetherSurfaceStructuresOracle {
         return Triple(checksum, basalt, magma)
     }
 
-    private fun report(name: String, biome: Biome, index: Int? = null, count: Int = 12) {
+    private fun report(
+        name: String,
+        biome: Biome,
+        index: Int? = null,
+        count: Int = 12,
+    ) {
         var checksum = -3750763034362895579L
         var basalt = 0
         var magma = 0

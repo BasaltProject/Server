@@ -10,25 +10,83 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the three firefly-bush patches. */
 class FireflyBushOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     /**
      * A grass bank beside a water channel. Two of the three specs only place next to water, so a
      * chunk without a shoreline would exercise nothing but their rejection.
      */
-    private fun shoreChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun shoreChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -54,7 +112,11 @@ class FireflyBushOracle {
         return checksum to bushes
     }
 
-    private fun report(name: String, biome: String, body: (Chunk, FakeEnvironment) -> Unit) {
+    private fun report(
+        name: String,
+        biome: String,
+        body: (Chunk, FakeEnvironment) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var bushes = 0
         var deferred = 0
@@ -83,9 +145,13 @@ class FireflyBushOracle {
         }
         report("regional", "minecraft:plains") { c, e ->
             FireflyBushPatchDecoration.decorate(c, 737373L, e, externalBlockState = { _, y, z ->
-                if (y in 66..69) Blocks.STONE.stateId
-                else if (y == 70) (if ((z and 15) in 7..8) Blocks.WATER.stateId else Blocks.GRASS_BLOCK.stateId)
-                else Blocks.AIR.stateId
+                if (y in 66..69) {
+                    Blocks.STONE.stateId
+                } else if (y == 70) {
+                    (if ((z and 15) in 7..8) Blocks.WATER.stateId else Blocks.GRASS_BLOCK.stateId)
+                } else {
+                    Blocks.AIR.stateId
+                }
             })
         }
         // Without a shoreline the two near-water specs must place nothing at all.
@@ -96,8 +162,12 @@ class FireflyBushOracle {
                 dry.setBlockStateId(x, 70, z, Blocks.GRASS_BLOCK.stateId)
             }
         }
-        FireflyBushPatchDecoration.decorateFeature(dry, 737373L, FakeEnvironment("minecraft:swamp"),
-            "patch_firefly_bush_near_water_swamp")
+        FireflyBushPatchDecoration.decorateFeature(
+            dry,
+            737373L,
+            FakeEnvironment("minecraft:swamp"),
+            "patch_firefly_bush_near_water_swamp",
+        )
         println("ORACLE dry=" + fold(dry).second)
     }
 }

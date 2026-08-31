@@ -25,7 +25,12 @@ class CarverOracle {
         return NormalNoise.create(source, -(id.length % 5 + 1), doubleArrayOf(1.0, 0.6, 0.3))
     }
 
-    private fun fake(name: String, x: Int, y: Int, z: Int): Double {
+    private fun fake(
+        name: String,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Double {
         var hash = -3750763034362895579L
         for (character in name) hash = (hash xor character.code.toLong()) * 1099511628211L
         hash = (hash xor x.toLong()) * 1099511628211L
@@ -35,24 +40,79 @@ class CarverOracle {
     }
 
     private inner class FakeEnvironment : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = ((x * 31 + z * 17) and 7) - 2
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = fake("secondary", x, 0, z)
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = fake(noiseId, x, 0, z)
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = fake(noiseId, x, y, z)
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float =
-            abs(fake(name, x, y, z)).toFloat()
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 64 + ((x * 7 + z * 13) and 31)
-        override fun biomeAt(x: Int, y: Int, z: Int): String = "minecraft:plains"
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String =
-            "minecraft:plains"
-        override fun isSteep(x: Int, z: Int): Boolean = ((x xor z) and 3) == 0
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 1000
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = ((x * 31 + z * 17) and 7) - 2
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = fake("secondary", x, 0, z)
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = fake(noiseId, x, 0, z)
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = fake(noiseId, x, y, z)
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = abs(fake(name, x, y, z)).toFloat()
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 64 + ((x * 7 + z * 13) and 31)
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = "minecraft:plains"
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = "minecraft:plains"
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = ((x xor z) and 3) == 0
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 1000
     }
 
     @Test
     fun dump() {
-        val router = NoiseRouterData.overworld(::syntheticNoise, BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0))
+        val router =
+            NoiseRouterData.overworld(
+                ::syntheticNoise,
+                BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0),
+            )
         val environment = FakeEnvironment()
         val chunk = Chunk(3, -5)
         // Solid stone up to y=100 so every carve has something to cut, plus a grass and dirt cap

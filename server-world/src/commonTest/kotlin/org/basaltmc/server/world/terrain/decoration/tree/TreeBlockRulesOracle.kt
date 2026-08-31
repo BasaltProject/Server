@@ -10,7 +10,10 @@ import kotlin.test.Test
  * thirty thousand and nowhere else.
  */
 class TreeBlockRulesOracle {
-    private fun fold(name: String, of: (Int) -> Long) {
+    private fun fold(
+        name: String,
+        of: (Int) -> Long,
+    ) {
         var checksum = -3750763034362895579L
         var hits = 0
         for (stateId in 0 until Blocks.stateCount) {
@@ -27,8 +30,9 @@ class TreeBlockRulesOracle {
         fold("isValidTree") { if (TreeBlockRules.isValidTreeState(it)) 1L else 0L }
         println("ORACLE logPaths=" + TreeBlockRules.LOG_BLOCK_PATHS.sorted().joinToString(","))
 
-        val generated = listOf("oak_log", "oak_leaves", "mangrove_roots", "muddy_mangrove_roots", "stone")
-            .mapNotNull { path -> Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId }
+        val generated =
+            listOf("oak_log", "oak_leaves", "mangrove_roots", "muddy_mangrove_roots", "stone")
+                .mapNotNull { path -> Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId }
         for ((index, gen) in generated.withIndex()) {
             fold("canReplace$index") { actual -> if (TreeBlockRules.canReplaceDeferred(actual, gen)) 1L else 0L }
             fold("resolve$index") { actual -> TreeBlockRules.resolveDeferredState(actual, gen).toLong() }

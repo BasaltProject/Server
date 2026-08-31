@@ -25,7 +25,10 @@ class NoiseRouterOracle {
 
     private fun base3d(): DensityFunction = BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0)
 
-    private fun dump(label: String, function: DensityFunction) {
+    private fun dump(
+        label: String,
+        function: DensityFunction,
+    ) {
         println("ORACLE $label.min=" + function.minValue().toRawBits() + " max=" + function.maxValue().toRawBits())
         for (i in 0 until 6) {
             val context = FunctionContext(i * 137 - 400, i * 53 - 60, i * -211 + 300)

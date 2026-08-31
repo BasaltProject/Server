@@ -12,7 +12,11 @@ class BiomeFloraOracle {
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
-    private fun groundChunk(chunkX: Int, chunkZ: Int, surface: String): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        surface: String,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -41,7 +45,8 @@ class BiomeFloraOracle {
             for (z in 0 until 16) {
                 for (x in 0 until 16) {
                     val id = chunk.getBlockStateId(x, y, z)
-                    if (id != Blocks.AIR.stateId && id != Blocks.STONE.stateId &&
+                    if (id != Blocks.AIR.stateId &&
+                        id != Blocks.STONE.stateId &&
                         Blocks.byStateId(id)?.block?.path !in setOf("grass_block", "podzol")
                     ) {
                         count++
@@ -52,7 +57,12 @@ class BiomeFloraOracle {
         return count
     }
 
-    private fun report(name: String, surface: String = "grass_block", count: Int = 8, body: (Chunk, WorldgenRandom) -> Unit) {
+    private fun report(
+        name: String,
+        surface: String = "grass_block",
+        count: Int = 8,
+        body: (Chunk, WorldgenRandom) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var placed = 0
         var deferred = 0

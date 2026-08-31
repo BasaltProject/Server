@@ -8,7 +8,10 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the flower forest, swamp and meadow flower patches. */
 class BiomeFlowerOracle {
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -36,7 +39,10 @@ class BiomeFlowerOracle {
         return checksum to flowers
     }
 
-    private fun report(name: String, body: (Chunk, WorldgenRandom, DecorationPos) -> Unit) {
+    private fun report(
+        name: String,
+        body: (Chunk, WorldgenRandom, DecorationPos) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var flowers = 0
         val distinct = mutableSetOf<Int>()

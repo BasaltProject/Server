@@ -8,7 +8,10 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the flower, mushroom and jungle grass patches. */
 class FlowerVegetationOracle {
-    private fun groundChunk(chunkX: Int = -7, chunkZ: Int = 4): Chunk {
+    private fun groundChunk(
+        chunkX: Int = -7,
+        chunkZ: Int = 4,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -24,7 +27,10 @@ class FlowerVegetationOracle {
      * Over several chunks rather than one: these patches sit behind rarity filters of up to 1/512,
      * so a single chunk mostly measures the filter rejecting and never reaches the placement itself.
      */
-    private fun report(name: String, body: (Chunk, WorldgenRandom) -> Unit) {
+    private fun report(
+        name: String,
+        body: (Chunk, WorldgenRandom) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var plants = 0
         var after = 0
@@ -39,8 +45,10 @@ class FlowerVegetationOracle {
                     for (x in 0 until 16) {
                         val id = chunk.getBlockStateId(x, y, z)
                         checksum = (checksum xor id.toLong()) * 1099511628211L
-                        if (!Blocks.isAir(id) && id != Blocks.STONE.stateId &&
-                            id != Blocks.GRASS_BLOCK.stateId && id != stateId("podzol")
+                        if (!Blocks.isAir(id) &&
+                            id != Blocks.STONE.stateId &&
+                            id != Blocks.GRASS_BLOCK.stateId &&
+                            id != stateId("podzol")
                         ) {
                             plants++
                         }
@@ -60,12 +68,16 @@ class FlowerVegetationOracle {
     fun dump() {
         report("flowerNormal") { c, r -> ForestFlowerDecoration.NORMAL.decorate(c, r) }
         report("flowerForest") { c, r -> ForestFlowerDecoration.FLOWER_FOREST.decorate(c, r) }
-        report("flowerAt") { c, r -> ForestFlowerDecoration.placeAt(c, r, DecorationPos(chunkOriginX(), 71, chunkOriginZ())) }
+        report(
+            "flowerAt",
+        ) { c, r -> ForestFlowerDecoration.placeAt(c, r, DecorationPos(chunkOriginX(), 71, chunkOriginZ())) }
         report("mushroomNormal") { c, r -> MushroomDecoration.NORMAL.decorate(c, r) }
         report("mushroomTaiga") { c, r -> MushroomDecoration.TAIGA.decorate(c, r) }
         report("mushroomOldGrowth") { c, r -> MushroomDecoration.OLD_GROWTH.decorate(c, r) }
         report("mushroomSwamp") { c, r -> MushroomDecoration.SWAMP.decorate(c, r) }
         report("jungleGrass") { c, r -> JungleGrassDecoration.decorate(c, r) }
-        report("jungleAt") { c, r -> JungleGrassDecoration.placePatchAt(c, r, DecorationPos(chunkOriginX(), 71, chunkOriginZ())) }
+        report(
+            "jungleAt",
+        ) { c, r -> JungleGrassDecoration.placePatchAt(c, r, DecorationPos(chunkOriginX(), 71, chunkOriginZ())) }
     }
 }

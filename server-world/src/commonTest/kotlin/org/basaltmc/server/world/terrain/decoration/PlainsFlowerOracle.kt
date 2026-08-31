@@ -9,7 +9,10 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the plains flowers and the wildflower beds. */
 class PlainsFlowerOracle {
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -29,8 +32,9 @@ class PlainsFlowerOracle {
                 for (x in 0 until 16) {
                     val id = chunk.getBlockStateId(x, y, z)
                     checksum = (checksum xor id.toLong()) * 1099511628211L
-                    if (Blocks.isWildflowersState(id)) wild++
-                    else if (!Blocks.isAir(id) && id != Blocks.STONE.stateId && id != Blocks.GRASS_BLOCK.stateId) {
+                    if (Blocks.isWildflowersState(id)) {
+                        wild++
+                    } else if (!Blocks.isAir(id) && id != Blocks.STONE.stateId && id != Blocks.GRASS_BLOCK.stateId) {
                         flowers++
                     }
                 }
@@ -39,7 +43,10 @@ class PlainsFlowerOracle {
         return Triple(checksum, flowers, wild)
     }
 
-    private fun report(name: String, body: (Chunk, WorldgenRandom, DecorationPos) -> Unit) {
+    private fun report(
+        name: String,
+        body: (Chunk, WorldgenRandom, DecorationPos) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var flowers = 0
         var wild = 0

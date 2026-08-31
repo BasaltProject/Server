@@ -3,7 +3,6 @@ package org.basaltmc.server.world.terrain
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.world.densityfunction.BlendedNoise
 import org.basaltmc.server.world.densityfunction.DensityFunction
-import org.basaltmc.server.world.densityfunction.FunctionContext
 import org.basaltmc.server.world.noise.NormalNoise
 import kotlin.test.Test
 

@@ -13,7 +13,11 @@ class LushVegetationOracle {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** A cave: solid stone with a hollow band, so both the floor and the ceiling are reachable. */
-    private fun caveChunk(chunkX: Int, chunkZ: Int, flooded: Boolean): Chunk {
+    private fun caveChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        flooded: Boolean,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {

@@ -24,7 +24,10 @@ class PlacementOracle {
         return chunk
     }
 
-    private fun run(name: String, modifiers: List<PlacementModifier>) {
+    private fun run(
+        name: String,
+        modifiers: List<PlacementModifier>,
+    ) {
         val chunk = stockedChunk()
         val random = WorldgenRandom(LegacyRandom(12345L))
         val placed = StringBuilder()

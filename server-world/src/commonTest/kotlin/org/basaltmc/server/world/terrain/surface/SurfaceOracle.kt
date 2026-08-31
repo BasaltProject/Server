@@ -14,17 +14,41 @@ import kotlin.test.Test
 class SurfaceOracle {
     private val biomes =
         listOf(
-            "minecraft:plains", "minecraft:badlands", "minecraft:eroded_badlands", "minecraft:wooded_badlands",
-            "minecraft:desert", "minecraft:frozen_peaks", "minecraft:snowy_slopes", "minecraft:jagged_peaks",
-            "minecraft:grove", "minecraft:stony_peaks", "minecraft:stony_shore", "minecraft:windswept_hills",
-            "minecraft:windswept_savanna", "minecraft:windswept_gravelly_hills", "minecraft:mangrove_swamp",
-            "minecraft:swamp", "minecraft:mushroom_fields", "minecraft:ice_spikes", "minecraft:frozen_ocean",
-            "minecraft:deep_frozen_ocean", "minecraft:warm_ocean", "minecraft:beach", "minecraft:snowy_beach",
-            "minecraft:dripstone_caves", "minecraft:sulfur_caves", "minecraft:old_growth_pine_taiga",
+            "minecraft:plains",
+            "minecraft:badlands",
+            "minecraft:eroded_badlands",
+            "minecraft:wooded_badlands",
+            "minecraft:desert",
+            "minecraft:frozen_peaks",
+            "minecraft:snowy_slopes",
+            "minecraft:jagged_peaks",
+            "minecraft:grove",
+            "minecraft:stony_peaks",
+            "minecraft:stony_shore",
+            "minecraft:windswept_hills",
+            "minecraft:windswept_savanna",
+            "minecraft:windswept_gravelly_hills",
+            "minecraft:mangrove_swamp",
+            "minecraft:swamp",
+            "minecraft:mushroom_fields",
+            "minecraft:ice_spikes",
+            "minecraft:frozen_ocean",
+            "minecraft:deep_frozen_ocean",
+            "minecraft:warm_ocean",
+            "minecraft:beach",
+            "minecraft:snowy_beach",
+            "minecraft:dripstone_caves",
+            "minecraft:sulfur_caves",
+            "minecraft:old_growth_pine_taiga",
         )
 
     /** A deterministic stand-in for real noise: a pure function of the name and position. */
-    private fun fake(name: String, x: Int, y: Int, z: Int): Double {
+    private fun fake(
+        name: String,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Double {
         var hash = -3750763034362895579L
         for (character in name) hash = (hash xor character.code.toLong()) * 1099511628211L
         hash = (hash xor x.toLong()) * 1099511628211L
@@ -36,30 +60,70 @@ class SurfaceOracle {
     private inner class FakeEnvironment : SurfaceRuleEnvironment {
         override val biomeZoomSeed: Long? = null
 
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = ((x * 31 + z * 17) and 7) - 2
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = ((x * 31 + z * 17) and 7) - 2
 
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = fake("secondary", x, 0, z)
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = fake("secondary", x, 0, z)
 
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = fake(noiseId, x, 0, z)
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = fake(noiseId, x, 0, z)
 
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = fake(noiseId, x, y, z)
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = fake(noiseId, x, y, z)
 
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float =
-            (abs(fake(name, x, y, z))).toFloat()
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = (abs(fake(name, x, y, z))).toFloat()
 
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
 
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 64 + ((x * 7 + z * 13) and 31)
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 64 + ((x * 7 + z * 13) and 31)
 
-        override fun biomeAt(x: Int, y: Int, z: Int): String =
-            biomes[(((x * 3 + z * 5 + y) % biomes.size) + biomes.size) % biomes.size]
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biomes[(((x * 3 + z * 5 + y) % biomes.size) + biomes.size) % biomes.size]
 
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: org.basaltmc.server.world.densityfunction.DensityCache?): String =
-            biomeAt(quartX shl 2, quartY shl 2, quartZ shl 2)
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: org.basaltmc.server.world.densityfunction.DensityCache?,
+        ): String = biomeAt(quartX shl 2, quartY shl 2, quartZ shl 2)
 
-        override fun isSteep(x: Int, z: Int): Boolean = ((x xor z) and 3) == 0
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = ((x xor z) and 3) == 0
 
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 1000 + (((y * 7 + x) % 13) + 13) % 13
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 1000 + (((y * 7 + x) % 13) + 13) % 13
     }
 
     @Test

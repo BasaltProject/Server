@@ -10,25 +10,84 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the three fluid springs. */
 class SpringOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     /**
      * Solid stone with single-block pockets punched through it: a spring needs exactly four solid
      * sides and exactly one hole, so neither a solid mass nor an open cave produces any.
      */
-    private fun pocketedChunk(chunkX: Int, chunkZ: Int, frozen: Boolean): Chunk {
+    private fun pocketedChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        frozen: Boolean,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         val fill = if (frozen) stateId("packed_ice") else Blocks.STONE.stateId
         for (x in 0 until 16) {
@@ -64,7 +123,12 @@ class SpringOracle {
         return Triple(checksum, water, lava)
     }
 
-    private fun report(name: String, biome: String, frozen: Boolean, body: (Chunk, FakeEnvironment) -> Unit) {
+    private fun report(
+        name: String,
+        biome: String,
+        frozen: Boolean,
+        body: (Chunk, FakeEnvironment) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var water = 0
         var lava = 0

@@ -22,7 +22,10 @@ class EndDecorationOracle {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** An end stone shelf with open air above it, which is where a chorus plant takes root. */
-    private fun endChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun endChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
