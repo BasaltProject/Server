@@ -45,10 +45,14 @@ basalt_module(server-world
     src/terrain/decoration/DesertWellDecoration.cpp
     src/terrain/decoration/DoublePlantPatchDecoration.cpp
     src/terrain/decoration/MushroomPatchDecoration.cpp
+    src/terrain/decoration/PaleMossDecoration.cpp
     src/terrain/decoration/PatchRegion.cpp
     src/terrain/decoration/PlainsFlowerFeatures.cpp
     src/terrain/decoration/TallGrassDecoration.cpp
+    src/terrain/decoration/tree/MangroveRootPlacer.cpp
     src/terrain/decoration/tree/TreeBlockRules.cpp
+    src/terrain/decoration/tree/TreeBranchingTrunkPlacers.cpp
+    src/terrain/decoration/tree/TreeFoliagePlacers.cpp
     src/terrain/decoration/tree/TreeHelpers.cpp
     src/terrain/decoration/tree/TreeTrunkPlacers.cpp
     src/terrain/decoration/VinePatchDecoration.cpp
@@ -104,6 +108,18 @@ basalt_test(server-world-tree-block-rules-test
 basalt_test(server-world-tree-trunk-placers-test
     SOURCES
         test/TreeTrunkPlacersTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-foliage-placers-test
+    SOURCES
+        test/TreeFoliagePlacersTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-branching-trunk-placers-test
+    SOURCES
+        test/TreeBranchingTrunkPlacersTest.cpp
     DEPENDS basalt::server-world
 )
 
@@ -254,6 +270,12 @@ basalt_test(server-world-grass-scatter-test
 basalt_test(server-world-cactus-test
     SOURCES
         test/CactusTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-pale-moss-test
+    SOURCES
+        test/PaleMossTest.cpp
     DEPENDS basalt::server-world
 )
 

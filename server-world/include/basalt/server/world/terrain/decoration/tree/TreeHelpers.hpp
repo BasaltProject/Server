@@ -27,4 +27,15 @@ inline constexpr std::array<HorizontalDirection, 4> kHorizontalDirections{
 /// Writes a tree block, dropping anything outside the world's vertical bounds.
 void setBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
+/// parity: `TrunkPlacer.placeBelowTrunkBlock` with the default dirt provider, which leaves the soil
+/// a tree may already be standing on alone.
+void placeBelowTrunkBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: `TreeFeature.validTreePos` plus the persistent-leaf guard: a player-placed leaf is never
+/// overwritten by generation.
+[[nodiscard]] bool canPlaceLeaf(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// Places a leaf, waterlogging it when it lands in source water.
+bool tryPlaceLeaf(Chunk& chunk, std::int32_t foliageStateId, std::int32_t x, std::int32_t y, std::int32_t z);
+
 } // namespace basalt::server::world::terrain::decoration::tree

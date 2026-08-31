@@ -26,26 +26,15 @@ constexpr double kBranchLengthMagic = 0.328;
 
 using PathSet = std::set<std::string, std::less<>>;
 
-[[nodiscard]] std::int32_t dirtStateId() {
-    static const std::int32_t stateId = [] {
-        const registry::BlockState* found = registry::blocks::named("dirt");
-        if (found == nullptr) {
-            throw std::runtime_error{"missing vanilla block minecraft:dirt"};
-        }
-        return found->stateId;
-    }();
-    return stateId;
-}
-
 [[nodiscard]] std::string pathOf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block == nullptr ? std::string{} : block->path();
 }
 
-/// What the below-trunk provider leaves alone: soil a tree may already be standing on.
-const PathSet& cannotReplaceBelowTrunkPaths() {
-    static const PathSet paths = {"dirt",       "coarse_dirt",     "rooted_dirt", "mud", "muddy_mangrove_roots",
-                                  "moss_block", "pale_moss_block", "podzol"};
+/// parity: block tag `mangrove_logs_can_grow_through`.
+const PathSet& mangroveLogGrowThroughPaths() {
+    static const PathSet paths = {"mud",          "muddy_mangrove_roots", "mangrove_roots", "mangrove_leaves",
+                                  "mangrove_log", "mangrove_propagule",   "moss_carpet",    "vine"};
     return paths;
 }
 
@@ -54,18 +43,6 @@ const PathSet& leafBlockPaths() {
                                   "acacia_leaves", "dark_oak_leaves", "pale_oak_leaves",        "mangrove_leaves",
                                   "cherry_leaves", "azalea_leaves",   "flowering_azalea_leaves"};
     return paths;
-}
-
-/// parity: `TrunkPlacer.placeBelowTrunkBlock` with the default dirt provider.
-void placeBelowTrunkBlock(Chunk& chunk, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
-    const ChunkHeight bounds = chunk.verticalBounds();
-    if (y < bounds.minY() || y > bounds.maxY()) {
-        return;
-    }
-    const std::string path = pathOf(chunk.decorationBlockStateId(x, y, z));
-    if (cannotReplaceBelowTrunkPaths().find(path) == cannotReplaceBelowTrunkPaths().end()) {
-        setBlock(chunk, x, y, z, dirtStateId());
-    }
 }
 
 [[nodiscard]] bool isAirOrLeaves(const Chunk& chunk, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
@@ -171,13 +148,48 @@ TrunkPlacer TrunkPlacer::megaJungle(const std::int32_t baseHeight, const std::in
     return placer;
 }
 
+TrunkPlacer TrunkPlacer::upwardsBranching(const std::int32_t baseHeight, const std::int32_t heightRandA,
+                                          const std::int32_t heightRandB, IntProvider extraBranchSteps,
+                                          const float placeBranchPerLogProbability, IntProvider extraBranchLength) {
+    TrunkPlacer placer = straight(baseHeight, heightRandA, heightRandB);
+    placer.kind_ = Kind::UpwardsBranching;
+    placer.extraBranchSteps_ = std::move(extraBranchSteps);
+    placer.placeBranchPerLogProbability_ = placeBranchPerLogProbability;
+    placer.extraBranchLength_ = std::move(extraBranchLength);
+    return placer;
+}
+
+TrunkPlacer TrunkPlacer::cherry(const std::int32_t baseHeight, const std::int32_t heightRandA,
+                                const std::int32_t heightRandB, IntProvider branchCount,
+                                IntProvider branchHorizontalLength, const std::int32_t branchStartOffsetMin,
+                                const std::int32_t branchStartOffsetMax, IntProvider branchEndOffsetFromTop) {
+    TrunkPlacer placer = straight(baseHeight, heightRandA, heightRandB);
+    placer.kind_ = Kind::Cherry;
+    placer.branchCount_ = std::move(branchCount);
+    placer.branchHorizontalLength_ = std::move(branchHorizontalLength);
+    placer.branchStartOffsetFromTop_ = IntProvider::uniform(branchStartOffsetMin, branchStartOffsetMax);
+    placer.secondBranchStartOffsetFromTop_ = IntProvider::uniform(branchStartOffsetMin, branchStartOffsetMax - 1);
+    placer.branchEndOffsetFromTop_ = std::move(branchEndOffsetFromTop);
+    return placer;
+}
+
 std::int32_t TrunkPlacer::treeHeight(random::RandomSource& random) const {
     return baseHeight_ + random.nextInt(heightRandA_ + 1) + random.nextInt(heightRandB_ + 1);
 }
 
 bool TrunkPlacer::validTreePos(const Chunk& chunk, const std::int32_t x, const std::int32_t y,
                                const std::int32_t z) const {
-    return isValidTreePos(chunk, x, y, z);
+    if (isValidTreePos(chunk, x, y, z)) {
+        return true;
+    }
+    if (kind_ != Kind::UpwardsBranching) {
+        return false;
+    }
+    const ChunkHeight bounds = chunk.verticalBounds();
+    if (y < bounds.minY() || y > bounds.maxY()) {
+        return false;
+    }
+    return mangroveLogGrowThroughPaths().contains(pathOf(chunk.decorationBlockStateId(x, y, z)));
 }
 
 bool TrunkPlacer::isFree(const Chunk& chunk, const std::int32_t x, const std::int32_t y, const std::int32_t z) const {
@@ -456,6 +468,10 @@ std::vector<FoliageAttachment> TrunkPlacer::placeTrunk(Chunk& chunk, random::Ran
         }
         return attachments;
     }
+    case Kind::UpwardsBranching:
+        return placeUpwardsBranchingTrunk(chunk, random, treeHeight, originX, originY, originZ, trunkStateId);
+    case Kind::Cherry:
+        return placeCherryTrunk(chunk, random, treeHeight, originX, originY, originZ, trunkStateId);
     case Kind::Giant:
         return placeGiant(chunk, treeHeight, originX, originY, originZ, trunkStateId);
     case Kind::MegaJungle: {

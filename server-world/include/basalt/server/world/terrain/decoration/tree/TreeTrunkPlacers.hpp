@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/terrain/decoration/IntProvider.hpp>
+#include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeTypes.hpp>
 
 #include <cstdint>
@@ -43,6 +44,19 @@ public:
     [[nodiscard]] static TrunkPlacer megaJungle(std::int32_t baseHeight, std::int32_t heightRandA,
                                                 std::int32_t heightRandB);
 
+    /// parity: `UpwardsBranchingTrunkPlacer`, the mangrove.
+    [[nodiscard]] static TrunkPlacer upwardsBranching(std::int32_t baseHeight, std::int32_t heightRandA,
+                                                      std::int32_t heightRandB, IntProvider extraBranchSteps,
+                                                      float placeBranchPerLogProbability,
+                                                      IntProvider extraBranchLength);
+
+    /// parity: `CherryTrunkPlacer`. The second branch's start offset is not configured: vanilla
+    /// derives it in the constructor as `UniformInt.of(min, max - 1)`, so this takes the bounds.
+    [[nodiscard]] static TrunkPlacer cherry(std::int32_t baseHeight, std::int32_t heightRandA, std::int32_t heightRandB,
+                                            IntProvider branchCount, IntProvider branchHorizontalLength,
+                                            std::int32_t branchStartOffsetMin, std::int32_t branchStartOffsetMax,
+                                            IntProvider branchEndOffsetFromTop);
+
     /// parity: `TrunkPlacer.getTreeHeight`. Two draws even when either bound is zero.
     [[nodiscard]] std::int32_t treeHeight(random::RandomSource& random) const;
 
@@ -55,7 +69,17 @@ public:
     [[nodiscard]] bool isFree(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) const;
 
 private:
-    enum class Kind : std::uint8_t { Straight, Bending, Fancy, Forking, DarkOak, Giant, MegaJungle };
+    enum class Kind : std::uint8_t {
+        Straight,
+        Bending,
+        Fancy,
+        Forking,
+        DarkOak,
+        Giant,
+        MegaJungle,
+        UpwardsBranching,
+        Cherry,
+    };
 
     /// parity: `TrunkPlacer.validTreePos`. Kind-dispatched because specialized placers widen the
     /// accepted blocks rather than replacing the rule.
@@ -69,6 +93,29 @@ private:
                                                             std::int32_t originY, std::int32_t originZ,
                                                             std::int32_t trunkStateId) const;
 
+    /// Defined beside the cherry placer, in TreeBranchingTrunkPlacers.cpp.
+    [[nodiscard]] std::vector<FoliageAttachment> placeUpwardsBranchingTrunk(Chunk& chunk, random::RandomSource& random,
+                                                                            std::int32_t treeHeight,
+                                                                            std::int32_t originX, std::int32_t originY,
+                                                                            std::int32_t originZ,
+                                                                            std::int32_t trunkStateId) const;
+
+    void placeBranch(Chunk& chunk, std::int32_t treeHeight, std::int32_t trunkStateId,
+                     std::vector<FoliageAttachment>& attachments, std::int32_t originX, std::int32_t originZ,
+                     std::int32_t currentHeight, HorizontalDirection branchDir, std::int32_t branchPos,
+                     std::int32_t branchSteps) const;
+
+    [[nodiscard]] std::vector<FoliageAttachment> placeCherryTrunk(Chunk& chunk, random::RandomSource& random,
+                                                                  std::int32_t treeHeight, std::int32_t originX,
+                                                                  std::int32_t originY, std::int32_t originZ,
+                                                                  std::int32_t trunkStateId) const;
+
+    [[nodiscard]] FoliageAttachment
+    generateCherryBranch(Chunk& chunk, random::RandomSource& random, std::int32_t treeHeight, std::int32_t originX,
+                         std::int32_t originY, std::int32_t originZ, std::int32_t trunkStateId,
+                         std::int32_t sidewaysStateId, HorizontalDirection branchDirection,
+                         std::int32_t offsetFromOrigin, bool middleContinuesUpwards) const;
+
     /// The placing form ignores the result, so this is deliberately not `[[nodiscard]]`.
     bool makeLimb(Chunk& chunk, std::int32_t startX, std::int32_t startY, std::int32_t startZ, std::int32_t endX,
                   std::int32_t endY, std::int32_t endZ, bool checkOnly, std::int32_t trunkStateId) const;
@@ -80,6 +127,14 @@ private:
     std::int32_t minHeightForLeaves_ = 0;
     IntProvider bendLength_;
     std::int32_t belowTrunkStateId_ = 0;
+    IntProvider extraBranchSteps_;
+    IntProvider extraBranchLength_;
+    float placeBranchPerLogProbability_ = 0.0F;
+    IntProvider branchCount_;
+    IntProvider branchHorizontalLength_;
+    IntProvider branchStartOffsetFromTop_;
+    IntProvider secondBranchStartOffsetFromTop_;
+    IntProvider branchEndOffsetFromTop_;
 };
 
 } // namespace basalt::server::world::terrain::decoration::tree
