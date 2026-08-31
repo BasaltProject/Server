@@ -24,9 +24,7 @@ basalt_module(server-world
     src/terrain/decoration/FireflyBushPatchDecoration.cpp
     src/terrain/decoration/FlowerFeatures.cpp
     src/terrain/decoration/FlowerPatchDecoration.cpp
-    src/terrain/decoration/FlowerForestDecoration.cpp
     src/terrain/decoration/FlowerVegetation.cpp
-    src/terrain/decoration/ForestFloorDecoration.cpp
     src/terrain/decoration/ForestRockDecoration.cpp
     src/terrain/decoration/GrassScatterPatches.cpp
     src/terrain/decoration/GlowLichenDecoration.cpp
@@ -37,6 +35,19 @@ basalt_module(server-world
     src/terrain/decoration/HugeMushroomFeature.cpp
     src/terrain/decoration/IntProvider.cpp
     src/terrain/decoration/OreBlockRules.cpp
+    src/terrain/decoration/end/EndDecoration.cpp
+    src/terrain/decoration/end/EndSurfaceStructuresDecoration.cpp
+    src/terrain/decoration/nether/NetherForestVegetation.cpp
+    src/terrain/decoration/nether/NetherHugeFungus.cpp
+    src/terrain/decoration/nether/NetherLavaSpring.cpp
+    src/terrain/decoration/nether/NetherLocalDecoration.cpp
+    src/terrain/decoration/nether/NetherMushroom.cpp
+    src/terrain/decoration/nether/NetherOreDecoration.cpp
+    src/terrain/decoration/nether/NetherSurfaceStructuresDecoration.cpp
+    src/terrain/decoration/nether/NetherUndergroundDecoration.cpp
+    src/terrain/decoration/nether/NetherVegetalDecoration.cpp
+    src/terrain/decoration/nether/NetherVegetalShared.cpp
+    src/terrain/decoration/nether/NetherVines.cpp
     src/terrain/decoration/OverworldOreConfigs.cpp
     src/terrain/decoration/OverworldSpringDecoration.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
@@ -44,10 +55,8 @@ basalt_module(server-world
     src/terrain/decoration/BushPatchDecoration.cpp
     src/terrain/decoration/BambooVegetationDecoration.cpp
     src/terrain/decoration/CactusFeature.cpp
-    src/terrain/decoration/JungleGrassDecoration.cpp
     src/terrain/decoration/JungleFeatures.cpp
     src/terrain/decoration/LushVegetationPatchFeature.cpp
-    src/terrain/decoration/MeadowDecoration.cpp
     src/terrain/decoration/MelonPatchDecoration.cpp
     src/terrain/decoration/CaveVineColumnFeature.cpp
     src/terrain/decoration/DesertWellDecoration.cpp
@@ -78,6 +87,9 @@ basalt_module(server-world
     src/terrain/decoration/RootedAzaleaFeature.cpp
     src/terrain/decoration/SimpleBlockFeature.cpp
     src/terrain/BiomeClimateData.cpp
+    src/terrain/DensityChunkSampler.cpp
+    src/terrain/NetherBiomeSource.cpp
+    src/terrain/TheEndBiomeSource.cpp
     src/terrain/surface/BadlandsClayBands.cpp
     src/terrain/surface/SurfaceBuilder.cpp
     src/terrain/surface/ChunkBiomeEnvironment.cpp
@@ -184,6 +196,12 @@ basalt_test(server-world-lush-vegetation-test
 basalt_test(server-world-standalone-features-test
     SOURCES
         test/StandaloneFeaturesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-small-patch-test
+    SOURCES
+        test/SmallPatchTest.cpp
     DEPENDS basalt::server-world
 )
 
@@ -394,6 +412,48 @@ basalt_test(server-world-surface-test
 basalt_test(server-world-biome-test
     SOURCES
         test/BiomeTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-nether-biome-source-test
+    SOURCES
+        test/NetherBiomeSourceTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-nether-vegetal-test
+    SOURCES
+        test/NetherVegetalTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-nether-local-test
+    SOURCES
+        test/NetherLocalTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-nether-ore-test
+    SOURCES
+        test/NetherOreTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-nether-surface-structures-test
+    SOURCES
+        test/NetherSurfaceStructuresTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-nether-underground-test
+    SOURCES
+        test/NetherUndergroundTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-end-decoration-test
+    SOURCES
+        test/EndDecorationTest.cpp
     DEPENDS basalt::server-world
 )
 

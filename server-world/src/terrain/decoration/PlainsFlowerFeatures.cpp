@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/noise/SimplexNoise.hpp>
 #include <basalt/server/world/terrain/decoration/PlainsFlowerFeatures.hpp>
+#include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 
 #include <array>
 #include <stdexcept>
@@ -89,6 +90,66 @@ void forestFloorDecoration::placeWildflowersAt(Chunk& chunk, random::RandomSourc
     }};
     placeFrom(chunk, random, origin, {countPlacement(count), randomOffsetPlacement(6, 2), airTargetFilter()},
               [&chunk, &random, &feature](const DecorationPos& position) { feature.place(chunk, random, position); });
+}
+
+namespace {
+
+/// parity: the leaf litter patch's own `block_predicate_filter`, which wants grass block below.
+[[nodiscard]] PlacementModifier blockBelowFilter(std::int32_t stateId) {
+    return filter([stateId](const PlacementContext& context, random::RandomSource&, const DecorationPos& origin) {
+        return context.chunk().blockStateId(origin.x & 15, origin.y - 1, origin.z & 15) == stateId;
+    });
+}
+
+[[nodiscard]] SimpleBlockFeature wildflowerFeature() {
+    return SimpleBlockFeature{[](random::RandomSource& random, const DecorationPos&) {
+        return forestFloorDecoration::flowerBedStateId(stateIdOf("wildflowers"), random.nextInt(16));
+    }};
+}
+
+[[nodiscard]] std::int32_t leafLitterStateId(std::int32_t choice, std::int32_t maxSegmentAmount) {
+    const std::int32_t segmentOffset = choice / 4;
+    if (segmentOffset >= maxSegmentAmount) {
+        throw std::logic_error{"leaf litter segment out of range"};
+    }
+    return forestFloorDecoration::flowerBedStateId(stateIdOf("leaf_litter"), choice);
+}
+
+[[nodiscard]] BiomeVegetalDecoration placed(std::vector<PlacementModifier> modifiers, SimpleBlockFeature feature) {
+    return
+        [modifiers = std::move(modifiers), feature = std::move(feature)](Chunk& chunk, random::RandomSource& random) {
+            const DecorationPos origin{.x = chunk.chunkX() * 16, .y = 0, .z = chunk.chunkZ() * 16};
+            placeFrom(chunk, random, origin, modifiers,
+                      [&](const DecorationPos& position) { feature.place(chunk, random, position); });
+        };
+}
+
+} // namespace
+
+const BiomeVegetalDecoration& forestFloorDecoration::birchWildflowers() {
+    static const BiomeVegetalDecoration decoration =
+        placed({countPlacement(3), rarityFilter(2), inSquarePlacement(), heightmapPlacement(), countPlacement(64),
+                randomOffsetPlacement(6, 2), airTargetFilter()},
+               wildflowerFeature());
+    return decoration;
+}
+
+const BiomeVegetalDecoration& forestFloorDecoration::meadowWildflowers() {
+    static const BiomeVegetalDecoration decoration =
+        placed({noiseThresholdCountPlacement(-0.8, 5, 10), inSquarePlacement(), heightmapPlacement(), countPlacement(8),
+                randomOffsetPlacement(6, 2), airTargetFilter()},
+               wildflowerFeature());
+    return decoration;
+}
+
+const BiomeVegetalDecoration& forestFloorDecoration::leafLitter() {
+    static const BiomeVegetalDecoration decoration = placed(
+        {countPlacement(2), inSquarePlacement(), heightmapPlacement(HeightmapType::WorldSurface), countPlacement(32),
+         randomOffsetPlacement(7, 3), airTargetFilter(), blockBelowFilter(stateIdOf("grass_block"))},
+        SimpleBlockFeature{[](random::RandomSource& random, const DecorationPos&) {
+            return leafLitterStateId(random.nextInt(12), 3);
+        }});
+    return decoration;
 }
 
 } // namespace basalt::server::world::terrain::decoration
