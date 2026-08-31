@@ -81,4 +81,8 @@ internal object CaveVineColumnFeature {
 
     private val CAVE_VINES_PLANT_NO_BERRIES = state("cave_vines_plant", mapOf("berries" to "false"))
     private val CAVE_VINES_PLANT_BERRIES = state("cave_vines_plant", mapOf("berries" to "true"))
+
+    internal fun placeForTest(chunk: Chunk, random: WorldgenRandom, origin: DecorationPos, inMoss: Boolean): Boolean =
+        place(chunk, random, origin, inMoss)
+
 }
