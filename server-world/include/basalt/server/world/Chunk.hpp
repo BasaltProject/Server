@@ -300,7 +300,10 @@ private:
     mutable bool heightsValid_ = true;
     std::optional<std::array<std::vector<std::int32_t>, kHeightmapCount>> worldgenHeights_;
 
+    /// Keyed for lookup, with the insertion order kept beside it: the order block entities come
+    /// back in is observable, because it is the order they are written to disk and to the client.
     std::map<std::int32_t, ChunkBlockEntity> blockEntities_;
+    std::vector<std::int32_t> blockEntityOrder_;
     std::vector<ChunkGeneratedEntity> generatedEntities_;
     std::vector<wire::nbt::NbtCompound> savedEntities_;
     std::vector<ChunkScheduledTick> blockTicks_;

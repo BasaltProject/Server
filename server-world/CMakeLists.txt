@@ -24,10 +24,12 @@ basalt_module(server-world
     src/terrain/decoration/FlowerFeatures.cpp
     src/terrain/decoration/FlowerPatchDecoration.cpp
     src/terrain/decoration/FlowerVegetation.cpp
+    src/terrain/decoration/ForestRockDecoration.cpp
     src/terrain/decoration/GrassScatterPatches.cpp
     src/terrain/decoration/GrassPatchDecoration.cpp
     src/terrain/decoration/GroundPlantPatchDecoration.cpp
     src/terrain/decoration/GroundVegetation.cpp
+    src/terrain/decoration/IceSpikesDecoration.cpp
     src/terrain/decoration/IntProvider.cpp
     src/terrain/decoration/OreBlockRules.cpp
     src/terrain/decoration/OverworldOreConfigs.cpp
@@ -36,6 +38,7 @@ basalt_module(server-world
     src/terrain/decoration/BushPatchDecoration.cpp
     src/terrain/decoration/CactusFeature.cpp
     src/terrain/decoration/MelonPatchDecoration.cpp
+    src/terrain/decoration/DesertWellDecoration.cpp
     src/terrain/decoration/DoublePlantPatchDecoration.cpp
     src/terrain/decoration/MushroomPatchDecoration.cpp
     src/terrain/decoration/PatchRegion.cpp
@@ -76,6 +79,24 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-ice-spikes-test
+    SOURCES
+        test/IceSpikesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-desert-well-test
+    SOURCES
+        test/DesertWellTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-forest-rock-test
+    SOURCES
+        test/ForestRockTest.cpp
     DEPENDS basalt::server-world
 )
 
