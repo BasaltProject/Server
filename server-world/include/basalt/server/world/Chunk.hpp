@@ -188,6 +188,86 @@ public:
     /// not sized.
     [[nodiscard]] std::size_t residentBytes() const;
 
+    /// Reads a world-coordinate position while a decoration is being generated. Positions outside
+    /// this chunk see earlier writes from the same feature rather than wrapping through `and 15`. A
+    /// scoped feature-stage reader can supply unloaded neighbour terrain; otherwise it is air.
+    [[nodiscard]] std::int32_t decorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) const;
+
+    /// Writes a world-coordinate decoration position. Local writes land immediately; external ones
+    /// keep their true coordinates until the runtime installs their target chunk. Most features
+    /// expect unknown external air; water-replacing ones pass their observed expectation.
+    void setDecorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ, std::int32_t stateId,
+                                   std::optional<std::int32_t> expectedExternalStateId = std::nullopt,
+                                   bool replaceAnyExternalState = false);
+
+    /// Hands deferred cross-chunk decoration writes to the runtime exactly once.
+    [[nodiscard]] std::vector<ChunkGeneratedBlockWrite> takeGeneratedBlockWrites();
+
+    /// Keeps a decoration's block entity beside an external block until the target chunk arrives.
+    /// `expectedStateId` is the block the feature just placed, so a rejected block write cannot
+    /// leave an orphaned block entity in real neighbour terrain.
+    void setDecorationBlockEntity(std::int32_t worldX, std::int32_t y, std::int32_t worldZ,
+                                  std::int32_t expectedStateId, wire::common::Identifier type,
+                                  wire::nbt::NbtCompound data);
+
+    [[nodiscard]] std::vector<ChunkGeneratedBlockEntityWrite> takeGeneratedBlockEntityWrites();
+
+    /// Schedules a generated block's tick locally, or keeps it beside an external block write.
+    void scheduleDecorationBlockTick(std::int32_t worldX, std::int32_t y, std::int32_t worldZ,
+                                     std::int32_t expectedStateId, wire::common::Identifier type, std::int32_t delay,
+                                     std::int32_t priority = 0);
+
+    [[nodiscard]] std::vector<ChunkGeneratedBlockTick> takeGeneratedBlockTicks();
+
+    /// Records block placement attempts without allocating on the normal write path. Scoped rather
+    /// than a lambda-taking template so an early return cannot leave the hook installed.
+    class BlockWriteObserverScope {
+    public:
+        using Observer = std::function<void(std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t)>;
+
+        BlockWriteObserverScope(Chunk& chunk, Observer observer);
+        ~BlockWriteObserverScope();
+        BlockWriteObserverScope(const BlockWriteObserverScope&) = delete;
+        BlockWriteObserverScope& operator=(const BlockWriteObserverScope&) = delete;
+        BlockWriteObserverScope(BlockWriteObserverScope&&) = delete;
+        BlockWriteObserverScope& operator=(BlockWriteObserverScope&&) = delete;
+
+    private:
+        Chunk* chunk_;
+    };
+
+    /// Supplies the undecorated neighbouring terrain while one feature stage crosses a chunk edge.
+    class ExternalStateScope {
+    public:
+        using Reader = std::function<std::optional<std::int32_t>(std::int32_t, std::int32_t, std::int32_t)>;
+
+        ExternalStateScope(Chunk& chunk, Reader reader);
+        ~ExternalStateScope();
+        ExternalStateScope(const ExternalStateScope&) = delete;
+        ExternalStateScope& operator=(const ExternalStateScope&) = delete;
+        ExternalStateScope(ExternalStateScope&&) = delete;
+        ExternalStateScope& operator=(ExternalStateScope&&) = delete;
+
+    private:
+        Chunk* chunk_;
+        Reader previous_;
+    };
+
+    /// Marks deferred writes from one configured feature with their delivery replacement rule.
+    class WritePolicyScope {
+    public:
+        WritePolicyScope(Chunk& chunk, GeneratedBlockWritePolicy policy);
+        ~WritePolicyScope();
+        WritePolicyScope(const WritePolicyScope&) = delete;
+        WritePolicyScope& operator=(const WritePolicyScope&) = delete;
+        WritePolicyScope(WritePolicyScope&&) = delete;
+        WritePolicyScope& operator=(WritePolicyScope&&) = delete;
+
+    private:
+        Chunk* chunk_;
+        GeneratedBlockWritePolicy previous_;
+    };
+
     /// What this chunk knows about structures, for position queries and for spawn overrides.
     [[nodiscard]] structure::ChunkStructures& structures() noexcept { return structures_; }
 
@@ -226,6 +306,15 @@ private:
     std::vector<ChunkScheduledTick> blockTicks_;
     std::vector<ChunkScheduledTick> fluidTicks_;
     structure::ChunkStructures structures_;
+
+    /// Keyed by packed world position so a later write to the same block replaces the earlier one,
+    /// insertion order preserved because delivery order is observable.
+    std::vector<ChunkGeneratedBlockWrite> generatedBlockWrites_;
+    std::vector<ChunkGeneratedBlockEntityWrite> generatedBlockEntityWrites_;
+    std::vector<ChunkGeneratedBlockTick> generatedBlockTicks_;
+    std::function<void(std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t)> blockWriteObserver_;
+    std::function<std::optional<std::int32_t>(std::int32_t, std::int32_t, std::int32_t)> externalDecorationState_;
+    GeneratedBlockWritePolicy generatedBlockWritePolicy_ = GeneratedBlockWritePolicy::Exact;
     std::optional<PackedLight> skyLight_;
     std::optional<PackedLight> blockLight_;
     bool dirty_ = false;

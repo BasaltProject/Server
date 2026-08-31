@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/noise/NormalNoise.hpp>
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
+#include <basalt/server/world/terrain/carver/NetherCaveCarver.hpp>
 #include <basalt/server/world/terrain/carver/OverworldCarvers.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleData.hpp>
 
@@ -136,4 +137,35 @@ TEST_CASE("the cave and canyon carvers cut the same chunk as the frozen kotlin")
 
     CHECK(carved == 238);
     CHECK(static_cast<std::int64_t>(checksum) == 864437565001245551LL);
+}
+
+TEST_CASE("the nether cave carver cuts the same chunk as the frozen kotlin") {
+    Chunk chunk{2, 7, kNetherHeight};
+    for (std::int32_t x = 0; x < 16; ++x) {
+        for (std::int32_t z = 0; z < 16; ++z) {
+            for (std::int32_t y = 0; y < 128; ++y) {
+                chunk.setBlockStateId(x, y, z, registry::blocks::named("netherrack")->stateId);
+            }
+        }
+    }
+    carver::carveNether(chunk, 4242LL);
+
+    std::uint64_t checksum = 14695981039346656037ULL;
+    std::int32_t carved = 0;
+    const std::int32_t netherrack = registry::blocks::named("netherrack")->stateId;
+    for (std::int32_t y = 0; y < 128; ++y) {
+        for (std::int32_t z = 0; z < 16; ++z) {
+            for (std::int32_t x = 0; x < 16; ++x) {
+                const std::int32_t stateId = chunk.blockStateId(x, y, z);
+                checksum =
+                    (checksum ^ static_cast<std::uint64_t>(static_cast<std::int64_t>(stateId))) * 1099511628211ULL;
+                if (stateId != netherrack) {
+                    ++carved;
+                }
+            }
+        }
+    }
+
+    CHECK(carved == 2763);
+    CHECK(static_cast<std::int64_t>(checksum) == 8478801668941863389LL);
 }

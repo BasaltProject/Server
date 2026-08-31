@@ -368,4 +368,173 @@ void Chunk::rebuildHeights() const {
     heightsValid_ = true;
 }
 
+namespace {
+
+/// Finds an existing deferred write for that block. The lists stay in insertion order because
+/// delivery order is observable, so this is a scan rather than a map lookup; a feature defers a
+/// handful of blocks, not thousands.
+template <typename Write>
+[[nodiscard]] Write* findWrite(std::vector<Write>& writes, std::int32_t x, std::int32_t y, std::int32_t z) {
+    for (Write& write : writes) {
+        if (write.x == x && write.y == y && write.z == z) {
+            return &write;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+std::int32_t Chunk::decorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) const {
+    if (y < bounds_.minY() || y > bounds_.maxY()) {
+        return registry::blocks::air().stateId;
+    }
+    if ((worldX >> 4) == chunkX_ && (worldZ >> 4) == chunkZ_) {
+        return blockStateId(worldX & 15, y, worldZ & 15);
+    }
+    for (const ChunkGeneratedBlockWrite& write : generatedBlockWrites_) {
+        if (write.x == worldX && write.y == y && write.z == worldZ) {
+            return write.stateId;
+        }
+    }
+    if (externalDecorationState_) {
+        if (const std::optional<std::int32_t> observed = externalDecorationState_(worldX, y, worldZ);
+            observed.has_value()) {
+            return *observed;
+        }
+    }
+    return registry::blocks::air().stateId;
+}
+
+void Chunk::setDecorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ, std::int32_t stateId,
+                                      std::optional<std::int32_t> expectedExternalStateId,
+                                      bool replaceAnyExternalState) {
+    if (y < bounds_.minY() || y > bounds_.maxY()) {
+        return;
+    }
+    if ((worldX >> 4) == chunkX_ && (worldZ >> 4) == chunkZ_) {
+        setBlockStateId(worldX & 15, y, worldZ & 15, stateId);
+        return;
+    }
+
+    const std::int32_t expected = expectedExternalStateId.value_or(registry::blocks::air().stateId);
+    ChunkGeneratedBlockWrite* previous = findWrite(generatedBlockWrites_, worldX, y, worldZ);
+    // What is really out there beats what the caller assumed: a feature replacing stone rather than
+    // air would otherwise defer with an air guard and have the write refused on delivery.
+    std::optional<std::int32_t> observed;
+    if (externalDecorationState_) {
+        observed = externalDecorationState_(worldX, y, worldZ);
+    }
+    const std::int32_t oldStateId = previous != nullptr ? previous->stateId : observed.value_or(expected);
+    if (oldStateId == stateId) {
+        if (blockWriteObserver_) {
+            blockWriteObserver_(worldX - chunkX_ * 16, y, worldZ - chunkZ_ * 16, oldStateId, stateId);
+        }
+        return;
+    }
+
+    const ChunkGeneratedBlockWrite write{
+        .x = worldX,
+        .y = y,
+        .z = worldZ,
+        .expectedStateId = previous != nullptr ? previous->expectedStateId : observed.value_or(expected),
+        .stateId = stateId,
+        .replaceAnyState = (previous != nullptr && previous->replaceAnyState) || replaceAnyExternalState,
+        .policy = generatedBlockWritePolicy_,
+    };
+    if (previous != nullptr) {
+        *previous = write;
+    } else {
+        generatedBlockWrites_.push_back(write);
+    }
+    if (blockWriteObserver_) {
+        blockWriteObserver_(worldX - chunkX_ * 16, y, worldZ - chunkZ_ * 16, oldStateId, stateId);
+    }
+}
+
+std::vector<ChunkGeneratedBlockWrite> Chunk::takeGeneratedBlockWrites() {
+    return std::exchange(generatedBlockWrites_, {});
+}
+
+void Chunk::setDecorationBlockEntity(std::int32_t worldX, std::int32_t y, std::int32_t worldZ,
+                                     std::int32_t expectedStateId, wire::common::Identifier type,
+                                     wire::nbt::NbtCompound data) {
+    if (y < bounds_.minY() || y > bounds_.maxY()) {
+        return;
+    }
+    if ((worldX >> 4) == chunkX_ && (worldZ >> 4) == chunkZ_) {
+        setBlockEntity(ChunkBlockEntity{worldX & 15, y, worldZ & 15, std::move(type), std::move(data)});
+        return;
+    }
+    ChunkGeneratedBlockEntityWrite write{.x = worldX,
+                                         .y = y,
+                                         .z = worldZ,
+                                         .expectedStateId = expectedStateId,
+                                         .type = std::move(type),
+                                         .data = std::move(data)};
+    if (ChunkGeneratedBlockEntityWrite* previous = findWrite(generatedBlockEntityWrites_, worldX, y, worldZ);
+        previous != nullptr) {
+        *previous = std::move(write);
+    } else {
+        generatedBlockEntityWrites_.push_back(std::move(write));
+    }
+}
+
+std::vector<ChunkGeneratedBlockEntityWrite> Chunk::takeGeneratedBlockEntityWrites() {
+    return std::exchange(generatedBlockEntityWrites_, {});
+}
+
+void Chunk::scheduleDecorationBlockTick(std::int32_t worldX, std::int32_t y, std::int32_t worldZ,
+                                        std::int32_t expectedStateId, wire::common::Identifier type, std::int32_t delay,
+                                        std::int32_t priority) {
+    if (y < bounds_.minY() || y > bounds_.maxY()) {
+        return;
+    }
+    if ((worldX >> 4) == chunkX_ && (worldZ >> 4) == chunkZ_) {
+        if (blockStateId(worldX & 15, y, worldZ & 15) == expectedStateId) {
+            scheduleBlockTick(ChunkScheduledTick{std::move(type), worldX & 15, y, worldZ & 15, delay, priority});
+        }
+        return;
+    }
+    ChunkGeneratedBlockTick tick{.x = worldX,
+                                 .y = y,
+                                 .z = worldZ,
+                                 .expectedStateId = expectedStateId,
+                                 .type = std::move(type),
+                                 .delay = delay,
+                                 .priority = priority};
+    if (ChunkGeneratedBlockTick* previous = findWrite(generatedBlockTicks_, worldX, y, worldZ); previous != nullptr) {
+        *previous = std::move(tick);
+    } else {
+        generatedBlockTicks_.push_back(std::move(tick));
+    }
+}
+
+std::vector<ChunkGeneratedBlockTick> Chunk::takeGeneratedBlockTicks() {
+    return std::exchange(generatedBlockTicks_, {});
+}
+
+Chunk::BlockWriteObserverScope::BlockWriteObserverScope(Chunk& chunk, Observer observer) : chunk_(&chunk) {
+    if (chunk_->blockWriteObserver_) {
+        throw std::logic_error{"nested block write observers are not supported"};
+    }
+    chunk_->blockWriteObserver_ = std::move(observer);
+}
+
+Chunk::BlockWriteObserverScope::~BlockWriteObserverScope() { chunk_->blockWriteObserver_ = nullptr; }
+
+Chunk::ExternalStateScope::ExternalStateScope(Chunk& chunk, Reader reader)
+    : chunk_(&chunk), previous_(std::move(chunk.externalDecorationState_)) {
+    chunk_->externalDecorationState_ = std::move(reader);
+}
+
+Chunk::ExternalStateScope::~ExternalStateScope() { chunk_->externalDecorationState_ = std::move(previous_); }
+
+Chunk::WritePolicyScope::WritePolicyScope(Chunk& chunk, GeneratedBlockWritePolicy policy)
+    : chunk_(&chunk), previous_(chunk.generatedBlockWritePolicy_) {
+    chunk_->generatedBlockWritePolicy_ = policy;
+}
+
+Chunk::WritePolicyScope::~WritePolicyScope() { chunk_->generatedBlockWritePolicy_ = previous_; }
+
 } // namespace basalt::server::world

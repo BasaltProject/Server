@@ -80,4 +80,30 @@ class CarverOracle {
         }
         println("ORACLE carve.checksum=$checksum carved=$carved")
     }
+
+    @Test
+    fun dumpNether() {
+        val chunk = Chunk(2, 7, org.basaltmc.server.world.ChunkHeight.NETHER)
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 0 until 128) {
+                    chunk.setBlockStateId(x, y, z, Blocks.NETHERRACK.stateId)
+                }
+            }
+        }
+        NetherCaveCarver.carve(chunk, 4242L)
+
+        var checksum = -3750763034362895579L
+        var carved = 0
+        for (y in 0 until 128) {
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    val stateId = chunk.getBlockStateId(x, y, z)
+                    checksum = (checksum xor stateId.toLong()) * 1099511628211L
+                    if (stateId != Blocks.NETHERRACK.stateId) carved++
+                }
+            }
+        }
+        println("ORACLE nether.checksum=$checksum carved=$carved")
+    }
 }
