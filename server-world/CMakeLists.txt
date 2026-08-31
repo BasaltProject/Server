@@ -92,7 +92,9 @@ basalt_module(server-world
     src/terrain/decoration/tree/TreeFoliagePlacers.cpp
     src/terrain/decoration/tree/TreeHelpers.cpp
     src/terrain/decoration/tree/TreeTrunkPlacers.cpp
+    src/terrain/decoration/VillageFeatures.cpp
     src/terrain/decoration/VinePatchDecoration.cpp
+    src/terrain/decoration/SmallFeatures.cpp
     src/terrain/decoration/StandaloneFeatures.cpp
     src/terrain/decoration/SugarCanePatchDecoration.cpp
     src/terrain/decoration/SurfaceFreezingDecoration.cpp
@@ -264,6 +266,18 @@ basalt_test(server-world-bamboo-test
 basalt_test(server-world-aquatic-vegetal-test
     SOURCES
         test/AquaticVegetalTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-small-features-test
+    SOURCES
+        test/SmallFeaturesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-village-features-test
+    SOURCES
+        test/VillageFeaturesTest.cpp
     DEPENDS basalt::server-world
 )
 
