@@ -1,6 +1,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/ChunkDataCodec.hpp>
 #include <basalt/server/world/light/Light.hpp>
+#include <basalt/wire/protocol/play/BitStorage.hpp>
+#include <basalt/wire/protocol/play/PalettedContainer.hpp>
 
 #include <doctest.h>
 
@@ -114,4 +117,57 @@ TEST_CASE("a window knows whether it had every neighbour") {
                                   return x == 0 && z == -1 ? &north : nullptr;
                               }};
     CHECK_FALSE(partial.isComplete());
+}
+
+TEST_CASE("the encoded sections carry both counts and both containers") {
+    // parity: LevelChunkSection.write always writes two shorts, never just one. A real client
+    // overran the buffer reading the next section when the fluid count was missing.
+    Chunk chunk{0, 0};
+    chunk.setBlockStateId(0, 0, 0, registry::blocks::stone().stateId);
+    chunk.setBlockStateId(1, 0, 0, registry::blocks::water().stateId);
+
+    const std::vector<std::uint8_t> encoded = chunkDataCodec::encodeSections(chunk);
+    basalt::wire::io::ByteBuffer buffer = basalt::wire::io::ByteBuffer::wrap(encoded);
+    // The section holding those two blocks is the one at y 0, which is the fifth of the overworld.
+    const auto sectionIndex = static_cast<std::size_t>((0 >> 4) - chunk.verticalBounds().minSection());
+    for (std::size_t skipped = 0; skipped < sectionIndex; ++skipped) {
+        CHECK(buffer.readShort() == 0);
+        CHECK(buffer.readShort() == 0);
+        static_cast<void>(basalt::wire::protocol::play::palettedContainer::read(buffer, 4096, 8));
+        static_cast<void>(basalt::wire::protocol::play::palettedContainer::read(buffer, 64, 3));
+    }
+    CHECK(buffer.readShort() == 2);
+    CHECK(buffer.readShort() == 1);
+    const std::vector<std::int32_t> blocks = basalt::wire::protocol::play::palettedContainer::read(buffer, 4096, 8);
+    CHECK(blocks[0] == registry::blocks::stone().stateId);
+    CHECK(blocks[1] == registry::blocks::water().stateId);
+    CHECK_FALSE(buffer.failed());
+}
+
+TEST_CASE("the heightmap is packed into the storage the client expects") {
+    // Sending one raw long per column is silently ignored client-side, which leaves the loading
+    // screen up forever.
+    Chunk chunk{0, 0};
+    chunk.setBlockStateId(0, 64, 0, registry::blocks::stone().stateId);
+    const std::vector<std::int64_t> packed = chunkDataCodec::encodeHeightmap(chunk);
+    // 385 values need nine bits each, and 256 of those fit in 37 longs.
+    CHECK(packed.size() == 37);
+
+    // The first column reads back as the height above the chunk's own floor, not the absolute one.
+    basalt::wire::protocol::play::BitStorage storage{9, 256, std::vector<std::uint64_t>{packed.begin(), packed.end()}};
+    CHECK(storage.get(0) == 65 - chunk.verticalBounds().minY());
+}
+
+TEST_CASE("an unlit chunk sends empty masks rather than empty arrays") {
+    Chunk chunk{0, 0};
+    const chunkDataCodec::LightData data = chunkDataCodec::encodeLight(chunk, false);
+    // No sky light asked for, and nothing burning: both sides are empty.
+    CHECK(data.skyLight.empty());
+    CHECK(data.blockLight.empty());
+    CHECK(data.skyLightMask.front() == 0);
+
+    // With sky light every section of an empty chunk is fully lit, so none of them is empty.
+    const chunkDataCodec::LightData lit = chunkDataCodec::encodeLight(chunk, true);
+    CHECK(lit.skyLight.size() == chunk.sectionCount());
+    CHECK(lit.emptySkyLightMask.front() == 0);
 }

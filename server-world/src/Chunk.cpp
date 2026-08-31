@@ -110,7 +110,31 @@ bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std:
     }
     dirty_ = true;
     updateHeights(x, y, z, stateId);
+    invalidateLight();
     return true;
+}
+
+const Chunk::PackedLight& Chunk::skyLight(const std::function<PackedLight()>& compute) {
+    if (!skyLight_.has_value()) {
+        skyLight_ = compute();
+    }
+    return *skyLight_;
+}
+
+const Chunk::PackedLight& Chunk::blockLight(const std::function<PackedLight()>& compute) {
+    if (!blockLight_.has_value()) {
+        blockLight_ = compute();
+    }
+    return *blockLight_;
+}
+
+const Chunk::PackedLight* Chunk::cachedSkyLight() const { return skyLight_.has_value() ? &*skyLight_ : nullptr; }
+
+const Chunk::PackedLight* Chunk::cachedBlockLight() const { return blockLight_.has_value() ? &*blockLight_ : nullptr; }
+
+void Chunk::invalidateLight() {
+    skyLight_.reset();
+    blockLight_.reset();
 }
 
 void Chunk::increaseInhabitedTime(std::int64_t delta) {
@@ -169,7 +193,10 @@ std::int32_t Chunk::worldgenHeightAt(std::int32_t x, std::int32_t z, HeightmapTy
     return (*worldgenHeights_)[static_cast<std::size_t>(type)][static_cast<std::size_t>(x + z * 16)];
 }
 
-void Chunk::invalidateHeightmaps() { heightsValid_ = false; }
+void Chunk::invalidateHeightmaps() {
+    heightsValid_ = false;
+    invalidateLight();
+}
 
 void Chunk::setBlockEntity(ChunkBlockEntity blockEntity) {
     if (blockEntity.y() < bounds_.minY() || blockEntity.y() > bounds_.maxY()) {
