@@ -48,6 +48,9 @@ basalt_module(server-world
     src/terrain/decoration/PatchRegion.cpp
     src/terrain/decoration/PlainsFlowerFeatures.cpp
     src/terrain/decoration/TallGrassDecoration.cpp
+    src/terrain/decoration/tree/TreeBlockRules.cpp
+    src/terrain/decoration/tree/TreeHelpers.cpp
+    src/terrain/decoration/tree/TreeTrunkPlacers.cpp
     src/terrain/decoration/VinePatchDecoration.cpp
     src/terrain/decoration/SugarCanePatchDecoration.cpp
     src/terrain/decoration/SurfaceFreezingDecoration.cpp
@@ -83,6 +86,24 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-types-test
+    SOURCES
+        test/TreeTypesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-block-rules-test
+    SOURCES
+        test/TreeBlockRulesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-trunk-placers-test
+    SOURCES
+        test/TreeTrunkPlacersTest.cpp
     DEPENDS basalt::server-world
 )
 
