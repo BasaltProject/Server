@@ -26,6 +26,8 @@ basalt_module(server-world
     src/structure/StructureProcessor.cpp
     src/structure/StructureQueries.cpp
     src/structure/StructureSpawnOverrides.cpp
+    src/structure/StructureTemplate.cpp
+    src/structure/StructureTemplateTransform.cpp
     src/structure/StructureTransform.cpp
         src/terrain/carver/NetherCaveCarver.cpp
     src/terrain/carver/OverworldCarvers.cpp
@@ -37,6 +39,7 @@ basalt_module(server-world
     src/terrain/decoration/ExtraVegetationDecoration.cpp
     src/terrain/decoration/FireflyBushPatchDecoration.cpp
     src/terrain/decoration/FlowerFeatures.cpp
+    src/terrain/decoration/FossilFeature.cpp
     src/terrain/decoration/FlowerPatchDecoration.cpp
     src/terrain/decoration/FlowerVegetation.cpp
     src/terrain/decoration/ForestRockDecoration.cpp
@@ -67,6 +70,7 @@ basalt_module(server-world
     src/terrain/decoration/MushroomFieldsDecoration.cpp
     src/terrain/decoration/OverworldBiomePaths.cpp
     src/terrain/decoration/OverworldSpringDecoration.cpp
+    src/terrain/decoration/OverworldUndergroundStructures.cpp
     src/terrain/decoration/OverworldVegetalDecoration.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacedFeatures.cpp
@@ -388,6 +392,18 @@ basalt_test(server-world-structure-tables-test
 basalt_test(server-world-structure-processor-test
     SOURCES
         test/StructureProcessorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-structure-template-test
+    SOURCES
+        test/StructureTemplateTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-underground-structures-test
+    SOURCES
+        test/UndergroundStructuresTest.cpp
     DEPENDS basalt::server-world
 )
 
