@@ -53,3 +53,8 @@ gradle-app.setting
 *.db
 *.db-shm
 *.db-wal
+
+# CMake
+/build/
+.cache/
+compile_commands.json
