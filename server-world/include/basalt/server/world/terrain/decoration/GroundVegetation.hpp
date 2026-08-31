@@ -55,6 +55,16 @@ namespace savannaGroundDecoration {
 
 } // namespace savannaGroundDecoration
 
+/// Desert ground cover: `patch_dry_grass_desert`, then `patch_dead_bush_2`.
+namespace desertDecoration {
+
+[[nodiscard]] const BiomeVegetalDecoration& decoration();
+
+/// The patch at one origin, which is what `/place feature` runs for `patch_dead_bush`.
+void placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin);
+
+} // namespace desertDecoration
+
 /// Badlands ground cover: `patch_dry_grass_badlands`, then `patch_dead_bush_badlands`.
 namespace badlandsDecoration {
 

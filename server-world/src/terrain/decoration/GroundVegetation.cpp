@@ -118,6 +118,26 @@ const BiomeVegetalDecoration& savannaGroundDecoration::windswept() {
     return decoration;
 }
 
+void desertDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
+    const SimpleBlockFeature feature{constant("dead_bush")};
+    placeFrom(chunk, random, origin, {countPlacement(4), randomOffsetPlacement(7, 3), airTargetFilter()},
+              [&chunk, &random, &feature](const DecorationPos& position) { feature.place(chunk, random, position); });
+}
+
+const BiomeVegetalDecoration& desertDecoration::decoration() {
+    static const BiomeVegetalDecoration built = [](Chunk& chunk, random::RandomSource& random) {
+        dryGrassDecoration::desert()(chunk, random);
+        // parity: placed_feature/patch_dead_bush_2.json, worldSurfaceSquaredWithCount(2) plus
+        // copyAndAdd. The outer count is two here and twenty in the badlands variant.
+        const SimpleBlockFeature feature{constant("dead_bush")};
+        runFromChunkCorner(chunk, random,
+                           {countPlacement(2), inSquarePlacement(), heightmapPlacement(), countPlacement(4),
+                            randomOffsetPlacement(7, 3), airTargetFilter()},
+                           feature);
+    };
+    return built;
+}
+
 const BiomeVegetalDecoration& badlandsDecoration::decoration() {
     static const BiomeVegetalDecoration built = [](Chunk& chunk, random::RandomSource& random) {
         dryGrassDecoration::badlands()(chunk, random);
