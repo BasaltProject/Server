@@ -15,11 +15,16 @@ basalt_module(server-world
         src/noise/ImprovedNoise.cpp
         src/region/ChunkNbt.cpp
         src/structure/StructureBounds.cpp
-        src/terrain/TerrainProvider.cpp
+        src/terrain/BiomeClimateData.cpp
+    src/terrain/BiomeTemperature.cpp
+    src/terrain/BiomeZoomer.cpp
+    src/terrain/TerrainProvider.cpp
     src/terrain/NoiseRouterData.cpp
+    src/terrain/OverworldAquifer.cpp
         src/noise/NormalNoise.cpp
         src/noise/PerlinNoise.cpp
         src/noise/SimplexNoise.cpp
+    src/noise/PerlinSimplexNoise.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::wire-common basalt::wire-protocol
 )
 
@@ -32,6 +37,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-biome-test
+    SOURCES
+        test/BiomeTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-aquifer-test
+    SOURCES
+        test/AquiferTest.cpp
     DEPENDS basalt::server-world
 )
 
