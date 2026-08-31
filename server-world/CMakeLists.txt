@@ -57,7 +57,10 @@ basalt_module(server-world
     src/terrain/decoration/BambooVegetationDecoration.cpp
     src/terrain/decoration/CactusFeature.cpp
     src/terrain/decoration/CaveLocalModificationDecoration.cpp
+    src/terrain/decoration/CoralDecoration.cpp
     src/terrain/decoration/CaveSpeleothemDecoration.cpp
+    src/terrain/decoration/SculkDecoration.cpp
+    src/terrain/decoration/SculkVeinSpread.cpp
     src/terrain/decoration/JungleFeatures.cpp
     src/terrain/decoration/LushVegetationPatchFeature.cpp
     src/terrain/decoration/MelonPatchDecoration.cpp
@@ -217,6 +220,18 @@ basalt_test(server-world-jungle-features-test
 basalt_test(server-world-cave-local-modification-test
     SOURCES
         test/CaveLocalModificationTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-sculk-test
+    SOURCES
+        test/SculkTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-coral-test
+    SOURCES
+        test/CoralTest.cpp
     DEPENDS basalt::server-world
 )
 
