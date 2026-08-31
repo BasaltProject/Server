@@ -23,7 +23,7 @@ TEST_CASE("a constant spline ignores where it is sampled") {
 }
 
 TEST_CASE("a spline passes through every point it was given") {
-    std::vector<std::unique_ptr<CubicSpline<float>>> values;
+    std::vector<SplineRef<float>> values;
     values.push_back(constantSpline<float>(0.0F));
     values.push_back(constantSpline<float>(1.0F));
     values.push_back(constantSpline<float>(4.0F));
@@ -39,7 +39,7 @@ TEST_CASE("a spline passes through every point it was given") {
 }
 
 TEST_CASE("past its ends a spline carries on along the endpoint's own tangent") {
-    std::vector<std::unique_ptr<CubicSpline<float>>> values;
+    std::vector<SplineRef<float>> values;
     values.push_back(constantSpline<float>(10.0F));
     values.push_back(constantSpline<float>(20.0F));
     const auto spline =
@@ -50,7 +50,7 @@ TEST_CASE("past its ends a spline carries on along the endpoint's own tangent") 
     CHECK(spline->sample(3.0F) == doctest::Approx(20.0F + 6.0F));
 
     // A zero tangent means it simply stops.
-    std::vector<std::unique_ptr<CubicSpline<float>>> flat;
+    std::vector<SplineRef<float>> flat;
     flat.push_back(constantSpline<float>(7.0F));
     const auto held = MultipointSpline<float>::create(identity(-10.0F, 10.0F), {0.0F}, std::move(flat), {0.0F});
     CHECK(held->sample(-5.0F) == 7.0F);
@@ -58,7 +58,7 @@ TEST_CASE("past its ends a spline carries on along the endpoint's own tangent") 
 }
 
 TEST_CASE("the bounds cover what the spline can actually reach") {
-    std::vector<std::unique_ptr<CubicSpline<float>>> values;
+    std::vector<SplineRef<float>> values;
     values.push_back(constantSpline<float>(0.0F));
     values.push_back(constantSpline<float>(1.0F));
     const auto spline =
@@ -73,12 +73,13 @@ TEST_CASE("the bounds cover what the spline can actually reach") {
 }
 
 TEST_CASE("a spline of splines samples through its children") {
-    std::vector<std::unique_ptr<CubicSpline<float>>> inner;
+    std::vector<SplineRef<float>> inner;
     inner.push_back(constantSpline<float>(1.0F));
     inner.push_back(constantSpline<float>(3.0F));
-    auto nested = MultipointSpline<float>::create(identity(0.0F, 1.0F), {0.0F, 1.0F}, std::move(inner), {0.0F, 0.0F});
+    SplineRef<float> nested =
+        MultipointSpline<float>::create(identity(0.0F, 1.0F), {0.0F, 1.0F}, std::move(inner), {0.0F, 0.0F});
 
-    std::vector<std::unique_ptr<CubicSpline<float>>> outer;
+    std::vector<SplineRef<float>> outer;
     outer.push_back(std::move(nested));
     outer.push_back(constantSpline<float>(9.0F));
     const auto spline =
@@ -88,7 +89,7 @@ TEST_CASE("a spline of splines samples through its children") {
 }
 
 TEST_CASE("ragged or empty input is refused rather than sampled") {
-    std::vector<std::unique_ptr<CubicSpline<float>>> one;
+    std::vector<SplineRef<float>> one;
     one.push_back(constantSpline<float>(0.0F));
     CHECK_THROWS_AS(static_cast<void>(MultipointSpline<float>::create(identity(0.0F, 1.0F), {0.0F, 1.0F},
                                                                       std::move(one), {0.0F, 0.0F})),

@@ -1,4 +1,5 @@
 #include <basalt/server/world/climate/Climate.hpp>
+#include <basalt/server/world/climate/Sampler.hpp>
 
 #include <atomic>
 #include <stdexcept>
@@ -58,6 +59,16 @@ ParameterPoint parameters(float temperature, float humidity, float continentalne
     return {parameterPointAt(temperature), parameterPointAt(humidity), parameterPointAt(continentalness),
             parameterPointAt(erosion),     parameterPointAt(depth),    parameterPointAt(weirdness),
             quantizeCoord(offset)};
+}
+
+TargetPoint Sampler::sample(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ,
+                            densityfunction::DensityCache* cache) const {
+    // parity: QuartPos.toBlock. A quart is four blocks, which is vanilla's biome grid resolution.
+    densityfunction::FunctionContext context{quartX << 2, quartY << 2, quartZ << 2, cache};
+    return target(static_cast<float>(temperature_->compute(context)), static_cast<float>(humidity_->compute(context)),
+                  static_cast<float>(continentalness_->compute(context)),
+                  static_cast<float>(erosion_->compute(context)), static_cast<float>(depth_->compute(context)),
+                  static_cast<float>(weirdness_->compute(context)));
 }
 
 } // namespace basalt::server::world::climate

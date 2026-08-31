@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <vector>
 
 namespace basalt::server::world::spline {
@@ -45,6 +46,11 @@ protected:
     CubicSpline() = default;
 };
 
+/// A child of a spline. Shared rather than owned outright because vanilla adds the *same* spline at
+/// more than one point, and building it twice would be a second object with the same numbers.
+template <typename C>
+using SplineRef = std::shared_ptr<const CubicSpline<C>>;
+
 /// parity: `CubicSpline.Constant`, which ignores its coordinate.
 template <typename C>
 class ConstantSpline final : public CubicSpline<C> {
@@ -67,9 +73,9 @@ class MultipointSpline final : public CubicSpline<C> {
 public:
     /// Refuses ragged or empty input: every caller builds one from constants, and a spline with no
     /// points has no value to give.
-    [[nodiscard]] static std::unique_ptr<MultipointSpline> create(BoundedFloatFunction<C> coordinate,
+    [[nodiscard]] static std::shared_ptr<MultipointSpline> create(BoundedFloatFunction<C> coordinate,
                                                                   std::vector<float> locations,
-                                                                  std::vector<std::unique_ptr<CubicSpline<C>>> values,
+                                                                  std::vector<SplineRef<C>> values,
                                                                   std::vector<float> derivatives);
 
     [[nodiscard]] float sample(const C& coordinate) const override;
@@ -82,23 +88,60 @@ public:
 
     [[nodiscard]] std::span<const float> derivatives() const noexcept { return derivatives_; }
 
-    MultipointSpline(BoundedFloatFunction<C> coordinate, std::vector<float> locations,
-                     std::vector<std::unique_ptr<CubicSpline<C>>> values, std::vector<float> derivatives,
-                     float minValue, float maxValue);
+    MultipointSpline(BoundedFloatFunction<C> coordinate, std::vector<float> locations, std::vector<SplineRef<C>> values,
+                     std::vector<float> derivatives, float minValue, float maxValue);
 
 private:
     BoundedFloatFunction<C> coordinate_;
     std::vector<float> locations_;
-    std::vector<std::unique_ptr<CubicSpline<C>>> values_;
+    std::vector<SplineRef<C>> values_;
     std::vector<float> derivatives_;
     float minValue_;
     float maxValue_;
 };
 
+/// Builds a multipoint spline point by point, which is how every terrain spline is written.
+///
+/// Points must go in ascending order: the sampler binary-searches them, so an unordered one is not
+/// a slower spline but a wrong one.
+template <typename C>
+class CubicSplineBuilder {
+public:
+    explicit CubicSplineBuilder(BoundedFloatFunction<C> coordinate) : coordinate_(std::move(coordinate)) {}
+
+    CubicSplineBuilder& addPoint(float location, float value, float derivative = 0.0F) {
+        return addPoint(location, std::make_shared<ConstantSpline<C>>(value), derivative);
+    }
+
+    CubicSplineBuilder& addPoint(float location, SplineRef<C> sampler, float derivative = 0.0F) {
+        if (!locations_.empty() && location <= locations_.back()) {
+            throw std::invalid_argument{"spline points must be added in ascending order"};
+        }
+        locations_.push_back(location);
+        values_.push_back(std::move(sampler));
+        derivatives_.push_back(derivative);
+        return *this;
+    }
+
+    [[nodiscard]] SplineRef<C> build() {
+        if (locations_.empty()) {
+            throw std::invalid_argument{"a spline with no points has no value to give"};
+        }
+        return MultipointSpline<C>::create(std::move(coordinate_), std::move(locations_), std::move(values_),
+                                           std::move(derivatives_));
+    }
+
+private:
+    BoundedFloatFunction<C> coordinate_;
+    std::vector<float> locations_;
+    std::vector<SplineRef<C>> values_;
+    std::vector<float> derivatives_;
+};
+
 /// A constant, as a spline. The common leaf of every built-in spline in the game.
 template <typename C>
-[[nodiscard]] std::unique_ptr<CubicSpline<C>> constantSpline(float value) {
-    return std::make_unique<ConstantSpline<C>>(value);
+[[nodiscard]] SplineRef<C> constantSpline(float value) {
+    return std::make_shared<ConstantSpline<C>>(value);
 }
 
 } // namespace basalt::server::world::spline

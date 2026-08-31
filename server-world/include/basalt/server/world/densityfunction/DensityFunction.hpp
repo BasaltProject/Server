@@ -131,7 +131,7 @@ namespace functions {
 [[nodiscard]] Function rangeChoice(Function input, double minInclusive, double maxExclusive, Function whenInRange,
                                    Function whenOutOfRange);
 [[nodiscard]] Function intervalSelect(Function input, std::vector<double> thresholds, std::vector<Function> functions);
-[[nodiscard]] Function spline(std::unique_ptr<const spline::CubicSpline<FunctionContext>> curve);
+[[nodiscard]] Function spline(spline::SplineRef<FunctionContext> curve);
 
 /// parity: `BlendedNoise`, the base 3D terrain noise every dimension samples one of.
 ///

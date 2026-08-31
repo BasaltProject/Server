@@ -390,8 +390,7 @@ std::atomic<std::size_t> nextSlot{0};
 /// parity: `DensityFunctions.Spline`.
 class SplineFunction final : public DensityFunction {
 public:
-    explicit SplineFunction(std::unique_ptr<const spline::CubicSpline<FunctionContext>> curve)
-        : curve_(std::move(curve)) {}
+    explicit SplineFunction(spline::SplineRef<FunctionContext> curve) : curve_(std::move(curve)) {}
 
     [[nodiscard]] double compute(FunctionContext& context) const override {
         return static_cast<double>(curve_->sample(context));
@@ -402,7 +401,7 @@ public:
     [[nodiscard]] double maxValue() const override { return static_cast<double>(curve_->maxValue()); }
 
 private:
-    std::unique_ptr<const spline::CubicSpline<FunctionContext>> curve_;
+    spline::SplineRef<FunctionContext> curve_;
 };
 
 /// parity: `BlendedNoise`. The three noises are seeded off one shared source, in this order.
@@ -732,9 +731,7 @@ Function intervalSelect(Function input, std::vector<double> thresholds, std::vec
     return std::make_shared<IntervalSelect>(std::move(input), std::move(thresholds), std::move(functions));
 }
 
-Function spline(std::unique_ptr<const spline::CubicSpline<FunctionContext>> curve) {
-    return std::make_shared<SplineFunction>(std::move(curve));
-}
+Function spline(spline::SplineRef<FunctionContext> curve) { return std::make_shared<SplineFunction>(std::move(curve)); }
 
 Function lerp(Function alpha, Function first, Function second) {
     if (const std::optional<double> fixed = first->constantValue()) {
