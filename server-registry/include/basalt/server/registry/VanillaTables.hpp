@@ -174,4 +174,6 @@ struct FireOddsEntry {
 /// Read from the item component report the data generator writes (see `basalt.datagen`).
 [[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> trimMaterialsTable();
 
+[[nodiscard]] std::string_view blockSupportIndexTable();
+
 } // namespace basalt::server::registry

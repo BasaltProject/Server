@@ -1,7 +1,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
@@ -236,4 +239,151 @@ TEST_CASE("what burns in a furnace burns for a while") {
     CHECK(fuels::isFuel(Identifier::vanilla("coal")));
     CHECK(fuels::burnTicks(Identifier::vanilla("coal")) > 0);
     CHECK_FALSE(fuels::isFuel(Identifier::vanilla("stone")));
+}
+
+TEST_CASE("a block that needs holding up says so, and stone does not") {
+    const std::int32_t stone = blocks::stone().stateId;
+    CHECK_FALSE(blockSupport::needsSupport(stone));
+
+    // A torch needs a face under or beside it, which is the whole point of the support table.
+    const std::optional<std::int32_t> torch = blocks::stateIdOf(Identifier::vanilla("torch"), {});
+    REQUIRE(torch.has_value());
+    CHECK(blockSupport::needsSupport(*torch));
+    CHECK(blockSupport::isModelled(*torch));
+
+    const std::int32_t air = blocks::air().stateId;
+    // Standing on stone it survives; floating in air it does not.
+    CHECK(blockSupport::canSurvive(*torch, stone, air, air, air, air, air));
+    CHECK_FALSE(blockSupport::canSurvive(*torch, air, air, air, air, air, air));
+}
+
+TEST_CASE("water and everything holding it answer the same question") {
+    const std::int32_t water = blocks::water().stateId;
+    CHECK(blockSupport::holdsWater(water));
+    CHECK_FALSE(blockSupport::holdsWater(blocks::stone().stateId));
+
+    const std::optional<std::int32_t> wetSlab =
+        blocks::stateIdOf(Identifier::vanilla("stone_slab"), {{"type", "bottom"}, {"waterlogged", "true"}});
+    REQUIRE(wetSlab.has_value());
+    CHECK(blockSupport::holdsWater(*wetSlab));
+}
+
+TEST_CASE("a piston moves what nobody named and refuses what it cannot") {
+    // parity: the table lists only the states that are not Normal, which is nearly everything.
+    CHECK(blockSupport::pushReaction(blocks::stone().stateId) == PushReaction::Normal);
+
+    const std::optional<std::int32_t> obsidian = blocks::stateIdOf(Identifier::vanilla("barrier"), {});
+    REQUIRE(obsidian.has_value());
+    CHECK(blockSupport::pushReaction(*obsidian) == PushReaction::Block);
+
+    // A flower comes off rather than riding along.
+    const std::optional<std::int32_t> sapling = blocks::stateIdOf(Identifier::vanilla("acacia_sapling"), {});
+    REQUIRE(sapling.has_value());
+    CHECK(blockSupport::pushReaction(*sapling) == PushReaction::Destroy);
+
+    // Bedrock is Normal here and a piston still will not move it: what stops it is its destroy time
+    // of -1, which PistonBaseBlock checks separately. parity: Block.isPushable.
+    CHECK(blockSupport::pushReaction(blocks::bedrock().stateId) == PushReaction::Normal);
+    CHECK(blocks::hardnessOf(blocks::bedrock().block)->isUnbreakable());
+}
+
+TEST_CASE("conducting redstone is not the same as being solid") {
+    // A slab conducts, a piece of glass does not.
+    CHECK(blockSupport::conductsRedstone(blocks::stone().stateId));
+    const std::optional<std::int32_t> glass = blocks::stateIdOf(Identifier::vanilla("glass"), {});
+    REQUIRE(glass.has_value());
+    CHECK(blockShapes::isFullCube(*glass));
+    CHECK_FALSE(blockSupport::conductsRedstone(*glass));
+}
+
+TEST_CASE("a mob's attributes are its own") {
+    // parity: DefaultAttributes. A cow is not a zombie is not a rabbit.
+    const std::optional<double> cow =
+        entityAttributes::baseValue(Identifier::vanilla("cow"), entityAttributes::kMaxHealth);
+    const std::optional<double> zombie =
+        entityAttributes::baseValue(Identifier::vanilla("zombie"), entityAttributes::kMaxHealth);
+    REQUIRE(cow.has_value());
+    REQUIRE(zombie.has_value());
+    CHECK(*cow != *zombie);
+    // The name travels with or without its namespace, since a plugin will write both.
+    CHECK(entityAttributes::baseValue(Identifier::vanilla("cow"), "minecraft:max_health") == cow);
+    // Having attributes at all is what being alive means.
+    CHECK(entityAttributes::isLiving(Identifier::vanilla("cow")));
+    CHECK_FALSE(entityAttributes::isLiving(Identifier::vanilla("item")));
+}
+
+TEST_CASE("an attribute travels as the number its registry gives it") {
+    // This table exists because these were written by hand once and attack_speed went out as
+    // attack_knockback, which is a mistake nobody spots by reading the code.
+    CHECK(attributeIds::protocolId("attack_speed") == 5);
+    CHECK(attributeIds::protocolId("minecraft:attack_knockback") == 4);
+    CHECK(attributeIds::protocolId("max_health") == 23);
+    CHECK_FALSE(attributeIds::exists("not_an_attribute"));
+}
+
+TEST_CASE("brewing walks the chain vanilla builds in code") {
+    // parity: PotionBrewing.bootstrap. Water plus nether wart is the awkward potion every other
+    // brew starts from.
+    const Identifier bottle = Identifier::vanilla("potion");
+    const std::optional<brewing::Brew> awkward =
+        brewing::mix(bottle, std::string{"water"}, Identifier::vanilla("nether_wart"));
+    REQUIRE(awkward.has_value());
+    CHECK(awkward->potion == "awkward");
+    CHECK(awkward->bottle == bottle);
+
+    // Gunpowder changes the bottle and leaves what is in it alone.
+    const std::optional<brewing::Brew> splash =
+        brewing::mix(bottle, std::string{"awkward"}, Identifier::vanilla("gunpowder"));
+    REQUIRE(splash.has_value());
+    CHECK(splash->bottle == Identifier::vanilla("splash_potion"));
+    CHECK(splash->potion == "awkward");
+
+    CHECK(brewing::isIngredient(Identifier::vanilla("nether_wart")));
+    // Stone really is one of the twenty one ingredients: water and stone give a mundane potion, and
+    // awkward and stone give an infested one. Twenty one, not the handful it used to be.
+    CHECK(brewing::isIngredient(Identifier::vanilla("stone")));
+    CHECK_FALSE(brewing::isIngredient(Identifier::vanilla("dirt")));
+    CHECK_FALSE(brewing::mix(bottle, std::string{"water"}, Identifier::vanilla("dirt")).has_value());
+}
+
+TEST_CASE("a slime's spawn box is bigger than the slime") {
+    // parity: the cube mobs carry a builder-only safety scale on the box a spawn is checked against.
+    const Identifier slime = Identifier::vanilla("slime");
+    CHECK(entityTypeShapes::spawnWidthOf(slime) == entityTypeShapes::widthOf(slime) * 4.0);
+    const Identifier cow = Identifier::vanilla("cow");
+    CHECK(entityTypeShapes::spawnWidthOf(cow) == entityTypeShapes::widthOf(cow));
+    CHECK(entityTypeShapes::categoryOf(cow) == "creature");
+    CHECK(entityTypeShapes::isFireImmune(Identifier::vanilla("blaze")));
+    CHECK(entityTypeShapes::isImmuneTo(Identifier::vanilla("fox"), "sweet_berry_bush"));
+    CHECK_FALSE(entityTypeShapes::isImmuneTo(Identifier::vanilla("cow"), "sweet_berry_bush"));
+}
+
+TEST_CASE("the first matching tool rule wins, which is what an exclusion is for") {
+    // parity: ToolComponent. `incorrect_for_diamond_tool` is listed first, so it beats the
+    // `mineable/pickaxe` rule that follows it.
+    const Identifier pickaxe = Identifier::vanilla("diamond_pickaxe");
+    const std::span<const itemTools::Rule> rules = itemTools::rulesFor(pickaxe);
+    REQUIRE(rules.size() >= 2);
+    CHECK(rules.front().blockTag.find("incorrect_for") != std::string_view::npos);
+
+    const Identifier obsidian = Identifier::vanilla("obsidian");
+    // A lookup that says the exclusion holds it: the tool is then not correct, whatever follows.
+    const auto excluded = [](std::string_view tag, const Identifier&) {
+        return tag.find("incorrect_for") != std::string_view::npos;
+    };
+    CHECK_FALSE(itemTools::isCorrectForDrops(&pickaxe, obsidian, excluded));
+
+    const auto mineable = [](std::string_view tag, const Identifier&) { return tag == "minecraft:mineable/pickaxe"; };
+    CHECK(itemTools::isCorrectForDrops(&pickaxe, obsidian, mineable));
+    CHECK(itemTools::miningSpeed(&pickaxe, obsidian, mineable) > 1.0F);
+    // A bare hand is never correct, which is why stone gives nothing when punched.
+    CHECK_FALSE(itemTools::isCorrectForDrops(nullptr, obsidian, mineable));
+    CHECK(itemTools::miningSpeed(nullptr, obsidian, mineable) == 1.0F);
+}
+
+TEST_CASE("a block with no hardness comes apart on the spot and bedrock never does") {
+    const auto never = [](std::string_view, const Identifier&) { return false; };
+    const Identifier flower = Identifier::vanilla("dandelion");
+    CHECK(itemTools::destroyProgressPerTick(nullptr, flower, 0.0F, false, {}, never) > 1.0F);
+    CHECK(itemTools::destroyProgressPerTick(nullptr, Identifier::vanilla("bedrock"), -1.0F, false, {}, never) == 0.0F);
 }
