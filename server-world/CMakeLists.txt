@@ -20,7 +20,12 @@ basalt_module(server-world
         src/noise/ImprovedNoise.cpp
         src/region/ChunkNbt.cpp
         src/structure/StructureBounds.cpp
+    src/structure/ConcentricRingsPlacement.cpp
+    src/structure/MineshaftBlocks.cpp
+    src/structure/StructurePlacementGrid.cpp
+    src/structure/StructureProcessor.cpp
     src/structure/StructureQueries.cpp
+    src/structure/StructureSpawnOverrides.cpp
     src/structure/StructureTransform.cpp
         src/terrain/carver/NetherCaveCarver.cpp
     src/terrain/carver/OverworldCarvers.cpp
@@ -365,6 +370,24 @@ basalt_test(server-world-portal-shape-test
 basalt_test(server-world-structure-transform-test
     SOURCES
         test/StructureTransformTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-structure-placement-test
+    SOURCES
+        test/StructurePlacementTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-structure-tables-test
+    SOURCES
+        test/StructureTablesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-structure-processor-test
+    SOURCES
+        test/StructureProcessorTest.cpp
     DEPENDS basalt::server-world
 )
 
