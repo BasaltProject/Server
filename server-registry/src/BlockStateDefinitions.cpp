@@ -24,7 +24,7 @@ struct Table {
 
 [[nodiscard]] Table build() {
     Table table;
-    for (const std::string_view encoded : blockStateProperties()) {
+    for (const std::string_view encoded : blockStatePropertiesTable()) {
         const std::size_t firstBar = encoded.find('|');
         const std::size_t secondBar = encoded.find('|', firstBar + 1);
         std::int32_t firstStateId = 0;
@@ -59,8 +59,8 @@ struct Table {
 
     // A block with a single state is not in the table above, so its own id starts and ends it.
     std::vector<std::pair<std::int32_t, Identifier>> firsts;
-    firsts.reserve(defaultBlockStates().size());
-    for (const auto& [stateId, path] : defaultBlockStates()) {
+    firsts.reserve(defaultBlockStatesTable().size());
+    for (const auto& [stateId, path] : defaultBlockStatesTable()) {
         Identifier block = Identifier::vanilla(std::string{path});
         const auto found = table.byBlock.find(block);
         firsts.emplace_back(found == table.byBlock.end() ? stateId : found->second.firstStateId(), std::move(block));

@@ -25,7 +25,7 @@ std::string join(std::initializer_list<std::string_view> parts) {
     return out;
 }
 
-constexpr std::array<std::pair<std::int32_t, std::string_view>, 1537> kItemIds = {{
+constexpr std::array<std::pair<std::int32_t, std::string_view>, 1537> kItemIdsTable = {{
     {0, "air"},
     {1, "stone"},
     {2, "granite"},
@@ -1565,7 +1565,7 @@ constexpr std::array<std::pair<std::int32_t, std::string_view>, 1537> kItemIds =
     {1536, "ominous_bottle"},
 }};
 
-constexpr std::array<std::pair<std::int32_t, std::string_view>, 158> kEntityTypeIds = {{
+constexpr std::array<std::pair<std::int32_t, std::string_view>, 158> kEntityTypeIdsTable = {{
     {0, "acacia_boat"},
     {1, "acacia_chest_boat"},
     {2, "allay"},
@@ -1726,7 +1726,7 @@ constexpr std::array<std::pair<std::int32_t, std::string_view>, 158> kEntityType
     {157, "fishing_bobber"},
 }};
 
-constexpr std::array<std::pair<std::int32_t, std::string_view>, 125> kParticleTypeIds = {{
+constexpr std::array<std::pair<std::int32_t, std::string_view>, 125> kParticleTypeIdsTable = {{
     {0, "angry_villager"},
     {1, "block"},
     {2, "block_marker"},
@@ -1854,7 +1854,7 @@ constexpr std::array<std::pair<std::int32_t, std::string_view>, 125> kParticleTy
     {124, "sulfur_cube_goo"},
 }};
 
-constexpr std::array<std::pair<std::int32_t, std::string_view>, 111> kDataComponentIds = {{
+constexpr std::array<std::pair<std::int32_t, std::string_view>, 111> kDataComponentIdsTable = {{
     {0, "custom_data"},
     {1, "max_stack_size"},
     {2, "max_damage"},
@@ -1968,7 +1968,7 @@ constexpr std::array<std::pair<std::int32_t, std::string_view>, 111> kDataCompon
     {110, "shulker/color"},
 }};
 
-constexpr std::array<std::string_view, 49> kBlockEntityTypeNames = {{
+constexpr std::array<std::string_view, 49> kBlockEntityTypeNamesTable = {{
     "furnace",
     "chest",
     "trapped_chest",
@@ -2020,7 +2020,7 @@ constexpr std::array<std::string_view, 49> kBlockEntityTypeNames = {{
     "potent_sulfur",
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 186> kBlockEntityOwners = {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 186> kBlockEntityOwnersTable = {{
     {"acacia_hanging_sign", "hanging_sign"},
     {"acacia_shelf", "shelf"},
     {"acacia_sign", "sign"},
@@ -2764,7 +2764,7 @@ constexpr std::array<std::string_view, 524> kBlockShapes = {{
     "0|0|0|0|0|100000|100000|100000|000000|0,0,0,32,2,32",
 }};
 
-const std::string kBlockShapeIndex = join(
+const std::string kBlockShapeIndexTable = join(
     {"AAABABABABABABABABABABABABABABABABABABABABABABABABABABABABACACACACACACACACACACACACACACACACADACADACADACADACADACADA"
      "CADACADACADACADACADACADACADACADACADACADACADACADACADACADACABAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAEAE"
      "AEAEAEAEAEABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAFAFABABABABA"
@@ -3411,7 +3411,7 @@ const std::string kBlockShapeIndex = join(
      "CACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACACAC"
      "ACACACACACACACACACACACACACACACACACACACACACACACACEuEuAC"});
 
-constexpr std::array<std::string_view, 119> kSupportRules = {{
+constexpr std::array<std::string_view, 119> kSupportRulesTable = {{
     "#0|||||||||||",
     "|#1||||||||||",
     "#2|||||||||||",
@@ -3533,7 +3533,7 @@ constexpr std::array<std::string_view, 119> kSupportRules = {{
     "|#75||||||||||",
 }};
 
-constexpr std::array<std::string_view, 76> kSupportSets = {{
+constexpr std::array<std::string_view, 76> kSupportSetsTable = {{
     "AA8AAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABhAAAAABA=",
     "AAAAAAAAAAAAAAAAAQ==",
@@ -3660,7 +3660,7 @@ constexpr std::array<std::string_view, 76> kSupportSets = {{
     "////////8/8T8AAAAg4P///wDA7wDYly94mAH+fbi/4wAAAAAMd++7e3d3//////8P8P//DwAAEBDhd3f/XHc=",
 }};
 
-constexpr std::array<std::int32_t, 1508> kRandomTickingStates = {{
+constexpr std::array<std::int32_t, 1508> kRandomTickingStatesTable = {{
     8,     9,     29,    30,    31,    32,    33,    34,    35,    36,    37,    38,    39,    40,    41,    42,
     43,    44,    45,    46,    47,    48,    49,    50,    51,    52,    53,    54,    55,    56,    57,    58,
     59,    60,    61,    62,    63,    64,    65,    66,    67,    68,    69,    70,    71,    72,    73,    74,
@@ -3758,7 +3758,7 @@ constexpr std::array<std::int32_t, 1508> kRandomTickingStates = {{
     32361, 32362, 32363, 32364,
 }};
 
-constexpr std::array<std::pair<std::string_view, std::int32_t>, 280> kFuelValues = {{
+constexpr std::array<std::pair<std::string_view, std::int32_t>, 280> kFuelValuesTable = {{
     {"lava_bucket", 20000},
     {"coal_block", 16000},
     {"blaze_rod", 2400},
@@ -4041,7 +4041,7 @@ constexpr std::array<std::pair<std::string_view, std::int32_t>, 280> kFuelValues
     {"leaf_litter", 100},
 }};
 
-constexpr std::array<std::int32_t, 2874> kRedstoneConductorStates = {{
+constexpr std::array<std::int32_t, 2874> kRedstoneConductorStatesTable = {{
     1,     2,     3,     4,     5,     6,     7,     8,     9,     10,    11,    12,    13,    14,    15,    16,
     17,    18,    19,    20,    21,    22,    23,    24,    25,    26,    27,    28,    85,    118,   119,   120,
     121,   122,   123,   124,   125,   126,   127,   128,   129,   130,   131,   132,   133,   134,   135,   136,
@@ -4224,7 +4224,7 @@ constexpr std::array<std::int32_t, 2874> kRedstoneConductorStates = {{
     32185, 32186, 32187, 32188, 32189, 32190, 32191, 32192, 32193, 32196,
 }};
 
-constexpr std::array<std::pair<std::int32_t, std::string_view>, 7024> kPushReactions = {{
+constexpr std::array<std::pair<std::int32_t, std::string_view>, 7024> kPushReactionsTable = {{
     {29, "DESTROY"},      {30, "DESTROY"},      {31, "DESTROY"},      {32, "DESTROY"},      {33, "DESTROY"},
     {34, "DESTROY"},      {35, "DESTROY"},      {36, "DESTROY"},      {37, "DESTROY"},      {38, "DESTROY"},
     {39, "DESTROY"},      {40, "DESTROY"},      {41, "DESTROY"},      {42, "DESTROY"},      {43, "DESTROY"},
@@ -5632,7 +5632,7 @@ constexpr std::array<std::pair<std::int32_t, std::string_view>, 7024> kPushReact
     {32362, "DESTROY"},   {32363, "DESTROY"},   {32364, "DESTROY"},   {32365, "DESTROY"},
 }};
 
-constexpr std::array<BrewingMix, 65> kBrewingMixes = {{
+constexpr std::array<BrewingMix, 65> kBrewingMixesTable = {{
     {"potionMixes", "water", "glowstone_dust", "thick"},
     {"potionMixes", "water", "redstone", "mundane"},
     {"potionMixes", "water", "nether_wart", "awkward"},
@@ -5700,7 +5700,7 @@ constexpr std::array<BrewingMix, 65> kBrewingMixes = {{
     {"containerMixes", "splash_potion", "dragon_breath", "lingering_potion"},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 45> kWeatheringSteps = {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 45> kWeatheringStepsTable = {{
     {"copper_bars", "exposed_copper_bars"},
     {"exposed_copper_bars", "weathered_copper_bars"},
     {"weathered_copper_bars", "oxidized_copper_bars"},
@@ -5748,7 +5748,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 45> kWeather
     {"weathered_lightning_rod", "oxidized_lightning_rod"},
 }};
 
-constexpr std::array<FireOddsEntry, 207> kFireOdds = {{
+constexpr std::array<FireOddsEntry, 207> kFireOddsTable = {{
     {13, 5, 20},     {14, 5, 20},     {15, 5, 20},     {16, 5, 20},     {17, 5, 20},     {18, 5, 20},
     {19, 5, 20},     {20, 5, 5},      {21, 5, 20},     {22, 5, 20},     {23, 5, 20},     {24, 5, 20},
     {49, 5, 5},      {50, 5, 5},      {51, 5, 5},      {52, 5, 5},      {53, 5, 5},      {54, 5, 5},
@@ -5786,7 +5786,7 @@ constexpr std::array<FireOddsEntry, 207> kFireOdds = {{
     {1191, 60, 100}, {1192, 60, 100}, {1195, 60, 100},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 19> kBlockFamilies = {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 19> kBlockFamiliesTable = {{
     {"prevents_decay", "AAAQAAAA/uO///"
                        "8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
                        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAgwc="},
@@ -5825,7 +5825,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 19> kBlockFa
                     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB"},
 }};
 
-constexpr std::array<std::string_view, 297> kItemStacking = {{
+constexpr std::array<std::string_view, 297> kItemStackingTable = {{
     "acacia_boat|1|0",
     "acacia_chest_boat|1|0",
     "acacia_hanging_sign|16|0",
@@ -6125,7 +6125,7 @@ constexpr std::array<std::string_view, 297> kItemStacking = {{
     "yellow_shulker_box|1|0",
 }};
 
-constexpr std::array<std::string_view, 41> kItemArmour = {{
+constexpr std::array<std::string_view, 41> kItemArmourTable = {{
     "chainmail_boots|feet|1.0|0.0|0.0",
     "chainmail_chestplate|chest|5.0|0.0|0.0",
     "chainmail_helmet|head|2.0|0.0|0.0",
@@ -6169,7 +6169,7 @@ constexpr std::array<std::string_view, 41> kItemArmour = {{
     "wolf_armor|body|11.0|0.0|0.0",
 }};
 
-constexpr std::array<std::string_view, 42> kItemFood = {{
+constexpr std::array<std::string_view, 42> kItemFoodTable = {{
     "apple|4|2.4|false|1.6||",
     "baked_potato|5|6.0|false|1.6||",
     "beef|3|1.8000001|false|1.6||",
@@ -6215,7 +6215,7 @@ constexpr std::array<std::string_view, 42> kItemFood = {{
     "tropical_fish|1|0.2|false|1.6||",
 }};
 
-constexpr std::array<std::string_view, 42> kItemWeapons = {{
+constexpr std::array<std::string_view, 42> kItemWeaponsTable = {{
     "copper_axe|8.0|-3.200000047683716",
     "copper_hoe|0.0|-2.0",
     "copper_pickaxe|2.0|-2.799999952316284",
@@ -6260,12 +6260,12 @@ constexpr std::array<std::string_view, 42> kItemWeapons = {{
     "wooden_sword|3.0|-2.4000000953674316",
 }};
 
-constexpr std::array<std::string_view, 2> kPortalBlockStateSpecs = {{
+constexpr std::array<std::string_view, 2> kPortalBlockStateSpecsTable = {{
     "7017|nether_portal|axis=x,z",
     "9469|end_portal_frame|eye=true,false;facing=north,south,west,east",
 }};
 
-constexpr std::array<std::string_view, 168> kVillageBlockStateSpecs = {{
+constexpr std::array<std::string_view, 168> kVillageBlockStateSpecsTable = {{
     "0|air|",
     "2|granite|",
     "4|diorite|",
@@ -6459,7 +6459,7 @@ constexpr std::array<std::string_view, 168> kVillageBlockStateSpecs = {{
     "21743|composter|level=0,1,2,3,4,5,6,7,8",
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 715> kBlockInstruments = {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 715> kBlockInstrumentsTable = {{
     {"acacia_door", "bass"},
     {"acacia_fence", "bass"},
     {"acacia_fence_gate", "bass"},
@@ -7177,7 +7177,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 715> kBlockI
     {"zombie_head", "zombie"},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 5> kCraftingRemainders = {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 5> kCraftingRemaindersTable = {{
     {"dragon_breath", "glass_bottle"},
     {"honey_bottle", "glass_bottle"},
     {"lava_bucket", "bucket"},
@@ -7185,7 +7185,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 5> kCrafting
     {"water_bucket", "bucket"},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 14> kItemBlocks = {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 14> kItemBlocksTable = {{
     {"beetroot_seeds", "beetroots"},
     {"carrot", "carrots"},
     {"cocoa_beans", "cocoa"},
@@ -7202,7 +7202,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 14> kItemBlo
     {"wheat_seeds", "wheat"},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 11> kTrimMaterials = {{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 11> kTrimMaterialsTable = {{
     {"amethyst_shard", "amethyst"},
     {"copper_ingot", "copper"},
     {"diamond", "diamond"},
@@ -7218,60 +7218,66 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 11> kTrimMat
 
 } // namespace
 
-std::span<const std::pair<std::int32_t, std::string_view>> itemIds() { return kItemIds; }
+std::span<const std::pair<std::int32_t, std::string_view>> itemIdsTable() { return kItemIdsTable; }
 
-std::span<const std::pair<std::int32_t, std::string_view>> entityTypeIds() { return kEntityTypeIds; }
+std::span<const std::pair<std::int32_t, std::string_view>> entityTypeIdsTable() { return kEntityTypeIdsTable; }
 
-std::span<const std::pair<std::int32_t, std::string_view>> particleTypeIds() { return kParticleTypeIds; }
+std::span<const std::pair<std::int32_t, std::string_view>> particleTypeIdsTable() { return kParticleTypeIdsTable; }
 
-std::span<const std::pair<std::int32_t, std::string_view>> dataComponentIds() { return kDataComponentIds; }
+std::span<const std::pair<std::int32_t, std::string_view>> dataComponentIdsTable() { return kDataComponentIdsTable; }
 
-std::span<const std::string_view> blockEntityTypeNames() { return kBlockEntityTypeNames; }
+std::span<const std::string_view> blockEntityTypeNamesTable() { return kBlockEntityTypeNamesTable; }
 
-std::span<const std::pair<std::string_view, std::string_view>> blockEntityOwners() { return kBlockEntityOwners; }
+std::span<const std::pair<std::string_view, std::string_view>> blockEntityOwnersTable() {
+    return kBlockEntityOwnersTable;
+}
 
-std::span<const std::string_view> blockShapes() { return kBlockShapes; }
+std::span<const std::string_view> blockShapeSpecsTable() { return kBlockShapes; }
 
-std::string_view blockShapeIndex() { return kBlockShapeIndex; }
+std::string_view blockShapeIndexTable() { return kBlockShapeIndexTable; }
 
-std::span<const std::string_view> supportRules() { return kSupportRules; }
+std::span<const std::string_view> supportRulesTable() { return kSupportRulesTable; }
 
-std::span<const std::string_view> supportSets() { return kSupportSets; }
+std::span<const std::string_view> supportSetsTable() { return kSupportSetsTable; }
 
-std::span<const std::int32_t> randomTickingStates() { return kRandomTickingStates; }
+std::span<const std::int32_t> randomTickingStatesTable() { return kRandomTickingStatesTable; }
 
-std::span<const std::pair<std::string_view, std::int32_t>> fuelValues() { return kFuelValues; }
+std::span<const std::pair<std::string_view, std::int32_t>> fuelValuesTable() { return kFuelValuesTable; }
 
-std::span<const std::int32_t> redstoneConductorStates() { return kRedstoneConductorStates; }
+std::span<const std::int32_t> redstoneConductorStatesTable() { return kRedstoneConductorStatesTable; }
 
-std::span<const std::pair<std::int32_t, std::string_view>> pushReactions() { return kPushReactions; }
+std::span<const std::pair<std::int32_t, std::string_view>> pushReactionsTable() { return kPushReactionsTable; }
 
-std::span<const BrewingMix> brewingMixes() { return kBrewingMixes; }
+std::span<const BrewingMix> brewingMixesTable() { return kBrewingMixesTable; }
 
-std::span<const std::pair<std::string_view, std::string_view>> weatheringSteps() { return kWeatheringSteps; }
+std::span<const std::pair<std::string_view, std::string_view>> weatheringStepsTable() { return kWeatheringStepsTable; }
 
-std::span<const FireOddsEntry> fireOdds() { return kFireOdds; }
+std::span<const FireOddsEntry> fireOddsTable() { return kFireOddsTable; }
 
-std::span<const std::pair<std::string_view, std::string_view>> blockFamilies() { return kBlockFamilies; }
+std::span<const std::pair<std::string_view, std::string_view>> blockFamiliesTable() { return kBlockFamiliesTable; }
 
-std::span<const std::string_view> itemStacking() { return kItemStacking; }
+std::span<const std::string_view> itemStackingTable() { return kItemStackingTable; }
 
-std::span<const std::string_view> itemArmour() { return kItemArmour; }
+std::span<const std::string_view> itemArmourTable() { return kItemArmourTable; }
 
-std::span<const std::string_view> itemFood() { return kItemFood; }
+std::span<const std::string_view> itemFoodTable() { return kItemFoodTable; }
 
-std::span<const std::string_view> itemWeapons() { return kItemWeapons; }
+std::span<const std::string_view> itemWeaponsTable() { return kItemWeaponsTable; }
 
-std::span<const std::string_view> portalBlockStateSpecs() { return kPortalBlockStateSpecs; }
+std::span<const std::string_view> portalBlockStateSpecsTable() { return kPortalBlockStateSpecsTable; }
 
-std::span<const std::string_view> villageBlockStateSpecs() { return kVillageBlockStateSpecs; }
+std::span<const std::string_view> villageBlockStateSpecsTable() { return kVillageBlockStateSpecsTable; }
 
-std::span<const std::pair<std::string_view, std::string_view>> blockInstruments() { return kBlockInstruments; }
+std::span<const std::pair<std::string_view, std::string_view>> blockInstrumentsTable() {
+    return kBlockInstrumentsTable;
+}
 
-std::span<const std::pair<std::string_view, std::string_view>> craftingRemainders() { return kCraftingRemainders; }
+std::span<const std::pair<std::string_view, std::string_view>> craftingRemaindersTable() {
+    return kCraftingRemaindersTable;
+}
 
-std::span<const std::pair<std::string_view, std::string_view>> itemBlocks() { return kItemBlocks; }
+std::span<const std::pair<std::string_view, std::string_view>> itemBlocksTable() { return kItemBlocksTable; }
 
-std::span<const std::pair<std::string_view, std::string_view>> trimMaterials() { return kTrimMaterials; }
+std::span<const std::pair<std::string_view, std::string_view>> trimMaterialsTable() { return kTrimMaterialsTable; }
 
 } // namespace basalt::server::registry

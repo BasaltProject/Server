@@ -19,20 +19,20 @@ struct Tables {
 
 [[nodiscard]] Tables build() {
     Tables tables;
-    for (const auto& [stateId, path] : defaultBlockStates()) {
+    for (const auto& [stateId, path] : defaultBlockStatesTable()) {
         Identifier block = Identifier::vanilla(std::string{path});
         tables.registry.registerEntry(stateId, block, BlockState{block, stateId, {}});
     }
-    for (const BlockHardnessEntry& entry : blockHardness()) {
+    for (const BlockHardnessEntry& entry : blockHardnessTable()) {
         tables.hardnessByBlock.emplace(
             Identifier::vanilla(std::string{entry.path}),
             BlockHardness{entry.destroyTime, entry.requiresCorrectTool, entry.explosionResistance});
     }
-    for (const auto& [id, path] : blockIds()) {
+    for (const auto& [id, path] : blockIdsTable()) {
         tables.blockIdsByName.emplace(Identifier::vanilla(std::string{path}), id);
     }
     // The last block's states run to the end of the palette, so the count is where they stop.
-    const auto& [lastStateId, lastPath] = defaultBlockStates().back();
+    const auto& [lastStateId, lastPath] = defaultBlockStatesTable().back();
     const blockStateDefinitions::Definition* last =
         blockStateDefinitions::of(Identifier::vanilla(std::string{lastPath}));
     tables.stateCount = lastStateId + (last == nullptr ? 1 : last->stateCount());
