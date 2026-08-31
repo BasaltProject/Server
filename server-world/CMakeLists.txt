@@ -26,6 +26,7 @@ basalt_module(server-world
     src/terrain/decoration/FlowerVegetation.cpp
     src/terrain/decoration/ForestRockDecoration.cpp
     src/terrain/decoration/GrassScatterPatches.cpp
+    src/terrain/decoration/GlowLichenDecoration.cpp
     src/terrain/decoration/GrassPatchDecoration.cpp
     src/terrain/decoration/GroundPlantPatchDecoration.cpp
     src/terrain/decoration/GroundVegetation.cpp
@@ -33,6 +34,7 @@ basalt_module(server-world
     src/terrain/decoration/IntProvider.cpp
     src/terrain/decoration/OreBlockRules.cpp
     src/terrain/decoration/OverworldOreConfigs.cpp
+    src/terrain/decoration/OverworldSpringDecoration.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/BushPatchDecoration.cpp
@@ -79,6 +81,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-glow-lichen-test
+    SOURCES
+        test/GlowLichenTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-spring-test
+    SOURCES
+        test/SpringTest.cpp
     DEPENDS basalt::server-world
 )
 
