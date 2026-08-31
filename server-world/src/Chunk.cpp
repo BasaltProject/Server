@@ -102,19 +102,43 @@ std::int32_t Chunk::blockStateId(std::int32_t x, std::int32_t y, std::int32_t z)
 
 bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
     ChunkSection& section = sections_[sectionIndexFor(y)];
-    if (!blockEntities_.empty() && changesBlock(section.blockStateId(x, y & 15, z), stateId)) {
-        const std::int32_t removedKey = blockEntityKey(x, y, z);
-        if (blockEntities_.erase(removedKey) != 0) {
-            std::erase(blockEntityOrder_, removedKey);
+    if (!blockWriteObserver_) {
+        if (!blockEntities_.empty() && changesBlock(section.blockStateId(x, y & 15, z), stateId)) {
+            removeBlockEntityAt(x, y, z);
+        }
+        if (!section.setBlockStateId(x, y & 15, z, stateId)) {
+            return false;
+        }
+        dirty_ = true;
+        updateHeights(x, y, z, stateId);
+        invalidateLight();
+        return true;
+    }
+
+    // An observed write reports the attempt whether or not it changed anything, which is what a
+    // feature that records what it placed needs to see.
+    const std::int32_t oldStateId = section.blockStateId(x, y & 15, z);
+    section.setBlockStateId(x, y & 15, z, stateId);
+    const bool changed = oldStateId != stateId;
+    if (changed) {
+        dirty_ = true;
+        updateHeights(x, y, z, stateId);
+        if (changesBlock(oldStateId, stateId)) {
+            removeBlockEntityAt(x, y, z);
         }
     }
-    if (!section.setBlockStateId(x, y & 15, z, stateId)) {
-        return false;
+    blockWriteObserver_(x, y, z, oldStateId, stateId);
+    if (changed) {
+        invalidateLight();
     }
-    dirty_ = true;
-    updateHeights(x, y, z, stateId);
-    invalidateLight();
-    return true;
+    return changed;
+}
+
+void Chunk::removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::int32_t removedKey = blockEntityKey(x, y, z);
+    if (blockEntities_.erase(removedKey) != 0) {
+        std::erase(blockEntityOrder_, removedKey);
+    }
 }
 
 const Chunk::PackedLight& Chunk::skyLight(const std::function<PackedLight()>& compute) {

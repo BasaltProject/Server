@@ -281,6 +281,8 @@ private:
 
     [[nodiscard]] std::int32_t blockEntityKey(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
+    void removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z);
+
     void updateHeights(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
     void rebuildHeights() const;
