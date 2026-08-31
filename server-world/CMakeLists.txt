@@ -4,6 +4,7 @@ basalt_module(server-world
         src/ChunkTracker.cpp
         src/GenerationMetrics.cpp
         src/LeafDistances.cpp
+        src/portal/PortalShape.cpp
         src/ChunkDataCodec.cpp
         src/ChunkSection.cpp
         src/ChunkTypes.cpp
@@ -19,6 +20,8 @@ basalt_module(server-world
         src/noise/ImprovedNoise.cpp
         src/region/ChunkNbt.cpp
         src/structure/StructureBounds.cpp
+    src/structure/StructureQueries.cpp
+    src/structure/StructureTransform.cpp
         src/terrain/carver/NetherCaveCarver.cpp
     src/terrain/carver/OverworldCarvers.cpp
     src/terrain/decoration/AquaticDecoration.cpp
@@ -350,6 +353,18 @@ basalt_test(server-world-beardifier-bubble-test
 basalt_test(server-world-spawn-finder-test
     SOURCES
         test/SpawnFinderTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-portal-shape-test
+    SOURCES
+        test/PortalShapeTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-structure-transform-test
+    SOURCES
+        test/StructureTransformTest.cpp
     DEPENDS basalt::server-world
 )
 
