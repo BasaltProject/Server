@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <basalt/server/registry/BlockConnections.hpp>
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
@@ -7,11 +9,15 @@
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/registry/Tags.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/registry/VanillaTables.hpp>
+#include <basalt/server/registry/World.hpp>
 
 #include <doctest.h>
 
+#include <algorithm>
+#include <map>
 #include <optional>
 #include <set>
 #include <string>
@@ -386,4 +392,193 @@ TEST_CASE("a block with no hardness comes apart on the spot and bedrock never do
     const Identifier flower = Identifier::vanilla("dandelion");
     CHECK(itemTools::destroyProgressPerTick(nullptr, flower, 0.0F, false, {}, never) > 1.0F);
     CHECK(itemTools::destroyProgressPerTick(nullptr, Identifier::vanilla("bedrock"), -1.0F, false, {}, never) == 0.0F);
+}
+
+TEST_CASE("ice is slippery and honey kills a jump") {
+    // parity: only the blocks that differ from the defaults are in the table.
+    const std::int32_t stone = blocks::stone().stateId;
+    CHECK(blockMovement::frictionOf(stone) == blockMovement::kDefaultFriction);
+
+    const std::optional<std::int32_t> ice = blocks::stateIdOf(Identifier::vanilla("ice"), {});
+    REQUIRE(ice.has_value());
+    CHECK(blockMovement::frictionOf(*ice) > blockMovement::kDefaultFriction);
+
+    const std::optional<std::int32_t> honey = blocks::stateIdOf(Identifier::vanilla("honey_block"), {});
+    REQUIRE(honey.has_value());
+    CHECK(blockMovement::jumpFactorOf(*honey) < blockMovement::kDefaultJumpFactor);
+
+    const std::optional<std::int32_t> slime = blocks::stateIdOf(Identifier::vanilla("slime_block"), {});
+    REQUIRE(slime.has_value());
+    CHECK(blockMovement::bouncinessOf(*slime) > 0.0F);
+}
+
+TEST_CASE("a note block plays what is under it, and a head is not tunable") {
+    // parity: NoteBlockInstrument. Anything the table does not name is the harp.
+    CHECK(noteBlockInstruments::of(Identifier::vanilla("stone")).serializedName() == "basedrum");
+    CHECK(noteBlockInstruments::of(Identifier::vanilla("dirt")).serializedName() == "harp");
+
+    const NoteBlockInstrument* skeleton = noteBlockInstruments::byName("skeleton");
+    REQUIRE(skeleton != nullptr);
+    CHECK_FALSE(skeleton->isTunable());
+    CHECK(skeleton->worksAbove());
+
+    const NoteBlockInstrument* harp = noteBlockInstruments::byName("harp");
+    REQUIRE(harp != nullptr);
+    CHECK(harp->isTunable());
+    CHECK_FALSE(harp->worksAbove());
+
+    // parity: NoteBlock.getPitchFromNote, an octave either side of the middle note.
+    CHECK(noteBlockInstruments::pitchOf(12) == doctest::Approx(1.0F));
+    CHECK(noteBlockInstruments::pitchOf(24) == doctest::Approx(2.0F));
+    CHECK(noteBlockInstruments::pitchOf(0) == doctest::Approx(0.5F));
+}
+
+TEST_CASE("a statistic's id is its position, which is protocol") {
+    // The statistics screen reads each counter by id, so the order is not a detail.
+    CHECK(customStats::idOf("leave_game") == 0);
+    CHECK(customStats::nameOf(0) == "leave_game");
+    CHECK_FALSE(customStats::idOf("not_a_statistic").has_value());
+    CHECK_FALSE(customStats::nameOf(static_cast<std::int32_t>(customStats::count())).has_value());
+}
+
+TEST_CASE("a point of interest is made of blocks, and a bed is sixteen of them") {
+    const std::vector<Identifier> home = pointsOfInterest::blocksOf(Identifier::vanilla("home"));
+    CHECK(home.size() == 16);
+    CHECK(std::ranges::find(home, Identifier::vanilla("red_bed")) != home.end());
+    CHECK(pointsOfInterest::blocksOf(Identifier::vanilla("armorer")).size() == 1);
+    CHECK(pointsOfInterest::blocksOf(Identifier::vanilla("nothing")).empty());
+    CHECK(pointsOfInterest::ids().size() == 21);
+}
+
+TEST_CASE("a waterlogged block does not burn, whatever it is made of") {
+    const std::optional<std::int32_t> dryFence = blocks::stateIdOf(
+        Identifier::vanilla("oak_fence"),
+        {{"north", "false"}, {"east", "false"}, {"south", "false"}, {"west", "false"}, {"waterlogged", "false"}});
+    const std::optional<std::int32_t> wetFence = blocks::stateIdOf(
+        Identifier::vanilla("oak_fence"),
+        {{"north", "false"}, {"east", "false"}, {"south", "false"}, {"west", "false"}, {"waterlogged", "true"}});
+    REQUIRE(dryFence.has_value());
+    REQUIRE(wetFence.has_value());
+    CHECK(fireOdds::igniteOdds(*dryFence) > 0);
+    CHECK(fireOdds::igniteOdds(*wetFence) == 0);
+    CHECK(fireOdds::burnOdds(*wetFence) == 0);
+}
+
+TEST_CASE("a biome keeps the id saved chunks were written with") {
+    // The original overworld entries keep their ids so saved chunks go on decoding after the nether,
+    // the end and the void were added.
+    CHECK(biomes::registry().idOf(Identifier::vanilla("plains")) == 0);
+    CHECK(biomes::plains().id == Identifier::vanilla("plains"));
+    CHECK(biomes::registry().size() == 66);
+}
+
+TEST_CASE("a fence joins its own kind and grabs a solid wall") {
+    // parity: FenceBlock.isSameFence is not "another fence": a wooden fence joins wooden fences and
+    // a nether brick fence joins nether brick ones, and the two ignore each other.
+    const std::map<std::string, std::string> open = {
+        {"north", "false"}, {"east", "false"}, {"south", "false"}, {"west", "false"}, {"waterlogged", "false"}};
+    const std::optional<std::int32_t> oak = blocks::stateIdOf(Identifier::vanilla("oak_fence"), open);
+    const std::optional<std::int32_t> nether = blocks::stateIdOf(Identifier::vanilla("nether_brick_fence"), open);
+    REQUIRE(oak.has_value());
+    REQUIRE(nether.has_value());
+    CHECK(blockConnections::isFence(*oak));
+    CHECK(blockConnections::connects(*oak));
+
+    CHECK(blockConnections::connectsTo(*oak, *oak, BlockFace::North));
+    CHECK_FALSE(blockConnections::connectsTo(*oak, *nether, BlockFace::North));
+    // A solid block is grabbed by both, which is the sturdy-face half of the rule.
+    CHECK(blockConnections::connectsTo(*oak, blocks::stone().stateId, BlockFace::North));
+    CHECK_FALSE(blockConnections::connectsTo(*oak, blocks::air().stateId, BlockFace::North));
+}
+
+TEST_CASE("stairs turn a corner when the stairs behind them face across") {
+    // parity: StairBlock.getStairsShape.
+    const auto stairs = [](std::string_view facing) {
+        return blocks::stateIdOf(
+            Identifier::vanilla("oak_stairs"),
+            {{"facing", std::string{facing}}, {"half", "bottom"}, {"shape", "straight"}, {"waterlogged", "false"}});
+    };
+    const std::optional<std::int32_t> north = stairs("north");
+    const std::optional<std::int32_t> east = stairs("east");
+    REQUIRE(north.has_value());
+    REQUIRE(east.has_value());
+    const std::int32_t air = blocks::air().stateId;
+
+    CHECK(blockConnections::stairShape(*north, air, air, air, air) == "straight");
+    // Stairs behind it facing across turn it into an outer corner.
+    CHECK(blockConnections::stairShape(*north, *east, air, air, air) == "outer_right");
+    CHECK_FALSE(blockConnections::stairShape(blocks::stone().stateId, air, air, air, air).has_value());
+}
+
+TEST_CASE("a tag that refers to another tag is flattened through it") {
+    // parity: TagLoader.build, resolving what a tag refers to before the tag itself.
+    using namespace basalt::server::registry::tags;
+    const Identifier planks = Identifier::vanilla("planks");
+    const Identifier wood = Identifier::vanilla("wood");
+    const Identifier oak = Identifier::vanilla("oak_planks");
+    const Identifier log = Identifier::vanilla("oak_log");
+
+    const std::map<Identifier, TagFile> files = {
+        {planks, TagFile{{TagEntry{oak, false, true}}, false}},
+        {wood, TagFile{{TagEntry{planks, true, true}, TagEntry{log, false, true}}, false}},
+    };
+    const auto resolved = resolve(files, [&](const Identifier& id) { return id == oak || id == log; });
+    REQUIRE(resolved.has_value());
+    CHECK(resolved->at(wood) == std::set<Identifier>{oak, log});
+    CHECK(resolved->at(planks) == std::set<Identifier>{oak});
+}
+
+TEST_CASE("a missing element is an error when required and dropped when not") {
+    using namespace basalt::server::registry::tags;
+    const Identifier tag = Identifier::vanilla("planks");
+    const Identifier missing = Identifier::vanilla("nothing");
+    const auto nothingExists = [](const Identifier&) { return false; };
+
+    const std::map<Identifier, TagFile> required = {{tag, TagFile{{TagEntry{missing, false, true}}, false}}};
+    const auto refused = resolve(required, nothingExists);
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().kind == TagError::Kind::MissingElement);
+
+    const std::map<Identifier, TagFile> optional = {{tag, TagFile{{TagEntry{missing, false, false}}, false}}};
+    const auto accepted = resolve(optional, nothingExists);
+    REQUIRE(accepted.has_value());
+    CHECK(accepted->at(tag).empty());
+}
+
+TEST_CASE("a cycle is refused rather than followed forever") {
+    using namespace basalt::server::registry::tags;
+    const Identifier first = Identifier::vanilla("first");
+    const Identifier second = Identifier::vanilla("second");
+    const std::map<Identifier, TagFile> files = {
+        {first, TagFile{{TagEntry{second, true, true}}, false}},
+        {second, TagFile{{TagEntry{first, true, true}}, false}},
+    };
+    const auto resolved = resolve(files, [](const Identifier&) { return true; });
+    REQUIRE_FALSE(resolved.has_value());
+    CHECK(resolved.error().kind == TagError::Kind::Cycle);
+}
+
+TEST_CASE("what is in water says so through its property, or is one of the four that cannot") {
+    // parity: BlockState.getFluidState. Checked against the state arithmetic this replaces: of
+    // 32,366 states the two agreed on all but 30, and those 30 are these four blocks.
+    CHECK(blockFluids::hasWaterFluid(blocks::water().stateId));
+    // Every level of it, not just the source, which is one state of sixteen.
+    CHECK(blockFluids::hasWaterFluid(blocks::water().stateId + 15));
+    CHECK_FALSE(blockFluids::hasWaterFluid(blocks::stone().stateId));
+
+    for (const std::string_view path : {"seagrass", "kelp", "kelp_plant"}) {
+        const std::optional<std::int32_t> state = blocks::stateIdOf(Identifier::vanilla(std::string{path}), {});
+        CAPTURE(path);
+        REQUIRE(state.has_value());
+        CHECK(blockFluids::hasWaterFluid(*state));
+    }
+
+    const std::optional<std::int32_t> wetSlab =
+        blocks::stateIdOf(Identifier::vanilla("stone_slab"), {{"type", "bottom"}, {"waterlogged", "true"}});
+    REQUIRE(wetSlab.has_value());
+    CHECK(blockFluids::hasWaterFluid(*wetSlab));
+
+    CHECK(blockFluids::hasFluid(blocks::lava().stateId));
+    CHECK_FALSE(blockFluids::hasWaterFluid(blocks::lava().stateId));
+    CHECK_FALSE(blockFluids::hasFluid(blocks::stone().stateId));
 }
