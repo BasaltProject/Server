@@ -119,4 +119,7 @@ public object FlowerForestDecoration : BiomeVegetalDecoration {
             "cornflower",
             "lily_of_the_valley",
         ).map { state(it) }
+
+    internal fun flowerAtForTest(x: Int, y: Int, z: Int): Int = flowerAt(x, y, z)
+
 }

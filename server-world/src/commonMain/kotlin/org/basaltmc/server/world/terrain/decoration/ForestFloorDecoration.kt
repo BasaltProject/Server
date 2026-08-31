@@ -124,4 +124,8 @@ public object ForestFloorDecoration {
     // Direction.Plane.HORIZONTAL provider order is NORTH, EAST, SOUTH, WEST, while block-state
     // IDs group facings as NORTH, SOUTH, WEST, EAST.
     private val HORIZONTAL_FACING_STATE_OFFSETS = intArrayOf(0, 12, 4, 8)
+
+    internal fun flowerBedStateIdForTest(defaultStateId: Int, choice: Int): Int =
+        flowerBedStateId(defaultStateId, choice)
+
 }

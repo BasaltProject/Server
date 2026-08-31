@@ -182,4 +182,8 @@ public object PlainsDecoration : BiomeVegetalDecoration {
 
     private fun blockId(name: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
+
+    internal fun flowerStateIdForTest(random: WorldgenRandom, origin: DecorationPos): Int =
+        flowerStateId(random, origin)
+
 }
