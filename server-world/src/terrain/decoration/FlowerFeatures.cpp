@@ -1,5 +1,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/FlowerFeatures.hpp>
+#include <basalt/server/world/terrain/decoration/TreeDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 
 #include <array>
 #include <stdexcept>
@@ -75,6 +77,11 @@ void cherryGroveDecoration::placeAt(Chunk& chunk, random::RandomSource& random, 
     const SimpleBlockFeature feature = pinkPetals();
     placeFrom(chunk, random, origin, {countPlacement(96), randomOffsetPlacement(6, 2), airTargetFilter()},
               [&chunk, &random, &feature](const DecorationPos& position) { feature.place(chunk, random, position); });
+}
+
+void cherryGroveDecoration::decorate(Chunk& chunk, random::RandomSource& random) {
+    flowersOnly()(chunk, random);
+    treeDecoration::single(tree::treeConfigs::cherryBees005(), 10, 0.1F, 1)(chunk, random);
 }
 
 } // namespace basalt::server::world::terrain::decoration

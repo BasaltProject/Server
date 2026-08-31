@@ -24,14 +24,14 @@ void placeSingleAt(Chunk& chunk, random::RandomSource& random, const DecorationP
 
 } // namespace paleGardenDecoration
 
-/// The cherry grove's pink petals. Vanilla's weighted provider keeps all 16 states: amount 1 to 4
-/// crossed with four horizontal facings.
-///
-/// Gap: the biome's `trees_cherry` tail is not here, because the tree features are not ported yet.
-/// What this covers is `flower_cherry` and nothing else.
+/// The cherry grove's pink petals and its own trees. Vanilla's weighted provider keeps all 16 petal
+/// states: amount 1 to 4 crossed with four horizontal facings.
 namespace cherryGroveDecoration {
 
-/// The petal patch as the biome runs it, noise-counted over the chunk.
+/// The petals followed by `trees_cherry`, in `BiomeDefaultFeatures.addCherryGroveVegetation` order.
+void decorate(Chunk& chunk, random::RandomSource& random);
+
+/// The petal-only tail, for when the global tree step already owns `trees_cherry`.
 [[nodiscard]] const BiomeVegetalDecoration& flowersOnly();
 
 /// The petal patch at one origin, which is what `/place feature` runs for `flower_cherry`.

@@ -20,10 +20,13 @@ basalt_module(server-world
     src/terrain/decoration/AquaticPatchDecoration.cpp
     src/terrain/decoration/BiomeDecoration.cpp
     src/terrain/decoration/BiomeFlowerFeatures.cpp
+    src/terrain/decoration/ExtraVegetationDecoration.cpp
     src/terrain/decoration/FireflyBushPatchDecoration.cpp
     src/terrain/decoration/FlowerFeatures.cpp
     src/terrain/decoration/FlowerPatchDecoration.cpp
+    src/terrain/decoration/FlowerForestDecoration.cpp
     src/terrain/decoration/FlowerVegetation.cpp
+    src/terrain/decoration/ForestFloorDecoration.cpp
     src/terrain/decoration/ForestRockDecoration.cpp
     src/terrain/decoration/GrassScatterPatches.cpp
     src/terrain/decoration/GlowLichenDecoration.cpp
@@ -31,6 +34,7 @@ basalt_module(server-world
     src/terrain/decoration/GroundPlantPatchDecoration.cpp
     src/terrain/decoration/GroundVegetation.cpp
     src/terrain/decoration/IceSpikesDecoration.cpp
+    src/terrain/decoration/HugeMushroomFeature.cpp
     src/terrain/decoration/IntProvider.cpp
     src/terrain/decoration/OreBlockRules.cpp
     src/terrain/decoration/OverworldOreConfigs.cpp
@@ -38,8 +42,12 @@ basalt_module(server-world
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/BushPatchDecoration.cpp
+    src/terrain/decoration/BambooVegetationDecoration.cpp
     src/terrain/decoration/CactusFeature.cpp
+    src/terrain/decoration/JungleGrassDecoration.cpp
     src/terrain/decoration/JungleFeatures.cpp
+    src/terrain/decoration/LushVegetationPatchFeature.cpp
+    src/terrain/decoration/MeadowDecoration.cpp
     src/terrain/decoration/MelonPatchDecoration.cpp
     src/terrain/decoration/CaveVineColumnFeature.cpp
     src/terrain/decoration/DesertWellDecoration.cpp
@@ -49,6 +57,8 @@ basalt_module(server-world
     src/terrain/decoration/PatchRegion.cpp
     src/terrain/decoration/PlainsFlowerFeatures.cpp
     src/terrain/decoration/TallGrassDecoration.cpp
+    src/terrain/decoration/TreeDecoration.cpp
+    src/terrain/decoration/TreePatchDecoration.cpp
     src/terrain/decoration/tree/FallenTreeFeature.cpp
     src/terrain/decoration/tree/MangroveRootPlacer.cpp
     src/terrain/decoration/tree/TreeBlockRules.cpp
@@ -60,10 +70,12 @@ basalt_module(server-world
     src/terrain/decoration/tree/TreeHelpers.cpp
     src/terrain/decoration/tree/TreeTrunkPlacers.cpp
     src/terrain/decoration/VinePatchDecoration.cpp
+    src/terrain/decoration/StandaloneFeatures.cpp
     src/terrain/decoration/SugarCanePatchDecoration.cpp
     src/terrain/decoration/SurfaceFreezingDecoration.cpp
     src/terrain/decoration/SurfacePatches.cpp
     src/terrain/decoration/Placement.cpp
+    src/terrain/decoration/RootedAzaleaFeature.cpp
     src/terrain/decoration/SimpleBlockFeature.cpp
     src/terrain/BiomeClimateData.cpp
     src/terrain/surface/BadlandsClayBands.cpp
@@ -136,6 +148,42 @@ basalt_test(server-world-tree-feature-test
 basalt_test(server-world-fallen-tree-test
     SOURCES
         test/FallenTreeTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-selector-test
+    SOURCES
+        test/TreeSelectorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-patch-test
+    SOURCES
+        test/TreePatchTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-biome-flora-test
+    SOURCES
+        test/BiomeFloraTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-extra-vegetation-test
+    SOURCES
+        test/ExtraVegetationTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-lush-vegetation-test
+    SOURCES
+        test/LushVegetationTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-standalone-features-test
+    SOURCES
+        test/StandaloneFeaturesTest.cpp
     DEPENDS basalt::server-world
 )
 
