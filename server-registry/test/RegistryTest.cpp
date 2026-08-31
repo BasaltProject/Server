@@ -6,6 +6,7 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -581,4 +582,48 @@ TEST_CASE("what is in water says so through its property, or is one of the four 
     CHECK(blockFluids::hasFluid(blocks::lava().stateId));
     CHECK_FALSE(blockFluids::hasWaterFluid(blocks::lava().stateId));
     CHECK_FALSE(blockFluids::hasFluid(blocks::stone().stateId));
+}
+
+TEST_CASE("food carries what eating it is worth, and what it leaves in the hand") {
+    const FoodValue* bread = itemFood::of(Identifier::vanilla("bread"));
+    REQUIRE(bread != nullptr);
+    CHECK(bread->nutrition > 0);
+    CHECK(bread->consumeTicks() > 0);
+    CHECK_FALSE(bread->remainder.has_value());
+
+    // parity: minecraft:use_remainder, the bowl left behind by a stew.
+    const FoodValue* stew = itemFood::of(Identifier::vanilla("mushroom_stew"));
+    REQUIRE(stew != nullptr);
+    REQUIRE(stew->remainder.has_value());
+    CHECK(*stew->remainder == Identifier::vanilla("bowl"));
+
+    // A golden apple may be eaten on a full stomach, and it applies effects.
+    const FoodValue* golden = itemFood::of(Identifier::vanilla("golden_apple"));
+    REQUIRE(golden != nullptr);
+    CHECK(golden->canAlwaysEat);
+    CHECK_FALSE(golden->effects.empty());
+    CHECK(golden->effects.front().as<ConsumeEffect::Apply>() != nullptr);
+
+    CHECK(itemFood::of(Identifier::vanilla("stone")) == nullptr);
+}
+
+TEST_CASE("a tag file is read the way vanilla writes one") {
+    using namespace basalt::server::registry::tags;
+    const auto file = tagFileJson::parse(R"({"values": ["minecraft:oak_planks", "#minecraft:logs",
+                                            {"id": "minecraft:nothing", "required": false}]})");
+    REQUIRE(file.has_value());
+    REQUIRE(file->entries.size() == 3);
+    CHECK(file->entries[0].id == Identifier::vanilla("oak_planks"));
+    CHECK_FALSE(file->entries[0].isTag);
+    CHECK(file->entries[0].required);
+    // A leading hash is what makes an entry a reference to another tag.
+    CHECK(file->entries[1].isTag);
+    CHECK(file->entries[1].id == Identifier::vanilla("logs"));
+    CHECK_FALSE(file->entries[2].required);
+    CHECK_FALSE(file->replace);
+
+    CHECK(tagFileJson::parse(R"({"replace": true, "values": []})")->replace);
+    // A shape this build does not understand is refused rather than half-read.
+    CHECK(tagFileJson::parse(R"({"values": [42]})").error() == tagFileJson::ParseError::UnsupportedEntry);
+    CHECK(tagFileJson::parse(R"({})").error() == tagFileJson::ParseError::MissingValues);
 }

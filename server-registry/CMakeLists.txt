@@ -7,6 +7,7 @@ basalt_module(server-registry
         src/BlockSupport.cpp
         src/Blocks.cpp
         src/Entities.cpp
+        src/ItemFood.cpp
         src/ItemTools.cpp
         src/Items.cpp
         src/Registries.cpp
