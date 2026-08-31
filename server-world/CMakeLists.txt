@@ -19,6 +19,7 @@ basalt_module(server-world
     src/terrain/carver/OverworldCarvers.cpp
     src/terrain/decoration/BiomeDecoration.cpp
     src/terrain/decoration/FlowerVegetation.cpp
+    src/terrain/decoration/GrassScatterPatches.cpp
     src/terrain/decoration/GroundVegetation.cpp
     src/terrain/decoration/IntProvider.cpp
     src/terrain/decoration/OreBlockRules.cpp
@@ -27,6 +28,7 @@ basalt_module(server-world
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/CactusFeature.cpp
     src/terrain/decoration/PatchRegion.cpp
+    src/terrain/decoration/SugarCanePatchDecoration.cpp
     src/terrain/decoration/SurfacePatches.cpp
     src/terrain/decoration/Placement.cpp
     src/terrain/decoration/SimpleBlockFeature.cpp
@@ -59,6 +61,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-sugar-cane-test
+    SOURCES
+        test/SugarCaneTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-grass-scatter-test
+    SOURCES
+        test/GrassScatterTest.cpp
     DEPENDS basalt::server-world
 )
 
