@@ -1,6 +1,7 @@
 basalt_module(server-world
     SOURCES
         src/Chunk.cpp
+        src/LeafDistances.cpp
         src/ChunkDataCodec.cpp
         src/ChunkSection.cpp
         src/ChunkTypes.cpp
@@ -118,7 +119,10 @@ basalt_module(server-world
     src/terrain/BiomeTemperature.cpp
     src/terrain/BiomeZoomer.cpp
     src/terrain/TerrainProvider.cpp
+    src/terrain/NoiseColumnHeights.cpp
+    src/terrain/OverworldBiomeSource.cpp
     src/terrain/NoiseRouterData.cpp
+    src/terrain/OverworldOreVeinifier.cpp
     src/terrain/OverworldAquifer.cpp
         src/noise/NormalNoise.cpp
         src/noise/PerlinNoise.cpp
@@ -292,6 +296,24 @@ basalt_test(server-world-overworld-vegetal-test
 basalt_test(server-world-placed-features-test
     SOURCES
         test/PlacedFeaturesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-ore-vein-column-test
+    SOURCES
+        test/OreVeinColumnTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-overworld-biome-source-test
+    SOURCES
+        test/OverworldBiomeSourceTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-leaf-distances-test
+    SOURCES
+        test/LeafDistancesTest.cpp
     DEPENDS basalt::server-world
 )
 
