@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/DecorationFixture.hpp"
+
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -16,50 +18,10 @@
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
+using basalt::server::world::testsupport::stateIdOf;
 namespace registry = basalt::server::registry;
 
 namespace {
-
-class FakeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
-public:
-    explicit FakeEnvironment(std::string biome) : biome_(std::move(biome)) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] basalt::server::random::RandomSource positionalRandom(std::int32_t x, std::int32_t,
-                                                                        std::int32_t z) const override {
-        return basalt::server::random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override { return 70; }
-
-    [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
-
-    [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
-        return biome_;
-    }
-
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
-private:
-    std::string biome_;
-};
 
 /// Stone pillars with air between them across the y range the feature scatters into. A vine needs a
 /// sturdy face on one of five sides, so open air alone would place nothing and a solid block would
@@ -100,13 +62,13 @@ private:
 }
 
 [[nodiscard]] std::tuple<std::int32_t, std::size_t, std::int64_t>
-run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironment&)>& body) {
+run(std::string_view biome, const std::function<void(Chunk&, const testsupport::FixedBiomeEnvironment&)>& body) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t vines = 0;
     std::size_t deferred = 0;
     for (std::int32_t index = 0; index < 60; ++index) {
         Chunk chunk = pillarChunk(index * 3 - 30, index * -5 + 15);
-        const FakeEnvironment environment{std::string{biome}};
+        const testsupport::FixedBiomeEnvironment environment{std::string{biome}};
         body(chunk, environment);
         const auto [chunkChecksum, chunkVines] = fold(chunk);
         checksum = (checksum ^ static_cast<std::uint64_t>(chunkChecksum)) * 1099511628211ULL;
@@ -121,7 +83,7 @@ run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironme
 TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
     SUBCASE("jungle") {
         const auto [vines, deferred, checksum] =
-            run("minecraft:jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 vinePatchDecoration::decorate(chunk, 191919LL, environment);
             });
         CHECK(vines == 3173);
@@ -131,7 +93,7 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
 
     SUBCASE("bamboo") {
         const auto [vines, deferred, checksum] =
-            run("minecraft:bamboo_jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:bamboo_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 vinePatchDecoration::decorate(chunk, 191919LL, environment);
             });
         CHECK(vines == 3173);
@@ -141,7 +103,7 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
 
     SUBCASE("sparse") {
         const auto [vines, deferred, checksum] =
-            run("minecraft:sparse_jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:sparse_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 vinePatchDecoration::decorate(chunk, 191919LL, environment);
             });
         CHECK(vines == 3173);
@@ -152,7 +114,7 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
     SUBCASE("wrong") {
         // plains is not one of the three jungle biomes, so this is the real rejection case.
         const auto [vines, deferred, checksum] =
-            run("minecraft:plains", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 vinePatchDecoration::decorate(chunk, 191919LL, environment);
             });
         CHECK(vines == 0);
@@ -163,14 +125,15 @@ TEST_CASE("the jungle vine feature places what the frozen kotlin places") {
     SUBCASE("regional") {
         // Nothing defers here: a vine only ever writes inside its own chunk. What the reader
         // changes is the neighbour lookups at the chunk edge, which is why the count moves.
-        const auto [vines, deferred,
-                    checksum] = run("minecraft:jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
-            vinePatchDecoration::decorate(
-                chunk, 191919LL, environment,
-                [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {
-                    return y >= 60 && y <= 100 ? registry::blocks::stone().stateId : registry::blocks::air().stateId;
-                });
-        });
+        const auto [vines, deferred, checksum] =
+            run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
+                vinePatchDecoration::decorate(
+                    chunk, 191919LL, environment,
+                    [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {
+                        return y >= 60 && y <= 100 ? registry::blocks::stone().stateId
+                                                   : registry::blocks::air().stateId;
+                    });
+            });
         CHECK(vines == 3867);
         CHECK(deferred == 0);
         CHECK(checksum == -3846520374742743887LL);

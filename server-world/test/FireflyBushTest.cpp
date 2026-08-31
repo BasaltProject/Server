@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/DecorationFixture.hpp"
+
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/FireflyBushPatchDecoration.hpp>
@@ -15,52 +17,10 @@
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
+using basalt::server::world::testsupport::stateIdOf;
 namespace registry = basalt::server::registry;
 
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) { return registry::blocks::named(path)->stateId; }
-
-class FakeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
-public:
-    explicit FakeEnvironment(std::string biome) : biome_(std::move(biome)) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] basalt::server::random::RandomSource positionalRandom(std::int32_t x, std::int32_t,
-                                                                        std::int32_t z) const override {
-        return basalt::server::random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override { return 70; }
-
-    [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
-
-    [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
-        return biome_;
-    }
-
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
-private:
-    std::string biome_;
-};
 
 /// A grass bank beside a water channel. Two of the three specs only place next to water, so a chunk
 /// without a shoreline would exercise nothing but their rejection.
@@ -96,13 +56,13 @@ private:
 }
 
 [[nodiscard]] std::tuple<std::int32_t, std::size_t, std::int64_t>
-run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironment&)>& body) {
+run(std::string_view biome, const std::function<void(Chunk&, const testsupport::FixedBiomeEnvironment&)>& body) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t bushes = 0;
     std::size_t deferred = 0;
     for (std::int32_t index = 0; index < 120; ++index) {
         Chunk chunk = shoreChunk(index * 3 - 60, index * -5 + 20);
-        const FakeEnvironment environment{std::string{biome}};
+        const testsupport::FixedBiomeEnvironment environment{std::string{biome}};
         body(chunk, environment);
         const auto [chunkChecksum, chunkBushes] = fold(chunk);
         checksum = (checksum ^ static_cast<std::uint64_t>(chunkChecksum)) * 1099511628211ULL;
@@ -117,7 +77,7 @@ run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironme
 TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
     SUBCASE("swamp") {
         const auto [bushes, deferred, checksum] =
-            run("minecraft:swamp", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorate(chunk, 737373LL, environment);
             });
         CHECK(bushes == 154);
@@ -127,7 +87,7 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
 
     SUBCASE("plains") {
         const auto [bushes, deferred, checksum] =
-            run("minecraft:plains", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorate(chunk, 737373LL, environment);
             });
         CHECK(bushes == 77);
@@ -138,7 +98,7 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
     SUBCASE("wrong") {
         // desert is in neither the swamp specs nor the 42-biome default list.
         const auto [bushes, deferred, checksum] =
-            run("minecraft:desert", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:desert", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorate(chunk, 737373LL, environment);
             });
         CHECK(bushes == 0);
@@ -148,7 +108,7 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
 
     SUBCASE("swampRarityOnly") {
         const auto [bushes, deferred, checksum] =
-            run("minecraft:swamp", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorateFeature(chunk, 737373LL, environment, "patch_firefly_bush_swamp");
             });
         CHECK(bushes == 28);
@@ -158,7 +118,7 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
 
     SUBCASE("nearWaterOnly") {
         const auto [bushes, deferred, checksum] =
-            run("minecraft:swamp", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 fireflyBushPatchDecoration::decorateFeature(chunk, 737373LL, environment,
                                                             "patch_firefly_bush_near_water_swamp");
             });
@@ -168,21 +128,22 @@ TEST_CASE("the firefly bush patches place what the frozen kotlin places") {
     }
 
     SUBCASE("regional") {
-        const auto [bushes, deferred,
-                    checksum] = run("minecraft:plains", [](Chunk& chunk, const FakeEnvironment& environment) {
-            fireflyBushPatchDecoration::decorate(
-                chunk, 737373LL, environment,
-                [](std::int32_t, std::int32_t y, std::int32_t z) -> std::optional<std::int32_t> {
-                    if (y >= 66 && y <= 69) {
-                        return registry::blocks::stone().stateId;
-                    }
-                    if (y == 70) {
-                        const std::int32_t local = z & 15;
-                        return local >= 7 && local <= 8 ? registry::blocks::water().stateId : stateIdOf("grass_block");
-                    }
-                    return registry::blocks::air().stateId;
-                });
-        });
+        const auto [bushes, deferred, checksum] =
+            run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
+                fireflyBushPatchDecoration::decorate(
+                    chunk, 737373LL, environment,
+                    [](std::int32_t, std::int32_t y, std::int32_t z) -> std::optional<std::int32_t> {
+                        if (y >= 66 && y <= 69) {
+                            return registry::blocks::stone().stateId;
+                        }
+                        if (y == 70) {
+                            const std::int32_t local = z & 15;
+                            return local >= 7 && local <= 8 ? registry::blocks::water().stateId
+                                                            : stateIdOf("grass_block");
+                        }
+                        return registry::blocks::air().stateId;
+                    });
+            });
         CHECK(bushes == 77);
         CHECK(deferred == 6);
         CHECK(checksum == -2291930531195999556LL);
@@ -204,7 +165,7 @@ TEST_CASE("the near-water specs place nothing without a shoreline") {
             dry.setBlockStateId(x, 70, z, stateIdOf("grass_block"));
         }
     }
-    const FakeEnvironment environment{"minecraft:swamp"};
+    const testsupport::FixedBiomeEnvironment environment{"minecraft:swamp"};
     fireflyBushPatchDecoration::decorateFeature(dry, 737373LL, environment, "patch_firefly_bush_near_water_swamp");
     CHECK(fold(dry).second == 0);
 }
