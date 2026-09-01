@@ -37,6 +37,10 @@ public:
     [[nodiscard]] double numberOr(std::int32_t index, double fallback) const;
     [[nodiscard]] bool booleanOr(std::int32_t index, bool fallback) const;
 
+    /// The value of one field of a table argument, as text, or nothing when it is absent or nil.
+    /// Numbers and booleans come back the way Lua writes them, which is what a message wants.
+    [[nodiscard]] std::optional<std::string> fieldAsText(std::int32_t index, std::string_view key) const;
+
     void pushNil();
     void pushBoolean(bool value);
     void pushInteger(std::int64_t value);

@@ -57,6 +57,20 @@ bool LuaArgs::booleanOr(std::int32_t index, bool fallback) const {
     return lua_toboolean(state_, index) != 0;
 }
 
+std::optional<std::string> LuaArgs::fieldAsText(std::int32_t index, std::string_view key) const {
+    lua_getfield(state_, index, std::string{key}.c_str());
+    if (lua_isnoneornil(state_, -1)) {
+        lua_pop(state_, 1);
+        return std::nullopt;
+    }
+    std::size_t length = 0;
+    const char* text = luaL_tolstring(state_, -1, &length);
+    std::string value{text, length};
+    // Two: what `luaL_tolstring` pushed, and the field itself.
+    lua_pop(state_, 2);
+    return value;
+}
+
 void LuaArgs::pushNil() { lua_pushnil(state_); }
 
 void LuaArgs::pushBoolean(bool value) { lua_pushboolean(state_, value ? 1 : 0); }
