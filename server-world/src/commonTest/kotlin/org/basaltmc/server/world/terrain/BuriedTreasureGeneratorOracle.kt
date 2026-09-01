@@ -23,7 +23,7 @@ class BuriedTreasureGeneratorOracle {
         val sandstone = state("sandstone")
         for (x in 0 until 16) {
             for (z in 0 until 16) {
-                for (y in -16..48) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                for (y in 30..48) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
                 for (y in 49..52) chunk.setBlockStateId(x, y, z, sandstone)
                 for (y in 53..62) chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
                 // A pocket of water under the sandstone, so the walk down has something to skip.
@@ -36,7 +36,7 @@ class BuriedTreasureGeneratorOracle {
     private fun fold(chunk: Chunk): Triple<Long, Int, Int> {
         var checksum = -3750763034362895579L
         var written = 0
-        for (y in -16..66) {
+        for (y in 28..66) {
             for (z in 0 until 16) {
                 for (x in 0 until 16) {
                     val id = chunk.getBlockStateId(x, y, z)
