@@ -57,6 +57,7 @@ basalt_module(server-runtime-core
         src/world/SelectableSlots.cpp
         src/world/GameRules.cpp
         src/world/BambooGrowth.cpp
+        src/world/BlockSurvival.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
         src/world/DetectorRails.cpp
@@ -64,9 +65,11 @@ basalt_module(server-runtime-core
         src/world/DripstoneGrowth.cpp
         src/world/FallingBlocks.cpp
         src/world/GrowthSupport.cpp
+        src/world/LavaGrowth.cpp
         src/world/LocalMobCaps.cpp
         src/world/StemGrowth.cpp
         src/world/PlantGrowth.cpp
+        src/world/MushroomGrowth.cpp
         src/world/NoteBlocks.cpp
         src/world/PoweredRails.cpp
         src/world/PressurePlates.cpp
@@ -136,6 +139,12 @@ basalt_test(server-runtime-world-border-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-lava-growth-test
+    SOURCES
+        test/LavaGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-local-mob-caps-test
     SOURCES
         test/LocalMobCapsTest.cpp
@@ -163,6 +172,12 @@ basalt_test(server-runtime-detector-rails-test
 basalt_test(server-runtime-world-light-test
     SOURCES
         test/WorldLightTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-survival-test
+    SOURCES
+        test/BlockSurvivalTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -199,6 +214,12 @@ basalt_test(server-runtime-vine-growth-test
 basalt_test(server-runtime-falling-blocks-test
     SOURCES
         test/FallingBlocksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mushroom-growth-test
+    SOURCES
+        test/MushroomGrowthTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
