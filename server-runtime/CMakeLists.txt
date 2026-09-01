@@ -58,10 +58,14 @@ basalt_module(server-runtime-core
         src/world/GameRules.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
+        src/world/DetectorRails.cpp
+        src/world/GrowthSupport.cpp
         src/world/LocalMobCaps.cpp
+        src/world/StemGrowth.cpp
         src/world/PressurePlates.cpp
         src/world/SnowyBlocks.cpp
         src/world/WorldBorder.cpp
+        src/world/WorldLight.cpp
         src/world/WorldClock.cpp
         src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
@@ -134,6 +138,24 @@ basalt_test(server-runtime-pressure-plates-test
 basalt_test(server-runtime-snowy-blocks-test
     SOURCES
         test/SnowyBlocksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-detector-rails-test
+    SOURCES
+        test/DetectorRailsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-world-light-test
+    SOURCES
+        test/WorldLightTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-stem-growth-test
+    SOURCES
+        test/StemGrowthTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
