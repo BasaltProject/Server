@@ -190,3 +190,49 @@ StructurePos transform(const StructurePos pos, const StructureMirror mirror, con
 }
 
 } // namespace basalt::server::world::structure
+
+namespace basalt::server::world::structure {
+
+StructureRotation rotated(StructureRotation rotation, StructureRotation by) {
+    return static_cast<StructureRotation>((static_cast<std::int32_t>(rotation) + static_cast<std::int32_t>(by)) % 4);
+}
+
+StructurePos relative(StructurePos pos, StructureDirection direction, std::int32_t distance) {
+    return StructurePos{pos.x + dx(direction) * distance, pos.y + dy(direction) * distance,
+                        pos.z + dz(direction) * distance};
+}
+
+StructurePos rotate(StructurePos pos, StructureRotation rotation) {
+    switch (rotation) {
+    case StructureRotation::Clockwise90:
+        return StructurePos{-pos.z, pos.y, pos.x};
+    case StructureRotation::Clockwise180:
+        return StructurePos{-pos.x, pos.y, -pos.z};
+    case StructureRotation::Counterclockwise90:
+        return StructurePos{pos.z, pos.y, -pos.x};
+    case StructureRotation::None:
+    default:
+        return pos;
+    }
+}
+
+StructurePos zeroPositionWithTransform(StructurePos zeroPos, StructureMirror mirror, StructureRotation rotation,
+                                       std::int32_t width, std::int32_t depth) {
+    const std::int32_t sizeX = width - 1;
+    const std::int32_t sizeZ = depth - 1;
+    const std::int32_t mirrorDeltaX = mirror == StructureMirror::FrontBack ? sizeX : 0;
+    const std::int32_t mirrorDeltaZ = mirror == StructureMirror::LeftRight ? sizeZ : 0;
+    switch (rotation) {
+    case StructureRotation::Counterclockwise90:
+        return StructurePos{zeroPos.x + mirrorDeltaZ, zeroPos.y, zeroPos.z + sizeX - mirrorDeltaX};
+    case StructureRotation::Clockwise90:
+        return StructurePos{zeroPos.x + sizeZ - mirrorDeltaZ, zeroPos.y, zeroPos.z + mirrorDeltaX};
+    case StructureRotation::Clockwise180:
+        return StructurePos{zeroPos.x + sizeX - mirrorDeltaX, zeroPos.y, zeroPos.z + sizeZ - mirrorDeltaZ};
+    case StructureRotation::None:
+    default:
+        return StructurePos{zeroPos.x + mirrorDeltaX, zeroPos.y, zeroPos.z + mirrorDeltaZ};
+    }
+}
+
+} // namespace basalt::server::world::structure

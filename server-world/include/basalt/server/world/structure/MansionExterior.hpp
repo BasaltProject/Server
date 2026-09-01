@@ -1,0 +1,71 @@
+#pragma once
+
+#include <basalt/server/world/structure/MansionGrid.hpp>
+
+#include <string>
+#include <vector>
+
+namespace basalt::server::world::structure {
+
+/// One template of a mansion, ready to be placed. parity: `WoodlandMansionPiece`.
+struct MansionPiece {
+    std::string templateName;
+    StructurePos position;
+    StructureRotation rotation = StructureRotation::None;
+    StructureMirror mirror = StructureMirror::None;
+
+    friend bool operator==(const MansionPiece&, const MansionPiece&) = default;
+};
+
+/// parity: `WoodlandMansionPieces.PlacementData`, the cursor the wall walk carries around.
+struct MansionPlacement {
+    StructurePos position;
+    StructureRotation rotation = StructureRotation::None;
+    std::string wallType;
+};
+
+/// parity: the wall and roof half of `WoodlandMansionPieces.MansionPiecePlacer`. The walk goes round
+/// the outline one cell at a time, turning outward at a corner and inward at a notch. `startX` and
+/// `startY` are the grid cell the house is measured from, just inside the entrance.
+class MansionExterior {
+public:
+    MansionExterior(std::int32_t startX, std::int32_t startY) : startX_(startX), startY_(startY) {}
+
+    void entrance(std::vector<MansionPiece>& pieces, MansionPlacement& data) const;
+    void wallPiece(std::vector<MansionPiece>& pieces, MansionPlacement& data) const;
+    /// An outward corner: a corner piece, then the cursor swings a quarter turn clockwise.
+    void turn(std::vector<MansionPiece>& pieces, MansionPlacement& data) const;
+    /// An inward corner, which places nothing: the wall just folds around the notch.
+    void innerTurn(MansionPlacement& data) const;
+
+    /// Walks the outline from the start cell until it comes back to `endX`/`endY` heading the way it
+    /// set out. parity: `traverseOuterWalls`, whose loop is a do-while, so a one-cell house still
+    /// lays its four corners.
+    void traverseOuterWalls(std::vector<MansionPiece>& pieces, MansionPlacement& data, const SimpleGrid& grid,
+                            StructureDirection heading, std::int32_t startGridX, std::int32_t startGridY,
+                            std::int32_t endX, std::int32_t endY) const;
+
+    /// parity: `createRoof`. Three passes over the grid: the roof slabs and their fronts, then the
+    /// short walls where a floor above continues, then the corners. They are separate passes and not
+    /// one, so the piece order in the list is not cell by cell.
+    void createRoof(std::vector<MansionPiece>& pieces, StructurePos roofOrigin, StructureRotation rotation,
+                    const SimpleGrid& grid, const SimpleGrid* aboveGrid) const;
+
+    /// Where a grid cell lands in the world, measured from the cell the house starts at.
+    [[nodiscard]] StructurePos cellPosition(StructurePos origin, StructureRotation rotation, std::int32_t x,
+                                            std::int32_t y) const;
+
+private:
+    void smallWalls(std::vector<MansionPiece>& pieces, StructurePos position, StructureRotation rotation,
+                    const SimpleGrid& grid, std::int32_t x, std::int32_t y) const;
+    void roofCorners(std::vector<MansionPiece>& pieces, StructurePos position, StructureRotation rotation,
+                     const SimpleGrid& grid, std::int32_t x, std::int32_t y) const;
+
+    std::int32_t startX_;
+    std::int32_t startY_;
+};
+
+/// parity: `Rotation.rotate(Direction)`. The vertical faces are left alone.
+[[nodiscard]] StructureDirection rotateDirection(StructureRotation rotation, StructureDirection direction);
+
+} // namespace basalt::server::world::structure

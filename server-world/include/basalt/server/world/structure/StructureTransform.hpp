@@ -50,4 +50,19 @@ enum class StructureDirection : std::uint8_t { Down, Up, North, South, West, Eas
 [[nodiscard]] StructurePos transform(StructurePos pos, StructureMirror mirror, StructureRotation rotation,
                                      StructurePos pivot);
 
+/// parity: `Rotation.getRotated`, composing one turn with another.
+[[nodiscard]] StructureRotation rotated(StructureRotation rotation, StructureRotation by);
+
+/// parity: `BlockPos.relative(direction, distance)`.
+[[nodiscard]] StructurePos relative(StructurePos pos, StructureDirection direction, std::int32_t distance);
+
+/// parity: `BlockPos.rotate`, which turns a position about the origin.
+[[nodiscard]] StructurePos rotate(StructurePos pos, StructureRotation rotation);
+
+/// parity: `StructureTemplate.getZeroPositionWithTransform`, which is where a turned template's own
+/// zero lands.
+[[nodiscard]] StructurePos zeroPositionWithTransform(StructurePos zeroPos, StructureMirror mirror,
+                                                     StructureRotation rotation, std::int32_t width,
+                                                     std::int32_t depth);
+
 } // namespace basalt::server::world::structure
