@@ -160,6 +160,11 @@ basalt_module(server-world
     src/terrain/surface/SurfaceRuleData.cpp
     src/terrain/surface/SurfaceRuleEnvironment.cpp
     src/terrain/surface/SurfaceRules.cpp
+    src/crafting/Crafting.cpp
+    src/crafting/RecipeJson.cpp
+    src/crafting/SpecialCrafting.cpp
+    src/loot/Loot.cpp
+    src/loot/LootTableJson.cpp
     src/terrain/BiomeTemperature.cpp
     src/terrain/DesertPyramidPiece.cpp
     src/terrain/DesertPyramidStructureGenerator.cpp
@@ -375,6 +380,18 @@ basalt_test(server-world-jigsaw-assembly-test
 basalt_test(server-world-buried-treasure-generator-test
     SOURCES
         test/BuriedTreasureGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-loot-test
+    SOURCES
+        test/LootTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-crafting-test
+    SOURCES
+        test/CraftingTest.cpp
     DEPENDS basalt::server-world
 )
 
