@@ -276,7 +276,7 @@ public class EndCityStructureGenerator(
         val pieces: List<EndCityPieces.Piece>,
     )
 
-    private companion object {
+    internal companion object {
         const val END_GENERATION_HEIGHT = 128
         const val MIN_START_Y = 60
         const val STRUCTURE_REFERENCE_RANGE = 8

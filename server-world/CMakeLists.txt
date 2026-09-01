@@ -164,6 +164,9 @@ basalt_module(server-world
     src/terrain/DesertPyramidPiece.cpp
     src/terrain/DesertPyramidStructureGenerator.cpp
     src/terrain/BiomeZoomer.cpp
+    src/terrain/EndCityPieces.cpp
+    src/terrain/EndCityStructureGenerator.cpp
+    src/terrain/StructureReferenceOrder.cpp
     src/terrain/TerrainProvider.cpp
     src/terrain/VillageStructureGenerator.cpp
     src/terrain/WoodlandMansionStructureGenerator.cpp
@@ -173,6 +176,7 @@ basalt_module(server-world
     src/terrain/MineshaftStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
+    src/terrain/RuinedPortalStructureGenerator.cpp
     src/terrain/ShipwreckStructureGenerator.cpp
     src/terrain/StrongholdStructureGenerator.cpp
     src/terrain/StructureBeardifier.cpp
@@ -366,6 +370,18 @@ basalt_test(server-world-buried-treasure-generator-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-structure-reference-order-test
+    SOURCES
+        test/StructureReferenceOrderTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-end-city-generator-test
+    SOURCES
+        test/EndCityGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-desert-pyramid-generator-test
     SOURCES
         test/DesertPyramidGeneratorTest.cpp
@@ -405,6 +421,12 @@ basalt_test(server-world-jigsaw-structures-test
 basalt_test(server-world-pillager-outpost-generator-test
     SOURCES
         test/PillagerOutpostGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-ruined-portal-generator-test
+    SOURCES
+        test/RuinedPortalGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
