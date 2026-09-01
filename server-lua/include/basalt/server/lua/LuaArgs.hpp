@@ -56,6 +56,32 @@ public:
     /// arrays start at one, so this is what a list from the host is written with.
     void setIndex(std::int64_t index);
 
+    /// Pushes the value at a one-based position of the table at `index`.
+    void pushIndex(std::int32_t index, std::int64_t position);
+
+    /// Pushes the value of one field of the table at `index`.
+    void pushField(std::int32_t index, std::string_view key);
+
+    /// Drops `count` values from the top of the stack.
+    void pop(std::int32_t count);
+
+    /// How long the array part of the table at `index` is, which is what `#` answers.
+    [[nodiscard]] std::int64_t length(std::int32_t index) const;
+
+    /// Walks the table at `index`. Starting from an absent key gives the first entry; each call
+    /// leaves the key and the value on the stack and answers true, or leaves nothing and answers
+    /// false at the end. This is `next`, which is the only way to see a table that is not an array.
+    [[nodiscard]] bool nextEntry(std::int32_t index);
+
+    [[nodiscard]] bool isBoolean(std::int32_t index) const;
+    /// Whether the number at `index` is an integer rather than a float, which JSON has to keep.
+    [[nodiscard]] bool isInteger(std::int32_t index) const;
+    [[nodiscard]] bool toBoolean(std::int32_t index) const;
+    [[nodiscard]] std::int64_t toInteger(std::int32_t index) const;
+    [[nodiscard]] double toNumber(std::int32_t index) const;
+    /// The value at `index` as text, whatever it is, the way Lua itself writes it.
+    [[nodiscard]] std::string toText(std::int32_t index) const;
+
     /// Raises a Lua error from inside a host function. Does not return.
     [[noreturn]] void raise(std::string_view message) const;
 

@@ -87,6 +87,40 @@ void LuaArgs::setField(std::string_view key) { lua_setfield(state_, -2, std::str
 
 void LuaArgs::setIndex(std::int64_t index) { lua_rawseti(state_, -2, static_cast<lua_Integer>(index)); }
 
+void LuaArgs::pushIndex(std::int32_t index, std::int64_t position) {
+    lua_rawgeti(state_, index, static_cast<lua_Integer>(position));
+}
+
+void LuaArgs::pushField(std::int32_t index, std::string_view key) {
+    lua_getfield(state_, index, std::string{key}.c_str());
+}
+
+void LuaArgs::pop(std::int32_t count) { lua_pop(state_, count); }
+
+std::int64_t LuaArgs::length(std::int32_t index) const { return static_cast<std::int64_t>(lua_rawlen(state_, index)); }
+
+bool LuaArgs::nextEntry(std::int32_t index) { return lua_next(state_, index) != 0; }
+
+bool LuaArgs::isBoolean(std::int32_t index) const { return lua_isboolean(state_, index); }
+
+bool LuaArgs::isInteger(std::int32_t index) const { return lua_isinteger(state_, index) != 0; }
+
+bool LuaArgs::toBoolean(std::int32_t index) const { return lua_toboolean(state_, index) != 0; }
+
+std::int64_t LuaArgs::toInteger(std::int32_t index) const {
+    return static_cast<std::int64_t>(lua_tointeger(state_, index));
+}
+
+double LuaArgs::toNumber(std::int32_t index) const { return static_cast<double>(lua_tonumber(state_, index)); }
+
+std::string LuaArgs::toText(std::int32_t index) const {
+    std::size_t length = 0;
+    const char* text = luaL_tolstring(state_, index, &length);
+    std::string value{text, length};
+    lua_pop(state_, 1);
+    return value;
+}
+
 void LuaArgs::raise(std::string_view message) const {
     luaL_error(state_, "%s", std::string{message}.c_str());
     // `luaL_error` never returns; this is only here because the compiler cannot know that.

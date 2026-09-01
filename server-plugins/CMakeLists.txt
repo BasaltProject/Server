@@ -4,17 +4,29 @@ basalt_module(server-plugins
         src/PluginManifest.cpp
         src/PluginEvents.cpp
         src/PluginEventTypes.cpp
+        src/PluginEventView.cpp
         src/PluginFolder.cpp
+        src/PluginJson.cpp
         src/PluginOrder.cpp
         src/PluginPackage.cpp
         src/PluginText.cpp
         src/PluginToml.cpp
     DEPENDS basalt::wire-common basalt::wire-io basalt::server-lua
+    # The event view builds a metatable and holds a registry reference, which the argument facade
+    # deliberately does not expose. `lua.h` stays out of every header here and lives in that one
+    # `.cpp`, which is the same rule the rest of the project follows for a fat dependency.
+    PRIVATE_DEPENDS basalt::lua
 )
 
 basalt_test(server-plugins-event-types-test
     SOURCES
         test/PluginEventTypesTest.cpp
+    DEPENDS basalt::server-plugins
+)
+
+basalt_test(server-plugins-event-view-test
+    SOURCES
+        test/PluginEventViewTest.cpp
     DEPENDS basalt::server-plugins
 )
 
@@ -53,6 +65,12 @@ basalt_test(server-plugins-toml-test
 basalt_test(server-plugins-command-test
     SOURCES
         test/PluginCommandSpecTest.cpp
+    DEPENDS basalt::server-plugins
+)
+
+basalt_test(server-plugins-json-test
+    SOURCES
+        test/PluginJsonTest.cpp
     DEPENDS basalt::server-plugins
 )
 
