@@ -1,0 +1,64 @@
+#pragma once
+
+#include <basalt/wire/protocol/play/HudPackets.hpp>
+
+#include <cstdint>
+#include <string>
+#include <variant>
+#include <vector>
+
+namespace basalt::server::runtime::world {
+
+/// What a block asks the clients to do besides changing state.
+///
+/// parity: `Level.playSound`, `Level.blockEvent` and `Level.levelEvent`. A block reacting on its own
+/// has no player to answer to, so without this its note or its ring had nowhere to go.
+namespace blockEffect {
+
+/// parity: `Level.playSound`, at the middle of the block.
+struct Sound {
+    std::string name;
+    wire::protocol::play::SoundSource source = wire::protocol::play::SoundSource::Blocks;
+    float volume = 1.0F;
+    float pitch = 1.0F;
+
+    friend bool operator==(const Sound&, const Sound&) = default;
+};
+
+/// parity: `Level.blockEvent`, whose two bytes mean whatever the block says they mean.
+struct Event {
+    std::int32_t b0 = 0;
+    std::int32_t b1 = 0;
+
+    friend bool operator==(const Event&, const Event&) = default;
+};
+
+/// parity: `Level.levelEvent`, the numbered one-off effects (`LevelEvent`).
+struct Effect {
+    /// parity: `LevelEvent.SOUND_DISPENSER_FAIL`, the click of a dispenser with nothing in it.
+    static constexpr std::int32_t kDispenserFail = 1001;
+
+    std::int32_t type = 0;
+    std::int32_t data = 0;
+
+    friend bool operator==(const Effect&, const Effect&) = default;
+};
+
+} // namespace blockEffect
+
+/// One of the three, as a variant rather than a hierarchy: there is no RTTI here to ask what a
+/// pointer really is, and three cases that never grow do not need one.
+using BlockEffect = std::variant<blockEffect::Sound, blockEffect::Event, blockEffect::Effect>;
+
+/// A block that changed, and whatever it wants the clients to hear or see about it.
+struct BlockChange {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::int32_t stateId = 0;
+    std::vector<BlockEffect> effects;
+
+    friend bool operator==(const BlockChange&, const BlockChange&) = default;
+};
+
+} // namespace basalt::server::runtime::world
