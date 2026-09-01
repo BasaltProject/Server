@@ -63,6 +63,7 @@ class WoodlandMansionGeneratorOracle {
         }
     }
 
+    /** Stone under a lake: the foundation has to walk down through the water to reach the rock. */
     private fun groundChunk(
         chunkX: Int,
         chunkZ: Int,
@@ -70,7 +71,8 @@ class WoodlandMansionGeneratorOracle {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
-                for (y in -8..74) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                for (y in -8..59) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                for (y in 60..69) chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
             }
         }
         return chunk
@@ -84,7 +86,12 @@ class WoodlandMansionGeneratorOracle {
                 for (x in 0 until 16) {
                     val id = chunk.getBlockStateId(x, y, z)
                     checksum = (checksum xor id.toLong()) * 1099511628211L
-                    if (id != Blocks.STONE.stateId && id != Blocks.AIR.stateId) written++
+                    if (id != Blocks.STONE.stateId &&
+                        id != Blocks.WATER.stateId &&
+                        id != Blocks.AIR.stateId
+                    ) {
+                        written++
+                    }
                 }
             }
         }
@@ -98,12 +105,15 @@ class WoodlandMansionGeneratorOracle {
         surface: Int,
         chunks: Int,
     ) {
+        // A gentle slope, so the four corners of the 5x5 probe box disagree and which offsets it
+        // uses is observable.
+        val surfaceAt = { x: Int, z: Int -> surface + (x + z).mod(8) }
         val generator =
             WoodlandMansionStructureGenerator(
                 biomeAt = { _, _, _ -> biome },
                 mansionBiomes = setOf("minecraft:dark_forest"),
                 templateOf = templates,
-                surfaceHeightAt = { _, _ -> surface },
+                surfaceHeightAt = surfaceAt,
             )
         val centre = WoodlandMansionStructureGenerator.GRID.candidateChunk(seed, 0, 0)
         var checksum = -3750763034362895579L
@@ -112,8 +122,10 @@ class WoodlandMansionGeneratorOracle {
         var entities = 0
         var starts = 0
         for (index in 0 until chunks) {
-            val chunkX = centre.first + index % 8 - 4
-            val chunkZ = centre.second + index / 8 - 4
+            // Offset so the window reaches seven chunks out on one side, which is the mansion's own
+            // reach: a shorter reach would drop those chunks.
+            val chunkX = centre.first + index % 10 - 7
+            val chunkZ = centre.second + index / 10 - 7
             val chunk = groundChunk(chunkX, chunkZ)
             generator.generateInto(chunk, seed)
             val (chunkChecksum, chunkWritten, chunkBlockEntities) = fold(chunk)
@@ -131,11 +143,12 @@ class WoodlandMansionGeneratorOracle {
 
     @Test
     fun dump() {
-        report("darkForest", 555L, "minecraft:dark_forest", 75, 64)
+        report("darkForest", 555L, "minecraft:dark_forest", 75, 100)
         // A biome outside the tag refuses the mansion, and the rotation roll still happens.
-        report("plains", 555L, "minecraft:plains", 75, 64)
-        // Ground below y 60 refuses it too, after the rotation was drawn.
-        report("lowGround", 555L, "minecraft:dark_forest", 40, 64)
-        report("otherSeed", 31L, "minecraft:dark_forest", 75, 64)
+        report("plains", 555L, "minecraft:plains", 75, 100)
+        // Ground just under y 60 refuses it, after the rotation was drawn. Fifty and not forty, so a
+        // lowered floor would let this one through.
+        report("lowGround", 555L, "minecraft:dark_forest", 50, 100)
+        report("otherSeed", 31L, "minecraft:dark_forest", 75, 100)
     }
 }

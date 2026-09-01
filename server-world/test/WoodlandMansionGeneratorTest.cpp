@@ -87,12 +87,16 @@ namespace {
     return &held.emplace(std::string{name}, roomTemplate(metadata)).first->second;
 }
 
+/// Stone under a lake: the foundation has to walk down through the water to reach the rock.
 [[nodiscard]] Chunk groundChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     Chunk chunk{chunkX, chunkZ};
     for (std::int32_t x = 0; x < 16; ++x) {
         for (std::int32_t z = 0; z < 16; ++z) {
-            for (std::int32_t y = -8; y <= 74; ++y) {
+            for (std::int32_t y = -8; y <= 59; ++y) {
                 chunk.setBlockStateId(x, y, z, registry::blocks::stone().stateId);
+            }
+            for (std::int32_t y = 60; y <= 69; ++y) {
+                chunk.setBlockStateId(x, y, z, registry::blocks::water().stateId);
             }
         }
     }
@@ -107,7 +111,8 @@ namespace {
             for (std::int32_t x = 0; x < 16; ++x) {
                 const std::int32_t id = chunk.blockStateId(x, y, z);
                 checksum = (checksum ^ static_cast<std::uint64_t>(static_cast<std::int64_t>(id))) * 1099511628211ULL;
-                if (id != registry::blocks::stone().stateId && id != registry::blocks::air().stateId) {
+                if (id != registry::blocks::stone().stateId && id != registry::blocks::water().stateId &&
+                    id != registry::blocks::air().stateId) {
                     ++written;
                 }
             }
@@ -130,12 +135,19 @@ struct Run {
         [biomeName](std::int32_t, std::int32_t, std::int32_t) { return biomeName; },
         {"minecraft:dark_forest"},
         templateOf,
-        [surface](std::int32_t, std::int32_t) { return surface; }};
+        // A gentle slope, so the four corners of the 5x5 probe box disagree and which offsets it
+        // uses is observable.
+        [surface](std::int32_t x, std::int32_t z) {
+            const std::int32_t rest = (x + z) % 8;
+            return surface + (rest < 0 ? rest + 8 : rest);
+        }};
     const auto centre = WoodlandMansionStructureGenerator::grid().candidateChunk(seed, 0, 0);
     Run result;
     std::uint64_t checksum = 14695981039346656037ULL;
     for (std::int32_t index = 0; index < chunks; ++index) {
-        Chunk chunk = groundChunk(centre.first + index % 8 - 4, centre.second + index / 8 - 4);
+        // Offset so the window reaches seven chunks out on one side, which is the mansion's own
+        // reach: a shorter reach would drop those chunks.
+        Chunk chunk = groundChunk(centre.first + index % 10 - 7, centre.second + index / 10 - 7);
         generator.generateInto(chunk, seed);
         const auto [chunkChecksum, written, blockEntities] = fold(chunk);
         checksum = (checksum ^ static_cast<std::uint64_t>(chunkChecksum)) * 1099511628211ULL;
@@ -161,12 +173,14 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 
 TEST_CASE("the woodland mansions stand where the frozen kotlin puts them") {
     SUBCASE("darkForest") {
-        check(run(555, "minecraft:dark_forest", 75, 64), 97382, 252, 15, 29, 3010941977405199476LL);
+        check(run(555, "minecraft:dark_forest", 75, 100), 151924, 227, 15, 24, 7746739610856060680LL);
     }
 
-    SUBCASE("plains") { check(run(555, "minecraft:plains", 75, 64), 0, 0, 0, 0, 570477500702440549LL); }
+    SUBCASE("plains") { check(run(555, "minecraft:plains", 75, 100), 0, 0, 0, 0, 4421841969977296241LL); }
 
-    SUBCASE("lowGround") { check(run(555, "minecraft:dark_forest", 40, 64), 0, 0, 0, 0, 570477500702440549LL); }
+    SUBCASE("lowGround") { check(run(555, "minecraft:dark_forest", 50, 100), 0, 0, 0, 0, 4421841969977296241LL); }
 
-    SUBCASE("otherSeed") { check(run(31, "minecraft:dark_forest", 75, 64), 84508, 229, 12, 25, 5270275810533381906LL); }
+    SUBCASE("otherSeed") {
+        check(run(31, "minecraft:dark_forest", 75, 100), 108934, 172, 9, 20, 5955887101684347433LL);
+    }
 }

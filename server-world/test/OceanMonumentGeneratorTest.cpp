@@ -7,9 +7,11 @@
 #include <doctest.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <utility>
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain;
@@ -57,13 +59,12 @@ struct Run {
     std::int64_t checksum = 0;
 };
 
-[[nodiscard]] Run run(std::int64_t seed, std::string_view biome, std::int32_t chunks) {
-    const std::string biomeName{biome};
-    OceanMonumentStructureGenerator generator{
-        [biomeName](std::int32_t, std::int32_t, std::int32_t) { return biomeName; },
-        {"minecraft:deep_ocean", "minecraft:deep_cold_ocean"},
-        {"minecraft:deep_ocean", "minecraft:deep_cold_ocean", "minecraft:ocean"},
-        [](std::int32_t, std::int32_t) { return 36; }};
+[[nodiscard]] Run run(std::int64_t seed, std::int32_t chunks,
+                      OceanMonumentStructureGenerator::NoiseBiomeAt noiseBiomeAt) {
+    OceanMonumentStructureGenerator generator{std::move(noiseBiomeAt),
+                                              {"minecraft:deep_ocean", "minecraft:deep_cold_ocean"},
+                                              {"minecraft:deep_ocean", "minecraft:deep_cold_ocean", "minecraft:ocean"},
+                                              [](std::int32_t, std::int32_t) { return 36; }};
     // Centred on the candidate the grid picks for the middle cell, which is 32 chunks wide.
     const auto centre = OceanMonumentStructureGenerator::grid().candidateChunk(seed, 0, 0);
     Run result;
@@ -91,11 +92,45 @@ void check(const Run& result, std::int32_t written, std::size_t entities, std::s
 } // namespace
 
 TEST_CASE("the ocean monuments stand where the frozen kotlin puts them") {
-    SUBCASE("deepOcean") { check(run(4711, "minecraft:deep_ocean", 144), 14350, 3, 16, 1448401856749821290LL); }
+    SUBCASE("deepOcean") {
+        check(run(4711, 144,
+                  [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:deep_ocean"}; }),
+              14350, 3, 16, 1448401856749821290LL);
+    }
 
-    SUBCASE("ocean") { check(run(4711, "minecraft:ocean", 144), 0, 0, 0, 1153227349664774837LL); }
+    SUBCASE("ocean") {
+        check(run(4711, 144, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:ocean"}; }),
+              0, 0, 0, 1153227349664774837LL);
+    }
 
-    SUBCASE("plains") { check(run(4711, "minecraft:plains", 144), 0, 0, 0, 1153227349664774837LL); }
+    SUBCASE("plains") {
+        check(run(4711, 144, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:plains"}; }),
+              0, 0, 0, 1153227349664774837LL);
+    }
 
-    SUBCASE("otherSeed") { check(run(8, "minecraft:deep_ocean", 144), 14464, 3, 16, -2931064608776548685LL); }
+    SUBCASE("layered") {
+        // Ocean only where the ground probe looks, so the y it is handed is observable.
+        check(run(4711, 144,
+                  [](std::int32_t, std::int32_t quartY, std::int32_t) {
+                      return std::string{quartY == 8 ? "minecraft:deep_ocean" : "minecraft:ocean"};
+                  }),
+              14350, 3, 16, 1448401856749821290LL);
+    }
+
+    SUBCASE("smallPocket") {
+        // An ocean pocket wide enough for a radius-24 sweep but not for the real 29, so the monument
+        // is refused and a narrower sweep would have let it through.
+        const auto centre = OceanMonumentStructureGenerator::grid().candidateChunk(4711, 0, 0);
+        const std::int32_t pocketX = (centre.first * 16 + 9) >> 2;
+        check(run(4711, 144,
+                  [pocketX](std::int32_t quartX, std::int32_t, std::int32_t) {
+                      return std::string{std::abs(quartX - pocketX) > 6 ? "minecraft:plains" : "minecraft:deep_ocean"};
+                  }),
+              0, 0, 0, 1153227349664774837LL);
+    }
+
+    SUBCASE("otherSeed") {
+        check(run(8, 144, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:deep_ocean"}; }),
+              14464, 3, 16, -2931064608776548685LL);
+    }
 }
