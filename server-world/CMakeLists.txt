@@ -19,10 +19,13 @@ basalt_module(server-world
         src/light/LightWindow.cpp
         src/noise/ImprovedNoise.cpp
         src/region/ChunkNbt.cpp
-        src/structure/StructureBounds.cpp
+        src/structure/StrongholdBrush.cpp
+    src/structure/StrongholdLayout.cpp
+    src/structure/StructureBounds.cpp
     src/structure/ConcentricRingsPlacement.cpp
     src/structure/JigsawAssembly.cpp
     src/structure/MineshaftBlocks.cpp
+    src/structure/MineshaftFill.cpp
     src/structure/MineshaftLayout.cpp
     src/structure/StructurePieceFill.cpp
     src/structure/StructurePlacementGrid.cpp
@@ -326,9 +329,27 @@ basalt_test(server-world-jigsaw-assembly-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-mineshaft-fill-test
+    SOURCES
+        test/MineshaftFillTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-mineshaft-layout-test
     SOURCES
         test/MineshaftLayoutTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-stronghold-brush-test
+    SOURCES
+        test/StrongholdBrushTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-stronghold-layout-test
+    SOURCES
+        test/StrongholdLayoutTest.cpp
     DEPENDS basalt::server-world
 )
 

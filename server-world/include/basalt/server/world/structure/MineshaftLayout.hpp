@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/world/structure/MineshaftBlocks.hpp>
 #include <basalt/server/world/structure/StructureTransform.hpp>
 
 #include <cstdint>
@@ -8,9 +9,6 @@
 #include <vector>
 
 namespace basalt::server::world::structure {
-
-/// parity: `MineshaftStructure.Type`. Decides the wood a mineshaft is framed in.
-enum class MineshaftType : std::uint8_t { Normal, Mesa };
 
 /// One assembled mineshaft piece: what it is, where it is, and the rolls its blocks will need.
 struct MineshaftPiece {
