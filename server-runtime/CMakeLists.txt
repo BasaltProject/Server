@@ -23,6 +23,7 @@ basalt_module(server-runtime-core
         src/config/ProfileSelection.cpp
         src/config/ServerListConfig.cpp
         src/config/UiConfigs.cpp
+        src/entity/MobRules.cpp
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/function/FunctionLibrary.cpp
@@ -43,7 +44,11 @@ basalt_module(server-runtime-core
         src/scoreboard/Scoreboard.cpp
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
-    DEPENDS basalt::server-registry basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
+        src/world/ItemEnchantability.cpp
+        src/world/MobLocalDifficulty.cpp
+        src/world/SelectableSlots.cpp
+        src/world/SpawnPotential.cpp
+    DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
@@ -62,6 +67,18 @@ basalt_test(server-runtime-timings-test
 basalt_test(server-runtime-config-test
     SOURCES
         test/ConfigDirectoryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-world-rules-test
+    SOURCES
+        test/WorldRulesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mob-rules-test
+    SOURCES
+        test/MobRulesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
