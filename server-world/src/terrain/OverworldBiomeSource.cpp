@@ -6,8 +6,7 @@ OverworldBiomeSource::OverworldBiomeSource(const OverworldNoiseRouter& router,
                                            const std::optional<std::int64_t> biomeZoomSeed)
     : zoomer_(biomeZoomSeed.has_value() ? std::optional<BiomeZoomer>{BiomeZoomer{*biomeZoomSeed}} : std::nullopt),
       parameters_(climate::RTree<climate::BiomeName>::create(climate::overworldBiomes::build())),
-      sampler_(router.temperature, router.vegetation, router.continents, router.erosion, router.depth,
-               router.ridges) {}
+      sampler_(router.temperature, router.vegetation, router.continents, router.erosion, router.depth, router.ridges) {}
 
 climate::BiomeName OverworldBiomeSource::biomeAtQuart(const std::int32_t quartX, const std::int32_t quartY,
                                                       const std::int32_t quartZ,
@@ -20,8 +19,7 @@ climate::BiomeName OverworldBiomeSource::biomeAt(const std::int32_t x, const std
     return biomeAtQuart(x >> 2, y >> 2, z >> 2, cache);
 }
 
-climate::BiomeName OverworldBiomeSource::blockBiomeAt(const std::int32_t x, const std::int32_t y,
-                                                      const std::int32_t z,
+climate::BiomeName OverworldBiomeSource::blockBiomeAt(const std::int32_t x, const std::int32_t y, const std::int32_t z,
                                                       densityfunction::DensityCache* cache) const {
     if (!zoomer_.has_value()) {
         return biomeAt(x, y, z, cache);

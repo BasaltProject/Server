@@ -270,7 +270,8 @@ class StructureTemplateOracle {
             val markers =
                 template.dataMarkers(StructurePos(10, 64, 20), rotation, StructureMirror.NONE, StructurePos(0, 0, 0))
             println(
-                "ORACLE query_${rotation.name} box=${box.minX},${box.minY},${box.minZ},${box.maxX},${box.maxY},${box.maxZ} " +
+                "ORACLE query_${rotation.name} " +
+                    "box=${box.minX},${box.minY},${box.minZ},${box.maxX},${box.maxY},${box.maxZ} " +
                     "jigsaws=${jigsaws.size} jigsaw=${jigsaws.firstOrNull()?.let {
                         "${it.pos.x},${it.pos.y},${it.pos.z}/${it.front.name}/${it.top.name}/${it.rollable}/" +
                             "${it.name}/${it.pool}/${it.target}/${it.finalStateName}/${it.placementPriority}/" +
@@ -303,7 +304,8 @@ class StructureTemplateOracle {
                 )
                 val (checksum, placed, blockEntities) = fold(chunk)
                 println(
-                    "ORACLE place_${mirror.name}_${rotation.name} placed=$placed entities=${chunk.generatedEntities().size} " +
+                    "ORACLE place_${mirror.name}_${rotation.name} placed=$placed " +
+                        "entities=${chunk.generatedEntities().size} " +
                         "blockEntities=$blockEntities deferred=${chunk.takeGeneratedBlockWrites().size} " +
                         "checksum=$checksum after=${random.nextInt()}",
                 )
