@@ -21,7 +21,9 @@ basalt_module(server-world
         src/light/LightSpread.cpp
         src/light/LightWindow.cpp
         src/noise/ImprovedNoise.cpp
+        src/region/AnvilRegion.cpp
         src/region/ChunkNbt.cpp
+        src/region/LinearRegion.cpp
         src/structure/StrongholdBrush.cpp
     src/structure/StrongholdCorridors.cpp
     src/structure/StrongholdLayout.cpp
@@ -211,8 +213,24 @@ basalt_module(server-world
         src/noise/PerlinNoise.cpp
         src/noise/SimplexNoise.cpp
     src/noise/PerlinSimplexNoise.cpp
-    DEPENDS basalt::server-random basalt::server-registry basalt::wire-common basalt::wire-protocol
-            basalt::wire-text
+    DEPENDS basalt::server-random basalt::server-registry basalt::wire-common basalt::wire-io
+            basalt::wire-protocol basalt::wire-text
+)
+
+basalt_test(server-world-anvil-region-test
+    SOURCES
+        test/AnvilRegionTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-linear-region-test
+    SOURCES
+        test/LinearRegionTest.cpp
+    DEPENDS basalt::server-world
+)
+
+target_compile_definitions(server-world-linear-region-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-world-simple-generators-test
