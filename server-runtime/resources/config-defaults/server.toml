@@ -1,0 +1,123 @@
+# Basalt server configuration, generated once with vanilla-parity defaults.
+# Delete a value and restart to have it regenerated.
+#
+# This is one file of several under config/. Options move out of here as their own domain grows a
+# file of its own (worlds, permission groups, server list, commands); see the file each one lands
+# in for where an option went.
+
+[server]
+# Port the server listens on.
+port = 25565
+# How many players can be connected at once. Vanilla ships 20; this ships 80,
+# because 20 is a number from 2010 and nothing in the server cares. What the list
+# *shows* is a separate thing, in server_list.toml, since a profile can advertise
+# whatever it likes without changing who actually gets in.
+max-players = 80
+# Verify players against Mojang's session server. Disabling this accepts any
+# claimed username with no verification (vanilla's "cracked" mode).
+online-mode = true
+# Game mode new players join in: survival, creative, adventure or spectator.
+gamemode = "survival"
+# Only let players on the whitelist in. Who is on it is state, not configuration:
+# it lives in players.db and is edited with /whitelist add and /whitelist remove.
+# /whitelist on and off move this for the run; a restart follows this file again.
+whitelist = false
+
+[network]
+# Reserved for future network tuning (compression threshold, rate limits).
+
+# A proxy in front of this server (BungeeCord, Waterfall, Velocity, Gate) connects
+# on behalf of every player, so without forwarding the whole server sees one address
+# and one offline uuid: the proxy's. Forwarding is how the proxy passes on who is
+# really there, and every mode below replaces the login handshake, so the proxy
+# authenticates against Mojang and this server does not. Set online-mode = false
+# above when you turn any of them on.
+#
+# Leave this alone unless there is a proxy. A server reachable from the internet
+# with forwarding on and no secret lets anybody claim to be anybody.
+[network.forwarding]
+# Which proxy is speaking for the players, if any:
+#
+#   none         Nobody is. This server authenticates its own players.
+#   bungeecord   BungeeCord's ip_forward. NO SECRET: the data rides on the handshake
+#                and nothing proves it came from the proxy, so this port must be
+#                unreachable from anywhere but the proxy. Enable ip_forward on it.
+#   bungeeguard  The same, plus the token BungeeGuard injects. Put the proxy's
+#                token in tokens below.
+#   safenet      The same idea with SafeNET's passphrase and property name. Put the
+#                proxy's passphrase in tokens below.
+#   velocity     Velocity's modern forwarding, signed with a shared secret. Set
+#                player-info-forwarding-mode = "modern" on the proxy and copy its
+#                forwarding.secret into secret below. The only mode that cannot be
+#                forged, so the only one that is safe on a reachable port.
+mode = "none"
+
+# The shared secret for mode = "velocity". This is the content of the proxy's
+# forwarding.secret file, not the path to it.
+secret = ""
+
+# The tokens accepted for mode = "bungeeguard" or "safenet". More than one so a key
+# can be rotated without a restart of everything at once.
+tokens = []
+
+# The property SafeNET carries its passphrase in, if you changed property-name.handshake
+# on the proxy. Ignored by every other mode.
+property-name = "safe_net_passphrase"
+
+[performance]
+# Count noise evaluations, biome lookups and per-phase timings while generating
+# chunks, then log a report once the startup chunks are ready. Diagnostics only:
+# it also forces startup generation onto a single thread so the counts are exact,
+# so leave it off unless you are measuring.
+generation-metrics = false
+
+# NO VANILLA. With this on, a world is split into regions that tick independently:
+# two of them stop having a fixed order of tick between each other, and what crosses
+# a border is deferred a tick. It only pays off when the players are spread out; a
+# hundred of them in the same town are one region either way.
+#
+# Splitting itself is not built yet, so today this only says which mode you asked
+# for: every world is still one region.
+regional = false
+
+# How many regions tick at once, with regional = true. "auto" works it out from the
+# cores available. Ignored while regional is off, where there is one region a world.
+region-threads = "auto"
+
+[plugins]
+# Whether the plugins folder is looked at. Off means nothing is loaded or compiled.
+enabled = true
+
+# What one plugin may run in a single turn, in Lua instructions. Refilled on every entry,
+# so it caps one handler and not the whole tick. Measured: 250,000 is about 13ms here.
+instructions-per-turn = 250000
+
+# The most memory one plugin's own objects may take, in megabytes.
+memory-mb = 32
+
+# How many copies of each plugin run at once. One is what a server wants; more is a
+# development switch that makes a plugin assuming there is only one of it fail here.
+test-lanes = 1
+
+# The data of a plugin that is no longer installed: "warn" names it at every startup,
+# "quiet" stops asking. Nothing is ever deleted on its own: /plugins purge does that.
+orphan-data = "warn"
+
+# What each plugin may reach beyond its own sandbox: "packets" sees everyone's chat,
+# "network" talks past the client, "commands" runs as the console. A plugin that asks for
+# one and is not listed here loads without it and says so. Entries go below the header.
+[plugins.allow]
+# arena = ["packets"]
+# lobby = ["network", "commands"]
+
+[logging]
+# One of: trace, debug, info, warn, error.
+level = "info"
+# Mirror everything the console shows into .basalt/logs/latest.log, archiving the
+# previous run as .basalt/logs/archive/<date>-<n>.log.gz on every start.
+file = true
+# How many days of archived logs to keep. 0 keeps them forever.
+keep-days = 14
+# Colour the console output. One of: auto, always, never. "auto" colours only when
+# writing to a terminal, so redirected output and log files stay clean.
+color = "auto"

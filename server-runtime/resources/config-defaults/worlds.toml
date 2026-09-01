@@ -1,0 +1,91 @@
+# Which worlds this server loads, and how they behave.
+#
+# This file DECLARES what to load. It never deletes anything:
+#   - Add a table for a name that has no directory yet  -> the world is created.
+#   - Copy a world directory into worlds/ and add its table -> the world is imported.
+#   - Remove a table -> the world stops loading. Its files are left untouched, and
+#     putting the table back loads it again exactly as it was.
+# Deleting a world means deleting worlds/<name>/ yourself, which is deliberate.
+
+[worlds.world]
+# The world players join into. Exactly one world must be marked as the default.
+default = true
+# normal    terrain with biomes, caves and structures
+# flat      the vanilla superflat preset: bedrock, two dirt, grass
+# void      nothing but air, with a small stone platform under the spawn so a
+#           fresh world is standable. For lobbies and hubs.
+# amplified vanilla's amplified terrain. NOT IMPLEMENTED YET: it needs a second
+#           set of density functions that this build does not port, and pretending
+#           normal terrain is amplified would be a silent lie, so declaring it
+#           stops the server instead.
+type = "normal"
+# Leave the seed out to have one generated on first creation. Once a world exists,
+# the seed it was generated with wins over this value and a mismatch is logged:
+# changing it does not regenerate terrain that is already on disk.
+# seed = 12345
+# overworld, nether or end. The dimension decides the sky, the height limits, the
+# 1:8 of a Nether portal and whether it can rain.
+dimension = "overworld"
+
+# The other two dimensions, as a vanilla server has them.
+#
+# linked_to names the overworld they belong to: a portal lit in that overworld
+# comes out here, and a portal here goes back to it. That is what lets a server
+# have SEVERAL sets of dimensions, each with its own Nether and its own End,
+# without a plugin rewriting portal travel. Leave it out and the world belongs to
+# the default one.
+#
+# With no seed of their own they share the seed of the overworld they belong to,
+# which is what a vanilla save does with its three dimensions.
+#
+# Remove a table and portals to it stop working (the server says so in the log);
+# the files stay where they are.
+[worlds.world_nether]
+type = "normal"
+dimension = "nether"
+linked_to = "world"
+
+[worlds.world_the_end]
+type = "normal"
+dimension = "end"
+linked_to = "world"
+
+# More worlds go here. Each one gets its own chunks, region files and settings,
+# and players travel between them with /tp.
+# [worlds.lobby]
+# type = "void"
+# [worlds.creative]
+# type = "flat"
+# seed = 42
+#
+# A second overworld with its own dimensions, which on Paper takes a plugin:
+# [worlds.skyblock]
+# type = "normal"
+# [worlds.skyblock_nether]
+# dimension = "nether"
+# linked_to = "skyblock"
+# [worlds.skyblock_the_end]
+# dimension = "end"
+# linked_to = "skyblock"
+#
+# Rules: only a nether or an end may name a linked_to, it has to name an overworld
+# that this file declares, and one overworld has at most one nether and one end.
+# Anything else stops the server naming the world, rather than sending portals
+# somewhere nobody chose.
+
+[defaults]
+# Inherited by every world, and overridable per world in worlds/<name>/settings.toml.
+# peaceful, easy, normal or hard. Decides whether hunger can starve you and how far
+# down it can take you.
+difficulty = "easy"
+# Radius, in chunks, sent to a client around its own position (vanilla's own
+# server.properties default is 10).
+view-distance = 10
+# How often changes are written to the region files: a crash costs at most this
+# much. Vanilla's own interval. 0 disables it, leaving chunks to save when they
+# unload or on stop.
+save-interval-seconds = 300
+# NOT VANILLA. The End's exit portal only opens when the dragon dies, and this build
+# has no dragon yet, so the End is a one-way trip unless you turn this on. With it on,
+# the portal in the middle of the End is open from the moment the world is created.
+open-end-exit-portal = false
