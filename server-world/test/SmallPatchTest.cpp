@@ -111,7 +111,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
     SUBCASE("flowerDefault") {
         const Run result = run("grass_block", false, false, 30,
                                [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment, std::int64_t seed) {
+                                  const testsupport::FixedBiomeEnvironment&, std::int64_t) {
                                    defaultVegetationDecoration::placeDefaultPatchAt(chunk, random, origin);
                                });
         CHECK(result.placed == 481);
@@ -124,8 +124,8 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
     SUBCASE("dryGrassAt") {
         const Run result = run("sand", false, false, 30,
                                [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { dryGrassDecoration::placeAt(chunk, random, origin); });
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { dryGrassDecoration::placeAt(chunk, random, origin); });
         CHECK(result.placed == 8161);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -135,9 +135,9 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
 
     SUBCASE("dryGrassDesert") {
         const Run result = run("sand", false, false, 30,
-                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { dryGrassDecoration::desert()(chunk, random); });
+                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos&,
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { dryGrassDecoration::desert()(chunk, random); });
         CHECK(result.placed == 7779);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -147,9 +147,9 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
 
     SUBCASE("dryGrassBadlands") {
         const Run result = run("red_sand", false, false, 30,
-                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { dryGrassDecoration::badlands()(chunk, random); });
+                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos&,
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { dryGrassDecoration::badlands()(chunk, random); });
         CHECK(result.placed == 7760);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -160,8 +160,8 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
     SUBCASE("forestFlowersAt") {
         const Run result = run("grass_block", false, false, 30,
                                [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { forestFlowerDecoration::placeAt(chunk, random, origin); });
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { forestFlowerDecoration::placeAt(chunk, random, origin); });
         CHECK(result.placed == 1155);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -171,9 +171,9 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
 
     SUBCASE("forestFlowersNormal") {
         const Run result = run("grass_block", false, false, 30,
-                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { forestFlowerDecoration::normal()(chunk, random); });
+                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos&,
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { forestFlowerDecoration::normal()(chunk, random); });
         CHECK(result.placed == 24);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -183,9 +183,9 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
 
     SUBCASE("forestFlowersFlowerForest") {
         const Run result = run("grass_block", false, false, 30,
-                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { forestFlowerDecoration::flowerForest()(chunk, random); });
+                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos&,
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { forestFlowerDecoration::flowerForest()(chunk, random); });
         CHECK(result.placed == 133);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -195,9 +195,9 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
 
     SUBCASE("jungleVines") {
         const Run result = run("grass_block", false, true, 30,
-                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { jungleVineDecoration::decoration()(chunk, random); });
+                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos&,
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { jungleVineDecoration::decoration()(chunk, random); });
         CHECK(result.placed == 41);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -208,8 +208,8 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
     SUBCASE("jungleVineAt") {
         const Run result =
             run("grass_block", false, true, 30,
-                [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                   const testsupport::FixedBiomeEnvironment& environment, std::int64_t seed) {
+                [](Chunk& chunk, rng::RandomSource&, const DecorationPos&, const testsupport::FixedBiomeEnvironment&,
+                   std::int64_t) {
                     for (std::int32_t y = 72; y <= 90; ++y) {
                         static_cast<void>(jungleVineDecoration::placeAt(
                             chunk, DecorationPos{.x = chunk.chunkX() * 16 + 9, .y = y, .z = chunk.chunkZ() * 16 + 8}));
@@ -225,8 +225,8 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
     SUBCASE("waterlilyAt") {
         const Run result = run("grass_block", true, false, 30,
                                [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { waterlilyPatchDecoration::placeAt(chunk, random, origin); });
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { waterlilyPatchDecoration::placeAt(chunk, random, origin); });
         CHECK(result.placed == 55);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -236,7 +236,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
 
     SUBCASE("waterlilyStep") {
         const Run result = run("grass_block", true, false, 30,
-                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
+                               [](Chunk& chunk, rng::RandomSource&, const DecorationPos&,
                                   const testsupport::FixedBiomeEnvironment& environment,
                                   std::int64_t seed) { waterlilyPatchDecoration::decorate(chunk, seed, environment); });
         CHECK(result.placed == 82);
@@ -249,8 +249,8 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
     SUBCASE("pumpkinAt") {
         const Run result = run("grass_block", false, false, 30,
                                [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment,
-                                  std::int64_t seed) { pumpkinPatchDecoration::placeAt(chunk, random, origin); });
+                                  const testsupport::FixedBiomeEnvironment&,
+                                  std::int64_t) { pumpkinPatchDecoration::placeAt(chunk, random, origin); });
         CHECK(result.placed == 657);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
@@ -260,7 +260,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
 
     SUBCASE("pumpkinStep") {
         const Run result = run("grass_block", false, false, 900,
-                               [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
+                               [](Chunk& chunk, rng::RandomSource&, const DecorationPos&,
                                   const testsupport::FixedBiomeEnvironment& environment,
                                   std::int64_t seed) { pumpkinPatchDecoration::decorate(chunk, seed, environment); });
         CHECK(result.placed == 18);
@@ -273,7 +273,7 @@ TEST_CASE("the small vegetation patches place what the frozen kotlin places") {
     SUBCASE("bareStone") {
         const Run result = run("stone", false, false, 30,
                                [](Chunk& chunk, rng::RandomSource& random, const DecorationPos& origin,
-                                  const testsupport::FixedBiomeEnvironment& environment, std::int64_t seed) {
+                                  const testsupport::FixedBiomeEnvironment&, std::int64_t) {
                                    defaultVegetationDecoration::placeDefaultPatchAt(chunk, random, origin);
                                });
         CHECK(result.placed == 0);

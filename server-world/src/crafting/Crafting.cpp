@@ -294,13 +294,13 @@ std::optional<loot::ItemStack> Recipe::assembleSmithing(const loot::ItemStack& b
     if (!trimPattern.has_value()) {
         return specialRecipes::withComponentsOf(result.item, 1, baseStack);
     }
-    const std::optional<wire::common::Identifier> material = hooks::trimMaterialOf(additionStack.item);
-    if (!material.has_value()) {
+    const std::optional<wire::common::Identifier> trimMaterial = hooks::trimMaterialOf(additionStack.item);
+    if (!trimMaterial.has_value()) {
         return std::nullopt;
     }
     wire::nbt::NbtCompound trim;
     trim.set("pattern", wire::nbt::NbtTag::ofString(trimPattern->toString()));
-    trim.set("material", wire::nbt::NbtTag::ofString(material->toString()));
+    trim.set("material", wire::nbt::NbtTag::ofString(trimMaterial->toString()));
     loot::ItemStack trimmed = specialRecipes::withComponentsOf(baseStack.item, 1, baseStack);
     // parity: applying the trim it already has is not a recipe at all.
     if (const wire::nbt::NbtTag* existing = trimmed.components.find(std::string{specialRecipes::kTrim});
