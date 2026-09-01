@@ -24,6 +24,7 @@ basalt_module(server-runtime-core
         src/config/ServerListConfig.cpp
         src/config/UiConfigs.cpp
         src/entity/Aabb.cpp
+        src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
@@ -45,9 +46,11 @@ basalt_module(server-runtime-core
         src/scoreboard/Scoreboard.cpp
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
+        src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/ItemEnchantability.cpp
         src/world/NaturalSpawnObstruction.cpp
+        src/world/PendingChunkDecorations.cpp
         src/world/PrimedTntQueue.cpp
         src/world/SculkSensorTracker.cpp
         src/world/MobLocalDifficulty.cpp
@@ -75,6 +78,18 @@ basalt_test(server-runtime-config-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-dropped-items-test
+    SOURCES
+        test/DroppedItemsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-pending-decorations-test
+    SOURCES
+        test/PendingDecorationsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-world-pieces-test
     SOURCES
         test/WorldPiecesTest.cpp
@@ -84,6 +99,12 @@ basalt_test(server-runtime-world-pieces-test
 basalt_test(server-runtime-world-rules-test
     SOURCES
         test/WorldRulesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-collision-test
+    SOURCES
+        test/EntityCollisionTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
