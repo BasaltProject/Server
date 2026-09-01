@@ -164,6 +164,7 @@ basalt_module(server-world
     src/terrain/DesertPyramidPiece.cpp
     src/terrain/DesertPyramidStructureGenerator.cpp
     src/terrain/BiomeZoomer.cpp
+    src/terrain/DimensionTerrainGenerator.cpp
     src/terrain/EndCityPieces.cpp
     src/terrain/EndCityStructureGenerator.cpp
     src/terrain/StructureReferenceOrder.cpp
@@ -174,9 +175,16 @@ basalt_module(server-world
     src/terrain/JungleTemplePiece.cpp
     src/terrain/JungleTempleStructureGenerator.cpp
     src/terrain/MineshaftStructureGenerator.cpp
+    src/terrain/NetherFortressBridgePlacement.cpp
+    src/terrain/NetherFortressBrush.cpp
+    src/terrain/NetherFortressCastlePlacement.cpp
+    src/terrain/NetherFortressPieces.cpp
+    src/terrain/NetherRuinedPortalGenerator.cpp
+    src/terrain/NetherStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
     src/terrain/RuinedPortalStructureGenerator.cpp
+    src/terrain/RealTerrainGenerator.cpp
     src/terrain/ShipwreckStructureGenerator.cpp
     src/terrain/StrongholdStructureGenerator.cpp
     src/terrain/StructureBeardifier.cpp
@@ -370,6 +378,12 @@ basalt_test(server-world-buried-treasure-generator-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-terrain-pipeline-test
+    SOURCES
+        test/TerrainPipelineTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-structure-reference-order-test
     SOURCES
         test/StructureReferenceOrderTest.cpp
@@ -397,6 +411,12 @@ basalt_test(server-world-jungle-temple-generator-test
 basalt_test(server-world-igloo-generator-test
     SOURCES
         test/IglooGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-nether-structure-generator-test
+    SOURCES
+        test/NetherStructureGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
