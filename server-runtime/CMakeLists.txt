@@ -12,12 +12,16 @@ basalt_module(server-runtime-core
     SOURCES
         src/Connection.cpp
         src/LoginHandler.cpp
+        src/config/AnimationsConfig.cpp
         src/config/BasaltConfig.cpp
         src/config/CommandsConfig.cpp
         src/config/CompatibilityConfig.cpp
         src/config/ConfigDirectory.cpp
         src/config/ForwardingConfig.cpp
         src/config/GroupsConfig.cpp
+        src/config/ProfileSelection.cpp
+        src/config/ServerListConfig.cpp
+        src/config/UiConfigs.cpp
         src/config/WorldsConfig.cpp
         src/function/FunctionLibrary.cpp
         src/net/ProxyLogin.cpp
@@ -56,6 +60,32 @@ basalt_test(server-runtime-timings-test
 basalt_test(server-runtime-config-test
     SOURCES
         test/ConfigDirectoryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-server-list-test
+    SOURCES
+        test/ServerListConfigTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-server-list-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-ui-config-test
+    SOURCES
+        test/UiConfigsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-ui-config-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-profile-test
+    SOURCES
+        test/ProfileSelectionTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
