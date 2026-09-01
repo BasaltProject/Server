@@ -107,8 +107,10 @@ std::int32_t strongholdPalette::ironDoor(std::string_view facing, std::string_vi
     return state("iron_door", doorProperties(facing, half));
 }
 
-std::int32_t strongholdPalette::bars(std::string_view first, std::string_view second) {
-    const auto on = [&](std::string_view side) { return side == first || side == second ? "true" : "false"; };
+std::int32_t strongholdPalette::bars(std::initializer_list<std::string_view> sides) {
+    const auto on = [&sides](std::string_view side) {
+        return std::find(sides.begin(), sides.end(), side) != sides.end() ? "true" : "false";
+    };
     return state("iron_bars", {{"north", on("north")},
                                {"south", on("south")},
                                {"east", on("east")},
@@ -202,13 +204,13 @@ void StrongholdBrush::door(StrongholdDoor type, std::int32_t x, std::int32_t y, 
     case StrongholdDoor::Grates:
         place(strongholdPalette::caveAir(), x + 1, y, z);
         place(strongholdPalette::caveAir(), x + 1, y + 1, z);
-        place(strongholdPalette::bars("west"), x, y, z);
-        place(strongholdPalette::bars("west"), x, y + 1, z);
-        place(strongholdPalette::bars("east", "west"), x, y + 2, z);
-        place(strongholdPalette::bars("east", "west"), x + 1, y + 2, z);
-        place(strongholdPalette::bars("east", "west"), x + 2, y + 2, z);
-        place(strongholdPalette::bars("east"), x + 2, y + 1, z);
-        place(strongholdPalette::bars("east"), x + 2, y, z);
+        place(strongholdPalette::bars({"west"}), x, y, z);
+        place(strongholdPalette::bars({"west"}), x, y + 1, z);
+        place(strongholdPalette::bars({"east", "west"}), x, y + 2, z);
+        place(strongholdPalette::bars({"east", "west"}), x + 1, y + 2, z);
+        place(strongholdPalette::bars({"east", "west"}), x + 2, y + 2, z);
+        place(strongholdPalette::bars({"east"}), x + 2, y + 1, z);
+        place(strongholdPalette::bars({"east"}), x + 2, y, z);
         return;
     case StrongholdDoor::IronDoor:
         frame(x, y, z);
