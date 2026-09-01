@@ -23,6 +23,7 @@ basalt_module(server-runtime-core
         src/config/ProfileSelection.cpp
         src/config/ServerListConfig.cpp
         src/config/UiConfigs.cpp
+        src/entity/Aabb.cpp
         src/entity/MobRules.cpp
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
@@ -44,7 +45,11 @@ basalt_module(server-runtime-core
         src/scoreboard/Scoreboard.cpp
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
+        src/world/EntityRegistry.cpp
         src/world/ItemEnchantability.cpp
+        src/world/NaturalSpawnObstruction.cpp
+        src/world/PrimedTntQueue.cpp
+        src/world/SculkSensorTracker.cpp
         src/world/MobLocalDifficulty.cpp
         src/world/SelectableSlots.cpp
         src/world/SpawnPotential.cpp
@@ -67,6 +72,12 @@ basalt_test(server-runtime-timings-test
 basalt_test(server-runtime-config-test
     SOURCES
         test/ConfigDirectoryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-world-pieces-test
+    SOURCES
+        test/WorldPiecesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
