@@ -56,12 +56,14 @@ basalt_module(server-runtime-core
         src/world/MobLocalDifficulty.cpp
         src/world/SelectableSlots.cpp
         src/world/GameRules.cpp
+        src/world/BambooGrowth.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
         src/world/DetectorRails.cpp
         src/world/GrowthSupport.cpp
         src/world/LocalMobCaps.cpp
         src/world/StemGrowth.cpp
+        src/world/PlantGrowth.cpp
         src/world/PressurePlates.cpp
         src/world/SnowyBlocks.cpp
         src/world/WorldBorder.cpp
@@ -150,6 +152,18 @@ basalt_test(server-runtime-detector-rails-test
 basalt_test(server-runtime-world-light-test
     SOURCES
         test/WorldLightTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-bamboo-growth-test
+    SOURCES
+        test/BambooGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-plant-growth-test
+    SOURCES
+        test/PlantGrowthTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
