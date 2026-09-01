@@ -77,7 +77,7 @@ public class VersionManifest(
             parseMetadata(versionId, Json.parseToJsonElement(metadataBody) as JsonObject)
         }
 
-    private fun parseMetadata(
+    internal fun parseMetadata(
         versionId: String,
         metadata: JsonObject,
     ): VersionMetadata {
