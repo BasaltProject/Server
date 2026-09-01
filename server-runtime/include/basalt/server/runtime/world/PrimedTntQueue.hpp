@@ -1,8 +1,9 @@
 #pragma once
 
+#include <basalt/server/runtime/world/WorldMutex.hpp>
+
 #include <array>
 #include <cstdint>
-#include <mutex>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -13,7 +14,7 @@ namespace basalt::server::runtime::world {
 /// allocate an entity id, so what it left behind waits here for one tick at most.
 class PrimedTntQueue {
 public:
-    explicit PrimedTntQueue(std::mutex& mutex) : mutex_(&mutex) {}
+    explicit PrimedTntQueue(WorldMutex& mutex) : mutex_(&mutex) {}
 
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
     void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z);
@@ -22,7 +23,7 @@ public:
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> takePrimedTnt();
 
 private:
-    std::mutex* mutex_;
+    WorldMutex* mutex_;
     std::vector<std::array<std::int32_t, 3>> primedTnt_;
 };
 

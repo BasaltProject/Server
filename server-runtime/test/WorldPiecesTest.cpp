@@ -7,11 +7,11 @@
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
 #include <basalt/server/runtime/world/PrimedTntQueue.hpp>
 #include <basalt/server/runtime/world/SculkSensorTracker.hpp>
+#include <basalt/server/runtime/world/WorldMutex.hpp>
 
 #include <doctest.h>
 
 #include <memory>
-#include <mutex>
 #include <string>
 
 using namespace basalt::server::runtime::world;
@@ -162,7 +162,7 @@ TEST_CASE("whether the blocks leave room for a mob") {
 }
 
 TEST_CASE("the tnt that was lit waits one tick for an entity id") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PrimedTntQueue queue{mutex};
     CHECK(queue.takePrimedTnt().empty());
 
@@ -177,7 +177,7 @@ TEST_CASE("the tnt that was lit waits one tick for an entity id") {
 }
 
 TEST_CASE("the sensors a footstep can reach") {
-    std::mutex mutex;
+    WorldMutex mutex;
     SculkSensorTracker sensors{mutex};
     const std::int32_t sensor = registry::blocks::named("sculk_sensor")->stateId;
     const std::int32_t stone = registry::blocks::stone().stateId;
@@ -219,7 +219,7 @@ TEST_CASE("the sensors a footstep can reach") {
 }
 
 TEST_CASE("what the world knows about the entities in it") {
-    std::mutex mutex;
+    WorldMutex mutex;
     EntityRegistry registry{mutex};
     CHECK(registry.entities().empty());
     CHECK(registry.entity(1) == nullptr);
@@ -270,7 +270,7 @@ TEST_CASE("what the world knows about the entities in it") {
 }
 
 TEST_CASE("what a loaded chunk brings back waits for the tick loop") {
-    std::mutex mutex;
+    WorldMutex mutex;
     EntityRegistry registry{mutex};
     CHECK(registry.takePendingEntities().empty());
 
@@ -285,7 +285,7 @@ TEST_CASE("what a loaded chunk brings back waits for the tick loop") {
 }
 
 TEST_CASE("an entity already standing there is in the way of a spawn") {
-    std::mutex mutex;
+    WorldMutex mutex;
     EntityRegistry registry{mutex};
     const Aabb spawnBox = naturalSpawnObstruction::spawnBox(of("zombie"), 0.5, 64.0, 0.5);
     const Aabb entityBox = naturalSpawnObstruction::entityBox(of("zombie"), 0.5, 64.0, 0.5);

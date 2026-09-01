@@ -1,7 +1,8 @@
 #pragma once
 
+#include <basalt/server/runtime/world/WorldMutex.hpp>
+
 #include <cstdint>
-#include <mutex>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -14,7 +15,7 @@ namespace basalt::server::runtime::world {
 /// touches it, so footsteps do not reach the deep dark yet.
 class SculkSensorTracker {
 public:
-    explicit SculkSensorTracker(std::mutex& mutex) : mutex_(&mutex) {}
+    explicit SculkSensorTracker(WorldMutex& mutex) : mutex_(&mutex) {}
 
     /// Called from the block write path without the lock held: the owner is the only writer of
     /// blocks, so this set only ever changes from that one thread.
@@ -26,7 +27,7 @@ public:
     [[nodiscard]] std::size_t size() const;
 
 private:
-    std::mutex* mutex_;
+    WorldMutex* mutex_;
     std::vector<std::int64_t> sculkSensors_;
 };
 

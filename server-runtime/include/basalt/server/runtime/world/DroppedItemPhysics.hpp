@@ -3,9 +3,9 @@
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
+#include <basalt/server/runtime/world/WorldMutex.hpp>
 
 #include <cstdint>
-#include <mutex>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -47,7 +47,7 @@ public:
     /// And the vertical speed that counts as none, so a bounce is never mistaken for a rest.
     static constexpr double kRestingSpeed = 1.0e-3;
 
-    DroppedItemPhysics(std::mutex& mutex, entity::entityCollision::BlockAt blockAt)
+    DroppedItemPhysics(WorldMutex& mutex, entity::entityCollision::BlockAt blockAt)
         : mutex_(&mutex), blockAt_(std::move(blockAt)) {}
 
     /// Adds a newly spawned (or re-added, for a partial pickup) dropped item to this world.
@@ -77,7 +77,7 @@ private:
     void mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
                              std::vector<std::int32_t>& absorbed);
 
-    std::mutex* mutex_;
+    WorldMutex* mutex_;
     entity::entityCollision::BlockAt blockAt_;
     std::vector<DroppedItem> droppedItems_;
 };

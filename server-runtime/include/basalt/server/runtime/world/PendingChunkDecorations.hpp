@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/WorldMutex.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkTypes.hpp>
 #include <basalt/wire/common/Uuid.hpp>
@@ -7,7 +8,6 @@
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <mutex>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -30,7 +30,7 @@ public:
     /// What the world says is loaded at a packed chunk key, or nothing when it is not.
     using ChunkAt = std::function<server::world::Chunk*(std::int64_t chunkKey)>;
 
-    explicit PendingChunkDecorations(std::mutex& mutex) : mutex_(&mutex) {}
+    explicit PendingChunkDecorations(WorldMutex& mutex) : mutex_(&mutex) {}
 
     /// The packed key both this and the chunk map are keyed by.
     [[nodiscard]] static std::int64_t key(std::int32_t chunkX, std::int32_t chunkZ);
@@ -82,7 +82,7 @@ private:
         friend auto operator<=>(const GeneratedEntityKey&, const GeneratedEntityKey&) = default;
     };
 
-    std::mutex* mutex_;
+    WorldMutex* mutex_;
     std::map<GeneratedEntityKey, GeneratedWorldEntity> generatedEntitiesByKey_;
     std::vector<server::world::ChunkGeneratedEntity> pendingGeneratedEntities_;
     std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockWrite>> pendingGeneratedBlockWrites_;

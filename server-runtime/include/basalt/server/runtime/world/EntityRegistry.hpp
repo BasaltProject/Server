@@ -2,11 +2,11 @@
 
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/world/WorldMutex.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -21,7 +21,7 @@ namespace basalt::server::runtime::world {
 /// behaviour change even where it has nothing to do with vanilla parity.
 class EntityRegistry {
 public:
-    explicit EntityRegistry(std::mutex& mutex) : mutex_(&mutex) {}
+    explicit EntityRegistry(WorldMutex& mutex) : mutex_(&mutex) {}
 
     /// Everything `/summon` put here, alive or just removed and not yet forgotten by clients.
     [[nodiscard]] std::vector<entity::ServerEntity*> entities() const;
@@ -55,7 +55,7 @@ public:
     [[nodiscard]] std::vector<std::int32_t> collectRemovedEntities();
 
 private:
-    std::mutex* mutex_;
+    WorldMutex* mutex_;
     /// In the order they were spawned, which is the order every listing here answers in.
     std::vector<std::unique_ptr<entity::ServerEntity>> entities_;
     std::vector<wire::nbt::NbtCompound> pendingEntities_;

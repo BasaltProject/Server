@@ -25,18 +25,18 @@ namespace {
 } // namespace
 
 DroppedItem& DroppedItemPhysics::spawnItem(DroppedItem dropped) {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     droppedItems_.push_back(std::move(dropped));
     return droppedItems_.back();
 }
 
 std::vector<DroppedItem> DroppedItemPhysics::items() const {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     return droppedItems_;
 }
 
 std::vector<DroppedItem> DroppedItemPhysics::nearbyItems(double x, double y, double z, double radius) const {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     const double radiusSquared = radius * radius;
     std::vector<DroppedItem> found;
     for (const DroppedItem& item : droppedItems_) {
@@ -52,7 +52,7 @@ std::vector<DroppedItem> DroppedItemPhysics::nearbyItems(double x, double y, dou
 }
 
 std::optional<DroppedItem> DroppedItemPhysics::removeItem(std::int32_t entityId) {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     const auto at =
         std::ranges::find_if(droppedItems_, [entityId](const DroppedItem& item) { return item.entityId == entityId; });
     if (at == droppedItems_.end()) {
@@ -64,7 +64,7 @@ std::optional<DroppedItem> DroppedItemPhysics::removeItem(std::int32_t entityId)
 }
 
 std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* region) {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<std::int32_t> despawned;
     for (std::size_t index = 0; index < droppedItems_.size();) {
         DroppedItem& item = droppedItems_[index];
