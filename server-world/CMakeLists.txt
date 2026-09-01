@@ -21,7 +21,9 @@ basalt_module(server-world
         src/region/ChunkNbt.cpp
         src/structure/StructureBounds.cpp
     src/structure/ConcentricRingsPlacement.cpp
+    src/structure/JigsawAssembly.cpp
     src/structure/MineshaftBlocks.cpp
+    src/structure/MineshaftLayout.cpp
     src/structure/StructurePieceFill.cpp
     src/structure/StructurePlacementGrid.cpp
     src/structure/StructureProcessor.cpp
@@ -315,6 +317,18 @@ basalt_test(server-world-village-features-test
 basalt_test(server-world-overworld-vegetal-test
     SOURCES
         test/OverworldVegetalTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-jigsaw-assembly-test
+    SOURCES
+        test/JigsawAssemblyTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-mineshaft-layout-test
+    SOURCES
+        test/MineshaftLayoutTest.cpp
     DEPENDS basalt::server-world
 )
 

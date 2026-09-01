@@ -66,8 +66,11 @@ public:
     [[nodiscard]] const std::string& location() const noexcept { return location_; }
 
     [[nodiscard]] std::int32_t groundLevelDelta() const noexcept { return kind_ == Kind::Empty ? 0 : 1; }
+
     [[nodiscard]] bool ignoreAir() const noexcept { return ignoreAir_; }
+
     [[nodiscard]] const StructureProcessorList& processors() const noexcept { return processors_; }
+
     [[nodiscard]] std::size_t listSize() const noexcept { return elements_ == nullptr ? 0 : elements_->size(); }
 
     [[nodiscard]] StructureBoundingBox getBoundingBox(const PoolTemplateLoader& loader, StructurePos position,
