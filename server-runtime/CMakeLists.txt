@@ -60,6 +60,7 @@ basalt_module(server-runtime-core
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
         src/world/DetectorRails.cpp
+        src/world/DaylightDetectors.cpp
         src/world/DripstoneGrowth.cpp
         src/world/FallingBlocks.cpp
         src/world/GrowthSupport.cpp
@@ -74,6 +75,7 @@ basalt_module(server-runtime-core
         src/world/RedstoneComponents.cpp
         src/world/RedstoneReactors.cpp
         src/world/SnowyBlocks.cpp
+        src/world/Tripwires.cpp
         src/world/VineGrowth.cpp
         src/world/WorldBorder.cpp
         src/world/WorldLight.cpp
@@ -170,9 +172,21 @@ basalt_test(server-runtime-bamboo-growth-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-daylight-detectors-test
+    SOURCES
+        test/DaylightDetectorsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-dripstone-growth-test
     SOURCES
         test/DripstoneGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-tripwires-test
+    SOURCES
+        test/TripwiresTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
