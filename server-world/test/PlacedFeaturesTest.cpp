@@ -22,6 +22,10 @@ namespace registry = basalt::server::registry;
 namespace {
 
 /// Every placed feature the registry answers to, in the order the frozen Kotlin lists them.
+/// The features that need more than a chunk, which answer to `contextual` instead.
+constexpr std::array<std::string_view, 6> kContextualIds{"chorus_plant", "end_spike",        "fossil_lower",
+                                                         "fossil_upper", "freeze_top_layer", "rooted_sulfur_spring"};
+
 constexpr std::array<std::string_view, 259> kIds{"acacia",
                                                  "acacia_checked",
                                                  "amethyst_geode",
@@ -337,14 +341,29 @@ constexpr std::array<std::string_view, 259> kIds{"acacia",
 } // namespace
 
 TEST_CASE("the placed feature registry answers to the frozen kotlin's ids") {
-    std::vector<std::string> found;
-    found.reserve(placedFeatures::ids().size());
-    for (const basalt::wire::common::Identifier& id : placedFeatures::ids()) {
-        found.push_back(id.path());
+    SUBCASE("runnable from a chunk alone") {
+        std::vector<std::string> found;
+        for (const basalt::wire::common::Identifier& id : placedFeatures::ids()) {
+            if (placedFeatures::find(id) != nullptr) {
+                found.push_back(id.path());
+            }
+        }
+        std::vector<std::string> expected{kIds.begin(), kIds.end()};
+        CHECK(found.size() == expected.size());
+        CHECK(found == expected);
     }
-    std::vector<std::string> expected{kIds.begin(), kIds.end()};
-    CHECK(found.size() == expected.size());
-    CHECK(found == expected);
+
+    SUBCASE("needing the rest of the world") {
+        std::vector<std::string> found;
+        for (const basalt::wire::common::Identifier& id : placedFeatures::contextualIds()) {
+            found.push_back(id.path());
+        }
+        std::vector<std::string> expected{kContextualIds.begin(), kContextualIds.end()};
+        CHECK(found.size() == expected.size());
+        CHECK(found == expected);
+        // The two halves are disjoint and together are everything the registry answers to.
+        CHECK(placedFeatures::ids().size() == kIds.size() + kContextualIds.size());
+    }
 }
 
 TEST_CASE("every placed feature places what the frozen kotlin places") {

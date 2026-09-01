@@ -376,6 +376,8 @@ const std::set<wire::common::Identifier>& placedFeatures::ids() {
         for (const auto& [id, placement] : registry()) {
             ids.insert(id);
         }
+        const std::set<wire::common::Identifier>& contextual = placedFeatures::contextualIds();
+        ids.insert(contextual.begin(), contextual.end());
         return ids;
     }();
     return built;
