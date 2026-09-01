@@ -149,6 +149,7 @@ basalt_module(server-world
     src/terrain/decoration/SimpleBlockFeature.cpp
     src/terrain/BiomeClimateData.cpp
     src/terrain/BubbleColumnFormation.cpp
+    src/terrain/BuriedTreasureStructureGenerator.cpp
     src/terrain/DensityChunkSampler.cpp
     src/terrain/NetherBiomeSource.cpp
     src/terrain/TheEndBiomeSource.cpp
@@ -163,6 +164,7 @@ basalt_module(server-world
     src/terrain/BiomeZoomer.cpp
     src/terrain/TerrainProvider.cpp
     src/terrain/WoodlandMansionStructureGenerator.cpp
+    src/terrain/IglooStructureGenerator.cpp
     src/terrain/MineshaftStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
@@ -345,6 +347,18 @@ basalt_test(server-world-overworld-vegetal-test
 basalt_test(server-world-jigsaw-assembly-test
     SOURCES
         test/JigsawAssemblyTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-buried-treasure-generator-test
+    SOURCES
+        test/BuriedTreasureGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-igloo-generator-test
+    SOURCES
+        test/IglooGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
