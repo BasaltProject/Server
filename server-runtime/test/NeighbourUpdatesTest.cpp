@@ -285,13 +285,23 @@ TEST_CASE("leaves take their distance from the trunk that turned up") {
     CHECK(propertyAt(loaded.state, 8, 65, 8, "distance") == "1");
 }
 
-TEST_CASE("a wall keeps its shape without somebody to work one out") {
+TEST_CASE("a wall works its own shape out, and a caller may answer for it instead") {
     Loaded loaded;
     loaded.put(8, 64, 8, stateOf("cobblestone_wall"));
     const std::int32_t placed = *loaded.state.blockState(8, 64, 8);
 
     neighbourUpdates::Context context = loaded.context();
+    // Nothing around it, and the shape it was placed with is already the right one.
     CHECK_FALSE(neighbourUpdates::connect(context, 8, 64, 8, placed).has_value());
+
+    // With a neighbour to reach out to, the unset hook still settles it: `Walls` answers.
+    loaded.put(9, 64, 8, stateOf("stone"));
+    const std::optional<std::int32_t> byItself = neighbourUpdates::connect(context, 8, 64, 8, placed);
+    REQUIRE(byItself.has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "east") == "low");
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "west") == "none");
+    loaded.put(9, 64, 8, air());
+    loaded.put(8, 64, 8, placed);
 
     std::vector<std::int32_t> asked;
     context.wallShape = [&asked](std::int32_t stateId, std::int32_t north, std::int32_t south, std::int32_t west,
@@ -323,6 +333,7 @@ TEST_CASE("the dust is asked to redraw itself where it sits") {
 
     neighbourUpdates::Context context = loaded.context();
     std::vector<BlockChange> bubbles;
+    // The unset hook is `RedstoneWire` itself, and a lone dust on stone is already a dot.
     CHECK_FALSE(neighbourUpdates::reshape(context, 8, 65, 8, bubbles).has_value());
 
     std::vector<std::int32_t> asked;

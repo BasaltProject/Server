@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
+#include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
@@ -11,9 +12,11 @@
 #include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/RedstoneWire.hpp>
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/SnowyBlocks.hpp>
 #include <basalt/server/runtime/world/Sponges.hpp>
+#include <basalt/server/runtime/world/Walls.hpp>
 
 #include <algorithm>
 #include <array>
@@ -95,13 +98,15 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
 /// parity: `WallBlock.updateShape`, sides and post together.
 [[nodiscard]] std::optional<std::int32_t> rebuildWall(const Context& context, std::int32_t x, std::int32_t y,
                                                       std::int32_t z, std::int32_t stateId) {
-    if (!context.wallShape) {
-        return std::nullopt;
-    }
     WorldState& world = context.world;
+    const std::int32_t north = stateAt(world, x, y, z - 1);
+    const std::int32_t south = stateAt(world, x, y, z + 1);
+    const std::int32_t west = stateAt(world, x - 1, y, z);
+    const std::int32_t east = stateAt(world, x + 1, y, z);
+    const std::int32_t above = stateAt(world, x, y + 1, z);
     const std::optional<std::map<std::string, std::string>> wanted =
-        context.wallShape(stateId, stateAt(world, x, y, z - 1), stateAt(world, x, y, z + 1),
-                          stateAt(world, x - 1, y, z), stateAt(world, x + 1, y, z), stateAt(world, x, y + 1, z));
+        context.wallShape ? context.wallShape(stateId, north, south, west, east, above)
+                          : walls::shapeOf(stateId, north, south, west, east, above);
     if (!wanted.has_value()) {
         return std::nullopt;
     }
@@ -235,11 +240,10 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
         }
     }
     // parity: `RedStoneWireBlock.updateShape`, which is what draws a line of dust as a line.
-    if (context.wireReshape) {
-        if (const std::optional<std::int32_t> drawn = context.wireReshape(world, x, y, z, *stateId);
-            drawn.has_value()) {
-            return drawn;
-        }
+    if (const std::optional<std::int32_t> drawn = context.wireReshape ? context.wireReshape(world, x, y, z, *stateId)
+                                                                      : redstoneWire::reshape(world, x, y, z, *stateId);
+        drawn.has_value()) {
+        return drawn;
     }
     if (const std::optional<std::int32_t> other = reshapes::of(world, x, y, z, *stateId, context.geyser);
         other.has_value()) {
@@ -312,17 +316,19 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     }
     // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.
-    if (context.dispenser) {
-        for (const BlockFace face : kFaces) {
-            if (const std::optional<BlockChange> armed = context.dispenser(
-                    world, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
-                armed.has_value()) {
-                reshaped(armed->stateId, armed->x, armed->y, armed->z);
-            }
-        }
-        if (const std::optional<BlockChange> armed = context.dispenser(world, x, y, z); armed.has_value()) {
+    const auto arm = [&context, &world](std::int32_t atX, std::int32_t atY, std::int32_t atZ) {
+        return context.dispenser ? context.dispenser(world, atX, atY, atZ)
+                                 : dispensers::onNeighbourChange(world, context.worldName, atX, atY, atZ);
+    };
+    for (const BlockFace face : kFaces) {
+        if (const std::optional<BlockChange> armed =
+                arm(x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
+            armed.has_value()) {
             reshaped(armed->stateId, armed->x, armed->y, armed->z);
         }
+    }
+    if (const std::optional<BlockChange> armed = arm(x, y, z); armed.has_value()) {
+        reshaped(armed->stateId, armed->x, armed->y, armed->z);
     }
     // parity: `CrafterBlock.neighborChanged`, the same rising edge with its own four ticks.
     if (const std::optional<BlockChange> armed = crafters::onNeighbourChange(world, context.worldName, x, y, z);

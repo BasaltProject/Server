@@ -38,23 +38,23 @@ using OnBroken = OnReshaped;
 
 /// What a dispenser makes of a signal reaching it.
 ///
-/// A callback because `Dispensers` is not ported yet and lives above this file. Without one a
-/// dispenser simply never books its turn.
+/// A callback so a caller can put its own hooks in front of a dispenser; left unset, `Dispensers`
+/// answers it, which is vanilla.
 using DispenserNeighbourChange =
     std::function<std::optional<BlockChange>(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z)>;
 
 /// The four sides and the post a wall settles on, from its neighbours and whatever covers it.
 ///
-/// A callback because `Walls` is not ported yet. Without one a wall keeps the shape it was placed
-/// with, which is the same "leave it alone" this file prefers everywhere else.
+/// A callback so a caller can answer it differently; left unset, `Walls` answers it, which is
+/// vanilla.
 using WallShape = std::function<std::optional<std::map<std::string, std::string>>(
     std::int32_t stateId, std::int32_t north, std::int32_t south, std::int32_t west, std::int32_t east,
     std::int32_t above)>;
 
 /// The way a line of dust draws itself towards what it can feed.
 ///
-/// A callback because `RedstoneWire` is not ported yet. Without one the dust still carries its
-/// power, which `redstone::settle` owns; only the connection properties are left alone.
+/// A callback so a caller can answer it differently; left unset, `RedstoneWire` answers it, which is
+/// vanilla.
 using WireReshape = std::function<std::optional<std::int32_t>(WorldState& world, std::int32_t x, std::int32_t y,
                                                               std::int32_t z, std::int32_t stateId)>;
 
