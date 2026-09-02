@@ -24,6 +24,7 @@ basalt_module(server-runtime-core
         src/config/ServerListConfig.cpp
         src/config/UiConfigs.cpp
         src/entity/Aabb.cpp
+        src/entity/BlockRay.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
         src/entity/ServerEntity.cpp
@@ -46,6 +47,7 @@ basalt_module(server-runtime-core
         src/scoreboard/Scoreboard.cpp
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
+        src/world/ChorusFlowerGrowth.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -108,6 +110,18 @@ basalt_module(server-runtime-core
         src/world/SpawnPotential.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
+)
+
+basalt_test(server-runtime-chorus-flower-growth-test
+    SOURCES
+        test/ChorusFlowerGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-ray-test
+    SOURCES
+        test/BlockRayTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-biome-registry-test
