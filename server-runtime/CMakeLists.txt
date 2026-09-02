@@ -96,6 +96,9 @@ basalt_module(server-runtime-core
         src/world/Beds.cpp
         src/world/ClimbingPlantGrowth.cpp
         src/world/Fluids.cpp
+        src/world/MobEffects.cpp
+        src/world/Lightning.cpp
+        src/world/Explosions.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -455,6 +458,24 @@ basalt_test(server-runtime-climbing-plant-growth-test
 basalt_test(server-runtime-fluids-test
     SOURCES
         test/FluidsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mob-effects-test
+    SOURCES
+        test/MobEffectsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-lightning-test
+    SOURCES
+        test/LightningTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-explosions-test
+    SOURCES
+        test/ExplosionsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
