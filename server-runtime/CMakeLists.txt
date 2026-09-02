@@ -94,6 +94,8 @@ basalt_module(server-runtime-core
         src/world/Geysers.cpp
         src/world/Signs.cpp
         src/world/Beds.cpp
+        src/world/ClimbingPlantGrowth.cpp
+        src/world/Fluids.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -441,6 +443,18 @@ basalt_test(server-runtime-signs-test
 basalt_test(server-runtime-beds-test
     SOURCES
         test/BedsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-climbing-plant-growth-test
+    SOURCES
+        test/ClimbingPlantGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-fluids-test
+    SOURCES
+        test/FluidsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
