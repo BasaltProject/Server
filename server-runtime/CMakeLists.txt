@@ -60,13 +60,16 @@ basalt_module(server-runtime-core
         src/world/BambooGrowth.cpp
         src/world/BlockInventory.cpp
         src/world/BlockSurvival.cpp
+        src/world/BrewingStands.cpp
         src/world/Buckets.cpp
         src/world/ChiseledBookshelves.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
+        src/world/Containers.cpp
         src/world/DecoratedPots.cpp
         src/world/DetectorRails.cpp
         src/world/DaylightDetectors.cpp
+        src/world/DoubleChests.cpp
         src/world/DripstoneGrowth.cpp
         src/world/FallingBlocks.cpp
         src/world/Fires.cpp
@@ -141,6 +144,12 @@ basalt_test(server-runtime-game-rules-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-containers-test
+    SOURCES
+        test/ContainersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-container-openers-test
     SOURCES
         test/ContainerOpenersTest.cpp
@@ -156,6 +165,12 @@ basalt_test(server-runtime-world-border-test
 basalt_test(server-runtime-chiseled-bookshelves-test
     SOURCES
         test/ChiseledBookshelvesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-brewing-stands-test
+    SOURCES
+        test/BrewingStandsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -258,6 +273,12 @@ basalt_test(server-runtime-bamboo-growth-test
 basalt_test(server-runtime-daylight-detectors-test
     SOURCES
         test/DaylightDetectorsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-double-chests-test
+    SOURCES
+        test/DoubleChestsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
