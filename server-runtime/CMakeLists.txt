@@ -26,6 +26,7 @@ basalt_module(server-runtime-core
         src/entity/Aabb.cpp
         src/entity/BlockRay.cpp
         src/entity/EntityPhysics.cpp
+        src/entity/FlyingMovement.cpp
         src/entity/Projectiles.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
@@ -79,6 +80,8 @@ basalt_module(server-runtime-core
         src/world/RealRecipes.cpp
         src/world/Pistons.cpp
         src/world/NeighbourUpdates.cpp
+        src/world/RealVillagerTrades.cpp
+        src/world/RuinedPortalVariants.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -182,6 +185,12 @@ basalt_test(server-runtime-real-timeline-tags-test
 basalt_test(server-runtime-sapling-growth-test
     SOURCES
         test/SaplingGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-flying-movement-test
+    SOURCES
+        test/FlyingMovementTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -336,6 +345,18 @@ basalt_test(server-runtime-pistons-test
 basalt_test(server-runtime-neighbour-updates-test
     SOURCES
         test/NeighbourUpdatesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-villager-trades-test
+    SOURCES
+        test/RealVillagerTradesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-ruined-portal-variants-test
+    SOURCES
+        test/RuinedPortalVariantsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

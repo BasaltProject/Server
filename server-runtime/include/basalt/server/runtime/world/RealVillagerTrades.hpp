@@ -1,0 +1,65 @@
+#pragma once
+
+#include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/common/logging/Logger.hpp>
+
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace basalt::server::runtime::world {
+
+/// One trade as the jar declares it: what it wants, what it gives, and how often.
+struct VillagerTrade {
+    wire::common::Identifier id;
+    wire::common::Identifier wants;
+    std::int32_t wantsCount = 1;
+    std::optional<wire::common::Identifier> alsoWants;
+    std::int32_t alsoWantsCount = 0;
+    wire::common::Identifier gives;
+    std::int32_t givesCount = 1;
+    std::int32_t maxUses = 12;
+    std::int32_t experience = 0;
+    float priceMultiplier = 0.0F;
+};
+
+/// Every villager trade the operator's own `server.jar` ships, by profession and level.
+///
+/// parity: 26.2 moved the trades out of `VillagerTrades` and into data. Each one is a file under
+/// `data/minecraft/villager_trade/<profession>/<level>/`, and the tag
+/// `data/minecraft/tags/villager_trade/<profession>/level_<n>.json` lists which belong to a level.
+/// Datapack content, so it is read from the operator's download rather than committed here.
+class RealVillagerTrades {
+public:
+    /// parity: `MerchantOffer`'s own default when a trade file does not say.
+    static constexpr std::int32_t kDefaultMaxUses = 12;
+
+    /// One jar entry as text, or nothing when the jar has no such entry.
+    using ReadText = std::function<std::optional<std::string>(std::string_view name)>;
+
+    /// The jar arrives as a callback rather than as `ServerJarAssets`: this needs the operator's own
+    /// copy of the game, and a test has no jar to hand it.
+    struct Jar {
+        ReadText readText;
+    };
+
+    explicit RealVillagerTrades(Jar jar, wire::common::Logger logger = wire::common::Logger{"VillagerTrades"})
+        : jar_(std::move(jar)), logger_(std::move(logger)) {}
+
+    /// The trades this profession offers at this level, in the order the tag lists them.
+    [[nodiscard]] const std::vector<VillagerTrade>& forProfession(std::string_view profession, std::int32_t level);
+
+    /// One trade file on its own, so the shape of a trade can be pinned without a jar to read from.
+    [[nodiscard]] static std::optional<VillagerTrade> parse(const wire::common::Identifier& id, std::string_view json);
+
+private:
+    Jar jar_;
+    wire::common::Logger logger_;
+    std::map<std::string, std::vector<VillagerTrade>> cache_;
+};
+
+} // namespace basalt::server::runtime::world
