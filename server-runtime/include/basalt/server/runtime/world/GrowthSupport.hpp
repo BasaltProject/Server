@@ -17,7 +17,10 @@ namespace basalt::server::runtime::world::growthSupport {
 /// offset or a light threshold.
 inline constexpr std::int32_t kGrowthLight = 9;
 
-inline constexpr std::array<std::string_view, 4> kHorizontalNames{"north", "south", "west", "east"};
+/// parity: `Direction.Plane.HORIZONTAL`'s own array, which is **not** the order the `Direction` enum
+/// declares them in. Anything that picks one at random reads it by index, so the difference is a
+/// different branch for the same seed.
+inline constexpr std::array<std::string_view, 4> kHorizontalNames{"north", "east", "south", "west"};
 
 inline constexpr std::array<std::string_view, 6> kFaceNames{"down", "up", "north", "south", "west", "east"};
 

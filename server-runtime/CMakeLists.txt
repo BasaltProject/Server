@@ -53,6 +53,7 @@ basalt_module(server-runtime-core
         src/world/RealFluidTags.cpp
         src/world/RealEntityTypeTags.cpp
         src/world/RealTimelineTags.cpp
+        src/world/SaplingGrowth.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -150,6 +151,12 @@ basalt_test(server-runtime-real-entity-type-tags-test
 basalt_test(server-runtime-real-timeline-tags-test
     SOURCES
         test/RealTimelineTagsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-sapling-growth-test
+    SOURCES
+        test/SaplingGrowthTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
