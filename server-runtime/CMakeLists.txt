@@ -64,6 +64,7 @@ basalt_module(server-runtime-core
         src/world/DaylightDetectors.cpp
         src/world/DripstoneGrowth.cpp
         src/world/FallingBlocks.cpp
+        src/world/Fires.cpp
         src/world/GrowthSupport.cpp
         src/world/LavaGrowth.cpp
         src/world/LocalMobCaps.cpp
@@ -136,6 +137,12 @@ basalt_test(server-runtime-container-openers-test
 basalt_test(server-runtime-world-border-test
     SOURCES
         test/WorldBorderTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-fires-test
+    SOURCES
+        test/FiresTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
