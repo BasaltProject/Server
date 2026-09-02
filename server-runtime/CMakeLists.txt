@@ -56,6 +56,9 @@ basalt_module(server-runtime-core
         src/world/RealTimelineTags.cpp
         src/world/SaplingGrowth.cpp
         src/world/RealLootTables.cpp
+        src/world/RealEnchantments.cpp
+        src/world/RealDialogs.cpp
+        src/world/RealTestInstances.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -171,6 +174,24 @@ basalt_test(server-runtime-projectiles-test
 basalt_test(server-runtime-real-loot-tables-test
     SOURCES
         test/RealLootTablesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-enchantments-test
+    SOURCES
+        test/RealEnchantmentsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-dialogs-test
+    SOURCES
+        test/RealDialogsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-test-instances-test
+    SOURCES
+        test/RealTestInstancesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
