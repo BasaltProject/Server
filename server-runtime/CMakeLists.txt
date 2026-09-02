@@ -35,6 +35,7 @@ basalt_module(server-runtime-core
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
+        src/item/ItemWear.cpp
         src/function/FunctionLibrary.cpp
         src/net/ProxyLogin.cpp
         src/net/SessionOutbox.cpp
@@ -99,6 +100,7 @@ basalt_module(server-runtime-core
         src/world/MobEffects.cpp
         src/world/Lightning.cpp
         src/world/Explosions.cpp
+        src/world/Anvils.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -159,7 +161,7 @@ basalt_module(server-runtime-core
         src/world/WorldMetadata.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
+    DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
@@ -413,6 +415,12 @@ basalt_test(server-runtime-block-entity-ticks-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-item-wear-test
+    SOURCES
+        test/ItemWearTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-string-reader-test
     SOURCES
         test/StringReaderTest.cpp
@@ -476,6 +484,12 @@ basalt_test(server-runtime-lightning-test
 basalt_test(server-runtime-explosions-test
     SOURCES
         test/ExplosionsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-anvils-test
+    SOURCES
+        test/AnvilsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
