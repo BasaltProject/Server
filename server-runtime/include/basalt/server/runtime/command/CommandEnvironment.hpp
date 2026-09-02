@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/config/CommandsConfig.hpp>
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -64,6 +65,10 @@ public:
         /// Where plugin events go, or null when there are no plugins. Read through a supplier: the
         /// plugin host is built after the command tree, which it registers `/plugins` into.
         std::function<plugins::PluginEventBus*()> pluginEvents;
+
+        /// What `/weather` samples a duration from when it was given none, which is the level's own
+        /// random in vanilla. Null where there is none, and the shortest the range allows stands in.
+        random::RandomSource* random = nullptr;
 
         std::int64_t worldSeed = 0;
         /// The world a freshly imported or freshly joined player belongs to.

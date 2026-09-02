@@ -39,7 +39,10 @@ basalt_module(server-runtime-core
         src/command/ArgumentTypes.cpp
         src/command/commands/BasicCommands.cpp
         src/command/Coordinates.cpp
+        src/command/RegistryArguments.cpp
         src/command/commands/PlayerCommands.cpp
+        src/command/commands/SessionCommands.cpp
+        src/command/commands/WorldCommands.cpp
         src/command/CommandTree.cpp
         src/command/EntitySelector.cpp
         src/command/SelectorParser.cpp
@@ -366,6 +369,32 @@ basalt_test(server-runtime-coordinates-test
     SOURCES
         test/CoordinatesTest.cpp
     DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-registry-arguments-test
+    SOURCES
+        test/RegistryArgumentsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-session-commands-test
+    SOURCES
+        test/SessionCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-session-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-world-commands-test
+    SOURCES
+        test/WorldCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-world-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-runtime-player-commands-test
