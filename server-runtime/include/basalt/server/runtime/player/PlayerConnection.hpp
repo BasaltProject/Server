@@ -55,6 +55,9 @@ struct PlayerConnection {
 
     /// Pushes the world's weather, which is three game events rather than one packet.
     std::function<void(const world::WorldWeather& weather)> sendWeather;
+
+    /// Closes this connection with a reason the client shows. Unset, nothing happens.
+    std::function<void(const wire::text::Component& reason)> disconnect;
 };
 
 } // namespace basalt::server::runtime::player

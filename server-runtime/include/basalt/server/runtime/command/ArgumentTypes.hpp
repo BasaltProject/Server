@@ -64,4 +64,23 @@ integerArgument(std::int32_t min = std::numeric_limits<std::int32_t>::min(),
 /// A loaded world, by name.
 [[nodiscard]] std::shared_ptr<const ArgumentType> worldArgument();
 
+/// `minecraft:entity` restricted to players, vanilla's `EntityArgument.players`.
+///
+/// The same grammar as the entity form (`EntitySelector` parses it), so `@e[tag=admin]` here means
+/// the players among them rather than a syntax error: vanilla's own `findPlayers` answers the same
+/// selector the same way. The value is a `std::vector<player::PlayerSession*>`.
+[[nodiscard]] std::shared_ptr<const ArgumentType> playersArgument(bool single);
+
+/// `minecraft:entity`, over players *and* summoned entities. The value is a
+/// `std::vector<CommandTarget>`.
+[[nodiscard]] std::shared_ptr<const ArgumentType> entitiesArgument(bool single = false);
+
+/// `minecraft:component`: the rest of the line as a chat component in its JSON form, so styles and
+/// events survive to the client. The value is a `wire::text::Component`.
+[[nodiscard]] std::shared_ptr<const ArgumentType> componentArgument();
+
+/// `minecraft:resource_location`: a namespaced id, checked for shape only. The value is a
+/// `wire::common::Identifier`.
+[[nodiscard]] std::shared_ptr<const ArgumentType> resourceLocationArgument();
+
 } // namespace basalt::server::runtime::command
