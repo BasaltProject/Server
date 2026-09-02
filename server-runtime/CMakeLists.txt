@@ -48,6 +48,7 @@ basalt_module(server-runtime-core
         src/timings/TimingsReport.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
+        src/world/FluidFlow.cpp
         src/world/ItemEnchantability.cpp
         src/world/NaturalSpawnObstruction.cpp
         src/world/PendingChunkDecorations.cpp
@@ -82,6 +83,7 @@ basalt_module(server-runtime-core
         src/world/ScheduledBlocks.cpp
         src/world/SnowyBlocks.cpp
         src/world/Tripwires.cpp
+        src/world/Vibrations.cpp
         src/world/VineGrowth.cpp
         src/world/WorldBorder.cpp
         src/world/WorldLight.cpp
@@ -220,6 +222,12 @@ basalt_test(server-runtime-tripwires-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-vibrations-test
+    SOURCES
+        test/VibrationsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-vine-growth-test
     SOURCES
         test/VineGrowthTest.cpp
@@ -229,6 +237,12 @@ basalt_test(server-runtime-vine-growth-test
 basalt_test(server-runtime-falling-blocks-test
     SOURCES
         test/FallingBlocksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-fluid-flow-test
+    SOURCES
+        test/FluidFlowTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
