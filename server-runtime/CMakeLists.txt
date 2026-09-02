@@ -41,6 +41,10 @@ basalt_module(server-runtime-core
         src/item/ItemComponentPayloads.cpp
         src/function/FunctionLibrary.cpp
         src/player/FoodData.cpp
+        src/player/PlayerSession.cpp
+        src/player/PlayerPersistence.cpp
+        src/player/PlayerRegistry.cpp
+        src/player/Menu.cpp
         src/player/PlayerInventory.cpp
         src/player/Combat.cpp
         src/player/ExperienceData.cpp
@@ -305,6 +309,12 @@ basalt_test(server-runtime-player-inventory-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-player-session-test
+    SOURCES
+        test/PlayerSessionTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-player-stats-test
     SOURCES
         test/PlayerStatsTest.cpp
@@ -516,6 +526,12 @@ basalt_test(server-runtime-climbing-plant-growth-test
 basalt_test(server-runtime-fluids-test
     SOURCES
         test/FluidsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-menu-test
+    SOURCES
+        test/MenuTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
