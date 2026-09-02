@@ -44,7 +44,8 @@ void move(world::WorldState& world, ServerEntity& entity, double gravity, double
     // parity: `Entity.restituteMovementAfterCollisions`: a stopped axis is zeroed unless the block
     // underneath bounces, and only slime and beds do.
     const float bounciness =
-        entity.onGround ? registry::blockMovement::bouncinessOf(blockUnder(world, entity)) * kNonLivingBounceShare : 0.0F;
+        entity.onGround ? registry::blockMovement::bouncinessOf(blockUnder(world, entity)) * kNonLivingBounceShare
+                        : 0.0F;
     if (moved[0] != entity.velocityX) {
         entity.velocityX = 0.0;
     }
