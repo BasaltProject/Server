@@ -36,6 +36,10 @@ basalt_module(server-runtime-core
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
+        src/command/CommandEnvironment.cpp
+        src/command/CommandTarget.cpp
+        src/command/ExecutionSource.cpp
+        src/command/CommandSource.cpp
         src/command/MessageOverrides.cpp
         src/placeholder/PlaceholderSlots.cpp
         src/item/ItemWear.cpp
@@ -664,6 +668,28 @@ basalt_test(server-runtime-pending-decorations-test
 basalt_test(server-runtime-game-rules-test
     SOURCES
         test/GameRulesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-command-environment-test
+    SOURCES
+        test/CommandEnvironmentTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-command-environment-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-command-source-test
+    SOURCES
+        test/CommandSourceTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-command-target-test
+    SOURCES
+        test/CommandTargetTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
