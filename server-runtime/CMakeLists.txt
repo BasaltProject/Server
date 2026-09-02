@@ -36,6 +36,9 @@ basalt_module(server-runtime-core
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
+        src/command/ArgumentTypes.cpp
+        src/command/CommandTree.cpp
+        src/command/CommandDispatcher.cpp
         src/command/CommandEnvironment.cpp
         src/command/CommandTarget.cpp
         src/command/ExecutionSource.cpp
@@ -623,6 +626,16 @@ basalt_test(server-runtime-advancement-triggers-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-argument-types-test
+    SOURCES
+        test/ArgumentTypesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-argument-types-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-anvils-test
     SOURCES
         test/AnvilsTest.cpp
@@ -668,6 +681,12 @@ basalt_test(server-runtime-pending-decorations-test
 basalt_test(server-runtime-game-rules-test
     SOURCES
         test/GameRulesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-command-dispatcher-test
+    SOURCES
+        test/CommandDispatcherTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
