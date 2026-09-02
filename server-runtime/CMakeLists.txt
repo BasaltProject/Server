@@ -63,6 +63,8 @@ basalt_module(server-runtime-core
         src/world/BlockInteractions.cpp
         src/world/ProjectileHits.cpp
         src/world/Furnaces.cpp
+        src/world/Hoppers.cpp
+        src/world/EndPortals.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -220,6 +222,18 @@ basalt_test(server-runtime-projectile-hits-test
 basalt_test(server-runtime-furnaces-test
     SOURCES
         test/FurnacesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-hoppers-test
+    SOURCES
+        test/HoppersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-end-portals-test
+    SOURCES
+        test/EndPortalsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
