@@ -25,6 +25,7 @@ basalt_module(server-runtime-core
         src/config/UiConfigs.cpp
         src/entity/Aabb.cpp
         src/entity/BlockRay.cpp
+        src/entity/EntityPhysics.cpp
         src/entity/Projectiles.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
@@ -70,6 +71,7 @@ basalt_module(server-runtime-core
         src/world/DamageProtection.cpp
         src/world/NaturalSpawnPredicates.cpp
         src/world/BiomeTagLoader.cpp
+        src/world/Dispensers.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -176,6 +178,12 @@ basalt_test(server-runtime-sapling-growth-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-entity-physics-test
+    SOURCES
+        test/EntityPhysicsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-projectiles-test
     SOURCES
         test/ProjectilesTest.cpp
@@ -269,6 +277,12 @@ basalt_test(server-runtime-natural-spawn-predicates-test
 basalt_test(server-runtime-biome-tag-loader-test
     SOURCES
         test/BiomeTagLoaderTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-dispensers-test
+    SOURCES
+        test/DispensersTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
