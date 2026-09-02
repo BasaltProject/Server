@@ -61,6 +61,7 @@ basalt_module(server-runtime-core
         src/world/BlockInventory.cpp
         src/world/BlockSurvival.cpp
         src/world/Buckets.cpp
+        src/world/ChiseledBookshelves.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
         src/world/DecoratedPots.cpp
@@ -72,6 +73,7 @@ basalt_module(server-runtime-core
         src/world/GrowthSupport.cpp
         src/world/Jukeboxes.cpp
         src/world/LavaGrowth.cpp
+        src/world/Lecterns.cpp
         src/world/LocalMobCaps.cpp
         src/world/Sponges.cpp
         src/world/StemGrowth.cpp
@@ -151,6 +153,12 @@ basalt_test(server-runtime-world-border-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-chiseled-bookshelves-test
+    SOURCES
+        test/ChiseledBookshelvesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-buckets-test
     SOURCES
         test/BucketsTest.cpp
@@ -172,6 +180,12 @@ basalt_test(server-runtime-jukeboxes-test
 basalt_test(server-runtime-lava-growth-test
     SOURCES
         test/LavaGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-lecterns-test
+    SOURCES
+        test/LecternsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
