@@ -59,6 +59,8 @@ basalt_module(server-runtime-core
         src/world/RealEnchantments.cpp
         src/world/RealDialogs.cpp
         src/world/RealTestInstances.cpp
+        src/world/RealNoiseParameters.cpp
+        src/world/BlockInteractions.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -192,6 +194,18 @@ basalt_test(server-runtime-real-dialogs-test
 basalt_test(server-runtime-real-test-instances-test
     SOURCES
         test/RealTestInstancesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-noise-parameters-test
+    SOURCES
+        test/RealNoiseParametersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-interactions-test
+    SOURCES
+        test/BlockInteractionsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
