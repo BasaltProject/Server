@@ -1,0 +1,393 @@
+#define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+
+#include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/MobRules.hpp>
+
+#include <doctest.h>
+
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+
+using basalt::server::runtime::entity::AttributeOperation;
+using basalt::server::runtime::entity::ServerEntity;
+using basalt::server::world::ChunkGeneratedEntity;
+using basalt::wire::common::Identifier;
+using basalt::wire::common::Uuid;
+using basalt::wire::nbt::NbtCompound;
+using basalt::wire::nbt::NbtList;
+using basalt::wire::nbt::NbtTag;
+using basalt::wire::nbt::NbtType;
+namespace entityNbt = basalt::server::runtime::entity::entityNbt;
+namespace ageableMobs = basalt::server::runtime::entity::ageableMobs;
+namespace cubeMobs = basalt::server::runtime::entity::cubeMobs;
+
+namespace {
+
+[[nodiscard]] ServerEntity entityOf(const std::string& type, std::int32_t entityId = 1) {
+    return ServerEntity{entityId, Uuid{0x1234, 0x5678}, Identifier::vanilla(type), 7, 1.5, 64.0, -2.5, 90.0F, 10.0F};
+}
+
+/// Everything a decode needs of a world: fresh ids and a protocol number for every type.
+[[nodiscard]] entityNbt::AllocateEntityId ids(std::shared_ptr<std::int32_t> next) {
+    return [next] { return (*next)++; };
+}
+
+[[nodiscard]] std::optional<std::int32_t> anyType(const Identifier&) { return 7; }
+
+} // namespace
+
+TEST_CASE("an entity comes back off its own tag as it went in") {
+    ServerEntity cow = entityOf("cow");
+    cow.velocityX = 0.25;
+    cow.velocityY = -0.5;
+    cow.velocityZ = 0.75;
+    cow.health = 8.0;
+    cow.age = -1200;
+    cow.airSupply = 120;
+    cow.persistent = true;
+    cow.customName = "Bessie";
+    cow.tags.emplace_back("chosen");
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(cow), 42, 9);
+
+    REQUIRE(back != nullptr);
+    CHECK(back->entityId() == 42);
+    CHECK(back->protocolType() == 9);
+    CHECK(back->uuid() == cow.uuid());
+    CHECK(back->type() == cow.type());
+    CHECK(back->x == doctest::Approx(1.5));
+    CHECK(back->z == doctest::Approx(-2.5));
+    CHECK(back->yaw == doctest::Approx(90.0F));
+    CHECK(back->pitch == doctest::Approx(10.0F));
+    CHECK(back->velocityY == doctest::Approx(-0.5));
+    CHECK(back->health == doctest::Approx(8.0));
+    CHECK(back->age == -1200);
+    CHECK(back->airSupply == 120);
+    CHECK(back->persistent);
+    REQUIRE(back->customName.has_value());
+    CHECK(*back->customName == "Bessie");
+    REQUIRE(back->tags.size() == 1);
+    CHECK(back->tags[0] == "chosen");
+}
+
+TEST_CASE("a tag with no position at all is not an entity") {
+    NbtCompound tag;
+    tag.putString("id", "minecraft:cow");
+
+    CHECK(entityNbt::decode(tag, 1, 1) == nullptr);
+
+    NbtList shortPos{NbtType::Double};
+    shortPos.push(NbtTag::ofDouble(1.0));
+    tag.set("Pos", NbtTag::ofList(std::move(shortPos)));
+    CHECK(entityNbt::decode(tag, 1, 1) == nullptr);
+}
+
+TEST_CASE("a tag naming nothing this build can parse is not an entity") {
+    NbtCompound tag;
+    tag.putString("id", "one:too:many");
+
+    CHECK(entityNbt::decode(tag, 1, 1) == nullptr);
+}
+
+TEST_CASE("a saved uuid is kept, and a broken one is replaced rather than refused") {
+    ServerEntity cow = entityOf("cow");
+    NbtCompound tag = entityNbt::encode(cow);
+    tag.putString("UUID", "not a uuid");
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(tag, 1, 1);
+
+    REQUIRE(back != nullptr);
+    CHECK(back->uuid() != cow.uuid());
+}
+
+TEST_CASE("the mobs that keep a boolean baby flag are read through it") {
+    // parity: `AgeableMob` writes an age, but the ones that are babies by flag write `IsBaby`.
+    REQUIRE(ageableMobs::usesBooleanBabyFlag("zombie"));
+    NbtCompound tag;
+    tag.putString("id", "minecraft:zombie");
+    NbtList pos{NbtType::Double};
+    pos.push(NbtTag::ofDouble(0.0));
+    pos.push(NbtTag::ofDouble(0.0));
+    pos.push(NbtTag::ofDouble(0.0));
+    tag.set("Pos", NbtTag::ofList(std::move(pos)));
+    tag.putBoolean("IsBaby", true);
+
+    const std::unique_ptr<ServerEntity> baby = entityNbt::decode(tag, 1, 1);
+
+    REQUIRE(baby != nullptr);
+    CHECK(baby->age == ageableMobs::kBabyStartAge);
+
+    tag.putBoolean("IsBaby", false);
+    tag.putInt("Age", 55);
+    const std::unique_ptr<ServerEntity> grown = entityNbt::decode(tag, 1, 1);
+    REQUIRE(grown != nullptr);
+    CHECK(grown->age == 55);
+}
+
+TEST_CASE("a cube's size is written one lower than it is kept") {
+    ServerEntity slime = entityOf("slime");
+    slime.cubeSize = 4;
+
+    const NbtCompound tag = entityNbt::encode(slime);
+
+    // parity: `Slime` stores size zero for the smallest one.
+    CHECK(tag.getInt("Size") == 3);
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(tag, 1, 1);
+    REQUIRE(back != nullptr);
+    CHECK(back->cubeSize == 4);
+
+    // Anything that is not a cube keeps the default and writes no size at all.
+    const NbtCompound cow = entityNbt::encode(entityOf("cow"));
+    CHECK_FALSE(cow.contains("Size"));
+    CHECK(entityNbt::decode(cow, 1, 1)->cubeSize == cubeMobs::kDefaultSize);
+}
+
+TEST_CASE("a villager keeps its profession without the namespace and a level of at least one") {
+    ServerEntity villager = entityOf("villager");
+    villager.profession = "librarian";
+    villager.villagerLevel = 3;
+    villager.villagerExperience = 250;
+
+    const NbtCompound tag = entityNbt::encode(villager);
+
+    REQUIRE(tag.getCompound("VillagerData") != nullptr);
+    CHECK(tag.getCompound("VillagerData")->getString("profession") == "minecraft:librarian");
+    CHECK(tag.getCompound("VillagerData")->getString("type") == "minecraft:plains");
+    CHECK(tag.getInt("Xp") == 250);
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(tag, 1, 1);
+    REQUIRE(back != nullptr);
+    CHECK(back->profession == "librarian");
+    CHECK(back->villagerLevel == 3);
+    CHECK(back->villagerExperience == 250);
+}
+
+TEST_CASE("a villager level of nothing at all is read as one") {
+    NbtCompound tag = entityNbt::encode(entityOf("villager"));
+    NbtCompound data;
+    data.putString("profession", "minecraft:nitwit");
+    data.putInt("level", 0);
+    tag.set("VillagerData", NbtTag::ofCompound(std::move(data)));
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(tag, 1, 1);
+
+    REQUIRE(back != nullptr);
+    CHECK(back->villagerLevel == 1);
+}
+
+TEST_CASE("a patrolling mob keeps where it was going, and everything else does not") {
+    ServerEntity pillager = entityOf("pillager");
+    pillager.patrolTarget = std::array<std::int32_t, 3>{10, 64, -20};
+    pillager.patrolLeader = true;
+    pillager.patrolling = true;
+
+    const NbtCompound tag = entityNbt::encode(pillager);
+    CHECK(tag.getIntArray("patrol_target").size() == 3);
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(tag, 1, 1);
+    REQUIRE(back != nullptr);
+    REQUIRE(back->patrolTarget.has_value());
+    CHECK((*back->patrolTarget)[0] == 10);
+    CHECK(back->patrolLeader);
+
+    ServerEntity cow = entityOf("cow");
+    cow.patrolLeader = true;
+    CHECK_FALSE(entityNbt::encode(cow).contains("PatrolLeader"));
+}
+
+TEST_CASE("a wandering trader keeps its delay and where it was headed") {
+    ServerEntity trader = entityOf("wandering_trader");
+    trader.despawnDelay = 4000;
+    trader.wanderTarget = std::array<std::int32_t, 3>{1, 2, 3};
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(trader), 1, 1);
+
+    REQUIRE(back != nullptr);
+    CHECK(back->despawnDelay == 4000);
+    REQUIRE(back->wanderTarget.has_value());
+    CHECK((*back->wanderTarget)[2] == 3);
+
+    // A llama travelling with one keeps the delay and nothing else.
+    ServerEntity llama = entityOf("trader_llama");
+    llama.despawnDelay = 100;
+    const NbtCompound tag = entityNbt::encode(llama);
+    CHECK(tag.getInt("DespawnDelay") == 100);
+    CHECK_FALSE(tag.contains("wander_target"));
+}
+
+TEST_CASE("a trapped skeleton horse remembers that it is one") {
+    ServerEntity horse = entityOf("skeleton_horse");
+    horse.skeletonTrap = true;
+    horse.skeletonTrapTime = 300;
+    horse.tamedHorse = true;
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(horse), 1, 1);
+
+    REQUIRE(back != nullptr);
+    CHECK(back->skeletonTrap);
+    CHECK(back->skeletonTrapTime == 300);
+    CHECK(back->tamedHorse);
+}
+
+TEST_CASE("a leashed mob remembers who is holding it") {
+    ServerEntity cow = entityOf("cow");
+    cow.leashHolderUuid = "0000-holder";
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(cow), 1, 1);
+
+    REQUIRE(back != nullptr);
+    REQUIRE(back->leashHolderUuid.has_value());
+    CHECK(*back->leashHolderUuid == "0000-holder");
+}
+
+TEST_CASE("a villager's own memories go out and come back") {
+    ServerEntity villager = entityOf("villager");
+    villager.lastSleptGameTime = 12345;
+    villager.golemDetectedTicks = 600;
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(villager), 1, 1);
+
+    REQUIRE(back != nullptr);
+    CHECK(back->lastSleptGameTime == 12345);
+    CHECK(back->golemDetectedTicks == 600);
+
+    // With nothing detected the memory is taken back out rather than written as a zero.
+    ServerEntity quiet = entityOf("villager");
+    quiet.golemDetectedTicks = 0;
+    const NbtCompound tag = entityNbt::encode(quiet);
+    REQUIRE(tag.getCompound("Brain") != nullptr);
+    CHECK_FALSE(tag.getCompound("Brain")->getCompound("memories")->contains("minecraft:golem_detected_recently"));
+}
+
+TEST_CASE("attributes and their modifiers are read back off the packed list") {
+    NbtCompound modifier;
+    modifier.putString("id", "minecraft:leader_zombie_bonus");
+    modifier.putDouble("amount", 3.0);
+    modifier.putString("operation", "add_value");
+    NbtList modifiers{NbtType::Compound};
+    modifiers.push(NbtTag::ofCompound(modifier));
+
+    NbtCompound attribute;
+    attribute.putString("id", "minecraft:max_health");
+    attribute.putDouble("base", 20.0);
+    attribute.set("modifiers", NbtTag::ofList(std::move(modifiers)));
+    NbtList attributes{NbtType::Compound};
+    attributes.push(NbtTag::ofCompound(attribute));
+
+    NbtCompound tag = entityNbt::encode(entityOf("zombie"));
+    tag.set("attributes", NbtTag::ofList(std::move(attributes)));
+    tag.putFloat("Health", 100.0F);
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(tag, 1, 1);
+
+    REQUIRE(back != nullptr);
+    CHECK(back->attributeValues.at("minecraft:max_health") == doctest::Approx(20.0));
+    REQUIRE(back->attributeModifiers.contains("minecraft:max_health"));
+    CHECK(back->attributeModifiers.at("minecraft:max_health").at("minecraft:leader_zombie_bonus").operation ==
+          AttributeOperation::AddValue);
+    // parity: health saved above what the attributes allow is clamped rather than kept.
+    CHECK(back->health == doctest::Approx(23.0));
+}
+
+TEST_CASE("a field vanilla writes as a float is read whatever number it was written as") {
+    NbtCompound tag = entityNbt::encode(entityOf("cow"));
+    tag.set("Health", NbtTag::ofDouble(6.0));
+    CHECK(entityNbt::decode(tag, 1, 1)->health == doctest::Approx(6.0));
+
+    tag.set("Health", NbtTag::ofByte(4));
+    CHECK(entityNbt::decode(tag, 1, 1)->health == doctest::Approx(4.0));
+
+    tag.set("Age", NbtTag::ofShort(30));
+    CHECK(entityNbt::decode(tag, 1, 1)->age == 30);
+}
+
+TEST_CASE("a vehicle carries its riders in its own tag") {
+    ServerEntity boat = entityOf("boat", 1);
+    ServerEntity rider = entityOf("cow", 2);
+    ServerEntity pillion = entityOf("chicken", 3);
+    boat.passengerIds = {2};
+    rider.passengerIds = {3};
+    std::map<std::int32_t, ServerEntity*> byId{{1, &boat}, {2, &rider}, {3, &pillion}};
+
+    const NbtCompound tag = entityNbt::encodeTree(boat, [&byId](std::int32_t id) {
+        const auto found = byId.find(id);
+        return found == byId.end() ? nullptr : found->second;
+    });
+
+    REQUIRE(tag.getList("Passengers") != nullptr);
+    REQUIRE(tag.getList("Passengers")->size() == 1);
+    const NbtCompound* first = (*tag.getList("Passengers"))[0].get<NbtCompound>();
+    REQUIRE(first != nullptr);
+    CHECK(first->getString("id") == "minecraft:cow");
+    REQUIRE(first->getList("Passengers") != nullptr);
+    CHECK(first->getList("Passengers")->size() == 1);
+
+    const auto next = std::make_shared<std::int32_t>(10);
+    const std::vector<std::unique_ptr<ServerEntity>> back = entityNbt::decodeTree(tag, ids(next), anyType);
+    REQUIRE(back.size() == 3);
+    CHECK(back[0]->entityId() == 10);
+    CHECK(back[1]->vehicleId == 10);
+    CHECK(back[2]->vehicleId == back[1]->entityId());
+    CHECK(back[0]->passengerIds.size() == 1);
+}
+
+TEST_CASE("a rider that was removed is left behind rather than saved with its vehicle") {
+    ServerEntity boat = entityOf("boat", 1);
+    ServerEntity rider = entityOf("cow", 2);
+    rider.removed = true;
+    boat.passengerIds = {2, 3};
+    std::map<std::int32_t, ServerEntity*> byId{{1, &boat}, {2, &rider}};
+
+    const NbtCompound tag = entityNbt::encodeTree(boat, [&byId](std::int32_t id) {
+        const auto found = byId.find(id);
+        return found == byId.end() ? nullptr : found->second;
+    });
+
+    CHECK_FALSE(tag.contains("Passengers"));
+}
+
+TEST_CASE("a type nobody can number is not restored") {
+    ServerEntity cow = entityOf("cow");
+    const auto next = std::make_shared<std::int32_t>(1);
+
+    CHECK(entityNbt::decodeTree(entityNbt::encode(cow), ids(next), [](const Identifier&) {
+              return std::optional<std::int32_t>{};
+          }).empty());
+}
+
+TEST_CASE("a generated entity is decoded through the same reader") {
+    ChunkGeneratedEntity descriptor;
+    descriptor.type = Identifier::vanilla("villager");
+    descriptor.x = 8.5;
+    descriptor.y = 70.0;
+    descriptor.z = -3.5;
+    descriptor.yaw = 45.0F;
+    descriptor.data.putInt("VillagerLevel", 2);
+
+    const std::unique_ptr<ServerEntity> entity = entityNbt::decodeGenerated(descriptor, 5, 6);
+
+    REQUIRE(entity != nullptr);
+    CHECK(entity->type() == Identifier::vanilla("villager"));
+    CHECK(entity->x == doctest::Approx(8.5));
+    CHECK(entity->yaw == doctest::Approx(45.0F));
+    CHECK(entity->villagerLevel == 2);
+}
+
+TEST_CASE("a generated vehicle brings its riders with it") {
+    ChunkGeneratedEntity rider;
+    rider.type = Identifier::vanilla("pillager");
+    ChunkGeneratedEntity ravager;
+    ravager.type = Identifier::vanilla("ravager");
+    ravager.passengers.push_back(rider);
+    const auto next = std::make_shared<std::int32_t>(1);
+
+    const std::vector<std::unique_ptr<ServerEntity>> entities =
+        entityNbt::decodeGeneratedTree(ravager, ids(next), anyType);
+
+    REQUIRE(entities.size() == 2);
+    CHECK(entities[0]->type() == Identifier::vanilla("ravager"));
+    CHECK(entities[1]->vehicleId == entities[0]->entityId());
+    CHECK(entities[0]->passengerIds.size() == 1);
+}

@@ -30,6 +30,7 @@ basalt_module(server-runtime-core
         src/entity/LivingMovement.cpp
         src/entity/PathFinder.cpp
         src/entity/Projectiles.cpp
+        src/entity/EntityNbt.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
         src/entity/ServerEntity.cpp
@@ -176,6 +177,7 @@ basalt_module(server-runtime-core
         src/world/WorldClock.cpp
         src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
+        src/world/WorldSpawnPoint.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
@@ -245,6 +247,12 @@ basalt_test(server-runtime-living-movement-test
 basalt_test(server-runtime-flying-movement-test
     SOURCES
         test/FlyingMovementTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-entity-nbt-test
+    SOURCES
+        test/EntityNbtTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -924,6 +932,12 @@ basalt_test(server-runtime-world-metadata-test
 
 target_compile_definitions(server-runtime-world-metadata-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-world-spawn-point-test
+    SOURCES
+        test/WorldSpawnPointTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-world-state-test
