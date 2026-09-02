@@ -58,6 +58,7 @@ basalt_module(server-runtime-core
         src/world/SelectableSlots.cpp
         src/world/GameRules.cpp
         src/world/BambooGrowth.cpp
+        src/world/BlockInventory.cpp
         src/world/BlockSurvival.cpp
         src/world/Buckets.cpp
         src/world/ChunkGenerationQueue.cpp
@@ -84,6 +85,7 @@ basalt_module(server-runtime-core
         src/world/RedstoneComponents.cpp
         src/world/RedstoneReactors.cpp
         src/world/ScheduledBlocks.cpp
+        src/world/Shulkers.cpp
         src/world/SnowyBlocks.cpp
         src/world/Tripwires.cpp
         src/world/Vibrations.cpp
@@ -183,6 +185,12 @@ basalt_test(server-runtime-scheduled-blocks-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-shulkers-test
+    SOURCES
+        test/ShulkersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-snowy-blocks-test
     SOURCES
         test/SnowyBlocksTest.cpp
@@ -198,6 +206,12 @@ basalt_test(server-runtime-detector-rails-test
 basalt_test(server-runtime-world-light-test
     SOURCES
         test/WorldLightTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-inventory-test
+    SOURCES
+        test/BlockInventoryTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
