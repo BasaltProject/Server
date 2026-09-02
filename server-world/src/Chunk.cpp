@@ -241,6 +241,11 @@ const ChunkBlockEntity* Chunk::blockEntityAt(std::int32_t localX, std::int32_t y
     return found == blockEntities_.end() ? nullptr : &found->second;
 }
 
+ChunkBlockEntity* Chunk::blockEntityAt(std::int32_t localX, std::int32_t y, std::int32_t localZ) {
+    const auto found = blockEntities_.find(blockEntityKey(localX, y, localZ));
+    return found == blockEntities_.end() ? nullptr : &found->second;
+}
+
 std::vector<ChunkBlockEntity> Chunk::blockEntities() const {
     std::vector<ChunkBlockEntity> all;
     all.reserve(blockEntities_.size());
