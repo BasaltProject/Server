@@ -50,6 +50,9 @@ basalt_module(server-runtime-core
         src/world/ChorusFlowerGrowth.cpp
         src/world/RealBlockTags.cpp
         src/world/RealItemTags.cpp
+        src/world/RealFluidTags.cpp
+        src/world/RealEntityTypeTags.cpp
+        src/world/RealTimelineTags.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -129,6 +132,24 @@ basalt_test(server-runtime-real-block-tags-test
 basalt_test(server-runtime-real-item-tags-test
     SOURCES
         test/RealItemTagsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-fluid-tags-test
+    SOURCES
+        test/RealFluidTagsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-entity-type-tags-test
+    SOURCES
+        test/RealEntityTypeTagsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-timeline-tags-test
+    SOURCES
+        test/RealTimelineTagsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
