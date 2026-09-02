@@ -68,6 +68,8 @@ basalt_module(server-runtime-core
         src/world/EndPodium.cpp
         src/world/NetherPortalGrowth.cpp
         src/world/DamageProtection.cpp
+        src/world/NaturalSpawnPredicates.cpp
+        src/world/BiomeTagLoader.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -255,6 +257,18 @@ basalt_test(server-runtime-nether-portal-growth-test
 basalt_test(server-runtime-damage-protection-test
     SOURCES
         test/DamageProtectionTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-natural-spawn-predicates-test
+    SOURCES
+        test/NaturalSpawnPredicatesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-biome-tag-loader-test
+    SOURCES
+        test/BiomeTagLoaderTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
