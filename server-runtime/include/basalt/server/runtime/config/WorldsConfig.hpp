@@ -57,7 +57,7 @@ struct DimensionFacts {
     std::string_view registryPath;
     std::int32_t registryIndex = 0;
     std::int32_t seaLevel = 0;
-    world::ChunkHeight chunkHeight = world::kOverworldHeight;
+    server::world::ChunkHeight chunkHeight = server::world::kOverworldHeight;
     bool hasSkylight = false;
     bool hasCeiling = false;
     /// parity: `DimensionType.coordinateScale`, the 1:8 that makes a Nether portal land where it
