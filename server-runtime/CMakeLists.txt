@@ -74,6 +74,9 @@ basalt_module(server-runtime-core
         src/world/Dispensers.cpp
         src/world/PortalIndex.cpp
         src/world/RealTimelines.cpp
+        src/world/StructureTemplates.cpp
+        src/world/BlockPlacement.cpp
+        src/world/RealRecipes.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -301,6 +304,24 @@ target_compile_definitions(server-runtime-portal-index-test
 basalt_test(server-runtime-real-timelines-test
     SOURCES
         test/RealTimelinesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-structure-templates-test
+    SOURCES
+        test/StructureTemplatesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-placement-test
+    SOURCES
+        test/BlockPlacementTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-recipes-test
+    SOURCES
+        test/RealRecipesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
