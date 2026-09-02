@@ -183,6 +183,9 @@ public:
 
     [[nodiscard]] std::optional<DroppedItem> removeItem(std::int32_t entityId);
 
+    /// Shoves one item along, for a piston pushing whatever its blocks sweep over.
+    bool shiftItem(std::int32_t entityId, double dx, double dy, double dz);
+
     [[nodiscard]] std::vector<std::int32_t> tickItems(const sched::Region* region = nullptr);
 
     [[nodiscard]] std::vector<entity::ServerEntity*> entities() const;

@@ -62,14 +62,15 @@ public:
     /// Removes and answers the dropped item with this entity id, or nothing if it is already gone.
     [[nodiscard]] std::optional<DroppedItem> removeItem(std::int32_t entityId);
 
-    /// One tick of item physics for the whole world, answering the entity ids that despawned.
+    /// Shoves one item along, which is what a piston does to whatever its blocks sweep over.
+    /// Answers false when the item is already gone.
+    bool shiftItem(std::int32_t entityId, double dx, double dy, double dz);
+
+    /// One tick of item physics for the whole world, answering the entity ids that despawned. parity:
+    /// `ItemEntity.tick`: gravity, the move against real block shapes, drag, ground friction, the
+    /// half-damped bounce and the merge with a neighbouring stack. Floating on a fluid is a gap.
     ///
-    /// parity: `ItemEntity.tick`: gravity, the move against the real block shapes, air drag, the
-    /// friction of the block underneath and the half-damped bounce on landing, over the lifetime,
-    /// and the merge with a neighbouring stack. Floating on a fluid is a documented gap.
-    ///
-    /// Deliberately does no I/O and takes no other lock: it runs on the tick thread, which must
-    /// never touch a socket.
+    /// Does no I/O and takes no other lock: it runs on the tick thread, which must never touch a socket.
     [[nodiscard]] std::vector<std::int32_t> tickItems(const sched::Region* region = nullptr);
 
 private:

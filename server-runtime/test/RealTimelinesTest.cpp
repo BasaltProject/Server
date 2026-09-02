@@ -167,7 +167,8 @@ TEST_CASE("a jar that lists an entry it cannot read is refused too") {
 
 TEST_CASE("the two shapes NBT has no room for are named separately") {
     const CapturedLog nulls;
-    FakeJar withNull{.files = {{entry("overworld"), R"({"tracks": null})"}}};
+    // A null field is simply absent in NBT, so only one inside a list has nowhere to go.
+    FakeJar withNull{.files = {{entry("overworld"), R"({"tracks": [null]})"}}};
     CHECK(RealTimelines{withNull.handle()}.size() == 0);
     CHECK(mentions(nulls.lines, "a null has no NBT equivalent"));
 
