@@ -4,12 +4,14 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
+#include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/text/Component.hpp>
 
 #include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -58,6 +60,12 @@ struct PlayerConnection {
 
     /// Closes this connection with a reason the client shows. Unset, nothing happens.
     std::function<void(const wire::text::Component& reason)> disconnect;
+
+    /// Puts this player in a game mode, which is a packet and a change on the session at once.
+    std::function<void(wire::protocol::play::Gamemode mode)> setGamemode;
+
+    /// Kills this player with the death message id vanilla would use.
+    std::function<void(std::string_view deathMessageId)> killPlayer;
 };
 
 } // namespace basalt::server::runtime::player

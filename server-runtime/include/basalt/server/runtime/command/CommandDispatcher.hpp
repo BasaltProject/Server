@@ -77,6 +77,10 @@ public:
     /// parity: `CommandSourceStack.getEntityOrException`, for forms that act on "you" as an entity.
     [[nodiscard]] Parsed<player::PlayerSession*> requireEntity() const;
 
+    /// The world this command acts on: the one its runner is standing in, or the default for the
+    /// console.
+    [[nodiscard]] Parsed<world::LoadedWorld*> world() const;
+
 private:
     const CommandSource* source_;
     const CommandDispatcher* dispatcher_;
@@ -122,6 +126,15 @@ private:
     std::vector<std::string> aliases_;
     std::string permission_;
 };
+
+/// The one-line syntax summary `/help` prints, e.g. `gamemode <gamemode> [<target>]`.
+///
+/// parity: brigadier's `CommandDispatcher.getSmartUsage`, including its bracket rules: a branch
+/// whose parent is already executable is optional and gets `[...]`, one that is not gets `(...)`,
+/// and several alternatives are joined with `|`. Vanilla's `/help` output is exactly these strings
+/// with a slash in front.
+[[nodiscard]] std::string smartUsage(const CommandNode& node, const CommandSource& source, bool optional = false,
+                                     bool deep = false);
 
 /// Parses and runs command lines, and hands out the tree the client needs to parse them itself.
 ///
