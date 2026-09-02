@@ -84,6 +84,8 @@ basalt_module(server-runtime-core
         src/world/RealVillagerTrades.cpp
         src/world/RuinedPortalVariants.cpp
         src/world/RealSurfaceEnvironment.cpp
+        src/world/NetherSurfaceEnvironment.cpp
+        src/world/Campfires.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -371,6 +373,18 @@ basalt_test(server-runtime-ruined-portal-variants-test
 basalt_test(server-runtime-real-surface-environment-test
     SOURCES
         test/RealSurfaceEnvironmentTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-nether-surface-environment-test
+    SOURCES
+        test/NetherSurfaceEnvironmentTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-campfires-test
+    SOURCES
+        test/CampfiresTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
