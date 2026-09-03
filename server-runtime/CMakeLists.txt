@@ -261,7 +261,12 @@ basalt_module(server-runtime-core
         src/world/WorldMetadata.cpp
         src/world/WorldSpawnPoint.cpp
         src/world/MobSpawnAttributes.cpp
+        src/world/MobSpawnForest.cpp
         src/world/MobSpawnVariantData.cpp
+        src/world/SpawnEquipmentEnchantments.cpp
+        src/world/SpawnEquipmentFinalizer.cpp
+        src/world/StructureSpawnLists.cpp
+        src/world/Trades.cpp
         src/world/VanillaSaveImport.cpp
         src/world/VillageProximity.cpp
         src/world/WeaponDamage.cpp
@@ -573,6 +578,24 @@ basalt_test(server-runtime-group-commands-test
 
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-spawn-equipment-test
+    SOURCES
+        test/SpawnEquipmentTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mob-spawn-forest-test
+    SOURCES
+        test/MobSpawnForestTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-trades-test
+    SOURCES
+        test/TradesTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-mob-spawn-attributes-test
