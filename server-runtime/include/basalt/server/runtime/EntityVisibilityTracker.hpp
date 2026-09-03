@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
+#include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>

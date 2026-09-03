@@ -1,32 +1,40 @@
 #pragma once
 
 #include <basalt/server/registry/ItemFood.hpp>
+#include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/config/UiConfigs.hpp>
-#include <basalt/server/runtime/world/RealBlockTags.hpp>
-#include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
-#include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/net/ProxyLogin.hpp>
 #include <basalt/server/runtime/net/SessionOutbox.hpp>
+#include <basalt/server/runtime/player/PlayerConnection.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
-#include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/ui/PlayerUi.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
+#include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
+#include <basalt/server/runtime/world/RealFluidTags.hpp>
+#include <basalt/server/runtime/world/RealItemTags.hpp>
+#include <basalt/server/runtime/world/RealTimelineTags.hpp>
 #include <basalt/wire/auth/Cfb8Cipher.hpp>
+#include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/auth/SessionProfile.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
 #include <basalt/wire/multiversion/ProtocolChain.hpp>
-#include <basalt/wire/text/LangTable.hpp>
 #include <basalt/wire/multiversion/ProtocolGate.hpp>
+#include <basalt/wire/multiversion/SubstitutionLabels.hpp>
+#include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/protocol/ProtocolState.hpp>
 #include <basalt/wire/protocol/handshake/HandshakePacket.hpp>
 #include <basalt/wire/protocol/login/LoginPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/protocol/status/StatusPackets.hpp>
+#include <basalt/wire/text/LangTable.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -37,10 +45,23 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace basalt::server::runtime::command {
 class CommandDispatcher;
+}
+
+namespace basalt::server::runtime::sched {
+class Owner;
+}
+
+namespace basalt::server::runtime::command::commands {
+class BossBarRegistry;
+}
+
+namespace basalt::server::runtime::world::jukeboxes {
+class SongOutputs;
 }
 
 namespace basalt::server::runtime::world {
@@ -51,9 +72,11 @@ class RealLootTables;
 class RealRecipes;
 class RealVillagerTrades;
 class RealEnchantments;
-class Jukeboxes;
 class PlayerProgress;
 class AdvancementTriggers;
+class WorldWeather;
+class RealDialogs;
+class RealTimelines;
 } // namespace basalt::server::runtime::world
 
 namespace basalt::server::storage {
@@ -64,7 +87,9 @@ namespace basalt::server::runtime {
 
 class ChunkStreamer;
 class CombatHandler;
+class BlockChangeBroadcaster;
 class ContainerMenuController;
+class ExplosionSystem;
 class BlockInteractionHandler;
 class ItemUseTimers;
 class PlayerLifecycle;
@@ -110,6 +135,21 @@ public:
         /// The NPCs a plugin is drawing in this world, and what a click on one does.
         std::function<std::vector<NpcView>()> npcs;
         std::function<bool(std::int32_t entityId, const std::string& playerUuid)> npcClicked;
+        /// Whether this player may pick that stack up off the ground.
+        std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t count,
+                           std::int32_t entityId)>
+            pickupAllowed;
+        /// Whether the step may stand. Refusing puts the player back where they were.
+        std::function<bool(const player::PlayerSession& player, double fromX, double fromY, double fromZ, double toX,
+                           double toY, double toZ)>
+            moveAllowed;
+        /// Whether the line may be said, and what it really says: `message` is the plugin's to edit.
+        std::function<bool(const player::PlayerSession& player, std::string& message)> chatAllowed;
+        /// The same for a slash command, without its slash.
+        std::function<bool(const player::PlayerSession& player, std::string& command)> commandAllowed;
+        std::function<bool(const player::PlayerSession& player)> swapHandsAllowed;
+        /// Whether the server-wide message goes out, and what it says.
+        std::function<bool(std::string& message)> broadcastAllowed;
     };
 
     /// Everything the session is handed at construction. A struct rather than forty parameters:
@@ -135,7 +175,7 @@ public:
         world::RealLootTables* lootTables = nullptr;
         world::RealRecipes* recipes = nullptr;
         world::RealVillagerTrades* villagerTrades = nullptr;
-        world::Jukeboxes* jukeboxes = nullptr;
+        world::jukeboxes::SongOutputs* jukeboxes = nullptr;
         std::function<bool()> whitelistEnforced;
         world::RealEnchantments* enchantments = nullptr;
         world::PlayerProgress* progress = nullptr;
@@ -143,10 +183,29 @@ public:
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         const world::realItemTags::TagMembers* itemTags = nullptr;
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
+        const world::realFluidTags::TagMembers* fluidTags = nullptr;
+        const world::realTimelineTags::TagMembers* timelineTags = nullptr;
+        const world::realEntityTypeTags::TagMembers* entityTypeTags = nullptr;
+        /// The two registries a client is sent that this build loads from the jar.
+        world::RealDialogs* dialogs = nullptr;
+        world::RealTimelines* timelines = nullptr;
+        /// What an older client's translation renames things with, when one is loaded.
+        const wire::multiversion::SubstitutionLabels* substitutionLabels = nullptr;
+        /// The server's own RSA pair, which only online mode uses.
+        const wire::auth::SessionKeyPair* keyPair = nullptr;
+        /// The bars `/bossbar` keeps, which a joining player is shown.
+        const command::commands::BossBarRegistry* bossBars = nullptr;
         /// Which client versions may in. Defaults to this build's own and nothing else.
         wire::multiversion::ProtocolGate protocolGate{{wire::multiversion::protocolVersions::kNative},
                                                       wire::multiversion::UnknownProtocolPolicy::Warn,
                                                       wire::multiversion::UnknownProtocolPolicy::Refuse};
+        /// The rolls this session makes that belong to no world stream: a sound's own seed and the
+        /// duration a consumed effect lands with.
+        std::function<std::int64_t()> nextSeed;
+        std::function<float()> nextFloat;
+        /// The block and blast machinery the server owns, shared by every session in it.
+        BlockChangeBroadcaster* blocks = nullptr;
+        ExplosionSystem* explosions = nullptr;
         PluginHooks plugins;
     };
 
@@ -241,6 +300,12 @@ public:
     /// A line only this player sees, which is how a plugin explains why it said no.
     void sendPluginNotice(const std::string& message);
 
+    /// The line above the hotbar, which is where a bed and a spawn point answer.
+    void sendActionBar(const wire::text::Component& message);
+
+    /// parity: `ServerGamePacketListenerImpl`'s `SWAP_ITEM_WITH_OFFHAND`: the F key.
+    void swapWithOffhand();
+
     /// A chat line everybody on the server sees.
     void broadcastToEveryone(const wire::text::Component& message);
 
@@ -251,9 +316,37 @@ public:
     /// The console's own language table, which is what a death message is written out with.
     [[nodiscard]] const wire::text::LangTable& consoleLang() const;
 
+    /// One chunk again, for a change too large to express as block updates. Delegates.
+    void resendChunk(std::int32_t chunkX, std::int32_t chunkZ);
+
+    void sendBiomes(const std::vector<std::pair<std::int32_t, std::int32_t>>& chunks);
+
+    /// parity: `Entity.stopRiding`: off the cart, standing where it left them. Delegates.
+    void dismount(player::PlayerSession& session);
+
+    /// What a plugin writes to this player, in chat or on the action bar.
+    void sendPluginText(const wire::text::Component& text, bool actionBar);
+
+    /// parity: `LivingEntity.addEffect`, for what a mob puts on somebody rather than a drink.
+    void addEffect(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier);
+
+    void syncSubmersion();
+
+    void syncHeldAttributes();
+
+    void syncExperience();
+
+    void sendStats();
+
+    void sendTime(world::LoadedWorld& world);
+
+    void sendWeather(const world::WorldWeather& weather);
+
+    void sendCommandTree();
+
     /// A sound everybody near it hears, which is how a bow, a pearl and a step all travel.
-    void broadcastSound(std::string_view sound, double x, double y, double z,
-                        wire::protocol::play::SoundSource source, float volume = 1.0F, float pitch = 1.0F);
+    void broadcastSound(std::string_view sound, double x, double y, double z, wire::protocol::play::SoundSource source,
+                        float volume = 1.0F, float pitch = 1.0F);
 
     /// The inventory delegates, which the satellites and the plugin bridge both reach for.
     void sendInventory();
@@ -298,6 +391,9 @@ public:
     double lastStepSquared = 0.0;
     bool addressRecorded = false;
 
+    /// parity of intent with Folia handing a player to the region they walked into.
+    void handOverToRegionOf(world::LoadedWorld& world);
+
 private:
     /// Everything queued has to be on the wire before the socket goes.
     void writeToSocket(const wire::io::ByteBuffer& frame);
@@ -306,6 +402,83 @@ private:
 
     void sendTranslated(const wire::multiversion::ProtocolChain& chain, std::int32_t id,
                         std::span<const std::uint8_t> body);
+
+    /// This connection's own outbound loop, and the only thing that writes to it unprompted.
+    void startOutboundLoop();
+
+    void drainFrames();
+
+    void handleFrame(wire::io::ByteBuffer& body);
+
+    void handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer& body);
+
+    void handleHandshake(std::int32_t packetId, wire::io::ByteBuffer& body);
+
+    void handleStatus(std::int32_t packetId, wire::io::ByteBuffer& body);
+
+    void handleLogin(std::int32_t packetId, wire::io::ByteBuffer& body);
+
+    void handleConfiguration(std::int32_t packetId, wire::io::ByteBuffer& body);
+
+    void handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body);
+
+    /// Everything the client is owed between the login sequence and its first tick.
+    void enterPlay();
+
+    void sendKeepAliveIfDue();
+
+    void flushOutbox();
+
+    /// One frame onto the wire, ciphered in send order. Only ever called with `sendMutex_` held.
+    void writeFrame(std::span<const std::uint8_t> frame);
+
+    void handleCustomPayload(wire::io::ByteBuffer& body);
+
+    /// Runs `work` on the owner of the world this player is in, or here when there is none yet.
+    void onOwner(std::function<void()> work);
+
+    void broadcastChat(const std::string& message);
+
+    void runCommand(const std::string& command);
+
+    void sendSuggestions(const wire::protocol::play::CommandSuggestionRequestPacket& request);
+
+    /// parity: `ClientboundUpdateRecipesPacket`, of which this sends the stonecutter half.
+    void sendStonecutterRecipes();
+
+    /// The callbacks a `PlayerSession` reaches this connection through.
+    [[nodiscard]] player::PlayerConnection playerConnection();
+
+    void handleLoginStart(wire::io::ByteBuffer& body);
+
+    void handleKey(wire::io::ByteBuffer& body);
+
+    void handleForwardingAnswer(wire::io::ByteBuffer& body);
+
+    /// Either finishes the login with what a BungeeCord-family proxy put on the handshake, or asks
+    /// a Velocity one for it and waits.
+    void startForwardedLogin(const wire::protocol::login::LoginStartPacket& loginStart);
+
+    void finishLogin(wire::common::Uuid id, const std::string& name,
+                     const std::vector<wire::auth::SessionProfileProperty>& properties);
+
+    /// Why this login may not proceed, or nothing when it may.
+    [[nodiscard]] std::optional<wire::text::Component> loginRefusal(wire::common::Uuid id, const std::string& name);
+
+    /// The one gate before a player exists at all. Answers whether it said no.
+    [[nodiscard]] bool pluginRefusesLogin(const std::string& name, const std::string& profileId);
+
+    /// Turns a client away while still in login, where a written reason still reaches the screen.
+    void disconnectFromLogin(const std::string& miniMessage);
+
+    void refuseVersion(const std::string& name, const wire::multiversion::ProtocolVerdict::Refused& refusal);
+
+    void enterConfiguration();
+
+    void sendRegistriesThenFinish();
+
+    /// The numeric members of one tag, or empty where this build has no real data for it.
+    [[nodiscard]] std::vector<std::int32_t> tagMembers(std::string_view registryId, std::string_view tagName) const;
 
     wire::io::TcpConnection connection_;
     Options options_;
@@ -317,7 +490,7 @@ private:
     wire::protocol::ProtocolState state_ = wire::protocol::ProtocolState::Handshake;
     std::optional<wire::protocol::handshake::HandshakePacket> handshake_;
     wire::multiversion::ProtocolVerdict verdict_{wire::multiversion::ProtocolVerdict::Native{}};
-    std::unique_ptr<wire::multiversion::ProtocolChain> translation_;
+    std::unique_ptr<wire::multiversion::java::JavaChain> translation_;
     std::optional<wire::auth::Cfb8Cipher> decryptCipher_;
     std::optional<wire::auth::Cfb8Cipher> encryptCipher_;
     bool compressionEnabled_ = false;
@@ -335,7 +508,24 @@ private:
 
     std::chrono::steady_clock::time_point lastKeepAlive_ = std::chrono::steady_clock::now();
     std::atomic<bool> streaming_{false};
+    /// A turn still running is not asked for a second one.
+    std::atomic<bool> tickTaskPending_{false};
     std::atomic<bool> closeWhenDrained_{false};
+    std::jthread outbound_;
+
+    /// Remembered, not passed around: the only reader is the failure path in `run`, and knowing
+    /// which packet a decoder died on is the difference between a one-line fix and a hunt.
+    std::int32_t lastPacketId_ = -1;
+
+    /// Which owner this player's packets go to, changed only between turns.
+    sched::Owner* regionOwner_ = nullptr;
+
+    /// What the login sequence is holding on to between its packets.
+    std::optional<std::string> pendingUsername_;
+    std::vector<std::uint8_t> challenge_;
+    std::optional<wire::auth::SessionProfile> pendingProfile_;
+    std::int8_t pendingSkinParts_ = static_cast<std::int8_t>(0x7F);
+    std::optional<wire::auth::forwarding::ForwardingResult> forwardedHandshake_;
 };
 
 } // namespace basalt::server::runtime

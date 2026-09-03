@@ -1,21 +1,34 @@
 #pragma once
 
+#include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 #include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
+
+namespace basalt::server::registry {
+struct BlockHardness;
+}
 
 namespace basalt::server::runtime::player {
 class PlayerSession;
 }
+
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+enum class BedProblem : std::uint8_t;
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -37,12 +50,34 @@ public:
                            const std::string& item)>
             interactAllowed;
         std::function<bool(const player::PlayerSession& player, const std::string& item)> dropAllowed;
+        /// Whether the dig may start at all, which is where a protection plugin says no first.
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
+            digAllowed;
+        /// Whether the held item may take this much wear, and whether that would finish it.
+        std::function<bool(const player::PlayerSession& player, const std::string& item, std::int32_t amount,
+                           bool broken)>
+            itemDamageAllowed;
+        /// Whether the sign may be written, and what it really says: `lines` is the plugin's to edit.
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::vector<std::string>& lines)>
+            signChange;
+        /// Whether a bucket may be filled or emptied here.
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
+                           const std::string& item, bool filling)>
+            bucketAllowed;
+        std::function<bool(const player::PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z)>
+            bedAllowed;
+        /// Whether a stack may be put into the world, and why it is going there.
+        std::function<bool(std::string_view worldName, double x, double y, double z, const std::string& item,
+                           std::int32_t count, std::string_view cause)>
+            itemSpawnAllowed;
     };
 
     /// The rolls placing and breaking make, none of which is part of the world's own stream.
     struct Options {
         std::function<double()> nextDouble;
         std::function<std::int64_t()> nextSeed;
+        std::function<bool()> nextBool;
     };
 
     explicit BlockInteractionHandler(ClientSession& owner, Hooks hooks = {}, Options options = {});
@@ -85,13 +120,135 @@ public:
     void tickDigging(player::PlayerSession& session);
 
 private:
+    /// The seed a loot roll, a fire's delay or a sound's own random starts from.
+    [[nodiscard]] std::int64_t nextSeed() const;
+
+    [[nodiscard]] double nextDouble() const;
+
+    /// Whether the block in front of this player comes apart in a single tick.
+    [[nodiscard]] bool breaksInOneTick(const wire::common::Identifier* block,
+                                       const registry::BlockHardness* hardness) const;
+
+    /// How much of a block this player takes off per tick, tool, enchantments and effects included.
+    [[nodiscard]] float destroyProgressPerTick(const wire::common::Identifier& block,
+                                               const registry::BlockHardness* hardness) const;
+
+    /// parity: `Player.getDestroySpeed` asks whether the eyes are under water, not the feet.
+    [[nodiscard]] bool eyesInWater() const;
+
+    void wearHeldItemOnBreak(const wire::common::Identifier& block);
+
+    /// Sets fire where the flint and steel points, and lights a Nether portal if it lands in a frame.
+    void igniteAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
+                  const storage::StoredItemStack& held);
+
+    /// Arms an end portal frame, and opens the portal when that was the twelfth eye.
+    void placeEnderEye(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
+                       const storage::StoredItemStack& held);
+
+    /// What breaking a block leaves behind, which is water when it was ice over something solid.
+    [[nodiscard]] std::optional<std::int32_t> meltedIce(std::optional<std::int32_t> broken,
+                                                        const wire::protocol::play::BlockPos& pos) const;
+
+    /// parity: `BellBlock.onHit` with `isProperHit`, which is what a bell can swing towards.
+    [[nodiscard]] bool ringBell(const wire::protocol::play::BlockHitResult& hit);
+
+    void dropHeldItem(bool all);
+
+    /// A newly placed sign: its block entity, then the editor for whoever put it there.
+    void openNewSign(const wire::protocol::play::BlockPos& pos, std::int32_t stateId);
+
+    /// Reopens an existing sign, unless it has been waxed. Answers whether it did.
+    [[nodiscard]] bool editSign(const wire::protocol::play::BlockPos& pos);
+
+    /// Tells the sculk sensors around `pos` that something happened there.
+    void heardBySculk(std::string_view event, const wire::protocol::play::BlockPos& pos);
+
+    /// Rolls `block`'s loot table and drops each resulting stack where it stood.
+    void dropLootFor(const wire::common::Identifier& block, const wire::protocol::play::BlockPos& pos,
+                     const wire::nbt::NbtCompound* carried = nullptr);
+
+    /// parity: `Block.popResource`'s own `Mth.nextDouble(random, -0.25, 0.25)`.
+    [[nodiscard]] double popJitter() const;
+
+    [[nodiscard]] bool useLectern(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    void openLectern(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    [[nodiscard]] bool useJukebox(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    [[nodiscard]] bool placeMinecart(player::PlayerSession& session, const wire::common::Identifier& item,
+                                     std::int32_t heldSlot, const storage::StoredItemStack& held,
+                                     const wire::protocol::play::BlockHitResult& hit);
+
+    [[nodiscard]] bool placeBoat(player::PlayerSession& session, const wire::common::Identifier& item,
+                                 std::int32_t heldSlot, const storage::StoredItemStack& held,
+                                 const wire::protocol::play::BlockHitResult& hit);
+
+    [[nodiscard]] bool spawnFromItem(player::PlayerSession& session, const wire::common::Identifier& type,
+                                     std::int32_t heldSlot, const storage::StoredItemStack& held, double x, double y,
+                                     double z);
+
+    [[nodiscard]] bool useSpawnEgg(player::PlayerSession& session, const wire::common::Identifier& egg,
+                                   std::int32_t heldSlot, const storage::StoredItemStack& held,
+                                   const wire::protocol::play::BlockHitResult& hit);
+
+    void useBookshelf(player::PlayerSession& session, const wire::protocol::play::BlockHitResult& hit);
+
+    void useShelf(player::PlayerSession& session, const wire::protocol::play::BlockHitResult& hit);
+
+    void swapHotbarWithShelf(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
+                             std::int32_t stateId);
+
+    /// Into the player's inventory if it fits, and onto the floor if it does not.
+    void giveOrDrop(player::PlayerSession& session, const storage::StoredItemStack& stack,
+                    const wire::protocol::play::BlockPos& pos);
+
+    void usePot(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    [[nodiscard]] bool placeOnCampfire(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    /// Takes the snow off the block under `pos`, or puts it on. parity: `SnowyBlock.updateShape`.
+    void refreshSnowUnder(const wire::protocol::play::BlockPos& pos);
+
+    void refreshSnowAt(const wire::protocol::play::BlockPos& pos);
+
+    void startDigging(const wire::protocol::play::BlockPos& pos);
+
+    void stopDigging();
+
+    void broadcastDestruction(const wire::protocol::play::BlockPos& pos, std::int32_t stage);
+
+    void useBucketOn(player::PlayerSession& session, const wire::common::Identifier& item, std::int32_t slot,
+                     const storage::StoredItemStack& held, const wire::protocol::play::BlockHitResult& hit);
+
+    /// The boxes of everything in this world that stops a block being placed inside it.
+    [[nodiscard]] std::vector<std::array<double, 6>> buildersInTheWay() const;
+
+    void toggleBlock(const wire::protocol::play::BlockPos& pos);
+
+    void cycleBlock(const wire::protocol::play::BlockPos& pos);
+
+    void useBed(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t state);
+
+    [[nodiscard]] std::optional<world::BedProblem> bedReachProblem(const player::PlayerSession& session,
+                                                                   const wire::protocol::play::BlockPos& head,
+                                                                   std::int32_t headState) const;
+
+    void setSpawnPointAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& bed);
+
+    /// A sound this player and everyone around them hears, which is what a lever and a diode make.
+    void broadcastSound(const wire::protocol::play::BlockPos& pos, const std::string& sound, float volume, float pitch);
+
     ClientSession* owner_;
     Hooks hooks_;
     Options options_;
-    /// What is being broken, since when, and how far along it is.
-    std::optional<wire::protocol::play::BlockPos> digging_;
-    double digProgress_ = 0.0;
-    std::int32_t digTicks_ = 0;
+    /// What an enchantment takes off a durability cost, read from the definitions themselves.
+    item::ItemDamageEffects damageEffects_;
+    /// Where this player is digging, for how long, and which crack stage everyone else has seen.
+    std::optional<wire::protocol::play::BlockPos> diggingAt_;
+    std::int32_t diggingTicks_ = 0;
+    std::int32_t diggingStage_ = -1;
 };
 
 } // namespace basalt::server::runtime
