@@ -1,6 +1,7 @@
 #include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginDispatch.hpp>
 #include <basalt/server/plugins/PluginEventView.hpp>
+#include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
 
 #include <algorithm>

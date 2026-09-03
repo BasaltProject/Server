@@ -5,6 +5,7 @@ basalt_module(server-plugins
         src/PluginEvents.cpp
         src/PluginEventTypes.cpp
         src/PluginDispatch.cpp
+        src/PluginApi.cpp
         src/PluginChannelHost.cpp
         src/PluginEventView.cpp
         src/PluginPacketView.cpp

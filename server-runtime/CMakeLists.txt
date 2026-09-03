@@ -106,6 +106,7 @@ basalt_module(server-runtime-core
         src/BlockInteractionHandler.cpp
         src/BlockUseHelpers.cpp
         src/BlockUseOn.cpp
+        src/plugins/ServerNpcs.cpp
         src/ChunkSimulationView.cpp
         src/ClientSession.cpp
         src/SessionLogin.cpp
@@ -343,7 +344,7 @@ basalt_module(server-runtime-core
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::server-assets basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
+    DEPENDS basalt::server-assets basalt::server-lua basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 

@@ -2,12 +2,15 @@
 
 #include <basalt/server/lua/LuaRef.hpp>
 #include <basalt/server/lua/LuaSandbox.hpp>
+#include <basalt/server/plugins/PluginChannelHost.hpp>
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
 #include <basalt/server/plugins/PluginManifest.hpp>
 #include <basalt/server/plugins/PluginPackage.hpp>
+#include <basalt/server/plugins/PluginPacketRegistry.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginRegistrations.hpp>
+#include <basalt/server/plugins/PluginServiceRegistry.hpp>
 #include <basalt/server/plugins/PluginServices.hpp>
 #include <basalt/server/plugins/PluginSurfaces.hpp>
 #include <basalt/server/plugins/PluginText.hpp>
@@ -22,6 +25,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -30,6 +34,8 @@
 namespace basalt::server::plugins {
 
 class PluginHost;
+class PluginCommandDispatch;
+class PluginEventDispatch;
 
 /// One Lua state of one plugin: its lane.
 struct PluginInstance {
@@ -271,6 +277,49 @@ public:
 
     void report(LoadedPlugin& plugin, const lua::LuaFailure& failure, std::string_view why);
 
+    /// The other half of `enter`: picking a paused turn back up, with the same care.
+    void resuming(LoadedPlugin& plugin, const std::function<void()>& resume);
+
+    /// Calls a plugin function that answers with one string: a placeholder, or a surface's title.
+    [[nodiscard]] std::string answer(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player,
+                                     std::string_view why);
+
+    /// The same, for a call that answers with a truth value.
+    [[nodiscard]] bool asks(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player, std::string_view why);
+
+    /// Somebody clicked a menu: runs the plugin's handler with who and where.
+    ///
+    /// The handler gets one table rather than two arguments because a click grows fields over time
+    /// and a table can take them without moving anybody's parameters around.
+    void clicked(LoadedPlugin& plugin, const lua::LuaRef& handler, PluginPlayerRef& player, std::int32_t slot);
+
+    /// Somebody right-clicked an NPC: runs the plugin's handler with the player who did.
+    void npcClicked(LoadedPlugin& plugin, const lua::LuaRef& handler, const std::string& playerUuid);
+
+    /// Hands one packet to one listener, on its own state and its own budget.
+    void deliverPacket(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPacket& packet);
+
+    [[nodiscard]] PluginServiceRegistry& serviceRegistry() noexcept { return services_registry_; }
+
+    [[nodiscard]] PluginPacketRegistry& packets() noexcept { return packets_; }
+
+    void registerCommand(LoadedPlugin& plugin, PluginInstance& instance, const PluginCommandSpec& spec,
+                         lua::LuaRef handler);
+
+    void registerEventHandler(LoadedPlugin& plugin, PluginInstance& instance, const PluginEventType& type,
+                              PluginEventPriority priority, bool observer, bool wantsCancelled,
+                              std::map<std::string, PluginEventValue, std::less<>> filters, lua::LuaRef handler);
+
+    void announce(LoadedPlugin& plugin, const std::string& name, lua::LuaRef handler);
+
+    [[nodiscard]] std::int32_t emit(const std::string& name, const lua::LuaRef& payload);
+
+    void listenOn(LoadedPlugin& plugin, const std::string& channel, lua::LuaRef fn);
+
+    [[nodiscard]] bool listeningOnChannel(std::string_view channel) const;
+
+    void channelMessage(const std::string& channel, const std::string& playerUuid, std::span<const std::uint8_t> bytes);
+
     /// Where a plugin's time is recorded, so the timings report names it beside the server's own
     /// work. A plugin that costs a millisecond a tick should be as visible as the chunk loader.
     using RecordTime = std::function<void(const std::string& pluginId, std::int64_t nanos)>;
@@ -305,7 +354,12 @@ private:
     /// captures it.
     std::vector<std::unique_ptr<LoadedPlugin>> plugins_;
     PluginAnnouncements announcements_;
+    PluginServiceRegistry services_registry_;
     PluginSurfaceRegistry surfaces_;
+    PluginPacketRegistry packets_;
+    PluginChannelHost channels_;
+    std::unique_ptr<PluginCommandDispatch> commandDispatch_;
+    std::unique_ptr<PluginEventDispatch> eventDispatch_;
     PluginEventBus events_;
     PluginWatchdog watchdog_;
     Allowed allowed_;

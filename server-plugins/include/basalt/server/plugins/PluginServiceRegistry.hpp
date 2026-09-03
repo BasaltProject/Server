@@ -1,7 +1,7 @@
 #pragma once
 
 #include <basalt/server/lua/LuaRef.hpp>
-#include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/plugins/PluginEvents.hpp>
 #include <basalt/server/plugins/PluginValues.hpp>
 
 #include <map>
@@ -11,6 +11,9 @@
 #include <string_view>
 
 namespace basalt::server::plugins {
+
+class LoadedPlugin;
+class PluginHost;
 
 /// What one plugin offers another, and the only way across.
 ///

@@ -1,5 +1,7 @@
 #include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/plugins/PluginObjects.hpp>
+#include <basalt/server/plugins/PluginPacketView.hpp>
 
 #include <algorithm>
 #include <mutex>
@@ -185,6 +187,78 @@ void PluginHost::report(LoadedPlugin& plugin, const lua::LuaFailure& failure, st
         return plugin.manifest.id + " is off after " + std::to_string(strikeLimit_) +
                " failures in a row; fix it and run /plugins reload " + plugin.manifest.id;
     });
+}
+
+void PluginHost::resuming(LoadedPlugin& plugin, const std::function<void()>& resume) {
+    if (plugin.disabled || !resume) {
+        return;
+    }
+    resume();
+    plugin.strikes = 0;
+}
+
+std::string PluginHost::answer(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player,
+                               std::string_view why) {
+    std::string said;
+    static_cast<void>(ask(
+        plugin, fn, why,
+        [this, &plugin, player](lua::LuaArgs& args) {
+            if (player == nullptr) {
+                args.pushNil();
+            } else {
+                pushPlayer(args, player->shared_from_this(), &services_->storage(), plugin.manifest.id, &plugin.text);
+            }
+            return 1;
+        },
+        [&said](lua::LuaArgs& args) { said = args.toText(-1); }));
+    return said;
+}
+
+bool PluginHost::asks(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player, std::string_view why) {
+    bool answered = false;
+    static_cast<void>(ask(
+        plugin, fn, why,
+        [this, &plugin, player](lua::LuaArgs& args) {
+            if (player == nullptr) {
+                args.pushNil();
+            } else {
+                pushPlayer(args, player->shared_from_this(), &services_->storage(), plugin.manifest.id, &plugin.text);
+            }
+            return 1;
+        },
+        [&answered](lua::LuaArgs& args) { answered = args.booleanOr(-1, false); }));
+    return answered;
+}
+
+void PluginHost::clicked(LoadedPlugin& plugin, const lua::LuaRef& handler, PluginPlayerRef& player, std::int32_t slot) {
+    static_cast<void>(ask(plugin, handler, "menu click",
+                          [this, &plugin, &player, slot](lua::LuaArgs& args) {
+                              args.pushTable();
+                              pushPlayer(args, player.shared_from_this(), &services_->storage(), plugin.manifest.id,
+                                         &plugin.text);
+                              args.setField("player");
+                              args.pushInteger(slot);
+                              args.setField("slot");
+                              return 1;
+                          },
+                          {}));
+}
+
+void PluginHost::npcClicked(LoadedPlugin& plugin, const lua::LuaRef& handler, const std::string& playerUuid) {
+    const std::shared_ptr<PluginPlayerRef> player = services_->players().byUuid(playerUuid);
+    if (player == nullptr) {
+        return;
+    }
+    static_cast<void>(answer(plugin, handler, player.get(), "npc click"));
+}
+
+void PluginHost::deliverPacket(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPacket& packet) {
+    static_cast<void>(ask(plugin, fn, "packet " + packet.name,
+                          [this, &plugin, &packet](lua::LuaArgs& args) {
+                              pushPacket(args, packet, *this, plugin);
+                              return 1;
+                          },
+                          {}));
 }
 
 } // namespace basalt::server::plugins
