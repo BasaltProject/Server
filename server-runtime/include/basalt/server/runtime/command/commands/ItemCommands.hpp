@@ -2,6 +2,13 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <functional>
+
+/// Declared, not included: the command only ever holds a pointer to one.
+namespace basalt::server::runtime::world {
+class RealLootTables;
+}
+
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `GiveCommand`.
@@ -23,6 +30,36 @@ public:
     ClearCommand();
 
     void build(const CommandNodeBuilder& root) const override;
+};
+
+/// parity: `ItemCommands`.
+///
+/// `replace` and the `from` copies work on both a player and a container. The `modify` forms are
+/// declared and refuse by name: an item modifier is a loot function, and none are loaded here, so
+/// accepting one would copy the stack unchanged and report a success that never happened.
+class ItemCommand final : public Command {
+public:
+    ItemCommand();
+
+    void build(const CommandNodeBuilder& root) const override;
+};
+
+/// parity: `LootCommand`: four destinations and four sources, each pairing the same way.
+///
+/// `mine` and `loot` roll a real table; `kill` rolls the entity's own; `fish` rolls the table it is
+/// given, since fishing itself does not exist here. The tool argument is parsed and ignored: loot
+/// conditions on it are not modelled, so it would change nothing.
+class LootCommand final : public Command {
+public:
+    /// The roll is seeded from the world seed rather than from a live random, so the same command at
+    /// the same place answers the same thing twice.
+    LootCommand(world::RealLootTables& lootTables, std::function<std::int64_t()> worldSeed);
+
+    void build(const CommandNodeBuilder& root) const override;
+
+private:
+    world::RealLootTables* lootTables_;
+    std::function<std::int64_t()> worldSeed_;
 };
 
 } // namespace basalt::server::runtime::command::commands

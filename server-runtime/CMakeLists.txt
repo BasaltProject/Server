@@ -62,11 +62,15 @@ basalt_module(server-runtime-core
         src/command/commands/FunctionCommands.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
+        src/command/commands/PlaceCommand.cpp
         src/command/commands/ProgressCommands.cpp
         src/command/commands/RandomCommand.cpp
+        src/command/commands/ItemCommand.cpp
         src/command/commands/ItemCommands.cpp
+        src/command/commands/ItemSlots.cpp
         src/command/commands/PlaceholderCommand.cpp
         src/command/commands/LocateCommand.cpp
+        src/command/commands/LootCommand.cpp
         src/command/commands/ParticleCommand.cpp
         src/command/commands/PlayerCommands.cpp
         src/command/commands/ProfilingCommands.cpp
@@ -75,6 +79,7 @@ basalt_module(server-runtime-core
         src/command/commands/SaveCommands.cpp
         src/command/commands/StopwatchCommand.cpp
         src/command/commands/TagCommand.cpp
+        src/command/commands/TestCommand.cpp
         src/command/commands/TeamCommand.cpp
         src/command/commands/TeleportCommand.cpp
         src/command/commands/TickCommand.cpp
@@ -85,6 +90,7 @@ basalt_module(server-runtime-core
         src/command/commands/ScoreboardObjectives.cpp
         src/command/commands/ScoreboardPlayers.cpp
         src/command/commands/SessionCommands.cpp
+        src/command/commands/WaypointCommand.cpp
         src/command/commands/WorldBorderCommand.cpp
         src/command/commands/WorldCommands.cpp
         src/command/CommandTree.cpp
@@ -552,6 +558,15 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-remaining-commands-test
+    SOURCES
+        test/RemainingCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-remaining-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-hud-commands-test
     SOURCES

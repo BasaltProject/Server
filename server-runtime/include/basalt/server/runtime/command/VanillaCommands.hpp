@@ -7,7 +7,20 @@
 #include <memory>
 #include <vector>
 
+/// Declared, not included: the hooks below only ever hold a pointer to one.
+namespace basalt::server::runtime::world {
+class RealDialogs;
+class RealEnchantments;
+class RealLootTables;
+class RealTestInstances;
+class StructureTemplates;
+} // namespace basalt::server::runtime::world
+
 namespace basalt::server::runtime::command {
+
+namespace commands {
+class FunctionRunner;
+}
 
 /// What the commands that need something only the running server owns are handed.
 ///
@@ -22,6 +35,12 @@ struct VanillaCommandHooks {
     world::RealAdvancements* advancements = nullptr;
     world::PlayerProgress* progress = nullptr;
     world::RealRecipes* recipes = nullptr;
+    world::StructureTemplates* templates = nullptr;
+    world::RealEnchantments* enchantments = nullptr;
+    world::RealDialogs* dialogs = nullptr;
+    world::RealLootTables* lootTables = nullptr;
+    world::RealTestInstances* testInstances = nullptr;
+    commands::FunctionRunner* functionRunner = nullptr;
 
     /// The world seed a `/random` draws from when it was given no sequence.
     std::function<std::int64_t()> worldSeed;
@@ -31,6 +50,8 @@ struct VanillaCommandHooks {
     std::function<std::int64_t()> nowEpochSeconds;
     /// A fresh draw in [0, 1), which is what `/spreadplayers` scatters with.
     std::function<double()> nextDouble;
+    /// What a feature's own random is seeded from in `/place`.
+    std::function<std::int64_t()> nextStructureSeed;
     /// A seed per sound, so two `/playsound` of the same sound do not sound identical.
     std::function<std::int64_t()> nextSoundSeed;
     /// What `/setidletimeout` records.
@@ -41,15 +62,13 @@ struct VanillaCommandHooks {
     std::function<void(bool)> setWhitelistState;
 };
 
-/// Every command Basalt understands, in registration order, one class each under
-/// `command/commands/` as vanilla splits them. Each reimplements its counterpart's tree shape,
-/// permission level and translation keys: the client resolves the keys, so a different one is
-/// visible.
+/// Every command Basalt understands, in registration order, one class each under `command/commands/`
+/// as vanilla splits them, each reimplementing its counterpart's tree shape, permission level and
+/// translation keys.
 ///
-/// Gaps, declared rather than silent: the data, datapack, execute, function, item and loot
-/// families. `import-players`, `placeholder`, `world` and `reload` have no vanilla counterpart.
-/// `reload`, `restart`, `timings` and the profiling family are registered by the server itself
-/// instead, each needing something only a running server owns.
+/// Gaps are declared rather than silent: the data, datapack, execute and function families. The
+/// server registers `reload`, `restart`, `timings` and the profiling family itself, since each needs
+/// something only a running server owns.
 [[nodiscard]] std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommandHooks& hooks);
 
 void registerVanillaCommands(CommandDispatcher& dispatcher, const VanillaCommandHooks& hooks);
