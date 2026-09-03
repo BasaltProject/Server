@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
@@ -14,6 +15,12 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+/// Declared, not included: a world is what `switchWorld` moves someone into, and the connection
+/// only ever holds a reference to one.
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime::player {
 
@@ -65,6 +72,27 @@ struct PlayerConnection {
     std::function<void(wire::protocol::play::Gamemode mode)> setGamemode;
 
     /// Kills this player with the death message id vanilla would use.
+    /// Gives health back, up to whatever their maximum is.
+    std::function<void(float amount)> heal;
+
+    /// Damage that goes through the ordinary path: armour, absorption, the death message and the
+    /// hurt animation. The message id is what a death sentence is looked up by, the type is what
+    /// the tags are tested against.
+    std::function<void(float amount, std::string_view deathMessageId, const wire::common::Identifier& damageType)> hurt;
+
+    /// Tells the client an effect started, or that it is over. The client draws its own icon and
+    /// screen tint from these and from nothing else.
+    std::function<void(const world::ActiveEffect& effect)> sendEffect;
+    std::function<void(const wire::common::Identifier& effect)> sendEffectRemoved;
+
+    /// Moves the player to another world, at the coordinates given. Answers false when the move did
+    /// not happen, which is how a command reports that nobody went anywhere.
+    std::function<bool(world::LoadedWorld& world, double x, double y, double z)> switchWorld;
+
+    /// Moves the player and tells their client, which is the only way a position set on the server
+    /// is believed: a client that was not told rubber-bands straight back.
+    std::function<void(double x, double y, double z, float yaw, float pitch)> teleportTo;
+
     /// Re-sends the command tree, which is filtered by permission and so goes stale the moment a
     /// player's group changes.
     std::function<void()> sendCommandTree;

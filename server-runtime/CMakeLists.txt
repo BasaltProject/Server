@@ -41,13 +41,16 @@ basalt_module(server-runtime-core
         src/TickLoop.cpp
         src/command/Coordinates.cpp
         src/command/RegistryArguments.cpp
+        src/command/commands/EffectCommand.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
         src/command/commands/RandomCommand.cpp
         src/command/commands/PlayerCommands.cpp
         src/command/commands/SaveCommands.cpp
         src/command/commands/StopwatchCommand.cpp
+        src/command/commands/TagCommand.cpp
         src/command/commands/TickCommand.cpp
+        src/command/commands/TimeCommand.cpp
         src/command/commands/ScoreCommands.cpp
         src/command/commands/SessionCommands.cpp
         src/command/commands/WorldCommands.cpp
@@ -385,6 +388,16 @@ basalt_test(server-runtime-registry-arguments-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-effect-command-test
+    SOURCES
+        test/EffectCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-effect-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-group-commands-test
     SOURCES
         test/GroupCommandsTest.cpp
@@ -425,6 +438,16 @@ target_compile_definitions(server-runtime-session-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
+basalt_test(server-runtime-tag-command-test
+    SOURCES
+        test/TagCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-tag-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-tick-command-test
     SOURCES
         test/TickCommandTest.cpp
@@ -432,6 +455,16 @@ basalt_test(server-runtime-tick-command-test
 )
 
 target_compile_definitions(server-runtime-tick-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-time-command-test
+    SOURCES
+        test/TimeCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-time-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
