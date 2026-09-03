@@ -104,6 +104,7 @@ basalt_module(server-runtime-core
         src/command/SelectorOptions.cpp
         src/BlockChangeBroadcaster.cpp
         src/ChunkSimulationView.cpp
+        src/ChunkStreamer.cpp
         src/CombatAttack.cpp
         src/CombatHandler.cpp
         src/CombatSystem.cpp
@@ -119,6 +120,8 @@ basalt_module(server-runtime-core
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
         src/RaidSystem.cpp
+        src/EntityVisibilityExtras.cpp
+        src/EntityVisibilityTracker.cpp
         src/EnvironmentTickSystem.cpp
         src/ExplosionSystem.cpp
         src/Favicon.cpp

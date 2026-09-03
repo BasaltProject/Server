@@ -21,6 +21,8 @@ struct StoredItemStack {
     std::string id;
     std::int32_t count = 0;
     wire::nbt::NbtCompound components;
+
+    friend bool operator==(const StoredItemStack&, const StoredItemStack&) = default;
 };
 
 /// A player's slots. Empty slots are absent, and the list keeps its length so slot numbers survive:
