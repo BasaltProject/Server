@@ -34,6 +34,7 @@ basalt_module(server-runtime-core
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
         src/entity/Raids.cpp
+        src/entity/WanderingTraderLifetime.cpp
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
@@ -102,6 +103,9 @@ basalt_module(server-runtime-core
         src/BlockChangeBroadcaster.cpp
         src/ChunkSimulationView.cpp
         src/CombatSystem.cpp
+        src/MobActionSystem.cpp
+        src/MobTickSystem.cpp
+        src/MobActionTick.cpp
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
         src/RaidSystem.cpp
@@ -794,6 +798,24 @@ basalt_test(server-runtime-raids-test
         test/RaidsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
+
+basalt_test(server-runtime-mob-tick-system-test
+    SOURCES
+        test/MobTickSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-mob-tick-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-mob-action-system-test
+    SOURCES
+        test/MobActionSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-mob-action-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-raid-system-test
     SOURCES
