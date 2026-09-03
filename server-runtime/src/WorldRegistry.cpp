@@ -1,0 +1,150 @@
+#include <basalt/server/runtime/WorldRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
+#include <basalt/wire/io/FileIO.hpp>
+
+#include <algorithm>
+#include <regex>
+#include <utility>
+
+namespace basalt::server::runtime {
+namespace {
+
+/// What a world may be called: it becomes a folder name and a row in every player's file.
+[[nodiscard]] bool isUsableName(const std::string& name) {
+    static const std::regex shape{"[a-zA-Z0-9_-]{1,64}"};
+    return std::regex_match(name, shape);
+}
+
+[[nodiscard]] bool isNormal(config::WorldType type) {
+    return type == config::WorldType::Normal || type == config::WorldType::Amplified;
+}
+
+} // namespace
+
+WorldRegistry::WorldRegistry(const config::BasaltConfig& config, const config::WorldsConfig& worlds,
+                             world::VanillaWorldGeneratorFactory* generators, player::PlayerRegistry& players,
+                             Hooks hooks, Options options, wire::common::Logger logger)
+    : worldsConfig_(&worlds), generators_(generators), players_(&players), hooks_(std::move(hooks)),
+      options_(std::move(options)), logger_(std::move(logger)), defaultName_(worlds.defaultWorld().name),
+      scheduler_(config.regional, config.regionThreads) {
+    // Overworlds first, and that order is the point: a Nether or an End that declares no seed of its
+    // own takes the seed of the overworld it belongs to, which is what makes one set of dimensions
+    // one world. parity: a vanilla save has a single seed for its three dimensions.
+    std::vector<const config::WorldDeclaration*> ordered;
+    ordered.reserve(worlds.worlds().size());
+    for (const config::WorldDeclaration& declaration : worlds.worlds()) {
+        ordered.push_back(&declaration);
+    }
+    std::ranges::stable_partition(ordered, [](const config::WorldDeclaration* declaration) {
+        return declaration->dimension == config::WorldDimension::Overworld;
+    });
+
+    for (const config::WorldDeclaration* declaration : ordered) {
+        std::optional<std::int64_t> inherited = declaration->seed;
+        if (!inherited.has_value()) {
+            const config::WorldDeclaration& overworld = worlds.overworldOf(*declaration);
+            if (const auto found = metadata_.find(overworld.name); found != metadata_.end()) {
+                inherited = found->second.seed;
+            }
+        }
+        metadata_.insert_or_assign(declaration->name, world::WorldMetadata::loadOrCreate(
+                                                          options_.worldsRoot + "/" + declaration->name, inherited,
+                                                          world::WorldMetadata::kDefaultSpawn, logger_));
+    }
+    for (const config::WorldDeclaration& declaration : worlds.worlds()) {
+        owned_.push_back(buildWorld(declaration, metadata_.at(declaration.name)));
+    }
+}
+
+WorldRegistry::~WorldRegistry() = default;
+
+std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::WorldDeclaration& declaration,
+                                                              world::WorldMetadata metadata) {
+    world::LoadedWorldOptions options;
+    options.timings = options_.timings;
+    options.scheduler = &scheduler_;
+    options.generationWorkers = options_.generationMetrics ? 1 : world::ChunkGenerationQueue::defaultWorkers();
+    if (generators_ != nullptr && isNormal(declaration.type)) {
+        world::VanillaWorldGeneratorFactory::Generators built = generators_->create(declaration, metadata);
+        // The one generation itself uses, so `/place structure` and `/locate structure` act on the
+        // same villages the world already has.
+        options.villageGenerator = built.villages;
+        options.strongholdGenerator = built.strongholds;
+        options.spawnChunkFinder = built.spawnChunk;
+        if (built.generate) {
+            options.normalGenerator = [generate = built.generate](std::int32_t chunkX, std::int32_t chunkZ,
+                                                                  std::int64_t gameTime, std::string_view difficulty) {
+                return generate(chunkX, chunkZ, gameTime, std::string{difficulty});
+            };
+        }
+        built_.insert_or_assign(declaration.name, std::move(built));
+    }
+    return std::make_unique<world::LoadedWorld>(declaration, worldsConfig_->settingsFor(declaration),
+                                                std::move(metadata), options_.worldsRoot, logger_, std::move(options));
+}
+
+std::map<std::string, world::LoadedWorld*> WorldRegistry::worlds() const {
+    std::map<std::string, world::LoadedWorld*> all;
+    for (const std::unique_ptr<world::LoadedWorld>& world : owned_) {
+        all.insert_or_assign(world->name(), world.get());
+    }
+    return all;
+}
+
+world::LoadedWorld& WorldRegistry::defaultWorld() const {
+    for (const std::unique_ptr<world::LoadedWorld>& world : owned_) {
+        if (world->name() == defaultName_) {
+            return *world;
+        }
+    }
+    return *owned_.front();
+}
+
+std::int64_t WorldRegistry::worldSeed() const { return defaultWorld().metadata().seed; }
+
+world::LoadedWorld* WorldRegistry::createWorld(const std::string& name, config::WorldDimension dimension,
+                                               config::WorldType type, std::optional<std::int64_t> seed) {
+    if (!isUsableName(name)) {
+        return nullptr;
+    }
+    for (const std::unique_ptr<world::LoadedWorld>& world : owned_) {
+        if (world->name() == name) {
+            return nullptr;
+        }
+    }
+    const config::WorldDeclaration declaration{
+        .name = name, .dimension = dimension, .type = type, .seed = seed, .isDefault = false};
+    wire::io::fileIO::createDirectories(options_.worldsRoot + "/" + name);
+    world::WorldMetadata metadata = world::WorldMetadata::loadOrCreate(
+        options_.worldsRoot + "/" + name, seed.has_value() ? seed : std::optional{worldSeed()},
+        world::WorldMetadata::kDefaultSpawn, logger_);
+    const std::int64_t madeWith = metadata.seed;
+    owned_.push_back(buildWorld(declaration, std::move(metadata)));
+    world::LoadedWorld* made = owned_.back().get();
+    logger_.info([&name, dimension, type, madeWith] {
+        return "Made world '" + name + "' (" + std::string{config::dimensionName(dimension)} + ", " +
+               std::string{config::worldTypeName(type)} + ", seed " + std::to_string(madeWith) + ").";
+    });
+    made->saveDirty();
+    // Next turn, not now: this is usually called from inside a plugin's own handler, and firing an
+    // event there would re-enter the Lua state that is already running. One turn later it is an
+    // ordinary event like any other.
+    if (hooks_.worldLoaded) {
+        scheduler_.global().schedule(0, [this, name] { hooks_.worldLoaded(name); });
+    }
+    return made;
+}
+
+void WorldRegistry::onConfigsReloaded() {
+    if (hooks_.rebuildCommands) {
+        hooks_.rebuildCommands();
+    }
+    for (const player::PlayerSession* player : players_->snapshot()) {
+        if (player->connection().sendCommandTree) {
+            player->connection().sendCommandTree();
+        }
+    }
+}
+
+} // namespace basalt::server::runtime
