@@ -56,6 +56,10 @@ basalt_module(server-runtime-core
         src/command/commands/DataModify.cpp
         src/command/commands/EffectCommand.cpp
         src/command/commands/EntityCommands.cpp
+        src/command/commands/ExecuteCommand.cpp
+        src/command/commands/ExecuteConditions.cpp
+        src/command/commands/ExecuteContext.cpp
+        src/command/commands/FunctionCommands.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
         src/command/commands/ProgressCommands.cpp
@@ -516,6 +520,26 @@ basalt_test(server-runtime-entity-commands-test
 )
 
 target_compile_definitions(server-runtime-entity-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-execute-command-test
+    SOURCES
+        test/ExecuteCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-execute-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-function-commands-test
+    SOURCES
+        test/FunctionCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-function-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
