@@ -99,7 +99,10 @@ basalt_module(server-runtime-core
         src/command/SelectorParser.cpp
         src/command/SelectorOptions.cpp
         src/ChunkSimulationView.cpp
+        src/Favicon.cpp
+        src/PersistenceCoordinator.cpp
         src/ServerMetrics.cpp
+        src/StatusEffectSystem.cpp
         src/VanillaGameData.cpp
         src/SubstituteLabels.cpp
         src/command/CommandDispatcher.cpp
@@ -564,6 +567,24 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-status-effect-system-test
+    SOURCES
+        test/StatusEffectSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-status-effect-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-persistence-coordinator-test
+    SOURCES
+        test/PersistenceCoordinatorTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-persistence-coordinator-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-vanilla-game-data-test
     SOURCES
