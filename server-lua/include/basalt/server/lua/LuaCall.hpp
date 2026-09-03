@@ -73,6 +73,12 @@ void installHostFunction(LuaSandbox& sandbox, const std::string& name, std::func
 /// so rather than blocking a tick.
 void installWaitingFunction(LuaSandbox& sandbox, const std::string& name, LuaCall::Arrange arrange);
 
+/// Pushes a host function as a value, for a table of methods rather than a global.
+///
+/// The body lives as long as the state does, the same as an installed global: a method on an object
+/// a plugin holds has to outlive the call that built it.
+void pushHostFunction(LuaArgs& lua, const std::string& name, std::function<std::int32_t(LuaArgs&)> body);
+
 /// One synchronous call of a held value, which cannot pause.
 ///
 /// For a placeholder or a surface: the server renders those in the middle of drawing something, so

@@ -186,6 +186,13 @@ void installBody(LuaSandbox& sandbox, const std::string& name, HostBody built, l
 
 } // namespace
 
+void pushHostFunction(LuaArgs& lua, const std::string& name, std::function<std::int32_t(LuaArgs&)> body) {
+    lua_State* state = lua.state();
+    HostBody* held = newBody(state);
+    *held = HostBody{.immediate = std::move(body), .arrange = {}, .name = name};
+    lua_pushcclosure(state, &CallAccess::immediate, 1);
+}
+
 void installHostFunction(LuaSandbox& sandbox, const std::string& name, std::function<std::int32_t(LuaArgs&)> body) {
     installBody(sandbox, name, HostBody{.immediate = std::move(body), .arrange = {}, .name = name},
                 &CallAccess::immediate);

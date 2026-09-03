@@ -1,0 +1,349 @@
+#include <basalt/server/lua/LuaCall.hpp>
+#include <basalt/server/plugins/PluginObjects.hpp>
+
+#include <cmath>
+#include <utility>
+
+namespace basalt::server::plugins {
+namespace {
+
+using lua::LuaArgs;
+
+/// What goes over an NPC's head: one line or several.
+///
+/// A list is joined with newlines, which is what a text display draws, so
+/// `name = { "<gold>Shop", "<gray>right click" }` is two lines with colour in both. It is not the
+/// profile name, which could hold neither.
+[[nodiscard]] std::string nameLines(LuaArgs& lua, std::int32_t index) {
+    if (lua.isString(index)) {
+        return lua.toText(index);
+    }
+    if (!lua.isTable(index)) {
+        return {};
+    }
+    std::string out;
+    const std::int64_t length = lua.length(index);
+    for (std::int64_t position = 1; position <= length; position++) {
+        lua.pushIndex(index, position);
+        out += out.empty() ? lua.toText(-1) : "\n" + lua.toText(-1);
+        lua.pop(1);
+    }
+    return out;
+}
+
+/// Players or uuids, since a plugin has one or the other to hand.
+[[nodiscard]] std::vector<std::string> uuidsFrom(LuaArgs& lua, std::int32_t index) {
+    std::vector<std::string> out;
+    if (index > lua.count() || !lua.isTable(index)) {
+        return out;
+    }
+    const std::int64_t length = lua.length(index);
+    for (std::int64_t position = 1; position <= length; position++) {
+        lua.pushIndex(index, position);
+        if (lua.isTable(-1)) {
+            lua.pushField(-1, "uuid");
+            if (lua.isString(-1)) {
+                out.push_back(lua.toText(-1));
+            }
+            lua.pop(1);
+        } else if (lua.isString(-1)) {
+            out.push_back(lua.toText(-1));
+        }
+        lua.pop(1);
+    }
+    return out;
+}
+
+/// One string field of the table at `index`, or nothing when it is absent.
+[[nodiscard]] std::optional<std::string> stringField(LuaArgs& lua, std::int32_t index, std::string_view key) {
+    lua.pushField(index, key);
+    std::optional<std::string> value;
+    if (lua.isString(-1)) {
+        value = lua.toText(-1);
+    }
+    lua.pop(1);
+    return value;
+}
+
+/// The audience of a hologram or an NPC, which is a list of uuids or nothing at all for everybody.
+[[nodiscard]] PluginValue audienceOf(const std::optional<std::vector<std::string>>& audience) {
+    return audience.has_value() ? PluginValue{*audience} : PluginValue{};
+}
+
+} // namespace
+
+void pushNpc(LuaArgs& lua, std::shared_ptr<PluginNpcRef> npc) {
+    PluginObject object{"npc"};
+    object.reads("id", [npc] { return PluginValue{static_cast<std::int64_t>(npc->id())}; })
+        .reads("uuid", [npc] { return PluginValue{npc->uuid()}; })
+        .reads("name", [npc] { return PluginValue{npc->name()}; })
+        .reads("world", [npc] { return PluginValue{npc->world()}; })
+        .reads("x", [npc] { return PluginValue{npc->x()}; })
+        .reads("y", [npc] { return PluginValue{npc->y()}; })
+        .reads("z", [npc] { return PluginValue{npc->z()}; })
+        .reads("alive", [npc] { return PluginValue{npc->alive()}; })
+        .reads("audience", [npc] { return audienceOf(npc->audience()); })
+        .writes("name", [npc](LuaArgs& args, std::int32_t index) { npc->setName(args.checkString(index)); })
+        .method("skin",
+                [npc](LuaArgs& args) {
+                    // `npc:skin(texture, signature)` or `npc:skin(player)`, which wears theirs.
+                    const std::int32_t base = firstArgument(args);
+                    if (args.isTable(base)) {
+                        args.pushBoolean(npc->skinFrom(stringField(args, base, "name").value_or("")));
+                        return 1;
+                    }
+                    npc->skin(args.checkString(base),
+                              args.isString(base + 1) ? std::optional{args.toText(base + 1)} : std::nullopt);
+                    args.pushBoolean(true);
+                    return 1;
+                })
+        .method("skin_from",
+                [npc](LuaArgs& args) {
+                    args.pushBoolean(npc->skinFrom(args.checkString(firstArgument(args))));
+                    return 1;
+                })
+        .method("looks_at_players",
+                [npc](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    npc->looksAtPlayers(args.isNil(base) || args.booleanOr(base, true));
+                    return 0;
+                })
+        .method("look",
+                [npc](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    npc->look(static_cast<float>(args.checkNumber(base)),
+                              static_cast<float>(args.numberOr(base + 1, 0.0)));
+                    return 0;
+                })
+        .method("teleport",
+                [npc](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::optional<PluginPoint> point = pointFrom(args, base);
+                    if (point.has_value()) {
+                        args.pushBoolean(npc->teleport(point->x, point->y, point->z));
+                        return 1;
+                    }
+                    args.pushBoolean(
+                        npc->teleport(args.checkNumber(base), args.checkNumber(base + 1), args.checkNumber(base + 2)));
+                    return 1;
+                })
+        .method("show_only_to",
+                [npc](LuaArgs& args) {
+                    npc->showOnlyTo(uuidsFrom(args, firstArgument(args)));
+                    return 0;
+                })
+        .method("show_to_all",
+                [npc](LuaArgs& args) {
+                    static_cast<void>(args);
+                    npc->showToAll();
+                    return 0;
+                })
+        .method("remove", [npc](LuaArgs& args) {
+            static_cast<void>(args);
+            npc->remove();
+            return 0;
+        });
+    std::move(object).push(lua);
+}
+
+void pushHologram(LuaArgs& lua, std::shared_ptr<PluginHologramRef> hologram) {
+    PluginObject object{"hologram"};
+    object.reads("id", [hologram] { return PluginValue{static_cast<std::int64_t>(hologram->id())}; })
+        .reads("type", [hologram] { return PluginValue{hologram->type()}; })
+        .reads("world", [hologram] { return PluginValue{hologram->world()}; })
+        .reads("x", [hologram] { return PluginValue{hologram->x()}; })
+        .reads("y", [hologram] { return PluginValue{hologram->y()}; })
+        .reads("z", [hologram] { return PluginValue{hologram->z()}; })
+        .reads("alive", [hologram] { return PluginValue{hologram->alive()}; })
+        .reads("text", [hologram] { return PluginValue{hologram->text()}; })
+        .reads("audience", [hologram] { return audienceOf(hologram->audience()); })
+        .writes("text", [hologram](LuaArgs& args, std::int32_t index) { hologram->setText(args.checkString(index)); })
+        .method("remove",
+                [hologram](LuaArgs& args) {
+                    static_cast<void>(args);
+                    hologram->remove();
+                    return 0;
+                })
+        .method("teleport",
+                [hologram](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::optional<PluginPoint> point = pointFrom(args, base);
+                    if (point.has_value()) {
+                        args.pushBoolean(hologram->teleport(point->x, point->y, point->z));
+                        return 1;
+                    }
+                    args.pushBoolean(hologram->teleport(args.checkNumber(base), args.checkNumber(base + 1),
+                                                        args.checkNumber(base + 2)));
+                    return 1;
+                })
+        .method("show_only_to",
+                [hologram](LuaArgs& args) {
+                    hologram->showOnlyTo(uuidsFrom(args, firstArgument(args)));
+                    return 0;
+                })
+        .method("show_to_all", [hologram](LuaArgs& args) {
+            static_cast<void>(args);
+            hologram->showToAll();
+            return 0;
+        });
+    std::move(object).push(lua);
+}
+
+void pushWorld(LuaArgs& lua, std::shared_ptr<PluginWorldRef> world, WorldHooks hooks) {
+    const std::shared_ptr<WorldHooks> shared = std::make_shared<WorldHooks>(std::move(hooks));
+    const auto resolve = [shared](const std::string& text) {
+        return shared->resolveText ? shared->resolveText(text) : text;
+    };
+    PluginObject object{"world"};
+    object.reads("name", [world] { return PluginValue{world->name()}; })
+        .reads("time", [world] { return PluginValue{world->time()}; })
+        .reads("raining", [world] { return PluginValue{world->raining()}; })
+        .reads("thundering", [world] { return PluginValue{world->thundering()}; })
+        .reads("difficulty", [world] { return PluginValue{world->difficulty()}; })
+        .reads("rules", [world] { return PluginValue{world->gameRules()}; })
+        .method("block",
+                [world](LuaArgs& args) {
+                    // `w:block(pos)` or `w:block(x, y, z)`; the second one is why this cannot use
+                    // `firstArgument`, since three numbers and self are four arguments either way.
+                    const std::optional<PluginPoint> point = pointFrom(args, args.count() >= 2 ? 2 : 1);
+                    std::optional<std::string> block;
+                    if (point.has_value()) {
+                        block = world->block(static_cast<std::int32_t>(std::floor(point->x)),
+                                             static_cast<std::int32_t>(std::floor(point->y)),
+                                             static_cast<std::int32_t>(std::floor(point->z)));
+                    } else {
+                        const std::int32_t base = args.count() >= 4 ? 2 : 1;
+                        block = world->block(static_cast<std::int32_t>(args.checkInteger(base)),
+                                             static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                             static_cast<std::int32_t>(args.checkInteger(base + 2)));
+                    }
+                    if (block.has_value()) {
+                        args.pushString(*block);
+                    } else {
+                        args.pushNil();
+                    }
+                    return 1;
+                })
+        .method("set_block",
+                [world](LuaArgs& args) {
+                    const std::int32_t base = firstArgument(args);
+                    const std::optional<PluginPoint> point = pointFrom(args, base);
+                    if (point.has_value()) {
+                        args.pushBoolean(world->setBlock(static_cast<std::int32_t>(std::floor(point->x)),
+                                                         static_cast<std::int32_t>(std::floor(point->y)),
+                                                         static_cast<std::int32_t>(std::floor(point->z)),
+                                                         args.checkString(base + 1)));
+                        return 1;
+                    }
+                    args.pushBoolean(world->setBlock(static_cast<std::int32_t>(args.checkInteger(base)),
+                                                     static_cast<std::int32_t>(args.checkInteger(base + 1)),
+                                                     static_cast<std::int32_t>(args.checkInteger(base + 2)),
+                                                     args.checkString(base + 3)));
+                    return 1;
+                })
+        .method("rule",
+                [world](LuaArgs& args) {
+                    // `w:rule("doDaylightCycle")` reads it, `w:rule("doDaylightCycle", false)` sets it.
+                    const std::int32_t base = firstArgument(args);
+                    const std::string name = args.checkString(base);
+                    if (args.isNil(base + 1)) {
+                        const std::optional<std::string> value = world->gameRule(name);
+                        if (value.has_value()) {
+                            args.pushString(*value);
+                        } else {
+                            args.pushNil();
+                        }
+                        return 1;
+                    }
+                    args.pushBoolean(world->setGameRule(name, args.toText(base + 1)));
+                    return 1;
+                })
+        .method("entities",
+                [world](LuaArgs& args) {
+                    args.pushTable();
+                    std::int64_t position = 1;
+                    for (const std::shared_ptr<PluginEntityRef>& entity : world->entities()) {
+                        pushEntity(args, entity);
+                        args.setIndex(position++);
+                    }
+                    return 1;
+                })
+        .method("npc",
+                [world, shared, resolve](LuaArgs& args) {
+                    // `w:npc{ name = "Bob", pos = ..., skin = ..., on_click = function(p) end }`.
+                    const std::int32_t options = firstArgument(args);
+                    if (!args.isTable(options)) {
+                        args.raise("world:npc{ name = ..., pos = ... } takes a table");
+                    }
+                    args.pushField(options, "pos");
+                    const std::optional<PluginPoint> point = pointFrom(args, args.top());
+                    args.pop(1);
+                    if (!point.has_value()) {
+                        args.raise("an npc needs a pos: worlds.default():npc{ pos = p.pos }");
+                    }
+                    args.pushField(options, "on_click");
+                    std::function<void(const std::string&)> onClick;
+                    if (args.isFunction(-1) && shared->onNpcClick) {
+                        lua::LuaRef handler = lua::LuaRef::of(args.state(), -1);
+                        const std::shared_ptr<lua::LuaRef> held = std::make_shared<lua::LuaRef>(std::move(handler));
+                        const WorldHooks::NpcClick call = shared->onNpcClick;
+                        onClick = [held, call](const std::string& uuid) { call(*held, uuid); };
+                    }
+                    args.pop(1);
+                    args.pushField(options, "name");
+                    const std::string name = resolve(nameLines(args, args.top()));
+                    args.pop(1);
+                    const std::shared_ptr<PluginNpcRef> made =
+                        world->npc(name, point->x, point->y, point->z, std::move(onClick));
+                    if (made == nullptr) {
+                        args.pushNil();
+                        return 1;
+                    }
+                    args.pushField(options, "skin");
+                    if (args.isTable(-1)) {
+                        const std::int32_t skin = args.top();
+                        const std::optional<std::string> texture = stringField(args, skin, "texture");
+                        if (texture.has_value()) {
+                            made->skin(*texture, stringField(args, skin, "signature"));
+                        }
+                    }
+                    args.pop(1);
+                    pushNpc(args, made);
+                    return 1;
+                })
+        .method("hologram",
+                [world, resolve](LuaArgs& args) {
+                    // `w:hologram("<gold>Shop", pos)` or `w:hologram(text, x, y, z)`.
+                    const std::int32_t base = firstArgument(args);
+                    const std::string text = resolve(args.checkString(base));
+                    const std::optional<PluginPoint> point = pointFrom(args, base + 1);
+                    const std::shared_ptr<PluginHologramRef> made =
+                        point.has_value() ? world->hologram(text, point->x, point->y, point->z)
+                                          : world->hologram(text, args.checkNumber(base + 1),
+                                                            args.checkNumber(base + 2), args.checkNumber(base + 3));
+                    if (made == nullptr) {
+                        args.pushNil();
+                    } else {
+                        pushHologram(args, made);
+                    }
+                    return 1;
+                })
+        .method("spawn", [world](LuaArgs& args) {
+            const std::int32_t base = firstArgument(args);
+            const std::string type = args.checkString(base);
+            const std::optional<PluginPoint> point = pointFrom(args, base + 1);
+            const std::shared_ptr<PluginEntityRef> made =
+                point.has_value() ? world->spawn(type, point->x, point->y, point->z)
+                                  : world->spawn(type, args.checkNumber(base + 1), args.checkNumber(base + 2),
+                                                 args.checkNumber(base + 3));
+            if (made == nullptr) {
+                args.pushNil();
+            } else {
+                pushEntity(args, made);
+            }
+            return 1;
+        });
+    std::move(object).push(lua);
+}
+
+} // namespace basalt::server::plugins
