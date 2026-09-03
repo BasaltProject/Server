@@ -17,9 +17,11 @@
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/common/logging/LogOutput.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
+#include <basalt/wire/common/logging/Panic.hpp>
 #include <basalt/wire/io/LogFile.hpp>
 #include <basalt/wire/io/Platform.hpp>
 
+#include <atomic>
 #include <cstdio>
 #include <exception>
 #include <memory>
@@ -189,6 +191,10 @@ int main(int argc, char** argv) {
     std::puts(std::string{kBanner}.c_str());
     std::puts(versionLine().c_str());
 
+    // Before anything that could fail: a crash from here on says what it was and where, instead of
+    // leaving the operator with one line from their shell.
+    wire::common::panic::install("Basalt Server", std::string{buildInfo::kVersion});
+
     // No prompts and no TTY detection: identical behaviour interactive, headless or containerized.
     // `--accept-eula` is a deliberate operator act, not a fallback.
     if (server::assets::eulaFile::check(hasFlag(argc, argv, "--accept-eula"), wire::common::Logger{"Eula"}) !=
@@ -233,10 +239,13 @@ int main(int argc, char** argv) {
 
     // The console outlives the server it talks to, because `/restart` replaces that server while
     // this thread is parked inside a blocking read of standard input.
+    //
+    // What it is handed is an atomic and not the instance itself: the console thread reads this
+    // while this one is building or dropping a server, and a plain pointer read there is a race
+    // that hands the console a half-built dispatcher.
     std::unique_ptr<Instance> running;
-    command::consoleReader::start([&running]() -> command::CommandDispatcher* {
-        return running == nullptr ? nullptr : running->server->commands();
-    });
+    std::atomic<command::CommandDispatcher*> live{nullptr};
+    command::consoleReader::start([&live] { return live.load(std::memory_order_acquire); });
 
     // One instance per turn around this loop. A restart is not a re-exec and not a new process: the
     // old instance winds itself down exactly as `/stop` does, and then a new one is built from the
@@ -250,12 +259,15 @@ int main(int argc, char** argv) {
         first = false;
         try {
             running = buildServer();
+            live.store(running->server->commands(), std::memory_order_release);
             running->server->start(instanceStartedAt);
         } catch (const std::exception& failure) {
+            live.store(nullptr, std::memory_order_release);
             wire::common::Logger{"Server"}.error([&failure] { return failure.what(); });
             exitCode = std::string_view{failure.what()}.starts_with("players.db") ? kDatabaseExitCode : kBindExitCode;
             break;
         }
+        live.store(nullptr, std::memory_order_release);
         if (!running->server->shouldRestart()) {
             break;
         }

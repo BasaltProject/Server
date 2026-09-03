@@ -1,9 +1,8 @@
 #include <basalt/server/runtime/TickLoop.hpp>
 
-#include <thread>
-
 #include <algorithm>
 #include <chrono>
+#include <thread>
 
 namespace basalt::server::runtime {
 namespace {
@@ -221,9 +220,9 @@ void TickLoop::stop() {
         sleepMillis(kSweepPollMillis);
         waited += kSweepPollMillis;
     }
-    // A stop from inside the tick itself (a signal noticed mid-tick) would be the ticker joining
-    // itself, so it is left to run out its own turn instead.
-    if (ticker_.joinable() && ticker_.get_id() != std::this_thread::get_id()) {
+    // Never called from the ticker itself: `BasaltServer::shutdown` moves off it first, because a
+    // thread that joins itself is a hard error and a detached one would outlive what it reads.
+    if (ticker_.joinable()) {
         ticker_.join();
     }
     if (sweeper_.joinable()) {
