@@ -108,6 +108,15 @@ struct PlayerConnection {
     /// is believed: a client that was not told rubber-bands straight back.
     std::function<void(double x, double y, double z, float yaw, float pitch)> teleportTo;
 
+    /// Gets this player out of the bed they are in, which is a packet and a pose at once.
+    std::function<void()> wakeUp;
+
+    /// Pushes the world's clock, which the client runs on its own between updates.
+    std::function<void(const world::LoadedWorld& world)> sendTime;
+
+    /// Pushes the air supply and the burning flag, which the HUD draws its bubbles and flames from.
+    std::function<void()> syncSubmersion;
+
     /// Re-sends the command tree, which is filtered by permission and so goes stale the moment a
     /// player's group changes.
     std::function<void()> sendCommandTree;
