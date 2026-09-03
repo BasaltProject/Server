@@ -38,22 +38,26 @@ basalt_module(server-runtime-core
         src/command/StringReader.cpp
         src/command/ArgumentTypes.cpp
         src/command/commands/AccessCommands.cpp
+        src/command/commands/AttributeCommand.cpp
         src/command/commands/BasicCommands.cpp
         src/TickLoop.cpp
         src/command/BlockEditor.cpp
         src/command/Coordinates.cpp
         src/command/ExecuteArguments.cpp
+        src/command/ParticleArgument.cpp
         src/command/RegistryArguments.cpp
         src/command/WorldArguments.cpp
         src/command/commands/BlockCommands.cpp
         src/command/commands/BossBarCommand.cpp
         src/command/commands/EffectCommand.cpp
+        src/command/commands/EntityCommands.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
         src/command/commands/ProgressCommands.cpp
         src/command/commands/RandomCommand.cpp
         src/command/commands/ItemCommands.cpp
         src/command/commands/PlaceholderCommand.cpp
+        src/command/commands/ParticleCommand.cpp
         src/command/commands/PlayerCommands.cpp
         src/command/commands/ProfilingCommands.cpp
         src/command/commands/RegionCommands.cpp
@@ -472,6 +476,16 @@ target_compile_definitions(server-runtime-effect-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
+basalt_test(server-runtime-entity-commands-test
+    SOURCES
+        test/EntityCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-entity-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-group-commands-test
     SOURCES
         test/GroupCommandsTest.cpp
@@ -609,6 +623,16 @@ basalt_test(server-runtime-item-commands-test
 )
 
 target_compile_definitions(server-runtime-item-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-particle-command-test
+    SOURCES
+        test/ParticleCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-particle-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
