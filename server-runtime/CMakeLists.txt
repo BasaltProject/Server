@@ -115,7 +115,10 @@ basalt_module(server-runtime-core
         src/command/ExecutionSource.cpp
         src/command/CommandSource.cpp
         src/command/MessageOverrides.cpp
+        src/placeholder/AnimationPlaceholders.cpp
+        src/placeholder/Decimals.cpp
         src/placeholder/PlaceholderSlots.cpp
+        src/placeholder/ServerPlaceholders.cpp
         src/item/ItemWear.cpp
         src/item/ItemComponentCodecs.cpp
         src/item/ItemDamageEffects.cpp
@@ -291,6 +294,7 @@ basalt_module(server-runtime-core
         src/entity/ai/IllagerGoals.cpp
         src/entity/ai/LongDistancePatrolGoal.cpp
         src/entity/ai/MobContext.cpp
+        src/entity/ai/MobGoals.cpp
         src/entity/ai/SpecialGoals.cpp
         src/entity/ai/TameGoals.cpp
         src/entity/ai/TargetGoals.cpp
@@ -632,6 +636,12 @@ basalt_test(server-runtime-wandering-trader-goals-test
 basalt_test(server-runtime-illager-goals-test
     SOURCES
         test/IllagerGoalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mob-goals-test
+    SOURCES
+        test/MobGoalsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -990,6 +1000,18 @@ basalt_test(server-runtime-particle-command-test
 
 target_compile_definitions(server-runtime-particle-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-animation-placeholders-test
+    SOURCES
+        test/AnimationPlaceholdersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-server-placeholders-test
+    SOURCES
+        test/ServerPlaceholdersTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-placeholder-command-test
