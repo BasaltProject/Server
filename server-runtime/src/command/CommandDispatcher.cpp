@@ -248,7 +248,7 @@ void CommandDispatcher::rebuild() {
     }
 }
 
-std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::string& input) {
+std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::string& input) const {
     StringReader reader{input};
     // Named after the command, so a report shows which one is slow rather than that "commands" are.
     // The name comes from the input rather than the parse, since a command that fails to parse
@@ -312,7 +312,7 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
     return successes;
 }
 
-Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringReader& reader, CommandNode& node,
+Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringReader& reader, const CommandNode& node,
                                                                       const CommandSource& source,
                                                                       const Arguments& arguments) const {
     CommandNode* redirect = node.redirect;
@@ -330,7 +330,7 @@ Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringRead
         return std::unexpected{reader.syntaxError(std::string{kUnknownCommand})};
     }
 
-    CommandNode& target = redirect == nullptr ? node : *redirect;
+    const CommandNode& target = redirect == nullptr ? node : *redirect;
     const std::int32_t start = reader.cursor();
     std::optional<CommandSyntaxError> deepest;
     for (CommandNode* child : target.sortedChildren()) {
