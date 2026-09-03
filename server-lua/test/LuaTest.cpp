@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/lua/LuaSandbox.hpp>
 
 #include <doctest.h>
@@ -305,4 +306,39 @@ TEST_CASE("a syntax error names the plugin's own file and line") {
     REQUIRE(runtime.has_value());
     CHECK(runtime->message.find("test.lua:3:") != std::string::npos);
     CHECK(runtime->report() == "[arena] " + runtime->message);
+}
+
+TEST_CASE("a registry reference keeps a value alive and lets it go again") {
+    const std::unique_ptr<LuaSandbox> sandbox = LuaSandbox::create("refs");
+    REQUIRE(sandbox != nullptr);
+
+    // The function is held from the host side, which is what a registered handler is.
+    LuaRef held;
+    installHostFunction(*sandbox, "keep", [&held](LuaArgs& lua) {
+        held = LuaRef::of(lua.state(), 1);
+        return 0;
+    });
+
+    // Nothing in the sandbox holds the function once the chunk is over, so what keeps it alive
+    // between registering and calling is the reference and nothing else.
+    REQUIRE(!run(*sandbox, "keep(function(n) return n * 2 end)").has_value());
+    REQUIRE(held.valid());
+
+    const std::expected<std::int32_t, LuaFailure> answered = callSync(
+        *sandbox, held,
+        [](LuaArgs& lua) {
+            lua.pushInteger(21);
+            return 1;
+        },
+        1);
+    REQUIRE(answered.has_value());
+    CHECK(*answered == 1);
+    LuaArgs results{sandbox->state()};
+    CHECK(results.checkInteger(-1) == 42);
+    results.pop(1);
+
+    // Releasing is what makes an unregistered handler actually go away.
+    held.release();
+    CHECK(!held.valid());
+    CHECK(!callSync(*sandbox, held, {}, 0).has_value());
 }

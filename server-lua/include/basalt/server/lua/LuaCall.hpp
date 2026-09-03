@@ -1,8 +1,10 @@
 #pragma once
 
 #include <basalt/server/lua/LuaArgs.hpp>
+#include <basalt/server/lua/LuaRef.hpp>
 #include <basalt/server/lua/LuaSandbox.hpp>
 
+#include <expected>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -70,5 +72,14 @@ void installHostFunction(LuaSandbox& sandbox, const std::string& name, std::func
 /// comparator, a metamethod, anything the interpreter reached through its synchronous path) it says
 /// so rather than blocking a tick.
 void installWaitingFunction(LuaSandbox& sandbox, const std::string& name, LuaCall::Arrange arrange);
+
+/// One synchronous call of a held value, which cannot pause.
+///
+/// For a placeholder or a surface: the server renders those in the middle of drawing something, so
+/// there is nowhere to pause to. `pushArguments` leaves its values on the stack and answers how many
+/// it left; the results are left on the stack for the caller to read and pop.
+[[nodiscard]] std::expected<std::int32_t, LuaFailure>
+callSync(LuaSandbox& sandbox, const LuaRef& function, const std::function<std::int32_t(LuaArgs&)>& pushArguments,
+         std::int32_t resultCount);
 
 } // namespace basalt::server::lua

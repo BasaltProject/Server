@@ -196,4 +196,23 @@ void installWaitingFunction(LuaSandbox& sandbox, const std::string& name, LuaCal
                 &CallAccess::waiting);
 }
 
+std::expected<std::int32_t, LuaFailure> callSync(LuaSandbox& sandbox, const LuaRef& function,
+                                                 const std::function<std::int32_t(LuaArgs&)>& pushArguments,
+                                                 std::int32_t resultCount) {
+    lua_State* state = sandbox.state();
+    if (!function.valid()) {
+        return std::unexpected(LuaFailure{.plugin = sandbox.name(), .message = "there is no function to call"});
+    }
+    const int before = lua_gettop(state);
+    function.push();
+    LuaArgs lua{state};
+    const std::int32_t argumentCount = pushArguments ? pushArguments(lua) : 0;
+    if (lua_pcall(state, argumentCount, resultCount, 0) != LUA_OK) {
+        const LuaFailure failure = sandbox.failureFromStack();
+        lua_settop(state, before);
+        return std::unexpected(failure);
+    }
+    return lua_gettop(state) - before;
+}
+
 } // namespace basalt::server::lua

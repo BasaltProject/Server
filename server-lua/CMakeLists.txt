@@ -2,6 +2,7 @@ basalt_module(server-lua
     SOURCES
         src/LuaArgs.cpp
         src/LuaCall.cpp
+        src/LuaRef.cpp
         src/LuaFailure.cpp
         src/LuaSandbox.cpp
     DEPENDS basalt::wire-common
