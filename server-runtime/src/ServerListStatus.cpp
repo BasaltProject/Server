@@ -1,0 +1,196 @@
+#include <basalt/server/runtime/Favicon.hpp>
+#include <basalt/server/runtime/ServerListStatus.hpp>
+#include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/wire/common/placeholder/PlaceholderText.hpp>
+#include <basalt/wire/io/FileIO.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
+#include <basalt/wire/text/Serializers.hpp>
+
+#include <utility>
+
+namespace basalt::server::runtime {
+namespace {
+
+namespace ph = wire::common::placeholder;
+
+using wire::protocol::status::ServerStatusPayload;
+using wire::text::Component;
+
+constexpr std::int32_t kIconSize = 64;
+constexpr std::size_t kSampleLimit = 12;
+
+/// Custom hover lines are sent with a nil UUID because the field is not optional in the packet and a
+/// made-up one would be a real player's identifier somewhere.
+constexpr std::string_view kNilUuid = "00000000-0000-0000-0000-000000000000";
+
+[[nodiscard]] std::int32_t readInt(const std::vector<std::uint8_t>& bytes, std::size_t offset) {
+    return static_cast<std::int32_t>(
+        (static_cast<std::uint32_t>(bytes[offset]) << 24) | (static_cast<std::uint32_t>(bytes[offset + 1]) << 16) |
+        (static_cast<std::uint32_t>(bytes[offset + 2]) << 8) | static_cast<std::uint32_t>(bytes[offset + 3]));
+}
+
+/// The PNG signature plus the width and height out of the IHDR chunk, which is always first.
+[[nodiscard]] bool isPng64(const std::vector<std::uint8_t>& bytes) {
+    static constexpr std::array<std::uint8_t, 8> kSignature{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+    if (bytes.size() < 24) {
+        return false;
+    }
+    for (std::size_t index = 0; index < kSignature.size(); index++) {
+        if (bytes[index] != kSignature[index]) {
+            return false;
+        }
+    }
+    return readInt(bytes, 16) == kIconSize && readInt(bytes, 20) == kIconSize;
+}
+
+[[nodiscard]] std::vector<std::uint8_t> builtInIcon() {
+    const std::span<const std::uint8_t> bytes = favicon::bytes();
+    return {bytes.begin(), bytes.end()};
+}
+
+} // namespace
+
+ServerListStatus::ServerListStatus(std::function<const config::ServerListConfig&()> config,
+                                   const ph::PlaceholderRegistry& placeholders,
+                                   std::function<std::vector<ListedPlayer>()> onlinePlayers, Options options,
+                                   Hooks hooks, wire::common::Logger logger)
+    : config_(std::move(config)), placeholders_(&placeholders), onlinePlayers_(std::move(onlinePlayers)),
+      options_(std::move(options)), hooks_(std::move(hooks)), logger_(std::move(logger)) {}
+
+ServerStatusPayload ServerListStatus::statusFor(std::int32_t protocolVersion, const std::string& host,
+                                                const std::optional<std::string>& address) {
+    const config::ServerListConfig& current = config_();
+    const config::PingRequest request{protocolVersion, host, address,
+                                      config::PingRequest::Lookup{[this, &current, &address] {
+                                          return current.rememberIp() && address.has_value() && hooks_.playerByAddress
+                                                     ? hooks_.playerByAddress(*address)
+                                                     : std::nullopt;
+                                      }}};
+    const ph::PlaceholderContext context = ph::PlaceholderContext{}.with(placeholder::pingSlot(), &request);
+    const config::ServerListProfile profile = current.select(*placeholders_, context, logger_);
+    const std::vector<ListedPlayer> players = onlinePlayers_ ? onlinePlayers_() : std::vector<ListedPlayer>{};
+
+    const std::int32_t online = profile.onlinePlayers.value_or(static_cast<std::int32_t>(players.size()));
+    std::int32_t max = profile.maxPlayers.value_or(options_.slots);
+    Component motd = render(profile.motd.value_or(std::vector<std::string>{}), context);
+
+    // The last word on what a pinger sees, after the profile decided it: a plugin can change the
+    // line and the slots without the operator's file having to know about it.
+    if (hooks_.ping) {
+        const Hooks::Answer answer = hooks_.ping(address, wire::text::toPlainText(motd), online, max);
+        if (answer.motd.has_value()) {
+            motd = wire::text::miniMessage::parse(*answer.motd);
+        }
+        if (answer.maxPlayers.has_value()) {
+            max = *answer.maxPlayers;
+        }
+    }
+
+    ServerStatusPayload payload;
+    payload.description = std::move(motd);
+    if (!profile.hidePlayerCount.value_or(false)) {
+        payload.players =
+            ServerStatusPayload::Players{.max = max, .online = online, .sample = sampleFor(profile, players, context)};
+    }
+    payload.version =
+        ServerStatusPayload::Version{.name = profile.versionName.value_or(options_.versionName),
+                                     .protocol = profile.versionProtocol.value_or(options_.protocolVersion)};
+    payload.favicon = iconFor(profile);
+    return payload;
+}
+
+std::vector<ServerStatusPayload::SamplePlayer>
+ServerListStatus::sampleFor(const config::ServerListProfile& profile, const std::vector<ListedPlayer>& players,
+                            const ph::PlaceholderContext& context) const {
+    std::vector<ServerStatusPayload::SamplePlayer> sample;
+    if (profile.hover.has_value()) {
+        for (const std::string& line : *profile.hover) {
+            sample.push_back({.name = substitute(line, context), .id = std::string{kNilUuid}});
+        }
+        return sample;
+    }
+    for (const ListedPlayer& player : players) {
+        if (sample.size() >= kSampleLimit) {
+            break;
+        }
+        sample.push_back({.name = player.name, .id = player.uuid});
+    }
+    return sample;
+}
+
+std::vector<std::uint8_t> ServerListStatus::iconFor(const config::ServerListProfile& profile) const {
+    if (!profile.icon.has_value()) {
+        return builtInIcon();
+    }
+    const std::string& name = *profile.icon;
+    {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        if (const auto found = icons_.find(name); found != icons_.end()) {
+            return found->second.empty() ? builtInIcon() : found->second;
+        }
+    }
+
+    const std::string path = options_.configRoot + "/" + name;
+    const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(path);
+    std::vector<std::uint8_t> usable;
+    if (!bytes.has_value()) {
+        logger_.warn([&path] { return "Server list icon " + path + " not found; using the built-in one."; });
+    } else if (!isPng64(*bytes)) {
+        logger_.warn([&path] { return "Server list icon " + path + " is not a 64x64 PNG; using the built-in one."; });
+    } else {
+        usable = *bytes;
+    }
+    {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        icons_.insert_or_assign(name, usable);
+    }
+    return usable.empty() ? builtInIcon() : usable;
+}
+
+Component ServerListStatus::render(const std::vector<std::string>& lines, const ph::PlaceholderContext& context) const {
+    if (lines.empty()) {
+        return Component::empty();
+    }
+    Component result = wire::text::miniMessage::parse(substitute(lines.front(), context));
+    for (std::size_t index = 1; index < lines.size(); index++) {
+        result = result.append(Component::text("\n"))
+                     .append(wire::text::miniMessage::parse(substitute(lines[index], context)));
+    }
+    return result;
+}
+
+std::string ServerListStatus::substitute(const std::string& text, const ph::PlaceholderContext& context) const {
+    // Placeholders are filled in before MiniMessage parses, so `%...%` and `<...>` never have to
+    // agree about anything.
+    //
+    // The two failures differ because the MOTD is a line strangers read. An unregistered name is the
+    // operator's typo: it stays visible and is warned about. A registered name this ping cannot
+    // answer, like a player's own name for someone who never connected, is ordinary: it resolves to
+    // nothing and only reaches the debug log.
+    return ph::substitute(
+        text, *placeholders_, context,
+        [this](std::string_view name, const ph::PlaceholderValue& value) -> std::optional<std::string> {
+            if (value.kind == ph::PlaceholderKind::Unknown) {
+                reportOnce("The server list uses %" + std::string{name} +
+                           "%, which is not a placeholder this server knows.");
+                return std::nullopt;
+            }
+            logger_.debug([&name, &value] {
+                return "Server list placeholder %" + std::string{name} +
+                       "% is empty here: " + value.reason.value_or("no reason given") + ".";
+            });
+            return std::string{};
+        });
+}
+
+void ServerListStatus::reportOnce(const std::string& message) const {
+    {
+        const std::lock_guard<std::mutex> guard{mutex_};
+        if (!reported_.insert(message).second) {
+            return;
+        }
+    }
+    logger_.warn([&message] { return message; });
+}
+
+} // namespace basalt::server::runtime
