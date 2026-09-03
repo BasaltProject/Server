@@ -9,6 +9,8 @@ basalt_module(server-plugins
         src/PluginJson.cpp
         src/PluginOrder.cpp
         src/PluginPackage.cpp
+        src/PluginRegistrations.cpp
+        src/PluginSurfaces.cpp
         src/PluginText.cpp
         src/PluginToml.cpp
     DEPENDS basalt::wire-common basalt::wire-io basalt::server-lua
