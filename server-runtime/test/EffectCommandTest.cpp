@@ -97,7 +97,8 @@ struct Client {
             removed.push_back(effect);
         };
         connection.heal = [this](float amount) { healed += amount; };
-        connection.hurt = [this](float amount, std::string_view, const basalt::wire::common::Identifier&) {
+        connection.hurt = [this](float amount, std::string_view, const basalt::wire::common::Identifier&,
+                               const std::optional<basalt::server::runtime::entity::DamageSource>&) {
             hurt += amount;
         };
         connection.switchWorld = [this](basalt::server::runtime::world::LoadedWorld& world, double, double, double) {

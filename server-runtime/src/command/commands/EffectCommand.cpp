@@ -75,7 +75,7 @@ playersOf(const CommandContext& context) {
         if (*effect == world::mobEffects::instantDamage()) {
             if (session->connection().hurt) {
                 session->connection().hurt(kInstantAmount * static_cast<float>(1 << amplifier), "magic",
-                                           world::damageTypes::kMagic);
+                                           world::damageTypes::kMagic, std::nullopt);
             }
             continue;
         }

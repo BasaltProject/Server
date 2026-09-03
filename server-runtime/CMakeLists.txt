@@ -33,6 +33,7 @@ basalt_module(server-runtime-core
         src/entity/EntityNbt.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
+        src/entity/Raids.cpp
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
@@ -100,6 +101,7 @@ basalt_module(server-runtime-core
         src/command/SelectorOptions.cpp
         src/BlockChangeBroadcaster.cpp
         src/ChunkSimulationView.cpp
+        src/CombatSystem.cpp
         src/ExplosionSystem.cpp
         src/Favicon.cpp
         src/PersistenceCoordinator.cpp
@@ -118,6 +120,7 @@ basalt_module(server-runtime-core
         src/placeholder/AnimationPlaceholders.cpp
         src/placeholder/Decimals.cpp
         src/placeholder/PlaceholderSlots.cpp
+        src/placeholder/PlayerPlaceholders.cpp
         src/placeholder/ServerPlaceholders.cpp
         src/item/ItemWear.cpp
         src/item/ItemComponentCodecs.cpp
@@ -783,6 +786,21 @@ basalt_test(server-runtime-server-list-status-test
 target_compile_definitions(server-runtime-server-list-status-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
+basalt_test(server-runtime-raids-test
+    SOURCES
+        test/RaidsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-combat-system-test
+    SOURCES
+        test/CombatSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-combat-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
 basalt_test(server-runtime-explosion-system-test
     SOURCES
         test/ExplosionSystemTest.cpp
@@ -1005,6 +1023,12 @@ target_compile_definitions(server-runtime-particle-command-test
 basalt_test(server-runtime-animation-placeholders-test
     SOURCES
         test/AnimationPlaceholdersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-player-placeholders-test
+    SOURCES
+        test/PlayerPlaceholdersTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

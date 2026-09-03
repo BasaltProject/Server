@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -83,10 +84,19 @@ struct PlayerConnection {
     /// Damage that goes through the ordinary path: armour, absorption, the death message and the
     /// hurt animation. The message id is what a death sentence is looked up by, the type is what
     /// the tags are tested against.
-    std::function<void(float amount, std::string_view deathMessageId, const wire::common::Identifier& damageType)> hurt;
+    ///
+    /// The source travels with it because only the caller knows it: below there is an id and no way
+    /// to name whoever swung.
+    std::function<void(float amount, std::string_view deathMessageId, const wire::common::Identifier& damageType,
+                       const std::optional<entity::DamageSource>& source)>
+        hurt;
 
     /// Tells the client an effect started, or that it is over. The client draws its own icon and
     /// screen tint from these and from nothing else.
+    /// Starts an effect on this player, which is what a splash potion and a command both do.
+    std::function<void(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier)>
+        addEffect;
+
     std::function<void(const world::ActiveEffect& effect)> sendEffect;
     std::function<void(const wire::common::Identifier& effect)> sendEffectRemoved;
 
