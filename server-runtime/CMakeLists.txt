@@ -37,6 +37,7 @@ basalt_module(server-runtime-core
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
         src/command/ArgumentTypes.cpp
+        src/command/commands/AccessCommands.cpp
         src/command/commands/BasicCommands.cpp
         src/TickLoop.cpp
         src/command/BlockEditor.cpp
@@ -63,6 +64,9 @@ basalt_module(server-runtime-core
         src/command/commands/TimeCommand.cpp
         src/command/commands/TimingsCommand.cpp
         src/command/commands/ScoreCommands.cpp
+        src/command/commands/ScoreboardCommand.cpp
+        src/command/commands/ScoreboardObjectives.cpp
+        src/command/commands/ScoreboardPlayers.cpp
         src/command/commands/SessionCommands.cpp
         src/command/commands/WorldBorderCommand.cpp
         src/command/commands/WorldCommands.cpp
@@ -416,6 +420,16 @@ basalt_test(server-runtime-registry-arguments-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-access-commands-test
+    SOURCES
+        test/AccessCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-access-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-block-commands-test
     SOURCES
         test/BlockCommandsTest.cpp
@@ -473,6 +487,16 @@ basalt_test(server-runtime-score-commands-test
 )
 
 target_compile_definitions(server-runtime-score-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-scoreboard-command-test
+    SOURCES
+        test/ScoreboardCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-scoreboard-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
