@@ -65,6 +65,7 @@ basalt_module(server-runtime-core
         src/command/commands/PlaceCommand.cpp
         src/command/commands/ProgressCommands.cpp
         src/command/commands/RandomCommand.cpp
+        src/command/commands/ImportPlayersCommand.cpp
         src/command/commands/ItemCommand.cpp
         src/command/commands/ItemCommands.cpp
         src/command/commands/ItemSlots.cpp
@@ -97,6 +98,10 @@ basalt_module(server-runtime-core
         src/command/EntitySelector.cpp
         src/command/SelectorParser.cpp
         src/command/SelectorOptions.cpp
+        src/ChunkSimulationView.cpp
+        src/ServerMetrics.cpp
+        src/VanillaGameData.cpp
+        src/SubstituteLabels.cpp
         src/command/CommandDispatcher.cpp
         src/command/CommandEnvironment.cpp
         src/command/CommandTarget.cpp
@@ -249,9 +254,10 @@ basalt_module(server-runtime-core
         src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
         src/world/WorldSpawnPoint.cpp
+        src/world/VanillaSaveImport.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
+    DEPENDS basalt::server-assets basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
@@ -558,6 +564,30 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-vanilla-game-data-test
+    SOURCES
+        test/VanillaGameDataTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-server-facts-test
+    SOURCES
+        test/ServerFactsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-server-facts-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-vanilla-save-import-test
+    SOURCES
+        test/VanillaSaveImportTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-vanilla-save-import-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-remaining-commands-test
     SOURCES
