@@ -121,9 +121,6 @@ private:
     /// Keeps the caller alive while the shutdown finishes on another thread.
     void awaitShutdown();
 
-    /// The shutdown itself, which only ever runs off the tick thread.
-    void shutdownNow();
-
     /// One session, on its own thread, with everything this server hands a connection.
     void serveConnection(wire::io::TcpConnection connection);
 
@@ -215,12 +212,8 @@ private:
     /// Set once the shutdown has finished its last write, so the caller knows it is safe to proceed.
     std::atomic<bool> shutdownComplete_{false};
     std::atomic<bool> restarting_{false};
-    /// Set by whoever moved the shutdown off the tick thread, so only one thread does.
-    std::atomic<bool> movingOffTick_{false};
     std::vector<std::jthread> connections_;
     std::jthread watchdog_;
-    /// Where a shutdown asked for from inside the tick runs instead. See `shutdown`.
-    std::jthread shutdownThread_;
 };
 
 } // namespace basalt::server::runtime

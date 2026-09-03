@@ -143,20 +143,10 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
 }
 
 void BasaltServer::shutdown() {
-    // Both ways in arrive on the tick thread: a signal is noticed inside the tick, and `/stop` runs
-    // on the owner of a world. Winding down joins that thread, and no thread can join itself, so the
-    // work moves to one of its own and the caller carries on to the end of its turn.
-    if (tickLoop_ != nullptr && tickLoop_->isTickThread()) {
-        bool expected = false;
-        if (movingOffTick_.compare_exchange_strong(expected, true)) {
-            shutdownThread_ = std::jthread{[this] { shutdownNow(); }};
-        }
-        return;
-    }
-    shutdownNow();
-}
-
-void BasaltServer::shutdownNow() {
+    // Runs wherever it was asked from, which is nearly always the tick thread: a signal is noticed
+    // inside the tick and `/stop` runs on the owner of a world. That is deliberate rather than
+    // tolerated. Saving a world drains its owner, and an owner may only be drained by the thread
+    // that owns it, so moving this off the tick thread trades a join for a far worse bug.
     // Once only: `/stop` and a signal can arrive together, and running this twice means two
     // concurrent saves of the same regions.
     bool expected = false;
