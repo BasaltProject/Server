@@ -261,11 +261,16 @@ basalt_module(server-runtime-core
         src/world/WorldMetadata.cpp
         src/world/WorldSpawnPoint.cpp
         src/world/MobSpawnAttributes.cpp
+        src/world/MobSpawnFinalization.cpp
+        src/world/MobSpawnFinalizers.cpp
         src/world/MobSpawnForest.cpp
+        src/world/MobVariantSpawnFinalizer.cpp
+        src/world/NaturalSpawner.cpp
         src/world/MobSpawnVariantData.cpp
         src/world/SpawnEquipmentEnchantments.cpp
         src/world/SpawnEquipmentFinalizer.cpp
         src/world/StructureSpawnLists.cpp
+        src/world/ZombieSpawnFinalizer.cpp
         src/world/Trades.cpp
         src/world/VanillaSaveImport.cpp
         src/world/VillageProximity.cpp
@@ -578,6 +583,21 @@ basalt_test(server-runtime-group-commands-test
 
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-natural-spawner-test
+    SOURCES
+        test/NaturalSpawnerTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-natural-spawner-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-mob-spawn-finalization-test
+    SOURCES
+        test/MobSpawnFinalizationTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-spawn-equipment-test
