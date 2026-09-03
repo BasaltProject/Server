@@ -1,0 +1,84 @@
+#pragma once
+
+#include <basalt/server/runtime/world/BlockChange.hpp>
+
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <vector>
+
+namespace basalt::server::runtime::player {
+class PlayerRegistry;
+class PlayerSession;
+} // namespace basalt::server::runtime::player
+
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+class RealLootTables;
+} // namespace basalt::server::runtime::world
+
+namespace basalt::server::runtime {
+
+/// Everything a block change owes the clients watching it: the update itself, the sound or particle
+/// that rides along with it, and what redstone and pistons do because of it.
+class BlockChangeBroadcaster {
+public:
+    /// What a plugin gets a say in. A callback rather than the plugin bus itself: this has no
+    /// business knowing what a plugin is, and an unset hook means nobody objects.
+    struct Hooks {
+        /// Whether a piston at this position may finish its move.
+        std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
+            pistonAllowed;
+    };
+
+    struct Options {
+        /// How far from a piston a player can be and still be in the way of what it pushes.
+        double pistonReach = 14.0;
+        /// The seed a washed-away block's loot roll and a block sound's own random start from.
+        std::function<std::int64_t()> nextSeed;
+    };
+
+    BlockChangeBroadcaster(player::PlayerRegistry& players, world::RealLootTables& lootTables, Hooks hooks,
+                           Options options);
+
+    /// The neighbour update any block written by the world itself owes the blocks around it.
+    void notifyAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                      std::int32_t y, std::int32_t z);
+
+    /// One block, its new state, and whatever it asked the clients to hear or see while they are at
+    /// it: a note, a bell, a door swinging, a dispenser clicking at nothing.
+    void announceBlock(const std::vector<player::PlayerSession*>& watchers, const world::BlockChange& change) const;
+
+    /// The effect half on its own, for the blocks that make a noise without changing state.
+    void sendEffects(const std::vector<player::PlayerSession*>& watchers, std::int32_t x, std::int32_t y,
+                     std::int32_t z, std::int32_t stateId, const std::vector<world::BlockEffect>& effects) const;
+
+    /// Sends a block that redstone moved to everyone watching, and lets its neighbours react.
+    void announceRedstone(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                          const world::BlockChange& change) const;
+
+    /// The piston half of a scheduled tick, with the players close enough to be shoved by it.
+    ///
+    /// parity: `PistonMovingBlockEntity.moveCollidedEntities`. A player who gets pushed is
+    /// teleported, because a client only learns it moved when the server says so.
+    [[nodiscard]] std::vector<world::BlockChange> finishPiston(world::LoadedWorld& world,
+                                                               const std::array<std::int32_t, 3>& position,
+                                                               const std::vector<player::PlayerSession*>& watchers);
+
+    /// Drops what a flow washed away. parity: `WaterFluid.beforeDestroyingBlock`, which rolls the
+    /// block's own loot table exactly as breaking it by hand would.
+    ///
+    /// Lava is the exception and drops nothing: its `beforeDestroyingBlock` only plays the fizz.
+    void dropWashedAwayBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                             std::int32_t destroyedState);
+
+private:
+    [[nodiscard]] std::int64_t nextSeed() const;
+
+    player::PlayerRegistry* players_;
+    world::RealLootTables* lootTables_;
+    Hooks hooks_;
+    Options options_;
+};
+
+} // namespace basalt::server::runtime

@@ -98,7 +98,9 @@ basalt_module(server-runtime-core
         src/command/EntitySelector.cpp
         src/command/SelectorParser.cpp
         src/command/SelectorOptions.cpp
+        src/BlockChangeBroadcaster.cpp
         src/ChunkSimulationView.cpp
+        src/ExplosionSystem.cpp
         src/Favicon.cpp
         src/PersistenceCoordinator.cpp
         src/ServerMetrics.cpp
@@ -567,6 +569,24 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-explosion-system-test
+    SOURCES
+        test/ExplosionSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-explosion-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-block-change-broadcaster-test
+    SOURCES
+        test/BlockChangeBroadcasterTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-block-change-broadcaster-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-status-effect-system-test
     SOURCES
