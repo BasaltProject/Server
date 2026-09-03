@@ -270,15 +270,18 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
     } else if (type == "parrot") {
         addIntIfSet(entries, data, "Variant", 20);
     } else if (type == "panda") {
+        // parity: `Panda`'s own fields start at 18 (`UNHAPPY_COUNTER`, `SNEEZE_COUNTER`,
+        // `EAT_COUNTER`), so the genes are 21 and 22. At 19 and 20 the client reads a byte where it
+        // keeps an integer and drops the connection with a packet handling error.
         const std::optional<std::int32_t> main = idOf(pandaGeneIds(), data.getString("MainGene"));
         if (main.has_value() && *main != 0) {
             entries.push_back(
-                Entry{.index = 19, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*main)}});
+                Entry{.index = 21, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*main)}});
         }
         const std::optional<std::int32_t> hidden = idOf(pandaGeneIds(), data.getString("HiddenGene"));
         if (hidden.has_value() && *hidden != 0) {
             entries.push_back(Entry{
-                .index = 20, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*hidden)}});
+                .index = 22, .value = SetEntityDataPacket::ByteValue{.value = static_cast<std::int8_t>(*hidden)}});
         }
     } else if (type == "pig") {
         addRegistryMetadata(entries, data, "variant", 19, registryIds({"temperate", "warm", "cold"}),
