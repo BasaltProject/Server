@@ -29,6 +29,8 @@ basalt_module(server-runtime-core
         src/entity/FlyingMovement.cpp
         src/entity/LivingMovement.cpp
         src/entity/PathFinder.cpp
+        src/entity/Minecarts.cpp
+        src/entity/PrimedTnt.cpp
         src/entity/Projectiles.cpp
         src/entity/EntityNbt.cpp
         src/entity/EntityCollision.cpp
@@ -103,6 +105,10 @@ basalt_module(server-runtime-core
         src/command/SelectorParser.cpp
         src/command/SelectorOptions.cpp
         src/BlockChangeBroadcaster.cpp
+        src/BasaltServer.cpp
+        src/BasaltServerConnections.cpp
+        src/BasaltServerLife.cpp
+        src/BasaltServerTick.cpp
         src/BlockInteractionHandler.cpp
         src/BlockUseHelpers.cpp
         src/BlockUseOn.cpp

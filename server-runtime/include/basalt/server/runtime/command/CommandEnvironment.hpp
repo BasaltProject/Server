@@ -118,6 +118,12 @@ public:
 
     [[nodiscard]] const Options& options() const noexcept { return options_; }
 
+    /// Worlds are the one thing here that changes while the server runs: a plugin can make one.
+    /// Everything else is decided before the tree is built.
+    void setWorlds(std::map<std::string, world::LoadedWorld*, std::less<>> worlds) {
+        options_.worlds = std::move(worlds);
+    }
+
     [[nodiscard]] const wire::common::Logger& logger() const noexcept { return options_.logger; }
 
     [[nodiscard]] const wire::text::LangTable& lang() const noexcept { return options_.lang; }

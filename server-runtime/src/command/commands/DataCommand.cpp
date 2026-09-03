@@ -66,8 +66,7 @@ holderOf(const CommandContext& context, std::string_view posName, std::string_vi
 
 /// parity: each holder has its own pair of strings, and the block ones take the three coordinates
 /// rather than a description, so there is no generic form to share.
-[[nodiscard]] Component holderMessage(const DataHolderRef& holder, std::string_view verb,
-                                      std::vector<Component> tail) {
+[[nodiscard]] Component holderMessage(const DataHolderRef& holder, std::string_view verb, std::vector<Component> tail) {
     if (const auto* named = holder.as<DataHolderRef::Storage>(); named != nullptr) {
         std::vector<Component> args{Component::text(named->id.toString())};
         args.insert(args.end(), tail.begin(), tail.end());
@@ -200,8 +199,7 @@ void DataCommand::build(const CommandNodeBuilder& root) const {
                                             {Component::text(*path), Component::text(std::to_string(result))}));
                 return static_cast<std::int32_t>(result);
             }
-            context.success(
-                holderMessage(*holder, "query", {Component::text(wire::nbt::snbt::stringify(*value))}));
+            context.success(holderMessage(*holder, "query", {Component::text(wire::nbt::snbt::stringify(*value))}));
             return number.value_or(1);
         };
         holders(form, "targetPos", "target", [get](const CommandNodeBuilder& holder) {

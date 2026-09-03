@@ -193,6 +193,7 @@ player::PlayerConnection ClientSession::playerConnection() {
         blockInteraction_->broadcastEffects(play::BlockPos{x, y, z}, stateId, effects);
     };
     connection.resendChunk = [this](std::int32_t chunkX, std::int32_t chunkZ) { resendChunk(chunkX, chunkZ); };
+    connection.handOverToRegion = [this](world::LoadedWorld& world) { handOverToRegionOf(world); };
     connection.sendBiomes = [this](const std::vector<std::pair<std::int32_t, std::int32_t>>& columns) {
         sendBiomes(columns);
     };

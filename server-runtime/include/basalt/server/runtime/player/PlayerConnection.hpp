@@ -142,6 +142,12 @@ struct PlayerConnection {
 
     std::function<void()> closeOpenMenu;
 
+    /// Moves this session onto the owner of the world it is standing in, between ticks.
+    ///
+    /// Called from the global phase, where no region is running: handing a session that walked
+    /// across a border to its new owner mid-tick is two threads inside the same player.
+    std::function<void(world::LoadedWorld& world)> handOverToRegion;
+
     /// This player as the database stores them, or nothing when there is nothing worth writing yet.
     ///
     /// The connection owns it because what a saved player is made of (position, inventory, effects)

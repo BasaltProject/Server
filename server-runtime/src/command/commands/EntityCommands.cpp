@@ -151,8 +151,8 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
         if (player::PlayerSession* session = target->player(); session != nullptr) {
             const auto* type = context.get<Identifier>("damageType");
             if (session->connection().hurt) {
-                session->connection().hurt(*amount, "generic",
-                                           type == nullptr ? Identifier::vanilla("generic") : *type, std::nullopt);
+                session->connection().hurt(*amount, "generic", type == nullptr ? Identifier::vanilla("generic") : *type,
+                                           std::nullopt);
             }
         } else if (entity::ServerEntity* what = target->entity(); what != nullptr) {
             what->health -= static_cast<double>(*amount);
