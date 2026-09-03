@@ -108,6 +108,9 @@ basalt_module(server-runtime-core
         src/CombatAttack.cpp
         src/CombatHandler.cpp
         src/CombatSystem.cpp
+        src/ContainerClicks.cpp
+        src/ContainerMenuController.cpp
+        src/ContainerSlots.cpp
         src/MobActionSystem.cpp
         src/ItemUseTimers.cpp
         src/PlayerLifecycle.cpp
@@ -206,6 +209,7 @@ basalt_module(server-runtime-core
         src/world/StructureTemplates.cpp
         src/world/BlockPlacement.cpp
         src/world/RealRecipes.cpp
+        src/world/PlacementVariants.cpp
         src/world/Pistons.cpp
         src/world/NeighbourUpdates.cpp
         src/world/RealVillagerTrades.cpp
