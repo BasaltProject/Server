@@ -102,6 +102,9 @@ basalt_module(server-runtime-core
         src/BlockChangeBroadcaster.cpp
         src/ChunkSimulationView.cpp
         src/CombatSystem.cpp
+        src/NaturalSpawningMaterialize.cpp
+        src/NaturalSpawningSystem.cpp
+        src/RaidSystem.cpp
         src/ExplosionSystem.cpp
         src/Favicon.cpp
         src/PersistenceCoordinator.cpp
@@ -791,6 +794,24 @@ basalt_test(server-runtime-raids-test
         test/RaidsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
+
+basalt_test(server-runtime-raid-system-test
+    SOURCES
+        test/RaidSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-raid-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-natural-spawning-system-test
+    SOURCES
+        test/NaturalSpawningSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-natural-spawning-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-combat-system-test
     SOURCES
