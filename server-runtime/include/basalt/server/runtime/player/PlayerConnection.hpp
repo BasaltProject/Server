@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/plugins/PluginWorldAccess.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
@@ -125,7 +126,21 @@ struct PlayerConnection {
     /// own copy and never asks.
     std::function<void()> syncExperience;
 
+    /// Pushes health, hunger and absorption, which the HUD draws its hearts and haunches from.
+    std::function<void()> syncHealth;
+
     std::function<void(std::string_view deathMessageId)> killPlayer;
+
+    /// A window a plugin drew, which is the session's business: the container machinery and the
+    /// socket are both already there.
+    std::function<void(const std::string& title, std::int32_t rows,
+                       const std::map<std::int32_t, plugins::PluginItem>& items,
+                       std::function<void(std::int32_t)> onClick)>
+        openPluginMenu;
+
+    std::function<void(const std::map<std::int32_t, plugins::PluginItem>& items)> refreshPluginMenu;
+
+    std::function<void()> closeOpenMenu;
 
     /// This player as the database stores them, or nothing when there is nothing worth writing yet.
     ///

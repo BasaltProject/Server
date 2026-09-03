@@ -106,7 +106,12 @@ basalt_module(server-runtime-core
         src/BlockInteractionHandler.cpp
         src/BlockUseHelpers.cpp
         src/BlockUseOn.cpp
+        src/plugins/PacketNames.cpp
+        src/plugins/PluginsCommand.cpp
         src/plugins/ServerNpcs.cpp
+        src/plugins/ServerPluginServices.cpp
+        src/plugins/ServerObjectModel.cpp
+        src/plugins/ServerWorldModel.cpp
         src/ChunkSimulationView.cpp
         src/ClientSession.cpp
         src/SessionLogin.cpp

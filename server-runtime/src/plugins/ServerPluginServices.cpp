@@ -1,0 +1,431 @@
+#include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/command/CommandSource.hpp>
+#include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/plugins/PacketNames.hpp>
+#include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
+#include <basalt/wire/protocol/play/SimplePackets.hpp>
+#include <basalt/wire/text/MiniMessage.hpp>
+
+#include <algorithm>
+#include <memory>
+#include <utility>
+
+namespace basalt::server::runtime::plugins {
+namespace {
+
+using server::plugins::PluginArgumentType;
+using server::plugins::PluginCommandArgument;
+using server::plugins::PluginCommandCall;
+using server::plugins::PluginCommandSpec;
+using server::plugins::PluginHandle;
+
+/// Before the object model is given to a test server: nobody is online and there are no worlds.
+class NoPlayers final : public server::plugins::PluginPlayers {
+public:
+    [[nodiscard]] std::vector<std::shared_ptr<server::plugins::PluginPlayerRef>> online() const override { return {}; }
+
+    [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef> byName(std::string_view) const override {
+        return nullptr;
+    }
+
+    [[nodiscard]] std::shared_ptr<server::plugins::PluginPlayerRef> byUuid(std::string_view) const override {
+        return nullptr;
+    }
+};
+
+class NoWorlds final : public server::plugins::PluginWorlds {
+public:
+    [[nodiscard]] std::vector<std::shared_ptr<server::plugins::PluginWorldRef>> all() const override { return {}; }
+
+    [[nodiscard]] std::shared_ptr<server::plugins::PluginWorldRef> byName(std::string_view) const override {
+        return nullptr;
+    }
+
+    [[nodiscard]] std::shared_ptr<server::plugins::PluginWorldRef> defaultWorld() const override { return nullptr; }
+
+    std::shared_ptr<server::plugins::PluginWorldRef> create(std::string_view, std::string_view, std::string_view,
+                                                            std::optional<std::int64_t>) override {
+        return nullptr;
+    }
+};
+
+class NoPlaceholders final : public server::plugins::PluginPlaceholders {
+public:
+    PluginHandle registerPlaceholder(std::string_view, std::string_view, Value) override { return {}; }
+
+    [[nodiscard]] std::string fill(std::string_view text, server::plugins::PluginPlayerRef*) const override {
+        return std::string{text};
+    }
+};
+
+class NoStorage final : public server::plugins::PluginStorage {
+public:
+    [[nodiscard]] std::optional<std::string> playerValue(std::string_view, std::string_view,
+                                                         std::string_view) override {
+        return std::nullopt;
+    }
+
+    void setPlayerValue(std::string_view, std::string_view, std::string_view,
+                        const std::optional<std::string>&) override {}
+
+    [[nodiscard]] std::map<std::string, std::string> playerValues(std::string_view, std::string_view) override {
+        return {};
+    }
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> top(std::string_view, std::string_view,
+                                                                       std::int32_t) override {
+        return {};
+    }
+};
+
+/// Before there is a world to open a window in.
+class NoMenus final : public server::plugins::PluginMenus {
+public:
+    PluginHandle open(server::plugins::PluginPlayerRef&, std::string_view, std::int32_t,
+                      const std::map<std::int32_t, server::plugins::PluginItem>&,
+                      std::function<void(std::int32_t)>) override {
+        return {};
+    }
+
+    void close(server::plugins::PluginPlayerRef&) override {}
+
+    void refresh(server::plugins::PluginPlayerRef&,
+                 const std::map<std::int32_t, server::plugins::PluginItem>&) override {}
+};
+
+class NoPackets final : public server::plugins::PluginPacketSender {
+public:
+    bool send(server::plugins::PluginPlayerRef&, std::string_view, std::span<const std::uint8_t>) override {
+        return false;
+    }
+
+    [[nodiscard]] bool isKnown(std::string_view name) const override { return packetNames::isKnown(name); }
+
+    [[nodiscard]] std::vector<std::string> names() const override { return packetNames::all(); }
+};
+
+/// Before there is a connection to talk over.
+class NoChannels final : public server::plugins::PluginChannelSender {
+public:
+    bool send(server::plugins::PluginPlayerRef&, std::string_view, std::span<const std::uint8_t>) override {
+        return false;
+    }
+};
+
+NoPlayers& noPlayers() {
+    static NoPlayers kNone;
+    return kNone;
+}
+
+NoWorlds& noWorlds() {
+    static NoWorlds kNone;
+    return kNone;
+}
+
+NoPlaceholders& noPlaceholders() {
+    static NoPlaceholders kNone;
+    return kNone;
+}
+
+NoStorage& noStorage() {
+    static NoStorage kNone;
+    return kNone;
+}
+
+NoMenus& noMenus() {
+    static NoMenus kNone;
+    return kNone;
+}
+
+NoPackets& noPackets() {
+    static NoPackets kNone;
+    return kNone;
+}
+
+NoChannels& noChannels() {
+    static NoChannels kNone;
+    return kNone;
+}
+
+/// One run of a plugin command, over the values the tree already parsed.
+class DispatchedCall final : public PluginCommandCall {
+public:
+    DispatchedCall(std::string source, bool console, std::map<std::string, Argument, std::less<>> values,
+                   std::function<void(const wire::text::Component&)> reply)
+        : source_(std::move(source)), console_(console), values_(std::move(values)), reply_(std::move(reply)) {}
+
+    [[nodiscard]] std::string source() const override { return source_; }
+
+    [[nodiscard]] bool isConsole() const override { return console_; }
+
+    void reply(std::string_view message) override {
+        if (reply_) {
+            reply_(wire::text::miniMessage::parse(std::string{message}));
+        }
+    }
+
+    [[nodiscard]] Argument argument(std::string_view name) const override {
+        const auto found = values_.find(name);
+        return found == values_.end() ? Argument{} : found->second;
+    }
+
+private:
+    std::string source_;
+    bool console_;
+    std::map<std::string, Argument, std::less<>> values_;
+    std::function<void(const wire::text::Component&)> reply_;
+};
+
+[[nodiscard]] std::shared_ptr<const command::ArgumentType> typeOf(const PluginCommandArgument& argument) {
+    switch (argument.type) {
+    case PluginArgumentType::Word:
+        return command::wordArgument();
+    case PluginArgumentType::Text:
+        return command::greedyStringArgument();
+    case PluginArgumentType::Int:
+        return command::integerArgument(
+            static_cast<std::int32_t>(argument.min.value_or(std::numeric_limits<std::int32_t>::min())),
+            static_cast<std::int32_t>(argument.max.value_or(std::numeric_limits<std::int32_t>::max())));
+    case PluginArgumentType::Float:
+        return command::doubleArgument(
+            argument.min.has_value() ? static_cast<double>(*argument.min) : -std::numeric_limits<double>::max(),
+            argument.max.has_value() ? static_cast<double>(*argument.max) : std::numeric_limits<double>::max());
+    case PluginArgumentType::Bool:
+        return command::boolArgument();
+    }
+    return command::wordArgument();
+}
+
+} // namespace
+
+PluginHandle OwnerTasks::after(std::int32_t delayTicks, std::function<void()> task) {
+    sched::TaskHandle handle = owner_->schedule(delayTicks, std::move(task));
+    return PluginHandle{[handle]() mutable { handle.cancel(); }};
+}
+
+PluginHandle OwnerTasks::every(std::int32_t delayTicks, std::int32_t periodTicks, std::function<void()> task) {
+    const std::int32_t period = std::max(periodTicks, 1);
+    // Shared because the re-arm outlives the call that made it, and cancelling has to reach both.
+    const auto cancelled = std::make_shared<bool>(false);
+    const auto handle = std::make_shared<sched::TaskHandle>();
+    const auto held = std::make_shared<std::function<void()>>(std::move(task));
+    sched::Owner* owner = owner_;
+    // The re-arm asks for one turn less than the period: a task scheduled while a turn is running is
+    // due that many turns *after* this one, so `every(1)` armed with 1 would run every other tick.
+    const auto arm = std::make_shared<std::function<void(std::int32_t)>>();
+    *arm = [owner, cancelled, handle, held, arm, period](std::int32_t delay) {
+        *handle = owner->schedule(delay, [cancelled, held, arm, period] {
+            if (*cancelled) {
+                return;
+            }
+            (*held)();
+            if (!*cancelled) {
+                (*arm)(period - 1);
+            }
+        });
+    };
+    (*arm)(std::max(delayTicks, 0));
+    return PluginHandle{[cancelled, handle] {
+        *cancelled = true;
+        handle->cancel();
+    }};
+}
+
+command::CommandNode* DispatcherCommands::add(Entry& entry) {
+    Entry* target = &entry;
+    sched::Owner* owner = owner_;
+    return &dispatcher_->registerNode(entry.spec.name(), [target, owner](const command::CommandNodeBuilder& root) {
+        root.permission(
+            target->spec.permission.value_or("basalt.plugin." + target->pluginId + "." + target->spec.name()));
+        // Literals first, then one argument node per argument, the executor hanging off the last.
+        const auto arguments = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
+        *arguments = [target, owner, arguments](const command::CommandNodeBuilder& builder, std::size_t index) {
+            // An optional argument means the command is runnable without it, so every node from the
+            // first optional one onwards executes.
+            const bool runnable = index >= target->spec.arguments.size() || target->spec.arguments[index].optional;
+            if (runnable) {
+                builder.executes([target, owner, index](const command::CommandContext& context) {
+                    std::map<std::string, PluginCommandCall::Argument, std::less<>> values;
+                    for (std::size_t at = 0; at < index && at < target->spec.arguments.size(); at++) {
+                        const PluginCommandArgument& argument = target->spec.arguments[at];
+                        if (!context.has(argument.name)) {
+                            continue;
+                        }
+                        if (const auto* text = context.get<std::string>(argument.name); text != nullptr) {
+                            values.emplace(argument.name, *text);
+                        } else if (const auto* whole = context.get<std::int32_t>(argument.name); whole != nullptr) {
+                            values.emplace(argument.name, static_cast<std::int64_t>(*whole));
+                        } else if (const auto* real = context.get<double>(argument.name); real != nullptr) {
+                            values.emplace(argument.name, *real);
+                        } else if (const auto* flag = context.get<bool>(argument.name); flag != nullptr) {
+                            values.emplace(argument.name, *flag);
+                        }
+                    }
+                    // Hands the call to the owner rather than running it here: a command arrives on
+                    // whichever owner the source belongs to, and plugin code only ever runs on one.
+                    const command::CommandSource& source = context.source();
+                    auto call = std::make_shared<DispatchedCall>(
+                        source.name(), source.player() == nullptr, std::move(values),
+                        [&source](const wire::text::Component& message) { source.sendSystemMessage(message); });
+                    const std::function<void(PluginCommandCall&)> run = target->run;
+                    if (owner->isCurrent()) {
+                        run(*call);
+                    } else {
+                        static_cast<void>(owner->submit([run, call] { run(*call); }));
+                    }
+                    return 1;
+                });
+            }
+            if (index >= target->spec.arguments.size()) {
+                return;
+            }
+            const PluginCommandArgument& argument = target->spec.arguments[index];
+            static_cast<void>(builder.argument(
+                argument.name, typeOf(argument),
+                [arguments, index](const command::CommandNodeBuilder& next) { (*arguments)(next, index + 1); }));
+        };
+        const auto literals = std::make_shared<std::function<void(const command::CommandNodeBuilder&, std::size_t)>>();
+        *literals = [target, literals, arguments](const command::CommandNodeBuilder& builder, std::size_t index) {
+            if (index < target->spec.literals.size()) {
+                static_cast<void>(builder.literal(
+                    target->spec.literals[index],
+                    [literals, index](const command::CommandNodeBuilder& next) { (*literals)(next, index + 1); }));
+                return;
+            }
+            (*arguments)(builder, 0);
+        };
+        (*literals)(root, 1);
+    });
+}
+
+PluginHandle DispatcherCommands::registerCommand(std::string_view pluginId, const PluginCommandSpec& spec,
+                                                 std::function<void(PluginCommandCall&)> run) {
+    auto entry = std::make_unique<Entry>(
+        Entry{.pluginId = std::string{pluginId}, .spec = spec, .run = std::move(run), .node = nullptr});
+    Entry* target = entry.get();
+    entries_.push_back(std::move(entry));
+    target->node = add(*target);
+    command::CommandDispatcher* dispatcher = dispatcher_;
+    return PluginHandle{[this, dispatcher, target] {
+        if (target->node != nullptr) {
+            dispatcher->unregisterNode(target->node);
+        }
+        std::erase_if(entries_, [target](const std::unique_ptr<Entry>& held) { return held.get() == target; });
+    }};
+}
+
+bool DispatcherCommands::runAsConsole(std::string_view command) {
+    const command::CommandSource* source = console_ ? console_() : nullptr;
+    if (source == nullptr) {
+        return false;
+    }
+    // Trimmed of its slash, since a plugin writes the command the way an operator types it.
+    std::string line{command};
+    if (line.starts_with('/')) {
+        line.erase(0, 1);
+    }
+    static_cast<void>(dispatcher_->execute(*source, line));
+    return true;
+}
+
+void DispatcherCommands::refresh() {
+    for (const std::unique_ptr<Entry>& entry : entries_) {
+        entry->node = add(*entry);
+    }
+}
+
+RootPaths::RootPaths(std::string root) : packages_(std::move(root) + "/plugins") {
+    if (packages_.starts_with("./")) {
+        packages_.erase(0, 2);
+    }
+}
+
+bool SessionPackets::send(server::plugins::PluginPlayerRef& player, std::string_view name,
+                          std::span<const std::uint8_t> bytes) {
+    const std::optional<std::pair<wire::protocol::ProtocolState, std::int32_t>> id = packetNames::idOf(name);
+    if (!id.has_value()) {
+        return false;
+    }
+    const std::string uuid = player.uuid();
+    for (const player::PlayerSession* session : registry_->snapshot()) {
+        if (session->uuid().toString() != uuid || !session->connection().sendPlayPacket) {
+            continue;
+        }
+        session->connection().sendPlayPacket(id->second,
+                                             [bytes](wire::io::ByteBuffer& buffer) { buffer.writeBytes(bytes); });
+        return true;
+    }
+    return false;
+}
+
+bool SessionPackets::isKnown(std::string_view name) const { return packetNames::isKnown(name); }
+
+std::vector<std::string> SessionPackets::names() const { return packetNames::all(); }
+
+bool SessionChannels::send(server::plugins::PluginPlayerRef& player, std::string_view channel,
+                           std::span<const std::uint8_t> bytes) {
+    const std::string uuid = player.uuid();
+    for (const player::PlayerSession* session : registry_->snapshot()) {
+        if (session->uuid().toString() != uuid || !session->connection().sendPlayPacket) {
+            continue;
+        }
+        const wire::protocol::play::CustomPayloadPacket packet{
+            .channel = std::string{channel}, .data = std::vector<std::uint8_t>(bytes.begin(), bytes.end())};
+        session->connection().sendPlayPacket(wire::protocol::play::CustomPayloadPacket::kClientboundId,
+                                             [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        return true;
+    }
+    return false;
+}
+
+ServerPluginServices::ServerPluginServices(sched::Owner& owner, command::CommandDispatcher& dispatcher,
+                                           std::function<std::int64_t()> currentTick,
+                                           std::function<const command::CommandSource*()> console, std::string root,
+                                           Parts parts)
+    : tasks_(owner, std::move(currentTick)), commands_(owner, dispatcher, std::move(console)), paths_(std::move(root)),
+      parts_(std::move(parts)) {}
+
+server::plugins::PluginPlayers& ServerPluginServices::players() {
+    return parts_.players == nullptr ? noPlayers() : *parts_.players;
+}
+
+server::plugins::PluginWorlds& ServerPluginServices::worlds() {
+    return parts_.worlds == nullptr ? noWorlds() : *parts_.worlds;
+}
+
+server::plugins::PluginPlaceholders& ServerPluginServices::placeholders() {
+    return parts_.placeholders == nullptr ? noPlaceholders() : *parts_.placeholders;
+}
+
+server::plugins::PluginStorage& ServerPluginServices::storage() {
+    return parts_.storage == nullptr ? noStorage() : *parts_.storage;
+}
+
+server::plugins::PluginMenus& ServerPluginServices::menus() {
+    return parts_.menus == nullptr ? noMenus() : *parts_.menus;
+}
+
+server::plugins::PluginPacketSender& ServerPluginServices::packets() {
+    return parts_.packets == nullptr ? noPackets() : *parts_.packets;
+}
+
+server::plugins::PluginChannelSender& ServerPluginServices::channels() {
+    return parts_.channels == nullptr ? noChannels() : *parts_.channels;
+}
+
+bool ServerPluginServices::at(std::string_view world, double x, double z, std::function<void()> task) {
+    sched::Owner* target = parts_.ownerAt ? parts_.ownerAt(std::string{world}, x, z) : nullptr;
+    if (target == nullptr) {
+        return false;
+    }
+    if (target->isCurrent()) {
+        task();
+    } else {
+        static_cast<void>(target->submit(std::move(task)));
+    }
+    return true;
+}
+
+} // namespace basalt::server::runtime::plugins

@@ -183,4 +183,21 @@ private:
     std::int64_t nextHandlerId_ = 0;
 };
 
+/// How the server fires an event, and what it costs when nobody is listening: with no bus or no
+/// handler the whole thing is a null check and a boolean, and nothing is allocated. That is the
+/// promise the event catalogue makes to the tick loop, kept in one place.
+///
+/// Answers the event when it fired, so the caller can read `cancelled` or a field a handler changed,
+/// and null when there was nobody to tell.
+template <typename Fill>
+[[nodiscard]] PluginEvent* emit(PluginEventBus* bus, const PluginEventType* type, Fill&& fill) {
+    if (bus == nullptr || type == nullptr || !bus->listening(*type)) {
+        return nullptr;
+    }
+    PluginEvent& event = bus->event(*type);
+    fill(event);
+    static_cast<void>(bus->fire(event));
+    return &event;
+}
+
 } // namespace basalt::server::plugins
