@@ -45,19 +45,23 @@ basalt_module(server-runtime-core
         src/command/RegistryArguments.cpp
         src/command/WorldArguments.cpp
         src/command/commands/BlockCommands.cpp
+        src/command/commands/BossBarCommand.cpp
         src/command/commands/EffectCommand.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
         src/command/commands/RandomCommand.cpp
         src/command/commands/ItemCommands.cpp
         src/command/commands/PlayerCommands.cpp
+        src/command/commands/ProfilingCommands.cpp
         src/command/commands/RegionCommands.cpp
         src/command/commands/SaveCommands.cpp
         src/command/commands/StopwatchCommand.cpp
         src/command/commands/TagCommand.cpp
+        src/command/commands/TeamCommand.cpp
         src/command/commands/TeleportCommand.cpp
         src/command/commands/TickCommand.cpp
         src/command/commands/TimeCommand.cpp
+        src/command/commands/TimingsCommand.cpp
         src/command/commands/ScoreCommands.cpp
         src/command/commands/SessionCommands.cpp
         src/command/commands/WorldBorderCommand.cpp
@@ -422,6 +426,16 @@ target_compile_definitions(server-runtime-block-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
+basalt_test(server-runtime-boss-bar-command-test
+    SOURCES
+        test/BossBarCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-boss-bar-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-effect-command-test
     SOURCES
         test/EffectCommandTest.cpp
@@ -482,6 +496,16 @@ target_compile_definitions(server-runtime-tag-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
+basalt_test(server-runtime-team-command-test
+    SOURCES
+        test/TeamCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-team-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-teleport-command-test
     SOURCES
         test/TeleportCommandTest.cpp
@@ -499,6 +523,16 @@ basalt_test(server-runtime-tick-command-test
 )
 
 target_compile_definitions(server-runtime-tick-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-timings-command-test
+    SOURCES
+        test/TimingsCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-timings-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
