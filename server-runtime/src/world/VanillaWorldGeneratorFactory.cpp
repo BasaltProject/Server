@@ -225,7 +225,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         std::map<std::string, std::shared_ptr<const server::world::noise::NormalNoise>, std::less<>>>();
     // parity: the overworld's shape is the jar's own noise files. Without them there is no terrain
     // to make, so the world says so rather than handing back a generator that dereferences nothing.
-    if (noises->get("minecraft:continentalness") == nullptr) {
+    if (noises->get("continentalness") == nullptr) {
         logger_.warn([] {
             return std::string{"No worldgen noise in the server jar, so no normal terrain can be generated. "
                                "The download the EULA step performs is what carries it."};
