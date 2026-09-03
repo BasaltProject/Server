@@ -38,11 +38,16 @@ basalt_module(server-runtime-core
         src/command/StringReader.cpp
         src/command/ArgumentTypes.cpp
         src/command/commands/BasicCommands.cpp
+        src/TickLoop.cpp
         src/command/Coordinates.cpp
         src/command/RegistryArguments.cpp
+        src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
+        src/command/commands/RandomCommand.cpp
         src/command/commands/PlayerCommands.cpp
         src/command/commands/SaveCommands.cpp
+        src/command/commands/StopwatchCommand.cpp
+        src/command/commands/TickCommand.cpp
         src/command/commands/ScoreCommands.cpp
         src/command/commands/SessionCommands.cpp
         src/command/commands/WorldCommands.cpp
@@ -380,6 +385,16 @@ basalt_test(server-runtime-registry-arguments-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-group-commands-test
+    SOURCES
+        test/GroupCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-group-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-hud-commands-test
     SOURCES
         test/HudCommandsTest.cpp
@@ -407,6 +422,16 @@ basalt_test(server-runtime-session-commands-test
 )
 
 target_compile_definitions(server-runtime-session-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-tick-command-test
+    SOURCES
+        test/TickCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-tick-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
