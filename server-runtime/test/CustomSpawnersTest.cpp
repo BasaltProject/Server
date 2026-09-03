@@ -25,6 +25,8 @@ using basalt::server::runtime::world::PatrolSpawnRequest;
 using basalt::server::runtime::world::PhantomSpawner;
 using basalt::server::runtime::world::SpawnRequest;
 using basalt::server::runtime::world::TraderLlamaSpawnRequest;
+using basalt::server::runtime::world::VillageSiegeSpawner;
+using basalt::server::runtime::world::VillageSiegeSpawnRequest;
 using basalt::server::runtime::world::WanderingTraderSpawner;
 using basalt::server::runtime::world::WanderingTraderSpawnRequest;
 using basalt::server::runtime::world::WorldMetadata;
@@ -206,4 +208,31 @@ TEST_CASE("no trader without the game rule, whatever the clock says") {
     CHECK(offered == 0);
     // And the saved state is untouched, so switching the rule back on does not owe a trader.
     CHECK(spawner.savedState().spawnDelay == 24000);
+}
+
+TEST_CASE("daylight cancels a siege outright rather than pausing it") {
+    Fixture fixture{scratch("siege-daylight")};
+    RandomSource random = RandomSource::legacy(1);
+    std::vector<VillageSiegeSpawnRequest> spawned;
+    VillageSiegeSpawner spawner;
+    // The clock starts at dawn, so it is never dark enough and nothing is even rolled.
+    for (std::int32_t tick = 0; tick < 24000; tick++) {
+        spawner.tick(*fixture.world, true, fixture.players(), random,
+                     [&spawned](const VillageSiegeSpawnRequest& request) { spawned.push_back(request); });
+    }
+    CHECK(spawned.empty());
+}
+
+TEST_CASE("a siege needs a village, so an empty flat world never gets one") {
+    Fixture fixture{scratch("siege-no-village")};
+    // Night, with monsters allowed: the only thing missing is anywhere to besiege.
+    fixture.world->clock().setTotalTicks(18000);
+    RandomSource random = RandomSource::legacy(1);
+    std::vector<VillageSiegeSpawnRequest> spawned;
+    VillageSiegeSpawner spawner;
+    for (std::int32_t tick = 0; tick < 12000; tick++) {
+        spawner.tick(*fixture.world, true, fixture.players(), random,
+                     [&spawned](const VillageSiegeSpawnRequest& request) { spawned.push_back(request); });
+    }
+    CHECK(spawned.empty());
 }
