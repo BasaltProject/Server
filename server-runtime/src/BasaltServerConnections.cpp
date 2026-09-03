@@ -263,6 +263,41 @@ ClientSession::PluginHooks BasaltServer::pluginHooks() {
         message = textOf(event->get(0), message);
         return !event->cancelled();
     };
+
+    hooks.joined = [bus](const player::PlayerSession& player) {
+        static_cast<void>(
+            server::plugins::emit(bus, &server::plugins::pluginEventTypes::playerJoin(),
+                                  [&player](server::plugins::PluginEvent& filled) { fillPlayer(filled, player); }));
+    };
+    hooks.sprintChanged = [bus](const player::PlayerSession& player, bool sprinting) {
+        static_cast<void>(server::plugins::emit(bus, &server::plugins::pluginEventTypes::playerSprint(),
+                                                [&player, sprinting](server::plugins::PluginEvent& filled) {
+                                                    fillPlayer(filled, player);
+                                                    filled.set(3, sprinting);
+                                                }));
+    };
+    hooks.sneakChanged = [bus](const player::PlayerSession& player, bool sneaking) {
+        static_cast<void>(server::plugins::emit(bus, &server::plugins::pluginEventTypes::playerSneak(),
+                                                [&player, sneaking](server::plugins::PluginEvent& filled) {
+                                                    fillPlayer(filled, player);
+                                                    filled.set(3, sneaking);
+                                                }));
+    };
+    hooks.heldSlotChanged = [bus](const player::PlayerSession& player, std::int32_t slot, std::int32_t fromSlot) {
+        static_cast<void>(server::plugins::emit(bus, &server::plugins::pluginEventTypes::playerItemHeld(),
+                                                [&player, slot, fromSlot](server::plugins::PluginEvent& filled) {
+                                                    fillPlayer(filled, player);
+                                                    filled.set(3, static_cast<std::int64_t>(slot));
+                                                    filled.set(4, static_cast<std::int64_t>(fromSlot));
+                                                }));
+    };
+    hooks.menuClosed = [bus](const player::PlayerSession& player, std::string_view kind) {
+        static_cast<void>(server::plugins::emit(bus, &server::plugins::pluginEventTypes::inventoryClose(),
+                                                [&player, kind](server::plugins::PluginEvent& filled) {
+                                                    fillPlayer(filled, player);
+                                                    filled.set(3, std::string{kind});
+                                                }));
+    };
     return hooks;
 }
 
