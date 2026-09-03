@@ -270,11 +270,14 @@ basalt_module(server-runtime-core
         src/world/MobSpawnVariantData.cpp
         src/world/SpawnEquipmentEnchantments.cpp
         src/world/SpawnEquipmentFinalizer.cpp
+        src/world/SkeletonHorseTrap.cpp
         src/world/StructureSpawnLists.cpp
         src/world/ZombieSpawnFinalizer.cpp
         src/world/Trades.cpp
         src/world/VanillaSaveImport.cpp
+        src/entity/ai/VillagerSchedule.cpp
         src/world/VillageDataLoader.cpp
+        src/world/VillageGolemSpawner.cpp
         src/world/VillageProximity.cpp
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
@@ -586,6 +589,15 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-village-golem-spawner-test
+    SOURCES
+        test/VillageGolemSpawnerTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-village-golem-spawner-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-custom-spawners-test
     SOURCES
