@@ -5,7 +5,10 @@ basalt_module(server-plugins
         src/PluginEvents.cpp
         src/PluginEventTypes.cpp
         src/PluginDispatch.cpp
+        src/PluginChannelHost.cpp
         src/PluginEventView.cpp
+        src/PluginPacketView.cpp
+        src/PluginStore.cpp
         src/PluginFolder.cpp
         src/PluginJson.cpp
         src/PluginOrder.cpp
@@ -20,8 +23,10 @@ basalt_module(server-plugins
         src/PluginPacketRegistry.cpp
         src/PluginRegistrations.cpp
         src/PluginSurfaces.cpp
+        src/PluginServiceRegistry.cpp
         src/PluginText.cpp
         src/PluginToml.cpp
+        src/PluginValues.cpp
     DEPENDS basalt::wire-common basalt::wire-io basalt::server-lua
     # The event view builds a metatable and holds a registry reference, which the argument facade
     # deliberately does not expose. `lua.h` stays out of every header here and lives in that one
