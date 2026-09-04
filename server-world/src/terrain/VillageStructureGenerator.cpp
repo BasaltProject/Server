@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <memory>
 #include <utility>
 
 namespace basalt::server::world::terrain {
@@ -102,7 +103,7 @@ std::pair<std::size_t, std::int64_t> VillageStructureGenerator::assemblyStats() 
     const std::scoped_lock lock{mutex_};
     std::int64_t pieces = 0;
     for (const auto& [key, start] : cache_) {
-        pieces += static_cast<std::int64_t>(start.pieces.size());
+        pieces += start == nullptr ? 0 : static_cast<std::int64_t>(start->pieces.size());
     }
     return {cache_.size(), pieces};
 }
@@ -186,15 +187,15 @@ std::vector<PlacedStructurePiece> VillageStructureGenerator::assemble(std::strin
         random);
 }
 
-const VillageStructureGenerator::VillageStart* VillageStructureGenerator::assembledStart(std::int32_t candidateChunkX,
-                                                                                         std::int32_t candidateChunkZ,
-                                                                                         std::int64_t seed) {
+std::shared_ptr<const VillageStructureGenerator::VillageStart>
+VillageStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
+                                          std::int64_t seed) {
     const CandidateKey key{seed, candidateChunkX, candidateChunkZ};
     {
         const std::scoped_lock lock{mutex_};
         const auto found = cache_.find(key);
         if (found != cache_.end()) {
-            return found->second.variant == nullptr ? nullptr : &found->second;
+            return found->second;
         }
     }
 
@@ -211,22 +212,23 @@ const VillageStructureGenerator::VillageStart* VillageStructureGenerator::assemb
     const std::scoped_lock lock{mutex_};
     const auto found = cache_.find(key);
     if (found != cache_.end()) {
-        return found->second.variant == nullptr ? nullptr : &found->second;
+        return found->second;
     }
     if (cache_.size() >= kAssemblyCacheCapacity) {
         cache_.clear();
     }
-    const VillageStart& stored = cache_.emplace(key, std::move(built)).first->second;
-    return stored.variant == nullptr ? nullptr : &stored;
+    std::shared_ptr<const VillageStart> stored =
+        built.variant == nullptr ? nullptr : std::make_shared<const VillageStart>(std::move(built));
+    return cache_.emplace(key, std::move(stored)).first->second;
 }
 
-std::vector<const VillageStructureGenerator::VillageStart*>
+std::vector<std::shared_ptr<const VillageStructureGenerator::VillageStart>>
 VillageStructureGenerator::referencedStarts(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
                                             const StructureBoundingBox& clip) {
     const std::int32_t cellX = floorDiv(chunkX, grid_.spacing());
     const std::int32_t cellZ = floorDiv(chunkZ, grid_.spacing());
     const std::int32_t reachChunks = (maxDistanceFromCenter_ + kBeardRadius) / 16 + 1;
-    std::vector<const VillageStart*> starts;
+    std::vector<std::shared_ptr<const VillageStart>> starts;
     for (std::int32_t dx = -1; dx <= 1; ++dx) {
         for (std::int32_t dz = -1; dz <= 1; ++dz) {
             const auto [candidateChunkX, candidateChunkZ] =
@@ -234,7 +236,7 @@ VillageStructureGenerator::referencedStarts(std::int32_t chunkX, std::int32_t ch
             if (std::abs(candidateChunkX - chunkX) > reachChunks || std::abs(candidateChunkZ - chunkZ) > reachChunks) {
                 continue;
             }
-            const VillageStart* start = assembledStart(candidateChunkX, candidateChunkZ, seed);
+            std::shared_ptr<const VillageStart> start = assembledStart(candidateChunkX, candidateChunkZ, seed);
             if (start == nullptr) {
                 continue;
             }
@@ -252,12 +254,12 @@ VillageStructureGenerator::referencedStarts(std::int32_t chunkX, std::int32_t ch
 void VillageStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ,
                                              std::int64_t seed) {
     const StructureBoundingBox clip = chunkClip(chunkX, chunkZ, 0);
-    const std::vector<const VillageStart*> starts = referencedStarts(chunkX, chunkZ, seed, clip);
+    const std::vector<std::shared_ptr<const VillageStart>> starts = referencedStarts(chunkX, chunkZ, seed, clip);
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed = random::setDecorationSeed(random, seed, chunkX * 16, chunkZ * 16);
     for (const Variant* variant : placementVariants()) {
         random::setFeatureSeed(random, decorationSeed, variant->structureIndex, kSurfaceStructuresStep);
-        for (const VillageStart* start : starts) {
+        for (const std::shared_ptr<const VillageStart>& start : starts) {
             if (start->variant != variant) {
                 continue;
             }
@@ -349,7 +351,7 @@ densityfunction::Function VillageStructureGenerator::finalDensityForChunk(std::i
     const StructureBoundingBox nearClip = chunkClip(chunkX, chunkZ, kBeardRadius);
     std::vector<BeardifierRigid> rigids;
     std::vector<BeardifierJunction> junctions;
-    for (const VillageStart* start : referencedStarts(chunkX, chunkZ, seed, referenceClip)) {
+    for (const std::shared_ptr<const VillageStart>& start : referencedStarts(chunkX, chunkZ, seed, referenceClip)) {
         for (const PlacedStructurePiece& piece : start->pieces) {
             if (!piece.boundingBox.intersects(nearClip)) {
                 continue;

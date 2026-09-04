@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -107,7 +108,9 @@ private:
     [[nodiscard]] std::vector<Start> nearbyStarts(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
                                                   const structure::StructureBoundingBox& clip);
 
-    [[nodiscard]] const std::vector<structure::PlacedStructurePiece>&
+    /// Shared rather than borrowed: the cache is cleared when it fills, and a reference into it
+    /// would dangle as soon as another worker triggered that mid-read.
+    [[nodiscard]] std::shared_ptr<const std::vector<structure::PlacedStructurePiece>>
     assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ, std::int64_t seed);
 
     /// parity, narrowed the same way the village generator narrows it: the jar tests the biome at
@@ -128,7 +131,7 @@ private:
     PoolLookup poolLookup_;
     structure::PoolTemplateLoader templateLoader_;
     mutable std::mutex mutex_;
-    std::map<CandidateKey, std::vector<structure::PlacedStructurePiece>> cache_;
+    std::map<CandidateKey, std::shared_ptr<const std::vector<structure::PlacedStructurePiece>>> cache_;
 };
 
 /// The four settings the Overworld's jigsaw structures use, and the fixed grids three of them have.

@@ -21,6 +21,8 @@ enum class GeneratedBlockWritePolicy : std::uint8_t {
     OreBaseStone,
     OreStone,
     OreDeepslate,
+    /// An amethyst geode, which replaces anything outside `#minecraft:features_cannot_replace`.
+    Geode,
 };
 
 /// One block entity of a chunk: where it sits, what kind it is, and the NBT it carries.

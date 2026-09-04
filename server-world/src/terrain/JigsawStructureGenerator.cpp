@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <memory>
 #include <utility>
 
 namespace basalt::server::world::terrain {
@@ -36,7 +37,7 @@ std::pair<std::size_t, std::int64_t> JigsawStructureGenerator::assemblyStats() c
     const std::scoped_lock lock{mutex_};
     std::int64_t pieces = 0;
     for (const auto& [key, start] : cache_) {
-        pieces += static_cast<std::int64_t>(start.size());
+        pieces += start == nullptr ? 0 : static_cast<std::int64_t>(start->size());
     }
     return {cache_.size(), pieces};
 }
@@ -80,9 +81,9 @@ bool JigsawStructureGenerator::inBiome(std::int32_t candidateChunkX, std::int32_
     return biomes_.contains(biomeAt_(centreX, probeY, centreZ));
 }
 
-const std::vector<PlacedStructurePiece>& JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX,
-                                                                                  std::int32_t candidateChunkZ,
-                                                                                  std::int64_t seed) {
+std::shared_ptr<const std::vector<PlacedStructurePiece>>
+JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
+                                         std::int64_t seed) {
     const CandidateKey key{seed, candidateChunkX, candidateChunkZ};
     {
         const std::scoped_lock lock{mutex_};
@@ -131,7 +132,8 @@ const std::vector<PlacedStructurePiece>& JigsawStructureGenerator::assembledStar
     if (cache_.size() >= settings_.cacheCapacity) {
         cache_.clear();
     }
-    return cache_.emplace(key, std::move(assembled)).first->second;
+    return cache_.emplace(key, std::make_shared<const std::vector<PlacedStructurePiece>>(std::move(assembled)))
+        .first->second;
 }
 
 std::vector<JigsawStructureGenerator::Start> JigsawStructureGenerator::nearbyStarts(std::int32_t chunkX,
@@ -149,10 +151,12 @@ std::vector<JigsawStructureGenerator::Start> JigsawStructureGenerator::nearbySta
             if (std::abs(candidateX - chunkX) > reachChunks || std::abs(candidateZ - chunkZ) > reachChunks) {
                 continue;
             }
-            const std::vector<PlacedStructurePiece>& pieces = assembledStart(candidateX, candidateZ, seed);
-            if (pieces.empty()) {
+            const std::shared_ptr<const std::vector<PlacedStructurePiece>> assembled =
+                assembledStart(candidateX, candidateZ, seed);
+            if (assembled == nullptr || assembled->empty()) {
                 continue;
             }
+            const std::vector<PlacedStructurePiece>& pieces = *assembled;
             const bool touches = std::any_of(pieces.begin(), pieces.end(), [&clip](const PlacedStructurePiece& piece) {
                 return piece.boundingBox.intersects(clip);
             });
@@ -269,7 +273,9 @@ std::optional<std::pair<std::int32_t, std::int32_t>> JigsawStructureGenerator::l
                 }
                 const auto [candidateX, candidateZ] =
                     grid_.candidateChunk(seed, (cellX + dx) * grid_.spacing(), (cellZ + dz) * grid_.spacing());
-                if (assembledStart(candidateX, candidateZ, seed).empty()) {
+                const std::shared_ptr<const std::vector<PlacedStructurePiece>> assembled =
+                    assembledStart(candidateX, candidateZ, seed);
+                if (assembled == nullptr || assembled->empty()) {
                     continue;
                 }
                 return std::pair{candidateX, candidateZ};

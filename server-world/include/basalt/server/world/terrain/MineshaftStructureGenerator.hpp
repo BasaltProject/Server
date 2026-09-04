@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <string>
@@ -49,7 +50,9 @@ private:
 
     /// Assembling a shaft is expensive and every chunk it touches asks for the same one, so the
     /// result is shared behind a lock.
-    [[nodiscard]] const structure::mineshaftLayout::Assembly&
+    /// Shared rather than borrowed: the cache is cleared when it fills, and a reference into it
+    /// would dangle the moment another worker triggered that while this one was still reading.
+    [[nodiscard]] std::shared_ptr<const structure::mineshaftLayout::Assembly>
     assemblyOf(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, structure::MineshaftType type) const;
 
     BiomeAt biomeAt_;
@@ -59,7 +62,8 @@ private:
     std::int32_t seaLevel_;
     structure::StructurePlacementGrid grid_;
     mutable std::mutex mutex_;
-    mutable std::map<std::pair<std::int64_t, structure::MineshaftType>, structure::mineshaftLayout::Assembly>
+    mutable std::map<std::pair<std::int64_t, structure::MineshaftType>,
+                     std::shared_ptr<const structure::mineshaftLayout::Assembly>>
         assembled_;
 };
 

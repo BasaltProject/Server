@@ -17,6 +17,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -78,6 +79,7 @@ public:
     /// A hook rather than the bus itself: this module is below the plugin one, and a world knowing
     /// what a plugin is would be an arrow pointing the wrong way.
     void setOnChunkInstalled(std::function<void(server::world::Chunk&)> handler) {
+        const std::scoped_lock lock{chunkInstalledMutex_};
         onChunkInstalled_ = std::move(handler);
     }
 
@@ -239,6 +241,16 @@ private:
     sched::Owner* owner_ = nullptr;
     sched::Owner* installOwner_ = nullptr;
     std::function<std::int32_t()> regionCount_;
+
+    /// The handler is installed while chunks are already being generated, so the worker that runs
+    /// an install reads it while the main thread is still assigning it. Copied out under the lock
+    /// and called outside it, because the handler itself reaches the plugin bus.
+    [[nodiscard]] std::function<void(server::world::Chunk&)> chunkInstalledHandler() const {
+        const std::scoped_lock lock{chunkInstalledMutex_};
+        return onChunkInstalled_;
+    }
+
+    mutable std::mutex chunkInstalledMutex_;
     std::function<void(server::world::Chunk&)> onChunkInstalled_;
 
     /// Keyed by packed coordinates, not by a pair: a pair key allocates and boxes both halves on
