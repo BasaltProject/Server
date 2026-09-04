@@ -254,24 +254,60 @@ GeneratedTerrain generateTerrain(const OverworldNoiseRouter& router, const surfa
     // parity: the `_WG` heightmaps stop being updated here, so everything that follows sees the bare
     // terrain rather than what the feature before it left standing.
     chunk.freezeWorldgenHeights();
-    generationMetrics::measure(generationMetrics::Phase::Structures, [&] {
-        if (generators.village != nullptr) {
-            generators.village->generateInto(chunk, chunkX, chunkZ, seed);
-        }
-        // Step 3, underground_structures, which is before every decoration step.
+    return GeneratedTerrain{std::move(chunk), std::move(cache), std::move(chunkEnvironment)};
+}
+
+void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerrain* neighbours,
+              const TerrainStructureGenerators& generators, const structure::TemplateLoader& templates) {
+    Chunk& chunk = terrain.chunk();
+    const surface::SurfaceRuleEnvironment& environment = terrain.environment();
+    const auto externalState = [neighbours](std::int32_t x, std::int32_t y,
+                                            std::int32_t z) -> std::optional<std::int32_t> {
+        return neighbours == nullptr ? std::nullopt : neighbours->blockStateIdAt(x, y, z);
+    };
+    const auto externalOceanFloor = [neighbours](std::int32_t x, std::int32_t z) -> std::optional<std::int32_t> {
+        return neighbours == nullptr ? std::nullopt : neighbours->oceanFloorHeightAt(x, z);
+    };
+    generationMetrics::measure(generationMetrics::Phase::Decoration, [&] {
+        // One reader for the whole phase. A feature body that reaches past the chunk edge asks the
+        // chunk, and the chunk asks this: without it the outside reads as air, which makes a lake
+        // preflight reject itself and a grass patch find no ground to stand on.
+        const Chunk::ExternalStateScope scope{chunk, externalState};
+        decoration::overworldLakeDecoration::decorate(chunk, seed, environment);
+        decoration::frozenOceanDecoration::decorateLocalModifications(chunk, seed, environment);
+        decoration::caveLocalModificationDecoration::decorate(chunk, seed, environment);
+        decoration::forestRockDecoration::decorate(chunk, seed, environment);
+        decoration::iceSpikesDecoration::decorate(chunk, seed, environment);
+        decoration::desertWellDecoration::decorate(chunk, seed, environment);
+        // The fossil body takes its templates by name, while the world hands them out by identifier.
+        const decoration::fossilFeature::TemplateLookup byName =
+            templates ? decoration::fossilFeature::TemplateLookup{[&templates](std::string_view name) {
+                const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+                    wire::common::Identifier::parse(name);
+                return parsed.has_value() ? templates(*parsed) : nullptr;
+            }}
+                      : nullptr;
+        // parity: `underground_structures` is step 3, and vanilla interleaves a step's structures with
+        // that step's features rather than running every structure first. Running them all ahead of the
+        // decoration lets a step 1 or 2 feature bury what a step 3 structure carved.
         if (generators.buriedTreasure != nullptr) {
             generators.buriedTreasure->generateInto(chunk, seed);
         }
         if (generators.trailRuins != nullptr) {
-            generators.trailRuins->generateInto(chunk, chunkX, chunkZ, seed);
+            generators.trailRuins->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
         if (generators.trialChamber != nullptr) {
-            generators.trialChamber->generateInto(chunk, chunkX, chunkZ, seed);
+            generators.trialChamber->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
         if (generators.mineshaft != nullptr) {
             generators.mineshaft->generateInto(chunk, seed);
         }
-        // Step 4, surface_structures, alongside the villages above.
+        decoration::overworldUndergroundStructures::decorate(chunk, seed, environment, byName, externalOceanFloor);
+        // parity: `surface_structures` is step 4, the village included, so it follows step 3 rather
+        // than opening the whole pass.
+        if (generators.village != nullptr) {
+            generators.village->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
+        }
         if (generators.desertPyramid != nullptr) {
             generators.desertPyramid->generateInto(chunk, seed);
         }
@@ -303,51 +339,17 @@ GeneratedTerrain generateTerrain(const OverworldNoiseRouter& router, const surfa
             generators.igloo->generateInto(chunk, seed);
         }
         if (generators.pillagerOutpost != nullptr) {
-            generators.pillagerOutpost->generateInto(chunk, chunkX, chunkZ, seed);
+            generators.pillagerOutpost->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
-    });
-    return GeneratedTerrain{std::move(chunk), std::move(cache), std::move(chunkEnvironment)};
-}
 
-void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerrain* neighbours,
-              JigsawStructureGenerator* ancientCity, const structure::TemplateLoader& templates) {
-    Chunk& chunk = terrain.chunk();
-    const surface::SurfaceRuleEnvironment& environment = terrain.environment();
-    const auto externalState = [neighbours](std::int32_t x, std::int32_t y,
-                                            std::int32_t z) -> std::optional<std::int32_t> {
-        return neighbours == nullptr ? std::nullopt : neighbours->blockStateIdAt(x, y, z);
-    };
-    const auto externalOceanFloor = [neighbours](std::int32_t x, std::int32_t z) -> std::optional<std::int32_t> {
-        return neighbours == nullptr ? std::nullopt : neighbours->oceanFloorHeightAt(x, z);
-    };
-    generationMetrics::measure(generationMetrics::Phase::Decoration, [&] {
-        // One reader for the whole phase. A feature body that reaches past the chunk edge asks the
-        // chunk, and the chunk asks this: without it the outside reads as air, which makes a lake
-        // preflight reject itself and a grass patch find no ground to stand on.
-        const Chunk::ExternalStateScope scope{chunk, externalState};
-        decoration::overworldLakeDecoration::decorate(chunk, seed, environment);
-        decoration::frozenOceanDecoration::decorateLocalModifications(chunk, seed, environment);
-        decoration::caveLocalModificationDecoration::decorate(chunk, seed, environment);
-        decoration::forestRockDecoration::decorate(chunk, seed, environment);
-        decoration::iceSpikesDecoration::decorate(chunk, seed, environment);
-        decoration::desertWellDecoration::decorate(chunk, seed, environment);
-        // The fossil body takes its templates by name, while the world hands them out by identifier.
-        const decoration::fossilFeature::TemplateLookup byName =
-            templates ? decoration::fossilFeature::TemplateLookup{[&templates](std::string_view name) {
-                const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
-                    wire::common::Identifier::parse(name);
-                return parsed.has_value() ? templates(*parsed) : nullptr;
-            }}
-                      : nullptr;
-        decoration::overworldUndergroundStructures::decorate(chunk, seed, environment, byName, externalOceanFloor);
         decoration::frozenOceanDecoration::decorateSurfaceStructures(chunk, seed, environment);
         // Ore and stone blobs are spheres around their origin, so most cross a chunk edge. The part
         // outside is deferred, and its guard has to be the block actually out there.
         decoration::overworldOreDecoration::decorate(chunk, seed, environment, externalOceanFloor, externalState);
         // Step 7 opens with its structures, and the ancient city is the first of the three, so the
         // sculk features below decorate a chunk that already has the city in it.
-        if (ancientCity != nullptr) {
-            ancientCity->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
+        if (generators.ancientCity != nullptr) {
+            generators.ancientCity->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
         decoration::sculkDecoration::decorate(chunk, seed, environment, externalState);
         decoration::caveSpeleothemDecoration::decorate(chunk, seed, environment, externalState);
@@ -372,7 +374,7 @@ Chunk generate(const OverworldNoiseRouter& router, const surface::SurfaceRuleEnv
     GeneratedTerrain terrain = generateTerrain(router, environment, chunkX, chunkZ, seed, generators);
     const std::unique_ptr<NeighbourTerrain> around =
         neighbours == nullptr ? nullptr : neighbours->around(chunkX, chunkZ);
-    decorate(terrain, seed, around.get(), generators.ancientCity, templates);
+    decorate(terrain, seed, around.get(), generators, templates);
     return std::move(terrain.chunk());
 }
 
