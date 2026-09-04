@@ -68,7 +68,7 @@ struct Run {
         const std::int32_t chunkX = index * 7 - 20;
         const std::int32_t chunkZ = index * -3 + 11;
         const std::vector<MineshaftPiece> pieces =
-            mineshaftLayout::assemble(seed + index, chunkX, chunkZ, type, 63, -64);
+            mineshaftLayout::assemble(seed + index, chunkX, chunkZ, type, 63, -64).pieces;
         Chunk chunk = stoneChunk(chunkX, chunkZ, flooded);
         const StructureBoundingBox clip{chunkX * 16, -8, chunkZ * 16, chunkX * 16 + 15, 64, chunkZ * 16 + 15};
         const MineshaftBlocks blocks{type};

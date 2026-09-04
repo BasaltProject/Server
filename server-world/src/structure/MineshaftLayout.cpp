@@ -32,7 +32,13 @@ public:
     [[nodiscard]] std::vector<MineshaftPiece>& pieces() noexcept { return pieces_; }
 
     void addRoom(std::int32_t west, std::int32_t north);
-    void moveBelowSeaLevel(std::int32_t seaLevel, std::int32_t minY);
+    /// Returns the vertical offset applied, which is what sets the structure's start y.
+    std::int32_t moveBelowSeaLevel(std::int32_t seaLevel, std::int32_t minY);
+
+    /// The mesa variant is lifted to the surface instead of buried. Same return.
+    std::int32_t moveToSurface(std::int32_t seaLevel, const mineshaftLayout::SurfaceHeightAt& surfaceHeightAt);
+
+    void offsetPiecesVertically(std::int32_t dy);
 
 private:
     [[nodiscard]] bool collides(const StructureBoundingBox& box) const {
@@ -98,10 +104,10 @@ std::optional<StructureBoundingBox> Builder::bounds() const {
     return box;
 }
 
-void Builder::moveBelowSeaLevel(std::int32_t seaLevel, std::int32_t minY) {
+std::int32_t Builder::moveBelowSeaLevel(std::int32_t seaLevel, std::int32_t minY) {
     const std::optional<StructureBoundingBox> box = bounds();
     if (!box.has_value()) {
-        return;
+        return 0;
     }
     const std::int32_t maxY = seaLevel - kSeaLevelMargin;
     // getYSpan is inclusive, so the span is maxY - minY + 1 and not the difference.
@@ -110,6 +116,30 @@ void Builder::moveBelowSeaLevel(std::int32_t seaLevel, std::int32_t minY) {
         top += random_->nextInt(maxY - top);
     }
     const std::int32_t dy = top - box->maxY;
+    offsetPiecesVertically(dy);
+    return dy;
+}
+
+std::int32_t Builder::moveToSurface(std::int32_t seaLevel, const mineshaftLayout::SurfaceHeightAt& surfaceHeightAt) {
+    const std::optional<StructureBoundingBox> box = bounds();
+    if (!box.has_value()) {
+        return 0;
+    }
+    // parity: `getCenter` rounds up on an even span, so the centre is not (min + max) / 2.
+    const std::int32_t centreX = box->minX + ((box->maxX - box->minX + 1) / 2);
+    const std::int32_t centreY = box->minY + ((box->maxY - box->minY + 1) / 2);
+    const std::int32_t centreZ = box->minZ + ((box->maxZ - box->minZ + 1) / 2);
+    const std::int32_t surfaceHeight = surfaceHeightAt(centreX, centreZ);
+    // parity: a shaft under water stays at sea level; above it, `randomBetweenInclusive` picks a
+    // height between sea level and the surface, and that draw only happens in that case.
+    const std::int32_t target =
+        surfaceHeight <= seaLevel ? seaLevel : seaLevel + random_->nextInt(surfaceHeight - seaLevel + 1);
+    const std::int32_t dy = target - centreY;
+    offsetPiecesVertically(dy);
+    return dy;
+}
+
+void Builder::offsetPiecesVertically(std::int32_t dy) {
     for (MineshaftPiece& piece : pieces_) {
         piece.box.minY += dy;
         piece.box.maxY += dy;
@@ -463,10 +493,14 @@ std::vector<StructureBoundingBox> Builder::addRoomChildren(std::size_t roomIndex
     return entrances;
 }
 
+/// parity: `findGenerationPoint` builds its start position at y 50 before any offset.
+constexpr std::int32_t kStartY = 50;
+
 } // namespace
 
-std::vector<MineshaftPiece> mineshaftLayout::assemble(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
-                                                      MineshaftType type, std::int32_t seaLevel, std::int32_t minY) {
+mineshaftLayout::Assembly mineshaftLayout::assemble(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                                    MineshaftType type, std::int32_t seaLevel, std::int32_t minY,
+                                                    const SurfaceHeightAt& surfaceHeightAt) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
     // parity: `MineshaftStructure.findGenerationPoint` throws this first draw away, and every roll of
@@ -475,10 +509,14 @@ std::vector<MineshaftPiece> mineshaftLayout::assemble(std::int64_t seed, std::in
     Builder builder{random};
     builder.addRoom(chunkX * 16 + 2, chunkZ * 16 + 2);
     if (type == MineshaftType::Mesa) {
-        return std::move(builder.pieces());
+        if (!surfaceHeightAt) {
+            return Assembly{.pieces = std::move(builder.pieces()), .stubY = kStartY};
+        }
+        const std::int32_t dy = builder.moveToSurface(seaLevel, surfaceHeightAt);
+        return Assembly{.pieces = std::move(builder.pieces()), .stubY = kStartY + dy};
     }
-    builder.moveBelowSeaLevel(seaLevel, minY);
-    return std::move(builder.pieces());
+    const std::int32_t dy = builder.moveBelowSeaLevel(seaLevel, minY);
+    return Assembly{.pieces = std::move(builder.pieces()), .stubY = kStartY + dy};
 }
 
 } // namespace basalt::server::world::structure

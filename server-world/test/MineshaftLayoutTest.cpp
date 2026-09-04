@@ -82,7 +82,7 @@ struct Run {
     std::uint64_t checksum = 14695981039346656037ULL;
     for (std::int32_t index = 0; index < shafts; ++index) {
         const std::vector<MineshaftPiece> assembled =
-            mineshaftLayout::assemble(seed + index, index * 7 - 20, index * -3 + 11, type, seaLevel, minY);
+            mineshaftLayout::assemble(seed + index, index * 7 - 20, index * -3 + 11, type, seaLevel, minY).pieces;
         if (index == 0) {
             result.first = assembled.empty() ? "none" : describe(assembled.front());
         }
@@ -152,5 +152,46 @@ TEST_CASE("the mineshaft layout lays out what the frozen kotlin lays out") {
               "ROOM/-/-/-318,24,178,-311,32,190/0/false/false/0/false/"
               "-315,25,178,-311,31,179;-314,26,189,-312,28,190;-312,26,178,-311,28,180",
               -5100485739522927534LL);
+    }
+}
+
+TEST_CASE("a mesa mineshaft is lifted to the surface instead of buried") {
+    constexpr std::int32_t kSeaLevel = 63;
+
+    // parity: `generatePiecesAndAdjust` puts the centre of the whole shaft at the target height, and
+    // the target is sea level whenever the surface is at or below it, with no draw spent.
+    const auto centreOf = [](const std::vector<MineshaftPiece>& pieces) {
+        StructureBoundingBox box = pieces.front().box;
+        for (const MineshaftPiece& piece : pieces) {
+            box.minY = std::min(box.minY, piece.box.minY);
+            box.maxY = std::max(box.maxY, piece.box.maxY);
+        }
+        return box.minY + ((box.maxY - box.minY + 1) / 2);
+    };
+
+    SUBCASE("a surface under water pins the centre to sea level") {
+        for (std::int32_t index = 0; index < 8; ++index) {
+            const auto floor = [](std::int32_t, std::int32_t) { return 40; };
+            const std::vector<MineshaftPiece> pieces =
+                mineshaftLayout::assemble(8877 + index, index * 7 - 20, index * -3 + 11, MineshaftType::Mesa, kSeaLevel,
+                                          -64, floor)
+                    .pieces;
+            REQUIRE(!pieces.empty());
+            CHECK(centreOf(pieces) == kSeaLevel);
+        }
+    }
+
+    SUBCASE("a surface above water keeps the centre between the two") {
+        for (std::int32_t index = 0; index < 8; ++index) {
+            const auto peak = [](std::int32_t, std::int32_t) { return 140; };
+            const std::vector<MineshaftPiece> pieces =
+                mineshaftLayout::assemble(8877 + index, index * 7 - 20, index * -3 + 11, MineshaftType::Mesa, kSeaLevel,
+                                          -64, peak)
+                    .pieces;
+            REQUIRE(!pieces.empty());
+            const std::int32_t centre = centreOf(pieces);
+            CHECK(centre >= kSeaLevel);
+            CHECK(centre <= 140);
+        }
     }
 }

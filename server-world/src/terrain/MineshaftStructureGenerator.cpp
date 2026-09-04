@@ -23,9 +23,10 @@ constexpr std::array<std::pair<std::int32_t, structure::MineshaftType>, 2> kEntr
 MineshaftStructureGenerator::MineshaftStructureGenerator(BiomeAt biomeAt,
                                                          std::set<std::string, std::less<>> normalBiomes,
                                                          std::set<std::string, std::less<>> mesaBiomes,
+                                                         structure::mineshaftLayout::SurfaceHeightAt surfaceHeightAt,
                                                          std::int32_t seaLevel)
     : biomeAt_(std::move(biomeAt)), normalBiomes_(std::move(normalBiomes)), mesaBiomes_(std::move(mesaBiomes)),
-      seaLevel_(seaLevel),
+      surfaceHeightAt_(std::move(surfaceHeightAt)), seaLevel_(seaLevel),
       grid_(1, 0, 0, structure::SpreadType::Linear, kFrequency, structure::FrequencyReduction::LegacyType3) {}
 
 bool MineshaftStructureGenerator::allows(structure::MineshaftType type, const std::string& biome) const {
@@ -43,29 +44,36 @@ std::optional<structure::MineshaftType> MineshaftStructureGenerator::typeAt(std:
     random::setLargeFeatureSeed(random, seed, chunkX, chunkZ);
     const structure::MineshaftType first =
         random.nextInt(2) == 0 ? structure::MineshaftType::Normal : structure::MineshaftType::Mesa;
-    const std::string biome = biomeAt_(chunkX * 16 + 8, seaLevel_, chunkZ * 16 + 8);
-    if (allows(first, biome)) {
+    if (accepts(seed, chunkX, chunkZ, first)) {
         return first;
     }
     const structure::MineshaftType second =
         first == structure::MineshaftType::Normal ? structure::MineshaftType::Mesa : structure::MineshaftType::Normal;
-    return allows(second, biome) ? std::optional{second} : std::nullopt;
+    return accepts(seed, chunkX, chunkZ, second) ? std::optional{second} : std::nullopt;
 }
 
-const std::vector<structure::MineshaftPiece>& MineshaftStructureGenerator::piecesOf(std::int64_t seed,
-                                                                                    std::int32_t chunkX,
-                                                                                    std::int32_t chunkZ,
-                                                                                    structure::MineshaftType type) {
-    const std::int64_t key =
-        (static_cast<std::int64_t>(chunkX) << 32) | (static_cast<std::int64_t>(chunkZ) & 0xFFFFFFFFLL);
+bool MineshaftStructureGenerator::accepts(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                          structure::MineshaftType type) const {
+    // parity: the biome is read at the structure's own start, not at sea level, and vanilla builds
+    // that position out of the chunk's middle x but its minimum z. A shaft that ends up in a cave
+    // biome is kept on that biome's tag even when the surface above it is ocean.
+    const structure::mineshaftLayout::Assembly& assembly = assemblyOf(seed, chunkX, chunkZ, type);
+    return allows(type, biomeAt_(chunkX * 16 + 8, assembly.stubY, chunkZ * 16));
+}
+
+const structure::mineshaftLayout::Assembly&
+MineshaftStructureGenerator::assemblyOf(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                        structure::MineshaftType type) const {
+    const std::pair<std::int64_t, structure::MineshaftType> key{
+        (static_cast<std::int64_t>(chunkX) << 32) | (static_cast<std::int64_t>(chunkZ) & 0xFFFFFFFFLL), type};
     {
         const std::scoped_lock lock{mutex_};
         if (const auto found = assembled_.find(key); found != assembled_.end()) {
             return found->second;
         }
     }
-    std::vector<structure::MineshaftPiece> pieces =
-        structure::mineshaftLayout::assemble(seed, chunkX, chunkZ, type, seaLevel_, kOverworldHeight.minY());
+    structure::mineshaftLayout::Assembly assembly = structure::mineshaftLayout::assemble(
+        seed, chunkX, chunkZ, type, seaLevel_, kOverworldHeight.minY(), surfaceHeightAt_);
     const std::scoped_lock lock{mutex_};
     if (const auto found = assembled_.find(key); found != assembled_.end()) {
         return found->second;
@@ -73,7 +81,7 @@ const std::vector<structure::MineshaftPiece>& MineshaftStructureGenerator::piece
     if (assembled_.size() >= kCacheCapacity) {
         assembled_.clear();
     }
-    return assembled_.emplace(key, std::move(pieces)).first->second;
+    return assembled_.emplace(key, std::move(assembly)).first->second;
 }
 
 void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
@@ -96,7 +104,7 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
                 if (!type.has_value() || *type != wanted) {
                     continue;
                 }
-                const std::vector<structure::MineshaftPiece>& pieces = piecesOf(seed, startX, startZ, *type);
+                const std::vector<structure::MineshaftPiece>& pieces = assemblyOf(seed, startX, startZ, *type).pieces;
                 const structure::MineshaftBlocks blocks{*type};
                 for (const structure::MineshaftPiece& piece : pieces) {
                     if (!piece.box.intersects(clip)) {
