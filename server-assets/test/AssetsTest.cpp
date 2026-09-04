@@ -205,15 +205,22 @@ TEST_CASE("the asset cache verifies what it downloaded and trusts its sidecar af
                                         .size = static_cast<std::int64_t>(payload.size())}};
 
     std::int32_t downloads = 0;
-    AssetCache cache{[&](std::string_view) -> std::optional<std::vector<std::uint8_t>> {
-                         ++downloads;
-                         return payload;
-                     },
-                     cacheRoot};
+    std::vector<std::size_t> reported;
+    AssetCache cache{
+        [&](std::string_view, const AssetCache::Progress& onProgress) -> std::optional<std::vector<std::uint8_t>> {
+            ++downloads;
+            onProgress(payload.size() / 2);
+            onProgress(payload.size());
+            reported.push_back(payload.size());
+            return payload;
+        },
+        cacheRoot};
 
     const std::expected<std::string, AssetError> first = cache.ensure(metadata, AssetCache::Artifact::Client);
     REQUIRE(first.has_value());
     CHECK(downloads == 1);
+    // The fetcher is handed somewhere to report to, so a download can say how far along it is.
+    CHECK(reported.size() == 1);
     CHECK(fileIO::readBytes(*first).value() == payload);
 
     // The sidecar matches and so does the size, so the second call reads nothing off the network.

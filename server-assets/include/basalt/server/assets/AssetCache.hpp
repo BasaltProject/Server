@@ -22,9 +22,14 @@ public:
     /// (`assets/`, `lang/`).
     enum class Artifact : std::uint8_t { Client, Server };
 
+    /// Told how many bytes have arrived so far, as they do. A jar is tens of megabytes over a link
+    /// nobody controls, so the wait is long enough that saying nothing about it reads as a hang.
+    using Progress = std::function<void(std::size_t bytesSoFar)>;
+
     /// Answers the bytes at a URL, or nothing when they could not be fetched. A hook for the same
     /// reason the manifest's is: this module does not decide how the server talks to the network.
-    using ByteFetcher = std::function<std::optional<std::vector<std::uint8_t>>(std::string_view url)>;
+    using ByteFetcher =
+        std::function<std::optional<std::vector<std::uint8_t>>(std::string_view url, const Progress& onProgress)>;
 
     explicit AssetCache(ByteFetcher fetch, std::string cacheRoot = "./.basalt/assets",
                         wire::common::Logger logger = wire::common::Logger{"AssetCache"});

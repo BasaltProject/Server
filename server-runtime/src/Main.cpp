@@ -134,9 +134,9 @@ template <typename T>
                     return std::unexpected(metadata.error());
                 }
                 return server::assets::AssetCache{
-                    [](std::string_view url) {
+                    [](std::string_view url, const server::assets::AssetCache::Progress& onProgress) {
                         const std::expected<wire::auth::HttpsResponse, wire::auth::HttpsError> response =
-                            wire::auth::httpsGet(url);
+                            wire::auth::httpsGet(url, wire::auth::kDefaultMaxBytes, onProgress);
                         return response.has_value() && response->ok() ? std::optional{response->body} : std::nullopt;
                     },
                     "./.basalt/assets", assetsLogger}

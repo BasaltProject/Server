@@ -126,6 +126,47 @@ TEST_CASE("the mobs that keep a boolean baby flag are read through it") {
     CHECK(grown->age == 55);
 }
 
+TEST_CASE("an entity is saved with the fields its own class has and no others") {
+    // parity: `Health` is `LivingEntity`, `Age` is `AgeableMob`, the three mob flags are `Mob` and
+    // `Sitting` is `TamableAnimal`. Writing them on everything left an arrow carrying a Health that
+    // the client then read off index 9 as its pierce level.
+    const NbtCompound arrow = entityNbt::encode(entityOf("arrow"));
+    CHECK(arrow.contains("Air"));
+    CHECK_FALSE(arrow.contains("Health"));
+    CHECK_FALSE(arrow.contains("Age"));
+    CHECK_FALSE(arrow.contains("NoAI"));
+    CHECK_FALSE(arrow.contains("Sitting"));
+    CHECK_FALSE(arrow.contains("LoveTicks"));
+
+    const NbtCompound cow = entityNbt::encode(entityOf("cow"));
+    CHECK(cow.contains("Health"));
+    CHECK(cow.contains("Age"));
+    CHECK(cow.contains("NoAI"));
+    CHECK(cow.contains("LoveTicks"));
+    CHECK_FALSE(cow.contains("Sitting"));
+
+    // An armor stand is alive without being a mob, and a wolf is the one that can be told to sit.
+    const NbtCompound stand = entityNbt::encode(entityOf("armor_stand"));
+    CHECK(stand.contains("Health"));
+    CHECK_FALSE(stand.contains("NoAI"));
+    CHECK(entityNbt::encode(entityOf("wolf")).contains("Sitting"));
+}
+
+TEST_CASE("primed tnt keeps its fuse under the name vanilla gives it") {
+    ServerEntity tnt = entityOf("tnt");
+    tnt.fuse = 40;
+
+    const NbtCompound tag = entityNbt::encode(tnt);
+    // parity: `PrimedTnt.TAG_FUSE`. `Fuse` with a capital is a creeper's swell time, another field.
+    CHECK(tag.getShort("fuse") == 40);
+    CHECK_FALSE(tag.contains("Fuse"));
+    CHECK(entityNbt::decode(tag, 1, 1)->fuse == 40);
+
+    // Nothing else carries one, and a tag without it leaves the entity unprimed rather than at zero.
+    CHECK_FALSE(entityNbt::encode(entityOf("cow")).contains("fuse"));
+    CHECK(entityNbt::decode(entityNbt::encode(entityOf("cow")), 1, 1)->fuse == ServerEntity::kNoFuse);
+}
+
 TEST_CASE("a cube's size is written one lower than it is kept") {
     ServerEntity slime = entityOf("slime");
     slime.cubeSize = 4;
@@ -364,7 +405,10 @@ TEST_CASE("a generated entity is decoded through the same reader") {
     descriptor.y = 70.0;
     descriptor.z = -3.5;
     descriptor.yaw = 45.0F;
-    descriptor.data.putInt("VillagerLevel", 2);
+    NbtCompound villagerData;
+    villagerData.putString("profession", "minecraft:toolsmith");
+    villagerData.putInt("level", 2);
+    descriptor.data.set("VillagerData", NbtTag::ofCompound(std::move(villagerData)));
 
     const std::unique_ptr<ServerEntity> entity = entityNbt::decodeGenerated(descriptor, 5, 6);
 
@@ -373,6 +417,7 @@ TEST_CASE("a generated entity is decoded through the same reader") {
     CHECK(entity->x == doctest::Approx(8.5));
     CHECK(entity->yaw == doctest::Approx(45.0F));
     CHECK(entity->villagerLevel == 2);
+    CHECK(entity->profession == "toolsmith");
 }
 
 TEST_CASE("a generated vehicle brings its riders with it") {

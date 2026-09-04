@@ -1,3 +1,4 @@
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -184,6 +185,7 @@ const std::set<std::string, std::less<>>& abstractHorseTypes() {
 } // namespace
 
 std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompound& data) {
+    const wire::common::Identifier typeId = wire::common::Identifier::vanilla(std::string{type});
     Entries entries;
     std::int8_t sharedFlags = 0;
     if (data.getBoolean("Invisible")) {
@@ -202,12 +204,15 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
     // Read as a number rather than as a float tag: a save written before Health became one, or an
     // imported world, still has to say how alive the mob is. Zero here is a mob the client lays on
     // its side and plays the death animation for, however well it is walking around.
-    if (data.contains("Health")) {
+    //
+    // parity: index 9 is `LivingEntity.DATA_HEALTH_ID`, and on an arrow the same slot is
+    // `AbstractArrow.PIERCE_LEVEL`, a byte. Every entity is saved with a Health tag, alive or not.
+    if (data.contains("Health") && server::registry::entityAttributes::isLiving(typeId)) {
         entries.push_back(Entry{.index = 9,
                                 .value = SetEntityDataPacket::FloatValue{
                                     .value = static_cast<float>(entityNbt::numericDouble(data, "Health"))}});
     }
-    if (mobs::isMob(wire::common::Identifier::vanilla(std::string{type}))) {
+    if (mobs::isMob(typeId)) {
         std::int8_t mobFlags = 0;
         if (data.getBoolean("NoAI")) {
             mobFlags |= 1;

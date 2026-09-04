@@ -66,6 +66,20 @@ TEST_CASE("health is read whichever numeric tag the save wrote it as") {
     CHECK(std::get<SetEntityDataPacket::FloatValue>(health->value).value == doctest::Approx(6.0));
 }
 
+TEST_CASE("a projectile keeps the health field off its own index 9") {
+    // parity: index 9 is `LivingEntity.DATA_HEALTH_ID` for a mob and `AbstractArrow.PIERCE_LEVEL`,
+    // a byte, for an arrow, and every entity is saved with a Health tag.
+    NbtCompound data;
+    data.putFloat("Health", 20.0F);
+    data.putBoolean("NoGravity", true);
+
+    const std::vector<SetEntityDataPacket::Entry> arrow = generatedEntityMetadata("arrow", data);
+    CHECK(entryAt(arrow, 9) == nullptr);
+    REQUIRE(entryAt(arrow, 5) != nullptr);
+    // An armor stand is not a mob but it is alive, so its health still goes out.
+    CHECK(entryAt(generatedEntityMetadata("armor_stand", data), 9) != nullptr);
+}
+
 TEST_CASE("a sheep's colour and its shearing share one byte") {
     NbtCompound data;
     data.putByte("Color", 4);

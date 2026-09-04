@@ -1,3 +1,5 @@
+#include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 
@@ -246,22 +248,36 @@ NbtCompound encode(const ServerEntity& entity) {
     tag.set("Pos", doubles(entity.x, entity.y, entity.z));
     tag.set("Motion", doubles(entity.velocityX, entity.velocityY, entity.velocityZ));
     tag.set("Rotation", floats(entity.yaw, entity.pitch));
-    tag.putFloat("Health", static_cast<float>(entity.health));
-    tag.putInt("Age", entity.age);
-    tag.putShort("Fuse", static_cast<std::int16_t>(entity.fuse));
+    // parity: Air is `Entity.saveWithoutId`, so everything has one. Each field below belongs to a
+    // class further down, and writing one on an entity that has no such field leaves a tag vanilla
+    // never writes: a boat with a Health, an arrow with an Age.
     tag.putShort("Air", static_cast<std::int16_t>(entity.airSupply));
+    const std::string_view path = entity.type().path();
+    if (server::registry::entityAttributes::isLiving(entity.type())) {
+        tag.putFloat("Health", static_cast<float>(entity.health));
+    }
+    if (mobs::isMob(entity.type())) {
+        tag.putBoolean("PersistenceRequired", entity.persistent);
+        tag.putBoolean("NoAI", entity.noAi);
+        tag.putBoolean("CanPickUpLoot", entity.canPickUpLoot);
+    }
+    if (ageableMobs::isAgeable(path)) {
+        tag.putInt("Age", entity.age);
+    }
+    if (!breeding::foodFor(entity.type()).empty()) {
+        tag.putInt("LoveTicks", entity.loveTicks);
+        tag.putInt("BreedCooldown", entity.breedCooldown);
+    }
+    if (taming::isTamable(entity.type())) {
+        tag.putBoolean("Sitting", entity.sitting);
+    }
+    if (path == "tnt") {
+        // parity: `PrimedTnt.TAG_FUSE` is lowercase; `Fuse` is a creeper's own swell time.
+        tag.putShort("fuse", static_cast<std::int16_t>(entity.fuse));
+    }
     if (cubeMobs::isCube(entity.type())) {
         tag.putInt("Size", std::max(entity.cubeSize, 1) - 1);
     }
-    tag.putBoolean("PersistenceRequired", entity.persistent);
-    tag.putBoolean("NoAI", entity.noAi);
-    tag.putBoolean("CanPickUpLoot", entity.canPickUpLoot);
-    tag.putInt("LoveTicks", entity.loveTicks);
-    tag.putInt("BreedCooldown", entity.breedCooldown);
-    tag.putString("VillagerProfession", entity.profession);
-    tag.putInt("VillagerLevel", entity.villagerLevel);
-    tag.putInt("VillagerExperience", entity.villagerExperience);
-    const std::string_view path = entity.type().path();
     if (patrols(path)) {
         if (entity.patrolTarget.has_value()) {
             tag.putIntArray("patrol_target", {entity.patrolTarget->begin(), entity.patrolTarget->end()});
@@ -307,7 +323,6 @@ NbtCompound encode(const ServerEntity& entity) {
     if (entity.owner.has_value()) {
         tag.putString("Owner", *entity.owner);
     }
-    tag.putBoolean("Sitting", entity.sitting);
     if (entity.customName.has_value()) {
         tag.putString("CustomName", *entity.customName);
     }
@@ -371,7 +386,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     const std::string_view path = type->path();
     entity->age = ageableMobs::usesBooleanBabyFlag(path) && numericBoolean(tag, "IsBaby") ? ageableMobs::kBabyStartAge
                                                                                           : numericInt(tag, "Age");
-    entity->fuse = numericInt(tag, "Fuse");
+    if (tag.contains("fuse")) {
+        entity->fuse = numericInt(tag, "fuse");
+    }
     if (tag.contains("Air")) {
         entity->airSupply = static_cast<std::int32_t>(tag.getShort("Air"));
     }
@@ -382,11 +399,6 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->canPickUpLoot = tag.getBoolean("CanPickUpLoot");
     entity->loveTicks = numericInt(tag, "LoveTicks");
     entity->breedCooldown = numericInt(tag, "BreedCooldown");
-    if (const std::string_view profession = tag.getString("VillagerProfession"); !profession.empty()) {
-        entity->profession = std::string{profession};
-    }
-    entity->villagerLevel = std::max(numericInt(tag, "VillagerLevel"), 1);
-    entity->villagerExperience = numericInt(tag, "VillagerExperience");
     if (patrols(path)) {
         if (const std::span<const std::int32_t> target = tag.getIntArray("patrol_target"); target.size() >= 3) {
             entity->patrolTarget = std::array<std::int32_t, 3>{target[0], target[1], target[2]};
