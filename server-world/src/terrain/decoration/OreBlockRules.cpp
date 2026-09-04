@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
+#include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
 
 #include <algorithm>
 
@@ -8,20 +9,11 @@ namespace {
 
 using BlockSet = std::set<std::string, std::less<>>;
 
-const BlockSet& baseStone() {
-    static const BlockSet blocks = {"stone", "granite", "diorite", "andesite", "tuff", "deepslate"};
-    return blocks;
-}
+const BlockSet& baseStone() { return stoneBlockTags::baseStoneOverworld(); }
 
-const BlockSet& stoneReplaceables() {
-    static const BlockSet blocks = {"stone", "granite", "diorite", "andesite"};
-    return blocks;
-}
+const BlockSet& stoneReplaceables() { return stoneBlockTags::stoneOreReplaceables(); }
 
-const BlockSet& deepslateReplaceables() {
-    static const BlockSet blocks = {"deepslate", "tuff"};
-    return blocks;
-}
+const BlockSet& deepslateReplaceables() { return stoneBlockTags::deepslateOreReplaceables(); }
 
 /// parity: block tag `features_cannot_replace`, the only thing a geode refuses to carve through.
 const BlockSet& geodeCannotReplace() {

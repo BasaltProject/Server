@@ -24,6 +24,7 @@ using structure::StructurePos;
 using structure::StructureRotation;
 
 constexpr std::int32_t kNetherSeaLevel = 32;
+constexpr std::size_t kSamplerCacheCapacity = 64;
 constexpr std::int32_t kNetherGenerationDepth = 128;
 constexpr std::int32_t kFossilMinY = 32;
 constexpr std::int32_t kFossilMaxY = 125;
@@ -178,6 +179,12 @@ DensityChunkSampler& NetherStructureGenerator::samplerAt(std::int32_t x, std::in
     }
     auto created = std::make_unique<DensityChunkSampler>(router_.finalDensity, key.first, key.second, 0,
                                                          kNetherGenerationDepth, 4, 8);
+    // One sampler per chunk with no ceiling is a leak in a server that keeps exploring: each holds a
+    // `FunctionContext` and a `DensityCache`. Clearing is safe here, and only here, because the only
+    // caller reads the sampler with `mutex_` still held, so no reference outlives this map.
+    if (samplers_.size() >= kSamplerCacheCapacity) {
+        samplers_.clear();
+    }
     return *samplers_.emplace(key, std::move(created)).first->second;
 }
 

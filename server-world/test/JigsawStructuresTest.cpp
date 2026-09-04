@@ -425,12 +425,15 @@ TEST_CASE("the deep jigsaw structures assemble where the frozen kotlin assembles
 
     SUBCASE("noCity") { check(runCity(1234, "minecraft:ocean"), 0, 0, -6294788893584798351LL, "none", 1, 0); }
 
+    // The chamber records its start like every other jigsaw structure, which is what the jar does and
+    // what the server has always done. The zero these two used to expect came from a settings object
+    // that only the tests ever read.
     SUBCASE("chamber") {
-        check(runChamber(1234, "minecraft:dripstone_caves"), 2976, 0, 1740388681668476531LL, "none", 1, 15);
+        check(runChamber(1234, "minecraft:dripstone_caves"), 2976, 8, -7428120839514114081LL, "none", 1, 15);
     }
 
     SUBCASE("chamberElsewhere") {
-        check(runChamber(77, "minecraft:lush_caves"), 3460, 0, -5265117914757100792LL, "none", 1, 19);
+        check(runChamber(77, "minecraft:lush_caves"), 3460, 7, 5873367261463590498LL, "none", 1, 19);
     }
 
     SUBCASE("noChamber") { check(runChamber(1234, "minecraft:ocean"), 0, 0, -3883247817186501711LL, "none", 1, 0); }

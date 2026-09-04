@@ -58,70 +58,23 @@ using wire::common::Identifier;
     return {members.begin(), members.end()};
 }
 
-[[nodiscard]] terrain::JigsawStructureSettings pillagerOutpostSettings() {
-    return {.name = "pillager_outpost",
-            // parity: `pillager_outpost.json` puts it in `surface_structures`, which is step 4, and
-            // it is the tenth of that step in registry order.
-            .structureIndex = 9,
-            .step = 4,
-            .startPool = "minecraft:pillager_outpost/base_plates",
-            .maxDepth = 7,
-            .maxDistanceFromCenter = 80,
-            .useExpansionHack = true,
-            .projectStartToHeightmap = true,
-            .heightSource = terrain::JigsawHeightSource::Surface,
-            .adjustment = terrain::TerrainAdjustment::BeardThin};
+// The settings live in `server-world` beside the generator that reads them, and the tests exercise
+// those same objects. Keeping a second copy here is what let a wrong step and a wrong terrain
+// adaptation ship while the suite stayed green.
+[[nodiscard]] const terrain::JigsawStructureSettings& pillagerOutpostSettings() {
+    return terrain::jigsawStructures::pillagerOutpost();
 }
 
-[[nodiscard]] terrain::JigsawStructureSettings trailRuinsSettings() {
-    return {.name = "trail_ruins",
-            // parity: `trail_ruins.json` puts it in `underground_structures`, step 3, after the
-            // buried treasure and the two mineshafts.
-            .structureIndex = 3,
-            .step = 3,
-            .startPool = "minecraft:trail_ruins/tower",
-            .maxDepth = 7,
-            .maxDistanceFromCenter = 80,
-            // parity: `trail_ruins.json` gives a constant `start_height` of -15 and projects the
-            // start to `WORLD_SURFACE_WG`. Drawing a height instead both puts the ruins at the wrong
-            // depth and spends a draw the jar never spends, which moves the whole assembly after it.
-            .projectStartToHeightmap = true,
-            .heightSource = terrain::JigsawHeightSource::Surface,
-            .startY = -15,
-            .adjustment = terrain::TerrainAdjustment::Bury,
-            .passWorldSeed = true};
+[[nodiscard]] const terrain::JigsawStructureSettings& trailRuinsSettings() {
+    return terrain::jigsawStructures::trailRuins();
 }
 
-[[nodiscard]] terrain::JigsawStructureSettings ancientCitySettings() {
-    return {.name = "ancient_city",
-            .structureIndex = 0,
-            .step = 7,
-            .startPool = "minecraft:ancient_city/city_center",
-            .startJigsawName = "minecraft:city_anchor",
-            .maxDepth = 7,
-            .maxDistanceFromCenter = 116,
-            .heightSource = terrain::JigsawHeightSource::Fixed,
-            .startY = -27,
-            .adjustment = terrain::TerrainAdjustment::BeardBox,
-            .startRecords = terrain::JigsawStartRecords::FromFirstPiece,
-            .cacheCapacity = 16};
+[[nodiscard]] const terrain::JigsawStructureSettings& ancientCitySettings() {
+    return terrain::jigsawStructures::ancientCity();
 }
 
-[[nodiscard]] terrain::JigsawStructureSettings trialChamberSettings() {
-    return {.name = "trial_chambers",
-            // parity: `trial_chambers.json` puts it in `underground_structures`, step 3, as the last
-            // of that step's five entries.
-            .structureIndex = 4,
-            .step = 3,
-            .startPool = "minecraft:trial_chambers/chamber/end",
-            .maxDepth = 20,
-            .maxDistanceFromCenter = 116,
-            .heightSource = terrain::JigsawHeightSource::Drawn,
-            .startY = -40,
-            .startYMax = -20,
-            .adjustment = terrain::TerrainAdjustment::Encapsulate,
-            .startRecords = terrain::JigsawStartRecords::FromFirstPiece,
-            .cacheCapacity = 16};
+[[nodiscard]] const terrain::JigsawStructureSettings& trialChamberSettings() {
+    return terrain::jigsawStructures::trialChamber();
 }
 
 } // namespace
