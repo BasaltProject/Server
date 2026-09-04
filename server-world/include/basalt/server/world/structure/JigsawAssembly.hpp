@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,10 +52,19 @@ struct JigsawRequest {
     /// hangs the generator.
     std::int32_t maxDistanceFromCenter = 0;
     std::int32_t maxVerticalDistanceFromCenter = std::numeric_limits<std::int32_t>::max();
+    /// parity: `JigsawStructure`'s `dimension_padding`, which shrinks the allowed region away from the
+    /// world's floor and ceiling before the vertical reach is applied.
+    std::int32_t dimensionPaddingBottom = 0;
+    std::int32_t dimensionPaddingTop = 0;
+    std::int32_t worldMinY = std::numeric_limits<std::int32_t>::min();
+    std::int32_t worldMaxY = std::numeric_limits<std::int32_t>::max();
     /// Reproduces the legacy village-only collision-box height expansion. Bastions disable it.
     bool useExpansionHack = false;
     /// The jigsaw block the start piece is anchored by, such as the ancient city's `city_anchor`.
     std::string startJigsawName;
+    /// parity: `PoolAliasLookup`, already resolved for this start. A jigsaw's pool goes through it
+    /// before the lookup, and pools that only exist as an alias target are unreachable without it.
+    std::map<std::string, std::string, std::less<>> poolAliases;
 };
 
 /// parity: `JigsawPlacement`, the breadth-first assembly of `Placer.tryPlacingChildren`, including
