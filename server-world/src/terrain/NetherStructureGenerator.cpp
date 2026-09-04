@@ -182,7 +182,16 @@ DensityChunkSampler& NetherStructureGenerator::samplerAt(std::int32_t x, std::in
 }
 
 std::int32_t NetherStructureGenerator::baseStateAt(std::int32_t x, std::int32_t y, std::int32_t z) {
-    if (samplerAt(x, z).sample(x & 15, y, z & 15) > 0.0) {
+    // Every chunk generation worker shares this generator, so both the sampler map and the sampler
+    // itself need the lock. The map is the obvious half; the sampler is the one that actually
+    // crashed, because it holds one `FunctionContext` and one `DensityCache` for its whole chunk
+    // and two threads inside `sample` walk over each other's cache slots.
+    double density = 0.0;
+    {
+        const std::scoped_lock lock{mutex_};
+        density = samplerAt(x, z).sample(x & 15, y, z & 15);
+    }
+    if (density > 0.0) {
         return netherrack();
     }
     return y < kNetherSeaLevel ? registry::blocks::lava().stateId : registry::blocks::air().stateId;
