@@ -48,6 +48,42 @@ using BiomeAt =
     DensityChunkSampler sampler{
         finalDensity,        chunkX, chunkZ, settings.noiseMinY, settings.noiseHeight, settings.cellWidth,
         settings.cellHeight, &cache};
+    // parity: `ChunkStatus.BIOMES` runs before `NOISE` and `SURFACE`, so the biome container is filled
+    // before any terrain exists. The order is not cosmetic: every climate lookup seeds the next one
+    // through `Climate.RTree`'s per-thread last result, so filling last shifts the ties the surface
+    // rules and the decorators go on to resolve.
+    generationMetrics::measure(generationMetrics::Phase::BiomeFill, [&] {
+        std::map<std::string, std::int32_t, std::less<>> idByName;
+        // parity: `ChunkAccess.fillBiomesFromNoise` walks section by section, and
+        // `LevelChunkSection.fillBiomesFromNoise` walks x, then y, then z inside each one. The order is
+        // observable because `Climate.RTree` seeds each search with the thread's previous result and keeps
+        // it on an exact tie, so a column that sits on a parameter boundary takes the biome of whatever
+        // was asked for just before it.
+        const std::int32_t sections = settings.verticalBounds.height() / 16;
+        for (std::int32_t section = 0; section < sections; ++section) {
+            for (std::int32_t quartX = 0; quartX < 4; ++quartX) {
+                for (std::int32_t withinSection = 0; withinSection < 4; ++withinSection) {
+                    const std::int32_t quartY = section * 4 + withinSection;
+                    const std::int32_t blockY = settings.verticalBounds.minY() + quartY * 4;
+                    for (std::int32_t quartZ = 0; quartZ < 4; ++quartZ) {
+                        const std::string_view biome =
+                            biomeAt(chunkX * 16 + quartX * 4, blockY, chunkZ * 16 + quartZ * 4, cache);
+                        auto found = idByName.find(biome);
+                        if (found == idByName.end()) {
+                            std::int32_t id = 0;
+                            const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+                                wire::common::Identifier::parse(biome);
+                            if (parsed.has_value()) {
+                                id = registry::biomes::registry().idOf(*parsed).value_or(0);
+                            }
+                            found = idByName.emplace(std::string{biome}, id).first;
+                        }
+                        chunk.setBiomeId(quartX, quartY, quartZ, found->second);
+                    }
+                }
+            }
+        }
+    });
     generationMetrics::measure(generationMetrics::Phase::TerrainFill, [&] {
         for (std::int32_t cellY = 0; cellY < sampler.verticalCells(); ++cellY) {
             const std::int32_t cellMinY = settings.noiseMinY + cellY * settings.cellHeight;
@@ -78,29 +114,6 @@ using BiomeAt =
     generationMetrics::measure(generationMetrics::Phase::Carvers, [&] { carverPass(chunk, cache); });
     generationMetrics::measure(generationMetrics::Phase::Structures, [&] { structurePass(chunk, cache); });
     generationMetrics::measure(generationMetrics::Phase::Decoration, [&] { decorationPass(chunk, cache); });
-    generationMetrics::measure(generationMetrics::Phase::BiomeFill, [&] {
-        std::map<std::string, std::int32_t, std::less<>> idByName;
-        for (std::int32_t quartY = 0; quartY < settings.verticalBounds.height() / 4; ++quartY) {
-            const std::int32_t blockY = settings.verticalBounds.minY() + quartY * 4;
-            for (std::int32_t quartX = 0; quartX < 4; ++quartX) {
-                for (std::int32_t quartZ = 0; quartZ < 4; ++quartZ) {
-                    const std::string_view biome =
-                        biomeAt(chunkX * 16 + quartX * 4, blockY, chunkZ * 16 + quartZ * 4, cache);
-                    auto found = idByName.find(biome);
-                    if (found == idByName.end()) {
-                        std::int32_t id = 0;
-                        const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
-                            wire::common::Identifier::parse(biome);
-                        if (parsed.has_value()) {
-                            id = registry::biomes::registry().idOf(*parsed).value_or(0);
-                        }
-                        found = idByName.emplace(std::string{biome}, id).first;
-                    }
-                    chunk.setBiomeId(quartX, quartY, quartZ, found->second);
-                }
-            }
-        }
-    });
     if (generationMetrics::enabled()) {
         generationMetrics::countChunk();
     }

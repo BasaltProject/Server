@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace basalt::server::world::climate {
 namespace detail {
@@ -163,6 +164,11 @@ std::unique_ptr<RTree<T>> RTree<T>::create(std::vector<std::pair<ParameterPoint,
             static_cast<int>(std::floor(std::log(static_cast<double>(children.size()) - 0.01) / std::log(6.0))));
         std::int64_t minCost = std::numeric_limits<std::int64_t>::max();
         std::size_t minDimension = 0;
+        // parity: `Climate.RTree.build` keeps the buckets it made while trying the winning axis rather than
+        // sorting again afterwards. Sorting again starts from the order the last axis left behind, and nodes
+        // whose centres tie on all seven axes then come out in a different order, which changes the tree and
+        // so which of two equally distant biomes a lookup reaches first.
+        std::vector<Node*> minOrder;
         for (std::size_t dimension = 0; dimension < kDimensions; ++dimension) {
             detail::sortNodes(children, dimension, false);
             std::int64_t totalCost = 0;
@@ -180,11 +186,23 @@ std::unique_ptr<RTree<T>> RTree<T>::create(std::vector<std::pair<ParameterPoint,
             if (minCost > totalCost) {
                 minCost = totalCost;
                 minDimension = dimension;
+                minOrder.clear();
+                minOrder.reserve(children.size());
+                for (const std::unique_ptr<Node>& child : children) {
+                    minOrder.push_back(child.get());
+                }
             }
         }
 
-        // Bucket along the cheapest axis, then order the buckets by the absolute centre.
-        detail::sortNodes(children, minDimension, false);
+        // Restore the winning axis's own order, then bucket along it and order the buckets by absolute centre.
+        std::unordered_map<const Node*, std::size_t> position;
+        position.reserve(minOrder.size());
+        for (std::size_t i = 0; i < minOrder.size(); ++i) {
+            position.emplace(minOrder[i], i);
+        }
+        std::ranges::sort(children, [&position](const std::unique_ptr<Node>& a, const std::unique_ptr<Node>& b) {
+            return position.at(a.get()) < position.at(b.get());
+        });
         std::vector<std::unique_ptr<Node>> buckets;
         for (std::size_t start = 0; start < children.size(); start += expected) {
             const std::size_t end = std::min(start + expected, children.size());
