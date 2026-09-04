@@ -399,37 +399,41 @@ void PluginHost::stop(LoadedPlugin& plugin) {
 }
 
 std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& plugin, std::string_view requested) {
-    const std::string path{requested};
-    if (std::optional<std::vector<std::uint8_t>> own = plugin.pkg->read(std::string{packageLayout::kSource} + path);
-        own.has_value()) {
-        return own;
-    }
-    const std::size_t slash = path.find('/');
-    if (slash == std::string::npos) {
+    const std::optional<std::string> own = packageLayout::moduleFile(requested);
+    if (!own.has_value()) {
         return std::nullopt;
     }
-    const std::string id = path.substr(0, slash);
-    const std::string rest = path.substr(slash + 1);
+    if (std::optional<std::vector<std::uint8_t>> found = plugin.pkg->read(*own); found.has_value()) {
+        return found;
+    }
+    // Past its own `src/`, the first part is whose the module is: `require("economy.api")` is
+    // `src/api.lua` of the plugin `economy`, and only if `economy` says that module is public.
+    const std::size_t dot = requested.find('.');
+    if (dot == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const std::string id{requested.substr(0, dot)};
+    const std::string_view module = requested.substr(dot + 1);
+    const std::optional<std::string> file = packageLayout::moduleFile(module);
+    if (!file.has_value()) {
+        return std::nullopt;
+    }
     // Its own code under its own id: `require("me.util")` from inside `me` is the same file as
     // `require("util")`, and a library that names its own modules the way everyone else does should
     // not have to write them differently.
     if (id == plugin.manifest.id) {
-        return plugin.pkg->read(std::string{packageLayout::kSource} + rest);
+        return plugin.pkg->read(*file);
     }
     const LoadedPlugin* owner = pluginById(id);
     if (owner == nullptr) {
         return std::nullopt;
-    }
-    std::string module = rest;
-    if (module.ends_with(".lua")) {
-        module.resize(module.size() - 4);
     }
     if (!owner->manifest.exports.exportsModule(module)) {
         // Not "no such module": it is there and it is private, and saying which is the difference
         // between a one-line fix and an afternoon.
         return std::nullopt;
     }
-    return owner->pkg->read(std::string{packageLayout::kSource} + rest);
+    return owner->pkg->read(*file);
 }
 
 } // namespace basalt::server::plugins

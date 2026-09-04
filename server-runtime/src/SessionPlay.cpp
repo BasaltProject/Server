@@ -72,6 +72,17 @@ std::string oneDecimal(double value) {
     return sign + std::to_string(tenths / 10) + "." + std::to_string(tenths % 10);
 }
 
+/// What a plugin drew, as what the window machinery draws: the same three fields, and the rest of a
+/// `PluginItem` (damage, enchantments) is not something a menu button has.
+[[nodiscard]] std::map<std::int32_t, PluginMenuItem>
+menuItemsOf(const std::map<std::int32_t, server::plugins::PluginItem>& items) {
+    std::map<std::int32_t, PluginMenuItem> drawn;
+    for (const auto& [slot, item] : items) {
+        drawn.emplace(slot, PluginMenuItem{.id = item.id, .count = item.count, .name = item.name, .lore = item.lore});
+    }
+    return drawn;
+}
+
 play::PlayerInfoEntry entryFor(const PlayerSession& player) {
     return play::PlayerInfoEntry{.uuid = player.uuid(),
                                  .name = player.name(),
@@ -224,6 +235,17 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.syncExperience = [this] { syncExperience(); };
     connection.killPlayer = [this](std::string_view deathMessageId) { killPlayer(deathMessageId); };
     connection.storedSnapshot = [this] { return storedSnapshot(); };
+    // A window a plugin drew. The controller has had all three of these all along; without them
+    // `menu:open` found no way through and returned as if it had opened one.
+    connection.openPluginMenu = [this](const std::string& title, std::int32_t rows,
+                                       const std::map<std::int32_t, server::plugins::PluginItem>& items,
+                                       std::function<void(std::int32_t)> onClick) {
+        menus_->openPluginMenu(title, rows, menuItemsOf(items), std::move(onClick));
+    };
+    connection.refreshPluginMenu = [this](const std::map<std::int32_t, server::plugins::PluginItem>& items) {
+        menus_->refreshPluginMenu(menuItemsOf(items));
+    };
+    connection.closeOpenMenu = [this] { menus_->closeOpenMenu(); };
     return connection;
 }
 
@@ -381,7 +403,15 @@ void ClientSession::enterPlay() {
     });
     logger_.info([&player] { return player.name() + " joined the game"; });
     if (options_.plugins.joined) {
-        options_.plugins.joined(player);
+        // Handed to the owner rather than announced from here, which is this connection's own
+        // thread: a decider only runs on the thread plugins live on, and fired from here the host
+        // drops it and warns. Nothing waits for the answer, so a turn later is late enough.
+        onOwner([this] {
+            const PlayerSession* joined = playerSession_.get();
+            if (joined != nullptr) {
+                options_.plugins.joined(*joined);
+            }
+        });
     }
 
     std::vector<play::PlayerInfoEntry> entries;

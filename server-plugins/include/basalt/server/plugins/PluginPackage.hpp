@@ -31,6 +31,13 @@ inline constexpr std::string_view kAssets = "resources/assets/";
 /// The extension of a built package.
 inline constexpr std::string_view kExtension = ".bspkg";
 
+/// The file a Lua module name points at, `src/` included: `util.money` is `src/util/money.lua`.
+///
+/// Dots and no extension, which is how Lua has always named a module. There is deliberately one
+/// spelling and not several: `require` caches by the name it was handed, so two names for one file
+/// would run it twice and hand each caller its own copy of what the module keeps.
+[[nodiscard]] std::optional<std::string> moduleFile(std::string_view module);
+
 } // namespace packageLayout
 
 /// The files of one plugin, however they are stored.

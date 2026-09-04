@@ -12,6 +12,72 @@ namespace {
 
 using lua::LuaArgs;
 
+/// One field of an event, when it is there and it is of the type asked for.
+template <typename T>
+[[nodiscard]] const T* fieldOf(const PluginEvent& event, std::string_view name) {
+    return std::get_if<T>(&event.get(name));
+}
+
+/// `e.player`, `e.entity` and `e.pos`: the objects behind the plain fields an event carries, looked
+/// up when asked for and never before. That is why an event carries a uuid and three numbers rather
+/// than objects most handlers never read; the event object is reused between fires, so this reads
+/// the one the view was built around.
+///
+/// A lookup that finds nobody answers nil: a player who logged out is a question with an answer.
+[[nodiscard]] PluginEventView::Objects objectsOf(PluginHost& host, LoadedPlugin& plugin, PluginEvent& event) {
+    PluginHost* server = &host;
+    LoadedPlugin* target = &plugin;
+    const PluginEvent* fired = &event;
+    return [server, target, fired](LuaArgs& lua, std::string_view name) {
+        const auto carries = [fired](std::string_view field) { return fired->type().indexOf(field) >= 0; };
+        if (name == "player" && carries("player_uuid")) {
+            const std::string* uuid = fieldOf<std::string>(*fired, "player_uuid");
+            std::shared_ptr<PluginPlayerRef> player =
+                uuid == nullptr ? nullptr : server->services().players().byUuid(*uuid);
+            // By name second: an event may name somebody it has no uuid for.
+            if (player == nullptr) {
+                const std::string* named = fieldOf<std::string>(*fired, "player_name");
+                player = named == nullptr ? nullptr : server->services().players().byName(*named);
+            }
+            if (player == nullptr) {
+                lua.pushNil();
+                return true;
+            }
+            pushPlayer(lua, std::move(player), &server->services().storage(), target->manifest.id, &target->text);
+            return true;
+        }
+        if (name == "entity" && carries("entity_id")) {
+            const std::int64_t* id = fieldOf<std::int64_t>(*fired, "entity_id");
+            const std::string* world = fieldOf<std::string>(*fired, "world");
+            const std::shared_ptr<PluginWorldRef> where =
+                world == nullptr ? nullptr : server->services().worlds().byName(*world);
+            if (id != nullptr && where != nullptr) {
+                for (const std::shared_ptr<PluginEntityRef>& entity : where->entities()) {
+                    if (entity->id() == static_cast<std::int32_t>(*id)) {
+                        pushEntity(lua, entity);
+                        return true;
+                    }
+                }
+            }
+            lua.pushNil();
+            return true;
+        }
+        if (name == "pos" && carries("x")) {
+            const double* x = fieldOf<double>(*fired, "x");
+            const double* y = fieldOf<double>(*fired, "y");
+            const double* z = fieldOf<double>(*fired, "z");
+            if (x == nullptr || y == nullptr || z == nullptr) {
+                lua.pushNil();
+                return true;
+            }
+            const std::string* world = fieldOf<std::string>(*fired, "world");
+            pushPosition(lua, world == nullptr ? std::string{} : *world, *x, *y, *z);
+            return true;
+        }
+        return false;
+    };
+}
+
 /// Pushes what a command handed over as an argument, in the shapes a spec can produce.
 void pushArgument(LuaArgs& lua, const PluginCommandCall::Argument& argument) {
     if (std::holds_alternative<std::monostate>(argument)) {
@@ -127,7 +193,8 @@ void PluginEventDispatch::registerEventHandler(LoadedPlugin& plugin, PluginInsta
             }
             if (*view == nullptr) {
                 *view = PluginEventView::create(
-                    *lane->sandbox, event, [&event](std::optional<std::string> message) { event.cancel(message); }, {},
+                    *lane->sandbox, event, [&event](std::optional<std::string> message) { event.cancel(message); },
+                    objectsOf(*host, *target, event),
                     [target](std::string_view message) { return target->text.resolve(message, nullptr, 0); });
             }
             if (*view == nullptr) {

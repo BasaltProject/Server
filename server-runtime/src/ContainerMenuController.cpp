@@ -268,6 +268,14 @@ void ContainerMenuController::fillPluginMenu(const std::map<std::int32_t, Plugin
             components.set("minecraft:custom_name",
                            wire::text::componentNbt::serialize(wire::text::miniMessage::parse(*item.name)));
         }
+        if (!item.lore.empty()) {
+            wire::nbt::NbtList lines{wire::nbt::NbtType::Compound};
+            for (const std::string& line : item.lore) {
+                static_cast<void>(
+                    lines.push(wire::text::componentNbt::serialize(wire::text::miniMessage::parse(line))));
+            }
+            components.set("minecraft:lore", wire::nbt::NbtTag::ofList(std::move(lines)));
+        }
         (*pluginMenu_)[static_cast<std::size_t>(slot)] =
             storage::StoredItemStack{.id = item.id, .count = std::max(item.count, 1), .components = components};
     }

@@ -208,11 +208,18 @@ void ClientSession::sendActionBar(const wire::text::Component& message) { sendPl
 void ClientSession::broadcastToEveryone(const wire::text::Component& message) {
     wire::text::Component text = message;
     if (options_.plugins.broadcastAllowed) {
-        std::string plain = wire::text::resolvePlainText(text, consoleLang());
+        const std::string said = wire::text::resolvePlainText(text, consoleLang());
+        std::string plain = said;
         if (!options_.plugins.broadcastAllowed(plain)) {
             return;
         }
-        text = wire::text::miniMessage::parse(plain);
+        // Only what a plugin actually rewrote is read back as MiniMessage. Flattening every
+        // broadcast through plain text costs the original its colour and its translation, so an
+        // untouched join announcement arrived white and already translated, in the console's
+        // language rather than each client's.
+        if (plain != said) {
+            text = wire::text::miniMessage::parse(plain);
+        }
     }
     if (options_.playerRegistry == nullptr) {
         return;
