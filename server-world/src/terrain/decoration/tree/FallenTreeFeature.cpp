@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/decoration/JavaHashSetOrder.hpp>
 #include <basalt/server/world/terrain/decoration/tree/FallenTreeFeature.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
 
@@ -63,28 +64,6 @@ constexpr std::array<StumpVine, 4> kStumpVines{
 }
 
 /// The bucket iteration order of vanilla's `HashSet<BlockPos>`, which the mushroom shuffle starts
-/// from.
-[[nodiscard]] std::vector<LogPos> javaHashSetOrder(const std::vector<LogPos>& positions) {
-    if (positions.empty()) {
-        return {};
-    }
-    std::size_t capacity = 16;
-    while (positions.size() > capacity * 3 / 4) {
-        capacity *= 2;
-    }
-    std::vector<LogPos> ordered;
-    ordered.reserve(positions.size());
-    for (std::size_t bucket = 0; bucket < capacity; ++bucket) {
-        for (const LogPos& position : positions) {
-            const std::int32_t hash = (position.y + position.z * 31) * 31 + position.x;
-            const std::uint32_t spread = static_cast<std::uint32_t>(hash) ^ (static_cast<std::uint32_t>(hash) >> 16U);
-            if ((spread & static_cast<std::uint32_t>(capacity - 1)) == bucket) {
-                ordered.push_back(position);
-            }
-        }
-    }
-    return ordered;
-}
 
 void decorateStumpVines(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y, std::int32_t z) {
     for (const StumpVine& vine : kStumpVines) {
