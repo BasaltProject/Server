@@ -81,6 +81,7 @@ basalt_module(server-world
     src/terrain/decoration/HugeMushroomFeature.cpp
     src/terrain/decoration/IntProvider.cpp
     src/terrain/decoration/OreBlockRules.cpp
+    src/terrain/decoration/VegetationBlockRules.cpp
     src/terrain/decoration/StoneBlockTags.cpp
     src/terrain/decoration/end/EndDecoration.cpp
     src/terrain/decoration/end/EndSurfaceStructuresDecoration.cpp

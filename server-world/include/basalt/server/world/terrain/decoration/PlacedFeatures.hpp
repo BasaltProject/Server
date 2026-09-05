@@ -26,7 +26,9 @@ namespace basalt::server::world::terrain::decoration {
 /// for the rest of the world alongside the position.
 namespace placedFeatures {
 
-/// One feature at chunk-local `localX`/`localZ` and world `y`.
+/// One feature at a world position, inside the chunk it is handed. The bodies read and write in
+/// world coordinates through `decorationBlockStateId`, so masking the position to the chunk sent
+/// every placement outside chunk (0,0) to the wrong column, where it was deferred and lost.
 using Placement = std::function<void(Chunk&, random::RandomSource&, std::int32_t, std::int32_t, std::int32_t)>;
 
 /// The placement for `id`, or null when nothing answers to that name.

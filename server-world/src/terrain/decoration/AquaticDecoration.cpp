@@ -23,14 +23,30 @@ namespace {
 }
 
 [[nodiscard]] std::int32_t localBlock(const Chunk& chunk, std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
-    return chunk.blockStateId(worldX & 15, y, worldZ & 15);
+    return chunk.decorationBlockStateId(worldX, y, worldZ);
 }
 
 void setLocalBlock(Chunk& chunk, std::int32_t worldX, std::int32_t y, std::int32_t worldZ, std::int32_t stateId) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (y >= bounds.minY() && y <= bounds.maxY()) {
-        chunk.setBlockStateId(worldX & 15, y, worldZ & 15, stateId);
+        chunk.setDecorationBlockStateId(worldX, y, worldZ, stateId);
     }
+}
+
+/// The `OCEAN_FLOOR` height of a column. A heightmap belongs to the chunk that owns it, so a column
+/// outside is scanned through the same reader the rest of the body uses.
+[[nodiscard]] std::int32_t oceanFloorAt(const Chunk& chunk, const std::vector<std::int32_t>& oceanFloor,
+                                        std::int32_t worldX, std::int32_t worldZ) {
+    if ((worldX >> 4) == chunk.chunkX() && (worldZ >> 4) == chunk.chunkZ()) {
+        return oceanFloor[static_cast<std::size_t>((worldX & 15) + (worldZ & 15) * 16)];
+    }
+    const ChunkHeight bounds = chunk.verticalBounds();
+    for (std::int32_t y = bounds.maxY(); y >= bounds.minY(); --y) {
+        if (heightmapMatches(HeightmapType::OceanFloor, chunk.decorationBlockStateId(worldX, y, worldZ))) {
+            return y + 1;
+        }
+    }
+    return bounds.minY();
 }
 
 [[nodiscard]] bool isWater(const Chunk& chunk, std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
@@ -47,7 +63,7 @@ void placeSeagrass(Chunk& chunk, random::RandomSource& random, const DecorationP
                    const std::vector<std::int32_t>& oceanFloor, double tallProbability) {
     const std::int32_t x = origin.x + random.nextInt(8) - random.nextInt(8);
     const std::int32_t z = origin.z + random.nextInt(8) - random.nextInt(8);
-    const std::int32_t y = oceanFloor[static_cast<std::size_t>((x & 15) + (z & 15) * 16)];
+    const std::int32_t y = oceanFloorAt(chunk, oceanFloor, x, z);
     if (!isWater(chunk, x, y, z)) {
         return;
     }
@@ -105,7 +121,7 @@ void placeSeaPickles(Chunk& chunk, random::RandomSource& random, const Decoratio
     for (std::int32_t attempt = 0; attempt < count; ++attempt) {
         const std::int32_t x = origin.x + random.nextInt(8) - random.nextInt(8);
         const std::int32_t z = origin.z + random.nextInt(8) - random.nextInt(8);
-        const std::int32_t y = oceanFloor[static_cast<std::size_t>((x & 15) + (z & 15) * 16)];
+        const std::int32_t y = oceanFloorAt(chunk, oceanFloor, x, z);
         const std::int32_t stateId = seaPickle + random.nextInt(4) * 2;
         if (isWater(chunk, x, y, z) && y > minY && aquaticsupport::seaPickleSupport(localBlock(chunk, x, y - 1, z))) {
             setLocalBlock(chunk, x, y, z, stateId);
