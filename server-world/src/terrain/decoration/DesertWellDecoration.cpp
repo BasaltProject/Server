@@ -26,19 +26,20 @@ constexpr std::array<std::pair<std::int32_t, std::int32_t>, 4> kHorizontalDirect
     return found->stateId;
 }
 
-/// The well is chunk-local: outside reads as air and outside writes are dropped.
+/// parity: El pozo abarca varios bloques alrededor de su origen, asi que cae sobre el borde a menudo.
+/// Vanilla escribe ahi por el `WorldGenLevel`; recortar pierde el trozo que asoma. Coordenadas de mundo.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    if (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= bounds.minY() && y <= bounds.maxY()) {
-        return chunk.blockStateId(x, y, z);
+    if (y < bounds.minY() || y > bounds.maxY()) {
+        return registry::blocks::air().stateId;
     }
-    return registry::blocks::air().stateId;
+    return chunk.decorationBlockStateId(x, y, z);
 }
 
 void set(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    if (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= bounds.minY() && y <= bounds.maxY()) {
-        chunk.setBlockStateId(x, y, z, stateId);
+    if (y >= bounds.minY() && y <= bounds.maxY()) {
+        chunk.setDecorationBlockStateId(x, y, z, stateId);
     }
 }
 
@@ -52,19 +53,21 @@ void set(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int3
            (static_cast<std::int64_t>(y) & 0xFFFLL);
 }
 
+/// Coordinates are world ones, like the rest of the well.
 void placeSuspiciousSand(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < bounds.minY() || y > bounds.maxY()) {
+    if (y < bounds.minY() || y > bounds.maxY()) {
         return;
     }
-    chunk.setBlockStateId(x, y, z, stateIdOf("suspicious_sand"));
+    const std::int32_t stateId = stateIdOf("suspicious_sand");
+    chunk.setDecorationBlockStateId(x, y, z, stateId);
     wire::nbt::NbtCompound data;
     data.putString("LootTable", "minecraft:archaeology/desert_well");
-    const std::int32_t worldX = chunk.chunkX() * 16 + x;
-    const std::int32_t worldZ = chunk.chunkZ() * 16 + z;
-    data.putLong("LootTableSeed", packedBlockPosition(worldX, y, worldZ));
-    chunk.setBlockEntity(
-        ChunkBlockEntity{x, y, z, wire::common::Identifier::vanilla("brushable_block"), std::move(data)});
+    data.putLong("LootTableSeed", packedBlockPosition(x, y, z));
+    // The brushable block entity travels with its sand, so one that landed in a neighbour still
+    // carries its loot table when that chunk arrives.
+    chunk.setDecorationBlockEntity(x, y, z, stateId, wire::common::Identifier::vanilla("brushable_block"),
+                                   std::move(data));
 }
 
 } // namespace
@@ -158,7 +161,7 @@ void desertWellDecoration::decorate(Chunk& chunk, std::int64_t seed,
     if ((colon == std::string::npos ? biome : biome.substr(colon + 1)) != "desert") {
         return;
     }
-    placeAt(chunk, random, localX, suppliedY, localZ);
+    placeAt(chunk, random, worldX, suppliedY, worldZ);
 }
 
 } // namespace basalt::server::world::terrain::decoration

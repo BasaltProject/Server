@@ -65,18 +65,21 @@ const StateSet& cactusSupport() {
     return states;
 }
 
+/// parity: these features scatter up to seven blocks from their origin, so they land in a neighbour
+/// often. Masking with `and 15` put those on the opposite edge of the same chunk, which is worse than
+/// dropping them; the deferred writer takes them to the chunk they belong to. Coordinates are world.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (y < bounds.minY() || y > bounds.maxY()) {
         return registry::blocks::air().stateId;
     }
-    return chunk.blockStateId(x & 15, y, z & 15);
+    return chunk.decorationBlockStateId(x, y, z);
 }
 
 void set(Chunk& chunk, const DecorationPos& position, std::int32_t stateId) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (position.y >= bounds.minY() && position.y <= bounds.maxY()) {
-        chunk.setBlockStateId(position.x & 15, position.y, position.z & 15, stateId);
+        chunk.setDecorationBlockStateId(position.x, position.y, position.z, stateId);
     }
 }
 
@@ -123,9 +126,11 @@ void set(Chunk& chunk, const DecorationPos& position, std::int32_t stateId) {
 }
 
 [[nodiscard]] DecorationPos inSquareAtHeight(const Chunk& chunk, random::RandomSource& random, HeightmapType type) {
-    const std::int32_t x = random.nextInt(16);
-    const std::int32_t z = random.nextInt(16);
-    return DecorationPos{.x = x, .y = chunk.heightAt(x, z, type), .z = z};
+    const std::int32_t localX = random.nextInt(16);
+    const std::int32_t localZ = random.nextInt(16);
+    return DecorationPos{.x = chunk.chunkX() * 16 + localX,
+                         .y = chunk.heightAt(localX, localZ, type),
+                         .z = chunk.chunkZ() * 16 + localZ};
 }
 
 [[nodiscard]] DecorationPos triangleOffset(const DecorationPos& origin, random::RandomSource& random,
@@ -212,10 +217,7 @@ void placeCactus(Chunk& chunk, random::RandomSource& random, std::int32_t rarity
     for (std::int32_t attempt = 0; attempt < 10; ++attempt) {
         const DecorationPos position = triangleOffset(origin, random, 7, 3);
         if (isAir(chunk, position) && canCactusSurvive(chunk, position)) {
-            cactusFeature::place(chunk, random,
-                                 DecorationPos{.x = chunk.chunkX() * 16 + position.x,
-                                               .y = position.y,
-                                               .z = chunk.chunkZ() * 16 + position.z});
+            cactusFeature::place(chunk, random, position);
         }
     }
 }
