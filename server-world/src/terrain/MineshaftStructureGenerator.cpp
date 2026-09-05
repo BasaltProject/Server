@@ -16,6 +16,10 @@ constexpr std::int32_t kReachChunks = 6;
 constexpr std::size_t kCacheCapacity = 64;
 
 /// Second and third of the five structures of `underground_structures`, in registry order.
+/// parity: the two are separate structures in the registry, and a start says which one it is.
+constexpr std::string_view kNormalName = "mineshaft";
+constexpr std::string_view kMesaName = "mineshaft_mesa";
+
 constexpr std::array<std::pair<std::int32_t, structure::MineshaftType>, 2> kEntries{
     std::pair{1, structure::MineshaftType::Normal}, std::pair{2, structure::MineshaftType::Mesa}};
 
@@ -109,11 +113,26 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
                     assemblyOf(seed, startX, startZ, *type);
                 const std::vector<structure::MineshaftPiece>& pieces = assembly->pieces;
                 const structure::MineshaftBlocks blocks{*type};
+                std::vector<structure::StructureBoundingBox> boxes;
+                boxes.reserve(pieces.size());
+                bool reachesHere = false;
                 for (const structure::MineshaftPiece& piece : pieces) {
+                    boxes.push_back(piece.box);
                     if (!piece.box.intersects(clip)) {
                         continue;
                     }
+                    reachesHere = true;
                     structure::mineshaftFill::place(piece, blocks, chunk, clip, random, biomeAt_);
+                }
+                // The blocks alone are not the whole structure: without the start the chunk cannot
+                // say what it holds, so `/locate` never finds it and nothing knows a position is
+                // inside one. parity: the start belongs to the chunk the shaft begins in.
+                if (reachesHere) {
+                    const std::string_view name = *type == structure::MineshaftType::Mesa ? kMesaName : kNormalName;
+                    if (std::optional<structure::StructureStartRecord> start =
+                            structure::StructureStartRecord::of(std::string{name}, startX, startZ, std::move(boxes))) {
+                        chunk.structures().add(std::move(*start));
+                    }
                 }
             }
         }

@@ -8,6 +8,9 @@ using namespace basalt::server::world;
 using namespace basalt::server::world::region;
 using basalt::wire::common::Identifier;
 using basalt::wire::nbt::NbtCompound;
+using basalt::wire::nbt::NbtList;
+using basalt::wire::nbt::NbtTag;
+using basalt::wire::nbt::NbtType;
 namespace registry = basalt::server::registry;
 
 TEST_CASE("a chunk survives a round trip through its own NBT") {
@@ -106,6 +109,46 @@ TEST_CASE("entities and structures ride with the chunk") {
     REQUIRE(back->structures().starts().size() == 1);
     CHECK(back->structures().starts().front().pieces.size() == 2);
     CHECK(back->structures().starts().front().fullBounds.maxX == 31);
+}
+
+TEST_CASE("a chunk imported from vanilla keeps its structures") {
+    // parity: vanilla keys `starts` by structure id instead of listing them, and each start repeats
+    // its own id inside. Reading only the list shape dropped every structure an imported world had,
+    // and said nothing about it.
+    // The shape is the jar's, and that means no `BB` on the start: it never writes one, and works
+    // its box out from the pieces every time it is asked.
+    NbtCompound start;
+    start.putString("id", "minecraft:mineshaft");
+    start.putInt("ChunkX", 0);
+    start.putInt("ChunkZ", 0);
+    start.putInt("references", 0);
+    NbtCompound first;
+    first.putIntArray("BB", {0, 20, 0, 15, 30, 15});
+    NbtCompound second;
+    second.putIntArray("BB", {16, 25, 8, 31, 40, 31});
+    start.set("Children",
+              NbtTag::ofList(NbtList{NbtType::Compound,
+                                     {NbtTag::ofCompound(std::move(first)), NbtTag::ofCompound(std::move(second))}}));
+    NbtCompound byName;
+    byName.set("minecraft:mineshaft", NbtTag::ofCompound(std::move(start)));
+    NbtCompound structures;
+    structures.set("starts", NbtTag::ofCompound(std::move(byName)));
+
+    NbtCompound tag = chunkNbt::write(Chunk{0, 0});
+    tag.set("structures", NbtTag::ofCompound(std::move(structures)));
+
+    const auto back = chunkNbt::read(tag);
+    REQUIRE(back.has_value());
+    CHECK(back->structures().has("mineshaft"));
+    REQUIRE(back->structures().starts().size() == 1);
+    CHECK(back->structures().starts().front().pieces.size() == 2);
+    // Worked out from the two pieces, because the start carried no box of its own.
+    const structure::StructureBoundingBox& bounds = back->structures().starts().front().fullBounds;
+    CHECK(bounds.minX == 0);
+    CHECK(bounds.minY == 20);
+    CHECK(bounds.maxX == 31);
+    CHECK(bounds.maxY == 40);
+    CHECK(bounds.maxZ == 31);
 }
 
 TEST_CASE("nonsense is refused with a reason rather than half-read") {
