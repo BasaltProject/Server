@@ -130,7 +130,14 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
                 if (reachesHere) {
                     const std::string_view name = *type == structure::MineshaftType::Mesa ? kMesaName : kNormalName;
                     if (std::optional<structure::StructureStartRecord> start =
-                            structure::StructureStartRecord::of(std::string{name}, startX, startZ, std::move(boxes))) {
+                            structure::StructureStartRecord::of(std::string{name}, startX, startZ, boxes)) {
+                        // The full box is the whole shaft, but the pieces kept here are only the ones
+                        // this chunk holds: every question a chunk is asked is about a position inside
+                        // it, and a piece that misses the chunk cannot answer one. A shaft crosses
+                        // dozens of chunks and carries some hundred and fifty pieces into each.
+                        std::erase_if(start->pieces, [&clip](const structure::StructureBoundingBox& piece) {
+                            return !piece.intersects(clip);
+                        });
                         chunk.structures().add(std::move(*start));
                     }
                 }

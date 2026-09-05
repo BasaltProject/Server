@@ -114,6 +114,9 @@ private:
 
     struct VillageStart {
         const Variant* variant = nullptr;
+        /// The chunk the village began in, which is what its structure start belongs to.
+        std::int32_t chunkX = 0;
+        std::int32_t chunkZ = 0;
         std::vector<structure::PlacedStructurePiece> pieces;
     };
 

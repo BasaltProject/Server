@@ -351,6 +351,13 @@ void RuinedPortalStructureGenerator::generateInto(Chunk& chunk, std::int64_t see
             if (portal == nullptr || !portal->box.intersects(clip)) {
                 continue;
             }
+            // Without the start the chunk cannot say what it holds, and a ruined portal is one of
+            // the seven separate structures of the registry, so it goes in under its own name.
+            chunk.structures().add(structure::StructureStartRecord{.structure = portal->variantName,
+                                                                   .chunkX = portal->chunkX,
+                                                                   .chunkZ = portal->chunkZ,
+                                                                   .fullBounds = portal->box,
+                                                                   .pieces = {portal->box}});
             place(*portal, chunk, clip, seed);
         }
     }
