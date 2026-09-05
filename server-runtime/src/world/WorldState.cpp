@@ -187,6 +187,11 @@ Chunk& WorldState::getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) 
     return install(std::move(*generated));
 }
 
+void WorldState::applyPendingWritesTo(Chunk& chunk) {
+    const WorldWriteLock lock{mutex_};
+    pendingDecorations_.applyPendingGeneratedBlockWrites(chunk);
+}
+
 Chunk& WorldState::installLocked(Chunk chunk) {
     const std::int32_t chunkX = chunk.chunkX();
     const std::int32_t chunkZ = chunk.chunkZ();

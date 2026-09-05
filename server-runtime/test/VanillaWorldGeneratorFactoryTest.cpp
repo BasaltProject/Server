@@ -41,7 +41,7 @@ TEST_CASE("a world with no jar still builds a generator that answers chunks") {
             .name = "end", .dimension = config::WorldDimension::End, .type = config::WorldType::Normal},
         WorldMetadata{});
     REQUIRE(end.generate);
-    const basalt::server::world::Chunk chunk = end.generate(0, 0, 0, "normal");
+    const basalt::server::world::Chunk chunk = end.generate(0, 0, 0, "normal", {});
     CHECK(chunk.chunkX() == 0);
     CHECK(chunk.chunkZ() == 0);
     // The End has no village generator to name, and nothing to locate a stronghold with.

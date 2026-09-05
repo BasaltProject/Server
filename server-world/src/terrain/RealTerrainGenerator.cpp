@@ -370,8 +370,11 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
 Chunk generate(const OverworldNoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
                std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
                const TerrainStructureGenerators& generators, NeighbourTerrainCache* neighbours,
-               const structure::TemplateLoader& templates) {
+               const structure::TemplateLoader& templates, const BeforeDecoration& beforeDecoration) {
     GeneratedTerrain terrain = generateTerrain(router, environment, chunkX, chunkZ, seed, generators);
+    if (beforeDecoration) {
+        beforeDecoration(terrain.chunk());
+    }
     const std::unique_ptr<NeighbourTerrain> around =
         neighbours == nullptr ? nullptr : neighbours->around(chunkX, chunkZ);
     decorate(terrain, seed, around.get(), generators, templates);

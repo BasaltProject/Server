@@ -298,7 +298,8 @@ TEST_CASE("a generator handed in is what the world generates with") {
     const std::string root = scratch("loaded-world-generator");
     std::int32_t calls = 0;
     LoadedWorldOptions options;
-    options.normalGenerator = [&calls](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, std::string_view) {
+    options.normalGenerator = [&calls](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, std::string_view,
+                                       const std::function<void(Chunk&)>&) {
         calls++;
         Chunk chunk{chunkX, chunkZ};
         chunk.setBlockStateId(0, 0, 0, reg::blocks::bedrock().stateId);
