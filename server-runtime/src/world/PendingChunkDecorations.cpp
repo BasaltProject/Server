@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/VegetationBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
 
+#include <unordered_set>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -21,20 +22,40 @@ using server::world::GeneratedBlockWritePolicy;
     return y >= chunk.verticalBounds().minY() && y <= chunk.verticalBounds().maxY();
 }
 
-void applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& write) {
+[[nodiscard]] bool isOrePolicy(GeneratedBlockWritePolicy policy) {
+    return policy == GeneratedBlockWritePolicy::OreBaseStone || policy == GeneratedBlockWritePolicy::OreStone ||
+           policy == GeneratedBlockWritePolicy::OreDeepslate;
+}
+
+/// A queued write was issued while its target did not exist yet. parity: in vanilla the target is
+/// always there as a proto chunk, so the write lands before that chunk decorates itself and whatever
+/// its own decoration puts on top wins. Only the batch's earlier writes may be overwritten, because
+/// among themselves they keep the order they were issued in.
+using BatchWritten = std::unordered_set<std::int64_t>;
+
+[[nodiscard]] std::int64_t cellKey(const ChunkGeneratedBlockWrite& write) {
+    return (static_cast<std::int64_t>(write.x & 15) << 40) | (static_cast<std::int64_t>(write.z & 15) << 32) |
+           (static_cast<std::int64_t>(write.y) & 0xFFFFFFFFLL);
+}
+
+bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& write,
+                             const BatchWritten* queued = nullptr) {
     if (!insideChunk(chunk, write.y)) {
-        return;
+        return false;
     }
     const std::int32_t localX = write.x & 15;
     const std::int32_t localZ = write.z & 15;
     const std::int32_t current = chunk.blockStateId(localX, write.y, localZ);
+    const bool decorated = queued != nullptr && current != write.expectedStateId && !queued->contains(cellKey(write));
+    const bool loosely = !(decorated && isOrePolicy(write.policy)) &&
+                         server::world::terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
     const bool canReplace =
         write.replaceAnyState || current == write.expectedStateId ||
-        (write.policy == GeneratedBlockWritePolicy::Tree &&
+        (!decorated && write.policy == GeneratedBlockWritePolicy::Tree &&
          server::world::terrain::decoration::tree::treeBlockRules::canReplaceDeferred(current, write.stateId)) ||
-        server::world::terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
+        loosely;
     if (!canReplace) {
-        return;
+        return false;
     }
     const std::int32_t stateId =
         write.policy == GeneratedBlockWritePolicy::Tree
@@ -45,9 +66,10 @@ void applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& writ
     const std::int32_t below = write.y > chunk.verticalBounds().minY() ? chunk.blockStateId(localX, write.y - 1, localZ)
                                                                        : registry::blocks::air().stateId;
     if (!server::world::terrain::decoration::vegetationBlockRules::survivesDeferred(stateId, below)) {
-        return;
+        return false;
     }
     chunk.setBlockStateId(localX, write.y, localZ, stateId);
+    return true;
 }
 
 void applyGeneratedBlockEntityWrite(Chunk& chunk, const ChunkGeneratedBlockEntityWrite& write) {
@@ -117,8 +139,11 @@ void PendingChunkDecorations::applyPendingGeneratedBlockWrites(Chunk& chunk) {
     }
     const std::vector<ChunkGeneratedBlockWrite> writes = std::move(found->second);
     pendingGeneratedBlockWrites_.erase(found);
+    BatchWritten queued;
     for (const ChunkGeneratedBlockWrite& write : writes) {
-        applyGeneratedBlockWrite(chunk, write);
+        if (applyGeneratedBlockWrite(chunk, write, &queued)) {
+            queued.insert(cellKey(write));
+        }
     }
 }
 
