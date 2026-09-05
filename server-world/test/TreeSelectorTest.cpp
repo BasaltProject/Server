@@ -116,7 +116,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 949);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2816894509355340310LL);
+        CHECK(result.checksum == 2069372230706065374LL);
         CHECK(result.after == 647488715);
     }
 
@@ -125,7 +125,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 729);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5909270835061874018LL);
+        CHECK(result.checksum == 2843509806932651030LL);
         CHECK(result.after == 116325522);
     }
 
@@ -134,7 +134,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 434);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6669624707011554807LL);
+        CHECK(result.checksum == -8115616550690310731LL);
         CHECK(result.after == -1988451487);
     }
 
@@ -143,7 +143,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 495);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8249629999795692942LL);
+        CHECK(result.checksum == -8396285437004753642LL);
         CHECK(result.after == 918253638);
     }
 
@@ -152,7 +152,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 540);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7441494048208059234LL);
+        CHECK(result.checksum == 4755524689858970858LL);
         CHECK(result.after == 146845651);
     }
 
@@ -161,7 +161,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 494);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 4169706782696065332LL);
+        CHECK(result.checksum == -112599581924497448LL);
         CHECK(result.after == -1988451487);
     }
 
@@ -170,7 +170,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 2476);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1246690123979484971LL);
+        CHECK(result.checksum == 6433109280689151001LL);
         CHECK(result.after == 1198019078);
     }
 
@@ -179,7 +179,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 1701);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 799705377152153404LL);
+        CHECK(result.checksum == 2513987706637083196LL);
         CHECK(result.after == 1198019078);
     }
 
@@ -188,7 +188,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 682);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4892621239721263757LL);
+        CHECK(result.checksum == -1057120404655679397LL);
         CHECK(result.after == -1337678787);
     }
 
@@ -197,7 +197,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 1051);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 266917869424075792LL);
+        CHECK(result.checksum == 2669495503215961868LL);
         CHECK(result.after == -1337678787);
     }
 
@@ -206,7 +206,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 1061);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -841193558136343899LL);
+        CHECK(result.checksum == 5221915458102947289LL);
         CHECK(result.after == -1337678787);
     }
 
@@ -215,7 +215,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 459);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -695509757132458097LL);
+        CHECK(result.checksum == -1059084671962761777LL);
         CHECK(result.after == -1988451487);
     }
 
@@ -224,7 +224,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 535);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 943738232425058388LL);
+        CHECK(result.checksum == -143771927657923228LL);
         CHECK(result.after == 146845651);
     }
 
@@ -233,7 +233,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 632);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1561222319730688410LL);
+        CHECK(result.checksum == 3954783636791134094LL);
         CHECK(result.after == -1814055817);
     }
 
@@ -242,7 +242,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 983);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -213176171147846028LL);
+        CHECK(result.checksum == 347734010996346828LL);
         CHECK(result.after == -1988451487);
     }
 
@@ -251,7 +251,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 829);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 894006166284794808LL);
+        CHECK(result.checksum == 1188715842911844300LL);
         CHECK(result.after == -1337678787);
     }
 
@@ -260,7 +260,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 482);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6546699005334071825LL);
+        CHECK(result.checksum == 6002715174383429563LL);
         CHECK(result.after == 918253638);
     }
 
@@ -269,7 +269,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 4931);
         CHECK(result.deferred == 50);
-        CHECK(result.checksum == 5276787163250587291LL);
+        CHECK(result.checksum == -7203759489310383309LL);
         CHECK(result.after == -1335941321);
     }
 
@@ -278,7 +278,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 1701);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2487101231037232597LL);
+        CHECK(result.checksum == 6259337802302199595LL);
         CHECK(result.after == -242315500);
     }
 
@@ -287,7 +287,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 1648);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8576030659457135219LL);
+        CHECK(result.checksum == -6000416175237605151LL);
         CHECK(result.after == 148710611);
     }
 
@@ -296,7 +296,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 2130);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8048807032472566862LL);
+        CHECK(result.checksum == -8744640095436507958LL);
         CHECK(result.after == -1956739131);
     }
 
@@ -305,7 +305,7 @@ TEST_CASE("the named tree selectors roll what the frozen kotlin rolls") {
         CHECK(result.known == "11111111");
         CHECK(result.changed == 960);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7295388139835064150LL);
+        CHECK(result.checksum == 3330967807495654946LL);
         CHECK(result.after == -699117507);
     }
 

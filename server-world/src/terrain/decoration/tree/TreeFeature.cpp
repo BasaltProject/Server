@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/decoration/tree/JavaHashSetOrder.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeatureDecorators.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
@@ -42,33 +43,27 @@ constexpr std::array<std::array<std::int32_t, 3>, 6> kBlockNeighbours{
     return ordered;
 }
 
-/// An insertion-ordered set, which is what vanilla's `LinkedHashSet` is and what the recorded order
-/// depends on.
+/// parity: the leaf buckets are `Sets.newHashSet()`, so the order the jar takes them in is a hash
+/// order and not the order they went in. It matters because a leaf reached twice is written twice.
 class OrderedPositions {
 public:
-    void add(const BlockPos& position) {
-        if (seen_.insert(position).second) {
-            order_.push_back(position);
-        }
-    }
+    void add(const BlockPos& position) { static_cast<void>(order_.add(position)); }
 
-    [[nodiscard]] bool empty() const noexcept { return head_ >= order_.size(); }
+    [[nodiscard]] bool empty() const noexcept { return order_.empty(); }
 
-    [[nodiscard]] bool contains(const BlockPos& position) const { return seen_.contains(position); }
+    [[nodiscard]] bool contains(const BlockPos& position) const { return order_.contains(position); }
 
-    /// Takes the oldest surviving entry, which is the only removal vanilla's iterator performs.
+    /// Takes whichever entry the jar's iterator would answer first, which is what it removes.
     [[nodiscard]] BlockPos takeFirst() {
-        const BlockPos position = order_[head_++];
-        seen_.erase(position);
+        const BlockPos position = order_.first();
+        static_cast<void>(order_.remove(position));
         return position;
     }
 
-    [[nodiscard]] const std::vector<BlockPos>& inOrder() const noexcept { return order_; }
+    [[nodiscard]] std::vector<BlockPos> inOrder() const { return order_.inOrder(); }
 
 private:
-    std::vector<BlockPos> order_;
-    std::set<BlockPos> seen_;
-    std::size_t head_ = 0;
+    JavaHashSetOrder order_;
 };
 
 enum class PlacementPhase : std::uint8_t { Root, Log, Leaf, Decoration };
