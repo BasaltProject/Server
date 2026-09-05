@@ -119,10 +119,10 @@ std::int32_t ChunkFeatureRegion::get(const DecorationPos& position) const {
     if (position.y < bounds.minY() || position.y > bounds.maxY()) {
         return registry::blocks::air().stateId;
     }
-    if ((position.x >> 4) == chunk_->chunkX() && (position.z >> 4) == chunk_->chunkZ()) {
-        return chunk_->blockStateId(position.x & 15, position.y, position.z & 15);
-    }
-    return position.y < kSeaLevel ? registry::blocks::water().stateId : registry::blocks::air().stateId;
+    // parity: an iceberg is wider than a chunk, so it reads into its neighbours. Guessing water
+    // below sea level and air above got the open sea right and everything else wrong, and `smooth`
+    // counts the sides that are not iceberg, so a wrong guess carves away blocks vanilla keeps.
+    return chunk_->decorationBlockStateId(position.x, position.y, position.z);
 }
 
 void ChunkFeatureRegion::set(const DecorationPos& position, const std::int32_t stateId) {
@@ -141,9 +141,9 @@ void ChunkFeatureRegion::set(const DecorationPos& position, const std::int32_t s
 
 void ChunkFeatureRegion::flush() {
     for (const auto& [position, stateId] : changes_) {
-        if ((position.x >> 4) == chunk_->chunkX() && (position.z >> 4) == chunk_->chunkZ()) {
-            chunk_->setBlockStateId(position.x & 15, position.y, position.z & 15, stateId);
-        }
+        // Deferred rather than dropped: the part of an iceberg that falls in the next chunk is
+        // still part of the iceberg.
+        chunk_->setDecorationBlockStateId(position.x, position.y, position.z, stateId);
     }
 }
 

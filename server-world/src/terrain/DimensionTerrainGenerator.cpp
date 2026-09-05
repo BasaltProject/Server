@@ -127,9 +127,14 @@ using BiomeAt =
 
 } // namespace
 
-Chunk nether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
-             std::int32_t chunkZ, const surface::SurfaceRuleEnvironment* surfaceEnvironment, std::int64_t seed,
-             NetherStructureGenerator* structureGenerator) {
+namespace {
+
+/// The Nether's four passes, shared by the full generator and by the undecorated one the neighbour
+/// cache hands out.
+[[nodiscard]] Chunk generateNether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSource,
+                                   std::int32_t chunkX, std::int32_t chunkZ,
+                                   const surface::SurfaceRuleEnvironment* surfaceEnvironment, std::int64_t seed,
+                                   NetherStructureGenerator* structureGenerator, const ChunkPass& decorationPass) {
     static const std::int32_t netherrack = plainState("netherrack");
     const Settings settings{.verticalBounds = kNetherHeight,
                             .noiseMinY = 0,
@@ -158,16 +163,42 @@ Chunk nether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSour
                 structureGenerator->generateInto(chunk, seed);
             }
         },
-        [&biomeSource, seed](Chunk& chunk, densityfunction::DensityCache& cache) {
+        decorationPass,
+        [&biomeSource](std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
+                       densityfunction::DensityCache& cache) {
+            return biomeSource.biomeAtQuart(blockX >> 2, blockY >> 2, blockZ >> 2, &cache);
+        });
+}
+
+} // namespace
+
+Chunk netherTerrain(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
+                    std::int32_t chunkZ, const surface::SurfaceRuleEnvironment* surfaceEnvironment, std::int64_t seed,
+                    NetherStructureGenerator* structureGenerator) {
+    return generateNether(router, biomeSource, chunkX, chunkZ, surfaceEnvironment, seed, structureGenerator,
+                          [](Chunk&, densityfunction::DensityCache&) {});
+}
+
+Chunk nether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
+             std::int32_t chunkZ, const surface::SurfaceRuleEnvironment* surfaceEnvironment, std::int64_t seed,
+             NetherStructureGenerator* structureGenerator, NeighbourTerrainCache* neighbours) {
+    const std::unique_ptr<NeighbourTerrain> around =
+        neighbours == nullptr ? nullptr : neighbours->around(chunkX, chunkZ);
+    return generateNether(
+        router, biomeSource, chunkX, chunkZ, surfaceEnvironment, seed, structureGenerator,
+        [&biomeSource, seed, &around](Chunk& chunk, densityfunction::DensityCache& cache) {
+            // One reader for the whole phase, like the Overworld's. Without it a body reaching past
+            // the edge sees nothing, and the delivery guard of every cross-chunk write is filled in
+            // with air and refused.
+            const Chunk::ExternalStateScope scope{
+                chunk, [&around](std::int32_t x, std::int32_t y, std::int32_t z) -> std::optional<std::int32_t> {
+                    return around == nullptr ? std::nullopt : around->blockStateIdAt(x, y, z);
+                }};
             const NetherBiomeLookup biomeLookup = biomeSource.cached(cache);
             decoration::nether::netherLocalDecoration::decorate(chunk, seed, biomeLookup);
             decoration::nether::netherSurfaceStructuresDecoration::decorate(chunk, seed, biomeLookup);
             decoration::nether::netherUndergroundDecoration::decorate(chunk, seed, biomeLookup);
             decoration::nether::netherVegetalDecoration::decorate(chunk, seed, biomeLookup);
-        },
-        [&biomeSource](std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
-                       densityfunction::DensityCache& cache) {
-            return biomeSource.biomeAtQuart(blockX >> 2, blockY >> 2, blockZ >> 2, &cache);
         });
 }
 

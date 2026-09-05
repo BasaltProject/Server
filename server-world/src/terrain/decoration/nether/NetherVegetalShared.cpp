@@ -46,11 +46,12 @@ std::int32_t stateId(const std::string_view path) {
 std::optional<std::int32_t> terrainStateAt(const Chunk& chunk, const std::int32_t x, const std::int32_t y,
                                            const std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    const bool inChunk = (x >> 4) == chunk.chunkX() && (z >> 4) == chunk.chunkZ();
-    if (!inChunk || y < bounds.minY() || y > bounds.maxY()) {
+    if (y < bounds.minY() || y > bounds.maxY()) {
         return std::nullopt;
     }
-    return chunk.blockStateId(x & 15, y, z & 15);
+    // parity: a spring counts the blocks around itself through the level, so on a chunk border it
+    // sees the next chunk. This was the last reader in the Nether that refused the outside.
+    return chunk.decorationBlockStateId(x, y, z);
 }
 
 std::optional<std::int32_t> stateAt(const Chunk& chunk, const std::int32_t x, const std::int32_t y,

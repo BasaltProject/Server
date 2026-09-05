@@ -112,8 +112,8 @@ struct Run {
 TEST_CASE("the frozen ocean steps place what the frozen kotlin places") {
     SUBCASE("icebergs") {
         const Run result = run("minecraft:frozen_ocean", false, 64);
-        CHECK(result.placed == 29559);
-        CHECK(result.checksum == -3483285912956374016LL);
+        CHECK(result.placed == 29627);
+        CHECK(result.checksum == -8550590560125964618LL);
     }
 
     SUBCASE("blueIce") {

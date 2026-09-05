@@ -114,23 +114,23 @@ struct Run {
 TEST_CASE("the nether underground step places what the frozen kotlin places") {
     SUBCASE("deltasStep") {
         const Run result = run("minecraft:basalt_deltas", -1, 4);
-        CHECK(result.placed == 66966);
-        CHECK(result.deferred == 492);
-        CHECK(result.checksum == 3315436426525407475LL);
+        CHECK(result.placed == 66968);
+        CHECK(result.deferred == 9);
+        CHECK(result.checksum == -6616901302331720368LL);
     }
 
     SUBCASE("wastesStep") {
         const Run result = run("minecraft:nether_wastes", -1, 4);
-        CHECK(result.placed == 2357);
-        CHECK(result.deferred == 759);
-        CHECK(result.checksum == -2176743476508666001LL);
+        CHECK(result.placed == 2359);
+        CHECK(result.deferred == 9);
+        CHECK(result.checksum == -3360507228709155986LL);
     }
 
     SUBCASE("valleyStep") {
         const Run result = run("minecraft:soul_sand_valley", -1, 4);
-        CHECK(result.placed == 2727);
-        CHECK(result.deferred == 787);
-        CHECK(result.checksum == -8272878855489018795LL);
+        CHECK(result.placed == 2729);
+        CHECK(result.deferred == 9);
+        CHECK(result.checksum == 6974368551250462788LL);
     }
 
     SUBCASE("index_0") {
@@ -149,16 +149,16 @@ TEST_CASE("the nether underground step places what the frozen kotlin places") {
 
     SUBCASE("index_2") {
         const Run result = run("minecraft:basalt_deltas", 2, 4);
-        CHECK(result.placed == 1);
+        CHECK(result.placed == 11);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8898257954980172882LL);
+        CHECK(result.checksum == 7024972290900274668LL);
     }
 
     SUBCASE("index_3") {
         const Run result = run("minecraft:nether_wastes", 3, 4);
-        CHECK(result.placed == 2);
+        CHECK(result.placed == 5);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2745564110756158693LL);
+        CHECK(result.checksum == -3600823487218636842LL);
     }
 
     SUBCASE("index_4") {
@@ -213,7 +213,7 @@ TEST_CASE("the nether underground step places what the frozen kotlin places") {
     SUBCASE("index_11") {
         const Run result = run("minecraft:nether_wastes", 11, 4);
         CHECK(result.placed == 1021);
-        CHECK(result.deferred == 281);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == -1218822257788054643LL);
     }
 
@@ -227,14 +227,14 @@ TEST_CASE("the nether underground step places what the frozen kotlin places") {
     SUBCASE("index_13") {
         const Run result = run("minecraft:basalt_deltas", 13, 4);
         CHECK(result.placed == 421);
-        CHECK(result.deferred == 58);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == 4197329621403570751LL);
     }
 
     SUBCASE("index_14") {
         const Run result = run("minecraft:basalt_deltas", 14, 4);
         CHECK(result.placed == 1218);
-        CHECK(result.deferred == 148);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == 549308592400050409LL);
     }
 

@@ -94,93 +94,93 @@ struct Run {
 TEST_CASE("the nether ores place what the frozen kotlin places") {
     SUBCASE("wastesStep") {
         const Run result = run("minecraft:nether_wastes", -1);
-        CHECK(result.ores == 15409);
-        CHECK(result.deferred == 2890);
-        CHECK(result.checksum == -9194898750883399376LL);
+        CHECK(result.ores == 15400);
+        CHECK(result.deferred == 0);
+        CHECK(result.checksum == -3528777164792077182LL);
     }
 
     SUBCASE("deltasStep") {
         const Run result = run("minecraft:basalt_deltas", -1);
-        CHECK(result.ores == 13906);
-        CHECK(result.deferred == 2359);
-        CHECK(result.checksum == 3986838795848497111LL);
+        CHECK(result.ores == 13897);
+        CHECK(result.deferred == 0);
+        CHECK(result.checksum == -645677922084069711LL);
     }
 
     SUBCASE("valleyStep") {
         const Run result = run("minecraft:soul_sand_valley", -1);
-        CHECK(result.ores == 17148);
-        CHECK(result.deferred == 3112);
-        CHECK(result.checksum == 1292203683201606230LL);
+        CHECK(result.ores == 17139);
+        CHECK(result.deferred == 0);
+        CHECK(result.checksum == -4883567176600809472LL);
     }
 
     SUBCASE("feature_ore_magma") {
         const Run result = run("minecraft:nether_wastes", 11);
         CHECK(result.ores == 5875);
-        CHECK(result.deferred == 1192);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == -740294980501719859LL);
     }
 
     SUBCASE("feature_ore_gold_deltas") {
         const Run result = run("minecraft:basalt_deltas", 13);
         CHECK(result.ores == 2320);
-        CHECK(result.deferred == 224);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == 7388038226068500589LL);
     }
 
     SUBCASE("feature_ore_quartz_deltas") {
         const Run result = run("minecraft:basalt_deltas", 14);
         CHECK(result.ores == 6491);
-        CHECK(result.deferred == 722);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == -742585879398821896LL);
     }
 
     SUBCASE("feature_ore_soul_sand") {
         const Run result = run("minecraft:soul_sand_valley", 16);
         CHECK(result.ores == 1953);
-        CHECK(result.deferred == 118);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == 8293216203304191856LL);
     }
 
     SUBCASE("feature_ore_gravel_nether") {
         const Run result = run("minecraft:nether_wastes", 17);
         CHECK(result.ores == 3052);
-        CHECK(result.deferred == 643);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == 7181531276100549191LL);
     }
 
     SUBCASE("feature_ore_blackstone") {
         const Run result = run("minecraft:nether_wastes", 18);
         CHECK(result.ores == 3035);
-        CHECK(result.deferred == 643);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == -8376579408986995457LL);
     }
 
     SUBCASE("feature_ore_gold_nether") {
         const Run result = run("minecraft:nether_wastes", 19);
         CHECK(result.ores == 1125);
-        CHECK(result.deferred == 112);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == -7246356463703054429LL);
     }
 
     SUBCASE("feature_ore_quartz_nether") {
         const Run result = run("minecraft:nether_wastes", 20);
         CHECK(result.ores == 3306);
-        CHECK(result.deferred == 364);
+        CHECK(result.deferred == 0);
         CHECK(result.checksum == -8000506675921932907LL);
     }
 
     SUBCASE("feature_ore_ancient_debris_large") {
         const Run result = run("minecraft:nether_wastes", 21);
-        CHECK(result.ores == 16);
+        CHECK(result.ores == 13);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2425688907210027763LL);
+        CHECK(result.checksum == -3932677524833922369LL);
     }
 
     SUBCASE("feature_ore_debris_small") {
         const Run result = run("minecraft:nether_wastes", 22);
-        CHECK(result.ores == 11);
+        CHECK(result.ores == 9);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8216636433649938467LL);
+        CHECK(result.checksum == 5600451575871802823LL);
     }
 }
 
