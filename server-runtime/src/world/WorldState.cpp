@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
@@ -268,6 +269,18 @@ Chunk& WorldState::installLocked(Chunk chunk) {
         return chunkAtLocked(key(otherX, otherZ));
     };
     redoShapes(installed, chunkAtPos);
+    // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked, which is what
+    // starts a lake running. Scheduling is this world's way of saying the same thing.
+    for (const server::world::ChunkShapeUpdate& mark : installed.fluidUpdates()) {
+        if (mark.y < installed.verticalBounds().minY() || mark.y > installed.verticalBounds().maxY()) {
+            continue;
+        }
+        const std::int32_t stateId = installed.blockStateId(mark.x & 15, mark.y, mark.z & 15);
+        if (const std::optional<FluidKind> kind = fluidFlow::kindOf(stateId); kind.has_value()) {
+            installed.scheduleFluidTick(server::world::ChunkScheduledTick{
+                .type = fluidId(*kind), .localX = mark.x & 15, .y = mark.y, .localZ = mark.z & 15, .delay = 0});
+        }
+    }
     // A neighbour that was waiting on this chunk gets its own marked blocks redone now.
     for (const auto& [dx, dz] :
          std::array<std::pair<std::int32_t, std::int32_t>, 4>{{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}}) {

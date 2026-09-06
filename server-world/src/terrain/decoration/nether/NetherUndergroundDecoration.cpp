@@ -285,6 +285,14 @@ void placeSpring(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, c
     }
     if (rockCount == spring.rockCount && holeCount == spring.holeCount) {
         setBlock(chunk, x, y, z, stateIdOf("lava"));
+        // parity: `SpringFeature` schedules the fluid where it puts it, which is what starts it
+        // running. Without it the spring is a single block of lava that never goes anywhere.
+        chunk.scheduleFluidTick(ChunkScheduledTick{.type = wire::common::Identifier::vanilla("lava"),
+                                                   .localX = x & 15,
+                                                   .y = y,
+                                                   .localZ = z & 15,
+                                                   .delay = 0,
+                                                   .priority = 0});
     }
 }
 
