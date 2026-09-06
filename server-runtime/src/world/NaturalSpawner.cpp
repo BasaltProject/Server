@@ -332,7 +332,9 @@ std::vector<MobCategory> categoriesFor(std::string_view difficulty, std::int64_t
 }
 
 std::int32_t spawnTopY(const server::world::Chunk& chunk, std::int32_t localX, std::int32_t localZ) {
-    return chunk.heightAt(localX, localZ, server::world::HeightmapType::WorldSurface) + 1;
+    // parity: `NaturalSpawner` adds one to a heightmap that answers with the topmost solid block.
+    // Ours answers with the free space over it, so it is already the same number.
+    return chunk.heightAt(localX, localZ, server::world::HeightmapType::WorldSurface);
 }
 
 std::int32_t maxClusterSize(const Identifier& type) {
