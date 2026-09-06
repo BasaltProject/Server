@@ -1,4 +1,5 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
@@ -159,6 +160,36 @@ StructurePos OceanRuinStructureGenerator::settle(const Chunk& chunk, const struc
     return StructurePos{position.x, settledY, position.z};
 }
 
+/// parity: `OceanRuinPieces.handleDataMarker`. The template carries a structure block tagged
+/// `chest`, and the piece turns it into a chest of its own, waterlogged where the sea already is,
+/// with the ruin's loot. The seed comes from the piece's stream, unlike the rot's.
+void placeMarkerChests(Chunk& chunk, const structure::StructureTemplate& piece, StructurePos position,
+                       StructureRotation rotation, const StructureBoundingBox& clip, bool large,
+                       random::RandomSource& random) {
+    for (const structure::StructureDataMarker& marker :
+         piece.dataMarkers(position, rotation, StructureMirror::None, kZero)) {
+        if (marker.metadata != "chest" || !clip.isInside(marker.pos)) {
+            continue;
+        }
+        const std::int32_t existing = chunk.blockStateId(marker.pos.x & 15, marker.pos.y, marker.pos.z & 15);
+        const bool waterlogged = registry::blockFluids::hasWaterFluid(existing);
+        const std::optional<std::int32_t> chestState = registry::blocks::stateIdOf(
+            wire::common::Identifier::vanilla("chest"),
+            {{"facing", "north"}, {"type", "single"}, {"waterlogged", waterlogged ? "true" : "false"}});
+        if (!chestState.has_value()) {
+            continue;
+        }
+        chunk.setBlockStateId(marker.pos.x & 15, marker.pos.y, marker.pos.z & 15, *chestState);
+        wire::nbt::NbtCompound data;
+        data.set("LootTable", wire::nbt::NbtTag::ofString(large ? "minecraft:chests/underwater_ruin_big"
+                                                                : "minecraft:chests/underwater_ruin_small"));
+        data.set("LootTableSeed", wire::nbt::NbtTag::ofLong(random.nextLong()));
+        data.set("components", wire::nbt::NbtTag::ofCompound(wire::nbt::NbtCompound{}));
+        chunk.setBlockEntity(ChunkBlockEntity{marker.pos.x & 15, marker.pos.y, marker.pos.z & 15,
+                                              wire::common::Identifier::vanilla("chest"), std::move(data)});
+    }
+}
+
 /// parity: `OceanRuinPieces.archyRuleProcessor`, at most five blocks turned into their suspicious
 /// twin, each carrying the ruin's archaeology loot. Its own positional random, so it neither reads
 /// nor moves the stream anything else draws from.
@@ -225,6 +256,7 @@ OceanRuinStructureGenerator::addPiece(Chunk& chunk, std::int64_t seed, const Str
                                     // own from the position, not from this piece's stream.
                                     .settingsRandom = nullptr,
                                     .worldSeed = seed});
+        placeMarkerChests(chunk, *piece, settled, rotation, clip, large, random);
         boxes.push_back(piece->getBoundingBox(settled, rotation, kZero, StructureMirror::None));
     }
     return boxes;
