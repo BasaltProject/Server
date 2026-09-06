@@ -82,8 +82,18 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         }
         built_.insert_or_assign(declaration.name, std::move(built));
     }
-    return std::make_unique<world::LoadedWorld>(declaration, worldsConfig_->settingsFor(declaration),
-                                                std::move(metadata), options_.worldsRoot, logger_, std::move(options));
+    std::unique_ptr<world::LoadedWorld> world =
+        std::make_unique<world::LoadedWorld>(declaration, worldsConfig_->settingsFor(declaration), std::move(metadata),
+                                             options_.worldsRoot, logger_, std::move(options));
+    // parity: a feature reading past the chunk edge has to see what another chunk already wrote
+    // there. In vanilla that write is in the neighbour's proto chunk; here it waits in the queue,
+    // so the neighbour view is taught to look in it first.
+    if (const auto entry = built_.find(declaration.name); entry != built_.end() && entry->second.useQueuedWrites) {
+        entry->second.useQueuedWrites([holder = world.get()](std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
+            return holder->queuedWriteAt(worldX, y, worldZ);
+        });
+    }
+    return world;
 }
 
 std::map<std::string, world::LoadedWorld*> WorldRegistry::worlds() const {

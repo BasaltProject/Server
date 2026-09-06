@@ -150,6 +150,23 @@ bool PendingChunkDecorations::sourceMayWrite(const std::int64_t chunkKey, const 
     return true;
 }
 
+std::optional<std::int32_t> PendingChunkDecorations::queuedWriteAt(const std::int32_t worldX, const std::int32_t y,
+                                                                   const std::int32_t worldZ) const {
+    const WorldReadLock lock{*mutex_};
+    const auto found = pendingGeneratedBlockWrites_.find(key(worldX >> 4, worldZ >> 4));
+    if (found == pendingGeneratedBlockWrites_.end()) {
+        return std::nullopt;
+    }
+    // Later writes to one cell replace earlier ones, so the last match is what the proto chunk holds.
+    std::optional<std::int32_t> held;
+    for (const QueuedBlockWrite& entry : found->second) {
+        if (entry.write.x == worldX && entry.write.y == y && entry.write.z == worldZ) {
+            held = entry.write.stateId;
+        }
+    }
+    return held;
+}
+
 void PendingChunkDecorations::forgetGeneratedWriteSources(const std::int64_t chunkKey) {
     writeSourceByCell_.erase(chunkKey);
 }

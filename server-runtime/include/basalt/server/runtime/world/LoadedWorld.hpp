@@ -78,6 +78,13 @@ public:
     LoadedWorld& operator=(LoadedWorld&&) = delete;
     ~LoadedWorld();
 
+    /// What a neighbour already queued for a cell of a chunk that has not generated yet, so a
+    /// feature reading past the edge sees it instead of undecorated terrain.
+    [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
+                                                            std::int32_t worldZ) const {
+        return state_.queuedWriteAt(worldX, y, worldZ);
+    }
+
     [[nodiscard]] const config::WorldDeclaration& declaration() const noexcept { return declaration_; }
 
     [[nodiscard]] const config::WorldSettings& settings() const noexcept { return settings_; }

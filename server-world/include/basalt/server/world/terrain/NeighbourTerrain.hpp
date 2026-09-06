@@ -49,8 +49,16 @@ class NeighbourTerrainCache {
 public:
     using Generate = std::function<Chunk(std::int32_t, std::int32_t)>;
 
+    /// parity: what another chunk already wrote into this one. Vanilla puts that write in the
+    /// neighbour's proto chunk, where every later read finds it; without this the reader sees
+    /// undecorated terrain and places over what is already there.
+    using QueuedAt = std::function<std::optional<std::int32_t>(std::int32_t, std::int32_t, std::int32_t)>;
+
     explicit NeighbourTerrainCache(Generate generateTerrain, std::int32_t radius = 1,
                                    std::size_t capacity = kDefaultCapacity);
+
+    /// Installs the lookup for writes waiting on a chunk that has not generated yet.
+    void setQueuedAt(QueuedAt queuedAt);
 
     /// A view bounded to `radius` chunks around the one being decorated. The view borrows this
     /// cache, so it must not outlive it.
@@ -86,6 +94,7 @@ private:
     static constexpr std::size_t kDefaultCapacity = 128;
 
     Generate generateTerrain_;
+    QueuedAt queuedAt_;
     std::int32_t radius_;
     std::size_t capacity_;
     std::mutex mutex_;

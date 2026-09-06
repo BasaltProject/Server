@@ -192,6 +192,33 @@ void ChunkGenerationQueue::awaitIdle(std::int64_t timeoutMillis) {
     }
 }
 
+/// parity: vanilla decorates a chunk only once its 3x3 neighbourhood reached the previous stage, so
+/// a feature never writes into a neighbour that is not there. Measured on the jar: the spawn 3x3
+/// first, then whole 3x3 blocks. Here the same rule is expressed as an order: a chunk waits for the
+/// neighbours that decorate before it, which are the ones `decoratesBefore` puts first.
+[[nodiscard]] bool earlierNeighboursDone(const std::unordered_map<std::int64_t, std::int32_t>& queued,
+                                         const std::unordered_set<std::int64_t>& inProgress, std::int32_t chunkX,
+                                         std::int32_t chunkZ) {
+    for (std::int32_t dx = -1; dx <= 1; ++dx) {
+        for (std::int32_t dz = -1; dz <= 1; ++dz) {
+            if (dx == 0 && dz == 0) {
+                continue;
+            }
+            const std::int32_t nx = chunkX + dx;
+            const std::int32_t nz = chunkZ + dz;
+            const bool earlier = nx != chunkX ? nx < chunkX : nz < chunkZ;
+            if (!earlier) {
+                continue;
+            }
+            const std::int64_t key = ChunkGenerationQueue::pack(nx, nz);
+            if (queued.contains(key) || inProgress.contains(key)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
     const std::lock_guard<std::mutex> lock{mutex_};
     if (queued_.empty()) {
@@ -201,6 +228,9 @@ std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
     std::int32_t bestPriority = std::numeric_limits<std::int32_t>::max();
     bool found = false;
     for (const auto& [key, priority] : queued_) {
+        if (!earlierNeighboursDone(queued_, inProgress_, unpackX(key), unpackZ(key))) {
+            continue;
+        }
         if (priority < bestPriority) {
             bestPriority = priority;
             bestKey = key;

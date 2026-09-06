@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <optional>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -40,6 +41,12 @@ public:
     /// Queues the mobs a just-installed chunk's structures brought with it. Called with no lock
     /// held.
     void addPendingGeneratedEntities(std::vector<server::world::ChunkGeneratedEntity> entities);
+
+    /// parity: what a neighbour already wrote into a chunk that has not generated yet. In vanilla
+    /// that write lands in the neighbour's proto chunk, so every later read sees it; here it waits
+    /// in the queue, and a reader that skips it takes the block for undecorated terrain.
+    [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
+                                                            std::int32_t worldZ) const;
 
     /// Forgets which source chunk won each cell of this now-evicted chunk.
     void forgetGeneratedWriteSources(std::int64_t chunkKey);
