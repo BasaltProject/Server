@@ -86,6 +86,11 @@ bool oreBlockRules::outranksOreDecoration(std::int32_t writeStateId, std::int32_
     if (!write.has_value() || !current.has_value()) {
         return false;
     }
+    // parity: a stone variant targets `base_stone_overworld`, which holds the other variants, so it
+    // replaces them the same whether the cell was decorated or not.
+    if (contains(baseStone(), write->block.path()) && contains(baseStone(), current->block.path())) {
+        return true;
+    }
     // Only an ore knows it could not have replaced this. Anything else that decorated the cell may
     // well have been allowed to.
     return !contains(baseStone(), write->block.path()) && contains(oreFeatureBlocks(), current->block.path());
