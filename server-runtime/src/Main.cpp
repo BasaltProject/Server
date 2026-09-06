@@ -277,9 +277,11 @@ int main(int argc, char** argv) {
         }
         running.reset();
     }
-    // The console thread is parked in a blocking read and never gets to run its own cleanup, so the
-    // terminal is put back from here. Skipping it leaves the operator's shell with no echo after the
-    // server stops, which looks like their terminal broke.
+    // Told to stop and waited for here, not left to a destructor at exit: standard input held open
+    // by a supervisor, a pipe or a fifo never ends, so a reader nobody stops keeps the process alive
+    // long after the server is gone. It puts the terminal back on its way out, and this is a second
+    // go for the case where it never started.
+    command::consoleReader::stop();
     wire::io::terminal::restoreMode();
     return exitCode;
 }
