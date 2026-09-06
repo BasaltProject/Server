@@ -146,6 +146,7 @@ std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
         const std::int64_t chunkKey = key(chunk->chunkX(), chunk->chunkZ());
         if (chunksByPos_.erase(chunkKey) != 0) {
             pendingDecorations_.forgetGeneratedEntities(chunkKey);
+            pendingDecorations_.forgetGeneratedWriteSources(chunkKey);
             ++removed;
         }
     }

@@ -1021,6 +1021,12 @@ basalt_test(server-world-chunk-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-placement-region-test
+    SOURCES
+        test/PlacementRegionTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_bench(server-world-noise-bench
     SOURCES
         bench/NoiseBench.cpp

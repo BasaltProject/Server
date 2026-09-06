@@ -207,6 +207,12 @@ public:
 
     [[nodiscard]] std::int32_t decorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) const;
 
+    /// The block a deferred write of this chunk already put on a cell outside it, if any. A feature
+    /// that runs later has to see what an earlier one queued there, or its target test reads the
+    /// untouched neighbour and it overwrites a block vanilla would have refused.
+    [[nodiscard]] std::optional<std::int32_t> queuedDecorationStateId(std::int32_t worldX, std::int32_t y,
+                                                                      std::int32_t worldZ) const;
+
     /// Writes a world-coordinate decoration position. Local writes land immediately; external ones
     /// keep their true coordinates until the runtime installs their target chunk. Most features
     /// expect unknown external air; water-replacing ones pass their observed expectation.
