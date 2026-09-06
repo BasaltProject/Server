@@ -22,9 +22,12 @@ using server::world::GeneratedBlockWritePolicy;
     return y >= chunk.verticalBounds().minY() && y <= chunk.verticalBounds().maxY();
 }
 
-[[nodiscard]] bool isOrePolicy(GeneratedBlockWritePolicy policy) {
-    return policy == GeneratedBlockWritePolicy::OreBaseStone || policy == GeneratedBlockWritePolicy::OreStone ||
-           policy == GeneratedBlockWritePolicy::OreDeepslate;
+/// parity: vanilla gets through a region's chunks in a raster, x outermost and ascending and z
+/// within it. Measured on the jar over 441 chunks and two different load shapes: it is the pattern
+/// the great majority of them follow, and it is what decides whose decoration sits on top where two
+/// chunks write the same cell.
+[[nodiscard]] bool decoratesBefore(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t otherX, std::int32_t otherZ) {
+    return chunkX != otherX ? chunkX < otherX : chunkZ < otherZ;
 }
 
 /// A queued write was issued while its target did not exist yet. parity: in vanilla the target is
@@ -38,7 +41,11 @@ using BatchWritten = std::unordered_set<std::int64_t>;
            (static_cast<std::int64_t>(write.y) & 0xFFFFFFFFLL);
 }
 
-bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& write,
+/// `sourceGoesOnTop` is whether the writing chunk decorates after this one. When it does the write
+/// lands over whatever is here, subject to the feature's own target test, which is what vanilla does
+/// with a chunk already carved and decorated next to it. When it does not, the receiver's decoration
+/// came later and would have covered the write, so only a cell nobody else touched takes it.
+bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& write, bool sourceGoesOnTop,
                               const BatchWritten* queued = nullptr) {
     if (!insideChunk(chunk, write.y)) {
         return false;
@@ -46,14 +53,15 @@ bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& writ
     const std::int32_t localX = write.x & 15;
     const std::int32_t localZ = write.z & 15;
     const std::int32_t current = chunk.blockStateId(localX, write.y, localZ);
-    const bool decorated = queued != nullptr && current != write.expectedStateId && !queued->contains(cellKey(write));
-    const bool outranks =
-        server::world::terrain::decoration::oreBlockRules::outranksOreDecoration(write.stateId, current);
-    const bool loosely = !(decorated && isOrePolicy(write.policy) && !outranks) &&
-                         server::world::terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
+    // Earlier writes of this same batch are not the receiver's decoration: among themselves they
+    // keep the order they were issued in, so a later one may still cover them.
+    const bool untouched = current == write.expectedStateId || (queued != nullptr && queued->contains(cellKey(write)));
+    const bool onTop = sourceGoesOnTop || untouched;
+    const bool loosely =
+        onTop && server::world::terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
     const bool canReplace =
         write.replaceAnyState || current == write.expectedStateId ||
-        (!decorated && write.policy == GeneratedBlockWritePolicy::Tree &&
+        (onTop && write.policy == GeneratedBlockWritePolicy::Tree &&
          server::world::terrain::decoration::tree::treeBlockRules::canReplaceDeferred(current, write.stateId)) ||
         loosely;
     if (!canReplace) {
@@ -122,30 +130,46 @@ void PendingChunkDecorations::forgetGeneratedEntities(std::int64_t chunkKey) {
 }
 
 void PendingChunkDecorations::deliverGeneratedBlockWrites(std::span<const ChunkGeneratedBlockWrite> writes,
-                                                          const ChunkAt& chunkAt) {
+                                                          const std::int32_t sourceChunkX,
+                                                          const std::int32_t sourceChunkZ, const ChunkAt& chunkAt) {
     for (const ChunkGeneratedBlockWrite& write : writes) {
-        const std::int64_t targetKey = key(write.x >> 4, write.z >> 4);
+        const std::int32_t targetChunkX = write.x >> 4;
+        const std::int32_t targetChunkZ = write.z >> 4;
+        const std::int64_t targetKey = key(targetChunkX, targetChunkZ);
         Chunk* target = chunkAt(targetKey);
         if (target == nullptr) {
-            pendingGeneratedBlockWrites_[targetKey].push_back(write);
+            pendingGeneratedBlockWrites_[targetKey].push_back(
+                QueuedBlockWrite{.write = write, .sourceChunkX = sourceChunkX, .sourceChunkZ = sourceChunkZ});
         } else {
-            applyGeneratedBlockWrite(*target, write);
+            applyGeneratedBlockWrite(*target, write,
+                                     decoratesBefore(targetChunkX, targetChunkZ, sourceChunkX, sourceChunkZ));
         }
     }
 }
 
-void PendingChunkDecorations::applyPendingGeneratedBlockWrites(Chunk& chunk) {
+void PendingChunkDecorations::applyPendingGeneratedBlockWrites(Chunk& chunk, const WritePhase phase) {
     const auto found = pendingGeneratedBlockWrites_.find(key(chunk.chunkX(), chunk.chunkZ()));
     if (found == pendingGeneratedBlockWrites_.end()) {
         return;
     }
-    const std::vector<ChunkGeneratedBlockWrite> writes = std::move(found->second);
+    std::vector<QueuedBlockWrite> writes = std::move(found->second);
     pendingGeneratedBlockWrites_.erase(found);
+    std::vector<QueuedBlockWrite> notYet;
     BatchWritten queued;
-    for (const ChunkGeneratedBlockWrite& write : writes) {
-        if (applyGeneratedBlockWrite(chunk, write, &queued)) {
-            queued.insert(cellKey(write));
+    for (const QueuedBlockWrite& entry : writes) {
+        const bool onTop = decoratesBefore(chunk.chunkX(), chunk.chunkZ(), entry.sourceChunkX, entry.sourceChunkZ);
+        // What a later chunk wrote has to wait for this one to decorate, or its decoration would
+        // cover a write that in vanilla went on last.
+        if (phase == WritePhase::BeforeDecoration && onTop) {
+            notYet.push_back(entry);
+            continue;
         }
+        if (applyGeneratedBlockWrite(chunk, entry.write, onTop, &queued)) {
+            queued.insert(cellKey(entry.write));
+        }
+    }
+    if (!notYet.empty()) {
+        pendingGeneratedBlockWrites_[key(chunk.chunkX(), chunk.chunkZ())] = std::move(notYet);
     }
 }
 

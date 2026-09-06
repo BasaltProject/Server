@@ -29,33 +29,6 @@ const BlockSet& geodeCannotReplace() {
                        [&haystack](const std::string& needle) { return haystack.find(needle) != haystack.end(); });
 }
 
-const BlockSet& oreFeatureBlocks() {
-    static const BlockSet blocks = {"andesite",
-                                    "clay",
-                                    "coal_ore",
-                                    "copper_ore",
-                                    "deepslate_coal_ore",
-                                    "deepslate_copper_ore",
-                                    "deepslate_diamond_ore",
-                                    "deepslate_emerald_ore",
-                                    "deepslate_gold_ore",
-                                    "deepslate_iron_ore",
-                                    "deepslate_lapis_ore",
-                                    "deepslate_redstone_ore",
-                                    "diamond_ore",
-                                    "diorite",
-                                    "dirt",
-                                    "emerald_ore",
-                                    "gold_ore",
-                                    "granite",
-                                    "gravel",
-                                    "iron_ore",
-                                    "lapis_ore",
-                                    "redstone_ore",
-                                    "tuff"};
-    return blocks;
-}
-
 } // namespace
 
 bool oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy policy, std::int32_t actualStateId) {
@@ -78,22 +51,6 @@ bool oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy policy, std::in
         break;
     }
     return false;
-}
-
-bool oreBlockRules::outranksOreDecoration(std::int32_t writeStateId, std::int32_t currentStateId) {
-    const std::optional<registry::BlockState> write = registry::blocks::byStateId(writeStateId);
-    const std::optional<registry::BlockState> current = registry::blocks::byStateId(currentStateId);
-    if (!write.has_value() || !current.has_value()) {
-        return false;
-    }
-    // parity: a stone variant targets `base_stone_overworld`, which holds the other variants, so it
-    // replaces them the same whether the cell was decorated or not.
-    if (contains(baseStone(), write->block.path()) && contains(baseStone(), current->block.path())) {
-        return true;
-    }
-    // Only an ore knows it could not have replaced this. Anything else that decorated the cell may
-    // well have been allowed to.
-    return !contains(baseStone(), write->block.path()) && contains(oreFeatureBlocks(), current->block.path());
 }
 
 GeneratedBlockWritePolicy oreBlockRules::policyFor(const std::set<std::string, std::less<>>& replaceable) {
