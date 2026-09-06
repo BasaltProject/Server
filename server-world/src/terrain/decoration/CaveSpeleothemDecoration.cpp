@@ -4,6 +4,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/CaveSpeleothemDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
 
 #include <algorithm>
@@ -200,6 +201,15 @@ private:
         std::clamp(value, static_cast<float>(minInclusive), static_cast<float>(maxInclusive)));
 }
 
+/// parity: a speleothem replaces `#dripstone_replaceable_blocks`, and vanilla decides that against
+/// whatever is really at the position. A write that crosses the chunk edge has to carry the same
+/// target predicate or it is refused as soon as the neighbour's own decoration touched the cell.
+void setSpeleothemBlock(SpeleothemRegion& region, const DecorationPos& position, std::int32_t stateId,
+                        const SpeleothemConfig& config) {
+    const Chunk::WritePolicyScope scope{region.chunk(), oreBlockRules::policyFor(*config.replaceable)};
+    region.set(position, stateId);
+}
+
 [[nodiscard]] float clampedNormalFloat(random::RandomSource& random, float mean, float deviation, float minInclusive,
                                        float maxInclusive) {
     return std::clamp(mean + static_cast<float>(random.nextGaussian()) * deviation, minInclusive, maxInclusive);
@@ -247,7 +257,9 @@ void growSpeleothem(SpeleothemRegion& region, const DecorationPos& origin, std::
     }
     DecorationPos position = origin;
     const auto place = [&](std::string_view thickness) {
-        region.set(position, pointedStateId(config.pointPath, thickness, tipDirection, region.hasWater(position)));
+        setSpeleothemBlock(region, position,
+                           pointedStateId(config.pointPath, thickness, tipDirection, region.hasWater(position)),
+                           config);
         position = offset(position, 0, tipDirection, 0);
     };
     if (height >= 3) {
@@ -266,7 +278,7 @@ void growSpeleothem(SpeleothemRegion& region, const DecorationPos& origin, std::
 
 void placeBaseIfPossible(SpeleothemRegion& region, const DecorationPos& position, const SpeleothemConfig& config) {
     if (config.replaceable->contains(region.blockPath(position))) {
-        region.set(position, config.baseStateId);
+        setSpeleothemBlock(region, position, config.baseStateId, config);
     }
 }
 
@@ -365,7 +377,7 @@ void replaceWithBase(SpeleothemRegion& region, const DecorationPos& first, std::
         if (!config.replaceable->contains(region.blockPath(position))) {
             return;
         }
-        region.set(position, config.baseStateId);
+        setSpeleothemBlock(region, position, config.baseStateId, config);
         position = offset(position, 0, direction, 0);
     }
 }
