@@ -1,4 +1,5 @@
 #include <basalt/server/random/PositionalHashing.hpp>
+#include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/structure/StructureTemplate.hpp>
@@ -676,6 +677,13 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         }
         if ((entry.worldPos.x >> 4) == chunk.chunkX() && (entry.worldPos.z >> 4) == chunk.chunkZ()) {
             chunk.setBlockStateId(entry.worldPos.x & 15, entry.worldPos.y, entry.worldPos.z & 15, finalStateId);
+            // parity: `placeInWorld` ends by running `updateFromNeighbourShapes` over every block it
+            // put down. The templates store a stair's `shape` as the modeller left it, so without
+            // this a hull's whole flight keeps `outer_right` where the jar reads `straight`.
+            if (registry::blockConnections::connects(finalStateId) ||
+                registry::blockConnections::isStairs(finalStateId)) {
+                chunk.markShapeUpdate(entry.worldPos.x, entry.worldPos.y, entry.worldPos.z);
+            }
         } else {
             // A clip wider than the chunk is deliberate for the features that have one, so what
             // falls outside belongs to a neighbour and has to be deferred. Masking it back in

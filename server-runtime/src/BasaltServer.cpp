@@ -142,7 +142,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             return "Loading world '" + world->name() + "' (seed " + std::to_string(world->metadata().seed) + ").";
         });
         world->warmSpawnArea(kSpawnRadiusChunks);
-        // parity: the dragon fight builds the podium the first time the End is loaded.
+        // Not parity: the fight builds it the first time a player is in the End, not on load. See
+        // the note on `endPodium`.
         if (world->declaration().dimension == config::WorldDimension::End) {
             const std::optional<std::array<std::int32_t, 3>> origin =
                 world::endPodium::ensure(world->state(), world->settings().openEndExitPortal);

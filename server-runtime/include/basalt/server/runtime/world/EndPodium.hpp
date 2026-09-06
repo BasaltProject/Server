@@ -11,10 +11,12 @@ namespace basalt::server::runtime::world {
 
 /// The bedrock podium at the middle of the End, where the exit portal stands.
 ///
-/// parity: `EndPodiumFeature`, placed the way `EnderDragonFight` places it when the End is first
-/// loaded: closed, because in vanilla the dragon is still alive at that point. There is no dragon
-/// here to open it, which is why an operator can ask for it open (see `worlds.toml`); that is a
-/// deliberate divergence and off by default.
+/// parity: `EndPodiumFeature`, closed, because in vanilla the dragon is still alive when it goes
+/// down. There is no dragon here to open it, so an operator may ask for it open (`worlds.toml`):
+/// deliberate divergence, off by default.
+///
+/// *When* it goes down is a second divergence and not deliberate: vanilla builds it the first time a
+/// player stands in the End, we build it at startup. Measured on seed 12345 as 65 cells around (0,0).
 namespace endPodium {
 
 inline constexpr std::int32_t kPodiumRadius = 4;
