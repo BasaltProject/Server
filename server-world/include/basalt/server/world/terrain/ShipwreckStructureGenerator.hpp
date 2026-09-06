@@ -3,6 +3,7 @@
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/structure/StructurePlacementGrid.hpp>
 #include <basalt/server/world/structure/StructureTemplate.hpp>
+#include <basalt/server/world/terrain/NeighbourTerrain.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -29,7 +30,7 @@ public:
 
     ShipwreckStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> oceanBiomes,
                                 std::set<std::string, std::less<>> beachBiomes, TemplateOf templateOf,
-                                HeightAt surfaceHeightAt, HeightAt oceanFloorAt);
+                                HeightAt surfaceHeightAt, HeightAt oceanFloorAt, WorldHeightAt worldHeightAt);
 
     /// A hull is up to 32 blocks long, so it spills into its neighbours. Every chunk it touches
     /// places its own part, which is what vanilla does by giving each chunk the same start and
@@ -64,6 +65,7 @@ private:
     TemplateOf templateOf_;
     HeightAt surfaceHeightAt_;
     HeightAt oceanFloorAt_;
+    WorldHeightAt worldHeightAt_;
 };
 
 } // namespace basalt::server::world::terrain

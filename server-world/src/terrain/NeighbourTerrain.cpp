@@ -107,6 +107,14 @@ std::optional<std::int32_t> NeighbourTerrainCache::blockAt(const std::int32_t ne
                      });
 }
 
+std::int32_t NeighbourTerrainCache::worldgenHeightAt(const std::int32_t worldX, const std::int32_t worldZ,
+                                                     const HeightmapType type) {
+    const std::int32_t chunkX = worldX >> 4;
+    const std::int32_t chunkZ = worldZ >> 4;
+    return withChunk(keyOf(chunkX, chunkZ), chunkX, chunkZ,
+                     [&](const Chunk& chunk) { return chunk.worldgenHeightAt(worldX & 15, worldZ & 15, type); });
+}
+
 std::int32_t NeighbourTerrainCache::oceanFloorAt(const std::int32_t neighbourX, const std::int32_t neighbourZ,
                                                  const std::int32_t worldX, const std::int32_t worldZ) {
     return withChunk(keyOf(neighbourX, neighbourZ), neighbourX, neighbourZ, [&](const Chunk& chunk) {

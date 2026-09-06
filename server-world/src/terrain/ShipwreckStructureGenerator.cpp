@@ -90,10 +90,10 @@ ShipwreckStructureGenerator::ShipwreckStructureGenerator(BiomeAt biomeAt,
                                                          std::set<std::string, std::less<>> oceanBiomes,
                                                          std::set<std::string, std::less<>> beachBiomes,
                                                          TemplateOf templateOf, HeightAt surfaceHeightAt,
-                                                         HeightAt oceanFloorAt)
+                                                         HeightAt oceanFloorAt, WorldHeightAt worldHeightAt)
     : biomeAt_(std::move(biomeAt)), oceanBiomes_(std::move(oceanBiomes)), beachBiomes_(std::move(beachBiomes)),
       templateOf_(std::move(templateOf)), surfaceHeightAt_(std::move(surfaceHeightAt)),
-      oceanFloorAt_(std::move(oceanFloorAt)) {}
+      oceanFloorAt_(std::move(oceanFloorAt)), worldHeightAt_(std::move(worldHeightAt)) {}
 
 const structure::StructurePlacementGrid& ShipwreckStructureGenerator::grid() {
     static const structure::StructurePlacementGrid built{24, 4, 165745295};
@@ -134,8 +134,10 @@ std::optional<StructurePos> ShipwreckStructureGenerator::settle(const structure:
     std::int32_t lowest = kOverworldHeight.maxY() + 1;
     for (std::int32_t dx = 0; dx < size.x; ++dx) {
         for (std::int32_t dz = 0; dz < size.z; ++dz) {
-            const std::int32_t height =
-                beached ? surfaceHeightAt_(origin.x + dx, origin.z + dz) : oceanFloorAt_(origin.x + dx, origin.z + dz);
+            // parity: `ShipwreckPiece.postProcess` averages `level.getHeight` over the footprint,
+            // not the density estimate the placement used to pick the spot.
+            const std::int32_t height = worldHeightAt_(
+                origin.x + dx, origin.z + dz, beached ? HeightmapType::WorldSurface : HeightmapType::OceanFloor);
             total += height;
             lowest = std::min(lowest, height);
         }

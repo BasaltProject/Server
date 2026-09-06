@@ -3,6 +3,7 @@
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/structure/StructurePlacementGrid.hpp>
 #include <basalt/server/world/structure/StructureTemplate.hpp>
+#include <basalt/server/world/terrain/NeighbourTerrain.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -30,7 +31,7 @@ public:
 
     OceanRuinStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> coldBiomes,
                                 std::set<std::string, std::less<>> warmBiomes, TemplateOf templateOf,
-                                OceanFloorAt oceanFloorAt);
+                                OceanFloorAt oceanFloorAt, WorldHeightAt worldHeightAt);
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
@@ -66,6 +67,7 @@ private:
     std::set<std::string, std::less<>> warmBiomes_;
     TemplateOf templateOf_;
     OceanFloorAt oceanFloorAt_;
+    WorldHeightAt worldHeightAt_;
 };
 
 } // namespace basalt::server::world::terrain

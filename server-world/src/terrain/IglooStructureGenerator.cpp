@@ -58,9 +58,10 @@ constexpr std::string_view kLaboratory = "igloo/bottom";
 } // namespace
 
 IglooStructureGenerator::IglooStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> iglooBiomes,
-                                                 TemplateOf templateOf, SurfaceHeightAt surfaceHeightAt)
+                                                 TemplateOf templateOf, SurfaceHeightAt surfaceHeightAt,
+                                                 WorldHeightAt worldHeightAt)
     : biomeAt_(std::move(biomeAt)), iglooBiomes_(std::move(iglooBiomes)), templateOf_(std::move(templateOf)),
-      surfaceHeightAt_(std::move(surfaceHeightAt)) {}
+      surfaceHeightAt_(std::move(surfaceHeightAt)), worldHeightAt_(std::move(worldHeightAt)) {}
 
 const structure::StructurePlacementGrid& IglooStructureGenerator::grid() {
     static const structure::StructurePlacementGrid built{32, 8, 14357618};
@@ -118,7 +119,7 @@ std::optional<StructureBoundingBox> IglooStructureGenerator::place(Chunk& chunk,
     // parity: the whole igloo settles on the surface at its entrance column, not its corner.
     const StructurePos entrance = plus(
         structure::transform(StructurePos{3 - offset.x, 0, -offset.z}, StructureMirror::None, rotation, pivot), placed);
-    const std::int32_t surface = surfaceHeightAt_(entrance.x, entrance.z);
+    const std::int32_t surface = worldHeightAt_(entrance.x, entrance.z, HeightmapType::WorldSurface);
     const StructurePos settled{placed.x, placed.y + surface - kGenerationHeight - 1, placed.z};
 
     found->placeInto(chunk, structure::TemplatePlacement{.position = settled,

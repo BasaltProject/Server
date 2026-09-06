@@ -12,6 +12,11 @@
 
 namespace basalt::server::world::terrain {
 
+/// parity: `level.getHeight`, the world's own map rather than the density estimate the placement
+/// used to pick the spot. A piece that settles on it is placed by every chunk it crosses, so all of
+/// them have to get the same answer or the piece is torn.
+using WorldHeightAt = std::function<std::int32_t(std::int32_t, std::int32_t, HeightmapType)>;
+
 /// The undecorated terrain around the chunk being decorated, so a feature reaching past the edge
 /// does not take the outside for air. World coordinates throughout.
 class NeighbourTerrain {
@@ -62,6 +67,11 @@ public:
 
     [[nodiscard]] std::int32_t oceanFloorAt(std::int32_t neighbourX, std::int32_t neighbourZ, std::int32_t worldX,
                                             std::int32_t worldZ);
+
+    /// The `_WG` height of any column, generating the chunk that owns it. Unlike the bounded view,
+    /// this always answers: a structure piece that settles on the mean of its footprint is placed by
+    /// every chunk it crosses, and they all have to reach the same number or the piece is torn.
+    [[nodiscard]] std::int32_t worldgenHeightAt(std::int32_t worldX, std::int32_t worldZ, HeightmapType type);
 
 private:
     /// Runs `reader` on the neighbour, generating it first if this is the first read. The lock is
