@@ -419,6 +419,13 @@ template <typename Write>
 
 } // namespace
 
+void Chunk::markShapeUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
+    const ChunkShapeUpdate mark{.x = worldX, .y = y, .z = worldZ};
+    if (std::ranges::find(shapeUpdates_, mark) == shapeUpdates_.end()) {
+        shapeUpdates_.push_back(mark);
+    }
+}
+
 std::int32_t Chunk::decorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) const {
     if (y < bounds_.minY() || y > bounds_.maxY()) {
         return registry::blocks::air().stateId;

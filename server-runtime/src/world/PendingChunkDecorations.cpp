@@ -56,7 +56,11 @@ bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& writ
     // Earlier writes of this same batch are not the receiver's decoration: among themselves they
     // keep the order they were issued in, so a later one may still cover them.
     const bool untouched = current == write.expectedStateId || (queued != nullptr && queued->contains(cellKey(write)));
-    const bool onTop = sourceGoesOnTop || untouched;
+    // A chunk that decorates later covers this write only with a feature that could have replaced
+    // it. Nothing after an ore targets a geode, a dirt vein or an ore, so those land regardless.
+    const bool onTop =
+        sourceGoesOnTop || untouched ||
+        server::world::terrain::decoration::oreBlockRules::survivesLaterDecoration(write.policy, write.stateId);
     const bool loosely =
         onTop && server::world::terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
     const bool canReplace =

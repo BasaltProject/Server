@@ -92,6 +92,16 @@ struct ChunkGeneratedEntity {
 };
 
 /// A generated decoration write whose target lies outside the chunk that produced it.
+/// A block a structure placed whose shape depends on its neighbours, so it has to be recomputed once
+/// they exist. parity: `StructurePiece.placeBlock` marks these with `markPosForPostProcessing`.
+struct ChunkShapeUpdate {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+
+    friend bool operator==(const ChunkShapeUpdate&, const ChunkShapeUpdate&) = default;
+};
+
 struct ChunkGeneratedBlockWrite {
     std::int32_t x = 0;
     std::int32_t y = 0;

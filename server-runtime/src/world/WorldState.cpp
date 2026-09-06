@@ -1,8 +1,12 @@
+#include <basalt/server/registry/BlockConnections.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
 
+#include <array>
+#include <map>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -194,6 +198,55 @@ void WorldState::applyPendingWritesTo(Chunk& chunk) {
     pendingDecorations_.applyPendingGeneratedBlockWrites(chunk, PendingChunkDecorations::WritePhase::BeforeDecoration);
 }
 
+namespace {
+
+/// parity: `LevelChunk.postProcessGeneration` running `Block.updateFromNeighbourShapes` over what
+/// the structure pieces marked. Only the connecting blocks are redone here; a torch losing its
+/// support is a different check and is not one of these.
+void redoShapes(Chunk& chunk, const std::function<Chunk*(std::int32_t, std::int32_t)>& chunkAt) {
+    static constexpr std::array<std::pair<registry::BlockFace, std::string_view>, 4> kSides{
+        {{registry::BlockFace::North, "north"},
+         {registry::BlockFace::South, "south"},
+         {registry::BlockFace::West, "west"},
+         {registry::BlockFace::East, "east"}}};
+    for (const server::world::ChunkShapeUpdate& mark : chunk.shapeUpdates()) {
+        const std::int32_t stateId = chunk.blockStateId(mark.x & 15, mark.y, mark.z & 15);
+        if (!registry::blockConnections::connects(stateId)) {
+            continue;
+        }
+        std::map<std::string, std::string> wanted;
+        bool complete = true;
+        for (const auto& [face, name] : kSides) {
+            const std::int32_t nx = mark.x + registry::stepX(face);
+            const std::int32_t nz = mark.z + registry::stepZ(face);
+            Chunk* holder =
+                (nx >> 4) == chunk.chunkX() && (nz >> 4) == chunk.chunkZ() ? &chunk : chunkAt(nx >> 4, nz >> 4);
+            if (holder == nullptr) {
+                // The neighbour is not here yet; its own install redoes this block from its side.
+                complete = false;
+                break;
+            }
+            const std::int32_t neighbour = holder->blockStateId(nx & 15, mark.y, nz & 15);
+            wanted[std::string{name}] =
+                registry::blockConnections::connectsTo(stateId, neighbour, face) ? "true" : "false";
+        }
+        if (!complete) {
+            continue;
+        }
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+        if (block == nullptr) {
+            continue;
+        }
+        const std::optional<std::int32_t> reshaped =
+            registry::blockStateDefinitions::stateIdOf(*block, wanted, stateId);
+        if (reshaped.has_value() && *reshaped != stateId) {
+            chunk.setBlockStateId(mark.x & 15, mark.y, mark.z & 15, *reshaped);
+        }
+    }
+}
+
+} // namespace
+
 Chunk& WorldState::installLocked(Chunk chunk) {
     const std::int32_t chunkX = chunk.chunkX();
     const std::int32_t chunkZ = chunk.chunkZ();
@@ -211,6 +264,17 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     pendingDecorations_.deliverGeneratedBlockWrites(installed.takeGeneratedBlockWrites(), installed.chunkX(),
                                                     installed.chunkZ(), chunkAt);
     pendingDecorations_.deliverGeneratedBlockEntityWrites(installed.takeGeneratedBlockEntityWrites(), chunkAt);
+    const auto chunkAtPos = [this](std::int32_t otherX, std::int32_t otherZ) {
+        return chunkAtLocked(key(otherX, otherZ));
+    };
+    redoShapes(installed, chunkAtPos);
+    // A neighbour that was waiting on this chunk gets its own marked blocks redone now.
+    for (const auto& [dx, dz] :
+         std::array<std::pair<std::int32_t, std::int32_t>, 4>{{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}}) {
+        if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz); neighbour != nullptr) {
+            redoShapes(*neighbour, chunkAtPos);
+        }
+    }
     pendingDecorations_.deliverGeneratedBlockTicks(installed.takeGeneratedBlockTicks(), chunkAt);
     chunkVersion_.fetch_add(1);
     entityRegistry_.addPendingEntities(installed.takeSavedEntities());

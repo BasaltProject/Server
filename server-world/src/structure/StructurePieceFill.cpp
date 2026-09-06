@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/structure/StructurePieceFill.hpp>
@@ -89,7 +90,14 @@ void StructurePieceFill::place(std::int32_t stateId, std::int32_t x, std::int32_
     if (canBeReplaced_ && !canBeReplaced_(existing)) {
         return;
     }
-    chunk_->setDecorationBlockStateId(position.x, position.y, position.z, oriented(stateId), existing);
+    const std::int32_t placed = oriented(stateId);
+    chunk_->setDecorationBlockStateId(position.x, position.y, position.z, placed, existing);
+    // parity: `StructurePiece.placeBlock` marks a connecting block so its shape is redone once the
+    // neighbours are there. A piece writes one side by hand and the pass decides the rest.
+    if ((position.x >> 4) == chunk_->chunkX() && (position.z >> 4) == chunk_->chunkZ() &&
+        registry::blockConnections::connects(placed)) {
+        chunk_->markShapeUpdate(position.x, position.y, position.z);
+    }
 }
 
 std::int32_t StructurePieceFill::oriented(std::int32_t stateId) const {

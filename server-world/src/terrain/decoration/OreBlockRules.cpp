@@ -53,6 +53,21 @@ bool oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy policy, std::in
     return false;
 }
 
+bool oreBlockRules::survivesLaterDecoration(GeneratedBlockWritePolicy policy, std::int32_t writeStateId) {
+    switch (policy) {
+    case GeneratedBlockWritePolicy::OreBaseStone:
+    case GeneratedBlockWritePolicy::OreStone:
+    case GeneratedBlockWritePolicy::OreDeepslate:
+    case GeneratedBlockWritePolicy::Geode:
+        break;
+    case GeneratedBlockWritePolicy::Exact:
+    case GeneratedBlockWritePolicy::Tree:
+        return false;
+    }
+    const std::optional<registry::BlockState> block = registry::blocks::byStateId(writeStateId);
+    return block.has_value() && !contains(baseStone(), block->block.path());
+}
+
 GeneratedBlockWritePolicy oreBlockRules::policyFor(const std::set<std::string, std::less<>>& replaceable) {
     if (replaceable.size() == deepslateReplaceables().size() && containsAll(replaceable, deepslateReplaceables())) {
         return GeneratedBlockWritePolicy::OreDeepslate;
