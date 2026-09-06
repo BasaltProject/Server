@@ -196,6 +196,14 @@ TEST_CASE("a world is found by name and refused when it is not loaded") {
     REQUIRE(parsed->as<LoadedWorld*>() != nullptr);
     CHECK(*parsed->as<LoadedWorld*>() == &world);
 
+    // Its level key names it too, and it carries a colon: a reader that stops there would take
+    // "minecraft" for the whole argument and refuse a world that is right in front of it.
+    StringReader byKey{world.levelKey()};
+    const Parsed<ArgumentValue> keyed = command::worldArgument()->parse(byKey, console, environment);
+    REQUIRE(keyed.has_value());
+    CHECK(*keyed->as<LoadedWorld*>() == &world);
+    CHECK(byKey.cursor() == static_cast<std::int32_t>(world.levelKey().size()));
+
     StringReader missing{"nowhere"};
     CHECK_FALSE(command::worldArgument()->parse(missing, console, environment).has_value());
     // The cursor is back at the name so the marker points at it.

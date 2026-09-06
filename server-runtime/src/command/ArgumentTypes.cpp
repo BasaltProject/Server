@@ -304,13 +304,18 @@ public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
                                               const CommandEnvironment& environment) const override {
         const std::int32_t start = reader.cursor();
-        const Parsed<std::string> name = reader.readString();
-        if (!name.has_value()) {
-            return std::unexpected{name.error()};
-        }
+        // Read a namespaced id, not a bare word: a level key carries a colon, and brigadier's
+        // unquoted reader stops at it, so `basalt:nether` used to be refused as "unknown world
+        // 'basalt'" with the rest of the argument left unread.
+        const std::string name = reader.readIdentifier();
         const std::map<std::string, world::LoadedWorld*, std::less<>>& worlds = environment.options().worlds;
-        if (const auto found = worlds.find(*name); found != worlds.end()) {
+        if (const auto found = worlds.find(name); found != worlds.end()) {
             return ArgumentValue::of(found->second);
+        }
+        for (const auto& [worldName, world] : worlds) {
+            if (world != nullptr && world->levelKey() == name) {
+                return ArgumentValue::of(world);
+            }
         }
         reader.setCursor(start);
         std::string known;
@@ -321,7 +326,7 @@ public:
             known += worldName;
         }
         return std::unexpected{CommandSyntaxError{
-            .component = Component::text("Unknown world '" + *name + "'. Loaded worlds: " + known + "."),
+            .component = Component::text("Unknown world '" + name + "'. Loaded worlds: " + known + "."),
             .input = reader.string(),
             .cursor = reader.cursor()}};
     }
@@ -333,6 +338,9 @@ public:
             std::vector<std::string> names;
             for (const auto& [name, world] : context.environment().options().worlds) {
                 names.push_back(name);
+                if (world != nullptr && world->levelKey() != name) {
+                    names.push_back(world->levelKey());
+                }
             }
             return context.matching(names);
         };
