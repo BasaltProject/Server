@@ -41,16 +41,16 @@ private:
 
     /// parity: `addPiece`. A warm ruin is one template; a cold one is three, rotted 0.9, 0.7, 0.5.
     [[nodiscard]] std::vector<structure::StructureBoundingBox>
-    addPiece(Chunk& chunk, const structure::StructureBoundingBox& clip, random::RandomSource& random,
+    addPiece(Chunk& chunk, std::int64_t seed, const structure::StructureBoundingBox& clip, random::RandomSource& random,
              random::RandomSource& pick, structure::StructurePos position, structure::StructureRotation rotation,
              bool cold, bool large, float baseIntegrity) const;
 
     /// parity: `addClusterRuins`. Eight candidate spots are drawn around the parent, four to eight of
     /// them are taken at random, and one is dropped if its box would touch the parent's.
     [[nodiscard]] std::vector<structure::StructureBoundingBox>
-    addCluster(Chunk& chunk, const structure::StructureBoundingBox& clip, random::RandomSource& random,
-               random::RandomSource& pick, structure::StructurePos parent, structure::StructureRotation parentRotation,
-               bool cold) const;
+    addCluster(Chunk& chunk, std::int64_t seed, const structure::StructureBoundingBox& clip,
+               random::RandomSource& random, random::RandomSource& pick, structure::StructurePos parent,
+               structure::StructureRotation parentRotation, bool cold) const;
 
     /// parity: `OceanRuinPiece.postProcess` plus its `getHeight`. The piece drops to the ocean floor
     /// and then, if its footprint is mostly a hole, sinks to the bottom of that hole instead of
