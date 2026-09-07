@@ -353,6 +353,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
             world.neighbours->setQueuedAt(std::move(queuedAt));
         }
     };
+    answer.useInstalledChunks = [&world](terrain::NeighbourTerrainCache::QueuedAt installedAt) {
+        if (world.neighbours != nullptr) {
+            world.neighbours->setInstalledAt(std::move(installedAt));
+        }
+    };
     answer.villages = built->village.get();
     answer.strongholds = built->strongholds.get();
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
@@ -471,6 +476,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
             world.neighbours->setQueuedAt(std::move(queuedAt));
         }
     };
+    answer.useInstalledChunks = [&world](terrain::NeighbourTerrainCache::QueuedAt installedAt) {
+        if (world.neighbours != nullptr) {
+            world.neighbours->setInstalledAt(std::move(installedAt));
+        }
+    };
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
                                const std::string& difficulty,
                                const std::function<void(server::world::Chunk&)>& beforeDecoration) {
@@ -520,6 +530,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
     answer.useQueuedWrites = [&world](terrain::NeighbourTerrainCache::QueuedAt queuedAt) {
         if (world.neighbours != nullptr) {
             world.neighbours->setQueuedAt(std::move(queuedAt));
+        }
+    };
+    answer.useInstalledChunks = [&world](terrain::NeighbourTerrainCache::QueuedAt installedAt) {
+        if (world.neighbours != nullptr) {
+            world.neighbours->setInstalledAt(std::move(installedAt));
         }
     };
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, const std::string&,
