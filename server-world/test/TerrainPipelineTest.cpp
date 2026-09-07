@@ -232,12 +232,12 @@ void check(const Run& result, std::int32_t solid, std::int32_t biomes, std::int6
 
 } // namespace
 
-TEST_CASE("the pipelines generate what the frozen kotlin generates") {
-    SUBCASE("plains") { check(runOverworld(1234, 0), 126916, 6144, 8048333525121418890LL); }
+TEST_CASE("the pipelines generate what the jar generates") {
+    SUBCASE("plains") { check(runOverworld(1234, 0), 126913, 6144, -5180958617207259769LL); }
 
     SUBCASE("desert") { check(runOverworld(1234, 1), 126919, 6144, -6765849239462433688LL); }
 
-    SUBCASE("otherSeed") { check(runOverworld(77, 0), 116480, 6144, -2082149927011027503LL); }
+    SUBCASE("otherSeed") { check(runOverworld(77, 0), 116474, 6144, -3674811653623309167LL); }
 
     SUBCASE("nether") { check(runNether(1234, 0.0, 0.0), 33082, 4096, -4176307358586819173LL); }
 

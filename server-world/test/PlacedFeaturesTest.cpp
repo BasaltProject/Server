@@ -366,7 +366,7 @@ TEST_CASE("the placed feature registry answers to the frozen kotlin's ids") {
     }
 }
 
-TEST_CASE("every placed feature places what the frozen kotlin places") {
+TEST_CASE("every placed feature places what the jar places") {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::size_t deferred = 0;
     std::int32_t after = 0;
@@ -386,6 +386,6 @@ TEST_CASE("every placed feature places what the frozen kotlin places") {
         after = random.nextInt();
     }
     CHECK(deferred == 71);
-    CHECK(static_cast<std::int64_t>(checksum) == 6905788050045897291LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -2959248436563559259LL);
     CHECK(after == -1699011601);
 }
