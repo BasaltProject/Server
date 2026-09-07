@@ -101,6 +101,15 @@ void StructurePieceFill::place(std::int32_t stateId, std::int32_t x, std::int32_
     }
 }
 
+void StructurePieceFill::placeRaw(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) const {
+    const StructurePos position{worldX(x, z), worldY(y), worldZ(x, z)};
+    if (!clip_.isInside(position)) {
+        return;
+    }
+    chunk_->setDecorationBlockStateId(position.x, position.y, position.z, stateId,
+                                      chunk_->decorationBlockStateId(position.x, position.y, position.z));
+}
+
 std::int32_t StructurePieceFill::oriented(std::int32_t stateId) const {
     if (!orientation_.has_value() || *orientation_ == StructureDirection::North) {
         return stateId;
