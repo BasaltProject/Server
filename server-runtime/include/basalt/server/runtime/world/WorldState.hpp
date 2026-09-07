@@ -149,7 +149,8 @@ public:
                                                             std::int32_t worldZ) const;
 
     /// Hands the chunk over to be installed, or installs it here when nobody owns this world.
-    void installLater(server::world::Chunk chunk);
+    /// `installed` runs once the chunk is really in the world, which is not when this returns.
+    void installLater(server::world::Chunk chunk, std::function<void()> installed = {});
 
     [[nodiscard]] std::optional<std::int32_t> blockState(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
