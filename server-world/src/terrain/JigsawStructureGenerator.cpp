@@ -107,13 +107,14 @@ JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int3
         const std::int32_t startY = settings_.heightSource == JigsawHeightSource::Drawn
                                         ? settings_.startY + random.nextInt(settings_.startYMax - settings_.startY + 1)
                                         : settings_.startY;
-        // parity: `PoolAliasLookup.create(poolAliases, startPos, seed)`, which forks a **legacy**
-        // positional factory off the world seed and reads it at the start position. Its draws are
+        // parity: `PoolAliasLookup.create(poolAliases, startPos, seed)`, which is
+        // `RandomSource.create(seed).forkPositional().at(pos)`. The fork matters: it seeds the
+        // factory with a draw off the world seed, not with the world seed itself. Its draws are
         // separate from the assembly's own random, so they cost nothing to the sequence below.
         std::map<std::string, std::string, std::less<>> resolvedAliases;
         if (!settings_.poolAliases.empty()) {
-            random::RandomSource aliasRandom =
-                random::PositionalRandomFactory::legacy(seed).at(candidateChunkX * 16, startY, candidateChunkZ * 16);
+            random::RandomSource aliasRandom = random::RandomSource::legacy(seed).forkPositional().at(
+                candidateChunkX * 16, startY, candidateChunkZ * 16);
             for (const JigsawStructureSettings::PoolAlias& binding : settings_.poolAliases) {
                 if (binding.kind == JigsawStructureSettings::PoolAlias::Kind::Random) {
                     const std::size_t pick = static_cast<std::size_t>(
