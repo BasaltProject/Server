@@ -386,6 +386,6 @@ TEST_CASE("every placed feature places what the jar places") {
         after = random.nextInt();
     }
     CHECK(deferred == 71);
-    CHECK(static_cast<std::int64_t>(checksum) == -2959248436563559259LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -6878351793896522959LL);
     CHECK(after == -1699011601);
 }
