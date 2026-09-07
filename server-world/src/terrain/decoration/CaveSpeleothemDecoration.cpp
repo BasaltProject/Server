@@ -552,9 +552,12 @@ void placePointedFeature(SpeleothemRegion& region, random::RandomSource& random,
         const DecorationPos origin{.x = x, .y = bounds.minY() + random.nextInt(321), .z = z};
         const std::int32_t nestedCount = 1 + random.nextInt(5);
         for (std::int32_t nested = 0; nested < nestedCount; ++nested) {
-            const DecorationPos target =
-                offset(origin, clampedNormal(random, 3.0F, -10, 10), clampedNormal(random, 0.6F, -2, 2),
-                       clampedNormal(random, 3.0F, -10, 10));
+            // parity: `RandomOffsetPlacement` draws x, then y, then z from the same source. As
+            // arguments of one call the order is unspecified, so the sequence is pinned here.
+            const std::int32_t offsetX = clampedNormal(random, 3.0F, -10, 10);
+            const std::int32_t offsetY = clampedNormal(random, 0.6F, -2, 2);
+            const std::int32_t offsetZ = clampedNormal(random, 3.0F, -10, 10);
+            const DecorationPos target = offset(origin, offsetX, offsetY, offsetZ);
             if (biomePath(environment.biomeAt(target.x, target.y, target.z)) != config.biome) {
                 continue;
             }
