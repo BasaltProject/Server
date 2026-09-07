@@ -1,5 +1,6 @@
 #include "NetherVegetalShared.hpp"
 
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::world::terrain::decoration::nether::shared {

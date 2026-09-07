@@ -1,6 +1,8 @@
 #include <basalt/server/random/RandomSupport.hpp>
 #include <basalt/wire/common/hash/Md5.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::random {
 namespace {
 

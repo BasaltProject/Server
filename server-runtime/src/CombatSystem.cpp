@@ -13,6 +13,7 @@
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <utility>
 

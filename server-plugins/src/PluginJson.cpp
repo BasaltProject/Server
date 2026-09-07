@@ -1,6 +1,7 @@
 #include <basalt/server/plugins/PluginJson.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <format>
 
 namespace basalt::server::plugins::pluginJson {

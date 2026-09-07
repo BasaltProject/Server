@@ -6,6 +6,7 @@
 #include <basalt/server/storage/PlayerStore.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <utility>
 

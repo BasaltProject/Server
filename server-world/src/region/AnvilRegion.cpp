@@ -1,6 +1,7 @@
 #include <basalt/server/world/region/AnvilRegion.hpp>
 #include <basalt/wire/io/Compression.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::region {

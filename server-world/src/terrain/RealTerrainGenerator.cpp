@@ -27,6 +27,7 @@
 #include <basalt/server/world/terrain/surface/SurfaceRuleData.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <utility>

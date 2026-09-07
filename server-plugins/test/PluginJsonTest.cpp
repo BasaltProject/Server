@@ -6,6 +6,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <format>
 #include <string>
 #include <vector>

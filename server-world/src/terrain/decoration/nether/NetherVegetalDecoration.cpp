@@ -3,6 +3,7 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/world/terrain/decoration/nether/NetherVegetalDecoration.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::terrain::decoration::nether {

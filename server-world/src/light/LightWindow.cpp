@@ -2,6 +2,7 @@
 #include <basalt/server/world/light/LightWindow.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <vector>
 

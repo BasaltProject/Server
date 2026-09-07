@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Tags.hpp>
 #include <basalt/server/runtime/world/RealFluidTags.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <utility>
 

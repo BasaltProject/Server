@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/MobSpawnForest.hpp>
 #include <basalt/server/runtime/world/SpawnEquipment.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>

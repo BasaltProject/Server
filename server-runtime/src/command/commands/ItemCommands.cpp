@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <vector>

@@ -4,6 +4,7 @@
 #include <basalt/server/world/crafting/RecipeJson.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime::world {
 namespace {

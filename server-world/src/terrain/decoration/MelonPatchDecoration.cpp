@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/MelonPatchDecoration.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

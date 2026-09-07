@@ -5,6 +5,7 @@ extern "C" {
 #include <lua.h>
 }
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::lua {

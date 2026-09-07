@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/MobSpawnVariantData.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 namespace basalt::server::runtime::world {

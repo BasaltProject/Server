@@ -6,6 +6,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <string>
 
 using basalt::server::runtime::command::ArgumentValue;

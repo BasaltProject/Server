@@ -4,6 +4,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <thread>
 #include <vector>
 

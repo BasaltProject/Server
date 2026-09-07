@@ -6,6 +6,7 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

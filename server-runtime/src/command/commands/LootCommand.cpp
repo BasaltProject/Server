@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>

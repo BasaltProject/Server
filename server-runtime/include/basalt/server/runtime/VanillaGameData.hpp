@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/RealVillagerTrades.hpp>
 #include <basalt/server/runtime/world/StructureTemplates.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>

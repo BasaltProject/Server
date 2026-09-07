@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/item/ItemWear.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime::item::itemWear {
 namespace {

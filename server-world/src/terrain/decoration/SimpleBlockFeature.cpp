@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <set>
 #include <stdexcept>

@@ -2,6 +2,7 @@
 #include <basalt/wire/common/json/Json.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <string>

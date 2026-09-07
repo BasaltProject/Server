@@ -6,6 +6,7 @@
 #include <doctest.h>
 
 #include <cmath>
+#include <cstdint>
 #include <set>
 #include <string>
 

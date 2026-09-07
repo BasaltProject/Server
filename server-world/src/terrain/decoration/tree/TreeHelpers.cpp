@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>

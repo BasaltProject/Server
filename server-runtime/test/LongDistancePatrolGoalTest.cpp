@@ -9,6 +9,7 @@
 #include <doctest.h>
 
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <vector>

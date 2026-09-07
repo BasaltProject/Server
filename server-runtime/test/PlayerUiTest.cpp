@@ -5,6 +5,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 using basalt::server::runtime::config::BossBarConfig;

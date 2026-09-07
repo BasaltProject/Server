@@ -3,6 +3,7 @@
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <utility>
 

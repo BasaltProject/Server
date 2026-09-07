@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/TreeDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/TreePatchDecoration.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 

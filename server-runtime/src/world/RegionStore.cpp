@@ -4,6 +4,7 @@
 #include <basalt/wire/nbt/NbtIO.hpp>
 
 #include <chrono>
+#include <cstdint>
 #include <map>
 #include <utility>
 

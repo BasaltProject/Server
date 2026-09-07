@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <map>
 #include <string>
 

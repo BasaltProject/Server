@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/SurfacePatches.hpp>
 
 #include <array>
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

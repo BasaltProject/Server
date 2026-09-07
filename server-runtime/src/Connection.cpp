@@ -2,6 +2,7 @@
 #include <basalt/wire/protocol/PacketFraming.hpp>
 
 #include <array>
+#include <cstdint>
 
 namespace basalt::server::runtime {
 

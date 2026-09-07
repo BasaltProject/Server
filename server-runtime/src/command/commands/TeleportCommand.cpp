@@ -7,6 +7,7 @@
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <vector>
 

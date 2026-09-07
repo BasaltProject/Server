@@ -2,6 +2,7 @@
 #include <basalt/server/world/terrain/decoration/CaveVineColumnFeature.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>

@@ -1,6 +1,7 @@
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
 #include <basalt/server/world/terrain/TerrainProvider.hpp>
 
+#include <cstdint>
 #include <utility>
 #include <vector>
 

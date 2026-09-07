@@ -10,6 +10,7 @@ using basalt::wire::common::Identifier;
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <stdexcept>
 #include <thread>
 #include <vector>

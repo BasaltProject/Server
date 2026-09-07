@@ -1,5 +1,6 @@
 #include <basalt/server/world/structure/StructureSpawnOverrides.hpp>
 
+#include <cstdint>
 #include <map>
 
 namespace basalt::server::world::structure {

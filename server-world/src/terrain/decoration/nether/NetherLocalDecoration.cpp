@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/nether/NetherLocalDecoration.hpp>
 
+#include <cstdint>
 #include <cstdlib>
 #include <stdexcept>
 #include <string>

@@ -3,6 +3,7 @@
 #include <basalt/wire/nbt/JsonToNbt.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <expected>
 
 namespace basalt::server::runtime::world {

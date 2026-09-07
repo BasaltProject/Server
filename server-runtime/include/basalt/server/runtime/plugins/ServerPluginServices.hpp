@@ -3,6 +3,7 @@
 #include <basalt/server/plugins/PluginServices.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>

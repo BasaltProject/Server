@@ -2,6 +2,7 @@
 #include <basalt/server/world/structure/StructurePlacementGrid.hpp>
 #include <basalt/wire/common/JavaCast.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 
 namespace basalt::server::world::structure {

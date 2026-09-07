@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 
 /// `/reload`: re-reads the configuration files that are read on every use. Bukkit's version is

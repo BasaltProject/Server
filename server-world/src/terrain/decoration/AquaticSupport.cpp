@@ -4,6 +4,7 @@
 #include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 
+#include <cstdint>
 #include <span>
 
 namespace basalt::server::world::terrain::decoration::aquaticsupport {

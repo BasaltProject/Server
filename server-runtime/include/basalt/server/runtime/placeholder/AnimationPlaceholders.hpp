@@ -2,6 +2,7 @@
 
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 
+#include <cstdint>
 #include <functional>
 
 namespace basalt::server::runtime::config {

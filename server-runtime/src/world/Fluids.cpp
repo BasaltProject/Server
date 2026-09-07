@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/Fluids.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string_view>
 
 namespace basalt::server::runtime::world::fluids {

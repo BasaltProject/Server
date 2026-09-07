@@ -4,6 +4,7 @@
 #include <basalt/server/registry/VanillaTables.hpp>
 
 #include <array>
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 

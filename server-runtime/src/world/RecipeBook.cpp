@@ -3,6 +3,7 @@
 #include <basalt/wire/protocol/play/RecipePackets.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <expected>
 #include <iterator>
 #include <optional>

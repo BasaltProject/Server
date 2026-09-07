@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::entity {

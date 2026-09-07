@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
+#include <cstdint>
 #include <memory>
 
 namespace basalt::server::runtime::world::fallingBlocks {

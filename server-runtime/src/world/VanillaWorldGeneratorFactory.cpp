@@ -37,6 +37,7 @@
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 #include <basalt/server/world/terrain/WoodlandMansionStructureGenerator.hpp>
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <set>

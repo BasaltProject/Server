@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/command/commands/ExecuteCommand.hpp>
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 

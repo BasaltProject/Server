@@ -1,6 +1,8 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world::brewingStands {
 namespace {
 

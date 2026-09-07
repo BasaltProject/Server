@@ -3,6 +3,8 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/Walls.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world::walls {
 namespace {
 

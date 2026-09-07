@@ -3,6 +3,7 @@
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>

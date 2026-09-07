@@ -1,5 +1,6 @@
 #include <basalt/server/world/terrain/surface/SurfaceRuleEnvironment.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 
 namespace basalt::server::world::terrain::surface {

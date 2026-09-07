@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/ai/WanderingTraderGoals.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::entity::ai {
 namespace {

@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 

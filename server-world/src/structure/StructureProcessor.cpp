@@ -4,6 +4,7 @@
 #include <basalt/server/world/structure/StructureProcessor.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <numeric>
 
 namespace basalt::server::world::structure {

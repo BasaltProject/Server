@@ -7,6 +7,7 @@
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <utility>
 

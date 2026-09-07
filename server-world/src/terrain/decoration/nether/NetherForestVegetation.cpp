@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/Blocks.hpp>
 
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::world::terrain::decoration::nether::shared {

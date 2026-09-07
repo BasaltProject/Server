@@ -4,6 +4,8 @@
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/LavaGrowth.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world::lavaGrowth {
 namespace {
 

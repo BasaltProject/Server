@@ -1,6 +1,7 @@
 #include <basalt/server/world/terrain/decoration/IntProvider.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <stdexcept>
 
 namespace basalt::server::world::terrain::decoration {

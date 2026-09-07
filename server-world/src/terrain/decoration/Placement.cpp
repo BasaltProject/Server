@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::terrain::decoration {

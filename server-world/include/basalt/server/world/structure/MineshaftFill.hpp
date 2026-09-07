@@ -4,6 +4,7 @@
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/structure/MineshaftLayout.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <string>
 

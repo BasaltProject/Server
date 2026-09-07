@@ -8,6 +8,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <memory>
 
 using basalt::server::runtime::entity::ServerEntity;

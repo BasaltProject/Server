@@ -9,6 +9,7 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <utility>
 

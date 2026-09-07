@@ -2,6 +2,7 @@
 #include <basalt/wire/io/Platform.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime {
 namespace {

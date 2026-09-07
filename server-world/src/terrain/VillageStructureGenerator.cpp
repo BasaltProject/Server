@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <utility>

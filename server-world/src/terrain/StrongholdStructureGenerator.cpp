@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/StructureBeardifier.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 
 namespace basalt::server::world::terrain {

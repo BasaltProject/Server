@@ -5,6 +5,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <memory>
 #include <utility>
 

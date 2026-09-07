@@ -1,6 +1,8 @@
 #include <basalt/server/lua/LuaArgs.hpp>
 #include <basalt/server/lua/LuaRef.hpp>
 
+#include <cstdint>
+
 extern "C" {
 #include <lauxlib.h>
 #include <lua.h>

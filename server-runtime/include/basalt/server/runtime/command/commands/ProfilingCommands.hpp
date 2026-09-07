@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `DebugCommand`, whose `start`/`stop` bracket a profiling run and write a report.

@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/registry/VanillaDimensionTypes.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::registry::vanillaDimensionTypes {

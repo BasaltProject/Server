@@ -2,6 +2,7 @@
 #include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 #include <basalt/server/world/terrain/decoration/TaigaGroundDecoration.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>

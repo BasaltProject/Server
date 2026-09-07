@@ -3,6 +3,7 @@
 #include <basalt/server/registry/VanillaBlocks.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <unordered_map>
 
 namespace basalt::server::registry::blocks {

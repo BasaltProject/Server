@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/IglooStructureGenerator.hpp>
 
 #include <array>
+#include <cstdint>
 #include <utility>
 #include <vector>
 

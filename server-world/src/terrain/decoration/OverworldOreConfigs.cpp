@@ -2,6 +2,7 @@
 #include <basalt/server/world/terrain/decoration/OverworldOreConfigs.hpp>
 #include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
 
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>

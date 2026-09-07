@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

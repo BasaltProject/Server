@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdint>
 
 namespace basalt::server::runtime::command::dataPaths {
 namespace {

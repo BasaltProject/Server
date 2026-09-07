@@ -15,6 +15,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <map>

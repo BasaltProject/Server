@@ -2,6 +2,8 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `BanPlayerCommands`. A banned player is disconnected on the spot, as vanilla does.

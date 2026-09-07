@@ -1,5 +1,7 @@
 #include <basalt/server/world/noise/ImprovedNoise.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::noise {
 
 ImprovedNoise::ImprovedNoise(random::RandomSource& source) {

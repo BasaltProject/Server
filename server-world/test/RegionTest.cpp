@@ -4,6 +4,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using namespace basalt::server::world;
 using namespace basalt::server::world::region;
 using basalt::wire::common::Identifier;

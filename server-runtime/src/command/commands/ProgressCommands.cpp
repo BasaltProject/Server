@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <string>
 #include <vector>

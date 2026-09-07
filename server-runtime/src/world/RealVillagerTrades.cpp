@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/world/RealVillagerTrades.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world {
 namespace {
 

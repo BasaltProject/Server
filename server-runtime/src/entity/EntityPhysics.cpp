@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::entity::entityPhysics {
 namespace {

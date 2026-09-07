@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <string_view>

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/Reshapes.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <string>
 

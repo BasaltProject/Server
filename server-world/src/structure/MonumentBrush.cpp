@@ -3,6 +3,7 @@
 #include <basalt/server/world/structure/MonumentBrush.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::world::structure {
 namespace {

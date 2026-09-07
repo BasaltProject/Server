@@ -2,6 +2,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
+#include <cstdint>
 #include <random>
 #include <stdexcept>
 #include <utility>

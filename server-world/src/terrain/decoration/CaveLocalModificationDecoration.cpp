@@ -13,6 +13,7 @@
 #include <array>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <numbers>
 #include <stdexcept>

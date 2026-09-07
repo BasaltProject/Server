@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::world::pressurePlates {

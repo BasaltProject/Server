@@ -30,6 +30,7 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <numbers>
 #include <utility>
 

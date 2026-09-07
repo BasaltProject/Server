@@ -5,6 +5,7 @@
 #include <doctest.h>
 
 #include <atomic>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <thread>

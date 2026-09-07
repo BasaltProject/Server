@@ -2,6 +2,7 @@
 #include <basalt/server/registry/VanillaEntries.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <unordered_map>
 

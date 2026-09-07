@@ -1,6 +1,7 @@
 #include <basalt/server/storage/PlayerRepository.hpp>
 #include <basalt/server/storage/StorageNbt.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::storage {

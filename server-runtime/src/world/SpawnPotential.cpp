@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/SpawnPotential.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 
 namespace basalt::server::runtime::world {

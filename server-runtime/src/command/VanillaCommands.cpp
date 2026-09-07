@@ -28,6 +28,8 @@
 #include <basalt/server/runtime/command/commands/WorldBorderCommand.hpp>
 #include <basalt/server/runtime/command/commands/WorldCommands.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command {
 namespace {
 

@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
 #include <functional>
 
 /// Declared, not included: the command only ever holds a pointer to one.

@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/net/SessionOutbox.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::net {

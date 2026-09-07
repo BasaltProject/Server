@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/commands/TimeCommand.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <vector>

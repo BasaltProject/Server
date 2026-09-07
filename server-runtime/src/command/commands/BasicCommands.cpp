@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 
+#include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>

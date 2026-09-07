@@ -1,5 +1,7 @@
 #include <basalt/server/world/terrain/TheEndBiomeSource.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::terrain {
 namespace {
 

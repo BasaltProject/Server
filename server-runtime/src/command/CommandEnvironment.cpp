@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::command {

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 
+#include <cstdint>
 #include <utility>
 #include <vector>
 

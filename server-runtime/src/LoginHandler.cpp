@@ -5,6 +5,8 @@
 #include <basalt/wire/protocol/login/LoginPackets.hpp>
 #include <basalt/wire/text/Component.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime {
 namespace {
 

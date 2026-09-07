@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 
+#include <cstdint>
 #include <string_view>
 
 namespace basalt::server::runtime::world::signs {

@@ -6,6 +6,7 @@
 #include <basalt/server/world/Chunk.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 

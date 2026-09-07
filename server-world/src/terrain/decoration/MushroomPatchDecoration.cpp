@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/MushroomPatchDecoration.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 #include <vector>

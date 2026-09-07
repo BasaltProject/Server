@@ -5,6 +5,7 @@
 
 #include <array>
 #include <bit>
+#include <cstdint>
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain;

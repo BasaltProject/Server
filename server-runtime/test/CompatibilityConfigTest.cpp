@@ -10,6 +10,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <set>
 #include <string>

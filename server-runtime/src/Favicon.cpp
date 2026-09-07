@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/Favicon.hpp>
 #include <basalt/wire/common/Base64.hpp>
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 

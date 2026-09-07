@@ -5,6 +5,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using basalt::server::runtime::player::Menu;
 using basalt::server::runtime::player::MenuSlot;
 using basalt::server::runtime::player::PlayerInventory;

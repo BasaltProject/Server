@@ -2,6 +2,8 @@
 
 #include <basalt/server/world/structure/MonumentBrush.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::structure {
 
 /// parity: `MonumentBuilding.postProcess`, the monument's own body down to the pillars that carry it

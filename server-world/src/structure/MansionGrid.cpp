@@ -1,5 +1,6 @@
 #include <basalt/server/world/structure/MansionGrid.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::structure {

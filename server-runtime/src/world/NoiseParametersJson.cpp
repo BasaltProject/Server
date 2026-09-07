@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/world/NoiseParametersJson.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world::noiseParametersJson {
 namespace {
 

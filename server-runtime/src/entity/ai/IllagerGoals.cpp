@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::entity::ai {
 namespace {

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 

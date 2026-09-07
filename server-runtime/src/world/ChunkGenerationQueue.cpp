@@ -2,6 +2,7 @@
 #include <basalt/wire/io/Platform.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <exception>
 #include <limits>
 #include <utility>

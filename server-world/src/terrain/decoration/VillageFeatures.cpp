@@ -9,6 +9,7 @@
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <set>
 #include <stdexcept>

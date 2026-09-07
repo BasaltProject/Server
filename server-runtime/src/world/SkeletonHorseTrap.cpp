@@ -9,6 +9,7 @@
 #include <basalt/server/world/terrain/BiomeTemperature.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::world::skeletonHorseTrap {
 namespace {

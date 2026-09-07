@@ -1,5 +1,7 @@
 #include <basalt/server/runtime/entity/ai/VillagerSchedule.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::entity::ai::villagerSchedule {
 namespace {
 

@@ -1,6 +1,7 @@
 #include <basalt/server/world/structure/StructureTransform.hpp>
 
 #include <array>
+#include <cstdint>
 
 namespace basalt::server::world::structure {
 namespace {

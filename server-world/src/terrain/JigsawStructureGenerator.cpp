@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <memory>

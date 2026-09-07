@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/command/Coordinates.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command {

@@ -1,6 +1,7 @@
 #include <basalt/server/world/crafting/SpecialCrafting.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <string>
 #include <utility>

@@ -6,6 +6,7 @@
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <limits>
 #include <mutex>
 

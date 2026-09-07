@@ -3,6 +3,7 @@
 #include <basalt/wire/protocol/play/BorderPackets.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {

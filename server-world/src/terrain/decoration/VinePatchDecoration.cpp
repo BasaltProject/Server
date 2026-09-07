@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/VinePatchDecoration.hpp>
 
 #include <array>
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

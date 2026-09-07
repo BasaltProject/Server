@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `TickCommand`. `freeze` stops the world without stopping the server: connections, chunk

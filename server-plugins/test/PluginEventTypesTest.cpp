@@ -5,6 +5,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <string>
 #include <vector>

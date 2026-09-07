@@ -1,5 +1,7 @@
 #include <basalt/server/world/structure/MansionPlacer.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::structure {
 namespace {
 

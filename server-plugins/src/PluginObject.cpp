@@ -2,6 +2,7 @@
 #include <basalt/server/plugins/PluginObject.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <set>
 #include <utility>

@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::world::growthSupport {

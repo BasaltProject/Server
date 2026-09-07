@@ -5,6 +5,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using namespace basalt::server::world;
 namespace registry = basalt::server::registry;
 

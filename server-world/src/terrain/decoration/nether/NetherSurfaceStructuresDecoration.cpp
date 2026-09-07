@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/nether/NetherSurfaceStructuresDecoration.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <optional>

@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

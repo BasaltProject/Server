@@ -2,6 +2,7 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/server/plugins/PluginPacketView.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {

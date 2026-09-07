@@ -9,6 +9,7 @@
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 
 #include <array>
+#include <cstdint>
 #include <limits>
 #include <optional>
 #include <set>

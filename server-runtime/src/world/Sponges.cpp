@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/Sponges.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <unordered_set>

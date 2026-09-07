@@ -7,6 +7,7 @@
 #include <basalt/server/world/terrain/decoration/PlainsFlowerFeatures.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <stdexcept>
 #include <string>

@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/plugins/ServerNpcs.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::plugins {

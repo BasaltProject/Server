@@ -1,6 +1,8 @@
 #include <basalt/server/world/PalettedContainer.hpp>
 
 #include <algorithm>
+#include <cstdint>
+#include <mutex>
 #include <stdexcept>
 
 namespace basalt::server::world {

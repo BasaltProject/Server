@@ -4,6 +4,7 @@
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::config {

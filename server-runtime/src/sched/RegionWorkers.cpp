@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 

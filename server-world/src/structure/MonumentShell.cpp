@@ -1,6 +1,7 @@
 #include <basalt/server/world/structure/MonumentShell.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::world::structure {
 namespace {

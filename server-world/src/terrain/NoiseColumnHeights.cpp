@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/NoiseColumnHeights.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::world::terrain {
 namespace {

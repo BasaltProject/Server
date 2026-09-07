@@ -2,6 +2,7 @@
 #include <basalt/server/world/structure/MineshaftBlocks.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>

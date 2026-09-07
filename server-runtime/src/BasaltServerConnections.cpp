@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/plugins/PacketNames.hpp>
 
+#include <cstdint>
 #include <random>
 #include <string>
 #include <utility>

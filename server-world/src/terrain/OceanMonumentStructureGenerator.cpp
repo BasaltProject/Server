@@ -7,6 +7,7 @@
 #include <basalt/server/world/terrain/OceanMonumentStructureGenerator.hpp>
 
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <optional>

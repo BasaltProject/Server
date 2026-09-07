@@ -1,6 +1,7 @@
 #include <basalt/server/world/terrain/NetherFortressPlacement.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <utility>
 

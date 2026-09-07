@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/VineGrowth.hpp>
 
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::world::vineGrowth {

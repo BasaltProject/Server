@@ -1,6 +1,7 @@
 #include <basalt/server/storage/StorageNbt.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::storage {

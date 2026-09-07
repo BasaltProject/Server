@@ -1,6 +1,7 @@
 #include "LightSpread.hpp"
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::world::light {
 namespace {

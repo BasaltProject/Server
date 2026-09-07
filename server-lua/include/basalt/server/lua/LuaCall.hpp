@@ -4,6 +4,7 @@
 #include <basalt/server/lua/LuaRef.hpp>
 #include <basalt/server/lua/LuaSandbox.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <functional>
 #include <memory>

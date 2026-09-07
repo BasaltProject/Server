@@ -4,6 +4,7 @@
 #include <basalt/server/storage/PlayerRepository.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <string>
 #include <vector>

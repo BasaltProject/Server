@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/player/PlayerStats.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::player {
 namespace {

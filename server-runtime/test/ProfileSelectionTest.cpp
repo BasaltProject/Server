@@ -6,6 +6,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <thread>

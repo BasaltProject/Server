@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 
 /// `/timings`: what the server is spending its time on, modelled on spark minus its sampling

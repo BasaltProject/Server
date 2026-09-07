@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cstdint>
 
 namespace basalt::server::runtime::world::redstoneComponents {
 namespace {

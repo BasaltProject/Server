@@ -3,6 +3,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <format>
 
 namespace basalt::server::assets {

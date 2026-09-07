@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/OverworldUndergroundStructures.hpp>
 #include <basalt/server/world/terrain/decoration/StandaloneFeatures.hpp>
 
+#include <cstdint>
 #include <set>
 #include <string>
 #include <vector>

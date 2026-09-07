@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <set>
 #include <utility>

@@ -1,5 +1,6 @@
 #include <basalt/server/storage/Sqlite.hpp>
 
+#include <cstdint>
 #include <sqlite3.h>
 #include <utility>
 

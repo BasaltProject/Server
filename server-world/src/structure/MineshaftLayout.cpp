@@ -2,6 +2,7 @@
 #include <basalt/server/world/structure/MineshaftLayout.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <functional>
 

@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cstdint>
 #include <string_view>
 
 namespace basalt::server::registry::blockShapes {

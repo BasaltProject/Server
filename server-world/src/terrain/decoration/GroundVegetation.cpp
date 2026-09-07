@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/GroundVegetation.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <string_view>
 

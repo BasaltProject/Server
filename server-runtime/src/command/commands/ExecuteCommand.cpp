@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::command::commands {
 namespace executeCommand {

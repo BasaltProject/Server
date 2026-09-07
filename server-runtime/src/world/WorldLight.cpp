@@ -4,6 +4,7 @@
 #include <basalt/wire/protocol/play/NibbleArray.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime::world::worldLight {
 namespace {

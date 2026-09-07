@@ -1,6 +1,7 @@
 #include <basalt/server/plugins/PluginEvents.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {

@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/command/commands/ProfilingCommands.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {

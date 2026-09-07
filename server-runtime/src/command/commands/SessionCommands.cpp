@@ -4,6 +4,7 @@
 #include <basalt/wire/text/TextColor.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 

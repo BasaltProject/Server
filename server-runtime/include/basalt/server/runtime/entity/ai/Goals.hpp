@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <set>
 #include <string>

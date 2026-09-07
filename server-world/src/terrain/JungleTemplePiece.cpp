@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/JungleTemplePiece.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <utility>

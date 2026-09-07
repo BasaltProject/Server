@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/CommandTree.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>

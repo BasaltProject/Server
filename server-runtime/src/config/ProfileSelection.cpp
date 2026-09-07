@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/config/ProfileSelection.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::config {

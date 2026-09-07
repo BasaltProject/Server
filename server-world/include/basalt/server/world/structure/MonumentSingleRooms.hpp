@@ -3,6 +3,8 @@
 #include <basalt/server/world/structure/MonumentBrush.hpp>
 #include <basalt/server/world/structure/MonumentRoomGraph.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::structure {
 
 /// The rooms that occupy a single lattice cell, plus the core the whole monument is built around.

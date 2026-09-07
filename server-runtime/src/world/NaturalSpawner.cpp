@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <set>
 
 namespace basalt::server::runtime::world::naturalSpawner {

@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/BiomeTemperature.hpp>
 #include <basalt/server/world/terrain/decoration/SurfaceFreezingDecoration.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <set>
 #include <stdexcept>

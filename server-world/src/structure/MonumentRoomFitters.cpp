@@ -1,6 +1,7 @@
 #include <basalt/server/world/structure/MonumentRoomFitters.hpp>
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <optional>
 

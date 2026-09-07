@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/ai/Goal.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>

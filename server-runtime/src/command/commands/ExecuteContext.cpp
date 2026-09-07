@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <set>
 

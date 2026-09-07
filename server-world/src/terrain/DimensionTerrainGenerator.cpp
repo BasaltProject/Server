@@ -14,6 +14,7 @@
 #include <basalt/server/world/terrain/surface/SurfaceBuilder.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleData.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>

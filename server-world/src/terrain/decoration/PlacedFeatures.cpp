@@ -45,6 +45,7 @@
 #include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <string_view>

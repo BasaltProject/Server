@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::player::playerPersistence {

@@ -1,5 +1,7 @@
 #include <basalt/server/runtime/world/PrimedTntQueue.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world {
 
 void PrimedTntQueue::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z) {

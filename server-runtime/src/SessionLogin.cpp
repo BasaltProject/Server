@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

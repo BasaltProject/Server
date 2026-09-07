@@ -4,6 +4,7 @@
 #include <basalt/server/world/structure/StrongholdBrush.hpp>
 
 #include <array>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::structure {

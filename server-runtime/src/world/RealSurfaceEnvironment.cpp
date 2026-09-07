@@ -3,6 +3,7 @@
 #include <basalt/server/world/densityfunction/DensityFunction.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::world {
 namespace {

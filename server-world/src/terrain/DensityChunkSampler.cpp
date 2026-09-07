@@ -1,5 +1,6 @@
 #include <basalt/server/world/terrain/DensityChunkSampler.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 

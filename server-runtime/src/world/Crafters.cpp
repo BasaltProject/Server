@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 

@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/decoration/HugeMushroomFeature.hpp>
 #include <basalt/server/world/terrain/decoration/MushroomFieldsDecoration.hpp>
 
+#include <cstdint>
 #include <string_view>
 #include <vector>
 

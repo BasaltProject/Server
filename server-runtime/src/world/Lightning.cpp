@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/world/Chunk.hpp>
 
+#include <cstdint>
 #include <limits>
 #include <map>
 #include <string>

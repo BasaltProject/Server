@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/Campfires.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime::world::campfires {
 namespace {

@@ -4,6 +4,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using basalt::server::runtime::entity::Raid;
 using basalt::server::runtime::entity::RaidManager;
 using basalt::server::runtime::entity::RaidStatus;

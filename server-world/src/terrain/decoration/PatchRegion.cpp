@@ -1,6 +1,8 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/PatchRegion.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::terrain::decoration {
 
 std::int32_t PatchRegion::get(const DecorationPos& position) const {

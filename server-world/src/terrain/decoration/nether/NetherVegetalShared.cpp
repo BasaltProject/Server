@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 
 namespace basalt::server::world::terrain::decoration::nether::shared {

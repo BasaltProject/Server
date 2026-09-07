@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <utility>
 

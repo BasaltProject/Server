@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/BiomeTemperature.hpp>
 
 #include <array>
+#include <cstdint>
 
 namespace basalt::server::world::terrain::biomeTemperature {
 namespace {

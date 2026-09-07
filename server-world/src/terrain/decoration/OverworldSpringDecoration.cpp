@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/OverworldSpringDecoration.hpp>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <utility>

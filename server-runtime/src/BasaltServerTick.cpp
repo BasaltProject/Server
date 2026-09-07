@@ -14,6 +14,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <exception>
 #include <random>
 #include <set>

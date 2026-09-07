@@ -7,6 +7,7 @@
 #include <basalt/server/world/terrain/decoration/RootedAzaleaFeature.hpp>
 #include <basalt/server/world/terrain/decoration/VinePatchDecoration.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <stdexcept>

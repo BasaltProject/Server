@@ -3,6 +3,7 @@
 
 #include <array>
 #include <charconv>
+#include <cstdint>
 #include <map>
 #include <span>
 #include <string>

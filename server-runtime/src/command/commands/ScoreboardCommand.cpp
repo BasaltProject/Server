@@ -5,6 +5,8 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 namespace scoreboardCommand {
 namespace {

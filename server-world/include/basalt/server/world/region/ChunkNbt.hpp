@@ -3,6 +3,7 @@
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <string>
 

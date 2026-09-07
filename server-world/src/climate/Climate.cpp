@@ -2,6 +2,7 @@
 #include <basalt/server/world/climate/Sampler.hpp>
 
 #include <atomic>
+#include <cstdint>
 #include <stdexcept>
 #include <vector>
 

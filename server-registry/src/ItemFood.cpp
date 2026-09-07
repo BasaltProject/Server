@@ -2,6 +2,7 @@
 #include <basalt/server/registry/VanillaTables.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <string_view>
 #include <unordered_map>
 

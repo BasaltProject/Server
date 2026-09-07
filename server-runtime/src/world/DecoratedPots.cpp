@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world::decoratedPots {
 namespace {
 
