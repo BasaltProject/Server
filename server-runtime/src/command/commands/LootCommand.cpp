@@ -200,7 +200,7 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
 
     const auto replaceInto = [report](const CommandContext& context, const Stacks& stacks,
                                       bool entities) -> Parsed<std::int32_t> {
-        const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot");
+        const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot", !entities);
         if (!slot.has_value()) {
             return std::unexpected{slot.error()};
         }
