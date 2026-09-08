@@ -24,6 +24,16 @@
 namespace basalt::server::runtime {
 namespace {
 
+/// parity: `EntityTypes.ITEM.getHeight() / 2`, which `popResource` sits the stack down by.
+constexpr double kItemHalfHeight = 0.125;
+
+/// parity: the y of `ItemEntity`'s own `setDeltaMovement`, the little hop a dropped block makes.
+constexpr double kPoppedUpwards = 0.2;
+
+} // namespace
+
+namespace {
+
 namespace play = wire::protocol::play;
 namespace reg = server::registry;
 
@@ -231,13 +241,21 @@ void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int
         if (reg::items::registry().byName(stack.item) == nullptr) {
             continue;
         }
+        // parity: `Block.popResource` scatters it a quarter of a block either way and sits it half
+        // its own height lower, and `ItemEntity`'s own constructor throws it up at 0.2. Dropping it
+        // dead still at the middle of the square left it a block lower than the jar's a few ticks
+        // later, which is what the bench sees.
+        const auto scatter = [&random] { return (random.nextDouble() * 0.5) - 0.25; };
         static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
                                                                      .uuid = wire::common::Uuid::random(),
                                                                      .item = stack.item,
                                                                      .count = stack.count,
-                                                                     .x = x + 0.5,
-                                                                     .y = y + 0.5,
-                                                                     .z = z + 0.5}));
+                                                                     .x = x + 0.5 + scatter(),
+                                                                     .y = y + 0.5 + scatter() - kItemHalfHeight,
+                                                                     .z = z + 0.5 + scatter(),
+                                                                     .velocityX = (random.nextDouble() * 0.2) - 0.1,
+                                                                     .velocityY = kPoppedUpwards,
+                                                                     .velocityZ = (random.nextDouble() * 0.2) - 0.1}));
     }
 }
 

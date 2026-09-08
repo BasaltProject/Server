@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
+#include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
 #include <basalt/server/world/LeafDistances.hpp>
@@ -15,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <iterator>
 #include <set>
 
 namespace basalt::server::runtime::world {
@@ -247,7 +249,16 @@ void LoadedWorld::warmSpawnArea(std::int32_t spawnRadiusChunks) {
 void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {
     for (Chunk* chunk : chunks) {
         const std::vector<entity::ServerEntity*> entities = state_.entitiesIn(chunk->chunkX(), chunk->chunkZ());
-        if (entities.empty() && chunk->savedEntities().empty()) {
+        // parity: `ItemEntity` is saved with the chunk it stands in like anything else. What is
+        // lying on the floor is half of what a farm is, and without this it went with the chunk.
+        std::vector<wire::nbt::NbtCompound> dropped;
+        for (const DroppedItem& item : state_.items()) {
+            if ((static_cast<std::int32_t>(std::floor(item.x)) >> 4) == chunk->chunkX() &&
+                (static_cast<std::int32_t>(std::floor(item.z)) >> 4) == chunk->chunkZ()) {
+                dropped.push_back(droppedItemNbt::encode(item));
+            }
+        }
+        if (entities.empty() && dropped.empty() && chunk->savedEntities().empty()) {
             continue;
         }
         std::vector<wire::nbt::NbtCompound> saved;
@@ -258,6 +269,7 @@ void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {
             saved.push_back(entity::entityNbt::encodeTree(
                 *entity, [this](std::int32_t entityId) { return state_.entity(entityId); }));
         }
+        saved.insert(saved.end(), std::make_move_iterator(dropped.begin()), std::make_move_iterator(dropped.end()));
         chunk->setSavedEntities(std::move(saved));
     }
 }
