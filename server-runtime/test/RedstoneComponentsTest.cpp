@@ -318,11 +318,22 @@ TEST_CASE("a change asks the components around it to look again") {
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("stone")));
     REQUIRE(world.setBlockState(9, 64, 8, repeaterState("east", "3", "false")));
-    REQUIRE(world.setBlockState(7, 64, 8, stateOf("redstone_torch", {{"lit", "true"}})));
+    // parity: `RedstoneTorchBlock.neighborChanged` books a turn only while the torch says the same
+    // thing as what it stands on. An unlit torch on an unpowered block is one that owes a turn; a
+    // lit one on the same block is right as it is and books nothing.
+    REQUIRE(world.setBlockState(7, 64, 8, stateOf("redstone_torch", {{"lit", "false"}})));
 
-    redstoneComponents::scheduleAround(world, 8, 64, 8);
+    redstoneComponents::scheduleAround(world, "overworld", 8, 64, 8);
     CHECK(world.hasScheduledBlockTick(9, 64, 8, Identifier::vanilla("repeater")));
     CHECK(world.hasScheduledBlockTick(7, 64, 8, Identifier::vanilla("redstone_torch")));
+
+    REQUIRE(world.setBlockState(7, 64, 8, stateOf("redstone_torch", {{"lit", "true"}})));
+    WorldState quiet = emptyWorld();
+    quiet.getOrGenerateChunk(0, 0);
+    REQUIRE(quiet.setBlockState(8, 64, 8, stateOf("stone")));
+    REQUIRE(quiet.setBlockState(7, 64, 8, stateOf("redstone_torch", {{"lit", "true"}})));
+    redstoneComponents::scheduleAround(quiet, "overworld", 8, 64, 8);
+    CHECK_FALSE(quiet.hasScheduledBlockTick(7, 64, 8, Identifier::vanilla("redstone_torch")));
 
     // parity: a repeater's delay is its own, two ticks per notch, so the three-tick one waits six.
     for (std::int32_t at = 0; at < 5; ++at) {

@@ -635,9 +635,16 @@ void BlockInteractionHandler::toggleBlock(const BlockPos& pos) {
     for (const world::BlockChange& change : toggled->changes) {
         broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);
     }
-    // parity: `LeverBlock.updateNeighbours`. Without this the lever moved and powered nothing at all.
+    // parity: `LeverBlock.updateNeighbours`. Without this the lever moved and powered nothing at all,
+    // and without the second half a torch on the far side of the wall never hears the flip. That
+    // second half belongs to *using* the lever: a `/setblock` of the same state does not do it.
     for (const world::BlockChange& change : toggled->changes) {
         notifyNeighbours(BlockPos{change.x, change.y, change.z});
+        if (const std::optional<std::array<std::int32_t, 3>> wall =
+                world::blockInteractions::attachmentOf(change.stateId, change.x, change.y, change.z);
+            wall.has_value()) {
+            notifyNeighbours(BlockPos{(*wall)[0], (*wall)[1], (*wall)[2]});
+        }
     }
     broadcastSound(pos, toggled->sound, 1.0F, 1.0F);
 }

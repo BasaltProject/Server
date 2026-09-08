@@ -47,7 +47,7 @@ using ContainerSignalAt =
 
 /// Asks each component around a change to look again, which is how vanilla's neighbour updates
 /// reach them. parity: `DiodeBlock.checkTickOnNeighbor` and the torch's own scheduling.
-void scheduleAround(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, because
 /// `updateFromNeighbourShapes` asks every direction and one of them is the one it watches. So an
