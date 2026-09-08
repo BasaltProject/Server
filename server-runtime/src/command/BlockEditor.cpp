@@ -96,7 +96,7 @@ void BlockEditor::notifyNeighbours() {
             [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 static_cast<void>(set(x, y, z, stateId));
             },
-            false);
+            adjustToNeighbours_);
     }
     // A reaction can move a block of its own, and those go out with everything else.
     written_.clear();

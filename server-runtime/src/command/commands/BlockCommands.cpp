@@ -26,10 +26,13 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
                                   : coordinates->resolve(context.source().position());
 }
 
-[[nodiscard]] Parsed<std::int32_t> setBlock(const CommandContext& context, Mode mode) {
+[[nodiscard]] Parsed<std::int32_t> setBlock(const CommandContext& context, Mode mode, bool strict = false) {
     std::expected<BlockEditor, CommandSyntaxError> editor = blocksOf(context);
     if (!editor.has_value()) {
         return std::unexpected{editor.error()};
+    }
+    if (strict) {
+        editor->placeExactly();
     }
     const std::array<std::int32_t, 3> at = resolve(context, "pos");
     if (const std::optional<CommandSyntaxError> failure = editor->require(at[0], at[1], at[2]); failure.has_value()) {
@@ -149,11 +152,14 @@ void SetBlockCommand::build(const CommandNodeBuilder& root) const {
             block.literal("keep", [](const CommandNodeBuilder& form) {
                 form.executes([](const CommandContext& context) { return setBlock(context, Mode::Keep); });
             });
-            for (const std::string_view word : {"replace", "strict"}) {
-                // parity: `strict` places the state exactly as written; this build never adjusts one
-                // to its surroundings, so it is what every form already does.
-                block.literal(std::string{word}, [](const CommandNodeBuilder& form) {
-                    form.executes([](const CommandContext& context) { return setBlock(context, Mode::Replace); });
+            // parity: `strict` places the state exactly as written, and every other form runs
+            // `Block.updateFromNeighbourShapes` on it first, which is what draws a dust put beside
+            // a dust as a line instead of a stub.
+            for (const auto& [word, placesExactly] :
+                 std::array<std::pair<std::string_view, bool>, 2>{{{"replace", false}, {"strict", true}}}) {
+                block.literal(std::string{word}, [exact = placesExactly](const CommandNodeBuilder& form) {
+                    form.executes(
+                        [exact](const CommandContext& context) { return setBlock(context, Mode::Replace, exact); });
                 });
             }
         });
