@@ -94,17 +94,22 @@ TEST_CASE("the box a cart has to be in") {
         return pressed;
     };
 
-    CHECK(pressesFrom(4.0, 64.0, 4.0));
-    CHECK(pressesFrom(5.0, 64.0, 5.0));
-    // A block above and a block below both count: a cart on a slope is still on the rail.
-    CHECK(pressesFrom(4.5, 65.0, 4.5));
-    CHECK(pressesFrom(4.5, 63.0, 4.5));
-    CHECK_FALSE(pressesFrom(3.9, 64.0, 4.5));
-    CHECK_FALSE(pressesFrom(5.1, 64.0, 4.5));
-    CHECK_FALSE(pressesFrom(4.5, 64.0, 3.9));
-    CHECK_FALSE(pressesFrom(4.5, 64.0, 5.1));
-    CHECK_FALSE(pressesFrom(4.5, 65.1, 4.5));
-    CHECK_FALSE(pressesFrom(4.5, 62.9, 4.5));
+    // parity: `getSearchBB` is the rail's square shrunk a fifth of a block on each horizontal side
+    // and off the top, and what has to touch it is the **cart's own box** (0.98 wide, 0.7 tall), not
+    // its middle. So the reach is x and z in (3.71, 5.29) and y in (63.3, 64.8). Medido contra el
+    // jar con una vagoneta lanzada: dispara con el centro en 4.84 para un rail en 5, y yendo por el
+    // centro disparaba en 5.12.
+    CHECK(pressesFrom(4.5, 64.0, 4.5));
+    CHECK(pressesFrom(3.75, 64.0, 4.5));
+    CHECK(pressesFrom(5.25, 64.0, 4.5));
+    CHECK_FALSE(pressesFrom(3.7, 64.0, 4.5));
+    CHECK_FALSE(pressesFrom(5.3, 64.0, 4.5));
+    CHECK_FALSE(pressesFrom(4.5, 64.0, 3.7));
+    CHECK_FALSE(pressesFrom(4.5, 64.0, 5.3));
+    // Un poco por debajo si llega, porque la vagoneta mide setenta centesimas de alto.
+    CHECK(pressesFrom(4.5, 63.5, 4.5));
+    CHECK_FALSE(pressesFrom(4.5, 63.2, 4.5));
+    CHECK_FALSE(pressesFrom(4.5, 64.9, 4.5));
 }
 
 TEST_CASE("what does not press a rail") {

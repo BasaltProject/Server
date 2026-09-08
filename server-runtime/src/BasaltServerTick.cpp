@@ -357,11 +357,20 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                 rider->y = entity->y;
                 rider->z = entity->z;
             }
-            const std::optional<world::BlockChange> pressed = world::detectorRails::check(
-                world.state(), wire::common::mth::floor(entity->x), wire::common::mth::floor(entity->y),
-                wire::common::mth::floor(entity->z), living);
-            if (pressed.has_value()) {
-                broadcaster_->announceRedstone(world, watchers, *pressed);
+            // parity: a detector rail looks for carts whose box touches its own, so the cart has to
+            // ask every rail its box reaches and not only the one under its middle: it is on the
+            // next rail a quarter of a block before its centre gets there.
+            const std::int32_t cartY = wire::common::mth::floor(entity->y);
+            for (std::int32_t railX = wire::common::mth::floor(entity->x - world::detectorRails::kCartHalfWidth);
+                 railX <= wire::common::mth::floor(entity->x + world::detectorRails::kCartHalfWidth); ++railX) {
+                for (std::int32_t railZ = wire::common::mth::floor(entity->z - world::detectorRails::kCartHalfWidth);
+                     railZ <= wire::common::mth::floor(entity->z + world::detectorRails::kCartHalfWidth); ++railZ) {
+                    if (const std::optional<world::BlockChange> pressed =
+                            world::detectorRails::check(world.state(), railX, cartY, railZ, living);
+                        pressed.has_value()) {
+                        broadcaster_->announceRedstone(world, watchers, *pressed);
+                    }
+                }
             }
             std::set<std::int32_t> visited;
             mobTicks_->tickPassengers(world, *entity, watchers, views, living, random, visited);

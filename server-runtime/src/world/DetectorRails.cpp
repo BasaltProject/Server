@@ -9,6 +9,17 @@
 namespace basalt::server::runtime::world::detectorRails {
 namespace {
 
+/// parity: `getSearchBB`'s own fifth of a block.
+constexpr double kSearchShrink = 0.2;
+
+/// parity: `EntityTypes.MINECART.sized(0.98F, 0.7F)`, its height; the half width is public because
+/// the caller needs it to know which rails a cart is touching.
+constexpr double kCartHeight = 0.7;
+
+} // namespace
+
+namespace {
+
 constexpr std::array kMinecarts = {std::string_view{"minecart"},
                                    std::string_view{"chest_minecart"},
                                    std::string_view{"furnace_minecart"},
@@ -42,12 +53,25 @@ std::optional<BlockChange> check(WorldState& world, std::int32_t x, std::int32_t
     const auto poweredAt = properties.find("powered");
     const bool powered = poweredAt != properties.end() && poweredAt->second == "true";
 
-    // parity: `checkPressed`'s own box, which reaches a block below the rail and a block above it.
-    const bool occupied = std::ranges::any_of(entities, [x, y, z](const entity::ServerEntity* standing) {
-        return standing != nullptr && !standing->removed && isMinecart(standing->type()) && standing->x >= x &&
-               standing->x <= x + 1 && standing->z >= z && standing->z <= z + 1 && standing->y >= y - 1 &&
-               standing->y <= y + 1;
-    });
+    // parity: `DetectorRailBlock.getSearchBB`, the rail's own square shrunk a fifth of a block on
+    // each horizontal side and off the top, against the **cart's own box** and not its middle. A
+    // cart is on the rail a good quarter of a block before its centre crosses the edge: measured,
+    // the jar fires at x 4.84 for a rail at 5 and going by the middle fired at 5.12.
+    const double minX = x + kSearchShrink;
+    const double maxX = x + 1 - kSearchShrink;
+    const double minY = y;
+    const double maxY = y + 1 - kSearchShrink;
+    const double minZ = z + kSearchShrink;
+    const double maxZ = z + 1 - kSearchShrink;
+    const bool occupied =
+        std::ranges::any_of(entities, [minX, maxX, minY, maxY, minZ, maxZ](const entity::ServerEntity* standing) {
+            if (standing == nullptr || standing->removed || !isMinecart(standing->type())) {
+                return false;
+            }
+            return standing->x + kCartHalfWidth > minX && standing->x - kCartHalfWidth < maxX &&
+                   standing->y + kCartHeight > minY && standing->y < maxY && standing->z + kCartHalfWidth > minZ &&
+                   standing->z - kCartHalfWidth < maxZ;
+        });
     if (occupied) {
         world.scheduleBlockTick(x, y, z, railBlock(), kRecheckTicks);
     }

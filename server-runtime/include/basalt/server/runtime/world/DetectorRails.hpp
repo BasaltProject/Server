@@ -16,6 +16,9 @@ namespace basalt::server::runtime::world {
 /// ticks to look again; the tick it finds nothing, it goes out. It feeds every side weakly and the
 /// block underneath strongly, which is what the redstone pass already reads off its own state.
 namespace detectorRails {
+/// parity: `EntityTypes.MINECART.sized(0.98F, 0.7F)`, half of it: how far a cart's box reaches to
+/// each side, which is what decides how many rails it is touching.
+inline constexpr double kCartHalfWidth = 0.49;
 
 /// parity: the twenty ticks a pressed rail waits before checking again.
 inline constexpr std::int32_t kRecheckTicks = 20;
