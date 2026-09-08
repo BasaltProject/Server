@@ -109,7 +109,8 @@ public final class PlayerStatistics {
             return null;
         }
         if (statistic.getType() == Statistic.Type.ENTITY) {
-            EntityType type = org.bukkit.Registry.ENTITY_TYPE.get(org.bukkit.NamespacedKey.fromString(name));
+            org.bukkit.NamespacedKey entityKey = org.bukkit.NamespacedKey.fromString(name);
+            EntityType type = entityKey == null ? null : org.bukkit.Registry.ENTITY_TYPE.get(entityKey);
             return type == null ? null : new Object[] {statistic, type};
         }
         Material material = Material.matchMaterial(name);
