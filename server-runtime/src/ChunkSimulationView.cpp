@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
+#include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
@@ -40,6 +41,19 @@ std::vector<std::array<std::int32_t, 2>> ChunkSimulationView::simulatedChunks(co
                     chunks.push_back({x, z});
                 }
             }
+        }
+    }
+    // parity: `/forceload` takes a `TicketType.FORCED` ticket, which holds the chunk at entity
+    // ticking with nobody anywhere near. Without this a forced chunk kept its blocks and did
+    // nothing with them: no hopper moved an item and no furnace smelted.
+    for (const std::int64_t key : world.forcedChunks()) {
+        const std::int32_t x = world::ChunkGenerationQueue::unpackX(key);
+        const std::int32_t z = world::ChunkGenerationQueue::unpackZ(key);
+        if (region != nullptr && !region->owns(x, z)) {
+            continue;
+        }
+        if (seen.insert(key).second) {
+            chunks.push_back({x, z});
         }
     }
     return chunks;

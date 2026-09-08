@@ -161,6 +161,17 @@ void add(Slots& slots, const wire::common::Identifier& item) {
     return false;
 }
 
+/// parity: `Container.isEmpty` and `HopperBlockEntity.inventoryFull`, the two questions
+/// `tryMoveItems` asks before deciding whether to give and whether to take.
+[[nodiscard]] bool isEmpty(const Slots& slots) {
+    return std::ranges::none_of(slots, [](const std::optional<ItemStack>& slot) { return slot.has_value(); });
+}
+
+[[nodiscard]] bool isFull(const Slots& slots) {
+    return std::ranges::all_of(
+        slots, [](const std::optional<ItemStack>& slot) { return slot.has_value() && slot->count >= kMaxStack; });
+}
+
 /// parity: `ejectItems`: the first slot with something in it gives one item to what it faces.
 [[nodiscard]] bool push(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace out,
                         Slots& slots) {
@@ -185,13 +196,9 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 }
 
 /// parity: `suckInItems` for the container half: one item out of whatever sits on top.
-[[nodiscard]] bool pull(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
-    const std::optional<Container> above = containerAt(world, x, y + 1, z);
-    if (!above.has_value()) {
-        return false;
-    }
-    Slots source = blockInventory::read(*above->data, above->size);
-    const std::vector<std::int32_t> takeable = slotsFor(above->path, above->size, registry::BlockFace::Down);
+[[nodiscard]] bool pullFrom(const Container& above, Slots& slots) {
+    Slots source = blockInventory::read(*above.data, above.size);
+    const std::vector<std::int32_t> takeable = slotsFor(above.path, above.size, registry::BlockFace::Down);
     for (const std::int32_t slot : takeable) {
         std::optional<ItemStack>* stack = slotAt(source, slot);
         if (stack == nullptr || !stack->has_value()) {
@@ -203,7 +210,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         add(slots, (*stack)->item);
         *stack = (*stack)->count <= 1 ? std::nullopt
                                       : std::optional{ItemStack{.item = (*stack)->item, .count = (*stack)->count - 1}};
-        blockInventory::write(*above->data, source);
+        blockInventory::write(*above.data, source);
         return true;
     }
     return false;
@@ -259,10 +266,17 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     if (entity == nullptr) {
         return false;
     }
-    const std::int32_t cooldown = entity->data().getInt(kCooldownKey, 0);
-    if (cooldown > 0) {
-        entity->data().putInt(kCooldownKey, cooldown - 1);
-        return true;
+    // parity: `pushItemsTick` counts down first and only then asks whether the cooldown is over, so
+    // a hopper that just moved waits eight ticks and not nine.
+    // parity: only a move calls `setChanged`. Counting down is not a change worth saving, and
+    // marking the chunk for it would rewrite every hopper's region file every single tick.
+    const std::int32_t was = entity->data().getInt(kCooldownKey, 0);
+    if (was - 1 > 0) {
+        entity->data().putInt(kCooldownKey, was - 1);
+        return false;
+    }
+    if (was != 0) {
+        entity->data().putInt(kCooldownKey, 0);
     }
     // parity: `HopperBlock.ENABLED`, which a redstone signal turns off.
     if (propertyOf(*stateId, "enabled") == "false") {
@@ -273,12 +287,17 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
         return false;
     }
     Slots slots = blockInventory::read(entity->data(), kSize);
-    bool moved = push(world, x, y, z, *out, slots);
-    if (!moved) {
-        moved = pull(world, x, y, z, slots);
+    // parity: `tryMoveItems` gives one away when it has something and takes one when it has room,
+    // and both happen on the same turn: the two are `moved |=`, not one or the other.
+    bool moved = false;
+    if (!isEmpty(slots)) {
+        moved = push(world, x, y, z, *out, slots);
     }
-    if (!moved) {
-        moved = suckIn(world, x, y, z, slots);
+    if (!isFull(slots)) {
+        // parity: `suckInItems` looks at what is lying above only when there is no container there.
+        const std::optional<Container> above = containerAt(world, x, y + 1, z);
+        const bool taken = above.has_value() ? pullFrom(*above, slots) : suckIn(world, x, y, z, slots);
+        moved = taken || moved;
     }
     if (!moved) {
         return false;
