@@ -342,18 +342,28 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: `ObserverBlock.neighborChanged`, which fires only for the block it is watching.
     redstoneComponents::watchFor(world, x, y, z);
     // parity: every `neighborChanged` that reads the power: doors, lamps, bulbs and the rest.
-    const auto reactAround = [&](std::int32_t atX, std::int32_t atY, std::int32_t atZ) {
-        for (const BlockChange& change :
-             redstoneReactors::update(world, context.worldName, atX, atY, atZ, context.random, context.reactorHooks)) {
+    //
+    // parity: a reactor writes with `UPDATE_ALL`, so whatever it changed goes on to tell its own
+    // neighbours. That is what carries a signal down a line of powered rails past the first one:
+    // `PoweredRailBlock.updateState` only ever looks at the rail it is asked about.
+    std::deque<Position> reacting;
+    reacting.push_back({x, y, z});
+    for (const BlockChange& change : settled) {
+        reacting.push_back({change.x, change.y, change.z});
+    }
+    std::int32_t reacted = 0;
+    while (!reacting.empty() && reacted < kMaxCascade) {
+        const Position at = reacting.front();
+        reacting.pop_front();
+        ++reacted;
+        for (const BlockChange& change : redstoneReactors::update(world, context.worldName, at[0], at[1], at[2],
+                                                                  context.random, context.reactorHooks)) {
             reshaped(change.stateId, change.x, change.y, change.z);
             if (!change.effects.empty()) {
                 effects.push_back(change);
             }
+            reacting.push_back({change.x, change.y, change.z});
         }
-    };
-    reactAround(x, y, z);
-    for (const BlockChange& change : settled) {
-        reactAround(change.x, change.y, change.z);
     }
     // parity: `RailBlock.updateState`, the one case a rail re-bends on a neighbour change: a
     // three-way junction with a signal arriving at it.
