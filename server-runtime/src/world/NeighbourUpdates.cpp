@@ -383,10 +383,9 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                                   .minY = context.minY,
                                   .maxY = context.maxY,
                                   .random = context.random};
-    pistons::trigger(piston, x, y, z, effects);
+    pistons::trigger(piston, x, y, z);
     for (const BlockFace face : kFaces) {
-        pistons::trigger(piston, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
-                         effects);
+        pistons::trigger(piston, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
     }
     // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
     sponges::absorb(world, x, y, z, reshaped);

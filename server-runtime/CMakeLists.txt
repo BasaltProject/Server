@@ -137,6 +137,7 @@ basalt_module(server-runtime-core
         src/VillagerTradeController.cpp
         src/UiStateSync.cpp
         src/RedstoneTickSystem.cpp
+        src/BlockEventTick.cpp
         src/ScheduledBlockTick.cpp
         src/MobTickSystem.cpp
         src/MobActionTick.cpp

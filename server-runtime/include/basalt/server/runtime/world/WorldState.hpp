@@ -24,6 +24,18 @@
 
 namespace basalt::server::runtime::world {
 
+/// parity: `ServerLevel.blockEvents`. A piston does not move when the signal reaches it: it books an
+/// event, and the event is what moves it, once a tick and only while the world runs. That is why a
+/// frozen world leaves a piston standing where it is.
+struct BlockEvent {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::string block;
+    std::int32_t first = 0;
+    std::int32_t second = 0;
+};
+
 /// Shared view over the loaded chunks.
 ///
 /// The owner writes blocks without waiting for anybody: what the lock guards is the *set* of
@@ -143,6 +155,12 @@ public:
     /// chunk decorates on top of it and reads it while doing so. Called between terrain and
     /// decoration, which is the same point.
     void applyPendingWritesTo(server::world::Chunk& chunk);
+
+    /// Books one, to be run by whoever ticks this world.
+    void queueBlockEvent(BlockEvent event);
+
+    /// Everything booked since the last call, in the order it was booked.
+    [[nodiscard]] std::vector<BlockEvent> takeBlockEvents();
 
     /// What a neighbour already queued for a cell of a chunk that has not generated yet.
     [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
@@ -271,6 +289,7 @@ private:
 
     PrimedTntQueue primedTntQueue_;
     PendingChunkDecorations pendingDecorations_;
+    std::vector<BlockEvent> blockEvents_;
     SculkSensorTracker sculkSensors_;
     EntityRegistry entityRegistry_;
     DroppedItemPhysics itemPhysics_;

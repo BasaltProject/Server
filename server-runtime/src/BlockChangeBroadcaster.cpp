@@ -148,6 +148,25 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
     world::redstoneComponents::scheduleAround(world.state(), change.x, change.y, change.z);
 }
 
+void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const world::BlockEvent& event,
+                                            const std::vector<player::PlayerSession*>& watchers) {
+    if (hooks_.pistonAllowed && !hooks_.pistonAllowed(world, event.x, event.y, event.z)) {
+        return;
+    }
+    random::RandomSource random = random::RandomSource::legacy(nextSeed());
+    const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
+    const world::pistons::Context context{.world = world.state(),
+                                          .worldName = world.name(),
+                                          .minY = facts.chunkHeight.minY(),
+                                          .maxY = facts.chunkHeight.maxY(),
+                                          .random = random};
+    std::vector<world::BlockChange> effects;
+    world::pistons::runEvent(context, event.x, event.y, event.z, event.first, event.second, effects);
+    for (const world::BlockChange& effect : effects) {
+        sendEffects(watchers, effect.x, effect.y, effect.z, effect.stateId, effect.effects);
+    }
+}
+
 std::vector<world::BlockChange>
 BlockChangeBroadcaster::finishPiston(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position,
                                      const std::vector<player::PlayerSession*>& watchers) {

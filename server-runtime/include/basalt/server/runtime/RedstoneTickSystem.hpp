@@ -71,6 +71,10 @@ public:
     /// components spending their delay, pistons landing, plates coming back up.
     void tickScheduledBlocks(world::LoadedWorld& world, const sched::Region& region);
 
+    /// parity: `ServerLevel.runBlockEvents`. What a block booked for itself rather than doing on the
+    /// spot: today the pistons, which is why a frozen world leaves one standing where it is.
+    void tickBlockEvents(world::LoadedWorld& world, const sched::Region& region);
+
     /// Presses the plates people are standing on.
     void tickPressurePlates(world::LoadedWorld& world, const sched::Region& region);
 
