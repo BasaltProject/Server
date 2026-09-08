@@ -29,7 +29,7 @@ public final class BasaltMapView implements MapView {
     private final List<MapRenderer> renderers = new CopyOnWriteArrayList<>();
     private record Sent(int fingerprint, long tick) {}
 
-    private final Map<UUID, Sent> sent = new HashMap<>();
+    private final Map<UUID, Sent> sent = new java.util.concurrent.ConcurrentHashMap<>();
     private final boolean virtual;
     private boolean defaultRenderer = true;
 
