@@ -193,6 +193,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world::redstone::settle(world.state(), world.name(), moved->x, moved->y, moved->z);
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
             world::redstoneComponents::scheduleAround(world.state(), moved->x, moved->y, moved->z);
+            // parity: a component writes its own state and the shapes around it are updated, which
+            // is what an observer watching a repeater or another observer is waiting for.
+            world::redstoneComponents::watchFor(world.state(), moved->x, moved->y, moved->z);
+            for (const world::BlockChange& change : settled) {
+                world::redstoneComponents::watchFor(world.state(), change.x, change.y, change.z);
+            }
             // parity: `Level.updateNeighborsAt` after the component wrote its new state, which is
             // what lights the lamp on a repeater's output side.
             const std::vector<world::BlockChange> reacted =

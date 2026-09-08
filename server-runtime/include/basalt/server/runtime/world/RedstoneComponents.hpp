@@ -49,7 +49,13 @@ using ContainerSignalAt =
 /// reach them. parity: `DiodeBlock.checkTickOnNeighbor` and the torch's own scheduling.
 void scheduleAround(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
-/// parity: `ObserverBlock.neighborChanged`, which only fires for the block it faces: an observer
+/// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, because
+/// `updateFromNeighbourShapes` asks every direction and one of them is the one it watches. So an
+/// observer books a turn as soon as it is placed, whatever is in front of it, and a chain of them
+/// is one turn out of step without this.
+void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: `ObserverBlock.updateShape`, which only fires for the block it faces: an observer
 /// watches one direction and ignores everything else that moves around it.
 void watchFor(WorldState& world, std::int32_t changedX, std::int32_t changedY, std::int32_t changedZ);
 
