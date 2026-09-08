@@ -6,6 +6,7 @@
 
 #include <doctest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -400,21 +401,18 @@ TEST_CASE("the move landing puts the head down and the blocks one along") {
 
     const std::vector<BlockChange> changes = pistons::finish(loaded.context(), 8, 64, 8);
 
-    // The block leaves, lands, and then the arm and the body follow, each at its own coordinates.
-    REQUIRE(changes.size() == 4);
-    CHECK(changes[0] == BlockChange{.x = 9, .y = 64, .z = 8, .stateId = air()});
-    CHECK(changes[1] == BlockChange{.x = 10, .y = 64, .z = 8, .stateId = stateOf("stone")});
-    CHECK(changes[2].x == 9);
-    CHECK(changes[2].y == 64);
-    CHECK(changes[2].z == 8);
-    CHECK(registry::blockStateDefinitions::blockOf(changes[2].stateId)->path() == "piston_head");
-    CHECK(changes[3].x == 8);
-    CHECK(changes[3].y == 64);
-    CHECK(changes[3].z == 8);
-    CHECK(propertyOf(changes[3].stateId, "extended") == "true");
+    // parity: medido contra el jar. El cuerpo lee extended y el destino ya tiene un moving_piston
+    // desde que empieza el deslizamiento, asi que el aterrizaje solo convierte cada uno en lo que
+    // lleva, donde ya esta.
+    REQUIRE(changes.size() == 2);
+    CHECK(changes[0] == BlockChange{.x = 10, .y = 64, .z = 8, .stateId = stateOf("stone")});
+    CHECK(changes[1].x == 9);
+    CHECK(changes[1].y == 64);
+    CHECK(changes[1].z == 8);
+    CHECK(registry::blockStateDefinitions::blockOf(changes[1].stateId)->path() == "piston_head");
     CHECK(world.blockState(10, 64, 8) == stateOf("stone"));
-    CHECK(world.blockState(9, 64, 8) == changes[2].stateId);
-    CHECK(world.blockState(8, 64, 8) == changes[3].stateId);
+    CHECK(world.blockState(9, 64, 8) == changes[1].stateId);
+    CHECK(propertyOf(*world.blockState(8, 64, 8), "extended") == "true");
 }
 
 TEST_CASE("a piston pointing up lands its blocks from the top down") {
@@ -430,13 +428,11 @@ TEST_CASE("a piston pointing up lands its blocks from the top down") {
     const std::vector<BlockChange> changes = pistons::finish(loaded.context(), 8, 64, 8);
 
     // parity: furthest along the push first, which up an axis is the highest block.
-    REQUIRE(changes.size() == 6);
-    CHECK(changes[0] == BlockChange{.x = 8, .y = 66, .z = 8, .stateId = air()});
-    CHECK(changes[1] == BlockChange{.x = 8, .y = 67, .z = 8, .stateId = stateOf("dirt")});
-    CHECK(changes[2] == BlockChange{.x = 8, .y = 65, .z = 8, .stateId = air()});
-    CHECK(changes[3] == BlockChange{.x = 8, .y = 66, .z = 8, .stateId = stateOf("stone")});
-    CHECK(changes[4].y == 65);
-    CHECK(propertyOf(changes[4].stateId, "facing") == "up");
+    REQUIRE(changes.size() == 3);
+    CHECK(changes[0] == BlockChange{.x = 8, .y = 67, .z = 8, .stateId = stateOf("dirt")});
+    CHECK(changes[1] == BlockChange{.x = 8, .y = 66, .z = 8, .stateId = stateOf("stone")});
+    CHECK(changes[2].y == 65);
+    CHECK(propertyOf(changes[2].stateId, "facing") == "up");
     CHECK(world.blockState(8, 67, 8) == stateOf("dirt"));
     CHECK(world.blockState(8, 66, 8) == stateOf("stone"));
 }
@@ -481,14 +477,16 @@ TEST_CASE("a block mid-slide is carried up to thirteen away and no further") {
 
     static_cast<void>(pistons::finish(loaded.context(), 8, 64, 8));
 
-    CHECK(world.blockState(9, 77, 8) == stateOf("dirt"));
-    CHECK(world.blockState(9, 78, 8) == air());
-    CHECK(world.blockState(22, 64, 8) == stateOf("dirt"));
-    CHECK(world.blockState(23, 64, 8) == air());
-    CHECK(world.blockState(9, 64, -5) == stateOf("dirt"));
-    CHECK(world.blockState(9, 64, -6) == air());
-    CHECK(world.blockState(0, 64, -1) == stateOf("dirt"));
-    CHECK(world.blockState(17, 64, 16) == stateOf("dirt"));
+    // Cada uno aterriza donde ya estaba su moving_piston, que es lo que hace `finalTick`. Lo que
+    // mide este caso es el alcance del barrido, no el desplazamiento.
+    CHECK(world.blockState(8, 77, 8) == stateOf("dirt"));
+    CHECK(world.blockState(8, 78, 8) == air());
+    CHECK(world.blockState(21, 64, 8) == stateOf("dirt"));
+    CHECK(world.blockState(22, 64, 8) == air());
+    CHECK(world.blockState(8, 64, -5) == stateOf("dirt"));
+    CHECK(world.blockState(8, 64, -6) == air());
+    CHECK(world.blockState(-1, 64, -1) == stateOf("dirt"));
+    CHECK(world.blockState(16, 64, 16) == stateOf("dirt"));
 }
 
 TEST_CASE("a sticky piston brings one block back with it and a plain one does not") {
@@ -705,16 +703,12 @@ TEST_CASE("the blocks mid-slide land furthest along first") {
 
     const std::vector<BlockChange> changes = pistons::finish(loaded.context(), 8, 64, 8);
 
-    // The dirt at the far end is written before the stone that follows it, so nothing is overwritten.
-    REQUIRE(changes.size() >= 4);
-    CHECK(changes[0].x == 10);
-    CHECK(changes[0].stateId == air());
-    CHECK(changes[1].x == 11);
-    CHECK(changes[1].stateId == stateOf("dirt"));
-    CHECK(changes[2].x == 9);
-    CHECK(changes[2].stateId == air());
-    CHECK(changes[3].x == 10);
-    CHECK(changes[3].stateId == stateOf("stone"));
+    // La tierra del extremo se escribe antes que la piedra que la sigue, para que nada se pise.
+    REQUIRE(changes.size() >= 2);
+    CHECK(changes[0].x == 11);
+    CHECK(changes[0].stateId == stateOf("dirt"));
+    CHECK(changes[1].x == 10);
+    CHECK(changes[1].stateId == stateOf("stone"));
     CHECK(world.blockState(11, 64, 8) == stateOf("dirt"));
     CHECK(world.blockState(10, 64, 8) == stateOf("stone"));
 }
@@ -731,16 +725,26 @@ TEST_CASE("a block mid-slide carries the state it is about to become") {
 
     const Chunk* chunk = world.chunkIfLoaded(0, 0);
     REQUIRE(chunk != nullptr);
+    // parity: `moveBlocks` deja dos, y cada uno en su destino: la tierra en la casilla a la que va,
+    // y el brazo en la de delante del piston llevando la cabeza que sera.
     const std::vector<basalt::server::world::ChunkBlockEntity> entities = chunk->blockEntities();
-    REQUIRE(entities.size() == 1);
-    const basalt::server::world::ChunkBlockEntity& entity = entities[0];
-    CHECK(entity.localX() == 9);
-    CHECK(entity.y() == 64);
-    CHECK(entity.localZ() == 8);
-    CHECK(entity.data().getInt("blockState") == stateOf("dirt"));
-    CHECK(entity.data().getString("facing") == "east");
-    CHECK(entity.data().getBoolean("extending"));
-    CHECK_FALSE(entity.data().getBoolean("source"));
+    REQUIRE(entities.size() == 2);
+    const auto at = [&entities](std::int32_t localX) -> const basalt::server::world::ChunkBlockEntity& {
+        const auto found = std::ranges::find_if(
+            entities, [localX](const basalt::server::world::ChunkBlockEntity& one) { return one.localX() == localX; });
+        REQUIRE(found != entities.end());
+        return *found;
+    };
+    const basalt::server::world::ChunkBlockEntity& carried = at(10);
+    CHECK(carried.y() == 64);
+    CHECK(carried.localZ() == 8);
+    CHECK(carried.data().getInt("blockState") == stateOf("dirt"));
+    CHECK(carried.data().getString("facing") == "east");
+    CHECK(carried.data().getBoolean("extending"));
+    CHECK_FALSE(carried.data().getBoolean("source"));
+    const basalt::server::world::ChunkBlockEntity& arm = at(9);
+    CHECK(registry::blockStateDefinitions::blockOf(arm.data().getInt("blockState"))->path() == "piston_head");
+    CHECK(arm.data().getBoolean("source"));
     CHECK(propertyOf(*world.blockState(9, 64, 8), "type") == "sticky");
 }
 
@@ -913,14 +917,20 @@ TEST_CASE("a push that crosses into the next chunk still finds its blocks") {
     std::vector<BlockChange> effects;
     pistons::trigger(loaded.context(), 14, 64, 8, effects);
 
-    // The far block is already in the next chunk mid-slide, at its own local coordinates.
+    // Los dos destinos caen en el chunk siguiente, cada uno en sus coordenadas locales: la piedra
+    // que sale de 15 aterriza en 16 y la tierra que sale de 16 en 17.
     const Chunk* next = world.chunkIfLoaded(1, 0);
     REQUIRE(next != nullptr);
     const std::vector<basalt::server::world::ChunkBlockEntity> entities = next->blockEntities();
-    REQUIRE(entities.size() == 1);
-    CHECK(entities[0].localX() == 0);
-    CHECK(entities[0].localZ() == 8);
-    CHECK(entities[0].data().getInt("blockState") == stateOf("dirt"));
+    REQUIRE(entities.size() == 2);
+    const auto carried = [&entities](std::int32_t localX) {
+        const auto found = std::ranges::find_if(
+            entities, [localX](const basalt::server::world::ChunkBlockEntity& one) { return one.localX() == localX; });
+        REQUIRE(found != entities.end());
+        return found->data().getInt("blockState");
+    };
+    CHECK(carried(0) == stateOf("stone"));
+    CHECK(carried(1) == stateOf("dirt"));
 
     static_cast<void>(pistons::finish(loaded.context(), 14, 64, 8));
 

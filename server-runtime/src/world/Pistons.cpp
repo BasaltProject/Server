@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <set>
 
 namespace basalt::server::runtime::world::pistons {
 namespace {
@@ -281,27 +282,82 @@ private:
 /// parity: `MovingPistonBlock` and its block entity: while the arm slides, each block on the way is a
 /// `moving_piston` carrying the state it will become. That is what a client draws mid-slide, and it
 /// is why a block being pushed is not solid for those two ticks.
-void beginMove(const Context& context, const Push& push, BlockFace direction, bool sticky) {
+void beginMove(const Context& context, const Push& push, BlockFace direction, bool sticky, std::int32_t pistonX,
+               std::int32_t pistonY, std::int32_t pistonZ, const std::string& path) {
+    // parity: `moveBlocks` builds the pushed block's `moving_piston` from the default state with only
+    // the facing set, so it is always `normal`. Only the arm carries the piston's own type.
     const std::optional<std::int32_t> moving = registry::blockStateDefinitions::stateIdOf(
         wire::common::Identifier::vanilla("moving_piston"),
+        {{"facing", std::string{nameOf(direction)}}, {"type", "normal"}}, std::nullopt);
+    const std::optional<std::int32_t> movingArm = registry::blockStateDefinitions::stateIdOf(
+        wire::common::Identifier::vanilla("moving_piston"),
         {{"facing", std::string{nameOf(direction)}}, {"type", sticky ? "sticky" : "normal"}}, std::nullopt);
-    if (!moving.has_value()) {
+    if (!moving.has_value() || !movingArm.has_value()) {
         return;
     }
+    // parity: `moveBlocks` reads every pushed state before writing anything, because one block's
+    // destination is the next one's source and reading as it goes would carry the wrong state.
+    std::vector<std::pair<Position, std::int32_t>> carried;
+    carried.reserve(push.moved.size());
     for (const Position& position : push.moved) {
-        const std::optional<std::int32_t> carried = context.world.blockState(position[0], position[1], position[2]);
-        server::world::Chunk* chunk = context.world.chunkIfLoaded(position[0] >> 4, position[2] >> 4);
-        if (!carried.has_value() || chunk == nullptr ||
-            !context.world.setBlockState(position[0], position[1], position[2], *moving)) {
+        if (const std::optional<std::int32_t> state = context.world.blockState(position[0], position[1], position[2]);
+            state.has_value()) {
+            carried.emplace_back(position, *state);
+        }
+    }
+    // parity: the `moving_piston` goes at the destination carrying what will land there, not where
+    // the block still stands. That is what a client draws sliding, and why the square a block is
+    // leaving stops being solid at once.
+    std::set<Position> destinations;
+    for (auto entry = carried.rbegin(); entry != carried.rend(); ++entry) {
+        const Position to = step(entry->first, direction);
+        server::world::Chunk* chunk = context.world.chunkIfLoaded(to[0] >> 4, to[2] >> 4);
+        if (chunk == nullptr || !context.world.setBlockState(to[0], to[1], to[2], *moving)) {
             continue;
         }
+        destinations.insert(to);
         wire::nbt::NbtCompound data;
-        data.putInt("blockState", *carried);
+        data.putInt("blockState", entry->second);
         data.putString("facing", std::string{nameOf(direction)});
         data.putBoolean("extending", true);
         data.putBoolean("source", false);
-        chunk->setBlockEntity(
-            server::world::ChunkBlockEntity{position[0] & 15, position[1], position[2] & 15, block(), std::move(data)});
+        chunk->setBlockEntity(server::world::ChunkBlockEntity{to[0] & 15, to[1], to[2] & 15, block(), std::move(data)});
+    }
+    // parity: `deleteAfterMove`, the squares nobody landed on. A block that moved into where its
+    // neighbour stood must not be wiped by that neighbour leaving.
+    for (const auto& [position, unused] : carried) {
+        if (destinations.contains(position)) {
+            continue;
+        }
+        static_cast<void>(context.world.setBlockState(position[0], position[1], position[2], air()));
+    }
+    // parity: the arm slides too, so the square in front carries the head it is about to be.
+    const Position head = step(Position{pistonX, pistonY, pistonZ}, direction);
+    const std::optional<std::int32_t> arm = registry::blockStateDefinitions::stateIdOf(
+        wire::common::Identifier::vanilla("piston_head"),
+        {{"facing", std::string{nameOf(direction)}}, {"type", sticky ? "sticky" : "normal"}, {"short", "false"}},
+        std::nullopt);
+    server::world::Chunk* armChunk = context.world.chunkIfLoaded(head[0] >> 4, head[2] >> 4);
+    if (arm.has_value() && armChunk != nullptr && context.world.setBlockState(head[0], head[1], head[2], *movingArm)) {
+        wire::nbt::NbtCompound data;
+        data.putInt("blockState", *arm);
+        data.putString("facing", std::string{nameOf(direction)});
+        data.putBoolean("extending", true);
+        data.putBoolean("source", true);
+        armChunk->setBlockEntity(
+            server::world::ChunkBlockEntity{head[0] & 15, head[1], head[2] & 15, block(), std::move(data)});
+    }
+    // parity: the body reads `extended` from the moment the slide starts, not when it ends. It is
+    // built from the piston that is standing there, or it would come back facing whichever way the
+    // default state points.
+    const std::optional<std::int32_t> standing = context.world.blockState(pistonX, pistonY, pistonZ);
+    if (!standing.has_value()) {
+        return;
+    }
+    if (const std::optional<std::int32_t> body = registry::blockStateDefinitions::stateIdOf(
+            wire::common::Identifier::vanilla(path), {{"extended", "true"}}, *standing);
+        body.has_value()) {
+        static_cast<void>(context.world.setBlockState(pistonX, pistonY, pistonZ, *body));
     }
 }
 
@@ -351,26 +407,22 @@ void beginMove(const Context& context, const Push& push, BlockFace direction, bo
 /// Puts every carried block down one along, which is what `PistonMovingBlockEntity.finalTick` does
 /// when the slide ends.
 [[nodiscard]] std::vector<BlockChange> landCarried(const Context& context,
-                                                   const std::vector<std::pair<Position, std::int32_t>>& carried,
-                                                   BlockFace direction) {
+                                                   const std::vector<std::pair<Position, std::int32_t>>& carried) {
     std::vector<BlockChange> changes;
     for (const auto& [position, stateId] : carried) {
-        const Position to = step(position, direction);
-        if (context.world.setBlockState(position[0], position[1], position[2], air())) {
-            changes.push_back(BlockChange{.x = position[0], .y = position[1], .z = position[2], .stateId = air()});
-        }
-        if (context.world.setBlockState(to[0], to[1], to[2], stateId)) {
-            changes.push_back(BlockChange{.x = to[0], .y = to[1], .z = to[2], .stateId = stateId});
+        if (context.world.setBlockState(position[0], position[1], position[2], stateId)) {
+            changes.push_back(BlockChange{.x = position[0], .y = position[1], .z = position[2], .stateId = stateId});
         }
     }
     return changes;
 }
 
 [[nodiscard]] std::vector<BlockChange> extend(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                                              std::int32_t stateId, BlockFace direction, const std::string& path,
-                                              const std::vector<PlayerPosition>& players,
+                                              BlockFace direction, const std::vector<PlayerPosition>& players,
                                               const std::function<void(const PlayerPosition&)>& onPlayerPushed) {
-    // The blocks are `moving_piston` right now, each carrying what it is about to become.
+    // parity: `PistonMovingBlockEntity.finalTick`. The body, the arm and every pushed block took
+    // their places when the slide began; what is left is turning each `moving_piston` into the state
+    // it has been carrying, where it already stands.
     const std::vector<std::pair<Position, std::int32_t>> carried = carriedBlocks(context, x, y, z, direction);
     std::vector<Position> moving;
     moving.reserve(carried.size());
@@ -379,24 +431,7 @@ void beginMove(const Context& context, const Push& push, BlockFace direction, bo
     }
     // Whatever they sweep comes along, which is `moveCollidedEntities`.
     dragAlong(context, moving, direction, players, onPlayerPushed);
-    std::vector<BlockChange> changes = landCarried(context, carried, direction);
-    // parity: the arm, which is a block of its own and carries whether the piston is sticky.
-    const Position head = step(Position{x, y, z}, direction);
-    const std::optional<std::int32_t> arm =
-        registry::blockStateDefinitions::stateIdOf(wire::common::Identifier::vanilla("piston_head"),
-                                                   {{"facing", std::string{nameOf(direction)}},
-                                                    {"type", path == "sticky_piston" ? "sticky" : "normal"},
-                                                    {"short", "false"}},
-                                                   std::nullopt);
-    if (arm.has_value() && context.world.setBlockState(head[0], head[1], head[2], *arm)) {
-        changes.push_back(BlockChange{.x = head[0], .y = head[1], .z = head[2], .stateId = *arm});
-    }
-    const std::optional<std::int32_t> body = registry::blockStateDefinitions::stateIdOf(
-        wire::common::Identifier::vanilla(path), {{"extended", "true"}}, stateId);
-    if (body.has_value() && context.world.setBlockState(x, y, z, *body)) {
-        changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *body});
-    }
-    return changes;
+    return landCarried(context, carried);
 }
 
 /// parity: a sticky piston brings one block back with it; a plain one leaves it where it is.
@@ -561,7 +596,7 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
         if (!push.has_value()) {
             return;
         }
-        beginMove(context, *push, *direction, path == "sticky_piston");
+        beginMove(context, *push, *direction, path == "sticky_piston", x, y, z, path);
     }
     // parity: `PistonBaseBlock.checkIfExtend`: 0 to push out, 1 to pull back, and the face it moves
     // along as the second byte.
@@ -596,13 +631,18 @@ std::vector<BlockChange> finish(const Context& context, std::int32_t x, std::int
     if (!direction.has_value()) {
         return {};
     }
+    // parity: a slide already in flight is finished, not reconsidered. The body took `extended` when
+    // it began, so asking again whether it should move would cancel the very move that is running.
+    if (!carriedBlocks(context, x, y, z, *direction).empty()) {
+        return extend(context, x, y, z, *direction, players, onPlayerPushed);
+    }
     const bool extended = propertyOf(*stateId, "extended") == "true";
     const bool powered = signalToPiston(context, x, y, z, *direction);
     if (powered == extended) {
         return {};
     }
     if (powered) {
-        return extend(context, x, y, z, *stateId, *direction, path, players, onPlayerPushed);
+        return extend(context, x, y, z, *direction, players, onPlayerPushed);
     }
     return retract(context, x, y, z, *stateId, *direction, path);
 }
