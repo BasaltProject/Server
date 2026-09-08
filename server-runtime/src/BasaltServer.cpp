@@ -226,7 +226,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                   }
                               },
                           .onUnloadInterval = [this] { persistence_->unloadUnreachableChunks(); },
-                          .onTick = [this] { tickWorlds(); }});
+                          .onTick = [this](bool worldRuns) { tickWorlds(worldRuns); }});
 
     functions_.reload();
     functionRunner_ = std::make_unique<command::commands::FunctionRunner>(functions_);

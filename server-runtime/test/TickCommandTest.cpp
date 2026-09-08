@@ -276,7 +276,11 @@ TEST_CASE("a frozen loop still owes the steps it was given, and unfreezing forge
 
 TEST_CASE("the loop actually ticks, and stops when it is told to") {
     std::atomic<std::int32_t> ticks{0};
-    basalt::server::runtime::TickLoop loop{{.saveIntervalSeconds = 0, .onTick = [&ticks] { ticks.fetch_add(1); }}};
+    basalt::server::runtime::TickLoop loop{{.saveIntervalSeconds = 0, .onTick = [&ticks](bool worldRuns) {
+                                                if (worldRuns) {
+                                                    ticks.fetch_add(1);
+                                                }
+                                            }}};
     loop.start();
     while (ticks.load() < 3) {
         std::this_thread::sleep_for(std::chrono::milliseconds{5});
@@ -289,9 +293,34 @@ TEST_CASE("the loop actually ticks, and stops when it is told to") {
     CHECK(ticks.load() == counted);
 }
 
+TEST_CASE("a frozen loop still calls back, so the console keeps working") {
+    std::atomic<std::int32_t> turns{0};
+    std::atomic<std::int32_t> worked{0};
+    basalt::server::runtime::TickLoop loop{{.saveIntervalSeconds = 0, .onTick = [&turns, &worked](bool worldRuns) {
+                                                turns.fetch_add(1);
+                                                if (worldRuns) {
+                                                    worked.fetch_add(1);
+                                                }
+                                            }}};
+    loop.setFrozen(true);
+    loop.start();
+    while (turns.load() < 3) {
+        std::this_thread::sleep_for(std::chrono::milliseconds{5});
+    }
+    loop.stop();
+    // parity: vanilla keeps serving the console while frozen and only stops the world. The callback
+    // has to run for a queued command to land; what it must not do is the world's turn.
+    CHECK(turns.load() >= 3);
+    CHECK(worked.load() == 0);
+}
+
 TEST_CASE("a frozen loop keeps its heartbeat but does no work") {
     std::atomic<std::int32_t> ticks{0};
-    basalt::server::runtime::TickLoop loop{{.saveIntervalSeconds = 0, .onTick = [&ticks] { ticks.fetch_add(1); }}};
+    basalt::server::runtime::TickLoop loop{{.saveIntervalSeconds = 0, .onTick = [&ticks](bool worldRuns) {
+                                                if (worldRuns) {
+                                                    ticks.fetch_add(1);
+                                                }
+                                            }}};
     loop.setFrozen(true);
     loop.start();
     while (loop.ticksRun() < 3) {
