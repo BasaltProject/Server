@@ -141,6 +141,13 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     if (blockSurvival::isSupported(world, x, y, z, *stateId, scaffolding, context.hasSkylight)) {
         return false;
     }
+    // parity: `SugarCaneBlock.updateShape` books a turn instead of breaking, so a cane left without
+    // its water stands for one more tick.
+    if (registry::blockStateDefinitions::blockOf(*stateId) != nullptr &&
+        registry::blockStateDefinitions::blockOf(*stateId)->path() == "sugar_cane") {
+        scheduledBlocks::scheduleSugarCane(world, x, y, z, false);
+        return false;
+    }
     world.setBlockState(x, y, z, registry::blocks::air().stateId);
     onBroken(*stateId, x, y, z);
     return true;
@@ -274,6 +281,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         arrived.has_value() && redstoneWire::isWire(*arrived)) {
         static_cast<void>(breakIfUnsupported(context, x, y, z, scaffolding, broken));
     }
+    // parity: `SugarCaneBlock.updateShape` runs on the cane itself as it lands, and that is where a
+    // cane with nothing to drink books the turn that breaks it.
+    scheduledBlocks::scheduleSugarCane(
+        world, x, y, z, blockSurvival::isSupported(world, x, y, z, std::nullopt, scaffolding, context.hasSkylight));
 
     // The block that just arrived reaches out to what was already there, which is the other half of
     // `updateShape`: a fence put down beside a fence joins it, not only the other way.

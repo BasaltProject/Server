@@ -220,6 +220,11 @@ const wire::common::Identifier& bubbleColumnTickType() {
     return instance;
 }
 
+const wire::common::Identifier& sugarCaneTickType() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("sugar_cane");
+    return instance;
+}
+
 std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -380,6 +385,27 @@ void scheduleFrogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::i
     random::RandomSource random = random::RandomSource::legacy(seed);
     const std::int32_t spread = random.nextInt(kFrogspawnMaxDelay - kFrogspawnMinDelay);
     world.scheduleBlockTick(x, y, z, frogspawnTickType(), kFrogspawnMinDelay + spread);
+}
+
+void scheduleSugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (supported || !stateId.has_value() || pathOf(*stateId) != "sugar_cane") {
+        return;
+    }
+    world.scheduleBlockTick(x, y, z, sugarCaneTickType(), 1);
+}
+
+void sugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported,
+               std::vector<BlockChange>& changes) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (supported || !stateId.has_value() || pathOf(*stateId) != "sugar_cane") {
+        return;
+    }
+    const std::int32_t empty = registry::blocks::air().stateId;
+    if (!world.setBlockState(x, y, z, empty)) {
+        return;
+    }
+    changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = empty});
 }
 
 void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes) {
