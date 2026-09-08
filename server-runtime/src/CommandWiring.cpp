@@ -57,6 +57,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     options.defaultWorldName = wiring.defaultWorldName;
     options.maxPlayers = wiring.maxPlayers;
     options.stopServer = wiring.stopServer;
+    options.dropBrokenBlock = wiring.dropBrokenBlock;
     options.lang = wiring.lang;
     if (wiring.playerStore != nullptr) {
         options.playerRepository = &wiring.playerStore->players();

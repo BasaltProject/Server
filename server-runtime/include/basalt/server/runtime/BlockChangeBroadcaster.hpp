@@ -71,12 +71,18 @@ public:
                                                                const std::array<std::int32_t, 3>& position,
                                                                const std::vector<player::PlayerSession*>& watchers);
 
-    /// Drops what a flow washed away. parity: `WaterFluid.beforeDestroyingBlock`, which rolls the
-    /// block's own loot table exactly as breaking it by hand would.
-    ///
-    /// Lava is the exception and drops nothing: its `beforeDestroyingBlock` only plays the fizz.
+    /// Drops what a flow washed away. parity: `WaterFluid.beforeDestroyingBlock` rolls the block's
+    /// own loot table, and lava's plays the fizz and drops nothing.
     void dropWashedAwayBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                              std::int32_t destroyedState);
+
+    /// Drops what a block change destroyed, whatever took its place.
+    ///
+    /// parity: `Block.updateOrDestroy` ends in `level.destroyBlock(pos, true)` unless the flags say
+    /// otherwise, and `RedStoneWireBlock.neighborChanged` calls `dropResources` by name before it
+    /// removes the dust. Either way the loot table is rolled exactly as breaking it by hand would.
+    void dropBrokenBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                         std::int32_t destroyedState);
 
 private:
     [[nodiscard]] std::int64_t nextSeed() const;

@@ -70,6 +70,11 @@ struct CommandWiring {
 
     std::function<server::plugins::PluginEventBus*()> pluginEvents;
     std::function<void()> stopServer;
+    /// parity: a block a command knocks down drops its own items. Handed over rather than reached
+    /// for: the command tree has no business knowing what a loot table is.
+    std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                       std::int32_t destroyedState)>
+        dropBrokenBlock;
     std::function<void()> requestRestart;
     std::function<void()> onConfigsReloaded;
     std::function<std::int64_t()> nowNanos;
