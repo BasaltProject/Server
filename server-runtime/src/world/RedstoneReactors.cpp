@@ -97,6 +97,19 @@ void openable(WorldState& world, std::string_view worldName, std::int32_t x, std
           changes, openSound(hooks, stateId, signal, random));
 }
 
+/// parity: `HopperBlock.checkPoweredState`, which is the whole of it: a hopper with any signal
+/// touching it is `enabled=false`, at once and with no delay. The tick already reads that property
+/// to decide whether to move an item; nothing was ever writing it.
+void hopperReact(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                 std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
+    const bool enabled = valueOf(properties, "enabled") == "true";
+    const bool wanted = redstone::bestNeighbourSignal(world, worldName, x, y, z) == 0;
+    if (enabled == wanted) {
+        return;
+    }
+    write(world, x, y, z, stateId, {{"enabled", wanted ? "true" : "false"}}, changes);
+}
+
 /// parity: `RedstoneLampBlock.neighborChanged`: it lights at once and books four ticks to go out, so
 /// a signal that blinks does not make the lamp blink with it.
 void lampReact(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
@@ -226,6 +239,10 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     }
     if (path == "redstone_lamp") {
         lampReact(world, worldName, x, y, z, *stateId, properties, changes);
+        return;
+    }
+    if (path == "hopper") {
+        hopperReact(world, worldName, x, y, z, *stateId, properties, changes);
         return;
     }
     if (path.ends_with("copper_bulb")) {
