@@ -3,10 +3,12 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace basalt::server::runtime::world {
 
@@ -29,6 +31,12 @@ namespace redstoneWire {
 /// or nothing when it was already right.
 [[nodiscard]] std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId);
+
+/// The dusts a change here has to reach across a step, in the order vanilla walks them. parity:
+/// `RedStoneWireBlock.updateIndirectNeighbourShapes`: the dust below and above a connected
+/// non-dust square. Without it a line running up a staircase is drawn as if the steps were not there.
+[[nodiscard]] std::vector<std::array<std::int32_t, 3>> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y,
+                                                                   std::int32_t z);
 
 } // namespace redstoneWire
 
