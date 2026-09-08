@@ -17,7 +17,7 @@ public class CustomInventory extends AbstractInventory {
     private final InventoryType type;
     private final Component title;
     private final ItemStack[] contents;
-    private final List<HumanEntity> viewers = new ArrayList<>();
+    private final List<HumanEntity> viewers = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public CustomInventory(InventoryHolder holder, InventoryType type, int size, Component title) {
         this.holder = holder;
