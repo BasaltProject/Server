@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
@@ -64,6 +65,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     const bool hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight;
+    const world::redstoneComponents::ContainerSignalAt containerSignal = world::comparatorReading::of(world.state());
     for (const std::array<std::int32_t, 3>& position : due) {
         const std::int32_t x = position[0];
         const std::int32_t y = position[1];
@@ -185,14 +187,15 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         }
         // parity: `RedstoneTorchBlock.tick` and `DiodeBlock.tick`, which is where a component's delay
         // is actually spent. What it changes then settles the dust around it.
-        if (const std::optional<world::BlockChange> moved =
-                world::redstoneComponents::tick(world.state(), world.name(), x, y, z, world.gameTime());
+        if (const std::optional<world::BlockChange> moved = world::redstoneComponents::tick(
+                world.state(), world.name(), x, y, z, world.gameTime(), containerSignal);
             moved.has_value()) {
             scheduled.push_back(*moved);
             const std::vector<world::BlockChange> settled =
                 world::redstone::settle(world.state(), world.name(), moved->x, moved->y, moved->z);
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
-            world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z, false);
+            world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z, false,
+                                                      containerSignal);
             // parity: a component writes its own state and the shapes around it are updated, which
             // is what an observer watching a repeater or another observer is waiting for.
             world::redstoneComponents::watchFor(world.state(), moved->x, moved->y, moved->z);

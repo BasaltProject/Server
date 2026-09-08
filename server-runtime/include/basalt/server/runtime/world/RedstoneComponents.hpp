@@ -54,12 +54,16 @@ using ContainerSignalAt =
 /// Asks each component around a change to look again, which is how vanilla's neighbour updates
 /// reach them. parity: `DiodeBlock.checkTickOnNeighbor` and the torch's own scheduling.
 ///
-/// `arrived` says the block was put down or taken away rather than having changed its own state.
-/// parity: a redstone torch tells the neighbours of each of its own neighbours in `onPlace` and
-/// `affectNeighborsAfterRemoval`, but when it flicks on its turn it writes with `UPDATE_ALL`, and
-/// that reaches its six squares and no further.
+/// `arrived` tells a block put down or taken away from one that changed its own state: parity, a
+/// flick writes `UPDATE_ALL` and reaches six squares, `onPlace` reaches further. `containerSignal`
+/// is what a comparator here would read, so one behind a container books no turn it does not need.
 void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-                    bool arrived = true);
+                    bool arrived = true, const ContainerSignalAt& containerSignal = {});
+
+/// The turn a comparator books when the container it reads changed hands. parity:
+/// `Level.updateNeighbourForOutputSignal`, reached from `BlockEntity.setChanged`: four horizontal
+/// squares, one more through a block that conducts, and only comparators listen.
+void scheduleComparatorsAround(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, because
 /// `updateFromNeighbourShapes` asks every direction and one of them is the one it watches. So an

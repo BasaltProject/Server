@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
+#include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
@@ -144,6 +145,25 @@ bool isPlain(std::string_view path) {
            shulkers::isShulkerBox(path);
 }
 
+bool setItemTellsComparators(const std::string_view path, const std::int32_t slot, const bool sameItem) {
+    // parity: `HopperBlockEntity.setItem` and `LecternBlockEntity`'s, neither of which calls
+    // `setChanged`: a hopper filled by command leaves the comparator beside it reading nothing.
+    if (path == "hopper" || path == "lectern") {
+        return false;
+    }
+    // parity: `ChiseledBookShelfBlockEntity.setItem` goes through `updateState`, so what the
+    // comparators hear is the block changing state, not this.
+    if (path == "chiseled_bookshelf") {
+        return false;
+    }
+    // parity: `AbstractFurnaceBlockEntity.setItem`, which only speaks for the slot whose contents
+    // decide the cook time.
+    if (furnaces::cookerFor(path).has_value()) {
+        return slot == furnaces::kInputSlot && !sameItem;
+    }
+    return true;
+}
+
 std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                          std::string_view from, const Readers& readers) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -164,6 +184,11 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
         if (const std::optional<std::int32_t> shelf = readers.shelf(x, y, z, *stateId, from); shelf.has_value()) {
             return shelf;
         }
+    }
+    // parity: `DetectorRailBlock.getAnalogOutputSignal`, which is a reading like any other even
+    // though what it reads is not in the block: it answers zero, never nothing.
+    if (path == "detector_rail") {
+        return readers.cart ? readers.cart(x, y, z) : 0;
     }
     const std::optional<std::int32_t> size = sizeOf(path);
     if (!size.has_value()) {

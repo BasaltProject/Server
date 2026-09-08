@@ -104,8 +104,13 @@ using Properties = std::map<std::string, std::string>;
 
 [[nodiscard]] bool torchIsFed(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                               std::int32_t z, const Properties& properties);
+[[nodiscard]] std::int32_t comparatorOutput(const WorldState& world, std::string_view worldName, std::int32_t x,
+                                            std::int32_t y, std::int32_t z, const Properties& properties,
+                                            const ContainerSignalAt& containerSignal);
+[[nodiscard]] std::int32_t storedOutput(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
-void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
+void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+              const ContainerSignalAt& containerSignal) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -130,6 +135,14 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
         return;
     }
     if (path == "comparator") {
+        // parity: `ComparatorBlock.checkTickOnNeighbor` books a turn only when the reading or the
+        // state would actually move. Booking on every nudge left turns pending from the build that
+        // fired later and read a world that had changed underneath them, a tick early every time.
+        const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+        const std::int32_t output = comparatorOutput(world, worldName, x, y, z, properties, containerSignal);
+        if (output == storedOutput(world, x, y, z) && (valueOf(properties, "powered") == "true") == (output > 0)) {
+            return;
+        }
         world.scheduleBlockTick(x, y, z, comparator(), kComparatorDelay);
     }
 }
@@ -223,16 +236,45 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
     return false;
 }
 
+/// parity: `ComparatorBlock.calculateOutputSignal`: nothing at all when the sides win, and otherwise
+/// the input, less the sides in subtract mode.
+[[nodiscard]] std::int32_t comparatorOutput(const WorldState& world, std::string_view worldName, std::int32_t x,
+                                            std::int32_t y, std::int32_t z, const Properties& properties,
+                                            const ContainerSignalAt& containerSignal) {
+    const std::int32_t input = comparatorInput(world, worldName, x, y, z, properties, containerSignal);
+    const std::int32_t sides = alternateSignal(world, x, y, z, properties);
+    if (input == 0 || sides > input) {
+        return 0;
+    }
+    return valueOf(properties, "mode") == "subtract" ? input - sides : input;
+}
+
+/// The level a comparator last wrote down. parity: `ComparatorBlockEntity.getOutputSignal`.
+[[nodiscard]] std::int32_t storedOutput(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+    if (chunk == nullptr) {
+        return 0;
+    }
+    const server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+    return entity == nullptr ? 0 : entity->data().getInt(redstone::kComparatorOutputKey, 0);
+}
+
 void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t output) {
     server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     if (chunk == nullptr) {
         return;
     }
-    const server::world::ChunkBlockEntity* existing = chunk->blockEntityAt(x & 15, y, z & 15);
-    wire::nbt::NbtCompound data = existing == nullptr ? wire::nbt::NbtCompound{} : existing->data();
+    // parity: `ComparatorBlockEntity.setOutputSignal` writes its field and nothing else. No
+    // `setChanged`, so the chunk is not dirtied and the level only reaches the disk when something
+    // else there is written: a comparator that changed level without changing state and then had its
+    // chunk unloaded comes back with the old one, in the jar and here.
+    if (server::world::ChunkBlockEntity* existing = chunk->blockEntityAt(x & 15, y, z & 15); existing != nullptr) {
+        existing->data().putInt(redstone::kComparatorOutputKey, output);
+        return;
+    }
+    wire::nbt::NbtCompound data;
     data.putInt(redstone::kComparatorOutputKey, output);
     chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, comparator(), std::move(data)});
-    chunk->markDirty();
 }
 
 /// parity: `ObserverBlock.tick`: it pulses. On its turn it goes on and books another turn to go off
@@ -326,15 +368,7 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
         return std::nullopt;
     }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
-    const std::int32_t input = comparatorInput(world, worldName, x, y, z, properties, containerSignal);
-    const std::int32_t sides = alternateSignal(world, x, y, z, properties);
-    const bool subtracting = valueOf(properties, "mode") == "subtract";
-    // parity: `ComparatorBlock.calculateOutputSignal`: nothing at all when the sides win, and
-    // otherwise the input, less the sides in subtract mode.
-    std::int32_t output = 0;
-    if (input != 0 && sides <= input) {
-        output = subtracting ? input - sides : input;
-    }
+    const std::int32_t output = comparatorOutput(world, worldName, x, y, z, properties, containerSignal);
     // parity: `ComparatorBlockEntity.setOutputSignal`, which is where the level lives: the state
     // only says whether there is one, so without this every comparator fed a flat fifteen.
     storeOutput(world, x, y, z, output);
@@ -369,17 +403,48 @@ const wire::common::Identifier& observer() {
 
 bool isComponent(std::int32_t stateId) { return std::ranges::find(kComponents, pathOf(stateId)) != kComponents.end(); }
 
+void scheduleComparatorsAround(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    constexpr std::array<BlockFace, 4> kHorizontal{BlockFace::North, BlockFace::South, BlockFace::West,
+                                                   BlockFace::East};
+    for (const BlockFace face : kHorizontal) {
+        std::int32_t bx = x + registry::stepX(face);
+        std::int32_t by = y + registry::stepY(face);
+        std::int32_t bz = z + registry::stepZ(face);
+        std::optional<std::int32_t> stateId = world.blockState(bx, by, bz);
+        if (!stateId.has_value()) {
+            continue;
+        }
+        if (pathOf(*stateId) != "comparator") {
+            if (!registry::blockSupport::conductsRedstone(*stateId)) {
+                continue;
+            }
+            // The one square further is only reached through a block that conducts, and only in the
+            // same direction: a comparator reading a chest behind a wall.
+            bx += registry::stepX(face);
+            by += registry::stepY(face);
+            bz += registry::stepZ(face);
+            stateId = world.blockState(bx, by, bz);
+            if (!stateId.has_value() || pathOf(*stateId) != "comparator") {
+                continue;
+            }
+        }
+        world.scheduleBlockTick(bx, by, bz, comparator(), kComparatorDelay);
+    }
+}
+
 /// parity: `Level.updateNeighborsAt`, which is the six neighbours of one square and nothing else.
-void scheduleNeighbours(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
-    schedule(world, worldName, x, y, z);
+void scheduleNeighbours(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                        const ContainerSignalAt& containerSignal) {
+    schedule(world, worldName, x, y, z, containerSignal);
     for (const BlockFace face : kFaces) {
-        schedule(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
+        schedule(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
+                 containerSignal);
     }
 }
 
 void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-                    const bool arrived) {
-    scheduleNeighbours(world, worldName, x, y, z);
+                    const bool arrived, const ContainerSignalAt& containerSignal) {
+    scheduleNeighbours(world, worldName, x, y, z, containerSignal);
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -395,7 +460,7 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
     if (arrived && (path == "redstone_torch" || path == "redstone_wall_torch")) {
         for (const BlockFace face : kFaces) {
             scheduleNeighbours(world, worldName, x + registry::stepX(face), y + registry::stepY(face),
-                               z + registry::stepZ(face));
+                               z + registry::stepZ(face), containerSignal);
         }
         return;
     }
@@ -403,7 +468,7 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
     if (path == "repeater" || path == "comparator") {
         if (const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing")); facing.has_value()) {
             scheduleNeighbours(world, worldName, x + registry::stepX(*facing), y + registry::stepY(*facing),
-                               z + registry::stepZ(*facing));
+                               z + registry::stepZ(*facing), containerSignal);
         }
     }
 }

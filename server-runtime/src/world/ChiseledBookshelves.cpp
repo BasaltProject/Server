@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/SelectableSlots.hpp>
 
 #include <cstdint>
@@ -105,6 +106,7 @@ std::optional<Interaction> putBook(WorldState& world, std::int32_t x, std::int32
     blockInventory::write(entity->data(), slots);
     entity->data().putInt(kLastSlotKey, slot);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     return Interaction{.change =
                            BlockChange{.x = x, .y = y, .z = z, .stateId = *turned, .effects = {sound(book, true)}},
                        .taken = std::nullopt};
@@ -132,6 +134,7 @@ std::optional<Interaction> takeBook(WorldState& world, std::int32_t x, std::int3
     blockInventory::write(entity->data(), slots);
     entity->data().putInt(kLastSlotKey, slot);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     return Interaction{.change =
                            BlockChange{.x = x, .y = y, .z = z, .stateId = *turned, .effects = {sound(book, false)}},
                        .taken = book};

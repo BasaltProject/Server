@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/world/NetherPortals.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
@@ -483,6 +484,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (carried != nullptr && entity != nullptr) {
             world::shulkers::restore(entity->data(), *carried);
             chunk->markDirty();
+            world::redstoneComponents::scheduleComparatorsAround(world->state(), placeAt.x, placeAt.y, placeAt.z);
         }
     }
     // parity: `MossyCarpetBlock.setPlacedBy`, which grows a second carpet over the one placed.

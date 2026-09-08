@@ -24,6 +24,7 @@
 #include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/server/runtime/world/SnowyBlocks.hpp>
@@ -495,6 +496,7 @@ void BlockInteractionHandler::usePot(PlayerSession& session, const BlockPos& pos
         return;
     }
     chunk->markDirty();
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), pos.x, pos.y, pos.z);
     if (session.gamemode != Gamemode::Creative) {
         session.inventory.set(heldSlot,
                               held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
@@ -538,6 +540,7 @@ bool BlockInteractionHandler::placeOnCampfire(PlayerSession& session, const Bloc
     }
     world::campfires::write(state, entity->data());
     chunk->markDirty();
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), pos.x, pos.y, pos.z);
     if (session.gamemode != Gamemode::Creative) {
         session.inventory.set(heldSlot,
                               held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});

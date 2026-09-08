@@ -5,11 +5,13 @@
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -175,7 +177,10 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         });
         return;
     }
-    slots[static_cast<std::size_t>(half->second)] = craftingStackOf(stack);
+    const std::optional<server::world::loot::ItemStack>& was = slots[static_cast<std::size_t>(half->second)];
+    const std::optional<server::world::loot::ItemStack> put = craftingStackOf(stack);
+    const bool sameItem = was.has_value() && put.has_value() && was->item == put->item;
+    slots[static_cast<std::size_t>(half->second)] = put;
     world::blockInventory::write(entity->data(), slots);
     // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the thing
     // being cooked changes: a new item does not inherit the last one's progress.
@@ -196,6 +201,10 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         world::furnaces::write(state, entity->data());
     }
     chunk->markDirty();
+    if (cooking != nullptr && world::containers::setItemTellsComparators(cooking->path(), half->second, sameItem)) {
+        world::redstoneComponents::scheduleComparatorsAround(world->state(), half->first.x, half->first.y,
+                                                             half->first.z);
+    }
 }
 
 std::optional<world::furnaces::State> ContainerMenuController::furnaceState() const {

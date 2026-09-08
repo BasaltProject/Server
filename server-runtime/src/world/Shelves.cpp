@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/SelectableSlots.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 
@@ -243,6 +244,7 @@ std::optional<SwapResult> swap(WorldState& world, std::int32_t x, std::int32_t y
     slots[static_cast<std::size_t>(slot)] = held;
     blockInventory::write(entity->data(), slots);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     std::string sound;
     if (removed.has_value() && !held.has_value()) {
         sound = "block.shelf.take_item";
@@ -289,6 +291,7 @@ bool swapHotbar(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
         }
         blockInventory::write(entity->data(), slots);
         world.chunkIfLoaded(position[0] >> 4, position[2] >> 4)->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, position[0], position[1], position[2]);
     }
     return swapped;
 }

@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <charconv>
 #include <cstdint>
@@ -78,6 +79,7 @@ std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_
     entity->data().putString(kSongKey, songOf(disc));
     entity->data().putInt(kOutputKey, comparatorOutput);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *playing};
 }
 
@@ -106,6 +108,7 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
     entity->data().remove(kSongKey);
     entity->data().remove(kOutputKey);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *quiet},
                      wire::common::Identifier::vanilla(std::string{kDiscPrefix} + song)};
 }
