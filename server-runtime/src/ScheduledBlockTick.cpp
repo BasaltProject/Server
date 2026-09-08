@@ -211,7 +211,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             }
         }
         world::scheduledBlocks::frogspawn(world.state(), x, y, z, scheduled);
-        // parity: `SugarCaneBlock.tick`, the turn a cane books when it loses what it was drinking.
+        // parity: `SugarCaneBlock.tick` ends in `level.destroyBlock(pos, true)`, and the `true` is
+        // the drop. What was standing there is read before, because after it is air.
+        const std::int32_t standing = world.state().blockState(x, y, z).value_or(0);
+        const std::size_t before = scheduled.size();
         world::scheduledBlocks::sugarCane(
             world.state(), x, y, z,
             world::blockSurvival::isSupported(
@@ -221,6 +224,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 },
                 hasSkylight),
             scheduled);
+        if (scheduled.size() != before) {
+            broadcaster_->dropBrokenBlock(world, x, y, z, standing);
+        }
         world::geysers::tick(world.state(), world.metadata().seed, world.gameTime(), x, y, z, scheduled);
         world::scheduledBlocks::snifferEgg(world.state(), x, y, z, random, scheduled);
         if (!scheduled.empty()) {
