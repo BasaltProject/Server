@@ -259,17 +259,37 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
 /// parity: `RedstoneTorchBlock.tick`: lit while the block it hangs on is not powered, out while it
 /// is. The burn-out after eight flicks in sixty ticks is not modelled.
 [[nodiscard]] std::optional<BlockChange> torchTick(WorldState& world, std::string_view worldName, std::int32_t x,
-                                                   std::int32_t y, std::int32_t z) {
+                                                   std::int32_t y, std::int32_t z, std::int64_t gameTime) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
     }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const bool lit = valueOf(properties, "lit") == "true";
-    if (lit != torchIsFed(world, worldName, x, y, z, properties)) {
+    const bool fed = torchIsFed(world, worldName, x, y, z, properties);
+    // parity: the list is trimmed at the front on every torch's turn, before anything is decided.
+    world.pruneTorchToggles(gameTime, kTorchToggleWindow);
+    if (lit) {
+        if (!fed) {
+            return std::nullopt;
+        }
+        const std::optional<BlockChange> moved = turn(world, x, y, z, *stateId, "lit", "false");
+        // parity: `isToggledTooFrequently(add = true)` puts the toggle in and then counts, so the
+        // eighth one is the one that burns the torch out and books its long wait.
+        world.addTorchToggle(TorchToggle{.x = x, .y = y, .z = z, .when = gameTime});
+        if (world.torchToggleCount(x, y, z) >= kMaxTorchToggles) {
+            world.scheduleBlockTick(x, y, z, torch(), kTorchRestartDelay);
+        }
+        return moved;
+    }
+    if (fed) {
         return std::nullopt;
     }
-    return turn(world, x, y, z, *stateId, "lit", lit ? "false" : "true");
+    // parity: a burnt out torch will not come back while its toggles are still inside the window.
+    if (world.torchToggleCount(x, y, z) >= kMaxTorchToggles) {
+        return std::nullopt;
+    }
+    return turn(world, x, y, z, *stateId, "lit", "true");
 }
 
 /// parity: `DiodeBlock.tick`: a repeater that should be off turns off, and one that should be on
@@ -357,7 +377,8 @@ void scheduleNeighbours(WorldState& world, std::string_view worldName, std::int3
     }
 }
 
-void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
+void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                    const bool arrived) {
     scheduleNeighbours(world, worldName, x, y, z);
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -368,8 +389,10 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
     // torch answer a lever put down by command two blocks away, which the jar never does.
     const std::string path = pathOf(*stateId);
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
-    // parity: `RedstoneTorchBlock.notifyNeighbors`, which updates around each of its six sides.
-    if (path == "redstone_torch" || path == "redstone_wall_torch") {
+    // parity: `RedstoneTorchBlock.notifyNeighbors`, which updates around each of its six sides. It
+    // only runs when the torch arrives or leaves: flicking on its own turn writes with `UPDATE_ALL`
+    // and stops at its six squares like anything else.
+    if (arrived && (path == "redstone_torch" || path == "redstone_wall_torch")) {
         for (const BlockFace face : kFaces) {
             scheduleNeighbours(world, worldName, x + registry::stepX(face), y + registry::stepY(face),
                                z + registry::stepZ(face));
@@ -456,14 +479,14 @@ std::int32_t comparatorInput(const WorldState& world, std::string_view worldName
 }
 
 std::optional<BlockChange> tick(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
-                                std::int32_t z, const ContainerSignalAt& containerSignal) {
+                                std::int32_t z, std::int64_t gameTime, const ContainerSignalAt& containerSignal) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
     }
     const std::string path = pathOf(*stateId);
     if (path == "redstone_torch" || path == "redstone_wall_torch") {
-        return torchTick(world, worldName, x, y, z);
+        return torchTick(world, worldName, x, y, z, gameTime);
     }
     if (path == "repeater") {
         return repeaterTick(world, worldName, x, y, z);

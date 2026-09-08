@@ -77,20 +77,20 @@ TEST_CASE("a torch goes out when the block it stands on is powered") {
     REQUIRE(world.setBlockState(8, 65, 8, stateOf("redstone_torch", {{"lit", "true"}})));
 
     // Nothing feeding the stone: the torch is lit and stays lit.
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 65, 8).has_value());
+    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 65, 8, 0).has_value());
     CHECK(propertyAt(world, 8, 65, 8, "lit") == "true");
 
     // A lever on the stone strongly powers it, so the torch goes out on its turn.
     REQUIRE(world.setBlockState(8, 63, 8,
                                 stateOf("lever", {{"powered", "true"}, {"face", "ceiling"}, {"facing", "north"}})));
-    const std::optional<BlockChange> out = redstoneComponents::tick(world, "world", 8, 65, 8);
+    const std::optional<BlockChange> out = redstoneComponents::tick(world, "world", 8, 65, 8, 0);
     REQUIRE(out.has_value());
     CHECK(propertyOf(out->stateId, "lit") == "false");
 
     // And it comes back when the lever does.
     REQUIRE(world.setBlockState(8, 63, 8,
                                 stateOf("lever", {{"powered", "false"}, {"face", "ceiling"}, {"facing", "north"}})));
-    const std::optional<BlockChange> relit = redstoneComponents::tick(world, "world", 8, 65, 8);
+    const std::optional<BlockChange> relit = redstoneComponents::tick(world, "world", 8, 65, 8, 0);
     REQUIRE(relit.has_value());
     CHECK(propertyOf(relit->stateId, "lit") == "true");
 }
@@ -101,13 +101,48 @@ TEST_CASE("a wall torch reads the wall behind it") {
     // parity: a wall torch facing east hangs on the block to its west.
     REQUIRE(world.setBlockState(7, 64, 8, stateOf("stone")));
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("redstone_wall_torch", {{"lit", "true"}, {"facing", "east"}})));
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8).has_value());
+    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
 
     REQUIRE(
         world.setBlockState(7, 65, 8, stateOf("lever", {{"powered", "true"}, {"face", "floor"}, {"facing", "north"}})));
-    const std::optional<BlockChange> out = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> out = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(out.has_value());
     CHECK(propertyOf(out->stateId, "lit") == "false");
+}
+
+TEST_CASE("a torch that goes out eight times in sixty ticks burns out") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("stone")));
+    REQUIRE(world.setBlockState(8, 65, 8, stateOf("redstone_torch", {{"lit", "true"}})));
+    // A wall lever facing east hangs on the block to its west, which is the one the torch stands on.
+    const std::int32_t lever = stateOf("lever", {{"powered", "true"}, {"face", "wall"}, {"facing", "east"}});
+
+    // parity: `RedstoneTorchBlock.RECENT_TOGGLES`. Only going *out* counts, and the eighth one
+    // inside sixty ticks is the one that burns the torch.
+    for (std::int32_t at = 0; at < 7; ++at) {
+        REQUIRE(world.setBlockState(9, 64, 8, lever));
+        REQUIRE(redstoneComponents::tick(world, "world", 8, 65, 8, at * 2).has_value());
+        REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
+        REQUIRE(redstoneComponents::tick(world, "world", 8, 65, 8, at * 2 + 1).has_value());
+    }
+    REQUIRE(propertyOf(*world.blockState(8, 65, 8), "lit") == "true");
+
+    REQUIRE(world.setBlockState(9, 64, 8, lever));
+    const std::optional<BlockChange> last = redstoneComponents::tick(world, "world", 8, 65, 8, 14);
+    REQUIRE(last.has_value());
+    CHECK(propertyOf(last->stateId, "lit") == "false");
+    // parity: `RESTART_DELAY`, the hundred and sixty ticks before it even looks again.
+    CHECK(world.hasScheduledBlockTick(8, 65, 8, Identifier::vanilla("redstone_torch")));
+
+    // The signal goes and the torch stays out: it has toggled too often to come back.
+    REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
+    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 65, 8, 15).has_value());
+    CHECK(propertyOf(*world.blockState(8, 65, 8), "lit") == "false");
+
+    // parity: the toggles age out of the sixty tick window and the torch lights again.
+    CHECK(redstoneComponents::tick(world, "world", 8, 65, 8, 200).has_value());
+    CHECK(propertyOf(*world.blockState(8, 65, 8), "lit") == "true");
 }
 
 TEST_CASE("a repeater turns on from what it faces and books its own turn off") {
@@ -117,15 +152,15 @@ TEST_CASE("a repeater turns on from what it faces and books its own turn off") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
     REQUIRE(world.setBlockState(8, 64, 8, repeaterState("east", "1", "false")));
 
-    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(on.has_value());
     CHECK(propertyOf(on->stateId, "powered") == "true");
     // Already on: nothing to report.
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8).has_value());
+    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
 
     // The source goes and the repeater turns off, booking a turn as it does.
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
-    const std::optional<BlockChange> off = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> off = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(off.has_value());
     CHECK(propertyOf(off->stateId, "powered") == "false");
     CHECK(world.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("repeater")));
@@ -140,17 +175,17 @@ TEST_CASE("a repeater held by another one does not move") {
     // it exactly where it is, which is what a redstone latch is built out of.
     REQUIRE(world.setBlockState(8, 64, 7, repeaterState("south", "1", "true")));
 
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8).has_value());
+    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
     CHECK(propertyAt(world, 8, 64, 8, "powered") == "false");
 
     // A repeater beside it that is not powered locks nothing.
     REQUIRE(world.setBlockState(8, 64, 7, repeaterState("south", "1", "false")));
-    CHECK(redstoneComponents::tick(world, "world", 8, 64, 8).has_value());
+    CHECK(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
 
     // And one pointing the other way locks nothing either.
     REQUIRE(world.setBlockState(8, 64, 8, repeaterState("east", "1", "false")));
     REQUIRE(world.setBlockState(8, 64, 7, repeaterState("north", "1", "true")));
-    CHECK(redstoneComponents::tick(world, "world", 8, 64, 8).has_value());
+    CHECK(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
 }
 
 TEST_CASE("an observer pulses on and then off by itself") {
@@ -158,13 +193,13 @@ TEST_CASE("an observer pulses on and then off by itself") {
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("observer", {{"facing", "east"}, {"powered", "false"}})));
 
-    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(on.has_value());
     CHECK(propertyOf(on->stateId, "powered") == "true");
     // It booked its own turn to go off again: that is the two-tick blink.
     CHECK(world.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("observer")));
 
-    const std::optional<BlockChange> off = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> off = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(off.has_value());
     CHECK(propertyOf(off->stateId, "powered") == "false");
 }
@@ -194,7 +229,7 @@ TEST_CASE("a comparator compares its rear input against its sides") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
     REQUIRE(world.setBlockState(8, 64, 8, comparatorState("east", "compare", "false")));
 
-    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(on.has_value());
     CHECK(propertyOf(on->stateId, "powered") == "true");
     // The strength it settled on is kept where a reader looks for it.
@@ -203,7 +238,7 @@ TEST_CASE("a comparator compares its rear input against its sides") {
     // parity: a block of redstone at the side is not a side input at all. Only a diode or dust
     // counts, which is why a lever or a block beside a comparator does nothing to it.
     REQUIRE(world.setBlockState(8, 64, 7, stateOf("redstone_block")));
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8).has_value());
+    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 15);
 }
 
@@ -221,7 +256,7 @@ TEST_CASE("a side that beats the rear puts a comparator out") {
                 {{"power", "9"}, {"north", "none"}, {"south", "side"}, {"west", "none"}, {"east", "none"}})));
     REQUIRE(world.setBlockState(8, 64, 8, comparatorState("east", "compare", "true")));
 
-    const std::optional<BlockChange> out = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> out = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(out.has_value());
     CHECK(propertyOf(out->stateId, "powered") == "false");
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 0);
@@ -231,7 +266,7 @@ TEST_CASE("a side that beats the rear puts a comparator out") {
         8, 64, 7,
         stateOf("redstone_wire",
                 {{"power", "2"}, {"north", "none"}, {"south", "side"}, {"west", "none"}, {"east", "none"}})));
-    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(on.has_value());
     CHECK(propertyOf(on->stateId, "powered") == "true");
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 5);
@@ -239,7 +274,7 @@ TEST_CASE("a side that beats the rear puts a comparator out") {
     // parity: `getControlInputSignal` counts only a diode or dust at the side. A block of redstone
     // there is full strength and still counts for nothing, so the five behind still wins.
     REQUIRE(world.setBlockState(8, 64, 7, stateOf("redstone_block")));
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8).has_value());
+    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 5);
 }
 
@@ -256,7 +291,7 @@ TEST_CASE("a repeater reads the dust in front of it even when it points elsewher
 
     // The dust gives that side nothing, and the repeater turns on all the same.
     CHECK(redstone::signalOf(*world.blockState(9, 64, 8), BlockFace::East) == 0);
-    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(on.has_value());
     CHECK(propertyOf(on->stateId, "powered") == "true");
 }
@@ -272,7 +307,7 @@ TEST_CASE("subtract mode takes the side off the rear") {
                 {{"power", "9"}, {"north", "none"}, {"south", "side"}, {"west", "none"}, {"east", "none"}})));
     REQUIRE(world.setBlockState(8, 64, 8, comparatorState("east", "subtract", "false")));
 
-    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8);
+    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(on.has_value());
     CHECK(propertyOf(on->stateId, "powered") == "true");
     // Fifteen behind and nine at the side leaves six.
@@ -280,7 +315,7 @@ TEST_CASE("subtract mode takes the side off the rear") {
 
     // In compare mode the same pair leaves the rear untouched.
     REQUIRE(world.setBlockState(8, 64, 8, comparatorState("east", "compare", "false")));
-    static_cast<void>(redstoneComponents::tick(world, "world", 8, 64, 8));
+    static_cast<void>(redstoneComponents::tick(world, "world", 8, 64, 8, 0));
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 15);
 }
 
