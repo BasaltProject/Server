@@ -266,6 +266,15 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         return scheduledBlocks::scaffoldingHasFallen(world, sx, sy, sz);
     };
 
+    // parity: `RedStoneWireBlock.onPlace` tells the blocks over and under it to update their own
+    // neighbours, and this dust is one of those, so a dust with nothing to sit on goes at once,
+    // before anything around it has been reshaped. That is what leaves the dust beside it a dot
+    // instead of a cross: it never sees this one arrive.
+    if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
+        arrived.has_value() && redstoneWire::isWire(*arrived)) {
+        static_cast<void>(breakIfUnsupported(context, x, y, z, scaffolding, broken));
+    }
+
     // The block that just arrived reaches out to what was already there, which is the other half of
     // `updateShape`: a fence put down beside a fence joins it, not only the other way.
     std::vector<BlockChange> bubbles;

@@ -88,15 +88,31 @@ void BlockEditor::notifyNeighbours() {
                                             .random = random,
                                             .hasSkylight = facts.hasSkylight};
     for (const std::array<std::int32_t, 3>& at : positions) {
+        const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
+        // parity: `BlockInput.place` keeps what the command wrote when the **shape** update leaves
+        // air, but a block that nothing holds up is a real removal and stays removed. That is the
+        // difference between half a door, which stays, and a dust with nothing under it, which goes.
+        bool shapedToAir = false;
+        bool unsupported = false;
         neighbourUpdates::afterChange(
             context, at[0], at[1], at[2], effects_,
-            [this](std::int32_t, std::int32_t x, std::int32_t y, std::int32_t z) {
+            [this, &at, &unsupported](std::int32_t, std::int32_t x, std::int32_t y, std::int32_t z) {
+                if (x == at[0] && y == at[1] && z == at[2]) {
+                    unsupported = true;
+                }
                 static_cast<void>(set(x, y, z, reg::blocks::air().stateId));
             },
-            [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
+            [this, &at, &shapedToAir](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
+                if (stateId == reg::blocks::air().stateId && x == at[0] && y == at[1] && z == at[2]) {
+                    shapedToAir = true;
+                }
                 static_cast<void>(set(x, y, z, stateId));
             },
             adjustToNeighbours_);
+        if (shapedToAir && !unsupported && written.has_value() && *written != reg::blocks::air().stateId &&
+            world_->state().blockState(at[0], at[1], at[2]) == reg::blocks::air().stateId) {
+            static_cast<void>(set(at[0], at[1], at[2], *written));
+        }
     }
     // A reaction can move a block of its own, and those go out with everything else.
     written_.clear();
