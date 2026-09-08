@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RandomTicks.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 
@@ -54,6 +55,8 @@ public:
     /// The rolls a world tick makes that are not part of any block's own stream.
     struct Options {
         std::function<std::int64_t()> nextSeed;
+        /// The jar's own song lengths, so a jukebox knows when to go quiet.
+        world::jukeboxes::SongOutputs* jukeboxes = nullptr;
     };
 
     RedstoneTickSystem(player::PlayerRegistry& players, world::RealRecipes& recipes,

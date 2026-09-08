@@ -448,7 +448,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                               .nextSeed = [] { return scratchSeed(); }});
     redstone_ = std::make_unique<RedstoneTickSystem>(
         playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_, RedstoneTickSystem::Hooks{},
-        RedstoneTickSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+        RedstoneTickSystem::Options{.nextSeed = [] { return scratchSeed(); }, .jukeboxes = &vanillaData_.jukeboxSongs});
     raids_ = std::make_unique<RaidSystem>(playerRegistry_, *broadcaster_, *spawning_, RaidSystem::Hooks{},
                                           RaidSystem::Options{.nextSeed = [] { return scratchSeed(); }}, logger_);
     statusEffects_ = std::make_unique<StatusEffectSystem>(

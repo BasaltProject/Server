@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <cstdint>
@@ -123,6 +124,22 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             const std::int32_t y = stored.y();
             const std::int32_t z = (position[1] << 4) + stored.localZ();
             const std::string path{stored.type().path()};
+            // parity: `JukeboxBlock.getTicker`, which only runs while there is a disc in.
+            if (path == "jukebox") {
+                const std::optional<std::string> song = jukeboxes::songAt(world, x, y, z);
+                if (!song.has_value()) {
+                    continue;
+                }
+                if (jukeboxes::tick(world, x, y, z, hooks.songLength ? hooks.songLength(*song) : 0)) {
+                    chunk->markDirty();
+                    // parity: `JukeboxBlockEntity.onSongChanged` ends in `updateNeighborsAt`, which
+                    // is what takes the signal off whatever the jukebox was feeding.
+                    if (hooks.songStopped) {
+                        hooks.songStopped(x, y, z);
+                    }
+                }
+                continue;
+            }
             // parity: `HopperBlockEntity.pushItemsTick`, one move per turn and then a rest.
             if (path == "hopper") {
                 if (hooks.allowHopperMove && !hooks.allowHopperMove(worldName, x, y, z)) {

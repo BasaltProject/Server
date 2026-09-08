@@ -46,6 +46,11 @@ struct Hooks {
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
                        const server::world::loot::ItemStack* input, const server::world::loot::ItemStack* result)>
         allowSmelt;
+    /// parity: `JukeboxSong.lengthInTicks`, which is data in the operator's own jar.
+    std::function<std::int64_t(const std::string& song)> songLength;
+    /// The turn a song ran out on: the block keeps its disc but stops feeding the redstone, so
+    /// whatever it was powering has to be told. parity: `JukeboxBlockEntity.onSongChanged`.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> songStopped;
 };
 
 /// Ticks every block entity in `chunks` that has something to do, answering the blocks that changed

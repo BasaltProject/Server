@@ -329,7 +329,14 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                                                            .z = done.z + 0.5});
             },
         .allowHopperMove = hooks_.allowHopperMove,
-        .allowSmelt = hooks_.allowSmelt};
+        .allowSmelt = hooks_.allowSmelt,
+        .songLength = [this](const std::string& song) -> std::int64_t {
+            return options_.jukeboxes == nullptr ? 0 : options_.jukeboxes->lengthOf(song);
+        },
+        .songStopped =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+                broadcaster_->notifyAround(world, watchersOf(world), x, y, z);
+            }};
     const std::vector<world::BlockChange> changes =
         world::blockEntityTicks::tick(world.state(), world.name(), world.clock(), world.weather(), chunks, hooks,
                                       config::dimensionFacts(world.declaration().dimension).hasSkylight);
