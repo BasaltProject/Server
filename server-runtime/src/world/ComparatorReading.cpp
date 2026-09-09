@@ -33,7 +33,8 @@ namespace {
 
 } // namespace
 
-redstoneComponents::ContainerSignalAt of(WorldState& world) {
+std::optional<std::int32_t> at(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                               const std::string_view from) {
     const containers::Readers readers{
         .shelf = [&world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t stateId,
                           const std::string_view from) { return shelfSignal(world, x, y, z, stateId, from); },
@@ -42,9 +43,12 @@ redstoneComponents::ContainerSignalAt of(WorldState& world) {
             [&world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 return detectorRails::comparatorSignal(world, x, y, z, world.entities());
             }};
-    return [&world, readers](const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                             const std::string_view from) {
-        return containers::analogSignal(world, x, y, z, from, readers);
+    return containers::analogSignal(world, x, y, z, from, readers);
+}
+
+redstoneComponents::ContainerSignalAt of(WorldState& world) {
+    return [&world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::string_view from) {
+        return at(world, x, y, z, from);
     };
 }
 

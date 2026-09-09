@@ -476,15 +476,20 @@ void WorldState::scheduleFluidTick(std::int32_t x, std::int32_t y, std::int32_t 
 }
 
 void WorldState::scheduleBlockTick(std::int32_t x, std::int32_t y, std::int32_t z, const wire::common::Identifier& type,
-                                   std::int32_t delay) {
+                                   std::int32_t delay, std::int32_t priority) {
     mine("A scheduled tick");
     const WorldWriteLock lock{mutex_};
     Chunk* chunk = chunkAtLocked(key(x >> 4, z >> 4));
     if (chunk == nullptr || y < chunk->verticalBounds().minY() || y > chunk->verticalBounds().maxY()) {
         return;
     }
-    chunk->scheduleBlockTick(
-        ChunkScheduledTick{.type = type, .localX = x & 15, .y = y, .localZ = z & 15, .delay = delay});
+    chunk->scheduleBlockTick(ChunkScheduledTick{.type = type,
+                                                .localX = x & 15,
+                                                .y = y,
+                                                .localZ = z & 15,
+                                                .delay = delay,
+                                                .priority = priority,
+                                                .order = nextTickOrder_++});
 }
 
 bool WorldState::hasScheduledBlockTick(std::int32_t x, std::int32_t y, std::int32_t z,
@@ -505,7 +510,7 @@ bool WorldState::hasScheduledBlockTick(std::int32_t x, std::int32_t y, std::int3
 std::vector<std::array<std::int32_t, 3>>
 WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduledTick>&)>& advance) {
     std::vector<ChunkScheduledTick> due;
-    std::vector<std::array<std::int32_t, 3>> positions;
+    std::vector<std::array<std::int32_t, 4>> found;
     const WorldWriteLock lock{mutex_};
     for (const auto& [chunkKey, chunk] : chunksByPos_) {
         // Nothing to advance, and most chunks have nothing: the same walk without this ran the
@@ -517,9 +522,24 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
         advance(*chunk, due);
         for (std::size_t index = before; index < due.size(); ++index) {
             const ChunkScheduledTick& tick = due[index];
-            positions.push_back(std::array<std::int32_t, 3>{(chunk->chunkX() << 4) + tick.localX, tick.y,
-                                                            (chunk->chunkZ() << 4) + tick.localZ});
+            found.push_back(std::array<std::int32_t, 4>{(chunk->chunkX() << 4) + tick.localX, tick.y,
+                                                        (chunk->chunkZ() << 4) + tick.localZ,
+                                                        static_cast<std::int32_t>(index)});
         }
+    }
+    // parity: `ScheduledTick.INTRA_TICK_DRAIN_ORDER`, priority first and then the order they were
+    // booked in. Without it the order was whichever chunk the map walked first, so two components
+    // due on the same turn ran in an order that had nothing to do with the game.
+    std::ranges::stable_sort(
+        found, [&due](const std::array<std::int32_t, 4>& left, const std::array<std::int32_t, 4>& right) {
+            const ChunkScheduledTick& one = due[static_cast<std::size_t>(left[3])];
+            const ChunkScheduledTick& other = due[static_cast<std::size_t>(right[3])];
+            return one.priority != other.priority ? one.priority < other.priority : one.order < other.order;
+        });
+    std::vector<std::array<std::int32_t, 3>> positions;
+    positions.reserve(found.size());
+    for (const std::array<std::int32_t, 4>& one : found) {
+        positions.push_back(std::array<std::int32_t, 3>{one[0], one[1], one[2]});
     }
     return positions;
 }

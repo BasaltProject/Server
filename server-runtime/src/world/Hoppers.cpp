@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
@@ -160,7 +161,8 @@ void add(Slots& slots, const wire::common::Identifier& item) {
                                     : ItemStack{.item = stack.item, .count = 1};
         blockInventory::write(*target.data, slots);
         world.chunkIfLoaded(target.x >> 4, target.z >> 4)->markDirty();
-        redstoneComponents::scheduleComparatorsAround(world, target.x, target.y, target.z);
+        redstoneComponents::scheduleComparatorsAround(world, {}, target.x, target.y, target.z,
+                                                      comparatorReading::of(world));
         return true;
     }
     return false;
@@ -216,7 +218,8 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         *stack = (*stack)->count <= 1 ? std::nullopt
                                       : std::optional{ItemStack{.item = (*stack)->item, .count = (*stack)->count - 1}};
         blockInventory::write(*above.data, source);
-        redstoneComponents::scheduleComparatorsAround(world, above.x, above.y, above.z);
+        redstoneComponents::scheduleComparatorsAround(world, {}, above.x, above.y, above.z,
+                                                      comparatorReading::of(world));
         return true;
     }
     return false;
@@ -310,7 +313,7 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     }
     blockInventory::write(entity->data(), slots);
     entity->data().putInt(kCooldownKey, kCooldown);
-    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return true;
 }
 

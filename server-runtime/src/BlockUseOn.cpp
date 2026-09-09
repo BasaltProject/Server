@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/EndPortals.hpp>
@@ -484,7 +485,9 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (carried != nullptr && entity != nullptr) {
             world::shulkers::restore(entity->data(), *carried);
             chunk->markDirty();
-            world::redstoneComponents::scheduleComparatorsAround(world->state(), placeAt.x, placeAt.y, placeAt.z);
+            world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), placeAt.x, placeAt.y,
+                                                                 placeAt.z,
+                                                                 world::comparatorReading::of(world->state()));
         }
     }
     // parity: `MossyCarpetBlock.setPlacedBy`, which grows a second carpet over the one placed.

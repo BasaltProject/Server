@@ -171,20 +171,22 @@ TEST_CASE("a repeater held by another one does not move") {
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
     REQUIRE(world.setBlockState(8, 64, 8, repeaterState("east", "1", "false")));
-    // parity: `RepeaterBlock.isLocked`. A powered repeater pointing at this one from the side holds
-    // it exactly where it is, which is what a redstone latch is built out of.
-    REQUIRE(world.setBlockState(8, 64, 7, repeaterState("south", "1", "true")));
+    // parity: `RepeaterBlock.isLocked` over `getControlInputSignal`. A diode at the side holds this
+    // one when it is **feeding** it, and a diode feeds along the opposite of its own `facing`. This
+    // neighbour sits to the north, so the one that locks is the one facing north. Measured in the
+    // bench circuit `repetidorbloqueo`; the rule written here before was the mirror of it.
+    REQUIRE(world.setBlockState(8, 64, 7, repeaterState("north", "1", "true")));
 
     CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
     CHECK(propertyAt(world, 8, 64, 8, "powered") == "false");
 
     // A repeater beside it that is not powered locks nothing.
-    REQUIRE(world.setBlockState(8, 64, 7, repeaterState("south", "1", "false")));
+    REQUIRE(world.setBlockState(8, 64, 7, repeaterState("north", "1", "false")));
     CHECK(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
 
     // And one pointing the other way locks nothing either.
     REQUIRE(world.setBlockState(8, 64, 8, repeaterState("east", "1", "false")));
-    REQUIRE(world.setBlockState(8, 64, 7, repeaterState("north", "1", "true")));
+    REQUIRE(world.setBlockState(8, 64, 7, repeaterState("south", "1", "true")));
     CHECK(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
 }
 
@@ -271,11 +273,14 @@ TEST_CASE("a side that beats the rear puts a comparator out") {
     CHECK(propertyOf(on->stateId, "powered") == "true");
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 5);
 
-    // parity: `getControlInputSignal` counts only a diode or dust at the side. A block of redstone
-    // there is full strength and still counts for nothing, so the five behind still wins.
+    // parity: `getControlInputSignal` without the diodes-only rule, which is the comparator's: a
+    // block of redstone at the side is worth fifteen and beats the five behind, so the comparator
+    // goes out. Measured in the bench circuit `ladodiodo`.
     REQUIRE(world.setBlockState(8, 64, 7, stateOf("redstone_block")));
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
-    CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 5);
+    const std::optional<BlockChange> beaten = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
+    REQUIRE(beaten.has_value());
+    CHECK(propertyOf(beaten->stateId, "powered") == "false");
+    CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 0);
 }
 
 TEST_CASE("a repeater reads the dust in front of it even when it points elsewhere") {
@@ -348,11 +353,25 @@ TEST_CASE("a comparator reads a container behind it, through a solid block if it
     CHECK(redstoneComponents::comparatorInput(world, "world", 8, 64, 8, properties, behind) == 7);
 }
 
+TEST_CASE("a repeater that already says what its input says books no turn") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("stone")));
+    // Off, and nothing feeding it: there is nothing for its turn to change.
+    REQUIRE(world.setBlockState(9, 64, 8, repeaterState("east", "3", "false")));
+
+    redstoneComponents::scheduleAround(world, "overworld", 8, 64, 8);
+
+    CHECK_FALSE(world.hasScheduledBlockTick(9, 64, 8, Identifier::vanilla("repeater")));
+}
+
 TEST_CASE("a change asks the components around it to look again") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("stone")));
-    REQUIRE(world.setBlockState(9, 64, 8, repeaterState("east", "3", "false")));
+    // parity: `DiodeBlock.checkTickOnNeighbor` books only for a diode that owes a turn, so this one
+    // is on with nothing feeding it: it has to go off and has not yet.
+    REQUIRE(world.setBlockState(9, 64, 8, repeaterState("east", "3", "true")));
     // parity: `RedstoneTorchBlock.neighborChanged` books a turn only while the torch says the same
     // thing as what it stands on. An unlit torch on an unpowered block is one that owes a turn; a
     // lit one on the same block is right as it is and books nothing.

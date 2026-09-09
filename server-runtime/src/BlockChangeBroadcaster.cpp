@@ -156,8 +156,12 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
             announceBlock(watchers, reacted);
         }
     }
-    world::redstoneComponents::scheduleAround(world.state(), world.name(), change.x, change.y, change.z, true,
-                                              world::comparatorReading::of(world.state()));
+    const world::redstoneComponents::ContainerSignalAt reading = world::comparatorReading::of(world.state());
+    world::redstoneComponents::scheduleAround(world.state(), world.name(), change.x, change.y, change.z, true, reading);
+    // parity: every piece of dust that moved reaches two squares out, so the component past it hears.
+    for (const world::BlockChange& moved : settled) {
+        world::redstoneComponents::scheduleAroundWire(world.state(), world.name(), moved.x, moved.y, moved.z, reading);
+    }
 }
 
 void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const world::BlockEvent& event,

@@ -1,6 +1,7 @@
 #include "ItemSlots.hpp"
 
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -208,7 +209,8 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
     });
     chunk->setBlockEntity(existing->withData(std::move(data)));
     if (tells) {
-        world::redstoneComponents::scheduleComparatorsAround((*world)->state(), at[0], at[1], at[2]);
+        world::redstoneComponents::scheduleComparatorsAround((*world)->state(), (*world)->name(), at[0], at[1], at[2],
+                                                             world::comparatorReading::of((*world)->state()));
     }
     return std::nullopt;
 }

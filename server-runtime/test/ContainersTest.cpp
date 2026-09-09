@@ -220,6 +220,20 @@ TEST_CASE("the two blocks that read themselves are asked to") {
     CHECK_FALSE(containers::analogSignal(world, 4, 64, 4, "south", readers).has_value());
 }
 
+TEST_CASE("a comparator reads a sculk sensor only while it is awake") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    REQUIRE(world.setBlockState(
+        8, 64, 8,
+        stateOf("sculk_sensor", {{"sculk_sensor_phase", "active"}, {"power", "11"}, {"waterlogged", "false"}})));
+    CHECK(containers::analogSignal(world, 8, 64, 8) == 11);
+
+    REQUIRE(world.setBlockState(
+        8, 64, 8,
+        stateOf("sculk_sensor", {{"sculk_sensor_phase", "cooldown"}, {"power", "0"}, {"waterlogged", "false"}})));
+    CHECK(containers::analogSignal(world, 8, 64, 8) == 0);
+}
+
 TEST_CASE("only some containers tell the comparators when a slot is written from outside") {
     // parity: `BaseContainerBlockEntity.setItem` ends in `setChanged`, but a hopper overrides it
     // away: `/item replace block` into a hopper leaves the comparator beside it reading nothing.

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Buckets.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
@@ -214,7 +215,7 @@ struct Target {
         }
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
-        redstoneComponents::scheduleComparatorsAround(world, into.x, into.y, into.z);
+        redstoneComponents::scheduleComparatorsAround(world, {}, into.x, into.y, into.z, comparatorReading::of(world));
         return true;
     }
     return false;
@@ -333,7 +334,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         slots[*slot] = minusOne(stack);
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
-        redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+        redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
         result.fired = true;
         return result;
     }
@@ -345,7 +346,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         slots[*slot] = special.left;
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
-        redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+        redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
         result.fired = true;
         return result;
     }
@@ -361,7 +362,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     slots[*slot] = minusOne(stack);
     blockInventory::write(blockEntity->data(), slots);
     chunk->markDirty();
-    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     result.fired = true;
     return result;
 }

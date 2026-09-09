@@ -61,9 +61,20 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
                     bool arrived = true, const ContainerSignalAt& containerSignal = {});
 
 /// The turn a comparator books when the container it reads changed hands. parity:
-/// `Level.updateNeighbourForOutputSignal`, reached from `BlockEntity.setChanged`: four horizontal
-/// squares, one more through a block that conducts, and only comparators listen.
-void scheduleComparatorsAround(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+/// `Level.updateNeighbourForOutputSignal`: four horizontal squares, one more through a conducting
+/// block, and only comparators listen. `worldName` may be empty where the container code has no name
+/// to hand; it only reaches a trapped chest's viewer count, which moving an item cannot change.
+void scheduleComparatorsAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
+                               std::int32_t z, const ContainerSignalAt& containerSignal = {});
+
+/// The turn a component books when a piece of dust beside it changed strength.
+///
+/// parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` ends by running `updateNeighborsAt` on
+/// the dust **and on each of its six squares**, so its reach is two steps. That second step is how a
+/// repeater one square past the dust hears that the dust lit up; without it a chain of repeaters
+/// stops at the first one.
+void scheduleAroundWire(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                        const ContainerSignalAt& containerSignal = {});
 
 /// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, because
 /// `updateFromNeighbourShapes` asks every direction and one of them is the one it watches. So an

@@ -336,12 +336,14 @@ TEST_CASE("a chunk is dirty only when it holds something the region file does no
     CHECK_FALSE(chunk.setBlockStateId(0, 64, 0, blocks::stone().stateId));
     CHECK_FALSE(chunk.isDirty());
 
-    // Loading a chunk's inhabited time off disk must not make it dirty; advancing it must.
+    // parity: `ChunkAccess.incrementInhabitedTime` adds and nothing else, so neither loading the
+    // value nor advancing it dirties the chunk. Advancing it happens every tick for every simulated
+    // chunk, and dirtying there rewrote the whole region on every save.
     chunk.restoreInhabitedTime(500);
     CHECK_FALSE(chunk.isDirty());
     CHECK(chunk.inhabitedTime() == 500);
     chunk.increaseInhabitedTime(1);
-    CHECK(chunk.isDirty());
+    CHECK_FALSE(chunk.isDirty());
     CHECK(chunk.inhabitedTime() == 501);
 }
 

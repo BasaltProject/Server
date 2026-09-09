@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
@@ -496,7 +497,8 @@ void BlockInteractionHandler::usePot(PlayerSession& session, const BlockPos& pos
         return;
     }
     chunk->markDirty();
-    world::redstoneComponents::scheduleComparatorsAround(world->state(), pos.x, pos.y, pos.z);
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), pos.x, pos.y, pos.z,
+                                                         world::comparatorReading::of(world->state()));
     if (session.gamemode != Gamemode::Creative) {
         session.inventory.set(heldSlot,
                               held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
@@ -540,7 +542,8 @@ bool BlockInteractionHandler::placeOnCampfire(PlayerSession& session, const Bloc
     }
     world::campfires::write(state, entity->data());
     chunk->markDirty();
-    world::redstoneComponents::scheduleComparatorsAround(world->state(), pos.x, pos.y, pos.z);
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), pos.x, pos.y, pos.z,
+                                                         world::comparatorReading::of(world->state()));
     if (session.gamemode != Gamemode::Creative) {
         session.inventory.set(heldSlot,
                               held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});

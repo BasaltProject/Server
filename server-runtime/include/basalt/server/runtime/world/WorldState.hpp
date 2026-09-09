@@ -209,7 +209,7 @@ public:
                            std::int32_t delay);
 
     void scheduleBlockTick(std::int32_t x, std::int32_t y, std::int32_t z, const wire::common::Identifier& type,
-                           std::int32_t delay);
+                           std::int32_t delay, std::int32_t priority = 0);
 
     /// parity: `LevelTicks.hasScheduledTick`, which is what stops a target being re-armed mid-hold.
     [[nodiscard]] bool hasScheduledBlockTick(std::int32_t x, std::int32_t y, std::int32_t z,
@@ -306,6 +306,8 @@ private:
     /// Keyed by packed coordinates, not by a pair: a pair key allocates and boxes both halves on
     /// every lookup, and these are the most called methods in the server.
     std::map<std::int64_t, std::unique_ptr<server::world::Chunk>> chunksByPos_;
+    /// parity: the counter behind `ScheduledTick.subTickOrder`, which is per level and not per chunk.
+    std::int64_t nextTickOrder_ = 0;
     std::atomic<std::int64_t> chunkVersion_{0};
 
     PrimedTntQueue primedTntQueue_;
