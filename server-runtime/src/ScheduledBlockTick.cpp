@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
+#include <basalt/server/runtime/world/ArrowButtons.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -108,7 +109,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         // parity: `BasePressurePlateBlock.tick`, the turn a pressed plate books to come back up.
         if (world::pressurePlates::isPlate(here)) {
             if (const std::optional<world::BlockChange> plate =
-                    world::pressurePlates::update(world.state(), x, y, z, standingOn(world, x, y, z, watchers));
+                    world::pressurePlates::update(world.state(), x, y, z, world::pressurePlates::Trigger::Scheduled,
+                                                  standingOn(world, x, y, z, watchers));
                 plate.has_value()) {
                 scheduled.push_back(*plate);
             }
@@ -249,6 +251,15 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         world::scheduledBlocks::snifferEgg(world.state(), x, y, z, random, scheduled);
         if (!scheduled.empty()) {
             sendBlockUpdates(watchers, scheduled);
+            continue;
+        }
+        // parity: `ButtonBlock.checkPressed` looks again on its own turn, and an arrow still stuck in
+        // the button keeps it down and books another turn instead of letting it up.
+        if (world::arrowButtons::heldByArrow(world.state(), x, y, z, here)) {
+            if (const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(here);
+                pressed.has_value()) {
+                world.state().scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("button"), *pressed);
+            }
             continue;
         }
         const std::optional<world::blockInteractions::BlockRelease> released =

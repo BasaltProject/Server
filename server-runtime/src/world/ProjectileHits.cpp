@@ -51,6 +51,17 @@ constexpr double kMaxSignal = 15.0;
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, air, {}};
 }
 
+/// parity: `TntBlock.onProjectileHit` into `TntBlock.prime`: the block goes and the entity that
+/// takes its place is what counts down.
+[[nodiscard]] std::optional<BlockChange> primeTnt(WorldState& world, const entity::BlockHit& hit) {
+    const std::int32_t air = registry::blocks::air().stateId;
+    if (!world.setBlockState(hit.blockX, hit.blockY, hit.blockZ, air)) {
+        return std::nullopt;
+    }
+    world.primeTnt(hit.blockX, hit.blockY, hit.blockZ);
+    return BlockChange{hit.blockX, hit.blockY, hit.blockZ, air, {}};
+}
+
 /// parity: `BigDripleafBlock.onProjectileHit`, which tips it right over.
 [[nodiscard]] std::optional<BlockChange> tiltDripleaf(WorldState& world, const entity::BlockHit& hit,
                                                       std::int32_t stateId, const wire::common::Identifier& block) {
@@ -67,7 +78,7 @@ constexpr double kMaxSignal = 15.0;
 
 } // namespace
 
-std::optional<BlockChange> onHit(WorldState& world, const entity::BlockHit& hit, bool byArrow) {
+std::optional<BlockChange> onHit(WorldState& world, const entity::BlockHit& hit, bool byArrow, bool burning) {
     const std::optional<std::int32_t> stateId = world.blockState(hit.blockX, hit.blockY, hit.blockZ);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -79,6 +90,11 @@ std::optional<BlockChange> onHit(WorldState& world, const entity::BlockHit& hit,
     const std::string& path = block->path();
     if (path == "target") {
         return hitTarget(world, hit, *stateId, *block, byArrow);
+    }
+    // parity: `TntBlock.onProjectileHit`, one of the few ways tnt goes off with no redstone and no
+    // hand: the projectile has to be alight, and then the block is gone and the entity is ticking.
+    if (path == "tnt") {
+        return burning ? primeTnt(world, hit) : std::nullopt;
     }
     // parity: `ChorusFlowerBlock` and `DecoratedPotBlock`, which simply break.
     if (path == "chorus_flower" || path == "decorated_pot") {

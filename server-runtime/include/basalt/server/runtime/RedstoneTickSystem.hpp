@@ -78,8 +78,16 @@ public:
     /// spot: today the pistons, which is why a frozen world leaves one standing where it is.
     void tickBlockEvents(world::LoadedWorld& world, const sched::Region& region);
 
-    /// Presses the plates people are standing on.
+    /// Presses the plates whatever is standing on them.
     void tickPressurePlates(world::LoadedWorld& world, const sched::Region& region);
+
+    /// Presses the wooden buttons an arrow is stuck in.
+    void tickArrowButtons(world::LoadedWorld& world, const sched::Region& region);
+
+    /// One square an arrow's box touches, pressed if it turns out to be a button it can press.
+    void pressArrowButton(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                          std::int32_t x, std::int32_t y, std::int32_t z, double arrowX, double arrowY, double arrowZ,
+                          double half, double height);
 
     /// The footsteps a sculk sensor hears.
     void tickFootsteps(world::LoadedWorld& world);

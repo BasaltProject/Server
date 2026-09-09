@@ -269,6 +269,16 @@ NbtCompound encode(const ServerEntity& entity) {
     tag.remove("Passengers");
     tag.putString("id", entity.type().toString());
     tag.set("UUID", uuidTag(entity.uuid()));
+    // parity: `LivingEntity.addAdditionalSaveData` writes `DeathTime` as a short, and only a body
+    // still counting has one worth keeping.
+    if (entity.deathTime > 0) {
+        tag.putShort("DeathTime", static_cast<std::int16_t>(entity.deathTime));
+    }
+    // parity: `Entity.addAdditionalSaveData` writes `Fire` as a short. It decides more than the
+    // flame the client draws: a burning arrow is what lights the tnt it lands in.
+    if (entity.fireTicks > 0) {
+        tag.putShort("Fire", static_cast<std::int16_t>(entity.fireTicks));
+    }
     tag.set("Pos", doubles(entity.x, entity.y, entity.z));
     tag.set("Motion", doubles(entity.velocityX, entity.velocityY, entity.velocityZ));
     tag.set("Rotation", floats(entity.yaw, entity.pitch));
@@ -411,6 +421,11 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     if (const double health = numericDouble(tag, "Health"); health > 0.0) {
         entity->health = health;
     }
+    // parity: a body saved mid-count comes back mid-count, and `isDeadOrDying` is what puts it back
+    // on the clock rather than a flag of its own.
+    entity->deathTime = numericInt(tag, "DeathTime");
+    entity->dying = entity->deathTime > 0;
+    entity->fireTicks = numericInt(tag, "Fire");
     const std::string_view path = type->path();
     entity->age = ageableMobs::usesBooleanBabyFlag(path) && numericBoolean(tag, "IsBaby") ? ageableMobs::kBabyStartAge
                                                                                           : numericInt(tag, "Age");

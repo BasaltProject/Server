@@ -20,6 +20,9 @@ namespace ai {
 class GoalSelector;
 }
 
+/// parity: `LivingEntity.tickDeath`, which removes the body once `deathTime` reaches twenty.
+inline constexpr std::int32_t kDeathTicks = 20;
+
 /// One entity that is not a player: what `/summon` puts in the world and what `/damage`, `/ride`,
 /// `/rotate`, `/swing` and `/attribute` then act on.
 ///
@@ -288,8 +291,21 @@ public:
     /// Whether it was killed rather than simply forgotten.
     ///
     /// parity: `Entity.die` against `Entity.discard`, which is the difference between a cow that
-    /// drops beef and one that despawned because nobody was near it.
+    /// drops beef and one that despawned because nobody was near it. Set for the one tick the death
+    /// is dealt with; `dying` is what lasts.
     bool killed = false;
+
+    /// Whether it is playing out its death. parity: `LivingEntity.isDeadOrDying`: what a mob does
+    /// for its last twenty ticks is nothing, but it is still there while it does it.
+    bool dying = false;
+
+    /// Whether it has already announced itself. parity: `Projectile.tick` sends `PROJECTILE_SHOOT`
+    /// on the projectile's **first** turn and never again, whoever fired it and even when nobody
+    /// did: one summoned by command announces itself just the same.
+    bool announced = false;
+
+    /// parity: `LivingEntity.deathTime` and its `DeathTime` tag, which counts those twenty ticks.
+    std::int32_t deathTime = 0;
 
     /// Modifiers by attribute then by id. parity: `AttributeInstance`'s three operations.
     std::map<std::string, std::map<std::string, AttributeModifier, std::less<>>, std::less<>> attributeModifiers;

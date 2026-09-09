@@ -289,6 +289,18 @@ TEST_CASE("a leashed mob remembers who is holding it") {
     CHECK(*back->leashHolderUuid == holder);
 }
 
+TEST_CASE("what is on fire comes back on fire") {
+    ServerEntity arrow = entityOf("arrow");
+    arrow.fireTicks = 200;
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(arrow), 1, 1);
+
+    REQUIRE(back != nullptr);
+    // parity: `Entity`'s own `Fire` short. Measured in `flechatnt`: a burning arrow lights the tnt
+    // it lands in and a plain one does not, so this is not just the flame the client draws.
+    CHECK(back->fireTicks == 200);
+}
+
 TEST_CASE("an entity's uuid goes out as the four ints vanilla reads") {
     ServerEntity cow = entityOf("cow");
     const basalt::wire::nbt::NbtCompound tag = entityNbt::encode(cow);

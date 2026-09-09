@@ -160,6 +160,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             step("Fluid tick", [this, &world, &region] { redstone_->tickFluids(world, region); });
             step("Random block tick", [this, &world, &region] { redstone_->tickRandomBlocks(world, region); });
             step("Pressure plate tick", [this, &world, &region] { redstone_->tickPressurePlates(world, region); });
+            step("Arrow button tick", [this, &world, &region] { redstone_->tickArrowButtons(world, region); });
             step("Tripwire tick", [this, &world, &region] { redstone_->tickTripwires(world, region); });
             step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
             // parity: `ServerLevel.tick` runs its block events after the block ticks and before the
@@ -250,8 +251,24 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
+    // parity: `LivingEntity.tickDeath`, which is the whole of what a dead mob does: count to twenty
+    // and then go. Until it goes it is still an entity, so a sculk sensor, a pressure plate and a
+    // comparator all keep feeling it, and `/kill` is no exception.
+    for (entity::ServerEntity* dying : world.state().entities()) {
+        if (dying->removed || !dying->dying) {
+            continue;
+        }
+        ++dying->deathTime;
+        if (dying->deathTime >= entity::kDeathTicks) {
+            dying->removed = true;
+        }
+    }
+
     // One snapshot for the whole tick: `entities()` takes the world's lock and copies the list, and
     // asking for it per entity turned a pen of cows into a lock convoy.
+    //
+    // A dying mob stays on the list: it is still an entity with a box, so a detector rail under it
+    // still reads it. What it stops doing is its own turn, which is skipped below.
     std::vector<entity::ServerEntity*> living;
     for (entity::ServerEntity* candidate : world.state().entities()) {
         if (!candidate->removed) {
@@ -294,6 +311,11 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     random::RandomSource random = random::RandomSource::legacy(scratchSeed());
     for (entity::ServerEntity* entity : living) {
         if (entity->removed || MobTickSystem::hasActiveVehicle(world, *entity)) {
+            continue;
+        }
+        // parity: `Mob.aiStep` stops the moment `isDeadOrDying`, so counting to twenty is the whole
+        // of a corpse's turn and that already happened above.
+        if (entity->dying) {
             continue;
         }
         // An entity is ticked by whoever owns the ground it is standing on. It may walk out of this

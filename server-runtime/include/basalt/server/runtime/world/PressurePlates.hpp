@@ -28,12 +28,25 @@ inline constexpr std::int32_t kHeavyMaxWeight = 150;
 
 [[nodiscard]] bool isPlate(std::int32_t stateId);
 
+/// Which of the two halves of `BasePressurePlateBlock` is asking.
+///
+/// parity: they are not the same question. `entityInside` recomputes **only while the plate reads
+/// zero**, so once it is on it stops looking; `tick` recomputes **only while it reads more than
+/// zero**, which is the turn that lets it up again. A plate that recomputed on both would never show
+/// the half-count a plate really shows when several entities land on the same tick.
+enum class Trigger : std::uint8_t {
+    /// Something is inside the plate's box this tick.
+    Touched,
+    /// The turn the plate booked for itself.
+    Scheduled,
+};
+
 /// Presses or releases the plate at these coordinates, given how many things are standing on it.
 ///
 /// Answers the change, or nothing when it was already showing that. A pressed plate books its own
 /// turn, which is what checks whether whatever pressed it has gone.
 [[nodiscard]] std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                std::int32_t standing);
+                                                Trigger from, std::int32_t standing);
 
 /// Whether this position is inside the box that presses the plate at these coordinates.
 [[nodiscard]] bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,

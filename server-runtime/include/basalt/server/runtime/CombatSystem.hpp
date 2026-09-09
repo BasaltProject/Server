@@ -40,6 +40,10 @@ public:
 
     /// One tick of something in flight, and whatever it hits on the way.
     ///
+    /// One game event, sent from a place rather than from a block. parity: `Level.gameEvent`.
+    void emitVibration(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       std::string_view event, double x, double y, double z);
+
     /// parity: `Projectile.hitTargetOrDeflectSelf`: what sticks stays where it landed, what does not
     /// is gone the moment it lands. What the block itself does about it is `onProjectileHit`.
     void tickProjectile(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,

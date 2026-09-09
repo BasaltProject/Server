@@ -44,8 +44,19 @@ struct Loaded {
 
     Loaded() { state.getOrGenerateChunk(0, 0); }
 
+    /// What the piston broke, in the order it broke it, for the tests that care.
+    std::vector<std::pair<std::int32_t, std::array<std::int32_t, 3>>> broken;
+
     [[nodiscard]] pistons::Context context() {
-        return pistons::Context{.world = state, .worldName = "overworld", .minY = -64, .maxY = 319, .random = random};
+        return pistons::Context{
+            .world = state,
+            .worldName = "overworld",
+            .minY = -64,
+            .maxY = 319,
+            .random = random,
+            .onDestroyed = [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
+                broken.emplace_back(stateId, std::array<std::int32_t, 3>{x, y, z});
+            }};
     }
 };
 
@@ -260,85 +271,23 @@ TEST_CASE("slime and honey stick to anything but each other") {
     CHECK_FALSE(dragsAlong("stone", "stone"));
 }
 
-TEST_CASE("carrying the push out moves every block one along, back to front") {
+TEST_CASE("what a piston crushes is dropped before the arm lands on it") {
     Loaded loaded;
     WorldState& world = loaded.state;
-    REQUIRE(world.setBlockState(9, 64, 8, stateOf("stone")));
-    REQUIRE(world.setBlockState(10, 64, 8, stateOf("dirt")));
-    const pistons::Push push{.moved = {{9, 64, 8}, {10, 64, 8}}, .destroyed = {}};
+    REQUIRE(world.setBlockState(8, 64, 8, piston("east", "false")));
+    const std::int32_t torch = stateOf("redstone_torch");
+    REQUIRE(world.setBlockState(9, 64, 8, torch));
+    REQUIRE(world.setBlockState(8, 64, 7, stateOf("redstone_block")));
 
-    const std::vector<BlockChange> changes = pistons::apply(loaded.context(), push, registry::BlockFace::East);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    static_cast<void>(fireEvents(loaded));
 
-    CHECK_FALSE(changes.empty());
-    CHECK(world.blockState(9, 64, 8) == air());
-    CHECK(world.blockState(10, 64, 8) == stateOf("stone"));
-    CHECK(world.blockState(11, 64, 8) == stateOf("dirt"));
-}
-
-TEST_CASE("what the push broke is gone before anything moves") {
-    Loaded loaded;
-    WorldState& world = loaded.state;
-    REQUIRE(world.setBlockState(9, 64, 8, stateOf("stone")));
-    REQUIRE(world.setBlockState(10, 64, 8, stateOf("torch")));
-    const pistons::Push push{.moved = {{9, 64, 8}}, .destroyed = {{10, 64, 8}}};
-
-    const std::vector<BlockChange> changes = pistons::apply(loaded.context(), push, registry::BlockFace::East);
-
-    // The break comes first, at its own coordinates, and only then does the stone land on top of it.
-    REQUIRE(changes.size() == 3);
-    CHECK(changes[0].stateId == air());
-    CHECK(changes[0].x == 10);
-    CHECK(changes[0].y == 64);
-    CHECK(changes[0].z == 8);
-    CHECK(changes[1].x == 10);
-    CHECK(changes[1].y == 64);
-    CHECK(changes[1].z == 8);
-    CHECK(changes[1].stateId == stateOf("stone"));
-    CHECK(changes[2].x == 9);
-    CHECK(changes[2].y == 64);
-    CHECK(changes[2].z == 8);
-    CHECK(changes[2].stateId == air());
-    CHECK(world.blockState(10, 64, 8) == stateOf("stone"));
-}
-
-TEST_CASE("every coordinate of a carried block is written where it belongs") {
-    Loaded loaded;
-    WorldState& world = loaded.state;
-    // Distinct on all three axes, so reading the wrong one is a different block.
-    REQUIRE(world.setBlockState(9, 64, 5, stateOf("stone")));
-    const pistons::Push push{.moved = {{9, 64, 5}}, .destroyed = {{2, 70, 3}}};
-    REQUIRE(world.setBlockState(2, 70, 3, stateOf("dirt")));
-
-    const std::vector<BlockChange> changes = pistons::apply(loaded.context(), push, registry::BlockFace::Up);
-
-    REQUIRE(changes.size() == 3);
-    CHECK(changes[0].x == 2);
-    CHECK(changes[0].y == 70);
-    CHECK(changes[0].z == 3);
-    CHECK(changes[1].x == 9);
-    CHECK(changes[1].y == 65);
-    CHECK(changes[1].z == 5);
-    CHECK(changes[1].stateId == stateOf("stone"));
-    CHECK(changes[2].x == 9);
-    CHECK(changes[2].y == 64);
-    CHECK(changes[2].z == 5);
-    CHECK(world.blockState(2, 70, 3) == air());
-    CHECK(world.blockState(9, 65, 5) == stateOf("stone"));
-    CHECK(world.blockState(9, 64, 5) == air());
-}
-
-TEST_CASE("a block outside the world is not carried anywhere") {
-    Loaded loaded;
-    WorldState& world = loaded.state;
-    REQUIRE(world.setBlockState(9, 64, 8, stateOf("stone")));
-    const pistons::Push push{.moved = {{300, 64, 300}, {9, 64, 8}}, .destroyed = {{300, 64, 300}}};
-
-    const std::vector<BlockChange> changes = pistons::apply(loaded.context(), push, registry::BlockFace::East);
-
-    // Only the one block that exists moves; the unloaded chunk yields nothing at all.
-    REQUIRE(changes.size() == 2);
-    CHECK(changes[0].x == 10);
-    CHECK(changes[1].x == 9);
+    // parity: `PistonBaseBlock.moveBlocks` drops what it destroys and only then puts air there.
+    // Measured in `pistonrompe`: the jar leaves a `redstone_torch` on the floor and this build used
+    // to leave nothing, because the arm simply overwrote the square.
+    REQUIRE(loaded.broken.size() == 1);
+    CHECK(loaded.broken[0].first == torch);
+    CHECK(loaded.broken[0].second == std::array<std::int32_t, 3>{9, 64, 8});
 }
 
 TEST_CASE("a powered piston books its move and says so with a sound") {
