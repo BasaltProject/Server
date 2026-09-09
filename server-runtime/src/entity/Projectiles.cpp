@@ -141,7 +141,12 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
     entity.x += entity.velocityX;
     entity.y += entity.velocityY;
     entity.z += entity.velocityZ;
-    entity.velocityY -= kind.gravity;
+    // parity: `Entity.applyGravity` returns at once when `isNoGravity`, so a projectile with the tag
+    // flies dead straight. Measured in `botonflecha`, where a flecha that should hang at half a
+    // block fell into the button and pressed it.
+    if (!entity.noGravity) {
+        entity.velocityY -= kind.gravity;
+    }
     aimAlongMovement(entity);
     return std::nullopt;
 }

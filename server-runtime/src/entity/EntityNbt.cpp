@@ -279,6 +279,10 @@ NbtCompound encode(const ServerEntity& entity) {
     if (entity.fireTicks > 0) {
         tag.putShort("Fire", static_cast<std::int16_t>(entity.fireTicks));
     }
+    // parity: `Entity.addAdditionalSaveData` writes `NoGravity` whenever it is set.
+    if (entity.noGravity) {
+        tag.putBoolean("NoGravity", true);
+    }
     tag.set("Pos", doubles(entity.x, entity.y, entity.z));
     tag.set("Motion", doubles(entity.velocityX, entity.velocityY, entity.velocityZ));
     tag.set("Rotation", floats(entity.yaw, entity.pitch));
@@ -426,6 +430,7 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->deathTime = numericInt(tag, "DeathTime");
     entity->dying = entity->deathTime > 0;
     entity->fireTicks = numericInt(tag, "Fire");
+    entity->noGravity = numericBoolean(tag, "NoGravity");
     const std::string_view path = type->path();
     entity->age = ageableMobs::usesBooleanBabyFlag(path) && numericBoolean(tag, "IsBaby") ? ageableMobs::kBabyStartAge
                                                                                           : numericInt(tag, "Age");

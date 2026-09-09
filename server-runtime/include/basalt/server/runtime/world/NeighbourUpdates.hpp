@@ -78,7 +78,15 @@ struct Context {
     bool evaporates = false;
     bool hasSkylight = true;
 
+    /// Wakes the fluids around a square that just changed, and answers what moved on the spot.
+    ///
+    /// parity: `LiquidBlock.onPlace`, `neighborChanged` and `updateShape` all end in the same
+    /// `scheduleTick`, so **any** block change is what makes water notice there is somewhere to go.
+    /// A hook because the flow needs the world's game rules and this does not carry them.
+    using WakeFluids = std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)>;
+
     DispenserNeighbourChange dispenser;
+    WakeFluids wakeFluids;
     WallShape wallShape;
     WireReshape wireReshape;
     reshapes::GeyserReshape geyser;

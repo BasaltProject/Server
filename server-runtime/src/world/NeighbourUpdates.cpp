@@ -482,6 +482,12 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     for (const BlockFace face : kFaces) {
         pistons::trigger(piston, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
     }
+    // parity: `LiquidBlock`'s three hooks, which all end in the same `scheduleTick`: water only
+    // notices there is somewhere to go when something around it changes. Measured in `aguapolvo`,
+    // where a `/setblock` of water simply stood there for ever because nobody woke it.
+    if (context.wakeFluids) {
+        context.wakeFluids(x, y, z);
+    }
     // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
     sponges::absorb(world, x, y, z, reshaped);
     sponges::dryIfEvaporating(world, x, y, z, reshaped, context.evaporates);

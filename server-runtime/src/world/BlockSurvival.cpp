@@ -130,6 +130,26 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
             return false;
         }
     }
+    // parity: `RedStoneWireBlock.canSurviveOn` is `isFaceSturdy(UP) || is(HOPPER)`, and that is a
+    // question about the **state** below, not about which block it is. The table cannot answer it:
+    // its rule for dust is a set of block ids taken from the probe, so a trapdoor that supports only
+    // when it is closed at the top of its block never made the list. Measured in `polvotrampilla`,
+    // where the jar leaves a dust standing on one and this build swept it away as it landed.
+    if (path == "redstone_wire") {
+        const std::int32_t below = stateAt(world, x, y - 1, z);
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(below);
+        return registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up) ||
+               (block != nullptr && block->path() == "hopper");
+    }
+    // parity: `BasePressurePlateBlock.canSurvive` is `canSupportRigidBlock(below) ||
+    // canSupportCenter(below, UP)`, another question about the **state** below that the table's set
+    // of block ids cannot ask. Same cause as the dust above: a trapdoor closed at the top of its
+    // block holds a plate up in the jar and swept it away here.
+    if (path.ends_with("_pressure_plate")) {
+        const std::int32_t below = stateAt(world, x, y - 1, z);
+        return registry::blockShapes::supportsRigid(below, registry::BlockFace::Up) ||
+               registry::blockShapes::supportsCentre(below, registry::BlockFace::Up);
+    }
     // Nothing the table skips is refused by it either, so this is a shortcut rather than a rule of
     // its own: it is here because "the table does not model this" and "this stands anywhere" are
     // different reasons to say yes.

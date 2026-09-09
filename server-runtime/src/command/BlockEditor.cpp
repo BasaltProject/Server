@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/runtime/command/BlockEditor.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
@@ -81,12 +82,23 @@ void BlockEditor::notifyNeighbours() {
     written_.clear();
     random::RandomSource random = random::RandomSource::legacy(0);
     const config::DimensionFacts& facts = config::dimensionFacts(world_->declaration().dimension);
-    const neighbourUpdates::Context context{.world = world_->state(),
-                                            .worldName = world_->name(),
-                                            .minY = bounds_.minY(),
-                                            .maxY = bounds_.maxY(),
-                                            .random = random,
-                                            .hasSkylight = facts.hasSkylight};
+    const neighbourUpdates::Context context{
+        .world = world_->state(),
+        .worldName = world_->name(),
+        .minY = bounds_.minY(),
+        .maxY = bounds_.maxY(),
+        .random = random,
+        .hasSkylight = facts.hasSkylight,
+        // parity: a `/setblock` of water is a block change like any other, and what makes water
+        // flow is a block change. Without this it stood where the command put it for ever.
+        .wakeFluids = [this, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
+            const world::fluidFlow::Context flow{.world = world_->state(),
+                                                 .gameRules = world_->gameRules(),
+                                                 .random = random,
+                                                 .ultrawarm =
+                                                     world_->declaration().dimension == config::WorldDimension::Nether};
+            static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
+        }};
     for (const std::array<std::int32_t, 3>& at : positions) {
         const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
         // parity: `BlockInput.place` keeps what the command wrote when the **shape** update leaves

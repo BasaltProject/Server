@@ -301,6 +301,18 @@ TEST_CASE("what is on fire comes back on fire") {
     CHECK(back->fireTicks == 200);
 }
 
+TEST_CASE("what hangs in the air comes back hanging") {
+    ServerEntity arrow = entityOf("arrow");
+    arrow.noGravity = true;
+
+    const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(arrow), 1, 1);
+
+    REQUIRE(back != nullptr);
+    // parity: `NoGravity` decides where a projectile goes, so losing it on the way in moves the
+    // entity. Measured in `botonflecha`, where the arrow fell into the button and pressed it.
+    CHECK(back->noGravity);
+}
+
 TEST_CASE("an entity's uuid goes out as the four ints vanilla reads") {
     ServerEntity cow = entityOf("cow");
     const basalt::wire::nbt::NbtCompound tag = entityNbt::encode(cow);
