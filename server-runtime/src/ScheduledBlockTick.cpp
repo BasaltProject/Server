@@ -196,6 +196,11 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
             world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z, false,
                                                       containerSignal);
+            // parity: writing its own state still runs the shape update on the six squares around it,
+            // and that is what locks the repeater beside a repeater that just turned on.
+            const std::vector<world::BlockChange> held =
+                world::redstoneComponents::relockAround(world.state(), moved->x, moved->y, moved->z);
+            scheduled.insert(scheduled.end(), held.begin(), held.end());
             // parity: every piece of dust that moved reaches two squares out, which is what tells the
             // next repeater in a chain that the dust in between lit up.
             for (const world::BlockChange& change : settled) {
@@ -214,8 +219,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world::redstoneReactors::update(world.state(), world.name(), moved->x, moved->y, moved->z, random);
             scheduled.insert(scheduled.end(), reacted.begin(), reacted.end());
             for (const world::BlockChange& change : settled) {
-                const std::vector<world::BlockChange> around =
-                    world::redstoneReactors::update(world.state(), world.name(), change.x, change.y, change.z, random);
+                const std::vector<world::BlockChange> around = world::redstoneReactors::updateAroundWire(
+                    world.state(), world.name(), change.x, change.y, change.z, random);
                 scheduled.insert(scheduled.end(), around.begin(), around.end());
             }
         }

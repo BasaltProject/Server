@@ -259,6 +259,22 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
 }
 
 /// parity: `DiodeBlock.getInputSignal`, which reads the block the repeater faces.
+/// What a diode reads out of the square it faces. parity: `DiodeBlock.getInputSignal`, which takes
+/// the plain signal and, short of fifteen, the strength of the dust there even when that dust is not
+/// drawn as connected to it.
+[[nodiscard]] std::int32_t diodeInput(const WorldState& world, std::string_view worldName, std::int32_t x,
+                                      std::int32_t y, std::int32_t z, BlockFace from) {
+    const std::optional<std::int32_t> target = world.blockState(x, y, z);
+    if (!target.has_value()) {
+        return 0;
+    }
+    const std::int32_t signal = redstone::signalFrom(world, worldName, x, y, z, from);
+    if (signal >= redstone::kMaxSignal || !redstone::isWire(*target)) {
+        return signal;
+    }
+    return std::max(signal, numberOf(registry::blockStateDefinitions::propertiesOf(*target), "power", 0));
+}
+
 [[nodiscard]] std::int32_t repeaterInput(const WorldState& world, std::string_view worldName, std::int32_t x,
                                          std::int32_t y, std::int32_t z, const Properties& properties) {
     const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
@@ -272,11 +288,7 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
     if (!target.has_value()) {
         return 0;
     }
-    const std::int32_t signal = redstone::signalFrom(world, worldName, nx, ny, nz, *facing);
-    if (signal >= redstone::kMaxSignal || !redstone::isWire(*target)) {
-        return signal;
-    }
-    return std::max(signal, numberOf(registry::blockStateDefinitions::propertiesOf(*target), "power", 0));
+    return diodeInput(world, worldName, nx, ny, nz, *facing);
 }
 
 /// parity: `RepeaterBlock.isLocked` over `DiodeBlock.getAlternateSignal`: a repeater pointed at from
@@ -553,6 +565,42 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
     // it only looked right because the bench had every repeater built backwards.
 }
 
+std::optional<std::int32_t> relock(WorldState& world, const std::int32_t x, const std::int32_t y,
+                                   const std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "repeater") {
+        return std::nullopt;
+    }
+    const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    const bool locked = isLocked(world, x, y, z, properties);
+    if ((valueOf(properties, "locked") == "true") == locked) {
+        return std::nullopt;
+    }
+    const std::optional<std::int32_t> turned =
+        registry::blockStateDefinitions::stateIdOf(repeater(), {{"locked", locked ? "true" : "false"}}, *stateId);
+    if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
+        return std::nullopt;
+    }
+    return turned;
+}
+
+std::vector<BlockChange> relockAround(WorldState& world, const std::int32_t x, const std::int32_t y,
+                                      const std::int32_t z) {
+    std::vector<BlockChange> changes;
+    // The axis rule vanilla writes (`directionToNeighbour.getAxis() != facing.getAxis()`) is not
+    // needed here: what a lock reads is only the two sides, so an update along the facing axis
+    // cannot change the answer and recomputing it costs nothing.
+    for (const BlockFace face : kUpdateOrder) {
+        const std::int32_t nx = x + registry::stepX(face);
+        const std::int32_t ny = y + registry::stepY(face);
+        const std::int32_t nz = z + registry::stepZ(face);
+        if (const std::optional<std::int32_t> held = relock(world, nx, ny, nz); held.has_value()) {
+            changes.push_back(BlockChange{.x = nx, .y = ny, .z = nz, .stateId = *held});
+        }
+    }
+    return changes;
+}
+
 void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || pathOf(*stateId) != "observer") {
@@ -607,7 +655,7 @@ std::int32_t comparatorInput(const WorldState& world, std::string_view worldName
             return *held;
         }
     }
-    const std::int32_t plain = redstone::signalFrom(world, worldName, bx, by, bz, *facing);
+    const std::int32_t plain = diodeInput(world, worldName, bx, by, bz, *facing);
     const std::optional<std::int32_t> target = world.blockState(bx, by, bz);
     if (!target.has_value()) {
         return plain;

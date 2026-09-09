@@ -129,6 +129,17 @@ void lampReact(WorldState& world, std::string_view worldName, std::int32_t x, st
     write(world, x, y, z, stateId, {{"lit", "true"}}, changes);
 }
 
+/// parity: `AbstractSkullBlock.neighborChanged`, which just carries the signal into `powered`. The
+/// client makes a piglin head move its mouth with it; from here it is one more state that follows.
+void skull(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+           std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
+    const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
+    if (signal == poweredIn(properties)) {
+        return;
+    }
+    write(world, x, y, z, stateId, {{"powered", signal ? "true" : "false"}}, changes);
+}
+
 /// parity: `CopperBulbBlock.checkAndFlip`: the bulb keeps its light and flips it on the *rising*
 /// edge only, which is what makes it a T flip-flop in one block.
 void bulb(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
@@ -252,6 +263,12 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         bulb(world, worldName, x, y, z, *stateId, properties, changes);
         return;
     }
+    // A `piston_head` ends the same way and is not one of these, so the `powered` property is what
+    // tells them apart: only a skull carries it.
+    if ((path.ends_with("_skull") || path.ends_with("_head")) && properties.contains("powered")) {
+        skull(world, worldName, x, y, z, *stateId, properties, changes);
+        return;
+    }
     if (path == "note_block") {
         noteBlock(world, worldName, x, y, z, *stateId, properties, changes);
         return;
@@ -291,6 +308,19 @@ std::vector<BlockChange> update(WorldState& world, std::string_view worldName, s
     for (const BlockFace face : kUpdateOrder) {
         react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
               changes, random, hooks);
+    }
+    return changes;
+}
+
+std::vector<BlockChange> updateAroundWire(WorldState& world, const std::string_view worldName, const std::int32_t x,
+                                          const std::int32_t y, const std::int32_t z, random::RandomSource& random,
+                                          const Hooks& hooks) {
+    std::vector<BlockChange> changes = update(world, worldName, x, y, z, random, hooks);
+    for (const BlockFace face : kUpdateOrder) {
+        const std::vector<BlockChange> further =
+            update(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
+                   random, hooks);
+        changes.insert(changes.end(), further.begin(), further.end());
     }
     return changes;
 }

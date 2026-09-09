@@ -89,8 +89,13 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
                 ignored += ignored.empty() ? key : ", " + key;
             }
         }
+        // The whole tag is kept even so: it is where anything that knows how to read a field looks,
+        // and a chest minecart's `Items` is one of those. Without this a comparator beside a detector
+        // rail read an empty cart, because the cart summoned with items had none.
+        entity.sourceNbt = nbt;
         if (!ignored.empty()) {
-            context.source().sendSystemMessage(Component::text("  Ignored, not modelled yet: " + ignored, kGray));
+            context.source().sendSystemMessage(
+                Component::text("  Kept in the tag but not acted on here: " + ignored, kGray));
         }
     };
 

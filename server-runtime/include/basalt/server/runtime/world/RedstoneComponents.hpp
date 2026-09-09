@@ -76,6 +76,18 @@ void scheduleComparatorsAround(WorldState& world, std::string_view worldName, st
 void scheduleAroundWire(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                         const ContainerSignalAt& containerSignal = {});
 
+/// Rewrites a repeater's `locked` property from what its sides say, answering the new state when it
+/// moved. parity: `RepeaterBlock.updateShape`, which recomputes it whenever a shape update arrives
+/// from an axis that is not the repeater's own. It is only a property: what the lock actually does
+/// is read live on the repeater's turn, so this is the half a player sees and a snapshot records.
+[[nodiscard]] std::optional<std::int32_t> relock(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// The same for the six squares around a block that just wrote its own state, which is the shape
+/// update `Level.setBlock` runs even with the flag that skips the neighbour updates. Answers what
+/// moved. parity: a repeater beside another one that turned on locks on that same turn, and without
+/// this it only locked later, when something else happened to touch it.
+[[nodiscard]] std::vector<BlockChange> relockAround(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
 /// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, because
 /// `updateFromNeighbourShapes` asks every direction and one of them is the one it watches. So an
 /// observer books a turn as soon as it is placed, whatever is in front of it, and a chain of them

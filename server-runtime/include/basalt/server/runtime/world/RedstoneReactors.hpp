@@ -55,6 +55,15 @@ struct Hooks {
                                               std::int32_t y, std::int32_t z, random::RandomSource& random,
                                               const Hooks& hooks = {}, bool itself = true);
 
+/// The same for a piece of dust whose strength moved, whose reach is two squares.
+///
+/// parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` runs `updateNeighborsAt` on the dust
+/// **and on each of its six squares**. A lamp stuck to a block that the dust powers from above is two
+/// steps away, and with one it never heard: measured in the bench circuit `lamparalejos`.
+[[nodiscard]] std::vector<BlockChange> updateAroundWire(WorldState& world, std::string_view worldName, std::int32_t x,
+                                                        std::int32_t y, std::int32_t z, random::RandomSource& random,
+                                                        const Hooks& hooks = {});
+
 /// The scheduled half of the lamp: it only goes dark if the signal is still gone.
 [[nodiscard]] std::optional<BlockChange> lampTick(WorldState& world, std::string_view worldName, std::int32_t x,
                                                   std::int32_t y, std::int32_t z);

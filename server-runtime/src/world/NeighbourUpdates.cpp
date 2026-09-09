@@ -41,6 +41,10 @@ constexpr std::int32_t kDirections = 6;
 constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
                                           BlockFace::South, BlockFace::West, BlockFace::East};
 
+/// parity: `NeighborUpdater.UPDATE_ORDER`, which is not `Direction.values()`.
+constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
+                                                BlockFace::Up,   BlockFace::North, BlockFace::South};
+
 /// The four a connecting block keeps a property for, named as those properties are.
 constexpr std::array<std::pair<BlockFace, std::string_view>, 4> kHorizontal{
     {{BlockFace::North, "north"}, {BlockFace::South, "south"}, {BlockFace::West, "west"}, {BlockFace::East, "east"}}};
@@ -248,6 +252,10 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
             return snowy;
         }
     }
+    // parity: `RepeaterBlock.updateShape`, which rewrites `locked` from what the sides say.
+    if (const std::optional<std::int32_t> held = redstoneComponents::relock(world, x, y, z); held.has_value()) {
+        return held;
+    }
     // parity: `RedStoneWireBlock.updateShape`, which is what draws a line of dust as a line.
     if (const std::optional<std::int32_t> drawn = context.wireReshape ? context.wireReshape(world, x, y, z, *stateId)
                                                                       : redstoneWire::reshape(world, x, y, z, *stateId);
@@ -368,8 +376,15 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // `PoweredRailBlock.updateState` only ever looks at the rail it is asked about.
     std::deque<Position> reacting;
     reacting.push_back({x, y, z});
+    // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` runs `updateNeighborsAt` on the dust
+    // that moved **and on each of its six squares**, so a lamp stuck to a block the dust powers from
+    // above is reached even though nothing touches it.
     for (const BlockChange& change : settled) {
         reacting.push_back({change.x, change.y, change.z});
+        for (const BlockFace face : kUpdateOrder) {
+            reacting.push_back(
+                {change.x + registry::stepX(face), change.y + registry::stepY(face), change.z + registry::stepZ(face)});
+        }
     }
     std::int32_t reacted = 0;
     while (!reacting.empty() && reacted < kMaxCascade) {
