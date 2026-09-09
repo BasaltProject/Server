@@ -18,10 +18,6 @@ namespace {
 /// parity: `getSearchBB`'s own fifth of a block.
 constexpr double kSearchShrink = 0.2;
 
-/// parity: `EntityTypes.MINECART.sized(0.98F, 0.7F)`, its height; the half width is public because
-/// the caller needs it to know which rails a cart is touching.
-constexpr double kCartHeight = 0.7;
-
 /// parity: `Container.getMaxStackSize`, which every minecart leaves at the default.
 constexpr std::int32_t kDefaultMaxStack = 64;
 

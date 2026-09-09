@@ -20,6 +20,9 @@ namespace detectorRails {
 /// each side, which is what decides how many rails it is touching.
 inline constexpr double kCartHalfWidth = 0.49;
 
+/// The other half of `EntityTypes.MINECART.sized(0.98F, 0.7F)`: how tall a cart's box is.
+inline constexpr double kCartHeight = 0.7;
+
 /// parity: the twenty ticks a pressed rail waits before checking again.
 inline constexpr std::int32_t kRecheckTicks = 20;
 
