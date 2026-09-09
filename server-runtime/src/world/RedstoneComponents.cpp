@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/world/terrain/decoration/JavaHashSetOrder.hpp>
 
 #include <algorithm>
 #include <array>
@@ -21,6 +22,15 @@ constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   Blo
 /// which of two components on the same turn goes first.
 constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
                                                 BlockFace::Up,   BlockFace::North, BlockFace::South};
+
+/// A block position `JavaHashSetOrder` can hash, which is `Vec3i.hashCode` over x, y and z.
+struct HashedPos {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+
+    [[nodiscard]] bool operator==(const HashedPos& other) const noexcept = default;
+};
 
 constexpr std::array<std::string_view, 5> kComponents{"redstone_torch", "redstone_wall_torch", "repeater", "comparator",
                                                       "observer"};
@@ -529,12 +539,28 @@ void scheduleNeighbours(WorldState& world, std::string_view worldName, std::int3
     }
 }
 
+std::vector<std::array<std::int32_t, 3>> wireReach(const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    // The order they go into the set is the dust and then `Direction.values()`, which only decides
+    // anything when two of them land in the same bucket.
+    std::vector<HashedPos> added;
+    added.reserve(1 + kFaces.size());
+    added.push_back({x, y, z});
+    for (const BlockFace face : kFaces) {
+        added.push_back({x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face)});
+    }
+    const std::vector<HashedPos> ordered = server::world::terrain::decoration::javaHashSetOrder(added);
+    std::vector<std::array<std::int32_t, 3>> out;
+    out.reserve(ordered.size());
+    for (const HashedPos& at : ordered) {
+        out.push_back({at.x, at.y, at.z});
+    }
+    return out;
+}
+
 void scheduleAroundWire(WorldState& world, const std::string_view worldName, const std::int32_t x, const std::int32_t y,
                         const std::int32_t z, const ContainerSignalAt& containerSignal) {
-    scheduleNeighbours(world, worldName, x, y, z, containerSignal);
-    for (const BlockFace face : kUpdateOrder) {
-        scheduleNeighbours(world, worldName, x + registry::stepX(face), y + registry::stepY(face),
-                           z + registry::stepZ(face), containerSignal);
+    for (const std::array<std::int32_t, 3>& at : wireReach(x, y, z)) {
+        scheduleNeighbours(world, worldName, at[0], at[1], at[2], containerSignal);
     }
 }
 

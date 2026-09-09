@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <expected>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -241,11 +242,33 @@ ServerEntity* decodeGeneratedTreeNode(const server::world::ChunkGeneratedEntity&
 
 } // namespace
 
+/// parity: `UUIDUtil.CODEC`, which is four ints and not a string: the two halves of the number, each
+/// split high word first. Vanilla reads nothing else for an entity, so a world written with a string
+/// there loses every uuid it had.
+[[nodiscard]] NbtTag uuidTag(const wire::common::Uuid& uuid) {
+    return NbtTag::ofIntArray({static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high() >> 32)),
+                               static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.high())),
+                               static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.low() >> 32)),
+                               static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid.low()))});
+}
+
+/// parity: `uuidFromIntArray`. The string form is still read because this build wrote it until now,
+/// and a world of ours should not lose its entities to the change.
+[[nodiscard]] std::optional<wire::common::Uuid> uuidIn(const NbtCompound& tag, std::string_view key) {
+    if (const std::span<const std::int32_t> parts = tag.getIntArray(key); parts.size() == 4) {
+        const auto word = [parts](std::size_t at) {
+            return static_cast<std::uint64_t>(static_cast<std::uint32_t>(parts[at]));
+        };
+        return wire::common::Uuid{(word(0) << 32) | word(1), (word(2) << 32) | word(3)};
+    }
+    return wire::common::Uuid::parse(tag.getString(key));
+}
+
 NbtCompound encode(const ServerEntity& entity) {
     NbtCompound tag = entity.sourceNbt.has_value() ? *entity.sourceNbt : NbtCompound{};
     tag.remove("Passengers");
     tag.putString("id", entity.type().toString());
-    tag.putString("UUID", entity.uuid().toString());
+    tag.set("UUID", uuidTag(entity.uuid()));
     tag.set("Pos", doubles(entity.x, entity.y, entity.z));
     tag.set("Motion", doubles(entity.velocityX, entity.velocityY, entity.velocityZ));
     tag.set("Rotation", floats(entity.yaw, entity.pitch));
@@ -305,7 +328,11 @@ NbtCompound encode(const ServerEntity& entity) {
     }
     if (entity.leashHolderUuid.has_value()) {
         NbtCompound leash;
-        leash.putString("UUID", *entity.leashHolderUuid);
+        // parity: `Leashable.LeashData.CODEC` uses the same four ints for who holds the rope.
+        if (const std::optional<wire::common::Uuid> held = wire::common::Uuid::parse(*entity.leashHolderUuid);
+            held.has_value()) {
+            leash.set("UUID", uuidTag(*held));
+        }
         tag.set("leash", NbtTag::ofCompound(std::move(leash)));
     }
     if (path == "villager" || path == "zombie_villager") {
@@ -367,7 +394,7 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
             }
         }
     }
-    const std::optional<Uuid> uuid = Uuid::parse(tag.getString("UUID"));
+    const std::optional<Uuid> uuid = uuidIn(tag, "UUID");
     auto entity = std::make_unique<ServerEntity>(entityId, uuid.value_or(Uuid::random()), *type, protocolType,
                                                  position[0], position[1], position[2], rotation[0], rotation[1]);
 
@@ -420,8 +447,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         entity->skeletonTrapTime = numericInt(tag, "SkeletonTrapTime");
         entity->tamedHorse = numericBoolean(tag, "Tame");
     }
-    if (const std::string_view leash = compoundOf(tag, "leash").getString("UUID"); !leash.empty()) {
-        entity->leashHolderUuid = std::string{leash};
+    if (const std::optional<Uuid> leash = uuidIn(compoundOf(tag, "leash"), "UUID");
+        leash.has_value() && !leash->isNil()) {
+        entity->leashHolderUuid = leash->toString();
     }
     const NbtCompound& villagerData = compoundOf(tag, "VillagerData");
     if (const std::string_view profession = villagerData.getString("profession"); !profession.empty()) {
