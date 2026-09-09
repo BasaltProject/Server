@@ -37,6 +37,13 @@ struct Event {
 struct Effect {
     /// parity: `LevelEvent.SOUND_DISPENSER_FAIL`, the click of a dispenser with nothing in it.
     static constexpr std::int32_t kDispenserFail = 1001;
+    /// parity: `LevelEvent.PARTICLES_AND_SOUND_BRUSH_BLOCK_COMPLETE`'s neighbour in the list, the
+    /// puff of smoke a redstone torch makes when it burns out.
+    static constexpr std::int32_t kRedstoneTorchBurnout = 1502;
+    /// parity: the click a crafter makes when what is in it is not a recipe.
+    static constexpr std::int32_t kCrafterFail = 1050;
+    /// parity: the sparks off a lightning rod, whose data is the rod's axis.
+    static constexpr std::int32_t kLightningRodSparks = 3002;
 
     std::int32_t type = 0;
     std::int32_t data = 0;

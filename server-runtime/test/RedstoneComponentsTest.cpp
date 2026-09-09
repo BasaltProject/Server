@@ -134,6 +134,11 @@ TEST_CASE("a torch that goes out eight times in sixty ticks burns out") {
     CHECK(propertyOf(last->stateId, "lit") == "false");
     // parity: `RESTART_DELAY`, the hundred and sixty ticks before it even looks again.
     CHECK(world.hasScheduledBlockTick(8, 65, 8, Identifier::vanilla("redstone_torch")));
+    // parity: `level.levelEvent(1502, pos, 0)`, the puff of smoke that goes with burning out.
+    REQUIRE(last->effects.size() == 1);
+    const auto* puff = std::get_if<blockEffect::Effect>(&last->effects.front());
+    REQUIRE(puff != nullptr);
+    CHECK(puff->type == blockEffect::Effect::kRedstoneTorchBurnout);
 
     // The signal goes and the torch stays out: it has toggled too often to come back.
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));

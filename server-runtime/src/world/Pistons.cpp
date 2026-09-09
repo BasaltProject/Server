@@ -303,7 +303,12 @@ private:
     wire::nbt::NbtCompound data;
     data.set("blockState", wire::nbt::NbtTag::ofCompound(std::move(state)));
     data.putInt("facing", static_cast<std::int32_t>(direction));
-    // parity: what is saved is `progressO`, which is a turn behind the slide, so it starts at zero.
+    // parity: what is saved is `progressO`, a turn behind the live `progress`, and measured on the
+    // bench it is zero for the whole of a slide: `piston`, `pistonpega` and `pistonsuelta` write zero
+    // on both of their turns. `pistonsensor` is the one circuit where the jar writes a half on the
+    // second, and what tells the two apart is when the block entity first ticks with respect to the
+    // block event, which this build does not model: it lands the slide from the piston's own turn
+    // rather than ticking each moving square. Zero is what three of the four measure.
     data.putFloat("progress", 0.0F);
     data.putBoolean("extending", extending);
     data.putBoolean("source", source);
@@ -523,17 +528,12 @@ void beginRetract(const Context& context, std::int32_t x, std::int32_t y, std::i
     slide(context, *push, registry::opposite(direction), direction, false);
 }
 
-/// parity: the half `PistonMovingBlockEntity.tick` adds each turn.
-constexpr float kHalfWay = 0.5F;
-
 /// One block mid-slide: where its `moving_piston` stands, what it will become, and which way it is
 /// going, because a pull back moves the other way from the piston's own face.
 struct Carried {
     Position at;
     std::int32_t stateId = 0;
     bool extending = true;
-    /// parity: `PistonMovingBlockEntity.progressO`, the only half of the slide that is written down.
-    float progress = 0.0F;
 };
 
 /// The blocks mid-slide: this piston's own `moving_piston` squares, furthest along first so nothing
@@ -557,10 +557,8 @@ struct Carried {
         const std::optional<std::int32_t> carriedStateId =
             moving ? carriedState(entity->data()) : std::optional<std::int32_t>{};
         if (moving && carriedStateId.has_value()) {
-            carried.push_back(Carried{.at = at,
-                                      .stateId = *carriedStateId,
-                                      .extending = entity->data().getBoolean("extending"),
-                                      .progress = entity->data().getFloat("progress")});
+            carried.push_back(
+                Carried{.at = at, .stateId = *carriedStateId, .extending = entity->data().getBoolean("extending")});
         } else if (at != Position{pistonX, pistonY, pistonZ}) {
             continue;
         }
@@ -583,34 +581,6 @@ struct Carried {
         return along(one.at) > along(other.at);
     });
     return carried;
-}
-
-/// Half the slide going by: what is written down moves from zero to a half, and the turn after that
-/// is the one that lands. False when the slide is not ripe yet, so the caller books another turn.
-///
-/// parity: `PistonMovingBlockEntity.tick` copies `progress` into `progressO` and then adds a half, and
-/// `progressO` is what is saved. So a slide is written out at zero on the turn it starts, at a half on
-/// the next, and on the third `progressO` has reached one and `finalTick` runs.
-[[nodiscard]] bool ripen(const Context& context, const std::vector<Carried>& carried) {
-    if (carried.empty() || carried.front().progress >= kHalfWay) {
-        return true;
-    }
-    for (const Carried& entry : carried) {
-        server::world::Chunk* chunk = context.world.chunkIfLoaded(entry.at[0] >> 4, entry.at[2] >> 4);
-        if (chunk == nullptr) {
-            continue;
-        }
-        const server::world::ChunkBlockEntity* held =
-            chunk->blockEntityAt(entry.at[0] & 15, entry.at[1], entry.at[2] & 15);
-        if (held == nullptr) {
-            continue;
-        }
-        wire::nbt::NbtCompound data = held->data();
-        data.putFloat("progress", kHalfWay);
-        chunk->setBlockEntity(
-            server::world::ChunkBlockEntity{entry.at[0] & 15, entry.at[1], entry.at[2] & 15, block(), std::move(data)});
-    }
-    return false;
 }
 
 /// Puts every carried block down where it already stands, which is what
@@ -636,10 +606,6 @@ struct Carried {
                                             const std::function<void(const PlayerPosition&)>& onPlayerPushed) {
     const std::vector<Carried> carried = carriedBlocks(context, x, y, z, direction);
     if (carried.empty()) {
-        return {};
-    }
-    if (!ripen(context, carried)) {
-        context.world.scheduleBlockTick(x, y, z, block(), kMoveTicks - 1);
         return {};
     }
     std::vector<Position> moving;
@@ -826,7 +792,7 @@ void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32
                                   .z = z,
                                   .stateId = now.value_or(*stateId),
                                   .effects = {blockEffect::Event{.b0 = b0, .b1 = b1}, sound}});
-    context.world.scheduleBlockTick(x, y, z, block(), kMoveTicks - 1);
+    context.world.scheduleBlockTick(x, y, z, block(), kMoveTicks);
 }
 
 std::vector<BlockChange> finish(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,

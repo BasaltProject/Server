@@ -74,10 +74,8 @@ struct Loaded {
     return effects;
 }
 
-/// The slide landing. It takes two turns: the first only writes the moving pistons half way through,
-/// which is `progressO` catching up with `progress`, and the second puts the blocks down.
+/// The slide landing, which is one turn: `finalTick` puts every square down where it already stands.
 [[nodiscard]] std::vector<BlockChange> finishSlide(Loaded& loaded, std::int32_t x, std::int32_t y, std::int32_t z) {
-    static_cast<void>(pistons::finish(loaded.context(), x, y, z));
     return pistons::finish(loaded.context(), x, y, z);
 }
 
@@ -405,16 +403,11 @@ TEST_CASE("a powered piston books its move and says so with a sound") {
     CHECK(sound->pitch >= 0.6F);
     CHECK(sound->pitch < 0.85F);
 
-    // parity: the move lands two ticks later, counted one turn at a time: the first turn is the one
-    // that writes the slide half way along, and it books the second. Every call to dueBlockTicks is
-    // one tick.
+    // parity: the move lands two ticks later, and every call to dueBlockTicks is one tick.
+    CHECK(world.dueBlockTicks().empty());
     const std::vector<std::array<std::int32_t, 3>> due = world.dueBlockTicks();
     REQUIRE(due.size() == 1);
     CHECK(due[0] == std::array<std::int32_t, 3>{8, 64, 8});
-    CHECK(pistons::finish(loaded.context(), 8, 64, 8).empty());
-    const std::vector<std::array<std::int32_t, 3>> landing = world.dueBlockTicks();
-    REQUIRE(landing.size() == 1);
-    CHECK(landing[0] == std::array<std::int32_t, 3>{8, 64, 8});
 }
 
 TEST_CASE("a piston cannot be powered by what it is about to push") {
@@ -868,16 +861,6 @@ TEST_CASE("a block mid-slide carries the state it is about to become") {
     CHECK(registry::blockStateDefinitions::blockOf(carriedIn(arm.data()))->path() == "piston_head");
     CHECK(arm.data().getBoolean("source"));
     CHECK(propertyOf(*world.blockState(9, 64, 8), "type") == "sticky");
-
-    // parity: `PistonMovingBlockEntity.tick` copies `progress` into `progressO` before adding a half,
-    // and `progressO` is what is written down. So the slide is saved at zero on the turn it starts
-    // and at a half on the next one, which is the turn before it lands.
-    CHECK(pistons::finish(loaded.context(), 8, 64, 8).empty());
-    const Chunk* halfway = world.chunkIfLoaded(0, 0);
-    REQUIRE(halfway != nullptr);
-    const basalt::server::world::ChunkBlockEntity* moving = halfway->blockEntityAt(10, 64, 8);
-    REQUIRE(moving != nullptr);
-    CHECK(moving->data().getFloat("progress") == doctest::Approx(0.5F));
 }
 
 TEST_CASE("what a block sweeps is the square it leaves and the one it lands on") {
