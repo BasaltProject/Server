@@ -6,6 +6,7 @@
 
 #include <doctest.h>
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -40,6 +41,38 @@ namespace {
 }
 
 const basalt::wire::common::Identifier kSensor = basalt::wire::common::Identifier::vanilla("sculk_sensor");
+
+/// A world with a clock, because a vibration is not heard where it happens: it takes a tick per
+/// block to arrive, and the sensor only moves it on its own scheduled turn.
+struct Bench {
+    WorldState world = emptyWorld();
+    std::int64_t now = 0;
+    std::vector<BlockChange> changes;
+
+    /// One turn of the world: the clock moves, and every tick that came due goes through the sensor.
+    void advance() {
+        ++now;
+        for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
+            if (const std::optional<BlockChange> change = vibrations::tick(world, at[0], at[1], at[2], now);
+                change.has_value()) {
+                changes.push_back(*change);
+            }
+        }
+    }
+
+    void advance(std::int32_t turns) {
+        for (std::int32_t turn = 0; turn < turns; ++turn) {
+            advance();
+        }
+    }
+
+    [[nodiscard]] std::int32_t frequencyAt(std::int32_t x, std::int32_t y, std::int32_t z) const {
+        const Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        REQUIRE(chunk != nullptr);
+        const basalt::server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+        return entity == nullptr ? -1 : entity->data().getInt(std::string{vibrations::kFrequencyKey}, -1);
+    }
+};
 
 } // namespace
 
@@ -99,62 +132,116 @@ TEST_CASE("every event carries the frequency vanilla gives it") {
     CHECK(vibrations::frequencyOf("") == 0);
 }
 
-TEST_CASE("a sensor wakes on the event's own frequency and books its thirty ticks") {
-    WorldState world = emptyWorld();
-    world.getOrGenerateChunk(0, 0);
-    REQUIRE(world.setBlockState(8, 64, 8, sleepingSensor()));
-    std::vector<BlockChange> changes;
+TEST_CASE("a sensor wakes on the event's own frequency, one turn per block away") {
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
 
-    vibrations::emit(world, "eat", 10.5, 64.5, 8.5, changes);
+    vibrations::emit(bench.world, "eat", 10.5, 64.5, 8.5, bench.now);
 
-    REQUIRE(changes.size() == 1);
-    CHECK(changes[0].x == 8);
-    CHECK(propertyOf(changes[0].stateId, "sculk_sensor_phase") == "active");
+    // parity: `VibrationSelector.chosenCandidate` picks on the turn **after** the noise, and
+    // `calculateTravelTimeInTicks` then spends one tick per whole block. Two blocks away is two
+    // turns, and nothing happens before that.
+    bench.advance();
+    CHECK(bench.changes.empty());
+    bench.advance();
+    REQUIRE(bench.changes.size() == 1);
+    CHECK(bench.changes[0].x == 8);
+    CHECK(propertyOf(bench.changes[0].stateId, "sculk_sensor_phase") == "active");
     // parity: `power` is **how close** the noise was, not what it was:
     // `VibrationSystem.getRedstoneStrengthForDistance` over the block distance, so two squares away
     // is fifteen less three. What it was goes in the block entity, and only a comparator reads it.
-    CHECK(propertyOf(changes[0].stateId, "power") == "12");
-    CHECK(world.hasScheduledBlockTick(8, 64, 8, kSensor));
+    CHECK(propertyOf(bench.changes[0].stateId, "power") == "12");
+    CHECK(bench.frequencyAt(8, 64, 8) == 8);
+    CHECK(bench.world.hasScheduledBlockTick(8, 64, 8, kSensor));
+}
+
+TEST_CASE("a noise in the sensor's own square arrives on the very next turn") {
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+
+    vibrations::emit(bench.world, "eat", 8.5, 64.5, 8.5, bench.now);
+
+    // parity: `Ticker.tick` spends a turn of the countdown on the same turn it picks, so a travel
+    // time of zero lands there and does not wait a second turn.
+    bench.advance();
+    REQUIRE(bench.changes.size() == 1);
+    CHECK(propertyOf(bench.changes[0].stateId, "power") == "15");
+}
+
+TEST_CASE("of two noises heard on the same turn the sensor keeps the louder one") {
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+
+    // parity: `VibrationSelector.shouldReplaceVibration`: same turn and same distance, so the higher
+    // frequency wins. The sensor is not awake yet, so both are candidates and only one survives.
+    vibrations::emit(bench.world, "eat", 8.5, 64.5, 8.5, bench.now);
+    vibrations::emit(bench.world, "explode", 8.5, 64.5, 8.5, bench.now);
+    bench.advance();
+
+    REQUIRE(bench.changes.size() == 1);
+    CHECK(bench.frequencyAt(8, 64, 8) == 15);
 }
 
 TEST_CASE("a sensor already awake takes no second vibration") {
-    WorldState world = emptyWorld();
-    world.getOrGenerateChunk(0, 0);
-    REQUIRE(world.setBlockState(8, 64, 8, sleepingSensor()));
-    std::vector<BlockChange> changes;
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
 
-    vibrations::emit(world, "eat", 8.5, 64.5, 8.5, changes);
-    vibrations::emit(world, "explode", 8.5, 64.5, 8.5, changes);
+    vibrations::emit(bench.world, "eat", 8.5, 64.5, 8.5, bench.now);
+    bench.advance();
+    REQUIRE(bench.changes.size() == 1);
 
-    CHECK(changes.size() == 1);
-    // Right on top of it, so the distance is nothing and the strength is full.
-    CHECK(propertyOf(*world.blockState(8, 64, 8), "power") == "15");
+    vibrations::emit(bench.world, "explode", 8.5, 64.5, 8.5, bench.now);
+    bench.advance(5);
+
+    CHECK(bench.changes.size() == 1);
+    CHECK(bench.frequencyAt(8, 64, 8) == 8);
+}
+
+TEST_CASE("a sensor does not hear its own square being placed or broken") {
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+
+    // parity: `SculkSensorBlockEntity.VibrationUser.canReceiveVibration`, the one event it refuses.
+    vibrations::emit(bench.world, "block_place", 8.5, 64.5, 8.5, bench.now);
+    vibrations::emit(bench.world, "block_destroy", 8.5, 64.5, 8.5, bench.now);
+    bench.advance(4);
+    CHECK(bench.changes.empty());
+
+    // The very same event one square over does reach it.
+    vibrations::emit(bench.world, "block_place", 9.5, 64.5, 8.5, bench.now);
+    bench.advance(3);
+    CHECK(bench.changes.size() == 1);
 }
 
 TEST_CASE("an event nothing listens to reaches no sensor") {
-    WorldState world = emptyWorld();
-    world.getOrGenerateChunk(0, 0);
-    REQUIRE(world.setBlockState(8, 64, 8, sleepingSensor()));
-    std::vector<BlockChange> changes;
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
 
-    vibrations::emit(world, "block_update", 8.5, 64.5, 8.5, changes);
+    vibrations::emit(bench.world, "block_update", 8.5, 64.5, 8.5, bench.now);
+    bench.advance(4);
 
-    CHECK(changes.empty());
-    CHECK(world.blockState(8, 64, 8) == sleepingSensor());
+    CHECK(bench.changes.empty());
+    CHECK(bench.world.blockState(8, 64, 8) == sleepingSensor());
 }
 
 TEST_CASE("the reach is a sphere of eight, not the cube it is walked in") {
     const auto hears = [](std::int32_t dx, std::int32_t dy, std::int32_t dz) {
-        WorldState world = emptyWorld();
+        Bench bench;
         for (std::int32_t chunkX = -1; chunkX <= 1; ++chunkX) {
             for (std::int32_t chunkZ = -1; chunkZ <= 1; ++chunkZ) {
-                world.getOrGenerateChunk(chunkX, chunkZ);
+                bench.world.getOrGenerateChunk(chunkX, chunkZ);
             }
         }
-        REQUIRE(world.setBlockState(8 + dx, 64 + dy, 8 + dz, sleepingSensor()));
-        std::vector<BlockChange> changes;
-        vibrations::emit(world, "eat", 8.5, 64.5, 8.5, changes);
-        return !changes.empty();
+        REQUIRE(bench.world.setBlockState(8 + dx, 64 + dy, 8 + dz, sleepingSensor()));
+        vibrations::emit(bench.world, "eat", 8.5, 64.5, 8.5, bench.now);
+        bench.advance(12);
+        return !bench.changes.empty();
     };
 
     CHECK(hears(8, 0, 0));
@@ -171,59 +258,54 @@ TEST_CASE("the reach is a sphere of eight, not the cube it is walked in") {
 }
 
 TEST_CASE("a calibrated sensor listens the same way") {
-    WorldState world = emptyWorld();
-    world.getOrGenerateChunk(0, 0);
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
     const std::int32_t calibrated =
         stateOf("calibrated_sculk_sensor",
                 {{"sculk_sensor_phase", "inactive"}, {"power", "0"}, {"waterlogged", "false"}, {"facing", "north"}});
-    REQUIRE(world.setBlockState(8, 64, 8, calibrated));
-    std::vector<BlockChange> changes;
+    REQUIRE(bench.world.setBlockState(8, 64, 8, calibrated));
 
-    vibrations::emit(world, "step", 8.5, 64.5, 8.5, changes);
+    vibrations::emit(bench.world, "step", 8.5, 64.5, 8.5, bench.now);
+    bench.advance();
 
-    REQUIRE(changes.size() == 1);
-    CHECK(propertyOf(changes[0].stateId, "sculk_sensor_phase") == "active");
-    // Right on top of it again, so full strength whatever the noise was.
-    CHECK(propertyOf(changes[0].stateId, "power") == "15");
+    REQUIRE(bench.changes.size() == 1);
+    CHECK(propertyOf(bench.changes[0].stateId, "sculk_sensor_phase") == "active");
+    // Right on top of it, so full strength whatever the noise was.
+    CHECK(propertyOf(bench.changes[0].stateId, "power") == "15");
     // The face it was placed on is not touched.
-    CHECK(propertyOf(changes[0].stateId, "facing") == "north");
-    CHECK(world.hasScheduledBlockTick(8, 64, 8, basalt::wire::common::Identifier::vanilla("calibrated_sculk_sensor")));
+    CHECK(propertyOf(bench.changes[0].stateId, "facing") == "north");
+    CHECK(bench.world.hasScheduledBlockTick(8, 64, 8,
+                                            basalt::wire::common::Identifier::vanilla("calibrated_sculk_sensor")));
 }
 
 TEST_CASE("an awake sensor settles through cooldown and then goes quiet") {
-    WorldState world = emptyWorld();
-    world.getOrGenerateChunk(0, 0);
-    REQUIRE(world.setBlockState(8, 64, 8, sleepingSensor()));
-    std::vector<BlockChange> changes;
-    vibrations::emit(world, "eat", 8.5, 64.5, 8.5, changes);
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+    vibrations::emit(bench.world, "eat", 8.5, 64.5, 8.5, bench.now);
+    bench.advance();
+    REQUIRE(bench.changes.size() == 1);
 
     // The thirty ticks it stays awake.
-    for (std::int32_t turn = 0; turn < 29; ++turn) {
-        CHECK(world.dueBlockTicks().empty());
-    }
-    CHECK(world.dueBlockTicks().size() == 1);
-
-    const std::optional<BlockChange> cooling = vibrations::tick(world, 8, 64, 8);
-    REQUIRE(cooling.has_value());
-    CHECK(propertyOf(cooling->stateId, "sculk_sensor_phase") == "cooldown");
-    CHECK(propertyOf(cooling->stateId, "power") == "0");
+    bench.advance(29);
+    CHECK(bench.changes.size() == 1);
+    bench.advance();
+    REQUIRE(bench.changes.size() == 2);
+    CHECK(propertyOf(bench.changes[1].stateId, "sculk_sensor_phase") == "cooldown");
+    CHECK(propertyOf(bench.changes[1].stateId, "power") == "0");
 
     // And the ten it takes to settle.
-    for (std::int32_t turn = 0; turn < 9; ++turn) {
-        CHECK(world.dueBlockTicks().empty());
-    }
-    CHECK(world.dueBlockTicks().size() == 1);
-
-    const std::optional<BlockChange> quiet = vibrations::tick(world, 8, 64, 8);
-    REQUIRE(quiet.has_value());
-    CHECK(propertyOf(quiet->stateId, "sculk_sensor_phase") == "inactive");
-    CHECK(world.blockState(8, 64, 8) == sleepingSensor());
+    bench.advance(9);
+    CHECK(bench.changes.size() == 2);
+    bench.advance();
+    REQUIRE(bench.changes.size() == 3);
+    CHECK(propertyOf(bench.changes[2].stateId, "sculk_sensor_phase") == "inactive");
+    CHECK(bench.world.blockState(8, 64, 8) == sleepingSensor());
 
     // Once quiet there is nothing left to book or to change.
-    CHECK_FALSE(vibrations::tick(world, 8, 64, 8).has_value());
-    for (std::int32_t turn = 0; turn < 40; ++turn) {
-        CHECK(world.dueBlockTicks().empty());
-    }
+    CHECK_FALSE(vibrations::tick(bench.world, 8, 64, 8, bench.now).has_value());
+    bench.advance(40);
+    CHECK(bench.changes.size() == 3);
 }
 
 TEST_CASE("a scheduled turn on anything but a sensor does nothing") {
@@ -231,20 +313,20 @@ TEST_CASE("a scheduled turn on anything but a sensor does nothing") {
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(8, 64, 8, registry::blocks::named("stone")->stateId));
 
-    CHECK_FALSE(vibrations::tick(world, 8, 64, 8).has_value());
-    CHECK_FALSE(vibrations::tick(world, 8, 400, 8).has_value());
+    CHECK_FALSE(vibrations::tick(world, 8, 64, 8, 1).has_value());
+    CHECK_FALSE(vibrations::tick(world, 8, 400, 8, 1).has_value());
 }
 
 TEST_CASE("the source block is the one the position falls in, negative or not") {
-    WorldState world = emptyWorld();
-    world.getOrGenerateChunk(-1, -1);
-    REQUIRE(world.setBlockState(-9, 64, -9, sleepingSensor()));
-    std::vector<BlockChange> changes;
+    Bench bench;
+    bench.world.getOrGenerateChunk(-1, -1);
+    REQUIRE(bench.world.setBlockState(-9, 64, -9, sleepingSensor()));
 
     // Truncating instead of flooring would put the source at -0.5 into block zero, eight away.
-    vibrations::emit(world, "eat", -0.5, 64.5, -0.5, changes);
+    vibrations::emit(bench.world, "eat", -0.5, 64.5, -0.5, bench.now);
+    bench.advance(14);
 
-    CHECK(changes.empty());
+    CHECK(bench.changes.empty());
 }
 
 TEST_CASE("the cheap filter callers use is the cube, and it is eight either way") {

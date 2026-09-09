@@ -146,10 +146,21 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             rail.has_value()) {
             scheduled.push_back(*rail);
         }
-        // parity: `SculkSensorBlock.tick`: thirty ticks awake, then ten of cooldown.
-        if (const std::optional<world::BlockChange> sensor = world::vibrations::tick(world.state(), x, y, z);
+        // parity: `SculkSensorBlock.tick`: thirty ticks awake, then ten of cooldown, plus the turn
+        // the vibration on its way spends. `activate` and `deactivate` both end in `updateNeighbours`,
+        // so this goes out with the redstone settled around it and not as a bare block update:
+        // measured in `sensormuerte`, where our sensor woke on the right tick and the comparator in
+        // front of it never noticed.
+        if (const std::optional<world::BlockChange> sensor =
+                world::vibrations::tick(world.state(), x, y, z, world.gameTime());
             sensor.has_value()) {
-            scheduled.push_back(*sensor);
+            broadcaster_->announceRedstone(world, watchers, *sensor);
+            // parity: `SculkSensorBlock.updateNeighbours` tells the square **below** as well. A
+            // sensor only feeds strongly upwards, so what is under it would never hear it otherwise.
+            random::RandomSource sensorRandom = freshRandom();
+            const std::vector<world::BlockChange> under =
+                world::redstoneReactors::update(world.state(), world.name(), x, y - 1, z, sensorRandom);
+            scheduled.insert(scheduled.end(), under.begin(), under.end());
         }
         // parity: `LightningRodBlock`'s own scheduled tick, eight after the strike.
         if (const std::optional<world::BlockChange> rod = world::lightning::releaseRod(world.state(), x, y, z);

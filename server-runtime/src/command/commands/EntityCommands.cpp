@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/EntityCommands.hpp>
+#include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -73,36 +74,25 @@ SummonCommand::SummonCommand(player::PlayerRegistry& players)
     : Command("summon", permissionLevel::kGamemasters), players_(&players) {}
 
 void SummonCommand::build(const CommandNodeBuilder& root) const {
-    /// The part of the NBT tail this build models. Everything else is reported rather than dropped
-    /// quietly: an entity that came out different from what was asked for is worth one line.
-    const auto applyNbt = [](const CommandContext& context, entity::ServerEntity& entity,
-                             const wire::nbt::NbtCompound& nbt) {
-        std::string ignored;
-        for (const std::string& key : nbt.names()) {
-            if (key == "CustomName") {
-                entity.customName = plainName(nbt.getString(key));
-            } else if (key == "Health") {
-                if (const wire::nbt::NbtTag* value = nbt.find(key); value != nullptr) {
-                    if (const auto* number = value->get<float>(); number != nullptr) {
-                        entity.health = static_cast<double>(*number);
-                    }
-                }
-            } else {
-                ignored += ignored.empty() ? key : ", " + key;
+    /// The tag as vanilla writes it, so the decoder that reads a saved entity can read this one.
+    const auto tagFor = [](const CommandContext& context, const wire::common::Identifier& id,
+                           const std::array<double, 3>& at, bool withNbt) {
+        wire::nbt::NbtCompound tag;
+        if (withNbt) {
+            if (const auto* given = context.get<wire::nbt::NbtCompound>("nbt"); given != nullptr) {
+                tag = *given;
             }
         }
-        // The whole tag is kept even so: it is where anything that knows how to read a field looks,
-        // and a chest minecart's `Items` is one of those. Without this a comparator beside a detector
-        // rail read an empty cart, because the cart summoned with items had none.
-        entity.sourceNbt = nbt;
-        if (!ignored.empty()) {
-            context.source().sendSystemMessage(
-                Component::text("  Kept in the tag but not acted on here: " + ignored, kGray));
-        }
+        tag.putString("id", id.toString());
+        tag.set("Pos", wire::nbt::NbtTag::ofList(
+                           wire::nbt::NbtList{wire::nbt::NbtType::Double,
+                                              {wire::nbt::NbtTag::ofDouble(at[0]), wire::nbt::NbtTag::ofDouble(at[1]),
+                                               wire::nbt::NbtTag::ofDouble(at[2])}}));
+        return tag;
     };
 
-    const auto summon = [this, applyNbt](const CommandContext& context, bool positioned,
-                                         bool withNbt) -> Parsed<std::int32_t> {
+    const auto summon = [this, tagFor](const CommandContext& context, bool positioned,
+                                       bool withNbt) -> Parsed<std::int32_t> {
         const auto* id = context.get<Identifier>("entity");
         if (id == nullptr) {
             return 0;
@@ -126,18 +116,8 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
         // kind, so summoning one has to build that kind: as a plain entity it never fell, never
         // merged and no plate or hopper saw it, because those all read the world's item list.
         // Measured in `placas`, where the jar's items landed on the plate and ours hung in the air.
+        const wire::nbt::NbtCompound tag = tagFor(context, *id, at, withNbt);
         if (*id == wire::common::Identifier::vanilla("item")) {
-            wire::nbt::NbtCompound tag;
-            if (withNbt) {
-                if (const auto* given = context.get<wire::nbt::NbtCompound>("nbt"); given != nullptr) {
-                    tag = *given;
-                }
-            }
-            tag.putString("id", id->toString());
-            tag.set("Pos", wire::nbt::NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Double,
-                                                                        {wire::nbt::NbtTag::ofDouble(at[0]),
-                                                                         wire::nbt::NbtTag::ofDouble(at[1]),
-                                                                         wire::nbt::NbtTag::ofDouble(at[2])}}));
             const std::optional<world::DroppedItem> dropped =
                 world::droppedItemNbt::decode(tag, [this] { return players_->allocateEntityId(); });
             if (!dropped.has_value()) {
@@ -149,12 +129,18 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
                             true);
             return 1;
         }
-        auto entity = std::make_unique<entity::ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(),
-                                                             *id, type->protocolId, at[0], at[1], at[2]);
-        if (withNbt) {
-            if (const auto* nbt = context.get<wire::nbt::NbtCompound>("nbt"); nbt != nullptr) {
-                applyNbt(context, *entity, *nbt);
-            }
+        // parity: `SummonCommand` builds the entity **through the save codec**
+        // (`EntityType.loadEntityRecursive`), so every tag a saved entity understands works here too.
+        // Doing it by hand read two fields out of thirty: measured in `flechavibra`, where an arrow
+        // summoned with `Motion` simply hung in the air because nothing applied it.
+        std::unique_ptr<entity::ServerEntity> entity =
+            entity::entityNbt::decode(tag, players_->allocateEntityId(), type->protocolId);
+        if (entity == nullptr) {
+            return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.summon.failed")}};
+        }
+        // `CustomName` is a text component on the way in and plain text once it is an entity's name.
+        if (const std::string_view named = tag.getString("CustomName"); !named.empty()) {
+            entity->customName = plainName(named);
         }
         static_cast<void>((*world)->state().spawnEntity(std::move(entity)));
         context.success(Component::translatable("commands.summon.success", {Component::text(id->toString())}), true);

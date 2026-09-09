@@ -175,7 +175,7 @@ void BlockInteractionHandler::heardBySculk(std::string_view event, const BlockPo
         return;
     }
     std::vector<world::BlockChange> changes;
-    world::vibrations::emit(world->state(), event, pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, changes);
+    world::vibrations::emit(world->state(), event, pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, world->gameTime());
     for (const world::BlockChange& change : changes) {
         broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);
         for (const world::BlockChange& settled :

@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -424,6 +425,11 @@ void destroyPushed(const Context& context, const Push& push) {
             context.onDestroyed(*broken, (*position)[0], (*position)[1], (*position)[2]);
         }
         static_cast<void>(context.world.setBlockState((*position)[0], (*position)[1], (*position)[2], air()));
+        // parity: `PistonBaseBlock.moveBlocks` raises `BLOCK_DESTROY` on every square it clears, so a
+        // sculk sensor hears a piston crushing a torch exactly as it hears one being broken by hand.
+        vibrations::emit(context.world, "block_destroy", static_cast<double>((*position)[0]) + 0.5,
+                         static_cast<double>((*position)[1]) + 0.5, static_cast<double>((*position)[2]) + 0.5,
+                         context.gameTime);
     }
 }
 
@@ -757,6 +763,10 @@ void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32
                                    .volume = kSoundVolume,
                                    .pitch =
                                        pitch(context.random, extending ? kExtendPitchSpread : kContractPitchSpread)};
+    // parity: `triggerEvent` raises `BLOCK_ACTIVATE` going out and `BLOCK_DEACTIVATE` coming back,
+    // both from the piston's own square and both after whatever it broke on the way.
+    vibrations::emit(context.world, extending ? "block_activate" : "block_deactivate", static_cast<double>(x) + 0.5,
+                     static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, context.gameTime);
     const std::optional<std::int32_t> now = context.world.blockState(x, y, z);
     effects.push_back(BlockChange{.x = x,
                                   .y = y,

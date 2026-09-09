@@ -201,7 +201,7 @@ TEST_CASE("summon refuses a player and a type nobody registered") {
     CHECK(fixture.source.lastAsText().find("commands.summon.failed") != std::string::npos);
 }
 
-TEST_CASE("summon acts on the two NBT keys it models, keeps the tag, and names the rest") {
+TEST_CASE("summon reads the tag through the same decoder a saved entity goes through") {
     Fixture fixture{scratch("entity-summon-nbt")};
     fixture.dispatcher.registerCommand(std::make_shared<commands::SummonCommand>(fixture.registry));
 
@@ -210,18 +210,30 @@ TEST_CASE("summon acts on the two NBT keys it models, keeps the tag, and names t
               R"(summon minecraft:pig 0 64 0 {CustomName:'{"text":"Wilbur"}',Health:5.0f,Glowing:1b})") == 1);
     ServerEntity* pig = summoned(fixture, "pig");
     REQUIRE(pig != nullptr);
+    // `CustomName` arrives as a text component and only its plain text becomes the name.
     REQUIRE(pig->customName.has_value());
     CHECK(*pig->customName == "Wilbur");
     CHECK(pig->health == doctest::Approx(5.0));
-    std::string all;
-    for (const Component& line : fixture.source.said) {
-        all += flatten(line);
-    }
-    CHECK(all.find("Kept in the tag but not acted on here: Glowing") != std::string::npos);
     // The whole tag stays on the entity even so: it is where a reader that knows a field looks, and
     // a chest minecart's `Items` is read from exactly there.
     REQUIRE(pig->sourceNbt.has_value());
     CHECK(pig->sourceNbt->getByte("Glowing", 0) == 1);
+}
+
+TEST_CASE("a summoned projectile flies the way its tag says") {
+    Fixture fixture{scratch("entity-summon-motion")};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SummonCommand>(fixture.registry));
+
+    CHECK(fixture.dispatcher.execute(
+              fixture.source, "summon minecraft:arrow 1.5 -60.0 0.5 {Motion:[0.6d,0.0d,0.0d],NoGravity:1b}") == 1);
+    ServerEntity* arrow = summoned(fixture, "arrow");
+    REQUIRE(arrow != nullptr);
+    // parity: `SummonCommand` goes through the save codec, so `Motion` and `NoGravity` mean here what
+    // they mean in a saved world. Building the entity by hand read `CustomName` and `Health` and
+    // nothing else: measured in `flechavibra`, where the arrow hung in the air where it appeared.
+    CHECK(arrow->velocityX == doctest::Approx(0.6));
+    CHECK(arrow->velocityY == doctest::Approx(0.0));
+    CHECK(arrow->noGravity);
 }
 
 TEST_CASE("damage takes health off an entity and kills it at zero") {

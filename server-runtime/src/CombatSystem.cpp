@@ -73,15 +73,10 @@ CombatSystem::CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem&
                            Options options)
     : broadcaster_(broadcaster), explosions_(explosions), hooks_(std::move(hooks)), options_(std::move(options)) {}
 
-/// parity: `Level.gameEvent`, which is what a sculk sensor is listening to. The caller tells the
-/// watchers about whatever the sensor did with it.
-void CombatSystem::emitVibration(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
-                                 std::string_view event, double x, double y, double z) {
-    std::vector<world::BlockChange> heard;
-    world::vibrations::emit(world.state(), event, x, y, z, heard);
-    for (const world::BlockChange& change : heard) {
-        broadcaster_.announceRedstone(world, watchers, change);
-    }
+/// parity: `Level.gameEvent`, which is what a sculk sensor is listening to. Nobody to tell here: the
+/// noise still has to travel, and the sensor lights up on its own turn.
+void CombatSystem::emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z) {
+    world::vibrations::emit(world.state(), event, x, y, z, world.gameTime());
 }
 
 void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
@@ -90,13 +85,17 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     const double fromX = entity.x;
     const double fromY = entity.y;
     const double fromZ = entity.z;
-    // parity: `Projectile.tick` announces the shot on the first turn, before anything else, and a
-    // sculk sensor hears it at frequency three whether anybody fired it or not.
+    const std::optional<entity::BlockHit> hit = entity::projectiles::tick(world.state(), entity, kind);
+    // parity: `Projectile.tick` announces the shot on the first turn, and a sculk sensor hears it at
+    // frequency three whether anybody fired it or not. It goes **after** the move because every
+    // projectile tick (`AbstractArrow`, `ThrowableProjectile`, `AbstractHurtingProjectile`) moves
+    // first and calls `super.tick()` last, so the shot is announced from where it got to. Measured
+    // in `flechavibra`: the jar reads power eight, which is four squares, and from the square it
+    // appeared in it would be five.
     if (!entity.announced) {
         entity.announced = true;
-        emitVibration(world, watchers, "projectile_shoot", entity.x, entity.y, entity.z);
+        emitVibration(world, "projectile_shoot", entity.x, entity.y, entity.z);
     }
-    const std::optional<entity::BlockHit> hit = entity::projectiles::tick(world.state(), entity, kind);
     const std::string_view path = kind.type.path();
 
     // parity: `AbstractHurtingProjectile.onHit`: a fireball goes off where it lands, whether that is
@@ -154,7 +153,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         return;
     }
     // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed.
-    emitVibration(world, watchers, "projectile_land", hit->x, hit->y, hit->z);
+    emitVibration(world, "projectile_land", hit->x, hit->y, hit->z);
     // parity: `Entity.isOnFire`, which is what `TntBlock.onProjectileHit` asks the arrow.
     const std::optional<world::BlockChange> change =
         world::projectileHits::onHit(world.state(), *hit, kind.sticks, entity.fireTicks > 0);

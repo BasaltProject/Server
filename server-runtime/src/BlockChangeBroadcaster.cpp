@@ -186,6 +186,7 @@ void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const wor
         .minY = facts.chunkHeight.minY(),
         .maxY = facts.chunkHeight.maxY(),
         .random = random,
+        .gameTime = world.gameTime(),
         .onDestroyed = [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             dropBrokenBlock(world, bx, by, bz, stateId);
         }};
@@ -217,6 +218,7 @@ BlockChangeBroadcaster::finishPiston(world::LoadedWorld& world, const std::array
         .minY = facts.chunkHeight.minY(),
         .maxY = facts.chunkHeight.maxY(),
         .random = random,
+        .gameTime = world.gameTime(),
         .onDestroyed = [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             dropBrokenBlock(world, bx, by, bz, stateId);
         }};

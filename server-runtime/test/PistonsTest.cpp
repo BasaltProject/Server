@@ -3,10 +3,12 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <doctest.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -41,6 +43,8 @@ namespace {
 struct Loaded {
     WorldState state = emptyWorld();
     rng::RandomSource random = rng::RandomSource::legacy(1);
+    /// The world's clock, which the game events a piston raises are stamped with.
+    std::int64_t now = 0;
 
     Loaded() { state.getOrGenerateChunk(0, 0); }
 
@@ -54,6 +58,7 @@ struct Loaded {
             .minY = -64,
             .maxY = 319,
             .random = random,
+            .gameTime = now,
             .onDestroyed = [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 broken.emplace_back(stateId, std::array<std::int32_t, 3>{x, y, z});
             }};
@@ -288,6 +293,85 @@ TEST_CASE("what a piston crushes is dropped before the arm lands on it") {
     REQUIRE(loaded.broken.size() == 1);
     CHECK(loaded.broken[0].first == torch);
     CHECK(loaded.broken[0].second == std::array<std::int32_t, 3>{9, 64, 8});
+}
+
+TEST_CASE("a sculk sensor hears the piston, and hears what it crushed first") {
+    // parity: `PistonBaseBlock.triggerEvent` raises `BLOCK_ACTIVATE` going out and `BLOCK_DEACTIVATE`
+    // coming back, and `moveBlocks` raises `BLOCK_DESTROY` on every square it clears. Nothing here
+    // raised any of the three, so a piston was silent to every sculk sensor around it.
+    const auto sleepingSensor = [] {
+        const std::optional<std::int32_t> stateId = registry::blockStateDefinitions::stateIdOf(
+            basalt::wire::common::Identifier::vanilla("sculk_sensor"),
+            {{"sculk_sensor_phase", "inactive"}, {"power", "0"}, {"waterlogged", "false"}}, std::nullopt);
+        REQUIRE(stateId.has_value());
+        return *stateId;
+    };
+    const auto frequencyAt = [](const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+        const Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        REQUIRE(chunk != nullptr);
+        const basalt::server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+        return entity == nullptr ? -1 : entity->data().getInt(std::string{vibrations::kFrequencyKey}, -1);
+    };
+
+    SUBCASE("going out is a block_activate") {
+        Loaded loaded;
+        WorldState& world = loaded.state;
+        REQUIRE(world.setBlockState(8, 64, 8, piston("east", "false")));
+        REQUIRE(world.setBlockState(8, 64, 7, stateOf("redstone_block")));
+        REQUIRE(world.setBlockState(8, 64, 10, sleepingSensor()));
+
+        pistons::trigger(loaded.context(), 8, 64, 8);
+        static_cast<void>(fireEvents(loaded));
+
+        // Two squares away, so two turns of travel after the turn it is picked on.
+        for (std::int32_t turn = 0; turn < 3; ++turn) {
+            ++loaded.now;
+            for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
+                static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], loaded.now));
+            }
+        }
+        CHECK(propertyOf(*world.blockState(8, 64, 10), "sculk_sensor_phase") == "active");
+        CHECK(frequencyAt(world, 8, 64, 10) == 10);
+    }
+
+    SUBCASE("what it crushed is louder and closer than the piston itself") {
+        Loaded loaded;
+        WorldState& world = loaded.state;
+        REQUIRE(world.setBlockState(8, 64, 8, piston("east", "false")));
+        REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_torch")));
+        REQUIRE(world.setBlockState(8, 64, 7, stateOf("redstone_block")));
+        REQUIRE(world.setBlockState(9, 64, 10, sleepingSensor()));
+
+        pistons::trigger(loaded.context(), 8, 64, 8);
+        static_cast<void>(fireEvents(loaded));
+
+        for (std::int32_t turn = 0; turn < 3; ++turn) {
+            ++loaded.now;
+            for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
+                static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], loaded.now));
+            }
+        }
+        // Both noises are heard on the same turn: the crushed torch is nearer, so it wins.
+        CHECK(frequencyAt(world, 9, 64, 10) == 12);
+    }
+
+    SUBCASE("coming back is a block_deactivate") {
+        Loaded loaded;
+        WorldState& world = loaded.state;
+        REQUIRE(world.setBlockState(8, 64, 8, piston("east", "true")));
+        REQUIRE(world.setBlockState(8, 64, 10, sleepingSensor()));
+
+        pistons::trigger(loaded.context(), 8, 64, 8);
+        static_cast<void>(fireEvents(loaded));
+
+        for (std::int32_t turn = 0; turn < 3; ++turn) {
+            ++loaded.now;
+            for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
+                static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], loaded.now));
+            }
+        }
+        CHECK(frequencyAt(world, 8, 64, 10) == 9);
+    }
 }
 
 TEST_CASE("a powered piston books its move and says so with a sound") {
