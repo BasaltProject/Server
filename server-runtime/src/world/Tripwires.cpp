@@ -82,6 +82,66 @@ bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX
            entityY <= y + 1;
 }
 
+/// parity: `TripWireBlock.shouldConnectTo`: another string, or a hook whose face points back at us.
+[[nodiscard]] bool connectsTo(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                              BlockFace towards) {
+    const std::optional<std::int32_t> beside =
+        world.blockState(x + registry::stepX(towards), y + registry::stepY(towards), z + registry::stepZ(towards));
+    if (!beside.has_value()) {
+        return false;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*beside);
+    if (block == nullptr) {
+        return false;
+    }
+    if (*block == wireBlock()) {
+        return true;
+    }
+    return *block == hookBlock() && valueOf(registry::blockStateDefinitions::propertiesOf(*beside), "facing") ==
+                                        nameOf(registry::opposite(towards));
+}
+
+std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    std::int32_t stateId, std::optional<BlockFace> towards) {
+    if (!isWire(stateId)) {
+        return std::nullopt;
+    }
+    // parity: only a horizontal neighbour draws anything; from above or below the string is left as
+    // it is.
+    Properties wanted;
+    if (towards.has_value()) {
+        if (registry::axisOf(*towards) == 1) {
+            return std::nullopt;
+        }
+        wanted.emplace(std::string{nameOf(*towards)}, connectsTo(world, x, y, z, *towards) ? "true" : "false");
+    } else {
+        for (const BlockFace face : kHorizontal) {
+            wanted.emplace(std::string{nameOf(face)}, connectsTo(world, x, y, z, face) ? "true" : "false");
+        }
+    }
+    const std::optional<std::int32_t> drawn = registry::blockStateDefinitions::stateIdOf(wireBlock(), wanted, stateId);
+    return drawn.has_value() && *drawn != stateId ? drawn : std::nullopt;
+}
+
+bool hookFalls(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+               BlockFace towards) {
+    if (!isHook(stateId)) {
+        return false;
+    }
+    const Properties properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const std::string named = valueOf(properties, "facing");
+    const auto found = std::ranges::find_if(kHorizontal, [&named](BlockFace face) { return nameOf(face) == named; });
+    if (found == kHorizontal.end() || registry::opposite(towards) != *found) {
+        return false;
+    }
+    const BlockFace facing = *found;
+    // parity: `canSurvive`, which wants the block it hangs on to have a sturdy face towards it.
+    const BlockFace behind = registry::opposite(facing);
+    const std::optional<std::int32_t> wall =
+        world.blockState(x + registry::stepX(behind), y + registry::stepY(behind), z + registry::stepZ(behind));
+    return !wall.has_value() || !registry::blockShapes::isFaceSturdy(*wall, facing);
+}
+
 bool isWire(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && *block == wireBlock();
@@ -103,7 +163,8 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
         return;
     }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
-    if (occupied != (valueOf(properties, "powered") == "true")) {
+    const bool wasPressed = valueOf(properties, "powered") == "true";
+    if (occupied != wasPressed) {
         const std::optional<std::int32_t> turned =
             registry::blockStateDefinitions::stateIdOf(*block, {{"powered", occupied ? "true" : "false"}}, *stateId);
         if (!turned.has_value()) {
@@ -116,8 +177,14 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
         // which is how the hook learns what happened without reading the square again.
         updateSource(world, x, y, z, *turned, gameTime, changes);
     }
+    // parity: `checkPressed` books ten ticks while something is on it, which is what notices the
+    // thing leaving, and a **zero** when it has just been let go, which is one last look on the very
+    // next turn. That second one changes nothing on its own and is booked anyway, so the list of
+    // pending ticks matches the jar's.
     if (occupied) {
         world.scheduleBlockTick(x, y, z, wireBlock(), kRecheckTicks);
+    } else if (wasPressed) {
+        world.scheduleBlockTick(x, y, z, wireBlock(), 0);
     }
 }
 

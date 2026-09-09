@@ -228,6 +228,8 @@ public:
         /// duration a consumed effect lands with.
         std::function<std::int64_t()> nextSeed;
         std::function<float()> nextFloat;
+        std::function<double()> nextDouble;
+        std::function<bool()> nextBool;
         /// The block and blast machinery the server owns, shared by every session in it.
         BlockChangeBroadcaster* blocks = nullptr;
         ExplosionSystem* explosions = nullptr;

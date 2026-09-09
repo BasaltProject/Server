@@ -440,6 +440,26 @@ TEST_CASE("what a container held falls out when its block goes") {
     CHECK(world.takeSpilledContents().empty());
 }
 
+TEST_CASE("a write that skips the block entity side effects spills nothing") {
+    // parity: `/setblock` and `/fill` write with `2 | 256`, and 256 is
+    // `UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`, so a chest replaced by command takes its contents with
+    // it. Measured on `cofrerompe`, where our side dropped items the jar never spawned.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("chest")));
+    Chunk* chunk = world.chunkIfLoaded(0, 0);
+    REQUIRE(chunk != nullptr);
+    basalt::wire::nbt::NbtCompound data;
+    blockInventory::Slots slots(27);
+    slots[0] = basalt::server::world::loot::ItemStack{.item = Identifier::vanilla("stone"), .count = 5};
+    blockInventory::write(data, slots);
+    chunk->setBlockEntity(basalt::server::world::ChunkBlockEntity{8, 64, 8, Identifier::vanilla("chest"), data});
+
+    REQUIRE(world.setBlockState(8, 64, 8, registry::blocks::air().stateId, WorldState::SideEffects::kSkip));
+
+    CHECK(world.takeSpilledContents().empty());
+}
+
 TEST_CASE("a block with no container behind it spills nothing") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);

@@ -22,6 +22,19 @@ namespace neighbourUpdates = runtime::world::neighbourUpdates;
 
 using wire::text::Component;
 
+/// parity: `Level.destroyBlock` writes `fluidState.createLegacyBlock()`, not air, so breaking a
+/// waterlogged block leaves the water it was logged with.
+[[nodiscard]] std::int32_t leftBehindBy(std::int32_t stateId) {
+    const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(stateId);
+    const auto logged = properties.find("waterlogged");
+    if (logged == properties.end() || logged->second != "true") {
+        return reg::blocks::air().stateId;
+    }
+    const std::optional<std::int32_t> water =
+        reg::blockStateDefinitions::stateIdOf(wire::common::Identifier::vanilla("water"), {{"level", "0"}});
+    return water.value_or(reg::blocks::air().stateId);
+}
+
 } // namespace
 
 BlockEditor::BlockEditor(const CommandEnvironment& environment, world::LoadedWorld& world)
@@ -45,21 +58,43 @@ std::optional<CommandSyntaxError> BlockEditor::require(std::int32_t x, std::int3
     return std::nullopt;
 }
 
-bool BlockEditor::set(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+bool BlockEditor::write(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                        world::WorldState::SideEffects sideEffects) {
     if (y < bounds_.minY() || y > bounds_.maxY()) {
         return false;
     }
     if (world_->state().blockState(x, y, z) == stateId) {
         return false;
     }
-    if (!world_->state().setBlockState(x, y, z, stateId)) {
+    if (!world_->state().setBlockState(x, y, z, stateId, sideEffects)) {
         return false;
     }
-    changesBySection_[play::SectionBlocksUpdatePacket::packSection(x >> 4, y >> 4, z >> 4)].insert_or_assign(
-        play::SectionBlocksUpdatePacket::packPosition(x, y, z), stateId);
+    record(x, y, z, stateId);
     written_.push_back({x, y, z});
     createBlockEntity(x, y, z, stateId);
     return true;
+}
+
+void BlockEditor::record(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+    changesBySection_[play::SectionBlocksUpdatePacket::packSection(x >> 4, y >> 4, z >> 4)].insert_or_assign(
+        play::SectionBlocksUpdatePacket::packPosition(x, y, z), stateId);
+}
+
+bool BlockEditor::set(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+    // parity: commands write with `Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`, so replacing a chest
+    // by command destroys what it held instead of dropping it.
+    return write(x, y, z, stateId, world::WorldState::SideEffects::kSkip);
+}
+
+bool BlockEditor::destroy(std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> old = stateAt(x, y, z);
+    if (!old.has_value() || *old == reg::blocks::air().stateId) {
+        return false;
+    }
+    if (environment_->options().dropBrokenBlock) {
+        environment_->options().dropBrokenBlock(*world_, x, y, z, *old);
+    }
+    return write(x, y, z, leftBehindBy(*old), world::WorldState::SideEffects::kRun);
 }
 
 void BlockEditor::createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
@@ -150,6 +185,11 @@ void BlockEditor::notifyNeighbours() {
                 reg::blockStateDefinitions::stateIdOf(*block, named->second, *shaped);
             kept.has_value() && *kept != *shaped) {
             static_cast<void>(set(at[0], at[1], at[2], *kept));
+            // parity: `onPlace` runs after `overwriteWithDefinedProperties`, so a target or a sensor
+            // whose `power` the command named still lands at zero.
+            neighbourUpdates::settleArrivedSignal(world_->state(), at[0], at[1], at[2],
+                                                  [this](std::int32_t stateId, std::int32_t x, std::int32_t y,
+                                                         std::int32_t z) { record(x, y, z, stateId); });
         }
     }
     written_properties_.clear();

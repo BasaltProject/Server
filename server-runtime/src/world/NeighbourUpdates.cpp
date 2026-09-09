@@ -278,6 +278,18 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     if (const std::optional<std::int32_t> held = redstoneComponents::relock(world, x, y, z); held.has_value()) {
         return held;
     }
+    // parity: `TripWireHookBlock.updateShape`, which drops the hook **only** when the news comes from
+    // the side it hangs on. From anywhere else it stays, which is why one put down in mid air by
+    // command lives until something touches its wall.
+    if (towards.has_value() && tripwires::hookFalls(world, x, y, z, *stateId, *towards)) {
+        return registry::blocks::air().stateId;
+    }
+    // parity: `TripWireBlock.updateShape`, which draws a line of string as a line the same way the
+    // dust does: every horizontal side follows `shouldConnectTo`.
+    if (const std::optional<std::int32_t> strung = tripwires::reshape(world, x, y, z, *stateId, towards);
+        strung.has_value()) {
+        return strung;
+    }
     // parity: `RedStoneWireBlock.updateShape`, which is what draws a line of dust as a line.
     if (const std::optional<std::int32_t> drawn = context.wireReshape
                                                       ? context.wireReshape(world, x, y, z, *stateId, towards)
@@ -290,6 +302,36 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
         return other;
     }
     return connect(context, x, y, z, *stateId);
+}
+
+void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                         const OnReshaped& onReshaped) {
+    // parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines:
+    // a block that arrives already carrying a signal and with no turn booked to spend it puts that
+    // signal back to zero. A `/setblock` of a target with `power=15` reads fifteen here and nothing
+    // in the jar, because a signal with no clock behind it is a signal that would never go out.
+    const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
+    if (!arrived.has_value()) {
+        return;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*arrived);
+    if (block == nullptr) {
+        return;
+    }
+    const std::string_view path = block->path();
+    if (path != "target" && path != "sculk_sensor" && path != "calibrated_sculk_sensor") {
+        return;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*arrived);
+    const auto power = properties.find("power");
+    if (power == properties.end() || power->second == "0" || world.hasScheduledBlockTick(x, y, z, *block)) {
+        return;
+    }
+    if (const std::optional<std::int32_t> quiet =
+            registry::blockStateDefinitions::stateIdOf(*block, {{"power", "0"}}, *arrived);
+        quiet.has_value() && world.setBlockState(x, y, z, *quiet)) {
+        (onReshaped ? onReshaped : OnReshaped{noop})(*quiet, x, y, z);
+    }
 }
 
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
@@ -321,10 +363,6 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
         static_cast<void>(breakIfUnsupported(context, x, y, z, scaffolding, broken));
     }
-    // parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines:
-    // a block that arrives already carrying a signal and with no turn booked to spend it puts that
-    // signal back to zero. A `/setblock` of a target with `power=15` reads fifteen here and nothing
-    // in the jar, because a signal with no clock behind it is a signal that would never go out.
     if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z); arrived.has_value()) {
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*arrived);
         const std::string_view path = block == nullptr ? std::string_view{} : block->path();
@@ -339,19 +377,8 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 vibrations::emit(world, "block_activate", x + 0.5, y + 0.5, z + 0.5, context.gameTime);
             }
         }
-        if (path == "target" || path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
-            const std::map<std::string, std::string> properties =
-                registry::blockStateDefinitions::propertiesOf(*arrived);
-            const auto power = properties.find("power");
-            if (power != properties.end() && power->second != "0" && !world.hasScheduledBlockTick(x, y, z, *block)) {
-                if (const std::optional<std::int32_t> quiet =
-                        registry::blockStateDefinitions::stateIdOf(*block, {{"power", "0"}}, *arrived);
-                    quiet.has_value() && world.setBlockState(x, y, z, *quiet)) {
-                    reshaped(*quiet, x, y, z);
-                }
-            }
-        }
     }
+    settleArrivedSignal(world, x, y, z, reshaped);
     // parity: `SugarCaneBlock.updateShape` runs on the cane itself as it lands, and that is where a
     // cane with nothing to drink books the turn that breaks it.
     scheduledBlocks::scheduleSugarCane(

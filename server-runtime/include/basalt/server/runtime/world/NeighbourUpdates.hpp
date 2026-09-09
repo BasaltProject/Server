@@ -105,6 +105,16 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                  std::vector<BlockChange>& effects, const OnBroken& onBroken, const OnReshaped& onReshaped = {},
                  bool reshapeSelf = true);
 
+/// Puts back to zero the signal a target or a sculk sensor arrived carrying with no turn booked to
+/// spend it, reporting the new state through `reshaped`.
+///
+/// parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines. It
+/// is separate because `onPlace` runs **after** `BlockInput.overwriteWithDefinedProperties`, so a
+/// command that names `power=15` still loses to it: a caller that replays what the command named has
+/// to ask for this again afterwards. Doing it twice costs nothing, since the second call sees a zero.
+void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                         const OnReshaped& reshaped = {});
+
 /// Joins a fence, a gate or a pane to what is now beside it, answering the new state if it moved.
 ///
 /// parity: `CrossCollisionBlock.updateShape`, which is the half of a neighbour update that changes

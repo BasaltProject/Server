@@ -90,6 +90,8 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.protocolGate = protocolGate_;
     options.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
     options.nextFloat = [] { return std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()); };
+    options.nextDouble = [] { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); };
+    options.nextBool = [] { return std::uniform_int_distribution<int>{0, 1}(scratchRandom()) == 1; };
     options.blocks = broadcaster_.get();
     options.explosions = explosions_.get();
     options.plugins = pluginHooks();

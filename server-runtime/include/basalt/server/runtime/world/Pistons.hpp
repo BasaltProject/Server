@@ -28,7 +28,8 @@ namespace pistons {
 /// parity: `PistonStructureResolver`'s own twelve.
 inline constexpr std::int32_t kPushLimit = 12;
 
-/// parity: `PistonBaseBlock`'s own two ticks between the arm starting to move and the blocks landing.
+/// parity: `PistonBaseBlock`'s own two ticks between the arm starting to move and the blocks landing,
+/// counted one at a time because the slide is written out half way through the first of them.
 inline constexpr std::int32_t kMoveTicks = 2;
 
 using Position = std::array<std::int32_t, 3>;

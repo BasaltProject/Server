@@ -66,12 +66,26 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
               sendPlayPacket(id, write);
           },
           surfacesOf(*this)),
-      menus_(std::make_unique<ContainerMenuController>(*this)),
-      blockInteraction_(std::make_unique<BlockInteractionHandler>(*this)),
-      chunkStreamer_(std::make_unique<ChunkStreamer>(*this)), combat_(std::make_unique<CombatHandler>(*this)),
+      menus_(std::make_unique<ContainerMenuController>(
+          *this, ContainerMenuController::Hooks{},
+          ContainerMenuController::Options{
+              .nextDouble = options_.nextDouble, .nextFloat = options_.nextFloat, .nextSeed = options_.nextSeed})),
+      // The rolls a dig or a place makes are the session's own, not any world's stream. Left unset
+      // they were a constant: every broken block rolled its loot from seed zero.
+      blockInteraction_(std::make_unique<BlockInteractionHandler>(
+          *this, BlockInteractionHandler::Hooks{},
+          BlockInteractionHandler::Options{
+              .nextDouble = options_.nextDouble, .nextSeed = options_.nextSeed, .nextBool = options_.nextBool})),
+      chunkStreamer_(std::make_unique<ChunkStreamer>(*this)),
+      combat_(std::make_unique<CombatHandler>(
+          *this, CombatHandler::Hooks{},
+          CombatHandler::Options{.nextDouble = options_.nextDouble, .nextSeed = options_.nextSeed})),
       entityTracker_(std::make_unique<EntityVisibilityTracker>(*this)),
-      itemUseTimers_(std::make_unique<ItemUseTimers>(*this)), lifecycle_(std::make_unique<PlayerLifecycle>(*this)),
-      uiState_(std::make_unique<UiStateSync>(*this)), trades_(std::make_unique<VillagerTradeController>(*this)) {}
+      itemUseTimers_(std::make_unique<ItemUseTimers>(
+          *this, ItemUseTimers::Hooks{},
+          ItemUseTimers::Options{.nextSeed = options_.nextSeed, .nextFloat = options_.nextFloat})),
+      lifecycle_(std::make_unique<PlayerLifecycle>(*this)), uiState_(std::make_unique<UiStateSync>(*this)),
+      trades_(std::make_unique<VillagerTradeController>(*this)) {}
 
 ClientSession::~ClientSession() {
     streaming_.store(false);

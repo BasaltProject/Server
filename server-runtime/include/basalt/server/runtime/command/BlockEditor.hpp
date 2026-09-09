@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 
 #include <cstdint>
@@ -38,6 +39,14 @@ public:
     /// gone.
     bool set(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
+    /// Breaks what is here the way `destroy` asks for: it drops, what it held falls out, and the
+    /// fluid it stood in stays. False when there was nothing to break.
+    ///
+    /// parity: `Level.destroyBlock(pos, true)`, which `/setblock ... destroy` and `/fill ... destroy`
+    /// call before writing. It drops the resources and then writes with `UPDATE_ALL`, so unlike the
+    /// command's own write it does **not** carry `UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`.
+    bool destroy(std::int32_t x, std::int32_t y, std::int32_t z);
+
     /// The properties the command actually named for the block last written here.
     ///
     /// parity: `BlockInput.place` shapes the state against the neighbours and then runs
@@ -56,6 +65,14 @@ public:
     void placeExactly() noexcept { adjustToNeighbours_ = false; }
 
 private:
+    /// The one write, with the block entity side effects the caller asks for.
+    bool write(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+               world::WorldState::SideEffects sideEffects);
+
+    /// Puts a change on the wire without writing it, for the reactions that write the world
+    /// themselves.
+    void record(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
+
     /// parity: `Level.setBlock` gives a block its block entity as it lands, so `/setblock` of a
     /// chest leaves something `/data` can read. This build creates them where they are used instead,
     /// which left a command-placed container with nowhere to put anything.

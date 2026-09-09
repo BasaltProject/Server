@@ -118,6 +118,11 @@ private:
     /// after the entities have moved, which is where a mob killed by another one dies.
     void tickDeaths(world::LoadedWorld& world, const sched::Region& region);
 
+    /// parity: `TntBlock.prime` makes the entity inside the neighbour update that lit the block, so
+    /// the fuse and its `PRIME_FUSE` land on that turn. Queued because the block half can run on a
+    /// client's thread; drained here, before the world's own turn.
+    void tickPrimedTnt(world::LoadedWorld& world);
+
     /// The bridge between a signal and an orderly stop: the handler only sets a flag, and this is
     /// what notices, once per tick.
     void shutdownIfSignalled();

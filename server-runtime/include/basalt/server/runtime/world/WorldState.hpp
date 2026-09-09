@@ -197,8 +197,15 @@ public:
     /// What the collision and spawning code asks the world, as the callback they take.
     [[nodiscard]] entity::entityCollision::BlockAt blockAccessor() const;
 
+    /// parity: `Block.UPDATE_SKIP_BLOCK_ENTITY_SIDEEFFECTS`, the 256 bit of the flags vanilla passes
+    /// to `Level.setBlock`. Every command that writes blocks sets it: `/setblock` and `/fill` write
+    /// with `2 | 256`, and `/clone` blanks each target with a barrier at 816 before writing the real
+    /// state, so a container replaced by a command never drops what it held.
+    enum class SideEffects : std::uint8_t { kRun, kSkip };
+
     /// Whether the position falls inside a loaded chunk, which is when the block was set.
-    bool setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
+    bool setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                       SideEffects sideEffects = SideEffects::kRun);
 
     [[nodiscard]] bool hasSculkSensorNear(double x, double y, double z, std::int32_t range) const;
 
@@ -270,8 +277,8 @@ public:
     /// What a container had in it when its block went, waiting to be turned into items.
     ///
     /// parity: `BlockEntity.preRemoveSideEffects`, which drops the contents of **any** block entity
-    /// that is a container, from wherever the block is replaced. It is queued rather than spawned on
-    /// the spot because the block write already holds this world's lock.
+    /// that is a container, from every block replacement that did not ask to skip it. It is queued
+    /// rather than spawned on the spot because the block write already holds this world's lock.
     struct Spilled {
         std::int32_t x = 0;
         std::int32_t y = 0;

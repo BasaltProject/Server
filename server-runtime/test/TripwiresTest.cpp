@@ -325,3 +325,70 @@ TEST_CASE("a hook told about a wire holds on for ten ticks and then lets go") {
     CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
     CHECK(propertyAt(world, 4, 64, 8, "powered") == "false");
 }
+
+TEST_CASE("a string draws its own line, and a hook only falls from the side it hangs on") {
+    // parity: `TripWireBlock.updateShape` and `TripWireHookBlock.updateShape`. Measured in
+    // `ganchosensor`: the jar's string had `east` and `west` true and ours had neither, and the jar's
+    // hook survived being put down in mid air while ours broke and fell as an item.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    layLine(world, 3);
+
+    /// A string joined to nothing, which is how vanilla's own default is drawn.
+    const auto looseWire = [] {
+        const std::optional<std::int32_t> state =
+            registry::blockStateDefinitions::stateIdOf(Identifier::vanilla("tripwire"),
+                                                       {{"powered", "false"},
+                                                        {"attached", "false"},
+                                                        {"disarmed", "false"},
+                                                        {"north", "false"},
+                                                        {"south", "false"},
+                                                        {"east", "false"},
+                                                        {"west", "false"}},
+                                                       std::nullopt);
+        REQUIRE(state.has_value());
+        return *state;
+    };
+
+    SUBCASE("the string follows what is beside it") {
+        REQUIRE(world.setBlockState(5, 64, 8, looseWire()));
+        const std::optional<std::int32_t> drawn =
+            tripwires::reshape(world, 5, 64, 8, *world.blockState(5, 64, 8), registry::BlockFace::West);
+        REQUIRE(drawn.has_value());
+        REQUIRE(world.setBlockState(5, 64, 8, *drawn));
+        // West of it is the hook at x=4 facing east, which points back: that side connects.
+        CHECK(propertyAt(world, 5, 64, 8, "west") == "true");
+        // The side nobody named is left where it was.
+        CHECK(propertyAt(world, 5, 64, 8, "east") == "false");
+
+        // The whole line at once when no side is named.
+        REQUIRE(world.setBlockState(6, 64, 8, looseWire()));
+        const std::optional<std::int32_t> whole =
+            tripwires::reshape(world, 6, 64, 8, *world.blockState(6, 64, 8), std::nullopt);
+        REQUIRE(whole.has_value());
+        REQUIRE(world.setBlockState(6, 64, 8, *whole));
+        CHECK(propertyAt(world, 6, 64, 8, "east") == "true");
+        CHECK(propertyAt(world, 6, 64, 8, "west") == "true");
+        CHECK(propertyAt(world, 6, 64, 8, "north") == "false");
+    }
+
+    SUBCASE("from above or below the string is left alone") {
+        REQUIRE(world.setBlockState(5, 64, 8, looseWire()));
+        CHECK_FALSE(
+            tripwires::reshape(world, 5, 64, 8, *world.blockState(5, 64, 8), registry::BlockFace::Up).has_value());
+    }
+
+    SUBCASE("the hook hangs on the block behind it and falls only from there") {
+        // The hook at x=4 faces east, so it hangs on x=3, which is air: it cannot survive.
+        const std::int32_t hook = *world.blockState(4, 64, 8);
+        CHECK(tripwires::hookFalls(world, 4, 64, 8, hook, registry::BlockFace::West));
+        // News from any other side leaves it where it is.
+        CHECK_FALSE(tripwires::hookFalls(world, 4, 64, 8, hook, registry::BlockFace::East));
+        CHECK_FALSE(tripwires::hookFalls(world, 4, 64, 8, hook, registry::BlockFace::North));
+        CHECK_FALSE(tripwires::hookFalls(world, 4, 64, 8, hook, registry::BlockFace::Up));
+
+        // With a wall behind it, it survives news from that side too.
+        REQUIRE(world.setBlockState(3, 64, 8, stateOf("stone")));
+        CHECK_FALSE(tripwires::hookFalls(world, 4, 64, 8, hook, registry::BlockFace::West));
+    }
+}
