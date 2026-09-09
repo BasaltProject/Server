@@ -45,6 +45,10 @@ constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   Blo
 constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
                                                 BlockFace::Up,   BlockFace::North, BlockFace::South};
 
+/// parity: `BlockBehaviour.UPDATE_SHAPE_ORDER`, which is neither of the other two.
+constexpr std::array<BlockFace, 6> kUpdateShapeOrder{BlockFace::West,  BlockFace::East, BlockFace::North,
+                                                     BlockFace::South, BlockFace::Down, BlockFace::Up};
+
 /// The four a connecting block keeps a property for, named as those properties are.
 constexpr std::array<std::pair<BlockFace, std::string_view>, 4> kHorizontal{
     {{BlockFace::North, "north"}, {BlockFace::South, "south"}, {BlockFace::West, "west"}, {BlockFace::East, "east"}}};
@@ -158,6 +162,24 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return true;
 }
 
+/// parity: `BlockState.updateNeighbourShapes`, the six squares a write redraws, each told the side
+/// the news arrives from and walked in vanilla's own order.
+void shapeAround(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, const OnReshaped& reshaped) {
+    std::vector<BlockChange> bubbles;
+    for (const BlockFace face : kUpdateShapeOrder) {
+        const std::int32_t nx = x + registry::stepX(face);
+        const std::int32_t ny = y + registry::stepY(face);
+        const std::int32_t nz = z + registry::stepZ(face);
+        if (const std::optional<std::int32_t> drawn = reshape(context, nx, ny, nz, bubbles, registry::opposite(face));
+            drawn.has_value()) {
+            reshaped(drawn.value(), nx, ny, nz);
+        }
+    }
+    for (const BlockChange& change : bubbles) {
+        reshaped(change.stateId, change.x, change.y, change.z);
+    }
+}
+
 /// What one step of the cascade carries with it, so `visit` keeps a signature worth reading.
 struct Walk {
     const Context& context;
@@ -167,11 +189,13 @@ struct Walk {
 };
 
 /// Reshapes the block there, breaks it if nothing holds it, and follows on from what it held.
-void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std::int32_t y, std::int32_t z) {
+void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std::int32_t y, std::int32_t z,
+           BlockFace towards) {
     fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z);
     bool changed = false;
     std::vector<BlockChange> bubbles;
-    if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, bubbles); reshaped.has_value()) {
+    if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, bubbles, towards);
+        reshaped.has_value()) {
         walk.onReshaped(*reshaped, x, y, z);
         changed = true;
     }
@@ -224,7 +248,7 @@ std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std:
 }
 
 std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                                    std::vector<BlockChange>& bubbles) {
+                                    std::vector<BlockChange>& bubbles, std::optional<BlockFace> towards) {
     WorldState& world = context.world;
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -257,8 +281,9 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
         return held;
     }
     // parity: `RedStoneWireBlock.updateShape`, which is what draws a line of dust as a line.
-    if (const std::optional<std::int32_t> drawn = context.wireReshape ? context.wireReshape(world, x, y, z, *stateId)
-                                                                      : redstoneWire::reshape(world, x, y, z, *stateId);
+    if (const std::optional<std::int32_t> drawn = context.wireReshape
+                                                      ? context.wireReshape(world, x, y, z, *stateId, towards)
+                                                      : redstoneWire::reshape(world, x, y, z, *stateId, towards);
         drawn.has_value()) {
         return drawn;
     }
@@ -288,6 +313,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // instead of a cross: it never sees this one arrive.
     if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
         arrived.has_value() && redstoneWire::isWire(*arrived)) {
+        // parity: `onPlace` settles this dust's own strength before it tells anybody, and that write
+        // redraws the squares around it while this dust is still there. It is the whole difference
+        // between leaving the dust beside it a dot and leaving it a cross: with no signal the
+        // strength does not move, nothing is written, and the neighbour never sees this dust arrive.
+        for (const BlockChange& change : redstone::settle(world, context.worldName, x, y, z)) {
+            reshaped(change.stateId, change.x, change.y, change.z);
+            shapeAround(context, change.x, change.y, change.z, reshaped);
+        }
         static_cast<void>(breakIfUnsupported(context, x, y, z, scaffolding, broken));
     }
     // parity: `SugarCaneBlock.updateShape` runs on the cane itself as it lands, and that is where a
@@ -310,11 +343,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // its own six sides: the dust one below and one above the square it connects to are told to look
     // again. It runs on the state the block ends up with, not the one it arrived as, so it goes
     // after the reshape above; without it a line up a staircase is drawn as if the steps were flat.
-    for (const std::array<std::int32_t, 3>& at : redstoneWire::acrossSteps(world, x, y, z)) {
-        if (const std::optional<std::int32_t> drawn =
-                redstoneWire::reshape(world, at[0], at[1], at[2], world.blockState(at[0], at[1], at[2]).value_or(0));
+    for (const redstoneWire::Step& at : redstoneWire::acrossSteps(world, x, y, z)) {
+        if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
+                world, at.x, at.y, at.z, world.blockState(at.x, at.y, at.z).value_or(0), at.towards);
             drawn.has_value()) {
-            reshaped(*drawn, at[0], at[1], at[2]);
+            reshaped(drawn.value(), at.x, at.y, at.z);
         }
     }
     // parity: `FallingBlock.onPlace` and its `updateShape`, which both do nothing but ask to be
@@ -340,12 +373,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         const Position at = pending.front();
         pending.pop_front();
         examined += kDirections;
-        visit(walk, pending, at[0], at[1] - 1, at[2]);
-        visit(walk, pending, at[0], at[1] + 1, at[2]);
-        visit(walk, pending, at[0], at[1], at[2] - 1);
-        visit(walk, pending, at[0], at[1], at[2] + 1);
-        visit(walk, pending, at[0] - 1, at[1], at[2]);
-        visit(walk, pending, at[0] + 1, at[1], at[2]);
+        // parity: `BlockBehaviour.updateNeighbourShapes` walks `UPDATE_SHAPE_ORDER`, which is
+        // neither `Direction.values()` nor `NeighborUpdater.UPDATE_ORDER`, and hands each neighbour
+        // the side the news arrives from. A dust redraws differently depending on both.
+        for (const BlockFace face : kUpdateShapeOrder) {
+            visit(walk, pending, at[0] + registry::stepX(face), at[1] + registry::stepY(face),
+                  at[2] + registry::stepZ(face), registry::opposite(face));
+        }
     }
     const std::vector<BlockChange> settled = redstone::settle(world, context.worldName, x, y, z);
     for (const BlockChange& change : settled) {

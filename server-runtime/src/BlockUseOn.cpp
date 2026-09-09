@@ -459,8 +459,9 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             });
         static_cast<void>(rail);
         // parity: `RedStoneWireBlock.getStateForPlacement`, which draws the dust as it lands.
-        settledStateId = world::redstoneWire::reshape(world->state(), placeAt.x, placeAt.y, placeAt.z, settledStateId)
-                             .value_or(settledStateId);
+        settledStateId =
+            world::redstoneWire::shapeOnPlacement(world->state(), placeAt.x, placeAt.y, placeAt.z, settledStateId)
+                .value_or(settledStateId);
     }
     if (second.has_value()) {
         owner_->world().setBlockState(second->x, second->y, second->z, second->stateId);

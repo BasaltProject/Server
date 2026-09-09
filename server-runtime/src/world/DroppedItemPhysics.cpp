@@ -114,7 +114,7 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         if (std::ranges::find(absorbed, item.entityId) != absorbed.end()) {
             continue;
         }
-        const std::int32_t interval = item.resting ? kMergeRestingInterval : kMergeMovingInterval;
+        const std::int32_t interval = item.crossedBlock ? kMergeMovingInterval : kMergeRestingInterval;
         if (item.age % interval != 0) {
             continue;
         }
@@ -169,9 +169,15 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
     const entity::Aabb box = entity::Aabb::of(item.x, item.y, item.z, kItemWidth, kItemHeight);
     const std::array<double, 3> moved =
         entity::entityCollision::collide(blockAt_, box, item.velocityX, item.velocityY, item.velocityZ);
+    const double wasX = item.x;
+    const double wasY = item.y;
+    const double wasZ = item.z;
     item.x += moved[0];
     item.y += moved[1];
     item.z += moved[2];
+    // parity: `ItemEntity.tick` compares the floors, so drifting inside one square is not "moved".
+    item.crossedBlock = std::floor(wasX) != std::floor(item.x) || std::floor(wasY) != std::floor(item.y) ||
+                        std::floor(wasZ) != std::floor(item.z);
 
     // parity: `getBlockPosBelowThatAffectsMyMovement`, the block whose friction an item feels.
     const std::optional<std::int32_t> under =

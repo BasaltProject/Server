@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
@@ -27,16 +28,33 @@ namespace redstoneWire {
 [[nodiscard]] std::map<std::string, std::string> connectionsFor(WorldState& world, std::int32_t x, std::int32_t y,
                                                                 std::int32_t z, std::int32_t stateId);
 
-/// The shape the dust at these coordinates should have, written if it moved. Answers the new state,
-/// or nothing when it was already right.
+/// The shape the dust here should have, written if it moved, or nothing when it was already right.
+///
+/// parity: `RedStoneWireBlock.updateShape`. `towards` decides how much is redrawn: from below
+/// nothing, from above all four sides, from a side only that one unless its connection moved or the
+/// dust is a cross. No direction redraws all four, which is what a dust that just landed does.
 [[nodiscard]] std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                  std::int32_t stateId);
+                                                  std::int32_t stateId,
+                                                  std::optional<registry::BlockFace> towards = std::nullopt);
+
+/// The shape a dust has as it lands, written if it moved. parity:
+/// `RedStoneWireBlock.getStateForPlacement`, which draws from the cross rather than from the state
+/// it starts with, so a dust put down on its own is a cross and never a dot.
+[[nodiscard]] std::optional<std::int32_t> shapeOnPlacement(WorldState& world, std::int32_t x, std::int32_t y,
+                                                           std::int32_t z, std::int32_t stateId);
+
+/// A dust a change here has to reach across a step, and the side it hears the news from.
+struct Step {
+    std::int32_t x;
+    std::int32_t y;
+    std::int32_t z;
+    registry::BlockFace towards;
+};
 
 /// The dusts a change here has to reach across a step, in the order vanilla walks them. parity:
 /// `RedStoneWireBlock.updateIndirectNeighbourShapes`: the dust below and above a connected
 /// non-dust square. Without it a line running up a staircase is drawn as if the steps were not there.
-[[nodiscard]] std::vector<std::array<std::int32_t, 3>> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y,
-                                                                   std::int32_t z);
+[[nodiscard]] std::vector<Step> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 } // namespace redstoneWire
 

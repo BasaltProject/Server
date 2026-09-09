@@ -41,6 +41,9 @@ struct DroppedItem {
 
     /// Whether this settled: once true the server stops sending movement for it, as vanilla does.
     bool resting = false;
+    /// parity: `ItemEntity.tick`'s `moved`, which is not "is it moving" but "did it change block this
+    /// turn": that is what picks the two-tick merge rate over the forty-tick one. Never saved.
+    bool crossedBlock = false;
 
     /// Set when a merge changed the count, so whoever can see it is told the new stack.
     bool countChanged = false;
