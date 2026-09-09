@@ -148,15 +148,17 @@ struct Noise {
 }
 
 /// parity: `SculkSensorBlock.activate`, which lights it and books the thirty ticks it stays on.
-///
-/// `power` and the frequency are **two different numbers**, and mixing them was a real bug here: the
-/// state's `power` is how close the noise was (`VibrationSystem.getRedstoneStrengthForDistance`) and
-/// the frequency is what kind of noise it was, which lives in the block entity and is what a
-/// comparator reads. Measured in `sensormuerte`: a pig dying three and pico blocks away leaves the
-/// state at ten and the comparator at fifteen.
+/// `power` and the frequency are two different numbers: `power` is how close the noise was
+/// (`getRedstoneStrengthForDistance`), the frequency is what kind it was and is what a comparator
+/// reads. parity: the tag `vibration_resonators`, `minecraft:amethyst_block` and nothing else.
+[[nodiscard]] bool resonates(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && block->path() == "amethyst_block";
+}
+
 [[nodiscard]] std::optional<BlockChange> activate(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId, const wire::common::Identifier& block,
-                                                  std::int32_t frequency, double distance) {
+                                                  std::int32_t frequency, double distance, std::int64_t gameTime) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto phase = properties.find("sculk_sensor_phase");
     if (phase == properties.end() || phase->second != "inactive") {
@@ -172,6 +174,22 @@ struct Noise {
         data->putInt(kFrequencyKey, frequency);
     }
     world.scheduleBlockTick(x, y, z, block, kActiveTicks);
+    // parity: `SculkSensorBlock.tryResonateVibration`. An amethyst block touching a sensor that has
+    // just fired sends the same frequency out again from its own square, and it does it for **every**
+    // side that has one: the loop has no `break`. That is how a sculk farm carries a reading past the
+    // eight squares a sensor reaches.
+    if (frequency >= 1 && frequency <= redstone::kMaxSignal) {
+        const std::string resonance = "resonate_" + std::to_string(frequency);
+        for (const registry::BlockFace face : kFaces) {
+            const std::int32_t ax = x + registry::stepX(face);
+            const std::int32_t ay = y + registry::stepY(face);
+            const std::int32_t az = z + registry::stepZ(face);
+            if (const std::optional<std::int32_t> beside = world.blockState(ax, ay, az);
+                beside.has_value() && resonates(*beside)) {
+                emit(world, resonance, ax + 0.5, ay + 0.5, az + 0.5, gameTime);
+            }
+        }
+    }
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
@@ -212,13 +230,10 @@ void wake(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, con
     return block != nullptr && block->path().ends_with("_wool");
 }
 
-/// parity: `VibrationSystem.Listener.isOccluded`. Six lines from the middle of the noise's square to
-/// the middle of the sensor's, each nudged a hundred-thousandth of a block in one of the six
-/// directions, and it counts as blocked only when **all six** meet wool.
-///
-/// The six are not six routes: the nudge is a hundred-thousandth, so they all cross the same squares
-/// unless the line runs exactly along a face, and that boundary case is the whole reason they exist.
-/// One block of wool in the way does hide the noise.
+/// parity: `VibrationSystem.Listener.isOccluded`. Six lines from the middle of one square to the
+/// middle of the other, each nudged a hundred-thousandth in one of the six directions, blocked only
+/// when all six meet wool. They cross the same squares unless the line runs exactly along a face,
+/// and that boundary case is the whole reason there are six.
 [[nodiscard]] bool occluded(WorldState& world, double x, double y, double z, std::int32_t sensorX, std::int32_t sensorY,
                             std::int32_t sensorZ) {
     const double fromX = std::floor(x) + 0.5;
@@ -240,6 +255,10 @@ void wake(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, con
     return true;
 }
 
+void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ,
+           const wire::common::Identifier& block, std::string_view event, double x, double y, double z,
+           std::int64_t gameTime, bool refuseWhileCarrying);
+
 /// parity: `VibrationSystem.Listener.handleGameEvent` over `VibrationSelector.addCandidate`. Nothing
 /// lights up here: the sensor writes the noise down and waits its turn.
 void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ, std::int32_t stateId,
@@ -260,6 +279,15 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
     if (occluded(world, x, y, z, sensorX, sensorY, sensorZ)) {
         return;
     }
+    offer(world, sensorX, sensorY, sensorZ, block, event, x, y, z, gameTime, true);
+}
+
+/// The write half of `VibrationSelector.addCandidate`. `refuseWhileCarrying` is what tells the two
+/// callers apart: `handleGameEvent` gives up when the sensor already has one on the way, and
+/// `forceScheduleVibration` (which is what stepping straight on the sensor uses) does not ask.
+void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ,
+           const wire::common::Identifier& block, std::string_view event, double x, double y, double z,
+           std::int64_t gameTime, bool refuseWhileCarrying) {
     wire::nbt::NbtCompound* data = dataOf(world, sensorX, sensorY, sensorZ, block);
     if (data == nullptr) {
         return;
@@ -267,7 +295,7 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
     const wire::nbt::NbtCompound* held = data->getCompound(kListenerKey);
     wire::nbt::NbtCompound listener = held == nullptr ? wire::nbt::NbtCompound{} : *held;
     // parity: one already on its way makes the sensor deaf until it lands.
-    if (listener.getCompound("event") != nullptr) {
+    if (refuseWhileCarrying && listener.getCompound("event") != nullptr) {
         return;
     }
     // parity: the distance that decides the travel is measured from where the noise happened to the
@@ -299,8 +327,7 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
 /// parity: `VibrationSystem.Ticker.tick`: pick what was heard last turn, then move it one block
 /// closer, and light the sensor on the turn it arrives.
 [[nodiscard]] std::optional<BlockChange> travel(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                std::int32_t stateId, const wire::common::Identifier& block,
-                                                std::int64_t gameTime) {
+                                                const wire::common::Identifier& block, std::int64_t gameTime) {
     wire::nbt::NbtCompound* data = heldBy(world, x, y, z);
     if (data == nullptr) {
         return std::nullopt;
@@ -349,12 +376,30 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
     const double toX = static_cast<double>(x) - std::floor(current->x);
     const double toY = static_cast<double>(y) - std::floor(current->y);
     const double toZ = static_cast<double>(z) - std::floor(current->z);
-    return activate(world, x, y, z, stateId, block, frequencyOf(current->event),
-                    std::sqrt((toX * toX) + (toY * toY) + (toZ * toZ)));
+    const std::optional<std::int32_t> now = world.blockState(x, y, z);
+    if (!now.has_value()) {
+        return std::nullopt;
+    }
+    return activate(world, x, y, z, *now, block, frequencyOf(current->event),
+                    std::sqrt((toX * toX) + (toY * toY) + (toZ * toZ)), gameTime);
 }
 } // namespace
 
 std::int32_t frequencyOf(std::string_view event) {
+    // parity: the table's own tail, `for (int i = 1; i <= 15; i++) map.put(getResonanceEventByFrequency(i), i)`.
+    // A resonance event is worth the number in its name, which is what carries the frequency across
+    // the amethyst.
+    if (event.starts_with("resonate_")) {
+        const std::string_view number = event.substr(std::string_view{"resonate_"}.size());
+        std::int32_t frequency = 0;
+        for (const char digit : number) {
+            if (digit < '0' || digit > '9') {
+                return 0;
+            }
+            frequency = (frequency * 10) + (digit - '0');
+        }
+        return frequency >= 1 && frequency <= redstone::kMaxSignal ? frequency : 0;
+    }
     const auto found = frequencies().find(event);
     return found == frequencies().end() ? 0 : found->second;
 }
@@ -392,6 +437,26 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
     }
 }
 
+bool stoodOn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
+             double entityZ, std::int64_t gameTime) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return false;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr || !isSensor(*block)) {
+        return false;
+    }
+    // parity: `canActivate`, the same inactive-only rule the rest of the sensor lives by.
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    const auto phase = properties.find("sculk_sensor_phase");
+    if (phase == properties.end() || phase->second != "inactive") {
+        return false;
+    }
+    offer(world, x, y, z, *block, "step", entityX, entityY, entityZ, gameTime, false);
+    return true;
+}
+
 std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                 std::int64_t gameTime) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -408,31 +473,35 @@ std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t 
         return std::nullopt;
     }
     const std::string& phase = found->second;
-    // parity: `VibrationSystem.Ticker.tick`, which runs on the block entity's own turn and is the
-    // only thing that ever lights the sensor. An active one is busy and hears nothing.
-    if (phase == "inactive") {
-        return travel(world, x, y, z, *stateId, *block, gameTime);
+    // parity: `SculkSensorBlock.tick`, the turn the block booked for itself. Thirty awake, then ten
+    // of cooldown.
+    std::optional<BlockChange> settled;
+    if (phase == "active" || phase == "cooldown") {
+        const std::map<std::string, std::string> wanted =
+            phase == "active" ? std::map<std::string, std::string>{{"sculk_sensor_phase", "cooldown"}, {"power", "0"}}
+                              : std::map<std::string, std::string>{{"sculk_sensor_phase", "inactive"}, {"power", "0"}};
+        if (const std::optional<std::int32_t> turned =
+                registry::blockStateDefinitions::stateIdOf(*block, wanted, *stateId);
+            turned.has_value() && world.setBlockState(x, y, z, *turned)) {
+            settled = BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
+            if (phase == "active") {
+                world.scheduleBlockTick(x, y, z, *block, kCooldownTicks);
+            } else {
+                // A world saved while a noise was travelling comes back with it written down and
+                // nothing booked to move it: this is where such a sensor picks the countdown back up.
+                wake(world, x, y, z, *block);
+            }
+        }
     }
-    std::map<std::string, std::string> wanted;
-    if (phase == "active") {
-        wanted = {{"sculk_sensor_phase", "cooldown"}, {"power", "0"}};
-    } else if (phase == "cooldown") {
-        wanted = {{"sculk_sensor_phase", "inactive"}, {"power", "0"}};
-    } else {
-        return std::nullopt;
+    // parity: `VibrationSystem.Ticker.tick` is the **block entity's** turn, and a block entity ticks
+    // every turn of the world whatever its block says. So a noise in flight keeps travelling while
+    // the sensor is awake, and simply is not heard when it lands: `receiveVibration` hands it over
+    // and `onReceiveVibration` throws it away because `canActivate` says no. Freezing the countdown
+    // instead kept the noise for forty ticks and rang the sensor a second time with it.
+    if (const std::optional<BlockChange> arrived = travel(world, x, y, z, *block, gameTime); arrived.has_value()) {
+        return arrived;
     }
-    const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(*block, wanted, *stateId);
-    if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
-        return std::nullopt;
-    }
-    if (phase == "active") {
-        world.scheduleBlockTick(x, y, z, *block, kCooldownTicks);
-    } else {
-        // A world saved while a noise was travelling comes back with it written down and nothing
-        // booked to move it: this is where such a sensor picks the countdown back up.
-        wake(world, x, y, z, *block);
-    }
-    return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
+    return settled;
 }
 
 } // namespace basalt::server::runtime::world::vibrations

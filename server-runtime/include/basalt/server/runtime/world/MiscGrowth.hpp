@@ -21,6 +21,11 @@ void nylium(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, s
 void redstoneOre(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                  std::vector<BlockChange>& changes);
 
+/// parity: `RedStoneOreBlock.interact`, the other half: walking over it, hitting it or using it puts
+/// the light on. Answers the change, or nothing when there is no ore there or it is already lit.
+[[nodiscard]] std::optional<BlockChange> lightRedstoneOre(WorldState& world, std::int32_t x, std::int32_t y,
+                                                          std::int32_t z);
+
 /// parity: `SweetBerryBushBlock.randomTick`: light nine above it and one roll in five.
 void sweetBerries(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                   random::RandomSource& random, std::vector<BlockChange>& changes, bool hasSkylight = true);

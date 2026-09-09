@@ -276,3 +276,52 @@ TEST_CASE("a hook that clicks tells a sculk sensor, and the click wins over the 
         CHECK(frequencyAt(world, 4, 64, 10) == 9);
     }
 }
+
+TEST_CASE("a wire tells the hooks at the ends of its line, and only to the south and west") {
+    // parity: `TripWireBlock.updateSource`. A tripwire laid by hand or by command has to attach its
+    // hooks by itself; nothing here did it, so a line built and never stepped on hung loose.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    layLine(world, 3);
+    CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
+
+    std::vector<BlockChange> changes;
+    const std::int32_t wire = *world.blockState(5, 64, 8);
+    tripwires::updateSource(world, 5, 64, 8, wire, 1, changes);
+
+    // The hook it reaches going west is the one at x=4, and writing it writes the pair.
+    CHECK(propertyAt(world, 4, 64, 8, "attached") == "true");
+    CHECK(propertyAt(world, 8, 64, 8, "attached") == "true");
+}
+
+TEST_CASE("a hook told about a wire holds on for ten ticks and then lets go") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    layLine(world, 3);
+    std::vector<BlockChange> changes;
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
+    REQUIRE(propertyAt(world, 4, 64, 8, "attached") == "true");
+
+    // The middle string goes, and the hook is told with the state it had, powered, as vanilla does
+    // from `affectNeighborsAfterRemoval`. parity: `calculateState` reads that square from what it
+    // was handed, so on this pass the line is whole and **fires**.
+    const std::int32_t was = *world.blockState(6, 64, 8);
+    const std::optional<std::int32_t> firing =
+        registry::blockStateDefinitions::stateIdOf(Identifier::vanilla("tripwire"), {{"powered", "true"}}, was);
+    REQUIRE(firing.has_value());
+    REQUIRE(world.setBlockState(6, 64, 8, registry::blocks::air().stateId));
+    tripwires::updateSource(world, 6, 64, 8, *firing, 1, changes);
+
+    CHECK(propertyAt(world, 4, 64, 8, "attached") == "true");
+    CHECK(propertyAt(world, 4, 64, 8, "powered") == "true");
+    // And it booked itself a look ten ticks out, which is what finds the gap.
+    CHECK(world.hasScheduledBlockTick(4, 64, 8, Identifier::vanilla("tripwire_hook")));
+    for (std::int32_t turn = 0; turn < 9; ++turn) {
+        CHECK(world.dueBlockTicks().empty());
+    }
+    REQUIRE(world.dueBlockTicks().size() == 1);
+
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
+    CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
+    CHECK(propertyAt(world, 4, 64, 8, "powered") == "false");
+}

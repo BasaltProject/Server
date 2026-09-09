@@ -44,6 +44,14 @@ inline constexpr std::string_view kListenerKey = "listener";
 /// sensor takes it only while it is inactive and has nothing already on the way.
 void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime);
 
+/// parity: `SculkSensorBlock.stepOn` over `Listener.forceScheduleVibration`: standing straight on a
+/// sensor puts a step into it **without** asking whether one is already on the way and without the
+/// wool check, which is the difference between walking past one and walking on it.
+///
+/// Answers whether the sensor took it.
+bool stoodOn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
+             double entityZ, std::int64_t gameTime);
+
 /// The scheduled half, and the sensor's whole clock: an active sensor goes to cooldown, one cooling
 /// down goes quiet, and an inactive one moves whatever vibration is travelling towards it.
 ///

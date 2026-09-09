@@ -12,10 +12,12 @@
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
 #include <basalt/server/runtime/world/BlockEntityTicks.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MiscGrowth.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
@@ -165,6 +167,33 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     for (std::size_t index = 0; index < items.size(); ++index) {
         touch(items[index].x, items[index].y, items[index].z, index + 1);
     }
+
+    // parity: `BigDripleafBlock.entityInside`, which is the same question the plate asks and the
+    // same sweep answers it: what is standing on the square, and is anything holding the leaf up.
+    const auto stand = [this, &world, &region, &watchers](double atX, double atY, double atZ, bool onGround) {
+        if (!onGround || !region.ownsPosition(atX, atZ)) {
+            return;
+        }
+        const auto x = static_cast<std::int32_t>(std::floor(atX));
+        const auto y = static_cast<std::int32_t>(std::floor(atY));
+        const auto z = static_cast<std::int32_t>(std::floor(atZ));
+        for (const std::int32_t at : {y, y - 1}) {
+            if (const std::optional<world::BlockChange> tipping =
+                    world::dripleaves::stoodOn(world.state(), world.name(), x, at, z, atY, onGround, world.gameTime());
+                tipping.has_value()) {
+                broadcaster_->announceRedstone(world, watchers, *tipping);
+                return;
+            }
+        }
+    };
+    for (const PlayerSession* player : watchers) {
+        if (player->gamemode != Gamemode::Spectator) {
+            stand(player->x, player->y, player->z, player->onGround);
+        }
+    }
+    for (const world::DroppedItem& item : items) {
+        stand(item.x, item.y, item.z, item.resting);
+    }
 }
 
 void RedstoneTickSystem::tickArrowButtons(world::LoadedWorld& world, const sched::Region& region) {
@@ -253,12 +282,35 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
             continue;
         }
         lastFootstep_[player->entityId()] = block;
+        // parity: `RedStoneOreBlock.stepOn`, which lights the ore under whoever walks over it unless
+        // they are sneaking. The random tick that puts it out again was already here; nothing ever
+        // lit it.
+        if (!player->sneaking) {
+            const auto oreX = static_cast<std::int32_t>(std::floor(player->x));
+            const auto oreZ = static_cast<std::int32_t>(std::floor(player->z));
+            const std::int32_t oreY = world::pressurePlates::blockUnder(player->y);
+            if (const std::optional<world::BlockChange> lit =
+                    world::miscGrowth::lightRedstoneOre(world.state(), oreX, oreY, oreZ);
+                lit.has_value()) {
+                changes.push_back(*lit);
+            }
+        }
         // parity: the warden's own `VibrationUser`, which hears a step sixteen blocks away and gets
         // angrier at whoever took it. Sneaking makes no vibration, so it hears nothing.
         if (!player->sneaking) {
             hearFootstep(world, *player);
         }
         if (!world.state().hasSculkSensorNear(player->x, player->y, player->z, world::vibrations::kRange)) {
+            continue;
+        }
+        // parity: `SculkSensorBlock.stepOn`, which puts the step straight into the sensor under the
+        // feet without asking whether it already has one on the way. Standing on one is not the same
+        // as walking past it, and only the second went through `handleGameEvent`.
+        const auto stepX = static_cast<std::int32_t>(std::floor(player->x));
+        const auto stepZ = static_cast<std::int32_t>(std::floor(player->z));
+        const std::int32_t stepY = world::pressurePlates::blockUnder(player->y);
+        if (world::vibrations::stoodOn(world.state(), stepX, stepY, stepZ, player->x, player->y, player->z,
+                                       world.gameTime())) {
             continue;
         }
         world::vibrations::emit(world.state(), "step", player->x, player->y, player->z, world.gameTime());

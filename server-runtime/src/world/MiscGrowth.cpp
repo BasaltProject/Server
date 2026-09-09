@@ -72,6 +72,26 @@ void nylium(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, s
     growthSupport::set(world, x, y, z, registry::blocks::named("netherrack")->stateId, changes);
 }
 
+std::optional<BlockChange> lightRedstoneOre(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return std::nullopt;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr || (block->path() != "redstone_ore" && block->path() != "deepslate_redstone_ore")) {
+        return std::nullopt;
+    }
+    if (propertyOf(*stateId, "lit") == std::optional<std::string>{"true"}) {
+        return std::nullopt;
+    }
+    const std::optional<std::int32_t> lit =
+        registry::blockStateDefinitions::stateIdOf(*block, {{"lit", "true"}}, *stateId);
+    if (!lit.has_value() || !world.setBlockState(x, y, z, *lit)) {
+        return std::nullopt;
+    }
+    return BlockChange{.x = x, .y = y, .z = z, .stateId = *lit};
+}
+
 void redstoneOre(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                  std::vector<BlockChange>& changes) {
     if (propertyOf(stateId, "lit") != std::optional<std::string>{"true"}) {

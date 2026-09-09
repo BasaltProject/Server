@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/PoweredRails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
@@ -302,6 +303,15 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     // tells them apart: only a skull carries it.
     if ((path.ends_with("_skull") || path.ends_with("_head")) && properties.contains("powered")) {
         skull(world, worldName, x, y, z, *stateId, properties, changes);
+        return;
+    }
+    // parity: `BigDripleafBlock.neighborChanged`, the whole of it: a signal puts the leaf back up
+    // and holds it there, which is what makes a dripleaf a redstone block and not only a plant.
+    if (path == "big_dripleaf") {
+        if (const std::optional<BlockChange> flat = dripleaves::react(world, worldName, x, y, z, gameTime);
+            flat.has_value()) {
+            changes.push_back(*flat);
+        }
         return;
     }
     if (path == "note_block") {
