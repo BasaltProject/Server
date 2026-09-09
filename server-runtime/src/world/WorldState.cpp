@@ -1,6 +1,8 @@
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
@@ -447,6 +449,37 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     if (y < chunk->verticalBounds().minY() || y > chunk->verticalBounds().maxY()) {
         return false;
     }
+    // parity: `BlockEntity.preRemoveSideEffects`, which every block entity that is a container runs
+    // when its block goes: what it held falls out. It is queued here rather than spawned because
+    // this call already holds the world's lock, and it is done **before** the write, because the
+    // write is what takes the block entity away.
+    //
+    // The cheap tests come first on purpose: this is the hottest write in the server, and the common
+    // case is a state that did not move at all. A block entity is only looked up once the block
+    // itself is known to be changing.
+    const std::int32_t was = chunk->blockStateId(x & 15, y, z & 15);
+    const auto blockChanges = [](std::int32_t before, std::int32_t after) {
+        const wire::common::Identifier* from = registry::blockStateDefinitions::blockOf(before);
+        const wire::common::Identifier* to = registry::blockStateDefinitions::blockOf(after);
+        return from != nullptr && to != nullptr && *from != *to;
+    };
+    if (was != stateId && chunk->blockEntityCount() > 0 && blockChanges(was, stateId)) {
+        const server::world::ChunkBlockEntity* held = chunk->blockEntityAt(x & 15, y, z & 15);
+        const std::optional<std::int32_t> size =
+            held == nullptr ? std::nullopt : containers::sizeOf(held->type().path());
+        if (size.has_value()) {
+            Spilled falling{.x = x, .y = y, .z = z, .stacks = {}};
+            for (const std::optional<server::world::loot::ItemStack>& slot :
+                 blockInventory::read(held->data(), *size)) {
+                if (slot.has_value() && slot->count > 0) {
+                    falling.stacks.push_back(*slot);
+                }
+            }
+            if (!falling.stacks.empty()) {
+                spilled_.push_back(std::move(falling));
+            }
+        }
+    }
     const bool changed = chunk->setBlockStateId(x & 15, y, z & 15, stateId);
     if (changed) {
         // A skylight opening or a torch reaches across chunk borders. Cached whole-chunk light is
@@ -633,5 +666,10 @@ std::vector<std::int32_t> WorldState::collectRemovedEntities() { return entityRe
 void WorldState::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z) { primedTntQueue_.primeTnt(x, y, z); }
 
 std::vector<std::array<std::int32_t, 3>> WorldState::takePrimedTnt() { return primedTntQueue_.takePrimedTnt(); }
+
+std::vector<WorldState::Spilled> WorldState::takeSpilledContents() {
+    const WorldWriteLock lock{mutex_};
+    return std::exchange(spilled_, {});
+}
 
 } // namespace basalt::server::runtime::world

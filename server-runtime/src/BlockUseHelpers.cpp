@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/server/runtime/world/SnowyBlocks.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
@@ -584,6 +585,16 @@ void BlockInteractionHandler::useBucketOn(PlayerSession& session, const Identifi
         context, item, hit.pos.x, hit.pos.y, hit.pos.z, hit.direction, session.gamemode == Gamemode::Creative);
     if (!result.has_value()) {
         return;
+    }
+    // parity: `BucketItem` raises `FLUID_PICKUP` where it took the fluid from and `FLUID_PLACE`
+    // where it put it, and a sculk sensor hears both. Which of the two it is comes from the item:
+    // an empty bucket is the one that picks up.
+    if (!result->changes.empty()) {
+        const world::FluidChange& at = result->changes.front();
+        if (world->state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kRange)) {
+            world::vibrations::emit(world->state(), item.path() == "bucket" ? "fluid_pickup" : "fluid_place",
+                                    at.x + 0.5, at.y + 0.5, at.z + 0.5, world->gameTime());
+        }
     }
     for (const world::FluidChange& change : result->changes) {
         broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);

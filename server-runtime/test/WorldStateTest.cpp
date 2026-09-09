@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <doctest.h>
@@ -10,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 using namespace basalt::server::runtime::world;
 namespace registry = basalt::server::registry;
@@ -401,4 +403,49 @@ TEST_CASE("what every loaded chunk costs, for the report an operator reads") {
 
     world.scheduleBlockTick(0, 64, 0, Identifier::vanilla("water"), 5);
     CHECK(world.chunkMemory().scheduledTicks == 1);
+}
+
+TEST_CASE("what a container held falls out when its block goes") {
+    // parity: `BlockEntity.preRemoveSideEffects`, which **every** block entity that is a container
+    // runs when its block is replaced. It is not in the loot table (a chest's is one chest and
+    // nothing else) and nothing here did it, so breaking a full chest lost what was in it.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("chest")));
+    Chunk* chunk = world.chunkIfLoaded(0, 0);
+    REQUIRE(chunk != nullptr);
+    basalt::wire::nbt::NbtCompound data;
+    blockInventory::Slots slots(27);
+    slots[0] = basalt::server::world::loot::ItemStack{.item = Identifier::vanilla("stone"), .count = 5};
+    slots[3] = basalt::server::world::loot::ItemStack{.item = Identifier::vanilla("dirt"), .count = 2};
+    blockInventory::write(data, slots);
+    chunk->setBlockEntity(basalt::server::world::ChunkBlockEntity{8, 64, 8, Identifier::vanilla("chest"), data});
+
+    // A state change that keeps the block keeps the contents.
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("chest")));
+    CHECK(world.takeSpilledContents().empty());
+
+    REQUIRE(world.setBlockState(8, 64, 8, registry::blocks::air().stateId));
+
+    const std::vector<WorldState::Spilled> spilled = world.takeSpilledContents();
+    REQUIRE(spilled.size() == 1);
+    CHECK(spilled.front().x == 8);
+    CHECK(spilled.front().y == 64);
+    CHECK(spilled.front().z == 8);
+    REQUIRE(spilled.front().stacks.size() == 2);
+    CHECK(spilled.front().stacks[0].item == Identifier::vanilla("stone"));
+    CHECK(spilled.front().stacks[0].count == 5);
+    CHECK(spilled.front().stacks[1].item == Identifier::vanilla("dirt"));
+    // Taken once and gone: the queue is drained by whoever turns it into items.
+    CHECK(world.takeSpilledContents().empty());
+}
+
+TEST_CASE("a block with no container behind it spills nothing") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("stone")));
+
+    REQUIRE(world.setBlockState(8, 64, 8, registry::blocks::air().stateId));
+
+    CHECK(world.takeSpilledContents().empty());
 }

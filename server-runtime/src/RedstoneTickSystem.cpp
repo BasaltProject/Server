@@ -162,6 +162,13 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
             touch(player->x, player->y, player->z, items.size());
         }
     }
+    // parity: `entityInside` runs for whoever is inside the square, and a mob is inside it just the
+    // same. Only players and items ever asked here.
+    for (const entity::ServerEntity* standing : world.state().entities()) {
+        if (!standing->removed) {
+            touch(standing->x, standing->y, standing->z, items.size());
+        }
+    }
     // parity: an item presses the plate on its own turn, so what it counts is itself and whoever
     // moved before it. The ones still to move are counted where they were when the tick began.
     for (std::size_t index = 0; index < items.size(); ++index) {
@@ -369,12 +376,25 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
             count++;
         }
     }
-    // parity: the stone and blackstone plates are `MOBS`, so a dropped item does not press them.
+    // parity: `PressurePlateBlock.getSignalStrength` picks the class it counts from the plate's own
+    // sensitivity: `EVERYTHING` counts any entity and `MOBS` only the living ones. The stone and
+    // blackstone plates are the `MOBS` pair.
     const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
     const wire::common::Identifier* block =
         stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
     const std::string_view path = block == nullptr ? std::string_view{} : block->path();
-    if (path != "stone_pressure_plate" && path != "polished_blackstone_pressure_plate") {
+    const bool livingOnly = path == "stone_pressure_plate" || path == "polished_blackstone_pressure_plate";
+    // A mob, an arrow, a boat or a lit tnt is an entity like any other, and none of them was counted:
+    // this sweep only knew about players and items, so a cow never pressed anything.
+    for (const entity::ServerEntity* standing : world.state().entities()) {
+        if (standing->removed || (livingOnly && !server::registry::entityAttributes::isLiving(standing->type()))) {
+            continue;
+        }
+        if (world::pressurePlates::isStandingOn(x, y, z, standing->x, standing->y, standing->z)) {
+            count++;
+        }
+    }
+    if (!livingOnly) {
         for (std::size_t index = 0; index < items.size(); ++index) {
             const world::DroppedItem& item = items[index];
             const bool taken = index < movedThrough;

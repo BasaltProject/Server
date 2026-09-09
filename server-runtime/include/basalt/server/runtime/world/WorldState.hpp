@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/SculkSensorTracker.hpp>
 #include <basalt/server/runtime/world/WorldMutex.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/loot/Loot.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -266,6 +267,20 @@ public:
 
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> takePrimedTnt();
 
+    /// What a container had in it when its block went, waiting to be turned into items.
+    ///
+    /// parity: `BlockEntity.preRemoveSideEffects`, which drops the contents of **any** block entity
+    /// that is a container, from wherever the block is replaced. It is queued rather than spawned on
+    /// the spot because the block write already holds this world's lock.
+    struct Spilled {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::int32_t z = 0;
+        std::vector<server::world::loot::ItemStack> stacks;
+    };
+
+    [[nodiscard]] std::vector<Spilled> takeSpilledContents();
+
 private:
     /// Refuses an access from anywhere but the owner, and only while strict ownership is on.
     ///
@@ -311,6 +326,7 @@ private:
     std::atomic<std::int64_t> chunkVersion_{0};
 
     PrimedTntQueue primedTntQueue_;
+    std::vector<Spilled> spilled_;
     PendingChunkDecorations pendingDecorations_;
     std::vector<BlockEvent> blockEvents_;
     std::deque<TorchToggle> torchToggles_;

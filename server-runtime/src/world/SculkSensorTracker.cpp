@@ -21,6 +21,13 @@ namespace {
 
 [[nodiscard]] std::int32_t unpackBlockZ(std::int64_t packed) { return static_cast<std::int32_t>(packed << 26 >> 38); }
 
+/// parity: the two blocks that listen. A vein of sculk in the deep dark writes them straight into
+/// the section, with no block entity, so the state is the only thing that names them there.
+[[nodiscard]] bool isSensorState(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && (block->path() == "sculk_sensor" || block->path() == "calibrated_sculk_sensor");
+}
+
 } // namespace
 
 void SculkSensorTracker::remember(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
@@ -41,14 +48,36 @@ void SculkSensorTracker::remember(std::int32_t x, std::int32_t y, std::int32_t z
 void SculkSensorTracker::rememberChunk(const server::world::Chunk& chunk) {
     const std::int32_t baseX = chunk.chunkX() << 4;
     const std::int32_t baseZ = chunk.chunkZ() << 4;
-    for (const server::world::ChunkBlockEntity& entity : chunk.blockEntities()) {
-        const std::string_view path = entity.type().path();
-        if (path != "sculk_sensor" && path != "calibrated_sculk_sensor") {
-            continue;
-        }
-        const std::int64_t position = blockKey(baseX + entity.localX(), entity.y(), baseZ + entity.localZ());
+    const auto keep = [this](std::int32_t x, std::int32_t y, std::int32_t z) {
+        const std::int64_t position = blockKey(x, y, z);
         if (std::ranges::find(sculkSensors_, position) == sculkSensors_.end()) {
             sculkSensors_.push_back(position);
+        }
+    };
+    for (const server::world::ChunkBlockEntity& entity : chunk.blockEntities()) {
+        const std::string_view path = entity.type().path();
+        if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+            keep(baseX + entity.localX(), entity.y(), baseZ + entity.localZ());
+        }
+    }
+    // A sensor the terrain generator wrote has no block entity of its own here, so the list above
+    // misses the whole of the deep dark. The palette answers cheaply whether a section can hold one,
+    // and only the few that can are walked.
+    const std::int32_t minY = chunk.verticalBounds().minY();
+    for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
+        const server::world::ChunkSection& section = chunk.section(index);
+        if (!section.mayContain([](std::int32_t stateId) { return isSensorState(stateId); })) {
+            continue;
+        }
+        const std::int32_t baseY = minY + (static_cast<std::int32_t>(index) * 16);
+        for (std::int32_t localY = 0; localY < 16; ++localY) {
+            for (std::int32_t localZ = 0; localZ < 16; ++localZ) {
+                for (std::int32_t localX = 0; localX < 16; ++localX) {
+                    if (isSensorState(section.blockStateId(localX, localY, localZ))) {
+                        keep(baseX + localX, baseY + localY, baseZ + localZ);
+                    }
+                }
+            }
         }
     }
 }
