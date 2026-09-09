@@ -117,7 +117,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     std::vector<world::BlockChange> effects;
     for (const world::explosions::Broken& block : broken) {
         world::neighbourUpdates::afterChange(
-            context, block.x, block.y, block.z, effects,
+            context, block.x, block.y, block.z, block.stateId, effects,
             [this, &watchers, &drops](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
                 sendBlock(watchers, bx, by, bz, reg::blocks::air().stateId);
                 // What the blast knocked loose afterwards falls as an ordinary break, not as part of

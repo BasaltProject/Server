@@ -135,14 +135,19 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
 
 /// Breaks the block there when nothing holds it up any more.
 [[nodiscard]] bool breakIfUnsupported(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                                      const blockSurvival::ScaffoldingHasFallen& scaffolding,
-                                      const OnBroken& onBroken) {
+                                      const blockSurvival::ScaffoldingHasFallen& scaffolding, const OnBroken& onBroken,
+                                      std::optional<BlockFace> towards = std::nullopt) {
     if (y < context.minY || y > context.maxY) {
         return false;
     }
     WorldState& world = context.world;
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || *stateId == registry::blocks::air().stateId) {
+        return false;
+    }
+    // parity: `updateShape` asks which side the news came from before it asks whether the block can
+    // stay, so a hook or a wall torch only falls when its own wall is what moved.
+    if (!blockSurvival::loosenedBy(*stateId, towards)) {
         return false;
     }
     if (blockSurvival::isSupported(world, x, y, z, *stateId, scaffolding, context.hasSkylight)) {
@@ -201,7 +206,7 @@ void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std:
         walk.onReshaped(change.stateId, change.x, change.y, change.z);
         changed = true;
     }
-    if (breakIfUnsupported(walk.context, x, y, z, walk.scaffolding, walk.onBroken) || changed) {
+    if (breakIfUnsupported(walk.context, x, y, z, walk.scaffolding, walk.onBroken, towards) || changed) {
         pending.push_back({x, y, z});
     }
 }
@@ -335,8 +340,8 @@ void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std:
 }
 
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                 std::vector<BlockChange>& effects, const OnBroken& onBroken, const OnReshaped& onReshaped,
-                 bool reshapeSelf) {
+                 std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
+                 const OnReshaped& onReshaped, bool reshapeSelf) {
     WorldState& world = context.world;
     const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
     const OnBroken broken = onBroken ? onBroken : OnBroken{noop};
@@ -547,6 +552,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (const std::optional<std::int32_t> laid = world.blockState(x, y, z);
         laid.has_value() && tripwires::isWire(*laid)) {
         tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
+    }
+    // parity: `TripWireBlock.affectNeighborsAfterRemoval`, which hands the line the string that has
+    // just gone **as if it were still there and powered**, so the hooks fire and each books itself a
+    // look ten ticks later to find the gap. Every other block's version of this hook is a plain "tell
+    // the neighbours", which the cascade above already does; this is the only one that substitutes a
+    // state, and without it a cut wire left both hooks hanging loose at once.
+    if (removed.has_value() && tripwires::isWire(*removed)) {
+        if (const std::optional<std::int32_t> live =
+                registry::blockStateDefinitions::stateIdOf(tripwires::wireBlock(), {{"powered", "true"}}, *removed);
+            live.has_value()) {
+            tripwires::updateSource(world, x, y, z, *live, context.gameTime, effects);
+        }
     }
     // parity: `LiquidBlock`'s three hooks, which all end in the same `scheduleTick`: water only
     // notices there is somewhere to go when something around it changes. Measured in `aguapolvo`,

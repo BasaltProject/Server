@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
+#include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
 
@@ -464,8 +465,11 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     if (sideEffects == SideEffects::kRun && was != stateId && chunk->blockEntityCount() > 0 &&
         blockChanges(was, stateId)) {
         const server::world::ChunkBlockEntity* held = chunk->blockEntityAt(x & 15, y, z & 15);
+        // parity: `ShulkerBoxBlockEntity.preRemoveSideEffects` is empty on purpose, because what the
+        // box held goes with the box. It is the one container in the game that keeps its contents.
+        const bool keepsContents = held != nullptr && shulkers::isShulkerBox(held->type().path());
         const std::optional<std::int32_t> size =
-            held == nullptr ? std::nullopt : containers::sizeOf(held->type().path());
+            held == nullptr || keepsContents ? std::nullopt : containers::sizeOf(held->type().path());
         if (size.has_value()) {
             Spilled falling{.x = x, .y = y, .z = z, .stacks = {}};
             for (const std::optional<server::world::loot::ItemStack>& slot :

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
@@ -25,6 +26,11 @@ inline constexpr std::int32_t kCropSurvivalLight = 8;
 /// walk lives with the scheduled blocks; without one, scaffolding is left standing.
 using ScaffoldingHasFallen =
     std::function<bool(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z)>;
+
+/// Whether news arriving from `towards`, seen from this block, is the news that can knock it down;
+/// nothing means yes. parity: nearly every `updateShape` that returns air for want of support tests
+/// `directionToNeighbour` first, so a block only falls when the square it hangs on is what changed.
+[[nodiscard]] bool loosenedBy(std::int32_t stateId, std::optional<registry::BlockFace> towards);
 
 /// Whether the block at these coordinates would stay where it is.
 [[nodiscard]] bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,

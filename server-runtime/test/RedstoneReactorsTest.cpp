@@ -198,11 +198,13 @@ TEST_CASE("tnt lights and leaves an entity behind it") {
     // The block is gone and the primed entity is queued for whoever spawns it.
     CHECK(world.takePrimedTnt().size() == 1);
 
-    // parity: unstable tnt is the one a command placed to explode when broken; a signal leaves it.
+    // parity: `unstable` is read in one place in the whole jar, `TntBlock.playerWillDestroy`, where it
+    // decides whether breaking the block by hand lights it. `neighborChanged` never looks at it, so a
+    // signal lights an unstable block exactly as it lights any other.
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("tnt", {{"unstable", "true"}})));
     static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random));
-    CHECK(world.blockState(8, 64, 8) != registry::blocks::air().stateId);
-    CHECK(world.takePrimedTnt().empty());
+    CHECK(world.blockState(8, 64, 8) == registry::blocks::air().stateId);
+    CHECK(world.takePrimedTnt().size() == 1);
 }
 
 TEST_CASE("the sound a door makes is the one its own code names") {

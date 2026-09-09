@@ -88,12 +88,12 @@ std::int64_t BlockChangeBroadcaster::nextSeed() const { return options_.nextSeed
 
 void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,
                                           const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
-                                          std::int32_t y, std::int32_t z) {
+                                          std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed) {
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
     const world::neighbourUpdates::Context context = contextOf(world, random);
     std::vector<world::BlockChange> effects;
     world::neighbourUpdates::afterChange(
-        context, x, y, z, effects,
+        context, x, y, z, removed, effects,
         [this, &world, &watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             sendBlock(watchers, bx, by, bz, reg::blocks::air().stateId);
             dropBrokenBlock(world, bx, by, bz, stateId);

@@ -85,6 +85,8 @@ private:
     bool adjustToNeighbours_ = true;
     /// What the command named, by position, until the next flush.
     std::map<std::array<std::int32_t, 3>, std::map<std::string, std::string>> written_properties_;
+    /// What each written position held before, for the removal half of the cascade.
+    std::map<std::array<std::int32_t, 3>, std::optional<std::int32_t>> replaced_;
 
     const CommandEnvironment* environment_;
     world::LoadedWorld* world_;

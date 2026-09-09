@@ -98,6 +98,10 @@ public:
     /// parity: `Level.updateNeighborsAt`, which is what makes a torch fall off a broken wall.
     void notifyNeighbours(const wire::protocol::play::BlockPos& pos);
 
+    /// The same, for a square whose old block is known to have gone, so the cascade can run the half
+    /// that belongs to the block that left.
+    void notifyNeighboursAfterRemoval(const wire::protocol::play::BlockPos& pos, std::int32_t removedStateId);
+
     [[nodiscard]] bool isAirLike(std::int32_t stateId) const;
 
     /// parity: the little upward push a thrown item leaves with.
