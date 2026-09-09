@@ -117,9 +117,35 @@ void BlockEditor::notifyNeighbours() {
             world_->state().blockState(at[0], at[1], at[2]) == reg::blocks::air().stateId) {
             static_cast<void>(set(at[0], at[1], at[2], *written));
         }
+        // parity: `BlockInput.place` ends in `overwriteWithDefinedProperties`, so a property the
+        // command named beats whatever the shape update decided. Without it a note block placed as a
+        // harp over glass came out a hat, and the jar leaves it a harp until the block below changes.
+        const auto named = written_properties_.find(at);
+        if (named == written_properties_.end() || named->second.empty()) {
+            continue;
+        }
+        const std::optional<std::int32_t> shaped = world_->state().blockState(at[0], at[1], at[2]);
+        if (!shaped.has_value()) {
+            continue;
+        }
+        const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(*shaped);
+        if (block == nullptr) {
+            continue;
+        }
+        if (const std::optional<std::int32_t> kept =
+                reg::blockStateDefinitions::stateIdOf(*block, named->second, *shaped);
+            kept.has_value() && *kept != *shaped) {
+            static_cast<void>(set(at[0], at[1], at[2], *kept));
+        }
     }
+    written_properties_.clear();
     // A reaction can move a block of its own, and those go out with everything else.
     written_.clear();
+}
+
+void BlockEditor::keepWritten(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                              std::map<std::string, std::string> properties) {
+    written_properties_[std::array<std::int32_t, 3>{x, y, z}] = std::move(properties);
 }
 
 void BlockEditor::flush() {

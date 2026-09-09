@@ -55,6 +55,10 @@ struct Context {
     std::int32_t minY = 0;
     std::int32_t maxY = 0;
     random::RandomSource& random;
+    /// What a block the piston broke leaves on the floor. parity: `PistonBaseBlock.moveBlocks` runs
+    /// `Block.dropResources` on everything it destroys, so a torch or a piece of dust in the way is
+    /// picked up afterwards rather than gone. Measured in the bench circuit `pistonrompe`.
+    std::function<void(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z)> onDestroyed;
 };
 
 [[nodiscard]] const wire::common::Identifier& block();

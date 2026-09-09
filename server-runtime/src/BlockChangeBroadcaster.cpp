@@ -171,11 +171,15 @@ void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const wor
     }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    const world::pistons::Context context{.world = world.state(),
-                                          .worldName = world.name(),
-                                          .minY = facts.chunkHeight.minY(),
-                                          .maxY = facts.chunkHeight.maxY(),
-                                          .random = random};
+    const world::pistons::Context context{
+        .world = world.state(),
+        .worldName = world.name(),
+        .minY = facts.chunkHeight.minY(),
+        .maxY = facts.chunkHeight.maxY(),
+        .random = random,
+        .onDestroyed = [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
+            dropBrokenBlock(world, bx, by, bz, stateId);
+        }};
     std::vector<world::BlockChange> effects;
     world::pistons::runEvent(context, event.x, event.y, event.z, event.first, event.second, effects);
     for (const world::BlockChange& effect : effects) {
@@ -198,11 +202,15 @@ BlockChangeBroadcaster::finishPiston(world::LoadedWorld& world, const std::array
     }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    const world::pistons::Context context{.world = world.state(),
-                                          .worldName = world.name(),
-                                          .minY = facts.chunkHeight.minY(),
-                                          .maxY = facts.chunkHeight.maxY(),
-                                          .random = random};
+    const world::pistons::Context context{
+        .world = world.state(),
+        .worldName = world.name(),
+        .minY = facts.chunkHeight.minY(),
+        .maxY = facts.chunkHeight.maxY(),
+        .random = random,
+        .onDestroyed = [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
+            dropBrokenBlock(world, bx, by, bz, stateId);
+        }};
     return world::pistons::finish(
         context, position[0], position[1], position[2], nearby,
         [&watchers](const world::pistons::PlayerPosition& pushed) {

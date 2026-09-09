@@ -48,6 +48,7 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
     if (mode == Mode::Destroy) {
         static_cast<void>(editor->set(at[0], at[1], at[2], reg::blocks::air().stateId));
     }
+    editor->keepWritten(at[0], at[1], at[2], block->properties);
     if (!editor->set(at[0], at[1], at[2], block->stateId) && mode != Mode::Destroy) {
         return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.setblock.failed")}};
     }
