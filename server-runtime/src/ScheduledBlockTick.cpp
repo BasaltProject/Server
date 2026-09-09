@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 
 namespace basalt::server::runtime {
 namespace {
@@ -110,7 +111,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (world::pressurePlates::isPlate(here)) {
             if (const std::optional<world::BlockChange> plate =
                     world::pressurePlates::update(world.state(), x, y, z, world::pressurePlates::Trigger::Scheduled,
-                                                  standingOn(world, x, y, z, watchers));
+                                                  standingOn(world, x, y, z, watchers, world.state().items(),
+                                                             std::numeric_limits<std::size_t>::max()));
                 plate.has_value()) {
                 scheduled.push_back(*plate);
             }

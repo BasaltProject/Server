@@ -187,12 +187,15 @@ TEST_CASE("an arrow sticks in what it hits and a snowball does not") {
     const std::optional<BlockHit> arrowHit = projectiles::tick(world, stuck, projectiles::arrow());
     REQUIRE(arrowHit.has_value());
     CHECK(arrowHit->blockX == 11);
-    CHECK(stuck.x == doctest::Approx(11.0));
+    // parity: `AbstractArrow.onHitBlock` backs it off a twentieth of a block along the axis it was
+    // moving on, so it ends up in the square in front of the stone and not on its face. Measured in
+    // `flechavibra`, where the jar's arrow rested one square short of where ours did.
+    CHECK(stuck.x == doctest::Approx(10.95));
     CHECK(stuck.velocityX == doctest::Approx(0.0));
     CHECK(stuck.onGround);
     // Once stuck it stays where it is, whatever else happens.
     CHECK_FALSE(projectiles::tick(world, stuck, projectiles::arrow()).has_value());
-    CHECK(stuck.x == doctest::Approx(11.0));
+    CHECK(stuck.x == doctest::Approx(10.95));
 
     ServerEntity gone = flying(projectiles::snowball(), 8.5, 64.5, 8.5);
     gone.velocityX = 3.0;

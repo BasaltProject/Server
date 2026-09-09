@@ -134,7 +134,9 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     // parity: `entityInside` is the entity's doing, not the player's. An item lying on a wooden
     // plate presses it with nobody around, so this cannot start by asking whether anybody is here.
-    const auto touch = [this, &world, &region, &watchers](double atX, double atY, double atZ) {
+    const std::vector<world::DroppedItem> items = world.state().items();
+    const auto touch = [this, &world, &region, &watchers, &items](double atX, double atY, double atZ,
+                                                                  std::size_t movedThrough) {
         if (!region.ownsPosition(atX, atZ)) {
             return;
         }
@@ -146,19 +148,22 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
             !world::pressurePlates::isStandingOn(x, y, z, atX, atY, atZ)) {
             return;
         }
-        if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
-                world.state(), x, y, z, world::pressurePlates::Trigger::Touched, standingOn(world, x, y, z, watchers));
+        if (const std::optional<world::BlockChange> change =
+                world::pressurePlates::update(world.state(), x, y, z, world::pressurePlates::Trigger::Touched,
+                                              standingOn(world, x, y, z, watchers, items, movedThrough));
             change.has_value()) {
             broadcaster_->announceRedstone(world, watchers, *change);
         }
     };
     for (const PlayerSession* player : watchers) {
         if (player->gamemode != Gamemode::Spectator) {
-            touch(player->x, player->y, player->z);
+            touch(player->x, player->y, player->z, items.size());
         }
     }
-    for (const world::DroppedItem& item : world.state().items()) {
-        touch(item.x, item.y, item.z);
+    // parity: an item presses the plate on its own turn, so what it counts is itself and whoever
+    // moved before it. The ones still to move are counted where they were when the tick began.
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        touch(items[index].x, items[index].y, items[index].z, index + 1);
     }
 }
 
@@ -302,7 +307,8 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
 }
 
 std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                            const std::vector<PlayerSession*>& watchers) {
+                                            const std::vector<PlayerSession*>& watchers,
+                                            const std::vector<world::DroppedItem>& items, std::size_t movedThrough) {
     std::int32_t count = 0;
     for (const PlayerSession* player : watchers) {
         if (player->gamemode != Gamemode::Spectator &&
@@ -316,8 +322,11 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
         stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
     const std::string_view path = block == nullptr ? std::string_view{} : block->path();
     if (path != "stone_pressure_plate" && path != "polished_blackstone_pressure_plate") {
-        for (const world::DroppedItem& item : world.state().items()) {
-            if (world::pressurePlates::isStandingOn(x, y, z, item.x, item.y, item.z)) {
+        for (std::size_t index = 0; index < items.size(); ++index) {
+            const world::DroppedItem& item = items[index];
+            const bool taken = index < movedThrough;
+            if (world::pressurePlates::isStandingOn(x, y, z, taken ? item.x : item.previousX,
+                                                    taken ? item.y : item.previousY, taken ? item.z : item.previousZ)) {
                 count++;
             }
         }

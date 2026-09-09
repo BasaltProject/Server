@@ -78,6 +78,11 @@ const wire::common::Identifier& rod() {
     return instance;
 }
 
+const wire::common::Identifier& bolt() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("lightning_bolt");
+    return instance;
+}
+
 std::optional<std::array<std::int32_t, 3>> targetFor(WorldState& world, std::int32_t x, std::int32_t z) {
     const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     if (chunk == nullptr) {

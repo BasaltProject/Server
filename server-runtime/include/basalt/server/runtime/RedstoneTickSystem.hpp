@@ -110,8 +110,14 @@ private:
     [[nodiscard]] std::vector<player::PlayerSession*> watchersOf(const world::LoadedWorld& world) const;
 
     /// How many things are on the plate at these coordinates, the way its own sensitivity counts.
+    ///
+    /// `movedThrough` is how many of `items` have already taken their turn this tick. Vanilla counts
+    /// from inside `Entity.move`, so anything that has not moved yet is still where it was, and that
+    /// is the whole reason four items landing together read one.
     [[nodiscard]] static std::int32_t standingOn(world::LoadedWorld& world, std::int32_t x, std::int32_t y,
-                                                 std::int32_t z, const std::vector<player::PlayerSession*>& watchers);
+                                                 std::int32_t z, const std::vector<player::PlayerSession*>& watchers,
+                                                 const std::vector<world::DroppedItem>& items,
+                                                 std::size_t movedThrough);
 
     /// parity: `Warden.increaseAngerAt` from a vibration: a step it hears is worth thirty-five.
     static void hearFootstep(world::LoadedWorld& world, const player::PlayerSession& player);
