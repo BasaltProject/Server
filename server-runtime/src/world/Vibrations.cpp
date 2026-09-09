@@ -1,6 +1,8 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -69,22 +71,46 @@ namespace {
     return table;
 }
 
+/// parity: `VibrationSystem.getRedstoneStrengthForDistance`, fifteen at the sensor and one at the
+/// edge of what it hears.
+[[nodiscard]] std::int32_t strengthFor(double distance) {
+    const double scale = static_cast<double>(redstone::kMaxSignal) / static_cast<double>(kRange);
+    return std::max(1, redstone::kMaxSignal - static_cast<std::int32_t>(std::floor(scale * distance)));
+}
+
 [[nodiscard]] bool isSensor(const wire::common::Identifier& block) {
     return block == sensor() || block == calibrated();
 }
 
 /// parity: `SculkSensorBlock.activate`, which lights it and books the thirty ticks it stays on.
+///
+/// `power` and the frequency are **two different numbers**, and mixing them was a real bug here: the
+/// state's `power` is how close the noise was (`VibrationSystem.getRedstoneStrengthForDistance`) and
+/// the frequency is what kind of noise it was, which lives in the block entity and is what a
+/// comparator reads. Measured in `sensormuerte`: a pig dying three and pico blocks away leaves the
+/// state at ten and the comparator at fifteen.
 void activate(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
-              const wire::common::Identifier& block, std::int32_t frequency, std::vector<BlockChange>& changes) {
+              const wire::common::Identifier& block, std::int32_t frequency, double distance,
+              std::vector<BlockChange>& changes) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto phase = properties.find("sculk_sensor_phase");
     if (phase == properties.end() || phase->second != "inactive") {
         return;
     }
     const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(
-        block, {{"sculk_sensor_phase", "active"}, {"power", std::to_string(frequency)}}, stateId);
+        block, {{"sculk_sensor_phase", "active"}, {"power", std::to_string(strengthFor(distance))}}, stateId);
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return;
+    }
+    // parity: `SculkSensorBlockEntity.setLastVibrationFrequency`, written under vanilla's own name.
+    if (server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
+        if (server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15); entity != nullptr) {
+            entity->data().putInt(kFrequencyKey, frequency);
+        } else {
+            wire::nbt::NbtCompound data;
+            data.putInt(kFrequencyKey, frequency);
+            chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, block, std::move(data)});
+        }
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
     world.scheduleBlockTick(x, y, z, block, kActiveTicks);
@@ -125,7 +151,7 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
                 if (distance > kRange) {
                     continue;
                 }
-                activate(world, sensorX, sensorY, sensorZ, *stateId, *block, frequency, changes);
+                activate(world, sensorX, sensorY, sensorZ, *stateId, *block, frequency, distance, changes);
             }
         }
     }

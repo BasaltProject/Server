@@ -190,7 +190,11 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (const std::optional<world::BlockChange> moved = world::redstoneComponents::tick(
                 world.state(), world.name(), x, y, z, world.gameTime(), containerSignal);
             moved.has_value()) {
-            scheduled.push_back(*moved);
+            // A comparator whose level moved without its state moving answers with the state it
+            // already had: there is nothing to send, only neighbours to tell.
+            if (moved->stateId != here) {
+                scheduled.push_back(*moved);
+            }
             const std::vector<world::BlockChange> settled =
                 world::redstone::settle(world.state(), world.name(), moved->x, moved->y, moved->z);
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());

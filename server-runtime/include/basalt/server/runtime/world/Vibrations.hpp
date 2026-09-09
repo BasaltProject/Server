@@ -21,6 +21,11 @@ namespace vibrations {
 inline constexpr std::int32_t kActiveTicks = 30;
 inline constexpr std::int32_t kCooldownTicks = 10;
 
+/// parity: `SculkSensorBlockEntity.last_vibration_frequency`, what kind of noise it last heard. It
+/// is not the same number as the state's `power`, which says how close the noise was, and a
+/// comparator reads this one.
+inline constexpr std::string_view kFrequencyKey = "last_vibration_frequency";
+
 /// parity: `SculkSensorBlockEntity`'s own listener range.
 inline constexpr std::int32_t kRange = 8;
 
