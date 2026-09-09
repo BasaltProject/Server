@@ -101,31 +101,113 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     return false;
 }
 
+[[nodiscard]] std::optional<BlockFace> faceNamed(std::string_view name) {
+    static constexpr std::array<std::pair<std::string_view, BlockFace>, 6> kNames{{{"down", BlockFace::Down},
+                                                                                   {"up", BlockFace::Up},
+                                                                                   {"north", BlockFace::North},
+                                                                                   {"south", BlockFace::South},
+                                                                                   {"west", BlockFace::West},
+                                                                                   {"east", BlockFace::East}}};
+    const auto found = std::ranges::find_if(kNames, [name](const auto& one) { return one.first == name; });
+    return found == kNames.end() ? std::nullopt : std::optional{found->second};
+}
+
+/// The sides a state hangs on: news from any other cannot take it down. Nothing means any side can,
+/// an empty set means none can, which is the bell hung between two walls. parity: only the blocks
+/// whose survival check lives in `updateShape`; a repeater, a comparator, a rail and the dust check
+/// theirs in `neighborChanged`, which arrives from every side, so they are not named here.
+[[nodiscard]] std::optional<std::uint8_t> hangsOn(std::int32_t stateId) {
+    const auto only = [](BlockFace face) { return static_cast<std::uint8_t>(1U << static_cast<std::uint8_t>(face)); };
+    const std::string path = pathOf(stateId);
+    // parity: `TripWireHookBlock`, `WallTorchBlock`, `LadderBlock`, `WallSignBlock`, `WallBannerBlock`,
+    // `CoralWallFanBlock` and `AmethystClusterBlock`, one line apiece and all the same:
+    // `directionToNeighbour.getOpposite() == state.getValue(FACING)`.
+    static constexpr std::array<std::string_view, 8> kBehindTheFace{"tripwire_hook",     "wall_torch",  "wall_sign",
+                                                                    "wall_hanging_sign", "wall_banner", "wall_fan",
+                                                                    "amethyst_cluster",  "amethyst_bud"};
+    if (path == "ladder" ||
+        std::ranges::any_of(kBehindTheFace, [&path](std::string_view suffix) { return path.ends_with(suffix); })) {
+        const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
+        return facing.has_value() ? std::optional{only(registry::opposite(*facing))} : std::nullopt;
+    }
+    // parity: `FaceAttachedHorizontalDirectionalBlock.getConnectedDirection`, which is `DOWN` for a
+    // ceiling, `UP` for a floor and the facing for a wall; what holds the block up is the opposite.
+    if (path == "lever" || path == "grindstone" || path.ends_with("_button")) {
+        const std::string face = valueOf(stateId, "face");
+        if (face == "floor") {
+            return only(BlockFace::Down);
+        }
+        if (face == "ceiling") {
+            return only(BlockFace::Up);
+        }
+        const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
+        return facing.has_value() ? std::optional{only(registry::opposite(*facing))} : std::nullopt;
+    }
+    // parity: `LanternBlock.getConnectedDirection`, `DOWN` when it hangs and `UP` when it stands. The
+    // property is what tells a lantern from a sea lantern, which is a full block and hangs on nothing.
+    if (path.ends_with("lantern")) {
+        const std::string hanging = valueOf(stateId, "hanging");
+        if (!hanging.empty()) {
+            return only(hanging == "true" ? BlockFace::Up : BlockFace::Down);
+        }
+        return std::nullopt;
+    }
+    // parity: `BigDripleafStemBlock`, the one that asks about both ends.
+    if (path == "big_dripleaf_stem") {
+        return static_cast<std::uint8_t>(only(BlockFace::Down) | only(BlockFace::Up));
+    }
+    // parity: `CocoaBlock`, which hangs on the jungle log its own face points at.
+    if (path == "cocoa") {
+        const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
+        return facing.has_value() ? std::optional{only(*facing)} : std::nullopt;
+    }
+    // parity: `BellBlock`. Its support is a floor below, a ceiling above or, on a wall, the square its
+    // own face points at, and a bell hung between two walls comes down from nothing at all: the test
+    // reads `attachment != DOUBLE_WALL` before it asks whether the bell can stay.
+    if (path == "bell") {
+        const std::string attachment = valueOf(stateId, "attachment");
+        if (attachment == "double_wall") {
+            return std::uint8_t{0};
+        }
+        if (attachment == "floor") {
+            return only(BlockFace::Down);
+        }
+        if (attachment == "ceiling") {
+            return only(BlockFace::Up);
+        }
+        const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
+        return facing.has_value() ? std::optional{only(*facing)} : std::nullopt;
+    }
+    // parity: `CeilingHangingSignBlock`, `SporeBlossomBlock`, `HangingRootsBlock`,
+    // `MangrovePropaguleBlock`, `DirtPathBlock` and `FarmlandBlock`, all gated on `UP`.
+    const bool ceilingSign = path.ends_with("_hanging_sign") && !path.ends_with("_wall_hanging_sign");
+    if (ceilingSign || path == "spore_blossom" || path == "hanging_roots" || path == "mangrove_propagule" ||
+        path == "dirt_path" || path == "farmland") {
+        return only(BlockFace::Up);
+    }
+    // parity: `BaseTorchBlock`, `CakeBlock`, `CandleCakeBlock`, `BasePressurePlateBlock`,
+    // `FlowerPotBlock`, `StandingSignBlock`, `BannerBlock` and `BigDripleafBlock`, all gated on `DOWN`.
+    const bool standingSign =
+        path.ends_with("_sign") && !path.ends_with("_wall_sign") && !path.ends_with("_hanging_sign");
+    const bool standingBanner = path.ends_with("_banner") && !path.ends_with("_wall_banner");
+    if (standingSign || standingBanner || path == "torch" || path == "soul_torch" || path == "redstone_torch" ||
+        path == "cake" || path.ends_with("candle_cake") || path.ends_with("_pressure_plate") || path == "flower_pot" ||
+        path.starts_with("potted_") || path == "big_dripleaf") {
+        return only(BlockFace::Down);
+    }
+    // Everything else falls from any side, which is what the eleven ungated families do and what a
+    // block whose survival is checked in `neighborChanged` does.
+    return std::nullopt;
+}
+
 } // namespace
 
 bool loosenedBy(std::int32_t stateId, std::optional<registry::BlockFace> towards) {
     if (!towards.has_value()) {
         return true;
     }
-    const std::string path = pathOf(stateId);
-    // parity: the wall-hung family, whose `updateShape` is one line apiece and all the same:
-    // `directionToNeighbour.getOpposite() == state.getValue(FACING)`. The block hangs on the square
-    // behind its face, and nothing else that happens around it can take it down.
-    static constexpr std::array<std::string_view, 6> kWallHungSuffixes{"tripwire_hook",     "wall_torch",  "wall_sign",
-                                                                       "wall_hanging_sign", "wall_banner", "wall_fan"};
-    const bool wallHung = path == "ladder" || std::ranges::any_of(kWallHungSuffixes, [&path](std::string_view suffix) {
-                              return path.ends_with(suffix);
-                          });
-    if (!wallHung) {
-        return true;
-    }
-    const std::string facing = valueOf(stateId, "facing");
-    static constexpr std::array<std::pair<std::string_view, BlockFace>, 4> kHorizontal{{{"north", BlockFace::North},
-                                                                                        {"south", BlockFace::South},
-                                                                                        {"west", BlockFace::West},
-                                                                                        {"east", BlockFace::East}}};
-    const auto named = std::ranges::find_if(kHorizontal, [&facing](const auto& one) { return one.first == facing; });
-    return named != kHorizontal.end() && *towards == registry::opposite(named->second);
+    const std::optional<std::uint8_t> sides = hangsOn(stateId);
+    return !sides.has_value() || (*sides & (1U << static_cast<std::uint8_t>(*towards))) != 0;
 }
 
 bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::optional<std::int32_t> stateId,

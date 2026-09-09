@@ -595,8 +595,11 @@ TEST_CASE("a column of bubbles carries the walk on as much as a block that moved
     for (std::int32_t y = 65; y <= 68; ++y) {
         loaded.put(8, y, 8, stateOf("water"));
     }
-    // Only reachable through the water the column climbed: nothing else beside the change moves.
-    loaded.put(7, 65, 8, stateOf("torch"));
+    // Only reachable through the water the column climbed: nothing else beside the change moves. The
+    // marker is a dust and not a torch because a torch checks its footing in `updateShape`, which is
+    // gated on the news coming from below, and the dust checks it in `neighborChanged`, which arrives
+    // from every side.
+    loaded.put(7, 65, 8, stateOf("redstone_wire"));
 
     Report report;
     neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),

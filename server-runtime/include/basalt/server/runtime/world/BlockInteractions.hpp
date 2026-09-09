@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -96,6 +97,15 @@ struct BlockRelease {
 /// `/setblock` of the same state updates the six squares around the lever and nothing more.
 [[nodiscard]] std::optional<std::array<std::int32_t, 3>> attachmentOf(std::int32_t stateId, std::int32_t x,
                                                                       std::int32_t y, std::int32_t z);
+
+/// The bell's own half of `updateShape`: a bell hung between two walls that loses one of them keeps
+/// hanging on the other, and a bell on one wall that gains a second joins the two.
+///
+/// parity: `BellBlock.updateShape`, the only `updateShape` in the game that rewrites a state rather
+/// than only deciding whether it stays. `towards` is the side the news arrives from, seen from the
+/// bell, and only news along the bell's own axis counts.
+[[nodiscard]] std::optional<std::int32_t> bellShape(const WorldState& world, std::int32_t x, std::int32_t y,
+                                                    std::int32_t z, std::int32_t stateId, registry::BlockFace towards);
 
 } // namespace blockInteractions
 

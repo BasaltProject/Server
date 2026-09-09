@@ -13,6 +13,23 @@
 namespace basalt::server::runtime::world::blockInteractions {
 namespace {
 
+[[nodiscard]] std::string_view faceName(registry::BlockFace face) {
+    switch (face) {
+    case registry::BlockFace::Down:
+        return "down";
+    case registry::BlockFace::Up:
+        return "up";
+    case registry::BlockFace::North:
+        return "north";
+    case registry::BlockFace::South:
+        return "south";
+    case registry::BlockFace::West:
+        return "west";
+    default:
+        return "east";
+    }
+}
+
 using Properties = std::map<std::string, std::string>;
 
 /// parity: `BlockSetType.canOpenByHand`, which is false for exactly one family that exists as a
@@ -297,6 +314,49 @@ std::optional<std::string> redstoneSound(std::int32_t stateId, bool open) {
         return std::nullopt;
     }
     return soundFor(*block, kind, open);
+}
+
+std::optional<std::int32_t> bellShape(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                      std::int32_t stateId, registry::BlockFace towards) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr || block->path() != "bell") {
+        return std::nullopt;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto attachment = properties.find("attachment");
+    const auto facing = properties.find("facing");
+    if (attachment == properties.end() || facing == properties.end()) {
+        return std::nullopt;
+    }
+    static constexpr std::array<std::pair<std::string_view, registry::BlockFace>, 4> kFacings{
+        {{"north", registry::BlockFace::North},
+         {"south", registry::BlockFace::South},
+         {"west", registry::BlockFace::West},
+         {"east", registry::BlockFace::East}}};
+    const auto named =
+        std::ranges::find_if(kFacings, [&facing](const auto& one) { return one.first == facing->second; });
+    if (named == kFacings.end() || registry::axisOf(named->second) != registry::axisOf(towards)) {
+        return std::nullopt;
+    }
+    const std::int32_t nx = x + registry::stepX(towards);
+    const std::int32_t ny = y + registry::stepY(towards);
+    const std::int32_t nz = z + registry::stepZ(towards);
+    const std::optional<std::int32_t> neighbour = world.blockState(nx, ny, nz);
+    if (!neighbour.has_value()) {
+        return std::nullopt;
+    }
+    // parity: the wall that has gone leaves the bell hanging on the other one, facing away from the gap.
+    if (attachment->second == "double_wall" && !registry::blockShapes::isFaceSturdy(*neighbour, towards)) {
+        return registry::blockStateDefinitions::stateIdOf(
+            *block, {{"attachment", "single_wall"}, {"facing", std::string{faceName(registry::opposite(towards))}}},
+            stateId);
+    }
+    // parity: and a second wall arriving on the far side joins the two.
+    if (attachment->second == "single_wall" && registry::opposite(named->second) == towards &&
+        registry::blockShapes::isFaceSturdy(*neighbour, named->second)) {
+        return registry::blockStateDefinitions::stateIdOf(*block, {{"attachment", "double_wall"}}, stateId);
+    }
+    return std::nullopt;
 }
 
 std::optional<std::array<std::int32_t, 3>> attachmentOf(std::int32_t stateId, std::int32_t x, std::int32_t y,

@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
@@ -288,6 +289,14 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     // command lives until something touches its wall.
     if (towards.has_value() && tripwires::hookFalls(world, x, y, z, *stateId, *towards)) {
         return registry::blocks::air().stateId;
+    }
+    // parity: `BellBlock.updateShape`, the one that rewrites the state instead of only deciding
+    // whether the block stays: a bell between two walls that loses one hangs on the other.
+    if (towards.has_value()) {
+        if (const std::optional<std::int32_t> rung = blockInteractions::bellShape(world, x, y, z, *stateId, *towards);
+            rung.has_value()) {
+            return rung;
+        }
     }
     // parity: `TripWireBlock.updateShape`, which draws a line of string as a line the same way the
     // dust does: every horizontal side follows `shouldConnectTo`.
