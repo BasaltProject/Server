@@ -1,9 +1,12 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/PoweredRails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
+#include <basalt/server/runtime/world/Shelves.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <array>
 #include <cstdint>
@@ -49,12 +52,13 @@ void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
 
 /// parity: `DoorBlock.playSound` and its two cousins, which is the same sound a hand makes and the
 /// same tenth of a tone of randomness.
-[[nodiscard]] std::vector<BlockEffect> openSound(const Hooks& hooks, std::int32_t stateId, bool open,
-                                                 random::RandomSource& random) {
-    if (!hooks.openSound) {
+[[nodiscard]] std::vector<BlockEffect> openSound(std::int32_t stateId, bool open, random::RandomSource& random) {
+    // parity: `DoorBlock.playSound` and its two cousins, the same sound a hand makes. It used to be a
+    // callback nobody ever filled in, so a door opened by redstone swung in silence.
+    const std::optional<std::string> sound = blockInteractions::redstoneSound(stateId, open);
+    if (!sound.has_value()) {
         return {};
     }
-    const std::optional<std::string> sound = hooks.openSound(stateId, open);
     if (!sound.has_value()) {
         return {};
     }
@@ -64,19 +68,35 @@ void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
                                .pitch = (random.nextFloat() * 0.1F) + 0.9F}};
 }
 
+/// parity: `Level.gameEvent(source, event, pos)`, which sends it from the middle of the square. The
+/// tracker is asked first because a door on a clock raises one of these every pulse and the search
+/// around a noise is a cube of seventeen a side.
+void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32_t y, std::int32_t z,
+           std::int64_t gameTime) {
+    if (!world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+        return;
+    }
+    vibrations::emit(world, event, x + 0.5, y + 0.5, z + 0.5, gameTime);
+}
+
 /// parity: `DoorBlock.neighborChanged`, which asks about its own half *and* the other one: a door
 /// opens from a signal reaching either end of it.
 void door(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-          std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes,
-          random::RandomSource& random, const Hooks& hooks) {
+          std::int32_t stateId, const Properties& properties, std::int64_t gameTime, std::vector<BlockChange>& changes,
+          random::RandomSource& random) {
     const std::int32_t otherHalf = valueOf(properties, "half") == "lower" ? 1 : -1;
     const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0 ||
                         redstone::bestNeighbourSignal(world, worldName, x, y + otherHalf, z) > 0;
     if (signal == poweredIn(properties)) {
         return;
     }
+    // parity: `DoorBlock.neighborChanged` raises the event **only when the door really swings**, not
+    // every time `powered` moves: a door already open that gets a second signal makes no noise.
+    if (signal != (valueOf(properties, "open") == "true")) {
+        heard(world, signal ? "block_open" : "block_close", x, y, z, gameTime);
+    }
     const Properties wanted{{"powered", signal ? "true" : "false"}, {"open", signal ? "true" : "false"}};
-    write(world, x, y, z, stateId, wanted, changes, openSound(hooks, stateId, signal, random));
+    write(world, x, y, z, stateId, wanted, changes, openSound(stateId, signal, random));
 
     // parity: `DoorBlock.updateShape`, where the other half copies this one rather than deciding for
     // itself. Without it a door opens halfway, which is not a state vanilla can be in.
@@ -90,14 +110,19 @@ void door(WorldState& world, std::string_view worldName, std::int32_t x, std::in
 
 /// parity: `TrapDoorBlock` and `FenceGateBlock`, which follow the signal with both properties.
 void openable(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-              std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes,
-              random::RandomSource& random, const Hooks& hooks) {
+              std::int32_t stateId, const Properties& properties, std::int64_t gameTime,
+              std::vector<BlockChange>& changes, random::RandomSource& random) {
     const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
     if (signal == poweredIn(properties)) {
         return;
     }
+    // parity: `TrapDoorBlock.neighborChanged` and `FenceGateBlock.neighborChanged`, both of which
+    // only make a noise when `open` itself moves.
+    if (signal != (valueOf(properties, "open") == "true")) {
+        heard(world, signal ? "block_open" : "block_close", x, y, z, gameTime);
+    }
     write(world, x, y, z, stateId, {{"powered", signal ? "true" : "false"}, {"open", signal ? "true" : "false"}},
-          changes, openSound(hooks, stateId, signal, random));
+          changes, openSound(stateId, signal, random));
 }
 
 /// parity: `HopperBlock.checkPoweredState`, which is the whole of it: a hopper with any signal
@@ -166,13 +191,19 @@ void bulb(WorldState& world, std::string_view worldName, std::int32_t x, std::in
 /// parity: `NoteBlock.neighborChanged`, which plays the note on the way up only: a signal going away
 /// is silent.
 void noteBlock(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-               std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
+               std::int32_t stateId, const Properties& properties, std::int64_t gameTime,
+               std::vector<BlockChange>& changes) {
     const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
     if (signal == poweredIn(properties)) {
         return;
     }
     std::vector<BlockEffect> effects =
         signal ? noteBlocks::playNote(world, x, y, z, stateId) : std::vector<BlockEffect>{};
+    // parity: `NoteBlock.playNote` raises `NOTE_BLOCK_PLAY` beside the sound, and only when the note
+    // really sounds: a note block with something on top of it is silent and so is the event.
+    if (!effects.empty()) {
+        heard(world, "note_block_play", x, y, z, gameTime);
+    }
     write(world, x, y, z, stateId, {{"powered", signal ? "true" : "false"}}, changes, std::move(effects));
 }
 
@@ -198,13 +229,17 @@ void noteBlock(WorldState& world, std::string_view worldName, std::int32_t x, st
 
 /// parity: `BellBlock.neighborChanged` into `attemptToRing`, which swings it the way it faces.
 void bell(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-          std::int32_t stateId, const Properties& properties, std::vector<BlockChange>& changes) {
+          std::int32_t stateId, const Properties& properties, std::int64_t gameTime,
+          std::vector<BlockChange>& changes) {
     const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
     if (signal == poweredIn(properties)) {
         return;
     }
     std::vector<BlockEffect> effects;
     if (signal) {
+        // parity: `BellBlock.attemptToRing` raises `BLOCK_CHANGE`, which is eleven, beside the sound.
+        // Only the ring: letting the signal go rings nothing and says nothing.
+        heard(world, "block_change", x, y, z, gameTime);
         effects.push_back(blockEffect::Event{.b0 = 1, .b1 = facingValue(valueOf(properties, "facing"))});
         effects.push_back(blockEffect::Sound{.name = "block.bell.use",
                                              .source = wire::protocol::play::SoundSource::Blocks,
@@ -232,7 +267,7 @@ void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int
 }
 
 void react(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-           std::vector<BlockChange>& changes, random::RandomSource& random, const Hooks& hooks) {
+           std::int64_t gameTime, std::vector<BlockChange>& changes, random::RandomSource& random) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -244,11 +279,11 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
 
     if (path.ends_with("_door") && properties.contains("half")) {
-        door(world, worldName, x, y, z, *stateId, properties, changes, random, hooks);
+        door(world, worldName, x, y, z, *stateId, properties, gameTime, changes, random);
         return;
     }
     if (path.ends_with("_trapdoor") || path.ends_with("_fence_gate")) {
-        openable(world, worldName, x, y, z, *stateId, properties, changes, random, hooks);
+        openable(world, worldName, x, y, z, *stateId, properties, gameTime, changes, random);
         return;
     }
     if (path == "redstone_lamp") {
@@ -270,7 +305,7 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         return;
     }
     if (path == "note_block") {
-        noteBlock(world, worldName, x, y, z, *stateId, properties, changes);
+        noteBlock(world, worldName, x, y, z, *stateId, properties, gameTime, changes);
         return;
     }
     if (path == "tnt") {
@@ -284,11 +319,12 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         return;
     }
     if (path == "bell") {
-        bell(world, worldName, x, y, z, *stateId, properties, changes);
+        bell(world, worldName, x, y, z, *stateId, properties, gameTime, changes);
         return;
     }
-    if (hooks.reactShelf) {
-        hooks.reactShelf(world, x, y, z, changes);
+    if (shelves::isShelf(path)) {
+        // parity: `ShelfBlock.neighborChanged`, which joins or breaks its chain with the signal.
+        shelves::reactToSignal(world, worldName, x, y, z, changes);
     }
 }
 
@@ -300,26 +336,27 @@ const wire::common::Identifier& lamp() {
 }
 
 std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
-                                std::int32_t z, random::RandomSource& random, const Hooks& hooks, const bool itself) {
+                                std::int32_t z, std::int64_t gameTime, random::RandomSource& random,
+                                const bool itself) {
     std::vector<BlockChange> changes;
     if (itself) {
-        react(world, worldName, x, y, z, changes, random, hooks);
+        react(world, worldName, x, y, z, gameTime, changes, random);
     }
     for (const BlockFace face : kUpdateOrder) {
         react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
-              changes, random, hooks);
+              gameTime, changes, random);
     }
     return changes;
 }
 
 std::vector<BlockChange> updateAroundWire(WorldState& world, const std::string_view worldName, const std::int32_t x,
-                                          const std::int32_t y, const std::int32_t z, random::RandomSource& random,
-                                          const Hooks& hooks) {
-    std::vector<BlockChange> changes = update(world, worldName, x, y, z, random, hooks);
+                                          const std::int32_t y, const std::int32_t z, const std::int64_t gameTime,
+                                          random::RandomSource& random) {
+    std::vector<BlockChange> changes = update(world, worldName, x, y, z, gameTime, random);
     for (const BlockFace face : kUpdateOrder) {
         const std::vector<BlockChange> further =
             update(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
-                   random, hooks);
+                   gameTime, random);
         changes.insert(changes.end(), further.begin(), further.end());
     }
     return changes;

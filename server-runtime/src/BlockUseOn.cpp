@@ -71,7 +71,8 @@ world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::Ra
                                             .minY = facts.chunkHeight.minY(),
                                             .maxY = facts.chunkHeight.maxY(),
                                             .random = random,
-                                            .hasSkylight = facts.hasSkylight};
+                                            .hasSkylight = facts.hasSkylight,
+                                            .gameTime = world.gameTime()};
 }
 
 } // namespace

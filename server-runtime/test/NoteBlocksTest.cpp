@@ -105,17 +105,6 @@ TEST_CASE("a note block retunes when what is under it changes") {
     CHECK_FALSE(noteBlocks::retune(world, 8, 63, 8, *world.blockState(8, 63, 8)).has_value());
 }
 
-TEST_CASE("a note block is tuned to what it is placed on") {
-    WorldState world = emptyWorld();
-    world.getOrGenerateChunk(0, 0);
-    REQUIRE(world.setBlockState(8, 63, 8, stateOf("gold_block")));
-
-    const std::int32_t placed = noteBlocks::placed(world, 8, 64, 8, stateOf("note_block"));
-    CHECK(propertyOf(placed, "instrument") == "bell");
-    // Anything else is handed back exactly as it came.
-    CHECK(noteBlocks::placed(world, 8, 64, 8, stateOf("stone")) == stateOf("stone"));
-}
-
 TEST_CASE("a note block with something on top stays quiet") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);

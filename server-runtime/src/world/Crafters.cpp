@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
@@ -58,16 +59,19 @@ constexpr std::string_view kTriggeredKey = "triggered";
 
 /// Puts the result into the container in front, answering whether it fitted.
 [[nodiscard]] bool insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                          const server::world::loot::ItemStack& stack, const Hooks& hooks) {
+                          const server::world::loot::ItemStack& stack) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (!stateId.has_value() || !hooks.containerSize) {
+    if (!stateId.has_value()) {
         return false;
     }
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     if (block == nullptr) {
         return false;
     }
-    const std::optional<std::int32_t> size = hooks.containerSize(block->path());
+    // How big the container in front is. This used to go through a callback that the one production
+    // caller never filled in, so `insert` always answered no and a crafter threw every result on the
+    // floor instead of putting it in the chest it was pointing at.
+    const std::optional<std::int32_t> size = containers::sizeOf(block->path());
     if (!size.has_value()) {
         return false;
     }
@@ -100,7 +104,7 @@ void deliver(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, 
     const std::int32_t tx = x + step[0];
     const std::int32_t ty = y + step[1];
     const std::int32_t tz = z + step[2];
-    if (insert(world, tx, ty, tz, result, hooks)) {
+    if (insert(world, tx, ty, tz, result)) {
         return;
     }
     world.spawnItem(DroppedItem{.entityId = hooks.allocateEntityId ? hooks.allocateEntityId() : 0,

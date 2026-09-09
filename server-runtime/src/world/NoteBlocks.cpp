@@ -72,16 +72,6 @@ std::optional<std::int32_t> retune(WorldState& world, std::int32_t x, std::int32
     return tuned;
 }
 
-std::int32_t placed(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
-    const wire::common::Identifier* here = registry::blockStateDefinitions::blockOf(stateId);
-    if (here == nullptr || *here != block()) {
-        return stateId;
-    }
-    const std::optional<std::int32_t> tuned = registry::blockStateDefinitions::stateIdOf(
-        block(), {{"instrument", std::string{instrumentAt(world, x, y, z).serializedName()}}}, stateId);
-    return tuned.value_or(stateId);
-}
-
 std::vector<BlockEffect> playNote(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                   std::int32_t stateId) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);

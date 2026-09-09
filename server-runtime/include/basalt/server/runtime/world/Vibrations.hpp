@@ -51,10 +51,6 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
 [[nodiscard]] std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                               std::int64_t gameTime);
 
-/// How far a vibration reaches, for the callers that filter before they emit.
-[[nodiscard]] bool isInRange(std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ, double x, double y,
-                             double z);
-
 } // namespace vibrations
 
 } // namespace basalt::server::runtime::world

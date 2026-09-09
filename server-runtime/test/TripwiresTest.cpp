@@ -3,9 +3,11 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <doctest.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -73,7 +75,7 @@ TEST_CASE("two hooks with string between them draw taut") {
     layLine(world, 3);
 
     std::vector<BlockChange> changes;
-    tripwires::calculateHook(world, 4, 64, 8, changes);
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
     CHECK_FALSE(changes.empty());
 
     // parity: attached means the line reached the hook pointing back, string unbroken.
@@ -95,7 +97,7 @@ TEST_CASE("a broken line is not attached at all") {
     REQUIRE(world.setBlockState(6, 64, 8, stateOf("stone")));
 
     std::vector<BlockChange> changes;
-    tripwires::calculateHook(world, 4, 64, 8, changes);
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
     CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
     CHECK(propertyAt(world, 8, 64, 8, "attached") == "false");
 }
@@ -108,7 +110,7 @@ TEST_CASE("two hooks side by side are not a line") {
     REQUIRE(world.setBlockState(5, 64, 8, hookOf("west")));
 
     std::vector<BlockChange> changes;
-    tripwires::calculateHook(world, 4, 64, 8, changes);
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
     CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
 }
 
@@ -124,7 +126,7 @@ TEST_CASE("a hook that does not point back is not the other end") {
     REQUIRE(world.setBlockState(8, 64, 8, hookOf("east")));
 
     std::vector<BlockChange> changes;
-    tripwires::calculateHook(world, 4, 64, 8, changes);
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
     CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
     CHECK(propertyAt(world, 6, 64, 8, "attached") == "false");
 }
@@ -134,10 +136,10 @@ TEST_CASE("standing on the string powers both hooks") {
     world.getOrGenerateChunk(0, 0);
     layLine(world, 3);
     std::vector<BlockChange> changes;
-    tripwires::calculateHook(world, 4, 64, 8, changes);
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
     changes.clear();
 
-    tripwires::press(world, 6, 64, 8, true, changes);
+    tripwires::press(world, 6, 64, 8, true, 1, changes);
     CHECK_FALSE(changes.empty());
     CHECK(propertyAt(world, 6, 64, 8, "powered") == "true");
     // parity: the hook is the part that gives off redstone, and both ends of the line follow.
@@ -148,12 +150,12 @@ TEST_CASE("standing on the string powers both hooks") {
 
     // Still stood on: nothing changed, so nothing is reported and the whole line is left alone.
     changes.clear();
-    tripwires::press(world, 6, 64, 8, true, changes);
+    tripwires::press(world, 6, 64, 8, true, 1, changes);
     CHECK(changes.empty());
 
     // And letting go puts both hooks out.
     changes.clear();
-    tripwires::press(world, 6, 64, 8, false, changes);
+    tripwires::press(world, 6, 64, 8, false, 1, changes);
     CHECK(propertyAt(world, 6, 64, 8, "powered") == "false");
     CHECK(propertyAt(world, 4, 64, 8, "powered") == "false");
     CHECK(propertyAt(world, 8, 64, 8, "powered") == "false");
@@ -167,7 +169,7 @@ TEST_CASE("string cut with shears powers nothing") {
     REQUIRE(world.setBlockState(6, 64, 8, wireOf("true", "true", "true")));
 
     std::vector<BlockChange> changes;
-    tripwires::calculateHook(world, 4, 64, 8, changes);
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
     CHECK(propertyAt(world, 4, 64, 8, "attached") == "true");
     CHECK(propertyAt(world, 4, 64, 8, "powered") == "false");
 }
@@ -182,7 +184,7 @@ TEST_CASE("a string with nothing at both ends powers nothing") {
     }
 
     std::vector<BlockChange> changes;
-    tripwires::press(world, 6, 64, 8, true, changes);
+    tripwires::press(world, 6, 64, 8, true, 1, changes);
     CHECK(propertyAt(world, 6, 64, 8, "powered") == "true");
     CHECK(propertyAt(world, 4, 64, 8, "powered") == "false");
     CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
@@ -205,9 +207,72 @@ TEST_CASE("what is not a wire and what is not a hook") {
     REQUIRE(world.setBlockState(4, 64, 8, stateOf("stone")));
 
     std::vector<BlockChange> changes;
-    tripwires::press(world, 4, 64, 8, true, changes);
-    tripwires::calculateHook(world, 4, 64, 8, changes);
-    tripwires::press(world, 500, 64, 500, true, changes);
-    tripwires::calculateHook(world, 500, 64, 500, changes);
+    tripwires::press(world, 4, 64, 8, true, 1, changes);
+    tripwires::calculateHook(world, 4, 64, 8, 1, changes);
+    tripwires::press(world, 500, 64, 500, true, 1, changes);
+    tripwires::calculateHook(world, 500, 64, 500, 1, changes);
     CHECK(changes.empty());
+}
+
+TEST_CASE("a hook that clicks tells a sculk sensor, and the click wins over the catch") {
+    // parity: `TripWireHookBlock.emitState` is an else-if chain over four events, so a hook that both
+    // catches and clicks on the same call raises **one**: `BLOCK_ACTIVATE`. Both ends of the line
+    // raise it, and both read the near hook's own old state. None of them were raised here.
+    const auto sleepingSensor = [] {
+        const std::optional<std::int32_t> state = registry::blockStateDefinitions::stateIdOf(
+            Identifier::vanilla("sculk_sensor"),
+            {{"sculk_sensor_phase", "inactive"}, {"power", "0"}, {"waterlogged", "false"}}, std::nullopt);
+        REQUIRE(state.has_value());
+        return *state;
+    };
+    const auto frequencyAt = [](const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+        const Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        REQUIRE(chunk != nullptr);
+        const basalt::server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+        return entity == nullptr ? -1 : entity->data().getInt(std::string{vibrations::kFrequencyKey}, -1);
+    };
+    const auto settle = [](WorldState& world, std::int64_t& now, std::int32_t turns) {
+        for (std::int32_t turn = 0; turn < turns; ++turn) {
+            ++now;
+            for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
+                static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], now));
+            }
+        }
+    };
+
+    SUBCASE("something stepping on the string is a block_activate") {
+        WorldState world = emptyWorld();
+        world.getOrGenerateChunk(0, 0);
+        layLine(world, 3);
+        REQUIRE(world.setBlockState(4, 64, 10, sleepingSensor()));
+        std::vector<BlockChange> changes;
+        std::int64_t now = 1;
+        tripwires::calculateHook(world, 4, 64, 8, now, changes);
+
+        tripwires::press(world, 5, 64, 8, true, now, changes);
+        REQUIRE(propertyAt(world, 4, 64, 8, "powered") == "true");
+        settle(world, now, 4);
+
+        CHECK(propertyAt(world, 4, 64, 10, "sculk_sensor_phase") == "active");
+        CHECK(frequencyAt(world, 4, 64, 10) == 10);
+    }
+
+    SUBCASE("stepping off it is a block_deactivate") {
+        WorldState world = emptyWorld();
+        world.getOrGenerateChunk(0, 0);
+        layLine(world, 3);
+        std::vector<BlockChange> changes;
+        std::int64_t now = 1;
+        tripwires::calculateHook(world, 4, 64, 8, now, changes);
+        tripwires::press(world, 5, 64, 8, true, now, changes);
+        REQUIRE(propertyAt(world, 4, 64, 8, "powered") == "true");
+        // The sensor goes down after the line is already pressed, so what it hears is the release.
+        REQUIRE(world.setBlockState(4, 64, 10, sleepingSensor()));
+
+        tripwires::press(world, 5, 64, 8, false, now, changes);
+        REQUIRE(propertyAt(world, 4, 64, 8, "powered") == "false");
+        settle(world, now, 4);
+
+        CHECK(frequencyAt(world, 4, 64, 10) == 9);
+    }
 }

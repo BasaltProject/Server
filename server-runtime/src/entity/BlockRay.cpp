@@ -139,4 +139,49 @@ std::optional<BlockHit> cast(world::WorldState& world, double fromX, double from
     return std::nullopt;
 }
 
+bool crosses(world::WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY, double toZ,
+             const std::function<bool(std::int32_t stateId)>& matches) {
+    const double dx = toX - fromX;
+    const double dy = toY - fromY;
+    const double dz = toZ - fromZ;
+
+    auto blockX = static_cast<std::int32_t>(std::floor(fromX));
+    auto blockY = static_cast<std::int32_t>(std::floor(fromY));
+    auto blockZ = static_cast<std::int32_t>(std::floor(fromZ));
+    const auto endX = static_cast<std::int32_t>(std::floor(toX));
+    const auto endY = static_cast<std::int32_t>(std::floor(toY));
+    const auto endZ = static_cast<std::int32_t>(std::floor(toZ));
+
+    const std::int32_t stepX = dx > 0 ? 1 : -1;
+    const std::int32_t stepY = dy > 0 ? 1 : -1;
+    const std::int32_t stepZ = dz > 0 ? 1 : -1;
+    const double deltaX = dx == 0.0 ? std::numeric_limits<double>::max() : std::abs(1.0 / dx);
+    const double deltaY = dy == 0.0 ? std::numeric_limits<double>::max() : std::abs(1.0 / dy);
+    const double deltaZ = dz == 0.0 ? std::numeric_limits<double>::max() : std::abs(1.0 / dz);
+    double nextX = dx == 0.0 ? std::numeric_limits<double>::max() : boundary(fromX, dx) / dx;
+    double nextY = dy == 0.0 ? std::numeric_limits<double>::max() : boundary(fromY, dy) / dy;
+    double nextZ = dz == 0.0 ? std::numeric_limits<double>::max() : boundary(fromZ, dz) / dz;
+
+    for (std::int32_t steps = 0; steps < kMaxSteps; ++steps) {
+        const std::optional<std::int32_t> stateId = world.blockState(blockX, blockY, blockZ);
+        if (stateId.has_value() && matches(*stateId)) {
+            return true;
+        }
+        if (blockX == endX && blockY == endY && blockZ == endZ) {
+            return false;
+        }
+        if (nextX < nextY && nextX < nextZ) {
+            blockX += stepX;
+            nextX += deltaX;
+        } else if (nextY < nextZ) {
+            blockY += stepY;
+            nextY += deltaY;
+        } else {
+            blockZ += stepZ;
+            nextZ += deltaZ;
+        }
+    }
+    return false;
+}
+
 } // namespace basalt::server::runtime::entity::blockRay

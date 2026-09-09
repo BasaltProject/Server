@@ -257,6 +257,50 @@ TEST_CASE("the reach is a sphere of eight, not the cube it is walked in") {
     CHECK_FALSE(hears(9, 0, 0));
 }
 
+TEST_CASE("wool in the line hides a noise, and wool beside it hides nothing") {
+    const auto wool = [] { return stateOf("white_wool", {}); };
+
+    SUBCASE("one block in the way is enough") {
+        Bench bench;
+        bench.world.getOrGenerateChunk(0, 0);
+        REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+        REQUIRE(bench.world.setBlockState(9, 64, 8, wool()));
+
+        vibrations::emit(bench.world, "eat", 10.5, 64.5, 8.5, bench.now);
+        bench.advance(6);
+
+        // parity: `isOccluded` wants all six lines blocked, and with the nudge at a hundred
+        // thousandth all six cross the same square. Wool between the two is wool between the two.
+        CHECK(bench.changes.empty());
+    }
+
+    SUBCASE("wool out of the line changes nothing") {
+        Bench bench;
+        bench.world.getOrGenerateChunk(0, 0);
+        REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+        REQUIRE(bench.world.setBlockState(9, 64, 9, wool()));
+        REQUIRE(bench.world.setBlockState(9, 65, 8, wool()));
+
+        vibrations::emit(bench.world, "eat", 10.5, 64.5, 8.5, bench.now);
+        bench.advance(4);
+
+        CHECK(bench.changes.size() == 1);
+    }
+
+    SUBCASE("anything that is not wool lets it through") {
+        Bench bench;
+        bench.world.getOrGenerateChunk(0, 0);
+        REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+        // parity: the tag is `#minecraft:wool` and nothing else, so a wall of stone hides nothing.
+        REQUIRE(bench.world.setBlockState(9, 64, 8, stateOf("stone", {})));
+
+        vibrations::emit(bench.world, "eat", 10.5, 64.5, 8.5, bench.now);
+        bench.advance(4);
+
+        CHECK(bench.changes.size() == 1);
+    }
+}
+
 TEST_CASE("a calibrated sensor listens the same way") {
     Bench bench;
     bench.world.getOrGenerateChunk(0, 0);
@@ -329,11 +373,24 @@ TEST_CASE("the source block is the one the position falls in, negative or not") 
     CHECK(bench.changes.empty());
 }
 
-TEST_CASE("the cheap filter callers use is the cube, and it is eight either way") {
-    CHECK(vibrations::isInRange(0, 0, 0, 8.0, 0.0, 0.0));
-    CHECK(vibrations::isInRange(0, 0, 0, -8.0, 0.0, 0.0));
-    CHECK(vibrations::isInRange(0, 0, 0, 8.0, 8.0, 8.0));
-    CHECK_FALSE(vibrations::isInRange(0, 0, 0, 8.5, 0.0, 0.0));
-    CHECK_FALSE(vibrations::isInRange(0, 0, 0, 0.0, -8.5, 0.0));
-    CHECK_FALSE(vibrations::isInRange(0, 0, 0, 0.0, 0.0, 9.0));
+TEST_CASE("a chunk that arrives with a sensor in it is known before anybody touches it") {
+    // The tracker is what a footstep asks before it looks around, so a sensor it does not know about
+    // is a sensor that hears nobody walk. Until this, only sensors placed or broken at runtime were
+    // in it: one that came with the terrain counted for nothing.
+    WorldState world{{}, [](std::int32_t chunkX, std::int32_t chunkZ) {
+                         Chunk chunk{chunkX, chunkZ};
+                         if (chunkX == 0 && chunkZ == 0) {
+                             chunk.setBlockEntity(basalt::server::world::ChunkBlockEntity{
+                                 8, 64, 8, basalt::wire::common::Identifier::vanilla("sculk_sensor"),
+                                 basalt::wire::nbt::NbtCompound{}});
+                         }
+                         return chunk;
+                     }};
+    CHECK_FALSE(world.hasSculkSensorNear(8.5, 64.5, 8.5, vibrations::kRange));
+
+    world.getOrGenerateChunk(0, 0);
+
+    CHECK(world.hasSculkSensorNear(8.5, 64.5, 8.5, vibrations::kRange));
+    // A sensor sixteen squares away is out of the eight the listener reaches.
+    CHECK_FALSE(world.hasSculkSensorNear(30.5, 64.5, 8.5, vibrations::kRange));
 }

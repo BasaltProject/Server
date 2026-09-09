@@ -72,10 +72,7 @@ void fill(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, con
             }
             return ItemStack{.item = item("oak_planks"), .count = 1};
         },
-        .allocateEntityId = [] { return 7; },
-        .containerSize = [](std::string_view path) -> std::optional<std::int32_t> {
-            return path == "chest" ? std::optional{27} : std::nullopt;
-        }};
+        .allocateEntityId = [] { return 7; }};
 }
 
 } // namespace

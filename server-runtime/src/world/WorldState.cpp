@@ -147,9 +147,12 @@ std::size_t WorldState::evictClean(const std::vector<Chunk*>& chunks) {
             continue;
         }
         const std::int64_t chunkKey = key(chunk->chunkX(), chunk->chunkZ());
+        const std::int32_t chunkX = chunk->chunkX();
+        const std::int32_t chunkZ = chunk->chunkZ();
         if (chunksByPos_.erase(chunkKey) != 0) {
             pendingDecorations_.forgetGeneratedEntities(chunkKey);
             pendingDecorations_.forgetGeneratedWriteSources(chunkKey);
+            sculkSensors_.forgetChunk(chunkX, chunkZ);
             ++removed;
         }
     }
@@ -329,6 +332,9 @@ Chunk& WorldState::installLocked(Chunk chunk) {
         return chunkAtLocked(key(otherX, otherZ));
     };
     redoShapes(installed, chunkAtPos);
+    // Every sculk sensor the chunk brought with it, so a footstep next to one that nobody has ever
+    // touched is still heard.
+    sculkSensors_.rememberChunk(installed);
     // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked, which is what
     // starts a lake running. Scheduling is this world's way of saying the same thing.
     for (const server::world::ChunkShapeUpdate& mark : installed.fluidUpdates()) {
