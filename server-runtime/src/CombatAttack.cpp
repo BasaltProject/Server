@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -133,6 +134,8 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         owner_->broadcastSound(kSoundAttackNoDamage, session->x, session->y, session->z, SoundSource::Players);
         return;
     }
+    // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
+    world::vibrations::emit(world->state(), "entity_damage", target->x, target->y, target->z, world->gameTime());
     // parity: `causeExtraKnockback`, which is the half a sprinting hit adds and nothing else without
     // enchantments: the 0.4 every hit is worth was already taken inside the hit.
     if (knockbackAttack) {
@@ -208,6 +211,7 @@ void CombatHandler::sweepAround(PlayerSession& session, const ServerEntity& targ
         if (!result.landed) {
             continue;
         }
+        world::vibrations::emit(world.state(), "entity_damage", nearby->x, nearby->y, nearby->z, world.gameTime());
         broadcastDamageEvent(*nearby, world::damageTypes::kPlayerAttack, session.entityId());
         broadcastMotion(*nearby);
         if (result.died) {

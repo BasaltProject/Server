@@ -3,6 +3,7 @@
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -83,8 +84,15 @@ private:
     /// Fires the inventory trigger once a tick, when something moved.
     void checkAdvancements(player::PlayerSession& session);
 
+    /// parity: `LivingEntity.handleEquipmentChanges`, which raises `EQUIP` or `UNEQUIP` for a slot
+    /// whose stack moved, and `Player.doesEmitEquipEvent` narrows that to the four armour slots. It
+    /// is silent on the first tick, which is what the empty snapshot below stands for.
+    void checkEquipment(player::PlayerSession& session);
+
     ClientSession* owner_;
     Hooks hooks_;
+    /// What the four armour slots held last turn, to see what moved. Empty until the first turn.
+    std::optional<std::array<std::optional<storage::StoredItemStack>, 4>> worn_;
 };
 
 } // namespace basalt::server::runtime

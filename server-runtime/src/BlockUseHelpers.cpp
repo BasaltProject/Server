@@ -331,15 +331,29 @@ bool BlockInteractionHandler::placeMinecart(PlayerSession& session, const Identi
         path == "minecart"
             ? item
             : Identifier::vanilla(path.substr(0, path.size() - std::string_view{"_minecart"}.size()) + "_minecart");
-    return spawnFromItem(session, type, heldSlot, held, hit.pos.x + 0.5, hit.pos.y + kMinecartRestHeight + slope,
-                         hit.pos.z + 0.5);
+    if (!spawnFromItem(session, type, heldSlot, held, hit.pos.x + 0.5, hit.pos.y + kMinecartRestHeight + slope,
+                       hit.pos.z + 0.5)) {
+        return false;
+    }
+    // parity: `MinecartItem` raises `ENTITY_PLACE` at the rail's own square, not at the cart.
+    heardBySculk("entity_place", hit.pos);
+    return true;
 }
 
 bool BlockInteractionHandler::placeBoat(PlayerSession& session, const Identifier& item, std::int32_t heldSlot,
                                         const storage::StoredItemStack& held, const play::BlockHitResult& hit) {
     // parity: `getBoat` puts it at the hit itself, which is the face of the block clicked.
     const BlockPos at = hit.pos.offset(hit.direction);
-    return spawnFromItem(session, item, heldSlot, held, at.x + 0.5, static_cast<double>(at.y), at.z + 0.5);
+    if (!spawnFromItem(session, item, heldSlot, held, at.x + 0.5, static_cast<double>(at.y), at.z + 0.5)) {
+        return false;
+    }
+    // parity: `BoatItem` raises `ENTITY_PLACE` at the exact point clicked, not at the square.
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        world::vibrations::emit(world->state(), "entity_place", hit.pos.x + static_cast<double>(hit.clickX),
+                                hit.pos.y + static_cast<double>(hit.clickY),
+                                hit.pos.z + static_cast<double>(hit.clickZ), world->gameTime());
+    }
+    return true;
 }
 
 bool BlockInteractionHandler::useSpawnEgg(PlayerSession& session, const Identifier& egg, std::int32_t heldSlot,
@@ -356,7 +370,12 @@ bool BlockInteractionHandler::useSpawnEgg(PlayerSession& session, const Identifi
     }
     // parity: the mob lands on the face that was clicked, unless the block has no collision at all.
     const BlockPos at = reg::blockShapes::isEmptyShape(*clicked) ? hit.pos : hit.pos.offset(hit.direction);
-    return spawnFromItem(session, type, heldSlot, held, at.x + 0.5, static_cast<double>(at.y), at.z + 0.5);
+    if (!spawnFromItem(session, type, heldSlot, held, at.x + 0.5, static_cast<double>(at.y), at.z + 0.5)) {
+        return false;
+    }
+    // parity: `SpawnEggItem.spawnsFrom` raises `ENTITY_PLACE` at the square the mob lands on.
+    heardBySculk("entity_place", at);
+    return true;
 }
 
 void BlockInteractionHandler::giveOrDrop(PlayerSession& session, const storage::StoredItemStack& stack,

@@ -155,15 +155,17 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
     for (const world::BlockChange& moved : settled) {
         announceBlock(watchers, moved);
     }
-    for (const world::BlockChange& reacted : world::redstoneReactors::update(
-             world.state(), world.name(), change.x, change.y, change.z, world.gameTime(), random)) {
+    for (const world::BlockChange& reacted :
+         world::redstoneReactors::update(world.state(), world.name(), change.x, change.y, change.z, world.gameTime(),
+                                         random, world.gameRules().get(world::gameRules::kTntExplodes))) {
         announceBlock(watchers, reacted);
     }
     // parity: every piece of dust that moved tells its own neighbours, so a lamp at the end of the
     // line lights rather than waiting for something to touch it.
     for (const world::BlockChange& moved : settled) {
         for (const world::BlockChange& reacted : world::redstoneReactors::updateAroundWire(
-                 world.state(), world.name(), moved.x, moved.y, moved.z, world.gameTime(), random)) {
+                 world.state(), world.name(), moved.x, moved.y, moved.z, world.gameTime(), random,
+                 world.gameRules().get(world::gameRules::kTntExplodes))) {
             announceBlock(watchers, reacted);
         }
     }

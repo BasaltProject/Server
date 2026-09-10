@@ -166,8 +166,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             // parity: `SculkSensorBlock.updateNeighbours` tells the square **below** as well. A
             // sensor only feeds strongly upwards, so what is under it would never hear it otherwise.
             random::RandomSource sensorRandom = freshRandom();
-            const std::vector<world::BlockChange> under = world::redstoneReactors::update(
-                world.state(), world.name(), x, y - 1, z, world.gameTime(), sensorRandom);
+            const std::vector<world::BlockChange> under =
+                world::redstoneReactors::update(world.state(), world.name(), x, y - 1, z, world.gameTime(),
+                                                sensorRandom, world.gameRules().get(world::gameRules::kTntExplodes));
             scheduled.insert(scheduled.end(), under.begin(), under.end());
         }
         // parity: `BigDripleafBlock.tick`, the stage it takes next: ten ticks each on the way down
@@ -248,11 +249,13 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             // parity: `Level.updateNeighborsAt` after the component wrote its new state, which is
             // what lights the lamp on a repeater's output side.
             const std::vector<world::BlockChange> reacted = world::redstoneReactors::update(
-                world.state(), world.name(), moved->x, moved->y, moved->z, world.gameTime(), random);
+                world.state(), world.name(), moved->x, moved->y, moved->z, world.gameTime(), random,
+                world.gameRules().get(world::gameRules::kTntExplodes));
             scheduled.insert(scheduled.end(), reacted.begin(), reacted.end());
             for (const world::BlockChange& change : settled) {
                 const std::vector<world::BlockChange> around = world::redstoneReactors::updateAroundWire(
-                    world.state(), world.name(), change.x, change.y, change.z, world.gameTime(), random);
+                    world.state(), world.name(), change.x, change.y, change.z, world.gameTime(), random,
+                    world.gameRules().get(world::gameRules::kTntExplodes));
                 scheduled.insert(scheduled.end(), around.begin(), around.end());
             }
         }

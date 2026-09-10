@@ -253,7 +253,12 @@ void bell(WorldState& world, std::string_view worldName, std::int32_t x, std::in
 /// parity: `TntBlock.neighborChanged`, which lights it and takes the block away. What is left is the
 /// entity, which the caller spawns when it sees the block go.
 void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-         std::vector<BlockChange>& changes) {
+         bool tntExplodes, std::vector<BlockChange>& changes) {
+    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off, and `neighborChanged`
+    // only removes the block when it answered true, so the tnt stays where it is.
+    if (!tntExplodes) {
+        return;
+    }
     // parity: `neighborChanged` does not look at `unstable`. That property is read in one place only,
     // `playerWillDestroy`, where it decides whether breaking the block by hand lights it: a signal
     // lights an unstable block exactly as it lights any other.
@@ -268,7 +273,7 @@ void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int
 }
 
 void react(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-           std::int64_t gameTime, std::vector<BlockChange>& changes, random::RandomSource& random) {
+           std::int64_t gameTime, bool tntExplodes, std::vector<BlockChange>& changes, random::RandomSource& random) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -319,7 +324,7 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         return;
     }
     if (path == "tnt") {
-        tnt(world, worldName, x, y, z, changes);
+        tnt(world, worldName, x, y, z, tntExplodes, changes);
         return;
     }
     if (path == "powered_rail" || path == "activator_rail") {
@@ -347,26 +352,26 @@ const wire::common::Identifier& lamp() {
 
 std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                                 std::int32_t z, std::int64_t gameTime, random::RandomSource& random,
-                                const bool itself) {
+                                const bool tntExplodes, const bool itself) {
     std::vector<BlockChange> changes;
     if (itself) {
-        react(world, worldName, x, y, z, gameTime, changes, random);
+        react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random);
     }
     for (const BlockFace face : kUpdateOrder) {
         react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
-              gameTime, changes, random);
+              gameTime, tntExplodes, changes, random);
     }
     return changes;
 }
 
 std::vector<BlockChange> updateAroundWire(WorldState& world, const std::string_view worldName, const std::int32_t x,
                                           const std::int32_t y, const std::int32_t z, const std::int64_t gameTime,
-                                          random::RandomSource& random) {
-    std::vector<BlockChange> changes = update(world, worldName, x, y, z, gameTime, random);
+                                          random::RandomSource& random, const bool tntExplodes) {
+    std::vector<BlockChange> changes = update(world, worldName, x, y, z, gameTime, random, tntExplodes);
     for (const BlockFace face : kUpdateOrder) {
         const std::vector<BlockChange> further =
             update(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
-                   gameTime, random);
+                   gameTime, random, tntExplodes);
         changes.insert(changes.end(), further.begin(), further.end());
     }
     return changes;

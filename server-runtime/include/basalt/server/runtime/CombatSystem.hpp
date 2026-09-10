@@ -71,7 +71,7 @@ private:
                                                            const std::vector<entity::ServerEntity*>& living,
                                                            const entity::ServerEntity& projectile);
 
-    bool hitEntityAlong(const std::vector<player::PlayerSession*>& watchers,
+    bool hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& arrow, double fromX,
                         double fromY, double fromZ);
 

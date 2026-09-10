@@ -121,6 +121,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                 entity::entityCombat::hurt(*target->mob, kSmallFireballDamage, fromX, fromZ, hooks_, "fireball");
             if (result.landed) {
                 announceEntityHit(watchers, *target->mob, world::damageTypes::kOnFire, entity.entityId(), result.died);
+                // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit,
+                // and only when the damage really came off the health.
+                emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z);
             }
         }
         if (target->player != nullptr && target->player->connection().hurt) {
@@ -146,7 +149,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         splashPotion(watchers, entity);
         return;
     }
-    if (kind.sticks && hitEntityAlong(watchers, living, entity, fromX, fromY, fromZ)) {
+    if (kind.sticks && hitEntityAlong(world, watchers, living, entity, fromX, fromY, fromZ)) {
         return;
     }
     if (!hit.has_value()) {
@@ -156,7 +159,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     emitVibration(world, "projectile_land", hit->x, hit->y, hit->z);
     // parity: `Entity.isOnFire`, which is what `TntBlock.onProjectileHit` asks the arrow.
     const std::optional<world::BlockChange> change =
-        world::projectileHits::onHit(world.state(), world.gameTime(), *hit, kind.sticks, entity.fireTicks > 0);
+        world::projectileHits::onHit(world.state(), world.gameTime(), *hit, kind.sticks, entity.fireTicks > 0,
+                                     world.gameRules().get(world::gameRules::kTntExplodes));
     if (change.has_value()) {
         broadcaster_.announceRedstone(world, watchers, *change);
     }
@@ -269,8 +273,9 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
     return found;
 }
 
-bool CombatSystem::hitEntityAlong(const std::vector<PlayerSession*>& watchers, const std::vector<ServerEntity*>& living,
-                                  ServerEntity& arrow, double fromX, double fromY, double fromZ) {
+bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                  const std::vector<ServerEntity*>& living, ServerEntity& arrow, double fromX,
+                                  double fromY, double fromZ) {
     const std::optional<Target> target = targetAlong(watchers, living, arrow, fromX, fromY, fromZ);
     if (!target.has_value()) {
         return false;
@@ -294,6 +299,7 @@ bool CombatSystem::hitEntityAlong(const std::vector<PlayerSession*>& watchers, c
             arrow.velocityZ *= kArrowBounce;
             return true;
         }
+        emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z);
         arrow.removed = true;
         if (arrow.ownerId.has_value()) {
             target->mob->hurtBy = *arrow.ownerId;

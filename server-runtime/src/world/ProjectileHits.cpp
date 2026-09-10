@@ -57,7 +57,12 @@ constexpr double kMaxSignal = 15.0;
 
 /// parity: `TntBlock.onProjectileHit` into `TntBlock.prime`: the block goes and the entity that
 /// takes its place is what counts down.
-[[nodiscard]] std::optional<BlockChange> primeTnt(WorldState& world, const entity::BlockHit& hit) {
+[[nodiscard]] std::optional<BlockChange> primeTnt(WorldState& world, const entity::BlockHit& hit, bool tntExplodes) {
+    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off, and `onProjectileHit`
+    // only removes the block when it answered true.
+    if (!tntExplodes) {
+        return std::nullopt;
+    }
     const std::int32_t air = registry::blocks::air().stateId;
     if (!world.setBlockState(hit.blockX, hit.blockY, hit.blockZ, air)) {
         return std::nullopt;
@@ -139,7 +144,7 @@ constexpr double kBellTopEdge = static_cast<double>(0.8124F);
 } // namespace
 
 std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit, bool byArrow,
-                                 bool burning) {
+                                 bool burning, bool tntExplodes) {
     const std::optional<std::int32_t> stateId = world.blockState(hit.blockX, hit.blockY, hit.blockZ);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -155,7 +160,7 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
     // parity: `TntBlock.onProjectileHit`, one of the few ways tnt goes off with no redstone and no
     // hand: the projectile has to be alight, and then the block is gone and the entity is ticking.
     if (path == "tnt") {
-        return burning ? primeTnt(world, hit) : std::nullopt;
+        return burning ? primeTnt(world, hit, tntExplodes) : std::nullopt;
     }
     // parity: `ChorusFlowerBlock` and `DecoratedPotBlock`, which simply break.
     if (path == "chorus_flower" || path == "decorated_pot") {

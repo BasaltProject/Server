@@ -93,6 +93,10 @@ inline constexpr GameRule kPlayersSleepingPercentage = GameRule::integer("player
 /// parity: what a fall costs, and what turning it off costs nothing.
 inline constexpr GameRule kFallDamage = GameRule::boolean("fall_damage", true);
 
+/// parity: `TntBlock.prime` answers false with this off, and the caller then leaves the block where it
+/// is: nothing lights and nothing is removed.
+inline constexpr GameRule kTntExplodes = GameRule::boolean("tnt_explodes", true);
+
 /// parity: off in vanilla, which is why lava has no infinite pools.
 inline constexpr GameRule kLavaSourceConversion = GameRule::boolean("lava_source_conversion", false);
 

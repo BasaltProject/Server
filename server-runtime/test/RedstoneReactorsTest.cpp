@@ -72,7 +72,7 @@ TEST_CASE("a door opens from a signal at either half and both halves follow") {
     rng::RandomSource random = rng::RandomSource::legacy(0);
     // The signal reaches the upper half only, and the whole door still opens.
     REQUIRE(world.setBlockState(9, 65, 8, stateOf("redstone_block")));
-    const std::vector<BlockChange> changes = redstoneReactors::update(world, "world", 9, 65, 8, 1, random);
+    const std::vector<BlockChange> changes = redstoneReactors::update(world, "world", 9, 65, 8, 1, random, true);
     CHECK_FALSE(changes.empty());
     CHECK(propertyAt(world, 8, 65, 8, "open") == "true");
     CHECK(propertyAt(world, 8, 64, 8, "open") == "true");
@@ -80,14 +80,14 @@ TEST_CASE("a door opens from a signal at either half and both halves follow") {
 
     // And it closes again when the signal goes.
     REQUIRE(world.setBlockState(9, 65, 8, registry::blocks::air().stateId));
-    static_cast<void>(redstoneReactors::update(world, "world", 9, 65, 8, 1, random));
+    static_cast<void>(redstoneReactors::update(world, "world", 9, 65, 8, 1, random, true));
     CHECK(propertyAt(world, 8, 65, 8, "open") == "false");
     CHECK(propertyAt(world, 8, 64, 8, "open") == "false");
 
     // parity: `DoorBlock.neighborChanged` asks about the other half as well, so the lower half
     // opens from a signal it cannot see itself.
     REQUIRE(world.setBlockState(9, 65, 8, stateOf("redstone_block")));
-    static_cast<void>(redstoneReactors::update(world, "world", 8, 63, 8, 1, random));
+    static_cast<void>(redstoneReactors::update(world, "world", 8, 63, 8, 1, random, true));
     CHECK(propertyAt(world, 8, 64, 8, "open") == "true");
     CHECK(propertyAt(world, 8, 65, 8, "open") == "true");
 }
@@ -99,12 +99,12 @@ TEST_CASE("a lamp lights at once and waits four ticks to go dark") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
 
     rng::RandomSource random = rng::RandomSource::legacy(0);
-    CHECK_FALSE(redstoneReactors::update(world, "world", 9, 64, 8, 1, random).empty());
+    CHECK_FALSE(redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true).empty());
     CHECK(propertyAt(world, 8, 64, 8, "lit") == "true");
 
     // parity: it does not go out at once. It books four ticks and checks again then.
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
-    CHECK(redstoneReactors::update(world, "world", 9, 64, 8, 1, random).empty());
+    CHECK(redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true).empty());
     CHECK(propertyAt(world, 8, 64, 8, "lit") == "true");
     CHECK(world.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("redstone_lamp")));
 
@@ -126,19 +126,19 @@ TEST_CASE("a copper bulb flips on the rising edge only") {
 
     rng::RandomSource random = rng::RandomSource::legacy(0);
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
-    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random));
+    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true));
     CHECK(propertyAt(world, 8, 64, 8, "lit") == "true");
     CHECK(propertyAt(world, 8, 64, 8, "powered") == "true");
 
     // Going away leaves the light exactly as it is: that is the flip-flop.
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
-    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random));
+    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true));
     CHECK(propertyAt(world, 8, 64, 8, "lit") == "true");
     CHECK(propertyAt(world, 8, 64, 8, "powered") == "false");
 
     // The next signal flips it off again.
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
-    const std::vector<BlockChange> changes = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> changes = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     CHECK(propertyAt(world, 8, 64, 8, "lit") == "false");
     REQUIRE_FALSE(changes.empty());
     CHECK(soundOf(changes.front()) == "block.copper_bulb.turn_off");
@@ -151,13 +151,13 @@ TEST_CASE("a note block plays on the way up and is silent on the way down") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
 
     rng::RandomSource random = rng::RandomSource::legacy(0);
-    const std::vector<BlockChange> played = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> played = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     REQUIRE_FALSE(played.empty());
     CHECK_FALSE(played.front().effects.empty());
     CHECK(propertyAt(world, 8, 64, 8, "powered") == "true");
 
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
-    const std::vector<BlockChange> quiet = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> quiet = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     REQUIRE_FALSE(quiet.empty());
     CHECK(quiet.front().effects.empty());
 }
@@ -170,7 +170,7 @@ TEST_CASE("a bell rings the way it faces, and only when the signal arrives") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
 
     rng::RandomSource random = rng::RandomSource::legacy(0);
-    const std::vector<BlockChange> rung = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> rung = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     REQUIRE_FALSE(rung.empty());
     CHECK(soundOf(rung.front()) == "block.bell.use");
     // parity: the swing carries the way it faces as a three-dimensional direction value.
@@ -180,7 +180,7 @@ TEST_CASE("a bell rings the way it faces, and only when the signal arrives") {
     CHECK(swing->b1 == 4);
 
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
-    const std::vector<BlockChange> silent = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> silent = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     REQUIRE_FALSE(silent.empty());
     CHECK(silent.front().effects.empty());
 }
@@ -192,7 +192,7 @@ TEST_CASE("tnt lights and leaves an entity behind it") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
 
     rng::RandomSource random = rng::RandomSource::legacy(0);
-    const std::vector<BlockChange> lit = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> lit = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     REQUIRE_FALSE(lit.empty());
     CHECK(world.blockState(8, 64, 8) == registry::blocks::air().stateId);
     // The block is gone and the primed entity is queued for whoever spawns it.
@@ -202,9 +202,16 @@ TEST_CASE("tnt lights and leaves an entity behind it") {
     // decides whether breaking the block by hand lights it. `neighborChanged` never looks at it, so a
     // signal lights an unstable block exactly as it lights any other.
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("tnt", {{"unstable", "true"}})));
-    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random));
+    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true));
     CHECK(world.blockState(8, 64, 8) == registry::blocks::air().stateId);
     CHECK(world.takePrimedTnt().size() == 1);
+
+    // parity: with the `tnt_explodes` rule off, `TntBlock.prime` answers false and `neighborChanged`
+    // leaves the block where it is: nothing lights and nothing goes.
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("tnt", {{"unstable", "false"}})));
+    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random, false));
+    CHECK(world.blockState(8, 64, 8) != registry::blocks::air().stateId);
+    CHECK(world.takePrimedTnt().empty());
 }
 
 TEST_CASE("the sound a door makes is the one its own code names") {
@@ -219,7 +226,7 @@ TEST_CASE("the sound a door makes is the one its own code names") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
 
     rng::RandomSource random = rng::RandomSource::legacy(0);
-    const std::vector<BlockChange> opened = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> opened = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     REQUIRE_FALSE(opened.empty());
     // parity: `TrapDoorBlock.playSound`, the same sound a hand makes. It used to go through a
     // callback that production code never filled in, so a trapdoor on a signal swung in silence.
@@ -232,7 +239,7 @@ TEST_CASE("the sound a door makes is the one its own code names") {
     CHECK(sound->pitch < 1.0F);
 
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
-    const std::vector<BlockChange> closed = redstoneReactors::update(world, "world", 9, 64, 8, 1, random);
+    const std::vector<BlockChange> closed = redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true);
     REQUIRE_FALSE(closed.empty());
     CHECK(soundOf(closed.front()) == "minecraft:block.wooden_trapdoor.close");
     CHECK(propertyAt(world, 8, 64, 8, "open") == "false");
@@ -249,7 +256,7 @@ TEST_CASE("a shelf joins its chain when the signal reaches it") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
 
     rng::RandomSource random = rng::RandomSource::legacy(0);
-    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random));
+    static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, 1, random, true));
 
     CHECK(propertyAt(world, 8, 64, 8, "powered") == "true");
 }
@@ -290,7 +297,7 @@ TEST_CASE("a sculk sensor hears a door swing, a gate swing and a note block, and
         std::int64_t now = 1;
 
         REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
-        static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, now, random));
+        static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, now, random, true));
         REQUIRE(propertyAt(world, 8, 64, 8, "open") == "true");
         settle(world, now, 4);
 
@@ -307,7 +314,7 @@ TEST_CASE("a sculk sensor hears a door swing, a gate swing and a note block, and
         std::int64_t now = 1;
 
         REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
-        static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, now, random));
+        static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, now, random, true));
         settle(world, now, 4);
 
         CHECK(frequencyAt(world, 8, 64, 10) == 10);
@@ -329,7 +336,7 @@ TEST_CASE("a sculk sensor hears a door swing, a gate swing and a note block, and
         std::int64_t now = 1;
 
         REQUIRE(world.setBlockState(9, 64, 8, stateOf("redstone_block")));
-        static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, now, random));
+        static_cast<void>(redstoneReactors::update(world, "world", 9, 64, 8, now, random, true));
         REQUIRE(propertyAt(world, 8, 64, 8, "powered") == "true");
         settle(world, now, 6);
 

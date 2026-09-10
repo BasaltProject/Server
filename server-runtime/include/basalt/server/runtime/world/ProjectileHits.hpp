@@ -23,8 +23,9 @@ inline constexpr std::int32_t kThrownHoldTicks = 8;
 /// parity: `TntBlock.onProjectileHit` asks the projectile whether it is on fire and nothing else, so
 /// a plain arrow sticks in the block and leaves it standing. `gameTime` is the world's clock, which
 /// a dripleaf tipped by an arrow books its return on.
+/// `tntExplodes` is the game rule: with it off `TntBlock.prime` answers false and the block stays.
 [[nodiscard]] std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit,
-                                               bool byArrow, bool burning = false);
+                                               bool byArrow, bool burning, bool tntExplodes);
 
 /// parity: `TargetBlock.getRedstoneStrength`: the distance from the middle of the face that was
 /// hit, over the half block that face is wide, is what decides the signal.
