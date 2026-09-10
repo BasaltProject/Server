@@ -1,16 +1,23 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/RespawnAnchors.hpp>
+#include <basalt/server/runtime/world/Waxing.hpp>
 
 #include <cstdint>
 #include <map>
@@ -44,6 +51,34 @@ constexpr double kSidewaysDrop = 0.15625;
 constexpr double kProjectileLift = 0.1;
 
 constexpr std::int32_t kMaxStack = 64;
+
+/// parity: the `15` vanilla passes with `LevelEvent.PARTICLES_AND_SOUND_PLANT_GROWTH`.
+constexpr std::int32_t kGrowthSparkles = 15;
+
+[[nodiscard]] const wire::common::Identifier& tnt() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("tnt");
+    return instance;
+}
+
+[[nodiscard]] const wire::common::Identifier& boneMealItem() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("bone_meal");
+    return instance;
+}
+
+[[nodiscard]] const wire::common::Identifier& shears() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("shears");
+    return instance;
+}
+
+[[nodiscard]] const wire::common::Identifier& glowstone() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("glowstone");
+    return instance;
+}
+
+[[nodiscard]] const wire::common::Identifier& honeycomb() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("honeycomb");
+    return instance;
+}
 
 [[nodiscard]] const wire::common::Identifier& flintAndSteel() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("flint_and_steel");
@@ -98,6 +133,32 @@ constexpr std::int32_t kMaxStack = 64;
     return hooks.allocateEntityId ? hooks.allocateEntityId() : 0;
 }
 
+/// parity: `hurtAndBreak(1, level, null, ...)`: a tool a dispenser uses wears exactly like one in a
+/// hand, and the slot is left empty when the last point of durability goes. The enchantments a hand
+/// would consult are not read here, which only matters for an enchanted tool inside a dispenser.
+[[nodiscard]] std::optional<ItemStack> wornOnce(const ItemStack& stack, random::RandomSource& random) {
+    const storage::StoredItemStack held{
+        .id = stack.item.toString(), .count = stack.count, .components = stack.components};
+    const std::optional<storage::StoredItemStack> after = item::itemWear::hurt(held, 1, random);
+    if (!after.has_value()) {
+        return std::nullopt;
+    }
+    ItemStack left = stack;
+    left.count = after->count;
+    left.components = after->components;
+    return left;
+}
+
+/// parity: `BuiltInLootTables.HARVEST_BEEHIVE`, which is three honeycombs and nothing else.
+constexpr std::int32_t kHoneycombs = 3;
+
+/// parity: `BeehiveBlock.HONEY_LEVEL`'s full value, which is when shears take anything at all.
+constexpr std::int32_t kFullHive = 5;
+
+/// parity: `EntityTypes.ITEM.getHeight() / 2` and `ItemEntity`'s own 0.2 upwards.
+constexpr double kItemHalfHeight = 0.125;
+constexpr double kPoppedUpwards = 0.2;
+
 /// The stack a slot is left with once one item leaves it.
 [[nodiscard]] std::optional<ItemStack> minusOne(const ItemStack& stack) {
     if (stack.count <= 1) {
@@ -126,11 +187,64 @@ constexpr std::int32_t kMaxStack = 64;
     return chosen;
 }
 
+/// parity: `CampfireBlock.canLight`, `CandleBlock.canLight` and `CandleCakeBlock.canLight`, which
+/// are the same question three times: my own kind of block, out of the water, and not lit already.
+[[nodiscard]] bool lightable(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return false;
+    }
+    const std::string_view path = block->path();
+    const bool kind =
+        path == "campfire" || path == "soul_campfire" || path.ends_with("candle") || path.ends_with("candle_cake");
+    return kind && propertyOf(stateId, "lit") == "false" && propertyOf(stateId, "waterlogged") != "true";
+}
+
+[[nodiscard]] bool isTntBlock(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && block->path() == "tnt";
+}
+
+/// How full a hive is, or nothing of the sort for a block that is not one.
+[[nodiscard]] std::int32_t honeyOf(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr || (block->path() != "beehive" && block->path() != "bee_nest")) {
+        return -1;
+    }
+    const std::string level = propertyOf(stateId, "honey_level");
+    return level.empty() ? -1 : std::stoi(level);
+}
+
+/// parity: `Block.popResource` with `BuiltInLootTables.HARVEST_BEEHIVE`: three honeycombs scattered
+/// inside the hive's own square, thrown up at 0.2 like anything else a block drops.
+void popHoneycombs(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
+                   const Hooks& hooks) {
+    if (!context.gameRules.get(gameRules::kBlockDrops)) {
+        return;
+    }
+    const auto scatter = [&context] { return (context.random.nextDouble() * 0.5) - 0.25; };
+    static_cast<void>(context.world.spawnItem(DroppedItem{.entityId = nextEntityId(hooks),
+                                                          .uuid = wire::common::Uuid::random(),
+                                                          .item = wire::common::Identifier::vanilla("honeycomb"),
+                                                          .count = kHoneycombs,
+                                                          .x = x + 0.5 + scatter(),
+                                                          .y = y + 0.5 + scatter() - kItemHalfHeight,
+                                                          .z = z + 0.5 + scatter(),
+                                                          .velocityX = (context.random.nextDouble() * 0.2) - 0.1,
+                                                          .velocityY = kPoppedUpwards,
+                                                          .velocityZ = (context.random.nextDouble() * 0.2) - 0.1}));
+}
+
 /// What a block-changing behaviour left in the slot. `handled` false means the item has no
 /// behaviour of this kind and falls through to being thrown.
 struct Special {
     bool handled = false;
     std::optional<ItemStack> left;
+    /// What the behaviour changed in the world, when it changed a block rather than only a fluid.
+    std::optional<BlockChange> change;
+    /// parity: `OptionalDispenseItemBehavior.setSuccess(false)`, which is not a fall through: the
+    /// item stays in the slot, nothing is thrown, and the dispenser clicks.
+    bool refused = false;
 };
 
 /// The block-changing behaviours: a full bucket pours, an empty one fills, and flint and steel
@@ -139,7 +253,7 @@ struct Special {
 /// parity: `DispenseItemBehavior.bootStrap`'s filled-bucket, empty-bucket and flint-and-steel
 /// entries. The rest of that table makes entities.
 [[nodiscard]] Special dispenseOnBlock(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                                      BlockFace out, const ItemStack& stack) {
+                                      BlockFace out, const ItemStack& stack, const Hooks& hooks) {
     const std::int32_t tx = x + registry::stepX(out);
     const std::int32_t ty = y + registry::stepY(out);
     const std::int32_t tz = z + registry::stepZ(out);
@@ -159,13 +273,145 @@ struct Special {
         }
         return Special{.handled = true, .left = ItemStack{.item = *result->replacement, .count = 1}};
     }
-    if (stack.item == flintAndSteel()) {
-        if (!fires::ignite(context.world, tx, ty, tz, context.random)) {
+    // parity: `DispenseItemBehavior`'s tnt entry, which is not a throw: the dispenser builds the
+    // primed entity itself at the square in front, and raises `ENTITY_PLACE` rather than the
+    // `PRIME_FUSE` a block being lit raises. With the `tnt_explodes` rule off it answers a failure,
+    // which is the click a dispenser makes when a behaviour says no.
+    if (stack.item == tnt()) {
+        if (!context.gameRules.get(gameRules::kTntExplodes)) {
+            return Special{.refused = true};
+        }
+        context.world.primeTnt(tx, ty, tz, "entity_place");
+        return Special{.handled = true, .left = minusOne(stack)};
+    }
+    // parity: `DispenseItemBehavior`'s bone meal entry, which runs `BoneMealItem.growCrop` on the
+    // square in front and sparkles there. A valid target spends the item even when the growth roll
+    // does nothing, and anything else is a refusal rather than a throw.
+    if (stack.item == boneMealItem()) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        if (!target.has_value() || !boneMeal::grows(*target)) {
+            return Special{.refused = true};
+        }
+        std::optional<BlockChange> grown = boneMeal::apply(context.world, tx, ty, tz, context.random);
+        if (grown.has_value()) {
+            grown->effects.emplace_back(
+                blockEffect::Effect{.type = blockEffect::Effect::kPlantGrowth, .data = kGrowthSparkles});
+        }
+        return Special{.handled = true, .left = minusOne(stack), .change = grown};
+    }
+    // parity: the glowstone entry, which only knows the respawn anchor: a full one refuses, and
+    // anything that is not an anchor falls through to being thrown.
+    if (stack.item == glowstone()) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        if (!target.has_value() || !respawnAnchors::isAnchor(*target)) {
             return {};
         }
-        return Special{.handled = true, .left = stack};
+        const std::optional<BlockChange> charged = respawnAnchors::charge(context.world, tx, ty, tz);
+        if (!charged.has_value()) {
+            return Special{.refused = true};
+        }
+        return Special{.handled = true, .left = minusOne(stack), .change = charged};
+    }
+    // parity: the honeycomb entry, which waxes the block in front. Not being waxable is a plain
+    // fall through to `super.execute`, so the comb is thrown rather than refused.
+    if (stack.item == honeycomb()) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        const std::optional<std::int32_t> waxed =
+            target.has_value() ? waxing::waxed(*target) : std::optional<std::int32_t>{};
+        if (!waxed.has_value() || !context.world.setBlockState(tx, ty, tz, *waxed)) {
+            return {};
+        }
+        BlockChange change{.x = tx, .y = ty, .z = tz, .stateId = *waxed};
+        change.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kWaxOn, .data = 0});
+        return Special{.handled = true, .left = minusOne(stack), .change = change};
+    }
+    // parity: `FlintAndSteelDispenseItemBehavior`, which answers success for everything except a
+    // tnt block it could not prime: aimed at a wall it wears one point and nothing else, and it is
+    // never thrown.
+    if (stack.item == flintAndSteel()) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        std::optional<BlockChange> change;
+        if (fires::ignite(context.world, tx, ty, tz, context.random)) {
+            const std::optional<std::int32_t> fire = context.world.blockState(tx, ty, tz);
+            change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = fire.value_or(0)};
+        } else if (target.has_value() && lightable(*target)) {
+            const std::optional<std::int32_t> lit = registry::blockStateDefinitions::stateIdOf(
+                *registry::blockStateDefinitions::blockOf(*target), {{"lit", "true"}}, *target);
+            if (lit.has_value() && context.world.setBlockState(tx, ty, tz, *lit)) {
+                change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *lit};
+            }
+        } else if (target.has_value() && isTntBlock(*target)) {
+            // parity: `TntBlock.prime` then `removeBlock`, and with `tnt_explodes` off the block
+            // stays where it is and the behaviour answers a failure.
+            if (!context.gameRules.get(gameRules::kTntExplodes)) {
+                return Special{.refused = true};
+            }
+            context.world.primeTnt(tx, ty, tz, "prime_fuse");
+            static_cast<void>(context.world.setBlockState(tx, ty, tz, registry::blocks::air().stateId));
+            change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = registry::blocks::air().stateId};
+        }
+        return Special{.handled = true, .left = wornOnce(stack, context.random), .change = change};
+    }
+    // parity: `ShearsDispenseItemBehavior.tryShearBeehive`, which only touches a hive that is full.
+    // Shearing a sheep in front of it is the other half and needs the mob.
+    if (stack.item == shears()) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        if (!target.has_value() || honeyOf(*target) < kFullHive) {
+            return Special{.refused = true};
+        }
+        const std::optional<std::int32_t> emptied = registry::blockStateDefinitions::stateIdOf(
+            *registry::blockStateDefinitions::blockOf(*target), {{"honey_level", "0"}}, *target);
+        if (!emptied.has_value() || !context.world.setBlockState(tx, ty, tz, *emptied)) {
+            return Special{.refused = true};
+        }
+        popHoneycombs(context, tx, ty, tz, hooks);
+        return Special{.handled = true,
+                       .left = wornOnce(stack, context.random),
+                       .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *emptied}};
     }
     return {};
+}
+
+/// parity: `MinecartDispenseItemBehavior`'s `1.125`, an eighth past the square in front.
+constexpr double kMinecartReach = 1.125;
+
+/// parity: `MinecartDispenseItemBehavior`. A dispenser puts a cart **on the rail** in front of it,
+/// or on the one a step below when the square in front is air, and throws the item like anything
+/// else when there is no rail either way. The heights are vanilla's own four numbers.
+[[nodiscard]] bool dispenseMinecart(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, BlockFace out,
+                                    const ItemStack& stack, const Hooks& hooks) {
+    const std::int32_t fx = x + registry::stepX(out);
+    const std::int32_t fy = y + registry::stepY(out);
+    const std::int32_t fz = z + registry::stepZ(out);
+    const std::optional<std::int32_t> front = world.blockState(fx, fy, fz);
+    if (!front.has_value()) {
+        return false;
+    }
+    const auto slopes = [](std::int32_t stateId) {
+        return registry::blockStateDefinitions::propertiesOf(stateId)["shape"].starts_with("ascending");
+    };
+    double lift = 0.0;
+    if (rails::isRail(*front)) {
+        lift = slopes(*front) ? 0.6 : 0.1;
+    } else {
+        const std::optional<std::int32_t> below = world.blockState(fx, fy - 1, fz);
+        if (*front != registry::blocks::air().stateId || !below.has_value() || !rails::isRail(*below)) {
+            return false;
+        }
+        lift = out != BlockFace::Down && slopes(*below) ? -0.4 : -0.9;
+    }
+    const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, stack.item);
+    if (!protocolType.has_value()) {
+        return false;
+    }
+    // parity: the cart lands an eighth of a block past the square in front, which is what puts it on
+    // the rail rather than inside the dispenser.
+    auto cart = std::make_unique<entity::ServerEntity>(nextEntityId(hooks), wire::common::Uuid::random(), stack.item,
+                                                       *protocolType, x + 0.5 + (registry::stepX(out) * kMinecartReach),
+                                                       y + registry::stepY(out) + lift,
+                                                       z + 0.5 + (registry::stepZ(out) * kMinecartReach));
+    static_cast<void>(world.spawnEntity(std::move(cart)));
+    return true;
 }
 
 /// The container in front: where it is and how many slots it has.
@@ -341,8 +587,15 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
 
     // parity: the `DispenseItemBehavior`s that change blocks. The ones that make an entity fall
     // through to being thrown.
-    const Special special = dropper ? Special{} : dispenseOnBlock(context, x, y, z, *out, stack);
+    const Special special = dropper ? Special{} : dispenseOnBlock(context, x, y, z, *out, stack, hooks);
+    if (special.refused) {
+        result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserFail, .data = 0});
+        return result;
+    }
     if (special.handled) {
+        if (special.change.has_value()) {
+            result.changes.push_back(*special.change);
+        }
         slots[*slot] = special.left;
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
@@ -351,6 +604,15 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         return result;
     }
 
+    // parity: a minecart goes on the rail rather than into a container or the air.
+    if (!dropper && stack.item.path().ends_with("minecart") && dispenseMinecart(world, x, y, z, *out, stack, hooks)) {
+        slots[*slot] = minusOne(stack);
+        blockInventory::write(blockEntity->data(), slots);
+        chunk->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+        result.fired = true;
+        return result;
+    }
     const std::optional<Target> into = containerInFront(world, x, y, z, *out, hooks);
     if (into.has_value()) {
         if (!insertOne(world, *into, stack)) {

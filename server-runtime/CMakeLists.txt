@@ -246,6 +246,7 @@ basalt_module(server-runtime-core
         src/world/Campfires.cpp
         src/world/BlockEntityTicks.cpp
         src/world/Walls.cpp
+        src/world/Waxing.cpp
         src/world/RedstoneWire.cpp
         src/world/Geysers.cpp
         src/world/Signs.cpp
@@ -271,6 +272,7 @@ basalt_module(server-runtime-core
         src/world/GameRules.cpp
         src/world/BambooGrowth.cpp
         src/world/BlockEntityDefaults.cpp
+        src/world/BoneMeal.cpp
         src/world/BlockInventory.cpp
         src/world/BlockSurvival.cpp
         src/world/BrewingStands.cpp
@@ -304,6 +306,7 @@ basalt_module(server-runtime-core
         src/world/PoweredRails.cpp
         src/world/PressurePlates.cpp
         src/world/Rails.cpp
+        src/world/RespawnAnchors.cpp
         src/world/RandomTicks.cpp
         src/world/Reshapes.cpp
         src/world/RecipeBook.cpp

@@ -289,7 +289,7 @@ TEST_CASE("what the world holds besides blocks") {
     CHECK(world.removeItem(2).has_value());
     CHECK(world.items().empty());
 
-    world.primeTnt(1, 64, 1);
+    world.primeTnt(1, 64, 1, "prime_fuse");
     CHECK(world.takePrimedTnt().size() == 1);
     CHECK(world.takePrimedTnt().empty());
 

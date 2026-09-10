@@ -67,7 +67,7 @@ constexpr double kMaxSignal = 15.0;
     if (!world.setBlockState(hit.blockX, hit.blockY, hit.blockZ, air)) {
         return std::nullopt;
     }
-    world.primeTnt(hit.blockX, hit.blockY, hit.blockZ);
+    world.primeTnt(hit.blockX, hit.blockY, hit.blockZ, "prime_fuse");
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, air, {}};
 }
 

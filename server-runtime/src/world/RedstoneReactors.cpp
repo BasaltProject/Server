@@ -270,7 +270,8 @@ void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int
         return;
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = registry::blocks::air().stateId});
-    world.primeTnt(x, y, z);
+    // parity: `TntBlock.prime` raises `PRIME_FUSE`, which is what a sculk sensor hears.
+    world.primeTnt(x, y, z, "prime_fuse");
 }
 
 void react(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,

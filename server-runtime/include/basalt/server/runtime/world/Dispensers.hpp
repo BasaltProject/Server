@@ -48,6 +48,8 @@ struct Hooks {
 struct Result {
     bool fired = false;
     std::vector<BlockEffect> effects;
+    /// The blocks a behaviour changed, which is bone meal growing what is in front of it.
+    std::vector<BlockChange> changes;
 };
 
 /// The turn itself: one item out of a slot picked at random, into the container in front or into

@@ -44,6 +44,14 @@ struct Effect {
     static constexpr std::int32_t kCrafterFail = 1050;
     /// parity: the sparks off a lightning rod, whose data is the rod's axis.
     static constexpr std::int32_t kLightningRodSparks = 3002;
+    /// parity: `LevelEvent.PARTICLES_AND_SOUND_WAX_ON`, and the two an axe raises taking it off
+    /// again and scraping a step of oxidation away.
+    static constexpr std::int32_t kWaxOn = 3003;
+    static constexpr std::int32_t kWaxOff = 3004;
+    static constexpr std::int32_t kCopperScrape = 3005;
+    /// parity: `LevelEvent.PARTICLES_AND_SOUND_PLANT_GROWTH`, the green sparkles bone meal makes,
+    /// whose data is how many of them to draw.
+    static constexpr std::int32_t kPlantGrowth = 1505;
     /// parity: `LevelEvent.COMPOSTER_FILL`, whose data says whether the layer went up: the client
     /// turns a one into the success sound and the green sparkles, and a zero into the plain fill.
     static constexpr std::int32_t kComposterFill = 1500;

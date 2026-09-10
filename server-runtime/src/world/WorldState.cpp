@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -460,7 +461,10 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     const auto blockChanges = [](std::int32_t before, std::int32_t after) {
         const wire::common::Identifier* from = registry::blockStateDefinitions::blockOf(before);
         const wire::common::Identifier* to = registry::blockStateDefinitions::blockOf(after);
-        return from != nullptr && to != nullptr && *from != *to;
+        // parity: `shouldChangedStateKeepBlockEntity`: a copper chest that weathers, waxes or is
+        // scraped keeps its block entity, so nothing falls out of it either.
+        return from != nullptr && to != nullptr && *from != *to &&
+               !registry::weathering::keepsBlockEntity(from->path(), to->path());
     };
     if (sideEffects == SideEffects::kRun && was != stateId && chunk->blockEntityCount() > 0 &&
         blockChanges(was, stateId)) {
@@ -666,9 +670,11 @@ entity::ServerEntity& WorldState::spawnEntity(std::unique_ptr<entity::ServerEnti
 
 std::vector<std::int32_t> WorldState::collectRemovedEntities() { return entityRegistry_.collectRemovedEntities(); }
 
-void WorldState::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z) { primedTntQueue_.primeTnt(x, y, z); }
+void WorldState::primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event) {
+    primedTntQueue_.primeTnt(x, y, z, event);
+}
 
-std::vector<std::array<std::int32_t, 3>> WorldState::takePrimedTnt() { return primedTntQueue_.takePrimedTnt(); }
+std::vector<PrimedTntQueue::Primed> WorldState::takePrimedTnt() { return primedTntQueue_.takePrimedTnt(); }
 
 std::vector<WorldState::Spilled> WorldState::takeSpilledContents() {
     const WorldWriteLock lock{mutex_};

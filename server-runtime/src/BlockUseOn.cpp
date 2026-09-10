@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
@@ -15,6 +16,7 @@
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
@@ -34,10 +36,12 @@
 #include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
+#include <basalt/server/runtime/world/RespawnAnchors.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/runtime/world/Waxing.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <cstdint>
@@ -59,6 +63,9 @@ std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
+
+/// parity: the `15` vanilla passes with `LevelEvent.PARTICLES_AND_SOUND_PLANT_GROWTH`.
+constexpr std::int32_t kGrowthSparkles = 15;
 
 storage::StoredItemStack withCount(const storage::StoredItemStack& stack, std::int32_t count) {
     storage::StoredItemStack copy = stack;
@@ -123,6 +130,127 @@ void BlockInteractionHandler::igniteAt(PlayerSession& session, const BlockPos& p
     }
     session.inventory.set(heldSlot, worn);
     owner_->sendInventorySlot(heldSlot);
+}
+
+bool BlockInteractionHandler::useBoneMeal(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
+                                          const storage::StoredItemStack& held) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    const std::optional<std::int32_t> existing =
+        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
+    // parity: `BoneMealItem.growCrop` spends the item on a valid target whether or not the growth
+    // roll did anything, and answers no on anything else so the click falls through.
+    if (!existing.has_value() || !world::boneMeal::grows(*existing)) {
+        return false;
+    }
+    random::RandomSource random = random::RandomSource::legacy(nextSeed());
+    std::optional<world::BlockChange> grown = world::boneMeal::apply(world->state(), pos.x, pos.y, pos.z, random);
+    if (grown.has_value()) {
+        grown->effects.emplace_back(
+            world::blockEffect::Effect{.type = world::blockEffect::Effect::kPlantGrowth, .data = kGrowthSparkles});
+        BlockChangeBroadcaster* blocks = owner_->options().blocks;
+        if (blocks != nullptr) {
+            blocks->announceBlock(owner_->playersInSameWorld(), *grown);
+        }
+    }
+    if (session.gamemode == Gamemode::Creative) {
+        return true;
+    }
+    session.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
+    owner_->sendInventorySlot(heldSlot);
+    return true;
+}
+
+void BlockInteractionHandler::reshapeBlock(const BlockPos& pos, const std::int32_t stateId, const std::int32_t effect) {
+    owner_->world().setBlockState(pos.x, pos.y, pos.z, stateId);
+    world::BlockChange change{.x = pos.x, .y = pos.y, .z = pos.z, .stateId = stateId};
+    change.effects.emplace_back(world::blockEffect::Effect{.type = effect, .data = 0});
+    BlockChangeBroadcaster* blocks = owner_->options().blocks;
+    if (blocks != nullptr) {
+        blocks->announceBlock(owner_->playersInSameWorld(), change);
+    }
+    // parity: `setBlock(pos, state, 11)`, which does tell the neighbours, and `GameEvent.BLOCK_CHANGE`.
+    notifyNeighbours(pos);
+    heardBySculk("block_change", pos);
+}
+
+bool BlockInteractionHandler::useHoneycomb(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
+                                           const storage::StoredItemStack& held) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    const std::optional<std::int32_t> existing =
+        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
+    const std::optional<std::int32_t> waxed =
+        existing.has_value() ? world::waxing::waxed(*existing) : std::optional<std::int32_t>{};
+    if (!waxed.has_value()) {
+        return false;
+    }
+    reshapeBlock(pos, *waxed, world::blockEffect::Effect::kWaxOn);
+    if (session.gamemode == Gamemode::Creative) {
+        return true;
+    }
+    session.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
+    owner_->sendInventorySlot(heldSlot);
+    return true;
+}
+
+bool BlockInteractionHandler::useAxe(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
+                                     const storage::StoredItemStack& held) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    const std::optional<std::int32_t> existing =
+        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
+    const std::optional<world::waxing::Scrape> cut =
+        existing.has_value() ? world::waxing::scraped(*existing) : std::optional<world::waxing::Scrape>{};
+    if (!cut.has_value()) {
+        return false;
+    }
+    // parity: stripping a log is only a sound, and the other two draw their own particles.
+    const std::int32_t effect = cut->cut == world::waxing::Cut::Scraped   ? world::blockEffect::Effect::kCopperScrape
+                                : cut->cut == world::waxing::Cut::Unwaxed ? world::blockEffect::Effect::kWaxOff
+                                                                          : 0;
+    if (effect == 0) {
+        owner_->world().setBlockState(pos.x, pos.y, pos.z, cut->stateId);
+        broadcastBlockUpdate(pos, cut->stateId);
+        notifyNeighbours(pos);
+        heardBySculk("block_change", pos);
+    } else {
+        reshapeBlock(pos, cut->stateId, effect);
+    }
+    if (session.gamemode == Gamemode::Creative) {
+        return true;
+    }
+    // parity: `hurtAndBreak(1, ...)`, one point off the axe whichever of the three it did.
+    random::RandomSource wear = random::RandomSource::legacy(nextSeed());
+    const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
+        held, 1, wear,
+        [this](const storage::StoredItemStack& stack, std::int32_t amount, random::RandomSource& source) {
+            return damageEffects_.process(stack, amount, source);
+        });
+    if (worn == held) {
+        return true;
+    }
+    session.inventory.set(heldSlot, worn);
+    owner_->sendInventorySlot(heldSlot);
+    return true;
+}
+
+bool BlockInteractionHandler::chargeAnchor(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
+                                           const storage::StoredItemStack& held) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    const std::optional<world::BlockChange> charged =
+        world == nullptr ? std::nullopt : world::respawnAnchors::charge(world->state(), pos.x, pos.y, pos.z);
+    if (!charged.has_value()) {
+        return false;
+    }
+    broadcastBlockUpdate(pos, charged->stateId);
+    // parity: `setBlock(pos, state, 3)` plus `GameEvent.BLOCK_CHANGE`, and the comparator beside it
+    // reads the charge, so the neighbours have to hear about it.
+    notifyNeighbours(pos);
+    heardBySculk("block_change", pos);
+    if (session.gamemode == Gamemode::Creative) {
+        return true;
+    }
+    session.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
+    owner_->sendInventorySlot(heldSlot);
+    return true;
 }
 
 void BlockInteractionHandler::placeEnderEye(PlayerSession& session, const BlockPos& pos, std::int32_t heldSlot,
@@ -211,6 +339,14 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
                 ack();
                 return;
             }
+        }
+        // parity: `RespawnAnchorBlock.useItemOn`, which takes a piece of glowstone until the fourth
+        // charge. Clicking it with anything else is the spawn point, which is not this.
+        if (path == "respawn_anchor" && held.has_value() &&
+            parsedOrNothing(held->id) == Identifier::vanilla("glowstone") &&
+            chargeAnchor(*session, hit.pos, heldSlot, *held)) {
+            ack();
+            return;
         }
         // parity: `JukeboxBlock.useItemOn`/`useWithoutItem`: a disc goes in, and clicking a playing
         // one takes it back out.
@@ -315,6 +451,22 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     // below throws the click away. parity: `FlintAndSteelItem.useOn`.
     if (held.has_value() && heldBlock == Identifier::vanilla("flint_and_steel")) {
         igniteAt(*session, hit.pos.offset(hit.direction), heldSlot, *held);
+        ack();
+        return;
+    }
+    // parity: `BoneMealItem.useOn`, which acts on the block clicked rather than the square beside it.
+    if (held.has_value() && heldBlock == Identifier::vanilla("bone_meal") &&
+        useBoneMeal(*session, hit.pos, heldSlot, *held)) {
+        ack();
+        return;
+    }
+    // parity: `HoneycombItem.useOn` and `AxeItem.useOn`, both of which change the block clicked.
+    if (held.has_value() && heldBlock == Identifier::vanilla("honeycomb") &&
+        useHoneycomb(*session, hit.pos, heldSlot, *held)) {
+        ack();
+        return;
+    }
+    if (held.has_value() && heldBlock->path().ends_with("_axe") && useAxe(*session, hit.pos, heldSlot, *held)) {
         ack();
         return;
     }

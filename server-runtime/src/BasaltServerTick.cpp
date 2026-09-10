@@ -202,13 +202,14 @@ void BasaltServer::tickPrimedTnt(world::LoadedWorld& world) {
     // the world's own turn so the two land together.
     const registry::EntityTypeEntry* tntType = registry::entityTypes::of(entity::primedTnt::type());
     if (tntType != nullptr) {
-        for (const std::array<std::int32_t, 3>& position : world.state().takePrimedTnt()) {
+        for (const world::PrimedTntQueue::Primed& lit : world.state().takePrimedTnt()) {
+            const std::array<std::int32_t, 3> position{lit.x, lit.y, lit.z};
             static_cast<void>(entity::primedTnt::prime(world.state(), position[0], position[1], position[2],
                                                        playerRegistry_.allocateEntityId(), tntType->protocolId));
             // parity: `TntBlock.prime` raises `PRIME_FUSE` from the block's own square, so a sculk
             // sensor hears the tnt being lit at ten and not only the bang at fifteen.
             if (world.state().hasSculkSensorNear(position[0], position[1], position[2], world::vibrations::kRange)) {
-                world::vibrations::emit(world.state(), "prime_fuse", position[0] + 0.5, position[1] + 0.5,
+                world::vibrations::emit(world.state(), lit.event, position[0] + 0.5, position[1] + 0.5,
                                         position[2] + 0.5, world.gameTime());
             }
             broadcaster_->sendEffects(watchers, position[0], position[1], position[2], registry::blocks::air().stateId,

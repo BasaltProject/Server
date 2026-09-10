@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/world/Chunk.hpp>
 
 #include <algorithm>
@@ -66,7 +67,9 @@ struct HeightmapTables {
     if (before == nullptr || after == nullptr) {
         return before != after;
     }
-    return *before != *after;
+    // parity: `shouldChangedStateKeepBlockEntity`, which is why waxing a copper chest does not
+    // empty it.
+    return *before != *after && !registry::weathering::keepsBlockEntity(before->path(), after->path());
 }
 
 } // namespace

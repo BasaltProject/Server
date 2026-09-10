@@ -164,10 +164,21 @@ namespace weathering {
 
 [[nodiscard]] std::optional<std::string_view> next(std::string_view block);
 
+/// What this block weathered from, which is what an axe scrapes it back to. parity:
+/// `WeatheringCopper.getPrevious`, the inverse of the same map.
+[[nodiscard]] std::optional<std::string_view> previous(std::string_view block);
+
 /// How weathered a block already is: 0 for fresh copper, 3 for oxidized.
 [[nodiscard]] std::optional<std::int32_t> stageOf(std::string_view block);
 
 [[nodiscard]] bool weathers(std::string_view block);
+
+/// Whether a block entity survives the block turning from one of these into the other.
+///
+/// parity: `Block.shouldChangedStateKeepBlockEntity`, which only the copper chest and the copper
+/// golem statue override, and both answer the same way: yes while the old block is in their own tag.
+/// It is what keeps a copper chest's contents through weathering, waxing and a scrape.
+[[nodiscard]] bool keepsBlockEntity(std::string_view from, std::string_view to);
 
 } // namespace weathering
 

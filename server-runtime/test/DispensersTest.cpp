@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <variant>
 #include <vector>
 
 using namespace basalt::server::runtime::world;
@@ -201,6 +202,52 @@ TEST_CASE("a dispenser away from the first chunk works off its own local coordin
     CHECK(thrown[0].y == 64.34375);
     CHECK(thrown[0].z == 19.5);
     CHECK_FALSE(slotsAt(world, 21, 64, 19, dispensers::kSize)[0].has_value());
+}
+
+TEST_CASE("a dispenser lights the tnt it holds instead of throwing it") {
+    // parity: `DispenseItemBehavior`'s tnt entry builds the primed entity in the square in front and
+    // never throws the block. With the `tnt_explodes` rule off it does neither.
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("tnt"), .count = 2});
+
+    const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    CHECK(result.fired);
+    CHECK(world.items().empty());
+    const std::vector<PrimedTntQueue::Primed> lit = world.takePrimedTnt();
+    REQUIRE(lit.size() == 1);
+    CHECK(lit[0].x == 8);
+    CHECK(lit[0].y == 64);
+    CHECK(lit[0].z == 7);
+    // parity: the dispenser makes the entity itself, so what a sculk sensor hears is `entity_place`
+    // and not the `prime_fuse` of a block being lit.
+    CHECK(lit[0].event == "entity_place");
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 1);
+}
+
+TEST_CASE("a minecart lands on the rail in front, or on the one a step below") {
+    // parity: `MinecartDispenseItemBehavior`, whose four heights are the rail in front (flat or a
+    // slope) and the rail below an empty square (again flat or a slope).
+    const auto dispensedOnto = [](const std::string& shape, std::int32_t railY) {
+        Fixture fixture;
+        WorldState& world = fixture.world;
+        oneItem(world, "north", ItemStack{.item = item("minecart"), .count = 1});
+        const std::optional<std::int32_t> rail = registry::blockStateDefinitions::stateIdOf(
+            item("rail"), {{"shape", shape}, {"waterlogged", "false"}}, std::nullopt);
+        REQUIRE(rail.has_value());
+        REQUIRE(world.setBlockState(8, railY, 7, *rail));
+        static_cast<void>(dispensers::fire(fixture.context(), 8, 64, 8, ids()));
+        const std::vector<ServerEntity*> spawned = world.entities();
+        return spawned.empty() ? std::optional<double>{} : std::optional{spawned.front()->y};
+    };
+
+    // On the rail in front: a tenth above the block, and six tenths on a slope.
+    CHECK(dispensedOnto("north_south", 64) == doctest::Approx(64.1));
+    CHECK(dispensedOnto("ascending_north", 64) == doctest::Approx(64.6));
+    // On the rail below an empty square: nine tenths down, and four tenths on a slope.
+    CHECK(dispensedOnto("north_south", 63) == doctest::Approx(63.1));
+    CHECK(dispensedOnto("ascending_north", 63) == doctest::Approx(63.6));
 }
 
 TEST_CASE("an empty dispenser clicks and nothing goes out") {
@@ -510,7 +557,7 @@ TEST_CASE("flint and steel lights a fire in front and stays in the slot") {
     CHECK(world.items().empty());
 }
 
-TEST_CASE("flint and steel with nowhere to light is thrown instead") {
+TEST_CASE("flint and steel with nowhere to light still wears, and is never thrown") {
     Fixture fixture;
     WorldState& world = fixture.world;
     fixture.floor();
@@ -520,9 +567,12 @@ TEST_CASE("flint and steel with nowhere to light is thrown instead") {
 
     CHECK(dispensers::fire(fixture.context(), 8, 64, 8, ids()).fired);
 
-    REQUIRE(world.items().size() == 1);
-    CHECK(world.items()[0].item == item("flint_and_steel"));
-    CHECK_FALSE(slotsAt(world, 8, 64, 8, dispensers::kSize)[0].has_value());
+    // parity: `FlintAndSteelDispenseItemBehavior` says success for everything but a tnt block it
+    // could not prime, so aiming it at a wall costs a point of durability and nothing else.
+    CHECK(world.items().empty());
+    const std::optional<ItemStack> left = slotsAt(world, 8, 64, 8, dispensers::kSize)[0];
+    REQUIRE(left.has_value());
+    CHECK(left->item == item("flint_and_steel"));
 }
 
 TEST_CASE("a dropper pours nothing and lights nothing") {
@@ -656,4 +706,121 @@ TEST_CASE("another container that faces somewhere is still not a dispenser") {
 
     CHECK(world.items().empty());
     CHECK(slotsAt(world, 8, 64, 8, 27)[0]->count == 1);
+}
+
+TEST_CASE("bone meal grows the crop in front and is spent doing it") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("bone_meal"), .count = 3});
+    const std::optional<std::int32_t> nearlyGrown =
+        registry::blockStateDefinitions::stateIdOf(item("wheat"), {{"age", "6"}}, std::nullopt);
+    REQUIRE(nearlyGrown.has_value());
+    REQUIRE(world.setBlockState(8, 64, 7, *nearlyGrown));
+
+    const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    // Two ages at least, so a crop this close to the end saturates whatever the roll says.
+    const std::optional<std::int32_t> grown =
+        registry::blockStateDefinitions::stateIdOf(item("wheat"), {{"age", "7"}}, std::nullopt);
+    CHECK(result.fired);
+    CHECK(world.blockState(8, 64, 7) == grown);
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 2);
+    CHECK(world.items().empty());
+    REQUIRE(result.changes.size() == 1);
+    CHECK(result.changes[0].x == 8);
+    CHECK(result.changes[0].z == 7);
+    REQUIRE(result.changes[0].effects.size() == 1);
+    CHECK(std::get<blockEffect::Effect>(result.changes[0].effects[0]).type == blockEffect::Effect::kPlantGrowth);
+
+    // A grown crop is not a target at all, so the second one is refused rather than thrown.
+    const dispensers::Result again = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+    CHECK_FALSE(again.fired);
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 2);
+    CHECK(world.items().empty());
+    REQUIRE(again.effects.size() == 1);
+    CHECK(std::get<blockEffect::Effect>(again.effects[0]).type == blockEffect::Effect::kDispenserFail);
+}
+
+TEST_CASE("a honeycomb waxes the copper chest in front without emptying it") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("honeycomb"), .count = 2});
+    REQUIRE(world.setBlockState(8, 64, 7, stateOf("exposed_copper_chest")));
+    blockInventory::Slots inChest(27);
+    inChest[0] = ItemStack{.item = item("diamond"), .count = 5};
+    fill(world, 8, 64, 7, inChest, "exposed_copper_chest");
+
+    const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    CHECK(result.fired);
+    CHECK(world.blockState(8, 64, 7) == stateOf("waxed_exposed_copper_chest"));
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 1);
+    // parity: `shouldChangedStateKeepBlockEntity`, so the chest keeps what it held and nothing
+    // spills on the floor.
+    CHECK(world.takeSpilledContents().empty());
+    const blockInventory::Slots after = slotsAt(world, 8, 64, 7, 27);
+    REQUIRE(after[0].has_value());
+    CHECK(after[0]->item == item("diamond"));
+    CHECK(after[0]->count == 5);
+}
+
+TEST_CASE("glowstone charges the respawn anchor in front until the fourth one") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("glowstone"), .count = 6});
+    const auto anchorAt = [](const std::string& charges) {
+        const std::optional<std::int32_t> stateId =
+            registry::blockStateDefinitions::stateIdOf(item("respawn_anchor"), {{"charges", charges}}, std::nullopt);
+        REQUIRE(stateId.has_value());
+        return *stateId;
+    };
+    REQUIRE(world.setBlockState(8, 64, 7, anchorAt("3")));
+
+    const dispensers::Result charged = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+    CHECK(charged.fired);
+    CHECK(world.blockState(8, 64, 7) == anchorAt("4"));
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 5);
+
+    // A full anchor refuses: the piece stays in the slot and nothing is thrown.
+    const dispensers::Result full = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+    CHECK_FALSE(full.fired);
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 5);
+    CHECK(world.items().empty());
+
+    // Aimed at anything else it is thrown like any other item.
+    REQUIRE(world.setBlockState(8, 64, 7, stateOf("air")));
+    CHECK(dispensers::fire(fixture.context(), 8, 64, 8, ids()).fired);
+    CHECK(world.items().size() == 1);
+}
+
+TEST_CASE("shears empty the full beehive in front and wear one point doing it") {
+    Fixture fixture;
+    WorldState& world = fixture.world;
+    oneItem(world, "north", ItemStack{.item = item("shears"), .count = 1});
+    const auto hiveAt = [](const std::string& honey) {
+        const std::optional<std::int32_t> stateId = registry::blockStateDefinitions::stateIdOf(
+            item("beehive"), {{"honey_level", honey}, {"facing", "north"}}, std::nullopt);
+        REQUIRE(stateId.has_value());
+        return *stateId;
+    };
+    REQUIRE(world.setBlockState(8, 64, 7, hiveAt("5")));
+
+    const dispensers::Result sheared = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+
+    CHECK(sheared.fired);
+    CHECK(world.blockState(8, 64, 7) == hiveAt("0"));
+    REQUIRE(world.items().size() == 1);
+    CHECK(world.items()[0].item == item("honeycomb"));
+    CHECK(world.items()[0].count == 3);
+    // parity: `hurtAndBreak(1, ...)`, which is a damage component and not a smaller stack.
+    const std::optional<ItemStack> left = slotsAt(world, 8, 64, 8, dispensers::kSize)[0];
+    REQUIRE(left.has_value());
+    CHECK(left->item == item("shears"));
+    CHECK(left->count == 1);
+
+    // An empty hive is a refusal: the shears stay, unworn, and nothing is thrown.
+    const dispensers::Result again = dispensers::fire(fixture.context(), 8, 64, 8, ids());
+    CHECK_FALSE(again.fired);
+    CHECK(world.items().size() == 1);
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0].has_value());
 }
