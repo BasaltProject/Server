@@ -48,6 +48,12 @@ struct Interaction {
 /// nothing.
 [[nodiscard]] std::int32_t comparatorSignal(const wire::nbt::NbtCompound& data);
 
+/// parity: `ChiseledBookShelfBlockEntity.updateState`, which **every** write to a shelf's slots runs:
+/// it remembers the slot that was touched and redraws the six `slot_N_occupied` from what is inside.
+/// A command that writes a slot owes it as much as a hand does. Answers the state it left behind.
+[[nodiscard]] std::optional<std::int32_t> slotsChanged(WorldState& world, std::int32_t x, std::int32_t y,
+                                                       std::int32_t z, std::int32_t touchedSlot, std::int64_t gameTime);
+
 } // namespace chiseledBookshelves
 
 } // namespace basalt::server::runtime::world

@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
@@ -260,7 +261,15 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         const bool sameItem = was != before.end() && was->getString("id", std::string{}) == one.second.id;
         return world::containers::setItemTellsComparators(path, one.first, sameItem);
     });
+    const bool shelf = world::chiseledBookshelves::isBookshelf(existing->type().path());
     chunk->setBlockEntity(existing->withData(std::move(data)));
+    // parity: `ChiseledBookShelfBlockEntity.updateState`, which every write to a shelf runs: the six
+    // `slot_N_occupied` come from what is inside and the shelf remembers the slot that was touched.
+    // It goes after the write, because it reads back what was written.
+    if (shelf) {
+        static_cast<void>(world::chiseledBookshelves::slotsChanged(
+            (*world)->state(), at[0], at[1], at[2], written.empty() ? -1 : written.back().first, (*world)->gameTime()));
+    }
     if (tells) {
         world::redstoneComponents::scheduleComparatorsAround((*world)->state(), (*world)->name(), at[0], at[1], at[2],
                                                              world::comparatorReading::of((*world)->state()));

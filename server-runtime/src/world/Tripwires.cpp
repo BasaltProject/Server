@@ -293,6 +293,9 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             continue;
         }
         write(world, tx, y, tz, *alongId, *along, attached, std::nullopt, changes);
+        // parity: ese `setBlock` redibuja a los **vecinos** de la cuerda, no a la cuerda: medido con
+        // `cuerdasola`, donde el jar deja la cuerda de al lado del gancho tal y como la escribio el
+        // comando. Redibujarla aqui la unia al gancho y el jar no lo hace.
     }
 }
 
