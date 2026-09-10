@@ -43,12 +43,6 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::South, Bl
     return found == properties.end() ? std::string{} : found->second;
 }
 
-[[nodiscard]] std::int32_t wireState() {
-    static const std::int32_t instance =
-        registry::blockStateDefinitions::stateIdOf(block(), {}, std::nullopt).value_or(0);
-    return instance;
-}
-
 /// parity: `shouldConnectTo`: dust joins dust, a diode only end on, an observer only at its face,
 /// and anything else that gives off a signal from a side.
 [[nodiscard]] bool connectsTo(std::int32_t stateId, const BlockFace* from) {
@@ -92,10 +86,15 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::South, Bl
         if (!above.has_value()) {
             return std::string{kNone};
         }
-        // parity: a trapdoor is the exception that a dust can always climb over.
+        // parity: a trapdoor is the exception that a dust can always climb over, and the rest is
+        // `RedStoneWireBlock.canSurviveOn`, which is `isFaceSturdy(UP) || is(HOPPER)`. It is a question
+        // about the **state**, not about which block it is, so the generated table cannot answer it:
+        // the same reason `blockSurvival::isSupported` spells the dust out by hand. Asking the table
+        // here left a dust unable to climb over anything with a sturdy top the probe never listed.
         const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(*neighbour);
-        const bool climbable = (id != nullptr && std::string_view{id->path()}.ends_with("_trapdoor")) ||
-                               registry::blockSupport::canSurvive(wireState(), *neighbour, 0, 0, 0, 0, 0, false);
+        const std::string_view path = id == nullptr ? std::string_view{} : id->path();
+        const bool climbable = path.ends_with("_trapdoor") || path == "hopper" ||
+                               registry::blockShapes::isFaceSturdy(*neighbour, registry::BlockFace::Up);
         if (climbable && connectsTo(*above, nullptr)) {
             const BlockFace back = registry::opposite(face);
             return std::string{registry::blockShapes::isFaceSturdy(*neighbour, back) ? kUp : kSide};
