@@ -425,7 +425,8 @@ TEST_CASE("a block that can fall books its two ticks, and so does an egg its hat
     std::vector<BlockChange> effects;
     neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, effects, {});
 
-    CHECK(loaded.state.hasScheduledBlockTick(8, 65, 8, fallingBlocks::entityType()));
+    // parity: the turn is booked under the block that books it, `sand` and not the entity type.
+    CHECK(loaded.state.hasScheduledBlockTick(8, 65, 8, basalt::wire::common::Identifier::vanilla("sand")));
     CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, scheduledBlocks::snifferEggTickType()));
 }
 

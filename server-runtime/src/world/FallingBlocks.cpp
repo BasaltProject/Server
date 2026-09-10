@@ -40,7 +40,14 @@ void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::i
     if (!stateId.has_value() || !falls(*stateId)) {
         return;
     }
-    world.scheduleBlockTick(x, y, z, entityType(), kFallDelayTicks);
+    // parity: a scheduled tick is stored under the **block** that booked it, so a world of ours opens
+    // in vanilla with the sand still about to fall. `falling_block` is an entity type and no block at
+    // all, and vanilla drops a tick whose name it cannot find in the block registry.
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr) {
+        return;
+    }
+    world.scheduleBlockTick(x, y, z, *block, kFallDelayTicks);
 }
 
 entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,

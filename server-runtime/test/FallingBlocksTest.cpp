@@ -57,8 +57,10 @@ TEST_CASE("a block that can fall books its own turn") {
 
     fallingBlocks::scheduleIfFalling(world, 4, 70, 4);
     fallingBlocks::scheduleIfFalling(world, 5, 70, 5);
-    CHECK(world.hasScheduledBlockTick(4, 70, 4, Identifier::vanilla("falling_block")));
-    CHECK_FALSE(world.hasScheduledBlockTick(5, 70, 5, Identifier::vanilla("falling_block")));
+    // parity: the turn is stored under the block that booked it, which is what vanilla writes to
+    // disk and what it looks the tick up by when it reads a chunk back.
+    CHECK(world.hasScheduledBlockTick(4, 70, 4, Identifier::vanilla("sand")));
+    CHECK_FALSE(world.hasScheduledBlockTick(5, 70, 5, Identifier::vanilla("stone")));
 
     // parity: two ticks, so it comes due on the second and not the first.
     CHECK(world.dueBlockTicks().empty());
