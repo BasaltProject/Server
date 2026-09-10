@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/config/BasaltConfig.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/VanillaWorldGeneratorFactory.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -43,6 +44,9 @@ public:
         /// One worker while measuring: the generation metrics count without atomics on purpose, so
         /// their numbers are only exact when a single thread is generating.
         bool generationMetrics = false;
+        /// The jar's song table, which every world hands to its own state so a comparator can read a
+        /// jukebox. Null in a test, and then every jukebox reads zero.
+        world::jukeboxes::SongOutputs* jukeboxes = nullptr;
     };
 
     WorldRegistry(const config::BasaltConfig& config, const config::WorldsConfig& worlds,

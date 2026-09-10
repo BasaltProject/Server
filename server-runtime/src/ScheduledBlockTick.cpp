@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
+#include <basalt/server/runtime/entity/BlockTriggers.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
@@ -132,6 +133,17 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             if (!stillOn) {
                 for (const world::DroppedItem& item : world.state().items()) {
                     if (world::tripwires::isStandingOn(x, y, z, item.x, item.y, item.z)) {
+                        stillOn = true;
+                        break;
+                    }
+                }
+            }
+            // parity: `TripWireBlock.checkPressed` asks the level for **every** entity in the wire's
+            // own shape, so what keeps a string down is not only a player or an item.
+            if (!stillOn) {
+                for (const entity::ServerEntity* standing : world.state().entities()) {
+                    if (!standing->removed && !entity::blockTriggers::ignored(standing->type()) &&
+                        world::tripwires::isStandingOn(x, y, z, standing->x, standing->y, standing->z)) {
                         stillOn = true;
                         break;
                     }

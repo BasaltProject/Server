@@ -25,6 +25,7 @@ basalt_module(server-runtime-core
         src/config/UiConfigs.cpp
         src/entity/Aabb.cpp
         src/entity/BlockRay.cpp
+        src/entity/BlockTriggers.cpp
         src/entity/EntityPhysics.cpp
         src/entity/FlyingMovement.cpp
         src/entity/LivingMovement.cpp

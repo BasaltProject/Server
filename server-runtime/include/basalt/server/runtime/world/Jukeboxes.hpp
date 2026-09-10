@@ -30,8 +30,7 @@ namespace jukeboxes {
 
 /// parity: `JukeboxBlock.HAS_RECORD` plus the disc itself, kept in the block entity.
 [[nodiscard]] std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                const wire::common::Identifier& disc,
-                                                std::int32_t comparatorOutput = 0);
+                                                const wire::common::Identifier& disc);
 
 /// Takes the disc back out, which is what right-clicking a playing jukebox does. Answers the change
 /// and the disc that popped.
@@ -50,8 +49,10 @@ namespace jukeboxes {
 /// stops feeding the redstone around it.
 [[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t lengthTicks);
 
-/// parity: `JukeboxBlock.getAnalogOutputSignal`, the playing song's own number.
-[[nodiscard]] std::int32_t comparatorOutputAt(const wire::nbt::NbtCompound& data);
+/// parity: `JukeboxBlock.getAnalogOutputSignal` into `JukeboxSong.comparatorOutput`, which is looked
+/// up from the disc rather than kept beside it: the block entity holds vanilla's `RecordItem` and
+/// nothing else, so the number comes from the world's song table.
+[[nodiscard]] std::int32_t comparatorOutputAt(const WorldState& world, const wire::nbt::NbtCompound& data);
 
 /// The song numbers, read once each from wherever the jar's data lives.
 ///

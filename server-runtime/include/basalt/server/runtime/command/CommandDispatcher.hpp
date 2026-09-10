@@ -197,6 +197,11 @@ public:
     /// command re-enter the dispatcher: `/placeholder cmdparse` and `/execute run` both do.
     std::int32_t execute(const CommandSource& source, const std::string& input) const;
 
+    /// The same, also counting how many times a command ran without failing. parity: the count is not
+    /// the result: `/time query gametime` succeeds once and answers the clock, `/execute as @e` over
+    /// three entities succeeds three times. A comparator on a command block reads the count.
+    std::int32_t execute(const CommandSource& source, const std::string& input, std::int32_t& successes) const;
+
     /// What a line could be completed with, the line ending where the client's cursor is.
     [[nodiscard]] SuggestionResult suggest(const CommandSource& source, const std::string& input) const;
 
@@ -235,7 +240,7 @@ private:
 
     [[nodiscard]] Parsed<std::int32_t> runChain(const std::vector<Link>& links, std::size_t index,
                                                 const CommandSource& source, const std::string& input,
-                                                StringReader& reader) const;
+                                                StringReader& reader, std::int32_t& successes) const;
 
     void collect(StringReader& reader, const CommandNode& node, const CommandSource& source, const Arguments& arguments,
                  std::vector<std::pair<std::int32_t, wire::protocol::play::CommandSuggestion>>& out) const;

@@ -250,6 +250,12 @@ void CommandDispatcher::rebuild() {
 }
 
 std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::string& input) const {
+    std::int32_t successes = 0;
+    return execute(source, input, successes);
+}
+
+std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::string& input,
+                                        std::int32_t& successes) const {
     StringReader reader{input};
     // Named after the command, so a report shows which one is slow rather than that "commands" are.
     // The name comes from the input rather than the parse, since a command that fails to parse
@@ -260,7 +266,7 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
     if (!links.has_value()) {
         reportSyntaxError(source, links.error());
     } else {
-        const Parsed<std::int32_t> ran = runChain(*links, 0, source, input, reader);
+        const Parsed<std::int32_t> ran = runChain(*links, 0, source, input, reader, successes);
         if (ran.has_value()) {
             result = *ran;
         } else {
@@ -278,13 +284,18 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
 
 Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links, std::size_t index,
                                                  const CommandSource& source, const std::string& input,
-                                                 StringReader& reader) const {
+                                                 StringReader& reader, std::int32_t& successes) const {
     const Link& link = links[index];
     if (index + 1 == links.size()) {
         if (!link.executor) {
             return std::unexpected{reader.syntaxError(std::string{kUnknownCommand})};
         }
         const Parsed<std::int32_t> result = link.executor(CommandContext{source, *this, input, link.arguments});
+        // parity: brigadier tells its consumer `true` for a leaf that ran at all, whatever it
+        // answered, and `false` only for one that threw. That is what a command block counts.
+        if (result.has_value()) {
+            ++successes;
+        }
         const ExecutionSource* execution = source.asExecution();
         if (execution != nullptr) {
             execution->report(result.has_value() ? *result : 0);
@@ -292,7 +303,7 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
         return result;
     }
     if (!link.modifier) {
-        return runChain(links, index + 1, source, input, reader);
+        return runChain(links, index + 1, source, input, reader, successes);
     }
     const std::vector<std::shared_ptr<const CommandSource>> sources =
         link.modifier(CommandContext{source, *this, input, link.arguments});
@@ -300,17 +311,17 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
         if (sources.size() != 1) {
             return 0;
         }
-        return runChain(links, index + 1, *sources.front(), input, reader);
+        return runChain(links, index + 1, *sources.front(), input, reader, successes);
     }
-    std::int32_t successes = 0;
+    std::int32_t worked = 0;
     for (const std::shared_ptr<const CommandSource>& next : sources) {
         // One branch failing is not the others' problem: vanilla runs the rest and counts.
-        const Parsed<std::int32_t> result = runChain(links, index + 1, *next, input, reader);
+        const Parsed<std::int32_t> result = runChain(links, index + 1, *next, input, reader, successes);
         if (result.has_value() && *result > 0) {
-            successes++;
+            worked++;
         }
     }
-    return successes;
+    return worked;
 }
 
 Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringReader& reader, const CommandNode& node,

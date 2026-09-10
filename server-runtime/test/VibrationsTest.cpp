@@ -322,6 +322,42 @@ TEST_CASE("a calibrated sensor listens the same way") {
                                             basalt::wire::common::Identifier::vanilla("calibrated_sculk_sensor")));
 }
 
+TEST_CASE("a calibrated sensor with a signal behind it hears one frequency and no other") {
+    // parity: `CalibratedSculkSensorBlockEntity.VibrationUser.canReceiveVibration`, which reads the
+    // signal on the square **behind** the sensor and refuses every noise whose frequency is not that
+    // number. A zero back hears everything, which is what the plain sensor does.
+    const auto sensorFacing = [](const std::string& facing) {
+        return stateOf(
+            "calibrated_sculk_sensor",
+            {{"sculk_sensor_phase", "inactive"}, {"power", "0"}, {"waterlogged", "false"}, {"facing", facing}});
+    };
+    {
+        Bench bench;
+        bench.world.getOrGenerateChunk(0, 0);
+        REQUIRE(bench.world.setBlockState(8, 64, 8, sensorFacing("north")));
+        // Facing north, so the back is south: a block of redstone there calls fifteen.
+        REQUIRE(bench.world.setBlockState(8, 64, 9, stateOf("redstone_block", {})));
+
+        // A step is eleven, and eleven is not fifteen.
+        vibrations::emit(bench.world, "step", 8.5, 64.5, 8.5, bench.now);
+        bench.advance();
+        CHECK(bench.changes.empty());
+    }
+    {
+        Bench bench;
+        bench.world.getOrGenerateChunk(0, 0);
+        REQUIRE(bench.world.setBlockState(8, 64, 8, sensorFacing("north")));
+        REQUIRE(bench.world.setBlockState(8, 64, 9, stateOf("redstone_block", {})));
+
+        // `entity_die` is fifteen, which is what this sensor is tuned to.
+        REQUIRE(vibrations::frequencyOf("entity_die") == 15);
+        vibrations::emit(bench.world, "entity_die", 8.5, 64.5, 8.5, bench.now);
+        bench.advance();
+        REQUIRE(bench.changes.size() == 1);
+        CHECK(propertyOf(bench.changes[0].stateId, "sculk_sensor_phase") == "active");
+    }
+}
+
 TEST_CASE("an awake sensor settles through cooldown and then goes quiet") {
     Bench bench;
     bench.world.getOrGenerateChunk(0, 0);

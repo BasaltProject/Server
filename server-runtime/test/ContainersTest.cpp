@@ -138,6 +138,13 @@ TEST_CASE("the blocks that carry the number in their own state need no contents"
     CHECK(readingOf("copper_bulb", {{"lit", "true"}, {"powered", "false"}}) == 15);
     CHECK(readingOf("copper_bulb", {{"lit", "false"}, {"powered", "false"}}) == 0);
 
+    // parity: `CreakingHeartBlock.hasAnalogOutputSignal` is true whatever state it is in, and the
+    // number is zero without a Creaking bound to it. Answering **zero** rather than nothing is the
+    // point: nothing would send the comparator looking one square further for a container.
+    CHECK(readingOf("creaking_heart", {{"axis", "y"}, {"creaking_heart_state", "uprooted"}, {"natural", "false"}}) ==
+          0);
+    CHECK(readingOf("creaking_heart", {{"axis", "y"}, {"creaking_heart_state", "dormant"}, {"natural", "false"}}) == 0);
+
     // parity: one per pose, in the order the enum declares them.
     const std::array<std::string, 4> poses{"standing", "sitting", "running", "star"};
     for (std::size_t index = 0; index < poses.size(); ++index) {

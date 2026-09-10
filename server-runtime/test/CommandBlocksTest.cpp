@@ -58,10 +58,11 @@ struct Loaded {
         return entity->data();
     }
 
-    [[nodiscard]] commandBlocks::RunCommand runner(bool succeeds = true) {
-        return [this, succeeds](std::int32_t, std::int32_t, std::int32_t, const std::string& command) {
+    /// `successes` is what the command answered: one for an ordinary command, more for a fork.
+    [[nodiscard]] commandBlocks::RunCommand runner(std::int32_t successes = 1) {
+        return [this, successes](std::int32_t, std::int32_t, std::int32_t, const std::string& command) {
             ran.push_back(command);
-            return succeeds;
+            return successes;
         };
     }
 };
@@ -161,7 +162,7 @@ TEST_CASE("a conditional block reads the one behind it") {
     loaded.dataAt(9, 64, 8).putBoolean("auto", true);
     commandBlocks::onSignal(loaded.state, 8, 64, 8, true);
 
-    static_cast<void>(commandBlocks::tick(loaded.state, 8, 64, 8, 1, true, 8, loaded.runner(false)));
+    static_cast<void>(commandBlocks::tick(loaded.state, 8, 64, 8, 1, true, 8, loaded.runner(0)));
 
     // The first one ran and failed, so the conditional one behind it stays put.
     REQUIRE(loaded.ran.size() == 1);
@@ -246,4 +247,30 @@ TEST_CASE("a turn that ran nothing still counts as a turn, so the comparator hea
 
     CHECK(loaded.ran.empty());
     CHECK(loaded.dataAt(8, 64, 8).getInt("SuccessCount") == 0);
+}
+
+TEST_CASE("the one command that runs without running") {
+    // parity: `BaseCommandBlock.performCommand` answers `Searge` before it looks at the rule or at
+    // the command itself: one success, nothing run. A comparator beside such a block reads one.
+    Loaded loaded;
+    loaded.put(8, 64, 8, blockOf("command_block"), "sEaRgE");
+    commandBlocks::onSignal(loaded.state, 8, 64, 8, true);
+
+    CHECK(commandBlocks::tick(loaded.state, 8, 64, 8, 7, false, 8, loaded.runner()));
+    CHECK(loaded.ran.empty());
+    CHECK(loaded.dataAt(8, 64, 8).getInt("SuccessCount") == 1);
+    CHECK(loaded.dataAt(8, 64, 8).getLong("LastExecution") == 7);
+}
+
+TEST_CASE("a command that forks counts every branch that worked") {
+    // parity: `BaseCommandBlock.performCommand` counts brigadier's callbacks, so an `/execute as @e`
+    // over three entities leaves three and the comparator beside the block reads three. The count is
+    // not the command's own result: it is how many times it succeeded.
+    Loaded loaded;
+    loaded.put(8, 64, 8, blockOf("command_block"), "execute as @e run say hi");
+    commandBlocks::onSignal(loaded.state, 8, 64, 8, true);
+
+    CHECK(commandBlocks::tick(loaded.state, 8, 64, 8, 1, true, 8, loaded.runner(3)));
+    CHECK(loaded.dataAt(8, 64, 8).getInt("SuccessCount") == 3);
+    CHECK(commandBlocks::comparatorSignal(loaded.dataAt(8, 64, 8)) == 3);
 }

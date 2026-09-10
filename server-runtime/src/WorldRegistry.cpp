@@ -86,6 +86,9 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
     std::unique_ptr<world::LoadedWorld> world =
         std::make_unique<world::LoadedWorld>(declaration, worldsConfig_->settingsFor(declaration), std::move(metadata),
                                              options_.worldsRoot, logger_, std::move(options));
+    if (options_.jukeboxes != nullptr) {
+        world->state().setSongOutput([songs = options_.jukeboxes](const std::string& song) { return songs->of(song); });
+    }
     // parity: a feature reading past the chunk edge has to see what another chunk already wrote
     // there. In vanilla that write is in the neighbour's proto chunk; here it waits in the queue,
     // so the neighbour view is taught to look in it first.

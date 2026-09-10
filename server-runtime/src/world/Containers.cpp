@@ -131,6 +131,13 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
     if (path.ends_with("copper_bulb")) {
         return textOf(properties, "lit") == "true" ? redstone::kMaxSignal : 0;
     }
+    // parity: `CreakingHeartBlock.hasAnalogOutputSignal` is true and its number comes from the
+    // Creaking bound to it: fifteen next to it, down to nothing at thirty-two blocks, and zero with
+    // none. There is no Creaking in this build, so the number is always zero; what matters is that
+    // the heart **answers**, because that is what stops a comparator looking past it for a container.
+    if (path == "creaking_heart") {
+        return 0;
+    }
     // parity: `CopperGolemStatueBlock`, one per pose in the order the enum declares them.
     if (path == "copper_golem_statue" || path.ends_with("_copper_golem_statue")) {
         const auto found = std::ranges::find(kGolemPoses, textOf(properties, "copper_golem_pose"));
@@ -241,7 +248,7 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     }
     // parity: `JukeboxBlock.getAnalogOutputSignal`, the number of the song that is playing.
     if (path == "jukebox") {
-        return jukeboxes::comparatorOutputAt(entity->data());
+        return jukeboxes::comparatorOutputAt(world, entity->data());
     }
     // parity: `LecternBlock.getAnalogOutputSignal`, which is nothing at all without a book, and
     // otherwise how far through it the reader is.

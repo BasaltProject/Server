@@ -134,8 +134,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     worldRegistry_ = std::make_unique<WorldRegistry>(
         config, worldsConfig, options_.generators, playerRegistry_, std::move(worldHooks),
-        WorldRegistry::Options{
-            .worldsRoot = options_.worldsRoot, .timings = &timings_, .generationMetrics = config.generationMetrics},
+        WorldRegistry::Options{.worldsRoot = options_.worldsRoot,
+                               .timings = &timings_,
+                               .generationMetrics = config.generationMetrics,
+                               .jukeboxes = &vanillaData_.jukeboxSongs},
         logger_);
 
     for (const auto& [name, world] : worldRegistry_->worlds()) {
@@ -453,11 +455,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         [this](std::int32_t x, std::int32_t y, std::int32_t z, const std::string& line) {
             command::CommandDispatcher* dispatcher = commands();
             if (dispatcher == nullptr) {
-                return false;
+                return 0;
             }
             const command::CommandBlockSource source{
                 {x + 0.5, y + 0.5, z + 0.5}, "@", true, wire::common::Logger{"CommandBlock"}};
-            return dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line) > 0;
+            std::int32_t successes = 0;
+            static_cast<void>(dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));
+            return successes;
         },
         RedstoneTickSystem::Hooks{},
         RedstoneTickSystem::Options{.nextSeed = [] { return scratchSeed(); }, .jukeboxes = &vanillaData_.jukeboxSongs});
