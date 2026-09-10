@@ -145,6 +145,12 @@ using Properties = std::map<std::string, std::string>;
 
 void scheduleComparator(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                         std::int32_t stateId, const ContainerSignalAt& containerSignal) {
+    // parity: `ComparatorBlock.checkTickOnNeighbor` asks this first: while its own turn is waiting
+    // in this tick's batch, a comparator books nothing, and what the waiting turn reads is the world
+    // as it is by then.
+    if (world.willTickThisTick(x, y, z, comparator())) {
+        return;
+    }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const std::int32_t output = comparatorOutput(world, worldName, x, y, z, properties, containerSignal);
     if (output == storedOutput(world, x, y, z) && (valueOf(properties, "powered") == "true") == (output > 0)) {
@@ -173,6 +179,11 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
         // `redstone_wall_torch` and not the standing one: vanilla drops a tick whose block is not
         // the one standing there.
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+        // parity: `RedstoneTorchBlock.neighborChanged` books nothing while its own turn is waiting
+        // in this tick's batch.
+        if (world.willTickThisTick(x, y, z, block == nullptr ? torch() : *block)) {
+            return;
+        }
         world.scheduleBlockTick(x, y, z, block == nullptr ? torch() : *block, kTorchDelay);
         return;
     }
@@ -188,6 +199,12 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
         }
         const bool on = valueOf(properties, "powered") == "true";
         if (on == (repeaterInput(world, worldName, x, y, z, properties) > 0)) {
+            return;
+        }
+        // parity: and nothing either while the repeater's own turn is waiting in this tick's batch:
+        // booking a second one left it pending after the first ran, and the stale turn is what
+        // answered the next change, four ticks before the jar's did.
+        if (world.willTickThisTick(x, y, z, repeater())) {
             return;
         }
         std::int32_t priority = kHigh;

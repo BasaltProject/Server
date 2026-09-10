@@ -228,7 +228,7 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     if (path == "redstone_block") {
         return kMaxSignal;
     }
-    // parity: `RedstoneTorchBlock.getSignal`, which feeds every side but the one above it.
+    // parity: `RedstoneTorchBlock.getSignal`, which feeds every side but the block it stands on.
     if (path == "redstone_torch") {
         return valueOf(properties, "lit") == "true" && from != BlockFace::Up ? kMaxSignal : 0;
     }
@@ -270,8 +270,13 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     }
     // parity: `TargetBlock` and `SculkSensorBlock`, both of which carry their strength in `power`
     // and count it down on their own scheduled tick.
-    if (path == "target" || path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+    if (path == "target" || path == "sculk_sensor") {
         return numberOf(properties, "power").value_or(0);
+    }
+    // parity: `CalibratedSculkSensorBlock.getSignal` gives nothing on the face it looks at, which is
+    // the one its frequency filter reads: a sensor that fed its own filter would tune itself.
+    if (path == "calibrated_sculk_sensor") {
+        return valueOf(properties, "facing") == nameOf(from) ? 0 : numberOf(properties, "power").value_or(0);
     }
     // parity: `TrappedChestBlock.getSignal`, one per person looking inside, capped at fifteen.
     if (path == "trapped_chest") {

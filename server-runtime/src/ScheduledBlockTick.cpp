@@ -78,6 +78,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         const std::int32_t x = position[0];
         const std::int32_t y = position[1];
         const std::int32_t z = position[2];
+        // parity: `LevelTicks.runCollectedTicks` takes the turn out of the batch before running it,
+        // so what the turn sets off books for real while everything still waiting does not.
+        world.state().beginBlockTick(x, y, z);
         if (!region.owns(x >> 4, z >> 4)) {
             continue;
         }
@@ -474,6 +477,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             });
         }
     }
+    // parity: `LevelTicks.cleanupAfterTick`. Nothing waits in the batch once the pass is over, so a
+    // world that stops between ticks books like any other.
+    world.state().endBlockTicks();
 }
 
 } // namespace basalt::server::runtime

@@ -240,6 +240,18 @@ public:
     /// The same for block ticks: a button that has been held down long enough, and later redstone.
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueBlockTicks();
 
+    /// parity: `LevelTicks.willTickThisTick`, the turns already taken for this tick and still to
+    /// run. A diode that hears a neighbour while its own turn is waiting books nothing.
+    [[nodiscard]] bool willTickThisTick(std::int32_t x, std::int32_t y, std::int32_t z,
+                                        const wire::common::Identifier& type) const;
+
+    /// parity: `LevelTicks.runCollectedTicks` takes the turn out of that set before running it.
+    void beginBlockTick(std::int32_t x, std::int32_t y, std::int32_t z);
+
+    /// parity: `LevelTicks.cleanupAfterTick`, which empties the batch when the pass ends. A world
+    /// that stops running keeps no turns waiting, and a frozen world books like any other.
+    void endBlockTicks();
+
     [[nodiscard]] std::vector<GeneratedWorldEntity>
     generatedEntities(const std::function<std::int32_t()>& allocateEntityId, std::int32_t centerChunkX,
                       std::int32_t centerChunkZ, std::int32_t radiusChunks);
@@ -315,9 +327,20 @@ private:
 
     [[nodiscard]] server::world::Chunk* chunkAtLocked(std::int64_t chunkKey) const;
     [[nodiscard]] std::vector<server::world::Chunk*> snapshot() const;
-    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueTicks(
-        const std::function<void(server::world::Chunk&, std::vector<server::world::ChunkScheduledTick>&)>& advance);
+    [[nodiscard]] std::vector<std::array<std::int32_t, 3>>
+    dueTicks(const std::function<void(server::world::Chunk&, std::vector<server::world::ChunkScheduledTick>&)>& advance,
+             bool remember);
     server::world::Chunk& installLocked(server::world::Chunk chunk);
+
+    /// One turn of this tick's batch, kept only to answer `willTickThisTick`.
+    struct CollectedTick {
+        std::int32_t x;
+        std::int32_t y;
+        std::int32_t z;
+        wire::common::Identifier type;
+    };
+
+    std::vector<CollectedTick> collectedBlockTicks_;
 
     mutable WorldMutex mutex_;
     LoadOrGenerate loadOrGenerate_;
