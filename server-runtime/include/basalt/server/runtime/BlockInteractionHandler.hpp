@@ -95,6 +95,10 @@ public:
 
     void writeSign(const wire::protocol::play::SignUpdatePacket& update);
 
+    /// parity: `handleSetCommandBlock`, the screen a command block opens. Refused outright for anyone
+    /// who is not an operator in creative, which is what `canUseGameMasterBlocks` asks.
+    void programCommandBlock(const wire::protocol::play::SetCommandBlockPacket& packet);
+
     /// parity: `Level.updateNeighborsAt`, which is what makes a torch fall off a broken wall.
     void notifyNeighbours(const wire::protocol::play::BlockPos& pos);
 
@@ -246,6 +250,12 @@ private:
 
     ClientSession* owner_;
     Hooks hooks_;
+    [[nodiscard]] bool mayUseGameMasterBlocks(player::PlayerSession& session) const;
+
+    /// One block entity's data to everyone watching, which is how a client is told what to put in
+    /// the screen it is about to open.
+    void sendBlockEntity(const wire::protocol::play::BlockPos& pos);
+
     Options options_;
     /// What an enchantment takes off a durability cost, read from the definitions themselves.
     item::ItemDamageEffects damageEffects_;

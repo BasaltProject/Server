@@ -201,6 +201,16 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
+        // parity: `CommandBlock.useWithoutItem`, which is `player.openCommandBlock(entity)` for
+        // anyone allowed to and nothing at all for anyone else. The client opens the screen itself,
+        // so what the server owes it is the block entity's own data.
+        if (world::commandBlocks::modeOf(path).has_value()) {
+            if (mayUseGameMasterBlocks(*session)) {
+                sendBlockEntity(hit.pos);
+                ack();
+                return;
+            }
+        }
         // parity: `JukeboxBlock.useItemOn`/`useWithoutItem`: a disc goes in, and clicking a playing
         // one takes it back out.
         if (path == "jukebox" && useJukebox(*session, hit.pos)) {

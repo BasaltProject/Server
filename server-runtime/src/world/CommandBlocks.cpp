@@ -22,6 +22,8 @@ constexpr std::string_view kConditionKey = "conditionMet";
 constexpr std::string_view kAutoKey = "auto";
 constexpr std::string_view kUpdateLastKey = "UpdateLastExecution";
 constexpr std::string_view kLastExecutionKey = "LastExecution";
+constexpr std::string_view kTrackOutputKey = "TrackOutput";
+constexpr std::string_view kLastOutputKey = "LastOutput";
 
 /// parity: `CommandBlock.tick` books its turn one tick out, both for the first one and for the
 /// repeating block's own next.
@@ -30,6 +32,16 @@ constexpr std::int32_t kDelay = 1;
 [[nodiscard]] const wire::common::Identifier& impulseBlock() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("command_block");
     return instance;
+}
+
+/// The block each mode is: there is no property for it, the three are three blocks.
+[[nodiscard]] const wire::common::Identifier& blockOfMode(Mode mode) {
+    static const wire::common::Identifier chain = wire::common::Identifier::vanilla("chain_command_block");
+    static const wire::common::Identifier repeating = wire::common::Identifier::vanilla("repeating_command_block");
+    if (mode == Mode::Chain) {
+        return chain;
+    }
+    return mode == Mode::Repeating ? repeating : impulseBlock();
 }
 
 [[nodiscard]] server::world::ChunkBlockEntity* entityAt(WorldState& world, std::int32_t x, std::int32_t y,
@@ -313,11 +325,74 @@ void onDataLoaded(WorldState& world, const std::int32_t x, const std::int32_t y,
     world.scheduleBlockTick(x, y, z, impulseBlock(), kDelay);
 }
 
+std::optional<BlockChange> program(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                   const std::string& command, const Mode mode, const bool trackOutput,
+                                   const bool conditional, const bool automatic) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return std::nullopt;
+    }
+    const std::optional<Mode> was = modeOf(pathOf(*stateId));
+    server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z);
+    if (!was.has_value() || entity == nullptr) {
+        return std::nullopt;
+    }
+    const bool wasAutomatic = entity->data().getBoolean(std::string{kAutoKey});
+    const bool powered = entity->data().getBoolean(std::string{kPoweredKey});
+    // parity: the mode **is** the block, so a screen that changed it puts a different one down with
+    // the facing it had and the conditional flag the packet carried. Vanilla writes it with flag 2,
+    // which tells the clients and not the neighbours, and then hands the block entity back: our
+    // write drops it, so it is put back by hand with everything it held.
+    std::optional<BlockChange> moved;
+    const std::optional<std::int32_t> wanted = registry::blockStateDefinitions::stateIdOf(
+        blockOfMode(mode), {{"facing", valueOf(*stateId, "facing")}, {"conditional", conditional ? "true" : "false"}},
+        std::nullopt);
+    if (wanted.has_value() && *wanted != *stateId) {
+        wire::nbt::NbtCompound kept = entity->data();
+        if (!world.setBlockState(x, y, z, *wanted, WorldState::SideEffects::kSkip)) {
+            return std::nullopt;
+        }
+        server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        if (chunk == nullptr) {
+            return std::nullopt;
+        }
+        chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, blockOfMode(mode), std::move(kept)});
+        entity = entityAt(world, x, y, z);
+        if (entity == nullptr) {
+            return std::nullopt;
+        }
+        moved = BlockChange{.x = x, .y = y, .z = z, .stateId = *wanted};
+    }
+    // parity: `BaseCommandBlock.setCommand` puts the success count back to zero with the new line.
+    entity->data().putString(std::string{kCommandKey}, command);
+    entity->data().putInt(std::string{kSuccessKey}, 0);
+    entity->data().putBoolean(std::string{kTrackOutputKey}, trackOutput);
+    if (!trackOutput) {
+        static_cast<void>(entity->data().remove(std::string{kLastOutputKey}));
+    }
+    entity->data().putBoolean(std::string{kAutoKey}, automatic);
+    world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    const std::optional<std::int32_t> now = world.blockState(x, y, z);
+    if (!now.has_value()) {
+        return moved;
+    }
+    // parity: `CommandBlockEntity.setAutomatic` books a turn the moment a block is switched to
+    // `auto` while nothing is powering it, and `onModeSwitch` books one for a repeating block that
+    // was already awake. A chain block books nothing either way: something else has to point at it.
+    const bool switchedOn = !wasAutomatic && automatic && !powered && mode != Mode::Chain;
+    const bool becameRepeating = *was != mode && mode == Mode::Repeating && (powered || automatic);
+    if (switchedOn || becameRepeating) {
+        static_cast<void>(markConditionMet(world, x, y, z, *now));
+        world.scheduleBlockTick(x, y, z, impulseBlock(), kDelay);
+    }
+    return moved;
+}
+
 wire::nbt::NbtCompound defaults() {
     wire::nbt::NbtCompound data;
     data.putString(std::string{kCommandKey}, "");
     data.putInt(std::string{kSuccessKey}, 0);
-    data.putBoolean("TrackOutput", true);
+    data.putBoolean(std::string{kTrackOutputKey}, true);
     data.putBoolean(std::string{kUpdateLastKey}, true);
     data.putBoolean(std::string{kPoweredKey}, false);
     data.putBoolean(std::string{kConditionKey}, false);

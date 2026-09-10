@@ -1,5 +1,6 @@
 #include "ItemSlots.hpp"
 
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
 #include <basalt/server/runtime/command/ExecuteArguments.hpp>
@@ -132,7 +133,22 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         return 1;
     };
 
-    const auto replace = [](const CommandContext& context, std::int32_t count) -> Parsed<std::int32_t> {
+    // parity: `ItemInput.createItemStack` refuses a count above the item's own stack size, and
+    // `/item replace` is the caller that does not split into stacks the way `/give` does. Without it
+    // a command could put three cakes in one slot, which no client and no vanilla server would.
+    const auto tooBig = [](const CommandContext& context, const ParsedItem& parsed,
+                           std::int32_t count) -> std::optional<CommandSyntaxError> {
+        const std::int32_t most = server::registry::itemStacking::maxStackSize(parsed.id);
+        if (most <= 0 || count <= most) {
+            return std::nullopt;
+        }
+        static_cast<void>(context);
+        return CommandSyntaxError{.component = Component::translatable(
+                                      "arguments.item.overstacked",
+                                      {Component::text(parsed.id.toString()), Component::text(std::to_string(most))})};
+    };
+
+    const auto replace = [tooBig](const CommandContext& context, std::int32_t count) -> Parsed<std::int32_t> {
         const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot");
         if (!slot.has_value()) {
             return std::unexpected{slot.error()};
@@ -140,6 +156,9 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         const auto* parsed = context.get<ParsedItem>("item");
         if (parsed == nullptr) {
             return 0;
+        }
+        if (const std::optional<CommandSyntaxError> failure = tooBig(context, *parsed, count); failure.has_value()) {
+            return std::unexpected{*failure};
         }
         const std::vector<std::string> notDrawn = item::itemComponentCodecs::notDrawn(parsed->components);
         if (!notDrawn.empty()) {
@@ -161,7 +180,7 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         return static_cast<std::int32_t>(targets.size());
     };
 
-    const auto replaceInBlock = [](const CommandContext& context, std::int32_t count) -> Parsed<std::int32_t> {
+    const auto replaceInBlock = [tooBig](const CommandContext& context, std::int32_t count) -> Parsed<std::int32_t> {
         const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot", true);
         if (!slot.has_value()) {
             return std::unexpected{slot.error()};
@@ -169,6 +188,9 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         const auto* parsed = context.get<ParsedItem>("item");
         if (parsed == nullptr) {
             return 0;
+        }
+        if (const std::optional<CommandSyntaxError> failure = tooBig(context, *parsed, count); failure.has_value()) {
+            return std::unexpected{*failure};
         }
         const std::array<std::int32_t, 3> at = blockAt(context, "pos");
         const storage::StoredItemStack stack{
