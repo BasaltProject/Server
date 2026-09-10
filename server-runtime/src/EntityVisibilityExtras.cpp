@@ -351,17 +351,6 @@ void EntityVisibilityTracker::syncGeneratedEntities() {
                               .objectData = isFrame ? frameDirectionData(descriptor.data.getString("facing")) : 0}
                 .write(buffer);
         });
-        if (isFrame && descriptor.data.getString("item") == "minecraft:elytra") {
-            const server::registry::Item* elytra =
-                server::registry::items::registry().byName(Identifier::vanilla("elytra"));
-            if (elytra != nullptr) {
-                owner_->sendPlayPacket(SetEntityDataPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                    SetEntityDataPacket::itemFrame(
-                        entity.entityId, wire::protocol::play::WireItemStack{.itemId = elytra->protocolId, .count = 1})
-                        .write(buffer);
-                });
-            }
-        }
         const std::vector<SetEntityDataPacket::Entry> metadata =
             entity::generatedEntityMetadata(descriptor.type.path(), descriptor.data);
         if (!metadata.empty()) {

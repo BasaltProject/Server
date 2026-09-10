@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
+#include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/world/terrain/decoration/JavaHashSetOrder.hpp>
@@ -710,12 +711,20 @@ std::int32_t comparatorInput(const WorldState& world, std::string_view worldName
     if (!target.has_value()) {
         return plain;
     }
-    // parity: a comparator reads a container one block further when a solid block is in the way.
-    if (plain < redstone::kMaxSignal && registry::blockSupport::conductsRedstone(*target) && containerSignal) {
-        const std::optional<std::int32_t> behind = containerSignal(
-            bx + registry::stepX(*facing), by + registry::stepY(*facing), bz + registry::stepZ(*facing), from);
-        if (behind.has_value()) {
-            return *behind;
+    // parity: a comparator reads a container one block further when a solid block is in the way, and
+    // an item frame hanging there counts as well: `max(frame, container)`, with an **empty** frame
+    // answering zero rather than answering nothing.
+    if (plain < redstone::kMaxSignal && registry::blockSupport::conductsRedstone(*target)) {
+        const std::int32_t fx = bx + registry::stepX(*facing);
+        const std::int32_t fy = by + registry::stepY(*facing);
+        const std::int32_t fz = bz + registry::stepZ(*facing);
+        const std::optional<std::int32_t> behind = containerSignal ? containerSignal(fx, fy, fz, from) : std::nullopt;
+        const std::optional<std::int32_t> frame = itemFrames::analogOutput(world, fx, fy, fz, *facing);
+        if (behind.has_value() && frame.has_value()) {
+            return std::max(*behind, *frame);
+        }
+        if (behind.has_value() || frame.has_value()) {
+            return behind.value_or(frame.value_or(0));
         }
     }
     return plain;

@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -14,10 +15,37 @@ namespace {
 
 constexpr std::string_view kBookKey = "Book";
 constexpr std::string_view kPageKey = "Page";
-constexpr std::string_view kPagesKey = "Pages";
+
+/// parity: `LecternBlockEntity.getPageCount`, which asks the book itself: a written one keeps its
+/// pages under `written_book_content` and a plain one under `writable_book_content`, and a book with
+/// neither has no pages at all.
+constexpr std::string_view kWrittenContent = "minecraft:written_book_content";
+constexpr std::string_view kWritableContent = "minecraft:writable_book_content";
+constexpr std::string_view kPagesField = "pages";
 
 /// parity: `LecternBlockEntity.getRedstoneSignal`'s fourteen steps between the covers.
 constexpr float kSignalSteps = 14.0F;
+
+/// The book on the stand, or nothing when there is none.
+[[nodiscard]] std::optional<server::world::loot::ItemStack> bookIn(const wire::nbt::NbtCompound& data) {
+    const wire::nbt::NbtCompound* stored = data.getCompound(std::string{kBookKey});
+    return stored == nullptr ? std::nullopt : blockInventory::readStack(*stored);
+}
+
+[[nodiscard]] std::int32_t pageCountOf(const wire::nbt::NbtCompound& data) {
+    const std::optional<server::world::loot::ItemStack> book = bookIn(data);
+    if (!book.has_value()) {
+        return 0;
+    }
+    for (const std::string_view key : {kWrittenContent, kWritableContent}) {
+        const wire::nbt::NbtCompound* content = book->components.getCompound(std::string{key});
+        const wire::nbt::NbtList* pages = content == nullptr ? nullptr : content->getList(std::string{kPagesField});
+        if (pages != nullptr) {
+            return static_cast<std::int32_t>(pages->size());
+        }
+    }
+    return 0;
+}
 
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
@@ -70,7 +98,7 @@ bool isBook(const wire::common::Identifier& item) {
 }
 
 std::optional<BlockChange> placeBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                     const wire::common::Identifier& book, std::int32_t pages) {
+                                     const server::world::loot::ItemStack& book) {
     std::int32_t stateId = 0;
     const wire::common::Identifier* id = lecternAt(world, x, y, z, stateId, "has_book", "false");
     if (id == nullptr) {
@@ -86,16 +114,17 @@ std::optional<BlockChange> placeBook(WorldState& world, std::int32_t x, std::int
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    entity->data().putString(kBookKey, book.toString());
+    // parity: `saveAdditional` writes the book with `ItemStack.CODEC` and the page beside it, and
+    // writes neither while the stand is empty.
+    entity->data().set(std::string{kBookKey}, wire::nbt::NbtTag::ofCompound(blockInventory::writeStack(book)));
     entity->data().putInt(kPageKey, 0);
-    entity->data().putInt(kPagesKey, std::max(1, pages));
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
-std::optional<std::pair<BlockChange, wire::common::Identifier>> takeBook(WorldState& world, std::int32_t x,
-                                                                         std::int32_t y, std::int32_t z) {
+std::optional<std::pair<BlockChange, server::world::loot::ItemStack>> takeBook(WorldState& world, std::int32_t x,
+                                                                               std::int32_t y, std::int32_t z) {
     std::int32_t stateId = 0;
     const wire::common::Identifier* id = lecternAt(world, x, y, z, stateId, "has_book", "true");
     if (id == nullptr) {
@@ -105,8 +134,7 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> takeBook(WorldSt
     if (entity == nullptr) {
         return std::nullopt;
     }
-    const std::expected<wire::common::Identifier, wire::common::IdentifierError> book =
-        wire::common::Identifier::parse(std::string{entity->data().getString(kBookKey)});
+    const std::optional<server::world::loot::ItemStack> book = bookIn(entity->data());
     if (!book.has_value()) {
         return std::nullopt;
     }
@@ -115,9 +143,8 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> takeBook(WorldSt
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
-    entity->data().remove(kBookKey);
-    entity->data().remove(kPageKey);
-    entity->data().remove(kPagesKey);
+    static_cast<void>(entity->data().remove(std::string{kBookKey}));
+    static_cast<void>(entity->data().remove(std::string{kPageKey}));
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *turned}, *book};
@@ -134,7 +161,7 @@ std::optional<BlockChange> turnPage(WorldState& world, std::int32_t x, std::int3
     if (entity == nullptr) {
         return std::nullopt;
     }
-    const std::int32_t pages = entity->data().getInt(kPagesKey, kDefaultPages);
+    const std::int32_t pages = pageCountOf(entity->data());
     const std::optional<std::int32_t> turned =
         registry::blockStateDefinitions::stateIdOf(*id, {{"powered", "true"}}, stateId);
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
@@ -162,8 +189,8 @@ std::optional<BlockChange> endPulse(WorldState& world, std::int32_t x, std::int3
 }
 
 std::int32_t comparatorSignal(const wire::nbt::NbtCompound& data) {
-    const bool hasBook = !data.getString(kBookKey).empty();
-    const std::int32_t pages = data.getInt(kPagesKey, kDefaultPages);
+    const bool hasBook = bookIn(data).has_value();
+    const std::int32_t pages = pageCountOf(data);
     const std::int32_t page = data.getInt(kPageKey, 0);
     const float progress = pages > 1 ? static_cast<float>(page) / static_cast<float>(pages - 1) : 1.0F;
     return static_cast<std::int32_t>(std::floor(progress * kSignalSteps)) + (hasBook ? 1 : 0);

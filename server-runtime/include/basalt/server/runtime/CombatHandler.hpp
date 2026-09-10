@@ -87,6 +87,13 @@ private:
     /// parity: `TamableAnimal.mobInteract`: a pet sits or stands, and a wild one may be tamed.
     bool tameOrSit(player::PlayerSession& session, entity::ServerEntity& entity);
 
+    /// parity: `ItemFrame.interact`, which takes what is in the hand and turns what is already
+    /// behind the glass. Answers whether the click was a frame's.
+    bool useItemFrame(player::PlayerSession& session, entity::ServerEntity& frame);
+
+    /// The item and the turn a frame is showing, sent to everyone who can see it.
+    void broadcastFrame(const entity::ServerEntity& frame);
+
     void mount(player::PlayerSession& session, entity::ServerEntity& vehicle);
 
     /// parity: `VehicleEntity.hurtServer`, which is damage points rather than health.

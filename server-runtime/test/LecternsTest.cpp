@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
 
 #include <doctest.h>
@@ -28,6 +29,22 @@ namespace {
     return basalt::wire::common::Identifier::vanilla(path);
 }
 
+/// A book with that many pages, written the way vanilla writes one: the pages are a component of
+/// the item, not a field of the lectern.
+[[nodiscard]] basalt::server::world::loot::ItemStack book(const std::string& path, std::int32_t pages) {
+    basalt::wire::nbt::NbtList written{basalt::wire::nbt::NbtType::String};
+    for (std::int32_t page = 0; page < pages; ++page) {
+        written.push(basalt::wire::nbt::NbtTag::ofString("page"));
+    }
+    basalt::wire::nbt::NbtCompound content;
+    content.set("pages", basalt::wire::nbt::NbtTag::ofList(std::move(written)));
+    basalt::server::world::loot::ItemStack stack{.item = item(path), .count = 1};
+    const std::string key =
+        path == "written_book" ? "minecraft:written_book_content" : "minecraft:writable_book_content";
+    stack.components.set(key, basalt::wire::nbt::NbtTag::ofCompound(std::move(content)));
+    return stack;
+}
+
 [[nodiscard]] WorldState emptyWorld() {
     return WorldState{{}, [](std::int32_t chunkX, std::int32_t chunkZ) { return Chunk{chunkX, chunkZ}; }};
 }
@@ -50,7 +67,7 @@ struct Loaded {
 /// A lectern with a book of that many pages already on it.
 void withBook(WorldState& world, std::int32_t pages) {
     REQUIRE(world.setBlockState(8, 64, 8, lectern("false", "false")));
-    REQUIRE(lecterns::placeBook(world, 8, 64, 8, item("written_book"), pages).has_value());
+    REQUIRE(lecterns::placeBook(world, 8, 64, 8, book("written_book", pages)).has_value());
 }
 
 } // namespace
@@ -67,32 +84,41 @@ TEST_CASE("a book goes on the stand and comes back off it") {
     WorldState& world = loaded.state;
     REQUIRE(world.setBlockState(8, 64, 8, lectern("false", "false")));
 
-    const std::optional<BlockChange> placed = lecterns::placeBook(world, 8, 64, 8, item("written_book"), 5);
+    const std::optional<BlockChange> placed = lecterns::placeBook(world, 8, 64, 8, book("written_book", 5));
     REQUIRE(placed.has_value());
     CHECK(placed->stateId == lectern("true", "false"));
-    CHECK(dataAt(world, 8, 64, 8).getInt("Pages") == 5);
     CHECK(dataAt(world, 8, 64, 8).getInt("Page") == 0);
+    // parity: `saveAdditional` stores the book with `ItemStack.CODEC`, components and all, which is
+    // where the pages live.
+    const basalt::wire::nbt::NbtCompound* stored = dataAt(world, 8, 64, 8).getCompound("Book");
+    REQUIRE(stored != nullptr);
+    CHECK(stored->getString("id") == "minecraft:written_book");
+    CHECK(stored->getCompound("components") != nullptr);
 
     // A stand that already holds one takes no second book.
-    CHECK_FALSE(lecterns::placeBook(world, 8, 64, 8, item("writable_book"), 2).has_value());
+    CHECK_FALSE(lecterns::placeBook(world, 8, 64, 8, book("writable_book", 2)).has_value());
 
-    const std::optional<std::pair<BlockChange, basalt::wire::common::Identifier>> taken =
+    const std::optional<std::pair<BlockChange, basalt::server::world::loot::ItemStack>> taken =
         lecterns::takeBook(world, 8, 64, 8);
     REQUIRE(taken.has_value());
     CHECK(taken->first.stateId == lectern("false", "false"));
-    CHECK(taken->second == item("written_book"));
-    CHECK(dataAt(world, 8, 64, 8).getString("Book").empty());
+    CHECK(taken->second.item == item("written_book"));
+    // The book comes back off the stand with its pages still on it.
+    CHECK(taken->second.components.getCompound("minecraft:written_book_content") != nullptr);
+    CHECK(dataAt(world, 8, 64, 8).getCompound("Book") == nullptr);
     CHECK_FALSE(lecterns::takeBook(world, 8, 64, 8).has_value());
 }
 
-TEST_CASE("a book of no pages is still a page long") {
+TEST_CASE("a book with no pages reads as fully read") {
     Loaded loaded;
     WorldState& world = loaded.state;
     REQUIRE(world.setBlockState(8, 64, 8, lectern("false", "false")));
 
-    REQUIRE(lecterns::placeBook(world, 8, 64, 8, item("writable_book"), 0).has_value());
+    REQUIRE(lecterns::placeBook(world, 8, 64, 8, book("writable_book", 0)).has_value());
 
-    CHECK(dataAt(world, 8, 64, 8).getInt("Pages") == 1);
+    // parity: `getPageCount` answers zero, and `getRedstoneSignal` reads anything under two pages as
+    // the whole book.
+    CHECK(lecterns::comparatorSignal(dataAt(world, 8, 64, 8)) == 15);
 }
 
 TEST_CASE("turning a page pulses the block for two ticks") {
@@ -135,7 +161,7 @@ TEST_CASE("an empty lectern turns no pages") {
 
     CHECK_FALSE(lecterns::turnPage(world, 8, 64, 8, 1).has_value());
     REQUIRE(world.setBlockState(4, 64, 4, registry::blocks::named("stone")->stateId));
-    CHECK_FALSE(lecterns::placeBook(world, 4, 64, 4, item("written_book"), 1).has_value());
+    CHECK_FALSE(lecterns::placeBook(world, 4, 64, 4, book("written_book", 1)).has_value());
     CHECK_FALSE(lecterns::takeBook(world, 4, 64, 4).has_value());
     CHECK_FALSE(lecterns::endPulse(world, 4, 64, 4).has_value());
 }
@@ -164,8 +190,8 @@ TEST_CASE("a lectern away from the middle chunk keeps its own book") {
     // have to be right for the book to land on the block.
     REQUIRE(world.setBlockState(21, 64, 21, lectern("false", "false")));
 
-    REQUIRE(lecterns::placeBook(world, 21, 64, 21, item("written_book"), 3).has_value());
-    CHECK(dataAt(world, 21, 64, 21).getInt("Pages") == 3);
+    REQUIRE(lecterns::placeBook(world, 21, 64, 21, book("written_book", 3)).has_value());
+    CHECK(dataAt(world, 21, 64, 21).getCompound("Book") != nullptr);
     REQUIRE(lecterns::turnPage(world, 21, 64, 21, 2).has_value());
     CHECK(dataAt(world, 21, 64, 21).getInt("Page") == 2);
     CHECK(lecterns::takeBook(world, 21, 64, 21).has_value());
@@ -182,27 +208,24 @@ TEST_CASE("a book of one page has only the page it is open at") {
 }
 
 TEST_CASE("a stand with no book reads as nothing, and a single page reads as full") {
-    basalt::wire::nbt::NbtCompound empty;
+    const auto stand = [](std::int32_t pages, std::optional<std::int32_t> page) {
+        basalt::wire::nbt::NbtCompound data;
+        data.set("Book",
+                 basalt::wire::nbt::NbtTag::ofCompound(blockInventory::writeStack(book("written_book", pages))));
+        if (page.has_value()) {
+            data.putInt("Page", *page);
+        }
+        return data;
+    };
+    const basalt::wire::nbt::NbtCompound empty;
     CHECK(lecterns::comparatorSignal(empty) == 14);
 
-    basalt::wire::nbt::NbtCompound single;
-    single.putString("Book", "minecraft:written_book");
-    single.putInt("Pages", 1);
-    single.putInt("Page", 0);
-    CHECK(lecterns::comparatorSignal(single) == 15);
+    CHECK(lecterns::comparatorSignal(stand(1, 0)) == 15);
 
     // Two pages is the shortest book with a first half and a second.
-    basalt::wire::nbt::NbtCompound pair;
-    pair.putString("Book", "minecraft:written_book");
-    pair.putInt("Pages", 2);
-    pair.putInt("Page", 0);
-    CHECK(lecterns::comparatorSignal(pair) == 1);
-    pair.putInt("Page", 1);
-    CHECK(lecterns::comparatorSignal(pair) == 15);
+    CHECK(lecterns::comparatorSignal(stand(2, 0)) == 1);
+    CHECK(lecterns::comparatorSignal(stand(2, 1)) == 15);
 
     // A book that never said which page it was open at is open at the first.
-    basalt::wire::nbt::NbtCompound unopened;
-    unopened.putString("Book", "minecraft:written_book");
-    unopened.putInt("Pages", 5);
-    CHECK(lecterns::comparatorSignal(unopened) == 1);
+    CHECK(lecterns::comparatorSignal(stand(5, std::nullopt)) == 1);
 }

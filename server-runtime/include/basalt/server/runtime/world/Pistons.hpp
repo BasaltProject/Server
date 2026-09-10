@@ -67,6 +67,18 @@ struct Context {
 
 [[nodiscard]] const wire::common::Identifier& block();
 
+/// What a booked half-way turn is filed under, which is the sliding block's own name so it can sit
+/// beside the piston's landing turn on the same square.
+[[nodiscard]] const wire::common::Identifier& slideTickType();
+
+/// One turn of the slide at this square. parity: `PistonMovingBlockEntity.tick`, which copies
+/// `progress` into `progressO` and then adds a half, and whose saved field is `progressO`.
+///
+/// It deliberately does **not** dirty the chunk, because `tick` never calls `setChanged`: a slide
+/// only reaches the disk half way through when something else dirties that chunk on the same turn,
+/// which is the whole reason `pistonsensor` reads differently from `piston`.
+void advanceSlide(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
 /// parity: `PistonBaseBlock.isPushable`. Air moves, obsidian and its family never do, a block with no
 /// destroy speed (bedrock) never does, and the push reaction decides the rest.
 ///

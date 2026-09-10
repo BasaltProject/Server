@@ -296,9 +296,22 @@ TEST_CASE("a lectern with no book reads nothing, whatever page it remembers") {
     WorldState& world = loaded.state;
     REQUIRE(world.setBlockState(
         8, 64, 8, stateOf("lectern", {{"facing", "north"}, {"has_book", "false"}, {"powered", "false"}})));
+    // parity: `saveAdditional` writes the book with `ItemStack.CODEC`, and how many pages it has is
+    // a component of the book itself.
+    nbt::NbtList pages{nbt::NbtType::String};
+    for (std::int32_t page = 0; page < 4; ++page) {
+        pages.push(nbt::NbtTag::ofString("page"));
+    }
+    nbt::NbtCompound content;
+    content.set("pages", nbt::NbtTag::ofList(std::move(pages)));
+    nbt::NbtCompound components;
+    components.set("minecraft:written_book_content", nbt::NbtTag::ofCompound(std::move(content)));
+    nbt::NbtCompound written;
+    written.putString("id", "minecraft:written_book");
+    written.putInt("count", 1);
+    written.set("components", nbt::NbtTag::ofCompound(std::move(components)));
     nbt::NbtCompound data;
-    data.putString("Book", "minecraft:written_book");
-    data.putInt("Pages", 4);
+    data.set("Book", nbt::NbtTag::ofCompound(std::move(written)));
     data.putInt("Page", 3);
     world.chunkIfLoaded(0, 0)->setBlockEntity(
         basalt::server::world::ChunkBlockEntity{8, 64, 8, basalt::wire::common::Identifier::vanilla("lectern"), data});

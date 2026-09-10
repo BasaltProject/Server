@@ -626,6 +626,26 @@ const wire::common::Identifier& block() {
     return instance;
 }
 
+/// parity: `PistonMovingBlockEntity.tick`'s own half.
+constexpr float kSlideStep = 0.5F;
+
+const wire::common::Identifier& slideTickType() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("moving_piston");
+    return instance;
+}
+
+void advanceSlide(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+    server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+    // The block entity a sliding square carries is vanilla's `piston`, whatever the block is called.
+    if (entity == nullptr || entity->type() != block()) {
+        return;
+    }
+    // parity: `progressO = progress` and then `progress += 0.5F`, capped at one. What is written
+    // down is the value from before, so the square that has just been created still says zero.
+    entity->data().putFloat("progress", std::min(1.0F, entity->data().getFloat("progress") + kSlideStep));
+}
+
 bool isPushable(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace pushing,
                 bool allowDestroyable, registry::BlockFace connection) {
     if (y < context.minY || y > context.maxY) {
@@ -793,6 +813,12 @@ void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32
                                   .stateId = now.value_or(*stateId),
                                   .effects = {blockEffect::Event{.b0 = b0, .b1 = b1}, sound}});
     context.world.scheduleBlockTick(x, y, z, block(), kMoveTicks);
+    // parity: a `moving_piston` gets its own ticker the moment it lands, and the **next** turn is
+    // the one that moves its progress. Booked as a turn per square rather than run from here, and
+    // booking one does not dirty a chunk, which is what keeps the value off the disk.
+    for (const Carried& sliding : carriedBlocks(context, x, y, z, *direction)) {
+        context.world.scheduleBlockTick(sliding.at[0], sliding.at[1], sliding.at[2], slideTickType(), 1);
+    }
 }
 
 std::vector<BlockChange> finish(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,

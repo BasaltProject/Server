@@ -22,6 +22,7 @@
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
@@ -101,6 +102,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             }
             continue;
         }
+        // parity: `PistonMovingBlockEntity.tick`, the turn that moves a slide's progress along. It
+        // writes into the block entity and leaves the chunk clean, exactly as the jar does, so what
+        // reaches the disk is the value from the turn before unless something else dirties the chunk.
+        world::pistons::advanceSlide(world.state(), x, y, z);
         std::vector<world::BlockChange> scheduled;
         random::RandomSource random = freshRandom();
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);

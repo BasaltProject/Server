@@ -108,8 +108,9 @@ std::optional<Cooker> cookerFor(std::string_view block) {
     return std::nullopt;
 }
 
-bool tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize) {
+Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize) {
     bool moved = false;
+    bool changed = false;
     const bool wasLit = state.litTimeRemaining > 0;
     bool isLit = wasLit;
     if (wasLit) {
@@ -134,6 +135,7 @@ bool tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize) {
                             consumeFuel(state, *fuel);
                             isLit = true;
                             moved = true;
+                            changed = true;
                         }
                     }
                     if (isLit) {
@@ -143,6 +145,7 @@ bool tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize) {
                             state.cookingTimer = 0;
                             state.cookingTotalTime = recipe->cookingTime;
                             burn(state, *ingredient, recipe->result);
+                            changed = true;
                         }
                     } else {
                         moved = moved || state.cookingTimer != 0;
@@ -164,7 +167,9 @@ bool tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize) {
         state.cookingTimer = stepped < 0 ? 0 : std::min(stepped, state.cookingTotalTime);
         moved = true;
     }
-    return moved;
+    // parity: `wasLit != isLit` is the third and last thing that sets `changed`, and it is also what
+    // writes the block's own `lit`.
+    return Ticked{.moved = moved, .changed = changed || wasLit != isLit};
 }
 
 std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor) {

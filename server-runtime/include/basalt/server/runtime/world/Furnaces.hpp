@@ -57,12 +57,21 @@ struct State {
     [[nodiscard]] bool lit() const noexcept { return litTimeRemaining > 0; }
 };
 
-/// One tick of the furnace.
+/// What one turn did.
 ///
-/// Answers whether anything at all moved, counters included, which is not the same question as
-/// vanilla's `changed`: that one only decides when to save. Here the state lives in NBT and has to
-/// be written back whenever it moved, so an idle furnace is the only one that answers no.
-[[nodiscard]] bool tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize = kDefaultStackSize);
+/// The two answers are not the same question. `moved` is whether any number changed, and here the
+/// state lives in NBT, so it has to be written back whenever it did. `changed` is vanilla's own
+/// `changed`, which it only sets when the fuel is spent, a smelt finishes or the fire flips: that is
+/// what calls `setChanged`, and `setChanged` is what dirties the chunk **and** what tells the
+/// comparator. A furnace counting down does neither, so its saved numbers lag behind the live ones
+/// exactly as in the jar.
+struct Ticked {
+    bool moved = false;
+    bool changed = false;
+};
+
+/// One tick of the furnace.
+[[nodiscard]] Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize = kDefaultStackSize);
 
 /// What the next item will take, which vanilla asks for whenever the input slot changes rather than
 /// every tick. parity: `AbstractFurnaceBlockEntity.getTotalCookTime`.

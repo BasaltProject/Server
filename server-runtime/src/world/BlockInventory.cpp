@@ -12,6 +12,36 @@ constexpr std::string_view kItems = "Items";
 
 } // namespace
 
+std::optional<server::world::loot::ItemStack> readStack(const wire::nbt::NbtCompound& stack) {
+    const std::string_view id = stack.getString("id");
+    if (id.empty()) {
+        return std::nullopt;
+    }
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+        wire::common::Identifier::parse(std::string{id});
+    if (!item.has_value()) {
+        return std::nullopt;
+    }
+    // parity: `ItemStack.CODEC` is `{id, count, components}`, and the components are where an
+    // enchantment, a custom name or a written book's pages live. Dropping them here emptied every
+    // enchanted book somebody left in a chest.
+    const wire::nbt::NbtCompound* components = stack.getCompound("components");
+    return server::world::loot::ItemStack{.item = *item,
+                                          .count = stack.getInt("count", 1),
+                                          .components = components == nullptr ? wire::nbt::NbtCompound{} : *components};
+}
+
+wire::nbt::NbtCompound writeStack(const server::world::loot::ItemStack& stack) {
+    wire::nbt::NbtCompound written;
+    written.putString("id", stack.item.toString());
+    written.putInt("count", stack.count);
+    // parity: `ItemStack.CODEC` leaves the field out when the item carries nothing of its own.
+    if (stack.components.size() > 0) {
+        written.set("components", wire::nbt::NbtTag::ofCompound(stack.components));
+    }
+    return written;
+}
+
 Slots read(const wire::nbt::NbtCompound& data, std::int32_t size) {
     Slots slots(static_cast<std::size_t>(std::max(size, 0)));
     const wire::nbt::NbtList* items = data.getList(kItems);
@@ -27,23 +57,7 @@ Slots read(const wire::nbt::NbtCompound& data, std::int32_t size) {
         if (slot < 0 || slot >= size) {
             continue;
         }
-        const std::string_view id = compound->getString("id");
-        if (id.empty()) {
-            continue;
-        }
-        const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
-            wire::common::Identifier::parse(std::string{id});
-        if (!item.has_value()) {
-            continue;
-        }
-        // parity: `ItemStack.CODEC` is `{id, count, components}`, and the components are where an
-        // enchantment, a custom name or a written book's pages live. Dropping them here emptied
-        // every enchanted book somebody left in a chest.
-        const wire::nbt::NbtCompound* components = compound->getCompound("components");
-        slots[static_cast<std::size_t>(slot)] = server::world::loot::ItemStack{
-            .item = *item,
-            .count = compound->getInt("count", 1),
-            .components = components == nullptr ? wire::nbt::NbtCompound{} : *components};
+        slots[static_cast<std::size_t>(slot)] = readStack(*compound);
     }
     return slots;
 }
@@ -54,14 +68,8 @@ void write(wire::nbt::NbtCompound& data, const Slots& slots) {
         if (!slots[slot].has_value()) {
             continue;
         }
-        wire::nbt::NbtCompound entry;
+        wire::nbt::NbtCompound entry = writeStack(*slots[slot]);
         entry.putByte("Slot", static_cast<std::int8_t>(slot));
-        entry.putString("id", slots[slot]->item.toString());
-        entry.putInt("count", slots[slot]->count);
-        // parity: `ItemStack.CODEC` leaves the field out when the item carries nothing of its own.
-        if (slots[slot]->components.size() > 0) {
-            entry.set("components", wire::nbt::NbtTag::ofCompound(slots[slot]->components));
-        }
         entries.push(wire::nbt::NbtTag::ofCompound(std::move(entry)));
     }
     data.set(kItems, wire::nbt::NbtTag::ofList(std::move(entries)));
@@ -87,20 +95,7 @@ Slots readFor(const std::string_view path, const wire::nbt::NbtCompound& data, c
     if (held == nullptr) {
         return slots;
     }
-    const std::string_view id = held->getString("id");
-    if (id.empty()) {
-        return slots;
-    }
-    const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
-        wire::common::Identifier::parse(std::string{id});
-    if (!item.has_value()) {
-        return slots;
-    }
-    const wire::nbt::NbtCompound* components = held->getCompound("components");
-    slots[0] =
-        server::world::loot::ItemStack{.item = *item,
-                                       .count = held->getInt("count", 1),
-                                       .components = components == nullptr ? wire::nbt::NbtCompound{} : *components};
+    slots[0] = readStack(*held);
     return slots;
 }
 
@@ -114,13 +109,7 @@ void writeFor(const std::string_view path, wire::nbt::NbtCompound& data, const S
         static_cast<void>(data.remove(std::string{kSingleItemKey}));
         return;
     }
-    wire::nbt::NbtCompound held;
-    held.putString("id", slots[0]->item.toString());
-    held.putInt("count", slots[0]->count);
-    if (slots[0]->components.size() > 0) {
-        held.set("components", wire::nbt::NbtTag::ofCompound(slots[0]->components));
-    }
-    data.set(std::string{kSingleItemKey}, wire::nbt::NbtTag::ofCompound(std::move(held)));
+    data.set(std::string{kSingleItemKey}, wire::nbt::NbtTag::ofCompound(writeStack(*slots[0])));
 }
 
 } // namespace basalt::server::runtime::world::blockInventory

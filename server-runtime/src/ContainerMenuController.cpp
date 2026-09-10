@@ -464,17 +464,17 @@ void ContainerMenuController::clickContainerButton(std::int32_t button) {
     } else if (button == ContainerButtonClickPacket::kLecternNextPage) {
         wanted = lecternPage_ + 1;
     } else if (button == ContainerButtonClickPacket::kLecternTakeBook) {
-        const std::optional<std::pair<world::BlockChange, Identifier>> taken =
+        const std::optional<std::pair<world::BlockChange, server::world::loot::ItemStack>> taken =
             world::lecterns::takeBook(world->state(), pos.x, pos.y, pos.z);
         if (!taken.has_value()) {
             return;
         }
         owner_->blockInteraction().broadcastBlockUpdate(BlockPos{taken->first.x, taken->first.y, taken->first.z},
                                                         taken->first.stateId);
-        const std::int32_t left =
-            session->inventory.add(storage::StoredItemStack{.id = taken->second.toString(), .count = 1});
+        const std::int32_t left = session->inventory.add(storage::StoredItemStack{
+            .id = taken->second.item.toString(), .count = 1, .components = taken->second.components});
         if (left > 0) {
-            owner_->spawnDroppedItem(taken->second, left, session->x, session->y, session->z);
+            owner_->spawnDroppedItem(taken->second.item, left, session->x, session->y, session->z);
         }
         sendInventory();
         owner_->blockInteraction().notifyNeighbours(pos);
