@@ -215,8 +215,8 @@ void add(Slots& slots, const ItemStack& stack) {
 }
 
 /// Puts one of `stack` into the container, answering whether it went in.
-[[nodiscard]] bool insert(WorldState& world, const Container& target, const ItemStack& stack,
-                          registry::BlockFace from) {
+[[nodiscard]] bool insert(WorldState& world, const Container& target, const ItemStack& stack, registry::BlockFace from,
+                          const Around& around) {
     Slots slots = blockInventory::readFor(target.path, *target.data, target.size);
     const std::vector<std::int32_t> allowed = slotsFor(target.path, target.size, from);
     for (const std::int32_t slot : allowed) {
@@ -238,12 +238,19 @@ void add(Slots& slots, const ItemStack& stack) {
         if (target.path == crafters::block().path() && !crafters::accepts(*target.data, slots, slot, stack)) {
             continue;
         }
+        const bool wasEmpty = !there->has_value();
         if (there->has_value()) {
             (*there)->count += 1;
         } else {
             *there = ItemStack{.item = stack.item, .count = 1, .components = stack.components};
         }
         blockInventory::writeFor(target.path, *target.data, slots);
+        // parity: `tryMoveInItem` only calls `setItem` when the slot it lands in is empty; a merge
+        // goes through `grow` and leaves the counters alone. And `setItem` only cares about the
+        // slot a furnace cooks from.
+        if (wasEmpty && slot == furnaces::kInputSlot) {
+            furnaces::inputChanged(target.path, *target.data, around.recipeFor);
+        }
         world.chunkIfLoaded(target.x >> 4, target.z >> 4)->markDirty();
         if (target.isBlock) {
             redstoneComponents::scheduleComparatorsAround(world, {}, target.x, target.y, target.z,
@@ -449,7 +456,7 @@ void noteChange(const Around& around, const BlockChange& change) {
         if (!slot.has_value()) {
             continue;
         }
-        if (!insert(world, *target, *slot, registry::opposite(out))) {
+        if (!insert(world, *target, *slot, registry::opposite(out), around)) {
             continue;
         }
         slot = minusOne(*slot);

@@ -464,7 +464,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                       entity::minecarts::kTntCartSpeedCap);
                         const double power = entity::minecarts::kTntCartPower + (random.nextDouble() * 1.5 * speed);
                         explosions_->blowUp(world, watchers, entity->x, entity->y, entity->z, static_cast<float>(power),
-                                            "tnt", entity->entityId());
+                                            "tnt", entity->entityId(), world::explosions::sparesRails);
                         world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z,
                                                 world.gameTime());
                     }

@@ -501,6 +501,45 @@ const wire::common::Identifier& observer() {
 
 bool isComponent(std::int32_t stateId) { return std::ranges::find(kComponents, pathOf(stateId)) != kComponents.end(); }
 
+std::vector<Reach> outputReach(const std::int32_t stateId, const std::int32_t x, const std::int32_t y,
+                               const std::int32_t z) {
+    const std::string path = pathOf(stateId);
+    if (path == "redstone_torch" || path == "redstone_wall_torch") {
+        std::vector<Reach> out;
+        out.reserve(kFaces.size());
+        for (const BlockFace face : kFaces) {
+            out.push_back(
+                Reach{.x = x + registry::stepX(face), .y = y + registry::stepY(face), .z = z + registry::stepZ(face)});
+        }
+        return out;
+    }
+    if (path != "repeater" && path != "comparator" && path != "observer") {
+        return {};
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
+    if (!facing.has_value()) {
+        return {};
+    }
+    // parity: a diode and an observer both feed the square **behind** the way they face, and the one
+    // square that square must not tell back is the diode itself.
+    const BlockFace out = registry::opposite(*facing);
+    return {Reach{
+        .x = x + registry::stepX(out), .y = y + registry::stepY(out), .z = z + registry::stepZ(out), .skip = *facing}};
+}
+
+void scheduleInFront(WorldState& world, const std::string_view worldName, const std::int32_t x, const std::int32_t y,
+                     const std::int32_t z, const BlockFace back, const ContainerSignalAt& containerSignal) {
+    schedule(world, worldName, x, y, z, containerSignal);
+    for (const BlockFace face : kUpdateOrder) {
+        if (face == back) {
+            continue;
+        }
+        schedule(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
+                 containerSignal);
+    }
+}
+
 void scheduleComparatorsAround(WorldState& world, const std::string_view worldName, const std::int32_t x,
                                const std::int32_t y, const std::int32_t z, const ContainerSignalAt& containerSignal) {
     // parity: `Level.updateNeighbourForOutputSignal` walks `Direction.Plane.HORIZONTAL`, which is
@@ -610,10 +649,10 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
         }
         return;
     }
-    // parity: `DiodeBlock.updateNeighborsInFront` is a single `neighborChanged` on the square the
-    // diode feeds, which is `opposite(facing)` and already one of the six above. There is nothing
-    // else: the reach this used to add was on the **input** side, which the jar never touches, and
-    // it only looked right because the bench had every repeater built backwards.
+    // parity: `DiodeBlock.updateNeighborsInFront` reaches past the square the diode feeds, but not
+    // from here: `outputReach` and `scheduleInFront` are where that lives, because the exclusion it
+    // carries (the way back to the diode) has no meaning for a caller that only knows a centre. What
+    // this used to add instead was reach on the **input** side, which the jar never touches.
 }
 
 std::optional<std::int32_t> relock(WorldState& world, const std::int32_t x, const std::int32_t y,

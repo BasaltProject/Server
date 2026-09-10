@@ -76,6 +76,27 @@ void scheduleComparatorsAround(WorldState& world, std::string_view worldName, st
 /// dust is.
 [[nodiscard]] std::vector<std::array<std::int32_t, 3>> wireReach(std::int32_t x, std::int32_t y, std::int32_t z);
 
+/// The squares a component tells when its own state moves, past the six around it. parity:
+/// `DiodeBlock.updateNeighborsInFront` and `ObserverBlock` tell the square they feed and that
+/// square's own neighbours. Without that second step a lamp stuck to the block a repeater feeds
+/// never hears the repeater turn on.
+struct Reach {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    /// The face of this square that must **not** be told, which is the way back to the component.
+    /// parity: `updateNeighborsAtExceptFromFacing`. Empty for a torch, which excludes nothing.
+    std::optional<server::registry::BlockFace> skip;
+};
+
+[[nodiscard]] std::vector<Reach> outputReach(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// The turn every component on and around the square a diode feeds books, less the way back to the
+/// diode itself. parity: `DiodeBlock.updateNeighborsInFront`, which is a `neighborChanged` on that
+/// square and an `updateNeighborsAtExceptFromFacing` on it.
+void scheduleInFront(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                     server::registry::BlockFace back, const ContainerSignalAt& containerSignal = {});
+
 /// The turn a component books when a piece of dust beside it changed strength.
 ///
 /// parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` ends by running `updateNeighborsAt` on

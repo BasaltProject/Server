@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
+#include <basalt/server/runtime/world/Rails.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -51,8 +52,17 @@ constexpr float kResistanceBias = 0.3F;
 
 } // namespace
 
+bool sparesRails(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                 const std::int32_t stateId) {
+    if (rails::isRail(stateId)) {
+        return true;
+    }
+    const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
+    return above.has_value() && rails::isRail(*above);
+}
+
 std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,
-                            float power, random::RandomSource& random) {
+                            float power, random::RandomSource& random, const Spares& spares) {
     // A set rather than a hash: the order the blocks come out in is the order they are broken, and a
     // stable one keeps what the caller sends to clients stable too.
     std::set<std::int64_t> hit;
@@ -89,10 +99,11 @@ std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t m
                     if (!stateId.has_value()) {
                         break;
                     }
+                    const bool spared = spares && spares(world, blockX, blockY, blockZ, *stateId);
                     if (*stateId != registry::blocks::air().stateId) {
-                        remaining -= (resistanceOf(*stateId) + kResistanceBias) * kStep;
+                        remaining -= ((spared ? 0.0F : resistanceOf(*stateId)) + kResistanceBias) * kStep;
                     }
-                    if (remaining > 0.0F && canBreak(*stateId)) {
+                    if (remaining > 0.0F && !spared && canBreak(*stateId)) {
                         hit.insert(packed(blockX, blockY, blockZ));
                     }
                     // parity: `xp += xd * 0.3F`, where the float step is widened for the sum.

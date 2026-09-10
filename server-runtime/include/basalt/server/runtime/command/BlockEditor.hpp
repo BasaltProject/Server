@@ -73,6 +73,14 @@ private:
     /// themselves.
     void record(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
+    /// parity: `BlockInput.place`'s `overwriteWithDefinedProperties`, run where vanilla runs it:
+    /// after the shaping and before the block sets anything off.
+    void keepNamedProperties(const std::array<std::int32_t, 3>& at);
+
+    /// parity: `BaseRailBlock.onPlace`, the one `onPlace` a command has to run itself.
+    void bendRail(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                  std::optional<std::int32_t> before);
+
     /// parity: `Level.setBlock` gives a block its block entity as it lands, so `/setblock` of a
     /// chest leaves something `/data` can read. This build creates them where they are used instead,
     /// which left a command-placed container with nowhere to put anything.

@@ -1,7 +1,9 @@
 #include "PistonSlide.hpp"
 
 #include <basalt/server/registry/BlockSupport.hpp>
+#include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/RedstoneReactors.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
@@ -48,12 +50,10 @@ using namespace internal;
     wire::nbt::NbtCompound data;
     data.set("blockState", wire::nbt::NbtTag::ofCompound(std::move(state)));
     data.putInt("facing", static_cast<std::int32_t>(direction));
-    // parity: what is saved is `progressO`, a turn behind the live `progress`, and measured on the
-    // bench it is zero for the whole of a slide: `piston`, `pistonpega` and `pistonsuelta` write zero
-    // on both of their turns. `pistonsensor` is the one circuit where the jar writes a half on the
-    // second, and what tells the two apart is when the block entity first ticks with respect to the
-    // block event, which this build does not model: it lands the slide from the piston's own turn
-    // rather than ticking each moving square. Zero is what three of the four measure.
+    // parity: what is saved is `progressO`, a turn behind the live `progress`, and it measures zero
+    // for the whole of a slide in three of the four benched circuits. The fourth writes a half on
+    // the second turn, which depends on when the block entity first ticks against the block event,
+    // and this build lands the slide from the piston's own turn instead of ticking each square.
     data.putFloat("progress", 0.0F);
     data.putBoolean("extending", extending);
     data.putBoolean("source", source);
@@ -90,9 +90,53 @@ using namespace internal;
 /// is a `moving_piston` facing our way that is still extending. Vanilla also lets it through on
 /// progress or on the tick it last moved, which inside a tick is always true.
 
-/// face going out and the opposite one coming back; `facing` stays the piston's, because that is what
-/// the `moving_piston` state carries either way.
-void slide(const Context& context, const Push& push, BlockFace moving, BlockFace facing, bool extending) {
+/// The half of a write a piston does for every square it touches: the shapes around it are redrawn
+/// and whatever they no longer hold up falls, and nobody re-reads the signal. parity: `moveBlocks`
+/// writes with `UPDATE_MOVE_BY_PISTON`, and what falls out writes its own air with `UPDATE_ALL`, so
+/// a lever knocked off the top of a piston does tell what it was powering.
+void settleAround(const Context& context, const std::vector<Position>& touched, std::vector<BlockChange>* changes) {
+    if (touched.empty()) {
+        return;
+    }
+    const neighbourUpdates::Context around{.world = context.world,
+                                           .worldName = context.worldName,
+                                           .minY = context.minY,
+                                           .maxY = context.maxY,
+                                           .random = context.random,
+                                           .gameTime = context.gameTime};
+    std::vector<Position> knocked;
+    const neighbourUpdates::OnBroken dropped = [&context, &knocked](std::int32_t stateId, std::int32_t bx,
+                                                                    std::int32_t by, std::int32_t bz) {
+        static_cast<void>(context.world.setBlockState(bx, by, bz, air()));
+        if (context.onDestroyed) {
+            context.onDestroyed(stateId, bx, by, bz);
+        }
+        knocked.push_back({bx, by, bz});
+    };
+    for (const Position& at : touched) {
+        neighbourUpdates::reshapeOnly(around, at[0], at[1], at[2], dropped);
+    }
+    constexpr std::array<registry::BlockFace, 6> kSides{registry::BlockFace::Down,  registry::BlockFace::Up,
+                                                        registry::BlockFace::North, registry::BlockFace::South,
+                                                        registry::BlockFace::West,  registry::BlockFace::East};
+    for (const Position& at : knocked) {
+        const std::vector<BlockChange> told = redstoneReactors::update(
+            context.world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random, true, false);
+        if (changes != nullptr) {
+            changes->insert(changes->end(), told.begin(), told.end());
+        }
+        // parity: a piston reads the signal from `neighborChanged` like anything else, and the lever
+        // it has just knocked off its own top was the one powering it: without this the piston stays
+        // out with nothing holding it there.
+        for (const registry::BlockFace face : kSides) {
+            trigger(context, at[0] + registry::stepX(face), at[1] + registry::stepY(face),
+                    at[2] + registry::stepZ(face));
+        }
+    }
+}
+
+void slide(const Context& context, const Push& push, BlockFace moving, BlockFace facing, bool extending,
+           std::vector<BlockChange>* changes = nullptr) {
     // parity: `moveBlocks` builds the pushed block's `moving_piston` from the default state with only
     // the facing set, so it is always `normal`. Only the arm carries the piston's own type.
     const std::optional<std::int32_t> block_ = registry::blockStateDefinitions::stateIdOf(
@@ -127,12 +171,17 @@ void slide(const Context& context, const Push& push, BlockFace moving, BlockFace
     }
     // parity: `deleteAfterMove`, the squares nobody landed on. A block that moved into where its
     // neighbour stood must not be wiped by that neighbour leaving.
+    std::vector<Position> emptied;
     for (const auto& [position, unused] : carried) {
         if (destinations.contains(position)) {
             continue;
         }
         static_cast<void>(context.world.setBlockState(position[0], position[1], position[2], air()));
+        emptied.push_back(position);
     }
+    std::vector<Position> touched{destinations.begin(), destinations.end()};
+    touched.insert(touched.end(), emptied.begin(), emptied.end());
+    settleAround(context, touched, changes);
 }
 
 /// The push going out: the blocks slide, the arm turns into the head it is about to be, and the body
@@ -173,11 +222,21 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
 /// `PistonMovingBlockEntity.finalTick` does when the slide ends.
 [[nodiscard]] std::vector<BlockChange> landCarried(const Context& context, const std::vector<Carried>& carried) {
     std::vector<BlockChange> changes;
+    std::vector<Position> landed;
     for (const Carried& entry : carried) {
         if (context.world.setBlockState(entry.at[0], entry.at[1], entry.at[2], entry.stateId)) {
             changes.push_back(
                 BlockChange{.x = entry.at[0], .y = entry.at[1], .z = entry.at[2], .stateId = entry.stateId});
+            landed.push_back(entry.at);
         }
+    }
+    // parity: `PistonMovingBlockEntity.finalTick` ends in `neighborChanged` on the square the block
+    // landed on, so a lamp that arrives with nothing powering it any more goes dark. Without it a
+    // block kept whatever state it was carrying for ever.
+    for (const Position& at : landed) {
+        const std::vector<BlockChange> told = redstoneReactors::update(context.world, context.worldName, at[0], at[1],
+                                                                       at[2], context.gameTime, context.random, true);
+        changes.insert(changes.end(), told.begin(), told.end());
     }
     return changes;
 }
@@ -221,7 +280,7 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
 void beginMove(const Context& context, const Push& push, BlockFace direction, bool sticky, std::int32_t pistonX,
                std::int32_t pistonY, std::int32_t pistonZ, const std::string& path, std::vector<BlockChange>& changes) {
     destroyPushed(context, push, changes);
-    slide(context, push, direction, direction, true);
+    slide(context, push, direction, direction, true, &changes);
     const std::optional<std::int32_t> movingArm = registry::blockStateDefinitions::stateIdOf(
         wire::common::Identifier::vanilla("moving_piston"),
         {{"facing", std::string{nameOf(direction)}}, {"type", sticky ? "sticky" : "normal"}}, std::nullopt);
@@ -249,6 +308,10 @@ void beginMove(const Context& context, const Push& push, BlockFace direction, bo
         body.has_value()) {
         static_cast<void>(context.world.setBlockState(pistonX, pistonY, pistonZ, *body));
     }
+    // parity: the body and the arm are written like everything else the piston moves, so what was
+    // standing on them falls: an extended piston is not a full block any more and a lever on its top
+    // cannot survive it.
+    settleAround(context, {Position{pistonX, pistonY, pistonZ}, head}, &changes);
 }
 
 /// The pull back starting, which vanilla also does the moment the event runs rather than when the

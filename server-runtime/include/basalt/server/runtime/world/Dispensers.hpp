@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
+#include <basalt/server/world/crafting/Crafting.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -42,6 +43,12 @@ struct Hooks {
     std::function<std::optional<std::int32_t>(std::string_view path)> containerSize;
     /// The protocol number a projectile of this type spawns with. Defaults to `entityTypes::of`.
     std::function<std::optional<std::int32_t>(const wire::common::Identifier& type)> protocolTypeOf;
+    /// parity: a dropper hands its stack to `HopperBlockEntity.addItem`, so filling the empty input
+    /// slot of a furnace goes through `setItem` and sets the cooking time. The recipe book is the
+    /// world's, so the caller answers it.
+    std::function<const server::world::crafting::Recipe*(server::world::crafting::Cooker,
+                                                         const server::world::loot::ItemStack&)>
+        recipeFor;
 };
 
 /// What a turn did: whether anything went out, and what the clients should hear about it.

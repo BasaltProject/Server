@@ -191,6 +191,20 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize)
     return Ticked{.moved = moved, .changed = changed || wasLit != isLit};
 }
 
+void inputChanged(std::string_view block, wire::nbt::NbtCompound& data,
+                  const std::function<const server::world::crafting::Recipe*(
+                      server::world::crafting::Cooker, const server::world::loot::ItemStack&)>& recipeFor) {
+    const std::optional<server::world::crafting::Cooker> cooker = cookerFor(block);
+    if (!cooker.has_value() || !recipeFor) {
+        return;
+    }
+    State state = read(data);
+    state.cookingTimer = 0;
+    state.cookingTotalTime = cookTimeFor(
+        state, [&recipeFor, cooker](const server::world::loot::ItemStack& stack) { return recipeFor(*cooker, stack); });
+    write(state, data);
+}
+
 State read(const wire::nbt::NbtCompound& data) {
     State state;
     state.litTimeRemaining = data.getShort(kLitRemainingKey);
