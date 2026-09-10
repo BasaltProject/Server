@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
@@ -68,6 +69,39 @@ constexpr std::int32_t kGrowthSparkles = 15;
 
 [[nodiscard]] const wire::common::Identifier& shears() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("shears");
+    return instance;
+}
+
+[[nodiscard]] const wire::common::Identifier& glassBottle() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("glass_bottle");
+    return instance;
+}
+
+/// parity: `PotionContents.createItemStack(Items.POTION, Potions.WATER)`, which is a plain potion
+/// carrying one component.
+[[nodiscard]] ItemStack waterBottle() {
+    wire::nbt::NbtCompound contents;
+    contents.putString("potion", "minecraft:water");
+    wire::nbt::NbtCompound components;
+    components.set("minecraft:potion_contents", wire::nbt::NbtTag::ofCompound(std::move(contents)));
+    return ItemStack{
+        .item = wire::common::Identifier::vanilla("potion"), .count = 1, .components = std::move(components)};
+}
+
+[[nodiscard]] const wire::common::Identifier& potion() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("potion");
+    return instance;
+}
+
+/// parity: `dispensed.getOrDefault(POTION_CONTENTS, EMPTY).is(Potions.WATER)`, the only potion the
+/// entry acts on.
+[[nodiscard]] bool isWaterBottle(const ItemStack& stack) {
+    const wire::nbt::NbtCompound* contents = stack.components.getCompound("minecraft:potion_contents");
+    return contents != nullptr && contents->getString("potion", std::string{}) == "minecraft:water";
+}
+
+[[nodiscard]] const wire::common::Identifier& honeyBottle() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("honey_bottle");
     return instance;
 }
 
@@ -371,6 +405,54 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
             change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = registry::blocks::air().stateId};
         }
         return Special{.handled = true, .left = wornOnce(stack, context.random), .change = change};
+    }
+    // parity: the potion entry, which only knows one potion: a **water** bottle turns the block in
+    // front into mud when it is in `convertable_to_mud`, and leaves the empty glass. Anything else,
+    // any other potion included, falls through to being thrown. Its `FLUID_PLACE` also comes from the
+    // dispenser's own square.
+    if (stack.item == potion() && isWaterBottle(stack)) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        const wire::common::Identifier* block =
+            target.has_value() ? registry::blockStateDefinitions::blockOf(*target) : nullptr;
+        if (block == nullptr || !hooks.convertsToMud || !hooks.convertsToMud(*block)) {
+            return {};
+        }
+        const registry::BlockState* mud = registry::blocks::named("mud");
+        if (mud == nullptr || !context.world.setBlockState(tx, ty, tz, mud->stateId)) {
+            return {};
+        }
+        heard(context.world, "fluid_place", x, y, z, hooks.gameTime);
+        const std::optional<ItemStack> left = minusOne(stack);
+        return Special{.handled = true,
+                       .left = left.has_value() ? left : ItemStack{.item = glassBottle(), .count = 1},
+                       .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = mud->stateId}};
+    }
+    // parity: the glass bottle entry: honey out of a hive that is full, a water bottle out of water,
+    // and anything else falls through to being thrown. Its `FLUID_PICKUP` comes from the
+    // **dispenser's** own square, not from the one in front, which is the opposite of the bucket's.
+    if (stack.item == glassBottle()) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        std::optional<ItemStack> filled;
+        std::optional<BlockChange> change;
+        if (target.has_value() && honeyOf(*target) >= kFullHive) {
+            const std::optional<std::int32_t> emptied = registry::blockStateDefinitions::stateIdOf(
+                *registry::blockStateDefinitions::blockOf(*target), {{"honey_level", "0"}}, *target);
+            if (emptied.has_value() && context.world.setBlockState(tx, ty, tz, *emptied)) {
+                filled = ItemStack{.item = honeyBottle(), .count = 1};
+                change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *emptied};
+            }
+        } else if (target.has_value() && registry::blockSupport::holdsWater(*target)) {
+            filled = waterBottle();
+        }
+        if (!filled.has_value()) {
+            return {};
+        }
+        heard(context.world, "fluid_pickup", x, y, z, hooks.gameTime);
+        // parity: `consumeWithRemainder`. What is left of the stack stays in the slot and the filled
+        // bottle only takes its place when it was the last one, which is the same shape the bucket
+        // above uses.
+        const std::optional<ItemStack> left = minusOne(stack);
+        return Special{.handled = true, .left = left.has_value() ? left : filled, .change = change};
     }
     // parity: `ShearsDispenseItemBehavior.tryShearBeehive`, which only touches a hive that is full.
     // Shearing a sheep in front of it is the other half and needs the mob.

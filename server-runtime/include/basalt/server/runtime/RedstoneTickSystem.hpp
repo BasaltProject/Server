@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RandomTicks.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 
@@ -62,6 +63,8 @@ public:
         /// The item tags the datapack loaded, which is what a chiseled bookshelf asks before it
         /// takes what a hopper is holding.
         const world::realItemTags::TagMembers* itemTags = nullptr;
+        /// The block tags, which is what a dispensed water bottle asks before it makes mud.
+        const world::realBlockTags::TagMembers* blockTags = nullptr;
     };
 
     /// `runCommand` is what a command block runs its command with. It is a constructor parameter and
