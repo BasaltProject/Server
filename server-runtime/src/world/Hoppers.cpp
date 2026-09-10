@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -175,19 +176,39 @@ struct Container {
                                                                        : nullptr;
 }
 
-[[nodiscard]] bool accepts(const Slots& slots, const wire::common::Identifier& item) {
-    return std::ranges::any_of(slots, [&item](const std::optional<ItemStack>& there) {
-        return !there.has_value() || (there->item == item && there->count < capOf(item));
+/// One item out of the stack, with everything it carries. parity: `ItemStack.shrink`, which takes a
+/// number off and leaves the components where they are.
+[[nodiscard]] std::optional<ItemStack> minusOne(const ItemStack& stack) {
+    if (stack.count <= 1) {
+        return std::nullopt;
+    }
+    ItemStack left = stack;
+    left.count = stack.count - 1;
+    return left;
+}
+
+/// parity: `ItemStack.isSameItemSameComponents`, which is what decides whether two stacks are the
+/// same thing. Two swords of the same name with different enchantments never share a slot.
+[[nodiscard]] bool same(const ItemStack& one, const ItemStack& other) {
+    return one.item == other.item && one.components == other.components;
+}
+
+[[nodiscard]] bool accepts(const Slots& slots, const ItemStack& stack) {
+    return std::ranges::any_of(slots, [&stack](const std::optional<ItemStack>& there) {
+        return !there.has_value() || (same(*there, stack) && there->count < capOf(stack.item));
     });
 }
 
-void add(Slots& slots, const wire::common::Identifier& item) {
+void add(Slots& slots, const ItemStack& stack) {
     for (std::optional<ItemStack>& there : slots) {
-        if (there.has_value() && (there->item != item || there->count >= capOf(item))) {
+        if (there.has_value() && (!same(*there, stack) || there->count >= capOf(stack.item))) {
             continue;
         }
-        there = there.has_value() ? ItemStack{.item = there->item, .count = there->count + 1}
-                                  : ItemStack{.item = item, .count = 1};
+        if (there.has_value()) {
+            there->count += 1;
+        } else {
+            there = ItemStack{.item = stack.item, .count = 1, .components = stack.components};
+        }
         return;
     }
 }
@@ -202,7 +223,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (there == nullptr) {
             continue;
         }
-        if (there->has_value() && ((*there)->item != stack.item || (*there)->count >= capIn(target.path, stack.item))) {
+        if (there->has_value() && (!same(**there, stack) || (*there)->count >= capIn(target.path, stack.item))) {
             continue;
         }
         // parity: `canPlaceItemThroughFace`. A furnace's result slot takes nothing, its fuel slot
@@ -211,8 +232,11 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (!containers::acceptsThroughFace(target.path, slot, stack.item, !there->has_value())) {
             continue;
         }
-        *there = there->has_value() ? ItemStack{.item = (*there)->item, .count = (*there)->count + 1}
-                                    : ItemStack{.item = stack.item, .count = 1};
+        if (there->has_value()) {
+            (*there)->count += 1;
+        } else {
+            *there = ItemStack{.item = stack.item, .count = 1, .components = stack.components};
+        }
         blockInventory::writeFor(target.path, *target.data, slots);
         world.chunkIfLoaded(target.x >> 4, target.z >> 4)->markDirty();
         if (target.isBlock) {
@@ -252,7 +276,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         // The roll can fail and the item is eaten anyway: `InputContainer.setChanged` shrinks the
         // stack whatever `addItem` answered.
         static_cast<void>(composters::addItem(world, x, y, z, slot->item, random));
-        slot = slot->count <= 1 ? std::nullopt : std::optional{ItemStack{.item = slot->item, .count = slot->count - 1}};
+        slot = minusOne(*slot);
         redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
         return true;
     }
@@ -266,21 +290,30 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         return false;
     }
     const wire::common::Identifier boneMeal = wire::common::Identifier::vanilla("bone_meal");
-    if (!accepts(slots, boneMeal)) {
+    const ItemStack given{.item = boneMeal, .count = 1};
+    if (!accepts(slots, given)) {
         return false;
     }
     if (!composters::empty(world, x, y, z).has_value()) {
         return false;
     }
-    add(slots, boneMeal);
+    add(slots, given);
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return true;
+}
+
+/// Notes a block whose state a move changed, for whoever has to tell the clients.
+void noteChange(const Around& around, const BlockChange& change) {
+    if (around.changes != nullptr) {
+        around.changes->push_back(change);
+    }
 }
 
 /// parity: `JukeboxBlockEntity` is a container of one, so a hopper loads a jukebox and another one
 /// under it takes the disc back out. What it holds lives under `RecordItem` rather than in an item
 /// list, so it goes through the jukebox's own door rather than through the generic one.
-[[nodiscard]] bool loadJukebox(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+[[nodiscard]] bool loadJukebox(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
+                               const Around& around) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     const wire::common::Identifier* block =
         stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
@@ -291,17 +324,20 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (!slot.has_value() || !jukeboxes::isDisc(slot->item)) {
             continue;
         }
-        if (!jukeboxes::insert(world, x, y, z, slot->item).has_value()) {
+        const std::optional<BlockChange> loaded = jukeboxes::insert(world, x, y, z, slot->item);
+        if (!loaded.has_value()) {
             return false;
         }
-        slot = slot->count <= 1 ? std::nullopt : std::optional{ItemStack{.item = slot->item, .count = slot->count - 1}};
+        noteChange(around, *loaded);
+        slot = minusOne(*slot);
         return true;
     }
     return false;
 }
 
 /// The other half: the disc out of the jukebox above, which stops the song.
-[[nodiscard]] bool takeDisc(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+[[nodiscard]] bool takeDisc(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
+                            const Around& around) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     const wire::common::Identifier* block =
         stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
@@ -312,23 +348,91 @@ void add(Slots& slots, const wire::common::Identifier& item) {
     if (!song.has_value()) {
         return false;
     }
-    const wire::common::Identifier disc = wire::common::Identifier::vanilla("music_disc_" + *song);
+    const ItemStack disc{.item = wire::common::Identifier::vanilla("music_disc_" + *song), .count = 1};
     if (!accepts(slots, disc)) {
         return false;
     }
-    if (!jukeboxes::eject(world, x, y, z).has_value()) {
+    const std::optional<std::pair<BlockChange, wire::common::Identifier>> ejected = jukeboxes::eject(world, x, y, z);
+    if (!ejected.has_value()) {
         return false;
     }
+    noteChange(around, ejected->first);
     add(slots, disc);
     return true;
 }
 
+/// parity: `ChiseledBookShelfBlockEntity` is a container of six that holds one book each and whose
+/// `acceptsItemType` asks the `bookshelf_books` tag, so a hopper full of cobblestone gets nowhere.
+/// Putting one in goes through `setItem`, which is what lights the slot on the block and moves the
+/// number a comparator reads.
+[[nodiscard]] bool shelveBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
+                              const Around& around) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    const wire::common::Identifier* block =
+        stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr || !chiseledBookshelves::isBookshelf(block->path())) {
+        return false;
+    }
+    for (std::optional<ItemStack>& slot : slots) {
+        if (!slot.has_value() || (around.isBookshelfBook && !around.isBookshelfBook(slot->item))) {
+            continue;
+        }
+        std::optional<chiseledBookshelves::Interaction> shelved;
+        for (std::int32_t where = 0; where < chiseledBookshelves::kSize && !shelved.has_value(); ++where) {
+            shelved = chiseledBookshelves::putBook(world, x, y, z, where, slot->item);
+        }
+        if (!shelved.has_value()) {
+            return false;
+        }
+        noteChange(around, shelved->change);
+        slot = minusOne(*slot);
+        return true;
+    }
+    return false;
+}
+
+/// The other half: a hopper under a shelf takes the books back out, one a turn.
+[[nodiscard]] bool unshelveBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
+                                const Around& around) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    const wire::common::Identifier* block =
+        stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr || !chiseledBookshelves::isBookshelf(block->path())) {
+        return false;
+    }
+    for (std::int32_t where = 0; where < chiseledBookshelves::kSize; ++where) {
+        const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* entity =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        if (entity == nullptr) {
+            return false;
+        }
+        const Slots held = blockInventory::read(entity->data(), chiseledBookshelves::kSize);
+        if (!held[static_cast<std::size_t>(where)].has_value()) {
+            continue;
+        }
+        if (!accepts(slots, *held[static_cast<std::size_t>(where)])) {
+            return false;
+        }
+        const std::optional<chiseledBookshelves::Interaction> taken =
+            chiseledBookshelves::takeBook(world, x, y, z, where);
+        if (!taken.has_value() || !taken->taken.has_value()) {
+            return false;
+        }
+        add(slots, ItemStack{.item = *taken->taken, .count = 1});
+        noteChange(around, taken->change);
+        return true;
+    }
+    return false;
+}
+
 [[nodiscard]] bool push(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace out,
-                        Slots& slots, random::RandomSource& random) {
+                        Slots& slots, random::RandomSource& random, const Around& around) {
     const std::int32_t tx = x + registry::stepX(out);
     const std::int32_t ty = y + registry::stepY(out);
     const std::int32_t tz = z + registry::stepZ(out);
-    if (compost(world, tx, ty, tz, registry::opposite(out), slots, random) || loadJukebox(world, tx, ty, tz, slots)) {
+    if (compost(world, tx, ty, tz, registry::opposite(out), slots, random) ||
+        loadJukebox(world, tx, ty, tz, slots, around) || shelveBook(world, tx, ty, tz, slots, around)) {
         return true;
     }
     const std::optional<Container> target = containerAt(world, tx, ty, tz);
@@ -342,7 +446,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (!insert(world, *target, *slot, registry::opposite(out))) {
             continue;
         }
-        slot = slot->count <= 1 ? std::nullopt : std::optional{ItemStack{.item = slot->item, .count = slot->count - 1}};
+        slot = minusOne(*slot);
         return true;
     }
     return false;
@@ -357,7 +461,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (stack == nullptr || !stack->has_value()) {
             continue;
         }
-        if (!accepts(slots, (*stack)->item)) {
+        if (!accepts(slots, **stack)) {
             continue;
         }
         // parity: `canTakeItemThroughFace`, which is what stops a hopper under a furnace draining
@@ -365,9 +469,8 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (!containers::givesThroughFace(above.path, slot, (*stack)->item, registry::BlockFace::Down)) {
             continue;
         }
-        add(slots, (*stack)->item);
-        *stack = (*stack)->count <= 1 ? std::nullopt
-                                      : std::optional{ItemStack{.item = (*stack)->item, .count = (*stack)->count - 1}};
+        add(slots, **stack);
+        *stack = minusOne(**stack);
         blockInventory::writeFor(above.path, *above.data, source);
         if (above.isBlock) {
             redstoneComponents::scheduleComparatorsAround(world, {}, above.x, above.y, above.z,
@@ -393,9 +496,11 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (item.y < minY || item.y > maxY) {
             continue;
         }
+        // parity: what a dropped stack carries goes into the hopper with it.
+        const ItemStack picked{.item = item.item, .count = 1, .components = item.components};
         std::int32_t left = item.count;
-        while (left > 0 && accepts(slots, item.item)) {
-            add(slots, item.item);
+        while (left > 0 && accepts(slots, picked)) {
+            add(slots, picked);
             --left;
         }
         if (left == item.count) {
@@ -421,7 +526,8 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 
 } // namespace
 
-bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random) {
+bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
+          const Around& around) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return false;
@@ -459,13 +565,14 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
     // and both happen on the same turn: the two are `moved |=`, not one or the other.
     bool moved = false;
     if (!isEmpty(slots)) {
-        moved = push(world, x, y, z, *out, slots, random);
+        moved = push(world, x, y, z, *out, slots, random, around);
     }
     if (!isFull(slots)) {
         // parity: `suckInItems` looks at what is lying above only when there is no container there,
         // and a composter that is ready **is** one: its bone meal comes out downwards.
         const std::optional<Container> above = containerAt(world, x, y + 1, z);
-        const bool taken = takeCompost(world, x, y + 1, z, slots) || takeDisc(world, x, y + 1, z, slots) ||
+        const bool taken = takeCompost(world, x, y + 1, z, slots) || takeDisc(world, x, y + 1, z, slots, around) ||
+                           unshelveBook(world, x, y + 1, z, slots, around) ||
                            (above.has_value() ? pullFrom(world, *above, slots) : suckIn(world, x, y, z, slots));
         moved = taken || moved;
     }

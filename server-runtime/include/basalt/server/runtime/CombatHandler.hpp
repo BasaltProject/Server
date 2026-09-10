@@ -91,6 +91,10 @@ private:
     /// behind the glass. Answers whether the click was a frame's.
     bool useItemFrame(player::PlayerSession& session, entity::ServerEntity& frame);
 
+    /// parity: `ItemFrame.hurtServer`: a frame with something behind the glass drops what it holds
+    /// and stays on the wall, and an empty one comes off.
+    void breakFrame(player::PlayerSession& session, entity::ServerEntity& frame);
+
     /// The item and the turn a frame is showing, sent to everyone who can see it.
     void broadcastFrame(const entity::ServerEntity& frame);
 

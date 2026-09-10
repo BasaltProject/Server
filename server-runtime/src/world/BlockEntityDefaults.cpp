@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
+#include <basalt/server/runtime/world/Shelves.hpp>
 
 #include <string_view>
 
@@ -62,6 +63,12 @@ wire::nbt::NbtCompound of(const wire::common::Identifier& block) {
     // one, which is what makes an untouched shelf read nothing on a comparator.
     if (path == "chiseled_bookshelf") {
         data.putInt("last_interacted_slot", -1);
+        return data;
+    }
+    // parity: `ShelfBlockEntity.saveAdditional`, which writes how it lines its three items up even
+    // for a shelf nobody has touched.
+    if (shelves::isShelf(path)) {
+        data.putBoolean("align_items_to_bottom", false);
         return data;
     }
     return data;

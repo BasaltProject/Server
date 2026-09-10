@@ -505,6 +505,11 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             },
         .allowHopperMove = hooks_.allowHopperMove,
         .allowSmelt = hooks_.allowSmelt,
+        .isBookshelfBook =
+            [this](const wire::common::Identifier& item) {
+                return options_.itemTags != nullptr &&
+                       world::realItemTags::contains(*options_.itemTags, "minecraft:bookshelf_books", item);
+            },
         .songLength = [this](const std::string& song) -> std::int64_t {
             return options_.jukeboxes == nullptr ? 0 : options_.jukeboxes->lengthOf(song);
         },

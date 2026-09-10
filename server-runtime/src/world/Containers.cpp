@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
+#include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
@@ -151,6 +152,12 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
 } // namespace
 
 std::optional<std::int32_t> sizeOf(std::string_view path) {
+    // parity: `ShelfBlockEntity implements ListBackedContainer`, three slots and no door of its own,
+    // so a hopper fills a shelf and another one empties it. It is by suffix rather than by name
+    // because there is one shelf per wood.
+    if (shelves::isShelf(path)) {
+        return shelves::kSize;
+    }
     const auto found = sizes().find(path);
     return found == sizes().end() ? std::nullopt : std::optional{found->second};
 }
@@ -196,8 +203,17 @@ std::vector<std::int32_t> slotsForFace(const std::string_view path, const std::i
     return every;
 }
 
+/// parity: `ChiseledBookShelfBlockEntity` takes and gives through `setItem`/`removeItem`, both of
+/// which run `updateState` and light the slot on the block. A hopper reaches it through its own door
+/// for that reason, the way it reaches a jukebox and a composter, so the plain container path has to
+/// keep its hands off.
+[[nodiscard]] bool hasItsOwnDoor(const std::string_view path) { return path == "chiseled_bookshelf"; }
+
 bool acceptsThroughFace(const std::string_view path, const std::int32_t slot, const wire::common::Identifier& item,
                         const bool slotIsEmpty) {
+    if (hasItsOwnDoor(path)) {
+        return false;
+    }
     // parity: `AbstractFurnaceBlockEntity.canPlaceItem`: nothing goes into the result slot, and the
     // fuel slot takes fuel or **one** empty bucket, which is what a lava bucket leaves behind.
     if (furnaces::cookerFor(path).has_value()) {
@@ -230,6 +246,9 @@ bool acceptsThroughFace(const std::string_view path, const std::int32_t slot, co
 
 bool givesThroughFace(const std::string_view path, const std::int32_t slot, const wire::common::Identifier& item,
                       const registry::BlockFace from) {
+    if (hasItsOwnDoor(path)) {
+        return false;
+    }
     // parity: `AbstractFurnaceBlockEntity.canTakeItemThroughFace`: what comes out of the fuel slot
     // downwards is the bucket the lava came in, and never the fuel itself.
     if (furnaces::cookerFor(path).has_value() && from == registry::BlockFace::Down && slot == furnaces::kFuelSlot) {

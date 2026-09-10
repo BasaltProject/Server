@@ -202,6 +202,14 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         }
         entries.push_back(NbtTag::ofCompound(entry));
     }
+    // parity: `ContainerHelper.saveAllItems` walks the slots in order, so the list on disk is in
+    // slot order however the slots were filled. Appending what the command wrote left a brewing
+    // stand whose four items were listed backwards.
+    std::ranges::sort(entries, [](const NbtTag& one, const NbtTag& other) {
+        const NbtCompound* first = one.get<NbtCompound>();
+        const NbtCompound* second = other.get<NbtCompound>();
+        return (first == nullptr ? 0 : slotIn(*first)) < (second == nullptr ? 0 : slotIn(*second));
+    });
     NbtCompound data = existing->data();
     if (world::blockInventory::holdsOneItem(existing->type().path())) {
         // parity: a decorated pot keeps its one stack under `item`, so writing a list here would

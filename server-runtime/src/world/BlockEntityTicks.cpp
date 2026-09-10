@@ -146,7 +146,11 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (hooks.allowHopperMove && !hooks.allowHopperMove(worldName, x, y, z)) {
                     continue;
                 }
-                if (hoppers::tick(world, x, y, z, random)) {
+                const hoppers::Around around{
+                    .isBookshelfBook = hooks.isBookshelfBook,
+                    .changes = &changes,
+                };
+                if (hoppers::tick(world, x, y, z, random, around)) {
                     chunk->markDirty();
                 }
                 continue;

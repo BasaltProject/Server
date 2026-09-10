@@ -298,13 +298,16 @@ TEST_CASE("the cook lands on the tick the timer meets the total") {
     const Recipe recipe = cooking("cooked_beef", 1, 120);
     furnaces::State state;
     state.litTimeRemaining = 50;
-    state.cookingTimer = 198;
-    state.cookingTotalTime = 200;
+    state.cookingTimer = 118;
+    // parity: while there is an input, the total is that input's own cooking time: `setItem` put it
+    // there. A furnace whose total says anything else with something in the slot is not a state the
+    // game can reach.
+    state.cookingTotalTime = 120;
     state.items[furnaces::kInputSlot] = stack("beef", 2);
 
     CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
-    CHECK(state.cookingTimer == 199);
-    CHECK(state.cookingTotalTime == 200);
+    CHECK(state.cookingTimer == 119);
+    CHECK(state.cookingTotalTime == 120);
     CHECK_FALSE(state.items[furnaces::kResultSlot].has_value());
 
     CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
@@ -318,7 +321,7 @@ TEST_CASE("the cook lands on the tick the timer meets the total") {
 }
 
 TEST_CASE("the last item of the input leaves the slot empty") {
-    const Recipe recipe = cooking("cooked_beef", 2);
+    const Recipe recipe = cooking("cooked_beef", 2, 1);
     furnaces::State state;
     state.litTimeRemaining = 50;
     state.cookingTimer = 0;
@@ -332,7 +335,7 @@ TEST_CASE("the last item of the input leaves the slot empty") {
 }
 
 TEST_CASE("a wet sponge fills the bucket standing next to it") {
-    const Recipe recipe = cooking("sponge");
+    const Recipe recipe = cooking("sponge", 1, 1);
     furnaces::State state;
     state.litTimeRemaining = 50;
     state.cookingTotalTime = 1;
@@ -347,7 +350,7 @@ TEST_CASE("a wet sponge fills the bucket standing next to it") {
 }
 
 TEST_CASE("the bucket a lava bucket left behind is filled by the same tick's sponge") {
-    const Recipe recipe = cooking("sponge");
+    const Recipe recipe = cooking("sponge", 1, 1);
     furnaces::State state;
     state.cookingTotalTime = 1;
     state.items[furnaces::kInputSlot] = stack("wet_sponge");
@@ -360,7 +363,7 @@ TEST_CASE("the bucket a lava bucket left behind is filled by the same tick's spo
 }
 
 TEST_CASE("anything else in the fuel slot is left alone by a drying sponge") {
-    const Recipe recipe = cooking("sponge");
+    const Recipe recipe = cooking("sponge", 1, 1);
     furnaces::State state;
     state.litTimeRemaining = 50;
     state.cookingTotalTime = 1;
@@ -373,7 +376,7 @@ TEST_CASE("anything else in the fuel slot is left alone by a drying sponge") {
 }
 
 TEST_CASE("an empty fuel slot is left alone by a drying sponge") {
-    const Recipe recipe = cooking("sponge");
+    const Recipe recipe = cooking("sponge", 1, 1);
     furnaces::State state;
     state.litTimeRemaining = 50;
     state.cookingTotalTime = 1;

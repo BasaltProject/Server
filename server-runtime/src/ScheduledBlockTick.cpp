@@ -105,7 +105,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         // parity: `PistonMovingBlockEntity.tick`, the turn that moves a slide's progress along. It
         // writes into the block entity and leaves the chunk clean, exactly as the jar does, so what
         // reaches the disk is the value from the turn before unless something else dirties the chunk.
-        world::pistons::advanceSlide(world.state(), x, y, z);
+        const bool slideTurn = world::pistons::advanceSlide(world.state(), x, y, z);
         std::vector<world::BlockChange> scheduled;
         random::RandomSource random = freshRandom();
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);
@@ -247,8 +247,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z,
                                                                  world::comparatorReading::of(world.state()));
         }
-        const std::vector<world::BlockChange> piston = broadcaster_->finishPiston(world, position, watchers);
-        scheduled.insert(scheduled.end(), piston.begin(), piston.end());
+        // A slide's own turn is not the landing's: the square that has just moved its progress along
+        // still has a tick to go, and landing it here took `pistonsensor` a tick early.
+        if (!slideTurn) {
+            const std::vector<world::BlockChange> piston = broadcaster_->finishPiston(world, position, watchers);
+            scheduled.insert(scheduled.end(), piston.begin(), piston.end());
+        }
         // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
         if (!hooks_.dispenseAllowed || hooks_.dispenseAllowed(world, x, y, z)) {
             const world::fluidFlow::Context context{.world = world.state(),

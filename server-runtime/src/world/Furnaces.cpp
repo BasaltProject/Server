@@ -108,6 +108,12 @@ std::optional<Cooker> cookerFor(std::string_view block) {
     return std::nullopt;
 }
 
+std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor) {
+    const std::optional<ItemStack>& ingredient = state.items[kInput];
+    const Recipe* recipe = (ingredient.has_value() && recipeFor) ? recipeFor(*ingredient) : nullptr;
+    return recipe == nullptr ? kDefaultCookTime : recipe->cookingTime;
+}
+
 Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize) {
     bool moved = false;
     bool changed = false;
@@ -120,6 +126,19 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize)
     }
     const std::optional<ItemStack>& fuel = state.items[kFuel];
     const std::optional<ItemStack>& ingredient = state.items[kInput];
+    // parity: `setItem` sets `cookingTotalTime` and zeroes the progress. The slots here are written
+    // from a hopper, a command and a dispenser without going through anything furnace-shaped, so the
+    // invariant is kept here: with an input, the total is that input's time. An empty input keeps
+    // the last one's, as in vanilla, because taking the last item out goes through `shrink`.
+    if (ingredient.has_value()) {
+        const std::int32_t wanted = cookTimeFor(state, recipeFor);
+        if (state.cookingTotalTime != wanted) {
+            state.cookingTotalTime = wanted;
+            state.cookingTimer = 0;
+            moved = true;
+            changed = true;
+        }
+    }
     if (isLit || (fuel.has_value() && ingredient.has_value())) {
         if (ingredient.has_value()) {
             const Recipe* recipe = recipeFor ? recipeFor(*ingredient) : nullptr;
@@ -170,12 +189,6 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize)
     // parity: `wasLit != isLit` is the third and last thing that sets `changed`, and it is also what
     // writes the block's own `lit`.
     return Ticked{.moved = moved, .changed = changed || wasLit != isLit};
-}
-
-std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor) {
-    const std::optional<ItemStack>& ingredient = state.items[kInput];
-    const Recipe* recipe = (ingredient.has_value() && recipeFor) ? recipeFor(*ingredient) : nullptr;
-    return recipe == nullptr ? kDefaultCookTime : recipe->cookingTime;
 }
 
 State read(const wire::nbt::NbtCompound& data) {

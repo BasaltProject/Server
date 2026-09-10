@@ -22,6 +22,7 @@ constexpr std::string_view kPageKey = "Page";
 constexpr std::string_view kWrittenContent = "minecraft:written_book_content";
 constexpr std::string_view kWritableContent = "minecraft:writable_book_content";
 constexpr std::string_view kPagesField = "pages";
+constexpr std::string_view kResolvedField = "resolved";
 
 /// parity: `LecternBlockEntity.getRedstoneSignal`'s fourteen steps between the covers.
 constexpr float kSignalSteps = 14.0F;
@@ -119,8 +120,33 @@ std::optional<BlockChange> placeBook(WorldState& world, std::int32_t x, std::int
     entity->data().set(std::string{kBookKey}, wire::nbt::NbtTag::ofCompound(blockInventory::writeStack(book)));
     entity->data().putInt(kPageKey, 0);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    // parity: `setBook` resolves what it is handed before it keeps it.
+    static_cast<void>(resolveBook(world, x, y, z));
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
+}
+
+bool resolveBook(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z, false);
+    if (entity == nullptr) {
+        return false;
+    }
+    const auto inside = [](wire::nbt::NbtCompound* holder, std::string_view key) -> wire::nbt::NbtCompound* {
+        wire::nbt::NbtTag* tag = holder == nullptr ? nullptr : holder->find(key);
+        return tag == nullptr ? nullptr : tag->get<wire::nbt::NbtCompound>();
+    };
+    wire::nbt::NbtCompound* book = inside(&entity->data(), kBookKey);
+    wire::nbt::NbtCompound* content = inside(inside(book, "components"), kWrittenContent);
+    // parity: `WrittenBookContent.resolve` answers nothing when it is already resolved, and the codec
+    // leaves the field out while it is false.
+    if (content == nullptr || content->getBoolean(std::string{kResolvedField})) {
+        return false;
+    }
+    content->putBoolean(std::string{kResolvedField}, true);
+    if (server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
+        chunk->markDirty();
+    }
+    return true;
 }
 
 std::optional<std::pair<BlockChange, server::world::loot::ItemStack>> takeBook(WorldState& world, std::int32_t x,

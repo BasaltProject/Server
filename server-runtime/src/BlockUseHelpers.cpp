@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
+#include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -370,6 +371,39 @@ bool BlockInteractionHandler::spawnFromItem(PlayerSession& session, const Identi
     }
     world->state().spawnEntity(std::make_unique<entity::ServerEntity>(
         registry->allocateEntityId(), wire::common::Uuid::random(), type, entry->protocolId, x, y, z));
+    if (session.gamemode != Gamemode::Creative) {
+        session.inventory.set(heldSlot,
+                              held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
+        owner_->sendInventorySlot(heldSlot);
+    }
+    return true;
+}
+
+bool BlockInteractionHandler::hangFrame(PlayerSession& session, const play::BlockHitResult& hit,
+                                        const std::int32_t heldSlot, const storage::StoredItemStack& held,
+                                        const Identifier& type) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    const reg::EntityTypeEntry* entry = reg::entityTypes::of(type);
+    player::PlayerRegistry* registry = owner_->options().playerRegistry;
+    if (world == nullptr || entry == nullptr || registry == nullptr) {
+        return false;
+    }
+    const BlockPos at = hit.pos.offset(hit.direction);
+    // The two enums are both in vanilla's `Direction` order, which is what makes this a cast.
+    const auto facing = static_cast<reg::BlockFace>(static_cast<std::uint8_t>(hit.direction));
+    if (!world::itemFrames::canHang(world->state(), at.x, at.y, at.z, facing)) {
+        return false;
+    }
+    const std::array<double, 3> hangs = world::itemFrames::hangingAt(at.x, at.y, at.z, facing);
+    auto frame = std::make_unique<entity::ServerEntity>(registry->allocateEntityId(), wire::common::Uuid::random(),
+                                                        type, entry->protocolId, hangs[0], hangs[1], hangs[2]);
+    frame->sourceNbt = world::itemFrames::freshTag(facing);
+    // parity: the spawn packet carries the face a hanging entity is on, which is what the client
+    // draws it against.
+    frame->objectData = static_cast<std::int32_t>(facing);
+    world->state().spawnEntity(std::move(frame));
+    // parity: `GameEvent.ENTITY_PLACE` from where the frame ended up.
+    world::vibrations::emit(world->state(), "entity_place", hangs[0], hangs[1], hangs[2], world->gameTime());
     if (session.gamemode != Gamemode::Creative) {
         session.inventory.set(heldSlot,
                               held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});

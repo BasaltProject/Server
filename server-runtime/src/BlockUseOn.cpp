@@ -460,6 +460,12 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
+    // parity: `ItemFrameItem.useOn`, which hangs it on the face clicked rather than putting a block.
+    if (held.has_value() && heldBlock.has_value() && heldBlock->path().ends_with("item_frame") &&
+        hangFrame(*session, hit, heldSlot, *held, *heldBlock)) {
+        ack();
+        return;
+    }
     // parity: `HoneycombItem.useOn` and `AxeItem.useOn`, both of which change the block clicked.
     if (held.has_value() && heldBlock == Identifier::vanilla("honeycomb") &&
         useHoneycomb(*session, hit.pos, heldSlot, *held)) {

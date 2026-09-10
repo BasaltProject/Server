@@ -158,6 +158,12 @@ private:
     [[nodiscard]] bool useBoneMeal(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
                                    std::int32_t heldSlot, const storage::StoredItemStack& held);
 
+    /// parity: `ItemFrameItem.useOn`, which hangs the frame in the square next to the face clicked
+    /// and only when it has something to hang on. Answers whether it went up.
+    [[nodiscard]] bool hangFrame(player::PlayerSession& session, const wire::protocol::play::BlockHitResult& hit,
+                                 std::int32_t heldSlot, const storage::StoredItemStack& held,
+                                 const wire::common::Identifier& type);
+
     /// Puts one piece of glowstone into a respawn anchor. Answers whether it took it.
     [[nodiscard]] bool chargeAnchor(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
                                     std::int32_t heldSlot, const storage::StoredItemStack& held);

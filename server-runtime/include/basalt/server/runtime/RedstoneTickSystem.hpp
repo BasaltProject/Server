@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RandomTicks.hpp>
+#include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 
 #include <cstdint>
@@ -58,6 +59,9 @@ public:
         std::function<std::int64_t()> nextSeed;
         /// The jar's own song lengths, so a jukebox knows when to go quiet.
         world::jukeboxes::SongOutputs* jukeboxes = nullptr;
+        /// The item tags the datapack loaded, which is what a chiseled bookshelf asks before it
+        /// takes what a hopper is holding.
+        const world::realItemTags::TagMembers* itemTags = nullptr;
     };
 
     /// `runCommand` is what a command block runs its command with. It is a constructor parameter and
