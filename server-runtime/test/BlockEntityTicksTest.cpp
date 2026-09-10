@@ -70,8 +70,10 @@ struct Loaded {
     }
 
     [[nodiscard]] std::vector<BlockChange> tick(const blockEntityTicks::Hooks& hooks = {}) {
-        return blockEntityTicks::tick(state, "overworld", clock, weather, {{kChunkX, kChunkZ}}, hooks);
+        return blockEntityTicks::tick(state, "overworld", clock, weather, {{kChunkX, kChunkZ}}, random, hooks);
     }
+
+    basalt::server::random::RandomSource random = basalt::server::random::RandomSource::legacy(1);
 };
 
 /// A recipe book with one smelting recipe and one campfire recipe.
@@ -316,8 +318,9 @@ TEST_CASE("a chunk that is not loaded, and a block entity with no ticker, are bo
     static_cast<void>(loaded.place("chest", stateOf("chest"), kX, 64, kZ));
 
     CHECK(loaded.tick({.recipeFor = book.lookup()}).empty());
-    CHECK(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock, loaded.weather, {{9, 9}}).empty());
-    CHECK(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock, loaded.weather, {}).empty());
+    CHECK(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock, loaded.weather, {{9, 9}}, loaded.random)
+              .empty());
+    CHECK(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock, loaded.weather, {}, loaded.random).empty());
 }
 
 TEST_CASE("a furnace that keeps burning says nothing, and one that goes out says so") {

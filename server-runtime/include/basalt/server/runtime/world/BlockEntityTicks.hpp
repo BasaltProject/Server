@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
@@ -55,10 +56,14 @@ struct Hooks {
 
 /// Ticks every block entity in `chunks` that has something to do, answering the blocks that changed
 /// so the caller can tell whoever is watching.
+///
+/// `random` is the world's own, needed by the one block entity that rolls for anything: a hopper
+/// feeding a composter. Required rather than defaulted, so a new caller cannot forget it.
 [[nodiscard]] std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
                                             const WorldWeather& weather,
                                             const std::vector<std::array<std::int32_t, 2>>& chunks,
-                                            const Hooks& hooks = {}, bool hasSkylight = true);
+                                            random::RandomSource& random, const Hooks& hooks = {},
+                                            bool hasSkylight = true);
 
 } // namespace blockEntityTicks
 

@@ -1,6 +1,7 @@
 #include "ItemSlots.hpp"
 
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -194,10 +195,32 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         entry.putByte("Slot", static_cast<std::int8_t>(slot));
         entry.set("id", NbtTag::ofString(stack.id));
         entry.set("count", NbtTag::ofInt(stack.count));
+        // parity: the components the command named travel with the item, exactly as `ItemStack.CODEC`
+        // writes them: without this an enchanted sword put in a chest by command came out plain.
+        if (stack.components.size() > 0) {
+            entry.set("components", NbtTag::ofCompound(stack.components));
+        }
         entries.push_back(NbtTag::ofCompound(entry));
     }
     NbtCompound data = existing->data();
-    data.set("Items", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(entries)}));
+    if (world::blockInventory::holdsOneItem(existing->type().path())) {
+        // parity: a decorated pot keeps its one stack under `item`, so writing a list here would
+        // leave a tag vanilla never wrote and lose what the command put in.
+        world::blockInventory::Slots one(1);
+        for (const auto& [slot, stack] : written) {
+            if (slot == 0) {
+                const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+                    wire::common::Identifier::parse(stack.id);
+                if (item.has_value()) {
+                    one[0] = server::world::loot::ItemStack{
+                        .item = *item, .count = stack.count, .components = stack.components};
+                }
+            }
+        }
+        world::blockInventory::writeFor(existing->type().path(), data, one);
+    } else {
+        data.set("Items", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(entries)}));
+    }
     // Only the containers that say so: a hopper filled by command leaves its comparator none the
     // wiser, and a furnace speaks only for the slot it cooks from.
     const std::vector<NbtCompound> before = itemsOf(existing->data());

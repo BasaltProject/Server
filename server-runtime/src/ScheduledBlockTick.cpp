@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
@@ -170,6 +171,18 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             for (const world::BlockChange& moved : hook) {
                 broadcaster_->announceRedstone(world, watchers, moved);
             }
+        }
+        // parity: `ComposterBlock.tick`, the twenty ticks the seventh layer waits before it becomes
+        // the bone meal, with the sound that says it is ready.
+        if (std::optional<world::BlockChange> ready = world::composters::settle(world.state(), x, y, z);
+            ready.has_value()) {
+            ready->effects.push_back(world::blockEffect::Sound{
+                .name = "block.composter.ready", .source = SoundSource::Blocks, .volume = 1.0F, .pitch = 1.0F});
+            broadcaster_->announceBlock(watchers, *ready);
+            broadcaster_->sendEffects(watchers, x, y, z, ready->stateId, ready->effects);
+            // parity: `setBlock(..., 3)` tells the neighbours, which is what a comparator reading the
+            // composter is waiting for.
+            world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z, containerSignal);
         }
         // parity: `LecternBlock.tick`, the two ticks a page turn pulses for.
         if (const std::optional<world::BlockChange> lectern = world::lecterns::endPulse(world.state(), x, y, z);

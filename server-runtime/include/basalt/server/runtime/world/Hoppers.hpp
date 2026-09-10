@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
@@ -24,7 +25,12 @@ inline constexpr std::int32_t kSize = 5;
 
 /// One hopper's turn. Answers whether anything moved, so the caller marks the chunk and tells
 /// whoever is looking at the two containers.
-[[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+///
+/// `random` is the world's, and it is a required parameter rather than something this reaches for:
+/// a hopper feeding a **composter** rolls the item's own chance, which is the one place a hopper is
+/// not deterministic.
+[[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                        random::RandomSource& random);
 
 /// One hopper minecart's turn, which is the same suck and nothing else.
 ///

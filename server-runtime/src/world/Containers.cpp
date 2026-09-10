@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
@@ -19,6 +20,7 @@
 #include <charconv>
 #include <cstdint>
 #include <map>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -161,6 +163,86 @@ bool isPlain(std::string_view path) {
            shulkers::isShulkerBox(path);
 }
 
+std::int32_t maxStackFor(const std::string_view path, const wire::common::Identifier& item) {
+    const std::int32_t inHand = registry::itemStacking::maxStackSize(item);
+    // parity: `ChiseledBookShelfBlockEntity.getMaxStackSize` and `JukeboxBlockEntity`'s, both one.
+    // The lectern's is one too and is not here: a lectern is no container to a hopper.
+    if (path == "chiseled_bookshelf" || path == "jukebox") {
+        return 1;
+    }
+    return inHand;
+}
+
+std::vector<std::int32_t> slotsForFace(const std::string_view path, const std::int32_t size,
+                                       const registry::BlockFace from) {
+    // parity: `AbstractFurnaceBlockEntity`'s three arrays, and `BrewingStandBlockEntity`'s.
+    if (furnaces::cookerFor(path).has_value()) {
+        if (from == registry::BlockFace::Down) {
+            return {furnaces::kResultSlot, furnaces::kFuelSlot};
+        }
+        return from == registry::BlockFace::Up ? std::vector{furnaces::kInputSlot} : std::vector{furnaces::kFuelSlot};
+    }
+    if (path == "brewing_stand") {
+        if (from == registry::BlockFace::Up) {
+            return {brewingStands::kIngredientSlot};
+        }
+        if (from == registry::BlockFace::Down) {
+            return {0, 1, 2, brewingStands::kIngredientSlot};
+        }
+        return {0, 1, 2, brewingStands::kFuelSlot};
+    }
+    std::vector<std::int32_t> every(static_cast<std::size_t>(std::max(size, 0)));
+    std::iota(every.begin(), every.end(), 0);
+    return every;
+}
+
+bool acceptsThroughFace(const std::string_view path, const std::int32_t slot, const wire::common::Identifier& item,
+                        const bool slotIsEmpty) {
+    // parity: `AbstractFurnaceBlockEntity.canPlaceItem`: nothing goes into the result slot, and the
+    // fuel slot takes fuel or **one** empty bucket, which is what a lava bucket leaves behind.
+    if (furnaces::cookerFor(path).has_value()) {
+        if (slot == furnaces::kResultSlot) {
+            return false;
+        }
+        if (slot != furnaces::kFuelSlot) {
+            return true;
+        }
+        return registry::fuels::isFuel(item) || (item.path() == "bucket" && slotIsEmpty);
+    }
+    // parity: `BrewingStandBlockEntity.canPlaceItem`, slot by slot.
+    if (path == "brewing_stand") {
+        if (slot == brewingStands::kIngredientSlot) {
+            return registry::brewing::isIngredient(item);
+        }
+        if (slot == brewingStands::kFuelSlot) {
+            return item == registry::brewing::fuel();
+        }
+        static constexpr std::array<std::string_view, 4> kBottles{"potion", "splash_potion", "lingering_potion",
+                                                                  "glass_bottle"};
+        return slotIsEmpty && std::ranges::find(kBottles, item.path()) != kBottles.end();
+    }
+    // parity: `ShulkerBoxBlockEntity.canPlaceItemThroughFace`, the one thing a box will not hold.
+    if (shulkers::isShulkerBox(path)) {
+        return !shulkers::isShulkerBox(item.path());
+    }
+    return true;
+}
+
+bool givesThroughFace(const std::string_view path, const std::int32_t slot, const wire::common::Identifier& item,
+                      const registry::BlockFace from) {
+    // parity: `AbstractFurnaceBlockEntity.canTakeItemThroughFace`: what comes out of the fuel slot
+    // downwards is the bucket the lava came in, and never the fuel itself.
+    if (furnaces::cookerFor(path).has_value() && from == registry::BlockFace::Down && slot == furnaces::kFuelSlot) {
+        return item.path() == "bucket" || item.path() == "water_bucket";
+    }
+    // parity: `BrewingStandBlockEntity.canTakeItemThroughFace`: the ingredient slot only gives back
+    // the glass bottle a brew leaves in it.
+    if (path == "brewing_stand" && slot == brewingStands::kIngredientSlot) {
+        return item.path() == "glass_bottle";
+    }
+    return true;
+}
+
 bool setItemTellsComparators(const std::string_view path, const std::int32_t slot, const bool sameItem) {
     // parity: `HopperBlockEntity.setItem` and `LecternBlockEntity`'s, neither of which calls
     // `setChanged`: a hopper filled by command leaves the comparator beside it reading nothing.
@@ -258,7 +340,7 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     // parity: `ChestBlock.getAnalogOutputSignal` reads the **pair**, so the same four stacks give
     // three in a single chest and two in a double one.
     std::int32_t seen = *size;
-    blockInventory::Slots slots = blockInventory::read(entity->data(), *size);
+    blockInventory::Slots slots = blockInventory::readFor(path, entity->data(), *size);
     if (const std::optional<std::pair<doubleChests::Half, doubleChests::Half>> pair =
             doubleChests::halves(world, x, y, z);
         pair.has_value()) {

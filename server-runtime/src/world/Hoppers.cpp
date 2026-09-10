@@ -4,10 +4,12 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -53,11 +55,12 @@ constexpr std::int32_t kContainerMaxStack = 99;
     return std::min(kContainerMaxStack, registry::itemStacking::maxStackSize(item));
 }
 
-/// parity: the sides `AbstractFurnaceBlockEntity.getSlotsForFace` opens to a hopper.
-constexpr auto kFurnaceSlotsForUp = std::to_array({furnaces::kInputSlot});
-constexpr auto kFurnaceSlotsForDown = std::to_array({furnaces::kResultSlot, furnaces::kFuelSlot});
-constexpr auto kFurnaceSlotsForSides = std::to_array({furnaces::kFuelSlot});
+/// The same, for a container that stacks lower than the item does.
+[[nodiscard]] std::int32_t capIn(std::string_view path, const wire::common::Identifier& item) {
+    return std::min(kContainerMaxStack, containers::maxStackFor(path, item));
+}
 
+/// parity: the sides `AbstractFurnaceBlockEntity.getSlotsForFace` opens to a hopper.
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto found = properties.find(name);
@@ -163,18 +166,7 @@ struct Container {
 /// parity: `WorldlyContainer.getSlotsForFace`: a furnace takes fuel from the side, ingredients
 /// from above and gives its result downwards. Everything else opens every slot to every side.
 [[nodiscard]] std::vector<std::int32_t> slotsFor(std::string_view path, std::int32_t size, registry::BlockFace from) {
-    if (!furnaces::cookerFor(path).has_value()) {
-        std::vector<std::int32_t> every(static_cast<std::size_t>(size));
-        std::iota(every.begin(), every.end(), 0);
-        return every;
-    }
-    if (from == registry::BlockFace::Down) {
-        return {kFurnaceSlotsForDown.begin(), kFurnaceSlotsForDown.end()};
-    }
-    if (from == registry::BlockFace::Up) {
-        return {kFurnaceSlotsForUp.begin(), kFurnaceSlotsForUp.end()};
-    }
-    return {kFurnaceSlotsForSides.begin(), kFurnaceSlotsForSides.end()};
+    return containers::slotsForFace(path, size, from);
 }
 
 /// parity: Kotlin's `getOrNull`: a face may name a slot the container does not have.
@@ -203,19 +195,25 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 /// Puts one of `stack` into the container, answering whether it went in.
 [[nodiscard]] bool insert(WorldState& world, const Container& target, const ItemStack& stack,
                           registry::BlockFace from) {
-    Slots slots = blockInventory::read(*target.data, target.size);
+    Slots slots = blockInventory::readFor(target.path, *target.data, target.size);
     const std::vector<std::int32_t> allowed = slotsFor(target.path, target.size, from);
     for (const std::int32_t slot : allowed) {
         std::optional<ItemStack>* there = slotAt(slots, slot);
         if (there == nullptr) {
             continue;
         }
-        if (there->has_value() && ((*there)->item != stack.item || (*there)->count >= capOf(stack.item))) {
+        if (there->has_value() && ((*there)->item != stack.item || (*there)->count >= capIn(target.path, stack.item))) {
+            continue;
+        }
+        // parity: `canPlaceItemThroughFace`. A furnace's result slot takes nothing, its fuel slot
+        // takes only fuel, a brewing stand's three slots each take their own thing, and a shulker
+        // box takes anything but another shulker box.
+        if (!containers::acceptsThroughFace(target.path, slot, stack.item, !there->has_value())) {
             continue;
         }
         *there = there->has_value() ? ItemStack{.item = (*there)->item, .count = (*there)->count + 1}
                                     : ItemStack{.item = stack.item, .count = 1};
-        blockInventory::write(*target.data, slots);
+        blockInventory::writeFor(target.path, *target.data, slots);
         world.chunkIfLoaded(target.x >> 4, target.z >> 4)->markDirty();
         if (target.isBlock) {
             redstoneComponents::scheduleComparatorsAround(world, {}, target.x, target.y, target.z,
@@ -239,11 +237,100 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 }
 
 /// parity: `ejectItems`: the first slot with something in it gives one item to what it faces.
+/// parity: `ComposterBlock.InputContainer`, which is a container with one slot that only takes
+/// something compostable, only through the **top** face and only while there is room. Putting the
+/// item in composts it there and then: `setChanged` is what calls `addItem`.
+[[nodiscard]] bool compost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace face,
+                           Slots& slots, random::RandomSource& random) {
+    if (face != registry::BlockFace::Up || !composters::levelAt(world, x, y, z).has_value()) {
+        return false;
+    }
+    for (std::optional<ItemStack>& slot : slots) {
+        if (!slot.has_value() || !composters::chanceOf(slot->item).has_value()) {
+            continue;
+        }
+        // The roll can fail and the item is eaten anyway: `InputContainer.setChanged` shrinks the
+        // stack whatever `addItem` answered.
+        static_cast<void>(composters::addItem(world, x, y, z, slot->item, random));
+        slot = slot->count <= 1 ? std::nullopt : std::optional{ItemStack{.item = slot->item, .count = slot->count - 1}};
+        redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+        return true;
+    }
+    return false;
+}
+
+/// parity: `ComposterBlock.OutputContainer`, the bone meal of a composter that is ready, given out
+/// through the **bottom** face only, and taking it empties the composter.
+[[nodiscard]] bool takeCompost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+    if (composters::levelAt(world, x, y, z) != composters::kReady) {
+        return false;
+    }
+    const wire::common::Identifier boneMeal = wire::common::Identifier::vanilla("bone_meal");
+    if (!accepts(slots, boneMeal)) {
+        return false;
+    }
+    if (!composters::empty(world, x, y, z).has_value()) {
+        return false;
+    }
+    add(slots, boneMeal);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+    return true;
+}
+
+/// parity: `JukeboxBlockEntity` is a container of one, so a hopper loads a jukebox and another one
+/// under it takes the disc back out. What it holds lives under `RecordItem` rather than in an item
+/// list, so it goes through the jukebox's own door rather than through the generic one.
+[[nodiscard]] bool loadJukebox(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    const wire::common::Identifier* block =
+        stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr || *block != jukeboxes::block()) {
+        return false;
+    }
+    for (std::optional<ItemStack>& slot : slots) {
+        if (!slot.has_value() || !jukeboxes::isDisc(slot->item)) {
+            continue;
+        }
+        if (!jukeboxes::insert(world, x, y, z, slot->item).has_value()) {
+            return false;
+        }
+        slot = slot->count <= 1 ? std::nullopt : std::optional{ItemStack{.item = slot->item, .count = slot->count - 1}};
+        return true;
+    }
+    return false;
+}
+
+/// The other half: the disc out of the jukebox above, which stops the song.
+[[nodiscard]] bool takeDisc(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    const wire::common::Identifier* block =
+        stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr || *block != jukeboxes::block()) {
+        return false;
+    }
+    const std::optional<std::string> song = jukeboxes::songAt(world, x, y, z);
+    if (!song.has_value()) {
+        return false;
+    }
+    const wire::common::Identifier disc = wire::common::Identifier::vanilla("music_disc_" + *song);
+    if (!accepts(slots, disc)) {
+        return false;
+    }
+    if (!jukeboxes::eject(world, x, y, z).has_value()) {
+        return false;
+    }
+    add(slots, disc);
+    return true;
+}
+
 [[nodiscard]] bool push(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace out,
-                        Slots& slots) {
+                        Slots& slots, random::RandomSource& random) {
     const std::int32_t tx = x + registry::stepX(out);
     const std::int32_t ty = y + registry::stepY(out);
     const std::int32_t tz = z + registry::stepZ(out);
+    if (compost(world, tx, ty, tz, registry::opposite(out), slots, random) || loadJukebox(world, tx, ty, tz, slots)) {
+        return true;
+    }
     const std::optional<Container> target = containerAt(world, tx, ty, tz);
     if (!target.has_value()) {
         return false;
@@ -263,7 +350,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 
 /// parity: `suckInItems` for the container half: one item out of whatever sits on top.
 [[nodiscard]] bool pullFrom(WorldState& world, const Container& above, Slots& slots) {
-    Slots source = blockInventory::read(*above.data, above.size);
+    Slots source = blockInventory::readFor(above.path, *above.data, above.size);
     const std::vector<std::int32_t> takeable = slotsFor(above.path, above.size, registry::BlockFace::Down);
     for (const std::int32_t slot : takeable) {
         std::optional<ItemStack>* stack = slotAt(source, slot);
@@ -273,10 +360,15 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (!accepts(slots, (*stack)->item)) {
             continue;
         }
+        // parity: `canTakeItemThroughFace`, which is what stops a hopper under a furnace draining
+        // its coal or one under a brewing stand stealing the ingredient.
+        if (!containers::givesThroughFace(above.path, slot, (*stack)->item, registry::BlockFace::Down)) {
+            continue;
+        }
         add(slots, (*stack)->item);
         *stack = (*stack)->count <= 1 ? std::nullopt
                                       : std::optional{ItemStack{.item = (*stack)->item, .count = (*stack)->count - 1}};
-        blockInventory::write(*above.data, source);
+        blockInventory::writeFor(above.path, *above.data, source);
         if (above.isBlock) {
             redstoneComponents::scheduleComparatorsAround(world, {}, above.x, above.y, above.z,
                                                           comparatorReading::of(world));
@@ -329,7 +421,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 
 } // namespace
 
-bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return false;
@@ -367,12 +459,14 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     // and both happen on the same turn: the two are `moved |=`, not one or the other.
     bool moved = false;
     if (!isEmpty(slots)) {
-        moved = push(world, x, y, z, *out, slots);
+        moved = push(world, x, y, z, *out, slots, random);
     }
     if (!isFull(slots)) {
-        // parity: `suckInItems` looks at what is lying above only when there is no container there.
+        // parity: `suckInItems` looks at what is lying above only when there is no container there,
+        // and a composter that is ready **is** one: its bone meal comes out downwards.
         const std::optional<Container> above = containerAt(world, x, y + 1, z);
-        const bool taken = above.has_value() ? pullFrom(world, *above, slots) : suckIn(world, x, y, z, slots);
+        const bool taken = takeCompost(world, x, y + 1, z, slots) || takeDisc(world, x, y + 1, z, slots) ||
+                           (above.has_value() ? pullFrom(world, *above, slots) : suckIn(world, x, y, z, slots));
         moved = taken || moved;
     }
     if (!moved) {

@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/runtime/command/BlockEditor.hpp>
+#include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -117,9 +118,7 @@ void BlockEditor::createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t
     // not anybody set them, so one created empty is a different block entity: a world of ours would
     // open in vanilla with a command block that has no `TrackOutput` and no `UpdateLastExecution`, and
     // the second of those decides whether it can run twice in a tick.
-    wire::nbt::NbtCompound data = world::commandBlocks::modeOf(block->path()).has_value()
-                                      ? world::commandBlocks::defaults()
-                                      : wire::nbt::NbtCompound{};
+    wire::nbt::NbtCompound data = world::blockEntityDefaults::of(*block);
     chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, std::move(data)});
 }
 

@@ -270,6 +270,7 @@ basalt_module(server-runtime-core
         src/world/SelectableSlots.cpp
         src/world/GameRules.cpp
         src/world/BambooGrowth.cpp
+        src/world/BlockEntityDefaults.cpp
         src/world/BlockInventory.cpp
         src/world/BlockSurvival.cpp
         src/world/BrewingStands.cpp
@@ -279,6 +280,7 @@ basalt_module(server-runtime-core
         src/world/ContainerOpeners.cpp
         src/world/Containers.cpp
         src/world/ComparatorReading.cpp
+        src/world/Composters.cpp
         src/world/DecoratedPots.cpp
         src/world/DetectorRails.cpp
         src/world/Crafters.cpp
@@ -1701,6 +1703,12 @@ basalt_test(server-runtime-bamboo-growth-test
 basalt_test(server-runtime-crafters-test
     SOURCES
         test/CraftersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-composter-test
+    SOURCES
+        test/ComposterTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

@@ -102,8 +102,10 @@ std::array<bool, kBottles> bottleBits(const State& state) {
 
 State read(const wire::nbt::NbtCompound& data) {
     State state;
-    state.fuel = data.getInt(kFuelKey, 0);
-    state.brewTime = data.getInt(kBrewTimeKey, 0);
+    // Read in vanilla's shapes, and in the int this build used to write, so a world of ours from
+    // before does not lose its brew.
+    state.fuel = data.getByte(kFuelKey, static_cast<std::int8_t>(data.getInt(kFuelKey, 0)));
+    state.brewTime = data.getShort(kBrewTimeKey, static_cast<std::int16_t>(data.getInt(kBrewTimeKey, 0)));
     state.items = blockInventory::read(data, kSize);
     for (std::int32_t slot = 0; slot < kBottles; ++slot) {
         const std::string_view potion = data.getString(potionKey(slot));
@@ -114,8 +116,11 @@ State read(const wire::nbt::NbtCompound& data) {
 }
 
 void write(const State& state, wire::nbt::NbtCompound& data) {
-    data.putInt(kFuelKey, state.fuel);
-    data.putInt(kBrewTimeKey, state.brewTime);
+    // parity: `saveAdditional` writes the brew time as a **short** and the fuel as a **byte**. A
+    // vanilla reader asks for those types by name and a plain int comes back as the default, so the
+    // two numbers have to go out in vanilla's own shapes or a world of ours loses them.
+    data.putShort(kBrewTimeKey, static_cast<std::int16_t>(state.brewTime));
+    data.putByte(kFuelKey, static_cast<std::int8_t>(state.fuel));
     blockInventory::write(data, state.items);
     for (std::int32_t slot = 0; slot < kBottles; ++slot) {
         const std::optional<std::string>& potion = state.potions[static_cast<std::size_t>(slot)];
