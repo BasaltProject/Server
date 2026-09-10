@@ -165,8 +165,13 @@ struct RedstoneFixture {
     basalt::server::runtime::world::RealRecipes recipes{
         {.readText = [](std::string_view) { return std::optional<std::string>{}; },
          .entriesUnder = [](std::string_view) { return std::vector<std::string>{}; }}};
-    RedstoneTickSystem redstone{env.spawn.base.registry, recipes, env.broadcaster,
-                                env.simulation,          {},      {.nextSeed = [] { return std::int64_t{17}; }}};
+    RedstoneTickSystem redstone{env.spawn.base.registry,
+                                recipes,
+                                env.broadcaster,
+                                env.simulation,
+                                [](std::int32_t, std::int32_t, std::int32_t, const std::string&) { return false; },
+                                {},
+                                {.nextSeed = [] { return std::int64_t{17}; }}};
     basalt::server::runtime::sched::RegionScheduler scheduler;
 
     explicit RedstoneFixture(const std::string& root) : env(root) {}

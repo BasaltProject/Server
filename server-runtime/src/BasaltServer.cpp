@@ -447,7 +447,19 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                   },
                               .nextSeed = [] { return scratchSeed(); }});
     redstone_ = std::make_unique<RedstoneTickSystem>(
-        playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_, RedstoneTickSystem::Hooks{},
+        playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_,
+        // parity: `BaseCommandBlock.performCommand`, which stands the source at the middle of the
+        // block with permission two, and only lets it speak while `commandBlockOutput` is on.
+        [this](std::int32_t x, std::int32_t y, std::int32_t z, const std::string& line) {
+            command::CommandDispatcher* dispatcher = commands();
+            if (dispatcher == nullptr) {
+                return false;
+            }
+            const command::CommandBlockSource source{
+                {x + 0.5, y + 0.5, z + 0.5}, "@", true, wire::common::Logger{"CommandBlock"}};
+            return dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line) > 0;
+        },
+        RedstoneTickSystem::Hooks{},
         RedstoneTickSystem::Options{.nextSeed = [] { return scratchSeed(); }, .jukeboxes = &vanillaData_.jukeboxSongs});
     raids_ = std::make_unique<RaidSystem>(playerRegistry_, *broadcaster_, *spawning_, RaidSystem::Hooks{},
                                           RaidSystem::Options{.nextSeed = [] { return scratchSeed(); }}, logger_);

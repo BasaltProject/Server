@@ -226,6 +226,7 @@ basalt_module(server-runtime-core
         src/world/DamageProtection.cpp
         src/world/NaturalSpawnPredicates.cpp
         src/world/BiomeTagLoader.cpp
+        src/world/CommandBlocks.cpp
         src/world/Dispensers.cpp
         src/world/Dripleaves.cpp
         src/world/DroppedItemNbt.cpp
@@ -1699,6 +1700,12 @@ basalt_test(server-runtime-bamboo-growth-test
 basalt_test(server-runtime-crafters-test
     SOURCES
         test/CraftersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-command-blocks-test
+    SOURCES
+        test/CommandBlocksTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

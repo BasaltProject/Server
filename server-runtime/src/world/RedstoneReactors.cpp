@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/PoweredRails.hpp>
@@ -321,6 +322,12 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     }
     if (path == "note_block") {
         noteBlock(world, worldName, x, y, z, *stateId, properties, gameTime, changes);
+        return;
+    }
+    // parity: `CommandBlock.neighborChanged`, which is only `setPoweredAndUpdate`. The block never
+    // changes state for a signal: what moves is its block entity, and the turn it books.
+    if (commandBlocks::modeOf(path).has_value()) {
+        commandBlocks::onSignal(world, x, y, z, redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0);
         return;
     }
     if (path == "tnt") {

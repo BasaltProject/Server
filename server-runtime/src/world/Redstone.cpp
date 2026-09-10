@@ -114,14 +114,19 @@ using Properties = std::map<std::string, std::string>;
 }
 
 /// parity: the blocks whose `isSignalSource` is true, whatever they are giving off right now.
-constexpr std::array<std::string_view, 19> kSignalSources{
+constexpr std::array<std::string_view, 20> kSignalSources{
     "redstone_block", "redstone_torch", "redstone_wall_torch", "repeater", "comparator", "observer", "lever",
     "daylight_detector", "detector_rail", "lectern", "tripwire_hook", "lightning_rod", "sculk_sensor",
     "calibrated_sculk_sensor", "trapped_chest",
     // parity: `JukeboxBlock.isSignalSource` is
     // always true, playing or not, and that is
     // what makes a dust reach out to it.
-    "jukebox", "light_weighted_pressure_plate", "heavy_weighted_pressure_plate", "target"};
+    "jukebox", "light_weighted_pressure_plate", "heavy_weighted_pressure_plate", "target",
+    // parity: `RedStoneWireBlock.isSignalSource` is true too, which is easy to miss because every
+    // redstone path checks for the dust before it asks. The two that do ask are the plain rail
+    // deciding whether to turn a corner and, above all, `NaturalSpawner.isValidEmptySpawnBlock`:
+    // a dust on the floor is what stops mobs spawning on it.
+    "redstone_wire"};
 
 [[nodiscard]] bool conducts(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);

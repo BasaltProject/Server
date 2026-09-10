@@ -85,9 +85,9 @@ void crossingsOf(world::LoadedWorld& world, double x, double y, double z, std::s
 
 RedstoneTickSystem::RedstoneTickSystem(player::PlayerRegistry& players, world::RealRecipes& recipes,
                                        BlockChangeBroadcaster& broadcaster, ChunkSimulationView& chunkSimulation,
-                                       Hooks hooks, Options options)
+                                       world::commandBlocks::RunCommand runCommand, Hooks hooks, Options options)
     : players_(&players), recipes_(&recipes), broadcaster_(&broadcaster), chunkSimulation_(&chunkSimulation),
-      hooks_(std::move(hooks)), options_(std::move(options)) {}
+      hooks_(std::move(hooks)), options_(std::move(options)), runCommand_(std::move(runCommand)) {}
 
 random::RandomSource RedstoneTickSystem::freshRandom() const {
     return random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);

@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
@@ -178,16 +179,28 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             leaf.has_value()) {
             scheduled.push_back(*leaf);
         }
-        // parity: `LightningRodBlock`'s own scheduled tick, eight after the strike.
+        // parity: `LightningRodBlock.tick` writes with `UPDATE_ALL` and then runs `updateNeighbours`,
+        // so letting go of the signal has to settle the dust around it and not only redraw the rod.
+        // Measured in `pararrayos`, where the rod went quiet on the right tick and the dust beside it
+        // stayed at fifteen for ever.
         if (const std::optional<world::BlockChange> rod = world::lightning::releaseRod(world.state(), x, y, z);
             rod.has_value()) {
-            scheduled.push_back(*rod);
+            broadcaster_->announceRedstone(world, watchers, *rod);
         }
-        // parity: `TargetBlock`'s own scheduled tick, which lets the signal go again.
+        // parity: `TargetBlock`'s own scheduled tick, which ends the same way: the signal going is a
+        // block change like any other.
         if (const std::optional<world::BlockChange> target =
                 world::projectileHits::releaseTarget(world.state(), x, y, z);
             target.has_value()) {
-            scheduled.push_back(*target);
+            broadcaster_->announceRedstone(world, watchers, *target);
+        }
+        // parity: `CommandBlock.tick`, the booked turn that runs the command and walks the chain on.
+        // It ends in `updateNeighbourForOutputSignal`, which here is the comparators around it.
+        if (world::commandBlocks::tick(
+                world.state(), x, y, z, world.gameTime(), world.gameRules().get(world::gameRules::kCommandBlocksWork),
+                world.gameRules().number(world::gameRules::kMaxCommandSequenceLength), runCommand_)) {
+            world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z,
+                                                                 world::comparatorReading::of(world.state()));
         }
         const std::vector<world::BlockChange> piston = broadcaster_->finishPiston(world, position, watchers);
         scheduled.insert(scheduled.end(), piston.begin(), piston.end());

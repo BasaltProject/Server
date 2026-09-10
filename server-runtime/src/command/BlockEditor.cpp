@@ -3,9 +3,12 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/runtime/command/BlockEditor.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <cstdint>
@@ -110,7 +113,14 @@ void BlockEditor::createBlockEntity(std::int32_t x, std::int32_t y, std::int32_t
     if (chunk == nullptr || chunk->blockEntityAt(x & 15, y, z & 15) != nullptr) {
         return;
     }
-    chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, wire::nbt::NbtCompound{}});
+    // parity: a block entity is not an empty bag. A command block's writes out seven fields whether or
+    // not anybody set them, so one created empty is a different block entity: a world of ours would
+    // open in vanilla with a command block that has no `TrackOutput` and no `UpdateLastExecution`, and
+    // the second of those decides whether it can run twice in a tick.
+    wire::nbt::NbtCompound data = world::commandBlocks::modeOf(block->path()).has_value()
+                                      ? world::commandBlocks::defaults()
+                                      : wire::nbt::NbtCompound{};
+    chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, *block, std::move(data)});
 }
 
 void BlockEditor::notifyNeighbours() {
@@ -185,6 +195,14 @@ void BlockEditor::notifyNeighbours() {
         if (shapedToAir && !unsupported && written.has_value() && *written != reg::blocks::air().stateId &&
             world_->state().blockState(at[0], at[1], at[2]) == reg::blocks::air().stateId) {
             static_cast<void>(set(at[0], at[1], at[2], *written));
+        }
+        // parity: `Level.updateNeighboursOnBlockSet` ends in `updateNeighbourForOutputSignal` for a
+        // block that has an analog output, and that one reaches **two** squares through anything that
+        // conducts. Without it a chest or a command block put down by command never told the
+        // comparator reading it from behind a wall.
+        if (world::comparatorReading::at(world_->state(), at[0], at[1], at[2], {}).has_value()) {
+            world::redstoneComponents::scheduleComparatorsAround(world_->state(), world_->name(), at[0], at[1], at[2],
+                                                                 world::comparatorReading::of(world_->state()));
         }
         // parity: `BlockInput.place` ends in `overwriteWithDefinedProperties`, so a property the
         // command named beats whatever the shape update decided. Without it a note block placed as a

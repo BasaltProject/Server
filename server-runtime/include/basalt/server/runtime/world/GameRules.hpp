@@ -45,6 +45,10 @@ inline constexpr GameRule kAdvanceWeather = GameRule::boolean("advance_weather",
 inline constexpr GameRule kKeepInventory = GameRule::boolean("keep_inventory", false);
 inline constexpr GameRule kMaxBlockModifications = GameRule::integer("max_block_modifications", 32768, 1);
 inline constexpr GameRule kMaxCommandSequenceLength = GameRule::integer("max_command_sequence_length", 65536, 0);
+
+/// parity: `isCommandBlockEnabled`, which is what stops a command block running its command. The
+/// cycle around it carries on either way: only the command is skipped.
+inline constexpr GameRule kCommandBlocksWork = GameRule::boolean("command_blocks_work", true);
 inline constexpr GameRule kMaxCommandForks = GameRule::integer("max_command_forks", 65536, 0);
 inline constexpr GameRule kSendCommandFeedback = GameRule::boolean("send_command_feedback", true);
 inline constexpr GameRule kLogAdminCommands = GameRule::boolean("log_admin_commands", true);

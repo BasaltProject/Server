@@ -267,7 +267,11 @@ TEST_CASE("which blocks can feed a circuit at all") {
     CHECK(redstone::isSignalSource(stateOf("trapped_chest")));
     CHECK_FALSE(redstone::isSignalSource(stateOf("chest")));
     CHECK_FALSE(redstone::isSignalSource(stateOf("stone")));
-    CHECK_FALSE(redstone::isSignalSource(stateOf("redstone_wire")));
+    // parity: `RedStoneWireBlock.isSignalSource` is true as well. Easy to miss, because every redstone
+    // path checks for the dust before it gets round to asking: the two that do ask are the plain rail
+    // turning a corner and `NaturalSpawner.isValidEmptySpawnBlock`, which is what stops a mob spawning
+    // on a piece of dust.
+    CHECK(redstone::isSignalSource(stateOf("redstone_wire")));
 
     CHECK(redstone::isWire(stateOf("redstone_wire")));
     CHECK_FALSE(redstone::isWire(stateOf("redstone_block")));

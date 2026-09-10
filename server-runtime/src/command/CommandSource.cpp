@@ -45,4 +45,22 @@ bool PlayerCommandSource::hasPermission(std::optional<std::string_view> node) co
     return node.has_value() && groups_->resolve(player_->group, *node);
 }
 
+CommandBlockSource::CommandBlockSource(std::array<double, 3> at, std::string name, bool speaks,
+                                       wire::common::Logger logger, wire::text::LangTable lang)
+    : at_(at), name_(std::move(name)), speaks_(speaks), logger_(std::move(logger)), lang_(std::move(lang)) {}
+
+wire::text::Component CommandBlockSource::displayName() const { return wire::text::Component::text(name_); }
+
+void CommandBlockSource::sendSystemMessage(const wire::text::Component& message) const {
+    if (!speaks_) {
+        return;
+    }
+    logger_.info([&] { return wire::text::resolvePlainText(message, lang_); });
+}
+
+bool CommandBlockSource::hasPermission(std::optional<std::string_view> node) const {
+    static_cast<void>(node);
+    return true;
+}
+
 } // namespace basalt::server::runtime::command

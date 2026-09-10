@@ -21,7 +21,7 @@ constexpr std::array kAll = {
     GameRule::boolean("block_drops", true),
     GameRule::boolean("block_explosion_drop_decay", true),
     GameRule::boolean("command_block_output", true),
-    GameRule::boolean("command_blocks_work", true),
+    gameRules::kCommandBlocksWork,
     GameRule::boolean("drowning_damage", true),
     GameRule::boolean("elytra_movement_check", true),
     GameRule::boolean("ender_pearls_vanish_on_death", true),
