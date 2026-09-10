@@ -494,8 +494,9 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         const Position at = reacting.front();
         reacting.pop_front();
         ++reacted;
-        for (const BlockChange& change : redstoneReactors::update(world, context.worldName, at[0], at[1], at[2],
-                                                                  context.gameTime, context.random, false)) {
+        for (const BlockChange& change :
+             redstoneReactors::update(world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random,
+                                      context.tntExplodes)) {
             reshaped(change.stateId, change.x, change.y, change.z);
             if (!change.effects.empty()) {
                 effects.push_back(change);

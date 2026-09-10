@@ -137,12 +137,27 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     }
                 }
             }
-            world::tripwires::press(world.state(), x, y, z, stillOn, world.gameTime(), scheduled);
+            // `checkPressed` ends in `setBlock(..., 3)` for the wire and for every hook `updateSource`
+            // reaches, so the line letting go has to settle the dust around it. Sending the squares
+            // as packets left a lamp lit for good once whoever stepped on the string walked away.
+            std::vector<world::BlockChange> pressed;
+            world::tripwires::press(world.state(), x, y, z, stillOn, world.gameTime(), pressed);
+            for (const world::BlockChange& moved : pressed) {
+                broadcaster_->announceRedstone(world, watchers, moved);
+            }
         }
         // parity: `TripWireHookBlock.tick`, the look the hook booked when a wire told it something.
         // Ten ticks later the string it was handed is gone for real, and the hook lets go.
+        //
+        // Every square `calculateState` writes goes out with flag 3 and the two hooks run
+        // `notifyNeighbors` on top, so this settles the dust around what moved instead of only
+        // redrawing it for the clients, which is what it used to do.
         if (here != 0 && world::tripwires::isHook(here)) {
-            world::tripwires::calculateHook(world.state(), x, y, z, world.gameTime(), scheduled);
+            std::vector<world::BlockChange> hook;
+            world::tripwires::calculateHook(world.state(), x, y, z, world.gameTime(), hook);
+            for (const world::BlockChange& moved : hook) {
+                broadcaster_->announceRedstone(world, watchers, moved);
+            }
         }
         // parity: `LecternBlock.tick`, the two ticks a page turn pulses for.
         if (const std::optional<world::BlockChange> lectern = world::lecterns::endPulse(world.state(), x, y, z);

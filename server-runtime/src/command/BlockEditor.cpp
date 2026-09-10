@@ -149,7 +149,8 @@ void BlockEditor::notifyNeighbours() {
                                                                   config::WorldDimension::Nether};
                 static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
             },
-        .gameTime = world_->gameTime()};
+        .gameTime = world_->gameTime(),
+        .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes)};
     for (const std::array<std::int32_t, 3>& at : positions) {
         const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
         // parity: `onPlace` runs inside the write, and everything `Level.setBlock` does afterwards is

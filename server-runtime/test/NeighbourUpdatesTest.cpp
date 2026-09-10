@@ -625,3 +625,24 @@ TEST_CASE("a lone neighbour east of the change is reached, and nothing beyond it
     CHECK(report.broken[0][1] == 9);
     CHECK(loaded.state.blockState(11, 64, 8) != air());
 }
+
+TEST_CASE("a signal arriving lights a tnt, and the game rule is what stops it") {
+    // parity: `TntBlock.neighborChanged` into `prime`. The cascade is the only path a redstone block
+    // put down by hand or by command takes, and it used to hand the reactors a hardcoded false for
+    // the `tnt_explodes` rule, so nothing a player could build ever lit one.
+    Loaded loaded;
+    loaded.put(8, 64, 8, stateOf("tnt", {{"unstable", "false"}}));
+    loaded.put(9, 64, 8, stateOf("redstone_block"));
+
+    Report report;
+    neighbourUpdates::afterChange(loaded.context(), 9, 64, 8, std::nullopt, report.effects, report.onBroken());
+    CHECK(loaded.state.blockState(8, 64, 8) == air());
+    CHECK(loaded.state.takePrimedTnt().size() == 1);
+
+    loaded.put(8, 64, 8, stateOf("tnt", {{"unstable", "false"}}));
+    neighbourUpdates::Context off = loaded.context();
+    off.tntExplodes = false;
+    neighbourUpdates::afterChange(off, 9, 64, 8, std::nullopt, report.effects, report.onBroken());
+    CHECK(loaded.state.blockState(8, 64, 8) != air());
+    CHECK(loaded.state.takePrimedTnt().empty());
+}

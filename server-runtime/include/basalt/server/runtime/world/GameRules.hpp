@@ -101,6 +101,10 @@ inline constexpr GameRule kFallDamage = GameRule::boolean("fall_damage", true);
 /// is: nothing lights and nothing is removed.
 inline constexpr GameRule kTntExplodes = GameRule::boolean("tnt_explodes", true);
 
+/// parity: `Block.popResource` and `Block.popExperience`, which are what every block break ends in.
+/// With this off a block still breaks and still goes: what it drops is what stops.
+inline constexpr GameRule kBlockDrops = GameRule::boolean("block_drops", true);
+
 /// parity: off in vanilla, which is why lava has no infinite pools.
 inline constexpr GameRule kLavaSourceConversion = GameRule::boolean("lava_source_conversion", false);
 

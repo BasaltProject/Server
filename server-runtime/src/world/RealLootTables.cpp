@@ -23,6 +23,23 @@ constexpr std::string_view kJsonSuffix = ".json";
     return path;
 }
 
+/// The block a wall-mounted one drops as, or nothing when it is not one of them. parity:
+/// `Blocks.wallVariant` gives it the standing block's loot table, so the jar carries no
+/// `blocks/redstone_wall_torch.json` at all. Dropping the `wall_` segment is the whole mapping.
+[[nodiscard]] std::optional<std::string> standingForm(const Identifier& block) {
+    if (block.namespaceName() != Identifier::kVanillaNamespace) {
+        return std::nullopt;
+    }
+    const std::string& path = block.path();
+    const std::size_t at = path.starts_with("wall_") ? 0 : path.find("_wall_");
+    if (at == std::string::npos) {
+        return std::nullopt;
+    }
+    std::string standing = path;
+    standing.erase(at == 0 ? 0 : at + 1, std::string_view{"wall_"}.size());
+    return standing;
+}
+
 } // namespace
 
 const LootTable* RealLootTables::byId(const Identifier& id) {
@@ -35,7 +52,10 @@ const LootTable* RealLootTables::forEntity(const Identifier& type) {
 }
 
 const LootTable* RealLootTables::forBlock(const Identifier& block) {
-    return read(block, std::string{kPrefix} + "blocks/" + block.path() + std::string{kJsonSuffix}, "drops nothing");
+    const std::optional<std::string> standing = standingForm(block);
+    const std::string& path = standing.value_or(block.path());
+    return read(standing.has_value() ? Identifier::vanilla(path) : block,
+                std::string{kPrefix} + "blocks/" + path + std::string{kJsonSuffix}, "drops nothing");
 }
 
 std::vector<Identifier> RealLootTables::ids() const {

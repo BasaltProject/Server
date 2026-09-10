@@ -89,6 +89,12 @@ public:
                          std::int32_t destroyedState);
 
 private:
+    /// The half of `announceRedstone` that is about a square rather than about a block: the dust
+    /// around it settles, what reacts reacts, and the components nearby book their turn. `arrived`
+    /// is `scheduleAround`'s, which only the square the change happened on can claim.
+    void settleFrom(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                    std::int32_t y, std::int32_t z, bool arrived) const;
+
     [[nodiscard]] std::int64_t nextSeed() const;
 
     player::PlayerRegistry* players_;

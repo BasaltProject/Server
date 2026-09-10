@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -89,6 +90,13 @@ inline constexpr std::string_view kComparatorOutputKey = "OutputSignal";
 
 /// parity: `BlockBehaviour.isSignalSource`, the blocks that can feed a circuit.
 [[nodiscard]] bool isSignalSource(std::int32_t stateId);
+
+/// The extra square this block tells when it changes, on top of the six its own write reaches.
+///
+/// parity: `LightningRodBlock.updateNeighbours` and `TripWireHookBlock.notifyNeighbors` both run an
+/// `updateNeighborsAt` on the square the block hangs on, which is `opposite(facing)`. Dust on the far
+/// side of that wall hears them go on and off, and with one step it never did.
+[[nodiscard]] std::optional<registry::BlockFace> alsoTells(std::int32_t stateId);
 
 /// Every position a change here can be felt at: the six neighbours, and through any of them that
 /// conducts, its own six.

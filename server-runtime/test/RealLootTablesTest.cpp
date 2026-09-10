@@ -136,3 +136,24 @@ TEST_CASE("without a jar nothing resolves and nothing is remembered") {
     CHECK(tables.forEntity(Identifier::vanilla("zombie")) == nullptr);
     CHECK(tables.ids().empty());
 }
+
+TEST_CASE("a wall-mounted block drops what the standing one drops") {
+    FakeJar jar;
+    jar.files["data/minecraft/loot_table/blocks/redstone_torch.json"] = std::string{kCobblestoneTable};
+    RealLootTables tables{jar.handle()};
+
+    // parity: `Blocks.wallVariant`. There is no `blocks/redstone_wall_torch.json` in the jar, so
+    // asking for one is asking for nothing: a torch knocked off its wall has to roll the standing
+    // block's table.
+    REQUIRE(tables.forBlock(Identifier::vanilla("redstone_wall_torch")) != nullptr);
+    CHECK(jar.requested.size() == 1);
+    CHECK(jar.requested.front() == "data/minecraft/loot_table/blocks/redstone_torch.json");
+    // The same table, cached under the standing name, so the pair costs one read between them.
+    CHECK(tables.forBlock(Identifier::vanilla("redstone_torch")) ==
+          tables.forBlock(Identifier::vanilla("redstone_wall_torch")));
+    CHECK(jar.requested.size() == 1);
+
+    // A block whose name merely ends in a wall is not one of them.
+    CHECK(tables.forBlock(Identifier::vanilla("cobblestone_wall")) == nullptr);
+    CHECK(jar.requested.back() == "data/minecraft/loot_table/blocks/cobblestone_wall.json");
+}
