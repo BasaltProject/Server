@@ -57,7 +57,11 @@ bool swapHotbar(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
 /// parity: `ShelfBlock.neighborChanged`: the signal flips `powered`, an unpowered shelf leaves its
 /// chain, and a powered one joins whatever is beside it.
 void reactToSignal(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-                   std::vector<BlockChange>& changes);
+                   std::int64_t gameTime, std::vector<BlockChange>& changes);
+
+/// parity: `ShelfBlockEntity.setChanged()`, which raises `BLOCK_ACTIVATE` on every write to its
+/// slots. No other container makes a noise when a hopper fills it: this one does.
+void slotsChanged(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime);
 
 /// parity: `getAllBlocksConnectedTo`, left to right: the shelves that share this one's chain, this
 /// one included. A shelf with no power is a chain of nothing.

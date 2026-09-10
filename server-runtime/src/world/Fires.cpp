@@ -77,15 +77,39 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     return difficulty == "normal" ? 2 : 3;
 }
 
+/// parity: `FireBlock.getStateForPlacement`. Fire standing on something that burns, or on a solid
+/// face, is the plain default state and shows no sides at all; only fire with neither under it
+/// reaches for its neighbours. There is no `down` property, which is the null the loop there skips.
+[[nodiscard]] std::map<std::string, std::string> fireSides(const WorldState& world, std::int32_t x, std::int32_t y,
+                                                           std::int32_t z) {
+    const std::int32_t below = stateAt(world, x, y - 1, z);
+    if (registry::fireOdds::igniteOdds(below) > 0 ||
+        registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up)) {
+        return {};
+    }
+    const auto burns = [](std::int32_t neighbour) {
+        return registry::fireOdds::igniteOdds(neighbour) > 0 ? "true" : "false";
+    };
+    return {{"up", burns(stateAt(world, x, y + 1, z))},
+            {"north", burns(stateAt(world, x, y, z - 1))},
+            {"south", burns(stateAt(world, x, y, z + 1))},
+            {"west", burns(stateAt(world, x - 1, y, z))},
+            {"east", burns(stateAt(world, x + 1, y, z))}};
+}
+
 /// Soul fire where the ground calls for it, ordinary fire everywhere else.
+///
+/// parity: `BaseFireBlock.getState`, and the state id comes from the block's **default**, not from
+/// the first of its palette: the five sides of a fire are `false` by default and `true` first.
 [[nodiscard]] std::optional<std::int32_t> fireFor(const WorldState& world, std::int32_t x, std::int32_t y,
                                                   std::int32_t z, std::int32_t age) {
     if (registry::blockConnections::isSoulFireBase(stateAt(world, x, y - 1, z))) {
         const registry::BlockState* soul = registry::blocks::named("soul_fire");
         return soul == nullptr ? std::nullopt : std::optional{soul->stateId};
     }
-    return registry::blockStateDefinitions::stateIdOf(wire::common::Identifier::vanilla("fire"),
-                                                      {{"age", std::to_string(age)}}, std::nullopt);
+    std::map<std::string, std::string> properties = fireSides(world, x, y, z);
+    properties.emplace("age", std::to_string(age));
+    return registry::blocks::stateIdOf(wire::common::Identifier::vanilla("fire"), properties);
 }
 
 /// parity: `FireBlock.getIgniteOdds(level, pos)`: the best of the six around an empty block.
@@ -208,8 +232,7 @@ bool ignite(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, r
     if (!existing.has_value() || *existing != registry::blocks::air().stateId) {
         return false;
     }
-    const std::optional<std::int32_t> fire =
-        registry::blockStateDefinitions::stateIdOf(wire::common::Identifier::vanilla("fire"), {}, std::nullopt);
+    const std::optional<std::int32_t> fire = fireFor(world, x, y, z, 0);
     if (!fire.has_value()) {
         return false;
     }

@@ -26,9 +26,11 @@ namespace {
     return block->stateId;
 }
 
+/// The block's **default** state with that age, which is the one with no sides showing: the first
+/// state of fire's palette has all five of them true.
 [[nodiscard]] std::int32_t fireAged(std::int32_t age) {
-    const std::optional<std::int32_t> stateId = registry::blockStateDefinitions::stateIdOf(
-        basalt::wire::common::Identifier::vanilla("fire"), {{"age", std::to_string(age)}}, std::nullopt);
+    const std::optional<std::int32_t> stateId =
+        registry::blocks::stateIdOf(basalt::wire::common::Identifier::vanilla("fire"), {{"age", std::to_string(age)}});
     REQUIRE(stateId.has_value());
     return *stateId;
 }

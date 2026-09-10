@@ -41,14 +41,14 @@ struct Around {
     /// The blocks whose state a move changed, for whoever tells the clients: a jukebox that has just
     /// been loaded and a bookshelf whose slot has just filled both look different afterwards.
     std::vector<BlockChange>* changes = nullptr;
+    /// parity: `ShelfBlockEntity.setChanged`, the one container that makes a noise when a hopper
+    /// touches it. A vibration is booked for the tick it arrives, so the turn has to be known.
+    std::int64_t gameTime = 0;
 };
 
-/// One hopper's turn. Answers whether anything moved, so the caller marks the chunk and tells
-/// whoever is looking at the two containers.
-///
-/// `random` is the world's, and it is a required parameter rather than something this reaches for:
-/// a hopper feeding a **composter** rolls the item's own chance, which is the one place a hopper is
-/// not deterministic.
+/// One hopper's turn, answering whether anything moved. `random` is the world's and is required
+/// rather than reached for: a hopper feeding a composter rolls the item's own chance, which is the
+/// one place a hopper is not deterministic.
 [[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
                         const Around& around = {});
 
@@ -58,7 +58,7 @@ struct Around {
 /// item a tick with **no cooldown**, never gives anything away, and asks about the square above its
 /// own middle rather than about a grid square, so half over a chest still counts. It also picks up
 /// what is lying in its own box, which a block hopper does not.
-[[nodiscard]] bool tickCart(WorldState& world, entity::ServerEntity& cart);
+[[nodiscard]] bool tickCart(WorldState& world, entity::ServerEntity& cart, std::int64_t gameTime);
 
 } // namespace hoppers
 

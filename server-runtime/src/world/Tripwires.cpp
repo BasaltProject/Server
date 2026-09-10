@@ -43,7 +43,7 @@ constexpr double kCrossingSlack = 0.0625;
 /// is asked first because a tripwire on a busy corridor raises one of these on every crossing.
 void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32_t y, std::int32_t z,
            std::int64_t gameTime) {
-    if (event.empty() || !world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+    if (event.empty() || !world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         return;
     }
     vibrations::emit(world, event, x + 0.5, y + 0.5, z + 0.5, gameTime);

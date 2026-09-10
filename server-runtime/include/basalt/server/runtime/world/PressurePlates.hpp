@@ -46,7 +46,7 @@ enum class Trigger : std::uint8_t {
 /// Answers the change, or nothing when it was already showing that. A pressed plate books its own
 /// turn, which is what checks whether whatever pressed it has gone.
 [[nodiscard]] std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                Trigger from, std::int32_t standing);
+                                                Trigger from, std::int32_t standing, std::int64_t gameTime = 0);
 
 /// Whether this position is inside the box that presses the plate at these coordinates.
 [[nodiscard]] bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,

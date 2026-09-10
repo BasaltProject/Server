@@ -72,10 +72,11 @@ void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
 
 /// parity: `Level.gameEvent(source, event, pos)`, which sends it from the middle of the square. The
 /// tracker is asked first because a door on a clock raises one of these every pulse and the search
-/// around a noise is a cube of seventeen a side.
+/// around a noise is a cube of thirty three a side, and it is asked for the **calibrated** radius:
+/// a calibrated sensor hears twice as far, so a narrower question deafens it past eight blocks.
 void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32_t y, std::int32_t z,
            std::int64_t gameTime) {
-    if (!world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+    if (!world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         return;
     }
     vibrations::emit(world, event, x + 0.5, y + 0.5, z + 0.5, gameTime);
@@ -347,7 +348,7 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     }
     if (shelves::isShelf(path)) {
         // parity: `ShelfBlock.neighborChanged`, which joins or breaks its chain with the signal.
-        shelves::reactToSignal(world, worldName, x, y, z, changes);
+        shelves::reactToSignal(world, worldName, x, y, z, gameTime, changes);
     }
 }
 

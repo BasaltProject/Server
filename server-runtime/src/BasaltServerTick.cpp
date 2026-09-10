@@ -165,10 +165,13 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             step("Inhabited-time tick", [this, &world, &region] { redstone_->tickInhabitedTime(world, region); });
             step("Fluid tick", [this, &world, &region] { redstone_->tickFluids(world, region); });
             step("Random block tick", [this, &world, &region] { redstone_->tickRandomBlocks(world, region); });
+            step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
+            // parity: `entityInside` is the entity's own turn, and `ServerLevel.tick` runs the
+            // entities **after** the block ticks. A plate that books its release before that pass
+            // loses a tick to it: vanilla writes twenty and this wrote nineteen.
             step("Pressure plate tick", [this, &world, &region] { redstone_->tickPressurePlates(world, region); });
             step("Arrow button tick", [this, &world, &region] { redstone_->tickArrowButtons(world, region); });
             step("Tripwire tick", [this, &world, &region] { redstone_->tickTripwires(world, region); });
-            step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
             // parity: `ServerLevel.tick` runs its block events after the block ticks and before the
             // entities, and skips them altogether while the world is frozen.
             step("Block event tick", [this, &world, &region] { redstone_->tickBlockEvents(world, region); });
@@ -208,7 +211,8 @@ void BasaltServer::tickPrimedTnt(world::LoadedWorld& world) {
                                                        playerRegistry_.allocateEntityId(), tntType->protocolId));
             // parity: `TntBlock.prime` raises `PRIME_FUSE` from the block's own square, so a sculk
             // sensor hears the tnt being lit at ten and not only the bang at fifteen.
-            if (world.state().hasSculkSensorNear(position[0], position[1], position[2], world::vibrations::kRange)) {
+            if (world.state().hasSculkSensorNear(position[0], position[1], position[2],
+                                                 world::vibrations::kCalibratedRange)) {
                 world::vibrations::emit(world.state(), lit.event, position[0] + 0.5, position[1] + 0.5,
                                         position[2] + 0.5, world.gameTime());
             }
@@ -474,7 +478,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             // parity: `MinecartHopper.tick` sucks after the movement, and with no cooldown at all:
             // a cart parked under a chest takes one item every tick it is enabled. It is no block
             // entity, so nothing it takes tells a comparator; the container it took from does.
-            static_cast<void>(world::hoppers::tickCart(world.state(), *entity));
+            static_cast<void>(world::hoppers::tickCart(world.state(), *entity, world.gameTime()));
             // parity: a detector rail looks for carts whose box touches its own, so the cart has to
             // ask every rail its box reaches and not only the one under its middle: it is on the
             // next rail a quarter of a block before its centre gets there.

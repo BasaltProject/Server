@@ -178,7 +178,7 @@ void tick(WorldState& world, std::int64_t seed, std::int64_t gameTime, std::int3
     // parity: `PotentSulfurBlockEntity`'s ticker raises `BLOCK_DEACTIVATE` when the geyser goes back
     // to sleep, and **only** then: starting up says nothing from here, because the noise of starting
     // is `onPlace`'s `BLOCK_ACTIVATE` and a geyser that was already there does not place itself.
-    if (turnedTo == "dormant" && world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+    if (turnedTo == "dormant" && world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         vibrations::emit(world, "block_deactivate", x + 0.5, y + 0.5, z + 0.5, gameTime);
     }
     scheduleTurn(world, seed, gameTime, x, y, z, turnedTo);

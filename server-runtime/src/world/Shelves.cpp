@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/SelectableSlots.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <cstdint>
 #include <deque>
@@ -299,7 +300,7 @@ bool swapHotbar(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
 }
 
 void reactToSignal(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-                   std::vector<BlockChange>& changes) {
+                   const std::int64_t gameTime, std::vector<BlockChange>& changes) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || !isShelf(pathOf(*stateId))) {
         return;
@@ -329,11 +330,29 @@ void reactToSignal(WorldState& world, std::string_view worldName, std::int32_t x
                                                    .source = wire::protocol::play::SoundSource::Blocks,
                                                    .volume = 1.0F,
                                                    .pitch = 1.0F}}});
+    // parity: the `gameEvent` beside the sound, which is what a sculk sensor beside a shelf hears.
+    if (world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        vibrations::emit(world, signal ? "block_activate" : "block_deactivate", static_cast<double>(x) + 0.5,
+                         static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, gameTime);
+    }
     if (signal) {
         connect(world, x, y, z, changes);
     } else {
         disconnect(world, x, y, z, changes);
     }
+}
+
+void slotsChanged(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                  const std::int64_t gameTime) {
+    if (!world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        return;
+    }
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !isShelf(pathOf(*stateId))) {
+        return;
+    }
+    vibrations::emit(world, "block_activate", static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
+                     static_cast<double>(z) + 0.5, gameTime);
 }
 
 std::vector<Position> chainAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {

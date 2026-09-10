@@ -152,9 +152,9 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
             !world::pressurePlates::isStandingOn(x, y, z, atX, atY, atZ)) {
             return;
         }
-        if (const std::optional<world::BlockChange> change =
-                world::pressurePlates::update(world.state(), x, y, z, world::pressurePlates::Trigger::Touched,
-                                              standingOn(world, x, y, z, watchers, items, movedThrough));
+        if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
+                world.state(), x, y, z, world::pressurePlates::Trigger::Touched,
+                standingOn(world, x, y, z, watchers, items, movedThrough), world.gameTime());
             change.has_value()) {
             broadcaster_->announceRedstone(world, watchers, *change);
         }
@@ -251,11 +251,17 @@ void RedstoneTickSystem::pressArrowButton(world::LoadedWorld& world, const std::
     if (!toggled.has_value()) {
         return;
     }
+    // parity: `checkPressed` raises `BLOCK_ACTIVATE` from the arrow, the same event a player's
+    // click raises.
+    if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
+        world::vibrations::emit(world.state(), "block_activate", x + 0.5, y + 0.5, z + 0.5, world.gameTime());
+    }
     // parity: `ButtonBlock.checkPressed` books the release, and books it again every turn an arrow
     // is still there.
+    // The turn goes under the button's own name, which is what the chunk saves.
     if (const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(*stateId);
         pressed.has_value()) {
-        world.state().scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("button"), *pressed);
+        world.state().scheduleBlockTick(x, y, z, *block, *pressed);
     }
     for (const world::BlockChange& change : toggled->changes) {
         broadcaster_->announceRedstone(world, watchers, change);
@@ -309,7 +315,7 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         if (!player->sneaking) {
             hearFootstep(world, *player);
         }
-        if (!world.state().hasSculkSensorNear(player->x, player->y, player->z, world::vibrations::kRange)) {
+        if (!world.state().hasSculkSensorNear(player->x, player->y, player->z, world::vibrations::kCalibratedRange)) {
             continue;
         }
         // parity: `SculkSensorBlock.stepOn`, which puts the step straight into the sensor under the
@@ -518,9 +524,9 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                 broadcaster_->notifyAround(world, watchersOf(world), x, y, z, std::nullopt);
             }};
     random::RandomSource random = freshRandom();
-    const std::vector<world::BlockChange> changes =
-        world::blockEntityTicks::tick(world.state(), world.name(), world.clock(), world.weather(), chunks, random,
-                                      hooks, config::dimensionFacts(world.declaration().dimension).hasSkylight);
+    const std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
+        world.state(), world.name(), world.clock(), world.weather(), world.gameTime(), chunks, random, hooks,
+        config::dimensionFacts(world.declaration().dimension).hasSkylight);
     if (changes.empty()) {
         return;
     }

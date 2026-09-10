@@ -121,7 +121,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             if (const std::optional<world::BlockChange> plate =
                     world::pressurePlates::update(world.state(), x, y, z, world::pressurePlates::Trigger::Scheduled,
                                                   standingOn(world, x, y, z, watchers, world.state().items(),
-                                                             std::numeric_limits<std::size_t>::max()));
+                                                             std::numeric_limits<std::size_t>::max()),
+                                                  world.gameTime());
                 plate.has_value()) {
                 scheduled.push_back(*plate);
             }
@@ -266,7 +267,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                  .recipeFor =
                      [this](server::world::crafting::Cooker cooker, const server::world::loot::ItemStack& stack) {
                          return recipes_ == nullptr ? nullptr : recipes_->cookingFor(cooker, stack);
-                     }});
+                     },
+                 .gameTime = world.gameTime()});
             if (!result.effects.empty()) {
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           result.effects);
@@ -414,7 +416,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (world::arrowButtons::heldByArrow(world.state(), x, y, z, here)) {
             if (const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(here);
                 pressed.has_value()) {
-                world.state().scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("button"), *pressed);
+                if (const wire::common::Identifier* button = server::registry::blockStateDefinitions::blockOf(here);
+                    button != nullptr) {
+                    world.state().scheduleBlockTick(x, y, z, *button, *pressed);
+                }
             }
             continue;
         }
@@ -422,6 +427,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             world::blockInteractions::release(world.state(), x, y, z);
         if (!released.has_value()) {
             continue;
+        }
+        // parity: the `BLOCK_DEACTIVATE` of `checkPressed`, which is the arrow's button letting go.
+        if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
+            world::vibrations::emit(world.state(), "block_deactivate", x + 0.5, y + 0.5, z + 0.5, world.gameTime());
         }
         // parity: `ButtonBlock.tick` into `updateNeighbours`: a button coming back up has to take
         // the signal with it, or whatever it powered stays on for good.
