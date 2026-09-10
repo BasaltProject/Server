@@ -447,6 +447,30 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                 rider->y = entity->y;
                 rider->z = entity->z;
             }
+            // parity: the activator rail, which tells the cart it is on every turn it is over one:
+            // a hopper cart stops while the rail is powered and a tnt cart lights its fuse.
+            entity::minecarts::activateOnRail(world.state(), *entity,
+                                              world.gameRules().get(world::gameRules::kTntExplodes));
+            // parity: `MinecartTNT.tick`, which counts the fuse down after the movement and blows up
+            // on the turn it reaches zero. The power is vanilla's own base plus what the speed adds.
+            if (entity->type().path() == "tnt_minecart" && entity->fuse >= 0) {
+                if (entity->fuse > 0) {
+                    --entity->fuse;
+                } else {
+                    entity->removed = true;
+                    if (world.gameRules().get(world::gameRules::kTntExplodes)) {
+                        const double speed = std::min(std::sqrt((entity->velocityX * entity->velocityX) +
+                                                                (entity->velocityZ * entity->velocityZ)),
+                                                      entity::minecarts::kTntCartSpeedCap);
+                        const double power = entity::minecarts::kTntCartPower + (random.nextDouble() * 1.5 * speed);
+                        explosions_->blowUp(world, watchers, entity->x, entity->y, entity->z, static_cast<float>(power),
+                                            "tnt", entity->entityId());
+                        world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z,
+                                                world.gameTime());
+                    }
+                    continue;
+                }
+            }
             // parity: `MinecartHopper.tick` sucks after the movement, and with no cooldown at all:
             // a cart parked under a chest takes one item every tick it is enabled. It is no block
             // entity, so nothing it takes tells a comparator; the container it took from does.

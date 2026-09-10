@@ -288,9 +288,21 @@ TEST_CASE("the comparator counts slots, not items") {
     data.putIntArray("disabled_slots", {5, 6});
     CHECK(crafters::comparatorSignal(data) == 4);
     CHECK(crafters::disabledSlots(data) == std::set<std::int32_t>{5, 6});
-    CHECK_FALSE(crafters::accepts(data, 5));
-    CHECK(crafters::accepts(data, 0));
-    CHECK(crafters::accepts(data, 8));
+    const ItemStack given{.item = item("stone"), .count = 1};
+    CHECK_FALSE(crafters::accepts(data, slots, 5, given));
+    // parity: `smallerStackExist`: slot 0 holds one and slot 2 is empty, so the one that takes the
+    // next item is the empty one further along and not the one that already has something.
+    CHECK_FALSE(crafters::accepts(data, slots, 0, given));
+    CHECK(crafters::accepts(data, slots, 2, given));
+    // A full slot takes nothing whatever comes after it.
+    CHECK_FALSE(crafters::accepts(data, slots, 1, given));
+
+    // With every enabled slot holding the same, the first one is the one that takes it.
+    blockInventory::Slots even(crafters::kSize);
+    for (std::int32_t slot = 0; slot < crafters::kSize; ++slot) {
+        even[static_cast<std::size_t>(slot)] = ItemStack{.item = item("stone"), .count = 2};
+    }
+    CHECK(crafters::accepts(data, even, 0, given));
 }
 
 TEST_CASE("a crafter away from the middle chunk crafts into its own neighbour") {
@@ -322,4 +334,27 @@ TEST_CASE("anything that is not a crafter is left alone") {
     CHECK_FALSE(crafters::onNeighbourChange(world, "overworld", 8, 64, 8).has_value());
     CHECK_FALSE(crafters::craft(world, 8, 64, 8, planks()).has_value());
     CHECK_FALSE(crafters::onNeighbourChange(world, "overworld", 300, 64, 300).has_value());
+}
+
+TEST_CASE("a slot is switched off only while it is empty") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    REQUIRE(world.setBlockState(8, 64, 8, crafter("false", "false")));
+    blockInventory::Slots slots(crafters::kSize);
+    slots[3] = ItemStack{.item = item("stone"), .count = 1};
+    nbt::NbtCompound data;
+    blockInventory::write(data, slots);
+    world.chunkIfLoaded(0, 0)->setBlockEntity(
+        basalt::server::world::ChunkBlockEntity{8, 64, 8, crafters::block(), data});
+
+    // parity: `slotCanBeDisabled` is the slot being empty, so the one with a stone in it keeps its
+    // switch wherever it was.
+    CHECK(crafters::setSlotState(world, 8, 64, 8, 0, false));
+    CHECK_FALSE(crafters::setSlotState(world, 8, 64, 8, 3, false));
+    CHECK(crafters::disabledSlots(dataAt(world, 8, 64, 8)) == std::set<std::int32_t>{0});
+
+    // Switching the same one off again moves nothing, and switching it back on does.
+    CHECK_FALSE(crafters::setSlotState(world, 8, 64, 8, 0, false));
+    CHECK(crafters::setSlotState(world, 8, 64, 8, 0, true));
+    CHECK(crafters::disabledSlots(dataAt(world, 8, 64, 8)).empty());
 }

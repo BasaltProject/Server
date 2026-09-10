@@ -76,7 +76,8 @@ void reportBlock(const CommandContext& context, const std::array<std::int32_t, 3
 
 } // namespace
 
-ItemCommand::ItemCommand() : Command("item", permissionLevel::kGamemasters) {}
+ItemCommand::ItemCommand(world::RealRecipes* recipes)
+    : Command("item", permissionLevel::kGamemasters), recipes_(recipes) {}
 
 void ItemCommand::build(const CommandNodeBuilder& root) const {
     /// The stack this form reads from, whether that is a container or another player.
@@ -106,7 +107,9 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
     };
 
     /// Copies a stack out of a block or a player and into the destination this form names.
-    const auto copyInto = [readSource](const CommandContext& context, bool entityTargets) -> Parsed<std::int32_t> {
+    world::RealRecipes* recipes = recipes_;
+    const auto copyInto = [readSource, recipes](const CommandContext& context,
+                                                bool entityTargets) -> Parsed<std::int32_t> {
         const Parsed<storage::StoredItemStack> source = readSource(context);
         if (!source.has_value()) {
             return std::unexpected{source.error()};
@@ -125,7 +128,7 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         }
         const std::array<std::int32_t, 3> at = blockAt(context, "pos");
         if (const std::optional<CommandSyntaxError> failure =
-                itemSlots::writeContainer(context, at, {{*slot, *source}});
+                itemSlots::writeContainer(context, at, {{*slot, *source}}, recipes);
             failure.has_value()) {
             return std::unexpected{*failure};
         }
@@ -180,7 +183,8 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         return static_cast<std::int32_t>(targets.size());
     };
 
-    const auto replaceInBlock = [tooBig](const CommandContext& context, std::int32_t count) -> Parsed<std::int32_t> {
+    const auto replaceInBlock = [tooBig, recipes](const CommandContext& context,
+                                                  std::int32_t count) -> Parsed<std::int32_t> {
         const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot", true);
         if (!slot.has_value()) {
             return std::unexpected{slot.error()};
@@ -195,7 +199,8 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         const std::array<std::int32_t, 3> at = blockAt(context, "pos");
         const storage::StoredItemStack stack{
             .id = parsed->id.toString(), .count = count, .components = parsed->components};
-        if (const std::optional<CommandSyntaxError> failure = itemSlots::writeContainer(context, at, {{*slot, stack}});
+        if (const std::optional<CommandSyntaxError> failure =
+                itemSlots::writeContainer(context, at, {{*slot, stack}}, recipes);
             failure.has_value()) {
             return std::unexpected{*failure};
         }

@@ -111,6 +111,10 @@ public:
     /// arrive.
     void clickContainerButton(std::int32_t button);
 
+    /// parity: `handleContainerSlotStateChanged`, which only the crafter listens to: it switches one
+    /// of its nine slots on or off, and a comparator counts a slot that is off as a full one.
+    void setSlotState(std::int32_t slot, bool enabled);
+
     /// Re-sends whatever the open block holds, for a change made on the server side.
     void syncOpenContainer();
 

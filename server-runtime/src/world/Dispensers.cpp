@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
@@ -49,8 +50,6 @@ constexpr double kSidewaysDrop = 0.15625;
 
 /// parity: the `(0, 0.1, 0)` offset a projectile leaves with, so it clears the block below.
 constexpr double kProjectileLift = 0.1;
-
-constexpr std::int32_t kMaxStack = 64;
 
 /// parity: the `15` vanilla passes with `LevelEvent.PARTICLES_AND_SOUND_PLANT_GROWTH`.
 constexpr std::int32_t kGrowthSparkles = 15;
@@ -420,6 +419,7 @@ struct Target {
     std::int32_t y = 0;
     std::int32_t z = 0;
     std::int32_t size = 0;
+    std::string path;
 };
 
 /// The container in front, or nothing when the block in front is not one.
@@ -438,20 +438,34 @@ struct Target {
     if (!size.has_value()) {
         return std::nullopt;
     }
-    return Target{.x = target.x, .y = target.y, .z = target.z, .size = *size};
+    return Target{.x = target.x, .y = target.y, .z = target.z, .size = *size, .path = std::string{block->path()}};
 }
 
 /// Puts one item of the stack into the container, answering whether a slot took it.
-[[nodiscard]] bool insertOne(WorldState& world, const Target& into, const ItemStack& stack) {
+[[nodiscard]] bool insertOne(WorldState& world, const Target& into, const ItemStack& stack, BlockFace from) {
     server::world::Chunk* chunk = world.chunkIfLoaded(into.x >> 4, into.z >> 4);
     server::world::ChunkBlockEntity* blockEntity =
         chunk == nullptr ? nullptr : chunk->blockEntityAt(into.x & 15, into.y, into.z & 15);
     if (blockEntity == nullptr) {
         return false;
     }
-    blockInventory::Slots slots = blockInventory::read(blockEntity->data(), into.size);
-    for (std::optional<ItemStack>& there : slots) {
-        if (there.has_value() && (there->item != stack.item || there->count >= kMaxStack)) {
+    blockInventory::Slots slots = blockInventory::readFor(into.path, blockEntity->data(), into.size);
+    // parity: `DropperBlock.dispenseFrom` hands the stack to `HopperBlockEntity.addItem`, so a
+    // dropper obeys the same doors a hopper does: the face, the slot's own rules, and the crafter's
+    // way of spreading what it is fed.
+    for (const std::int32_t slot : containers::slotsForFace(into.path, into.size, from)) {
+        if (slot < 0 || static_cast<std::size_t>(slot) >= slots.size()) {
+            continue;
+        }
+        std::optional<ItemStack>& there = slots[static_cast<std::size_t>(slot)];
+        if (there.has_value() && (there->item != stack.item || there->components != stack.components ||
+                                  there->count >= containers::maxStackFor(into.path, stack.item))) {
+            continue;
+        }
+        if (!containers::acceptsThroughFace(into.path, slot, stack.item, !there.has_value())) {
+            continue;
+        }
+        if (into.path == crafters::block().path() && !crafters::accepts(blockEntity->data(), slots, slot, stack)) {
             continue;
         }
         if (there.has_value()) {
@@ -459,7 +473,7 @@ struct Target {
         } else {
             there = ItemStack{.item = stack.item, .count = 1, .components = stack.components};
         }
-        blockInventory::write(blockEntity->data(), slots);
+        blockInventory::writeFor(into.path, blockEntity->data(), slots);
         chunk->markDirty();
         redstoneComponents::scheduleComparatorsAround(world, {}, into.x, into.y, into.z, comparatorReading::of(world));
         return true;
@@ -615,7 +629,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     }
     const std::optional<Target> into = containerInFront(world, x, y, z, *out, hooks);
     if (into.has_value()) {
-        if (!insertOne(world, *into, stack)) {
+        if (!insertOne(world, *into, stack, registry::opposite(*out))) {
             return result;
         }
     } else {

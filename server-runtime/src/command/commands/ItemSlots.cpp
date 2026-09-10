@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
@@ -166,7 +167,8 @@ std::vector<std::pair<std::int32_t, storage::StoredItemStack>> containerItems(co
 
 std::optional<CommandSyntaxError>
 writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>& at,
-               const std::vector<std::pair<std::int32_t, storage::StoredItemStack>>& written) {
+               const std::vector<std::pair<std::int32_t, storage::StoredItemStack>>& written,
+               world::RealRecipes* recipes) {
     const Parsed<world::LoadedWorld*> world = context.world();
     if (!world.has_value()) {
         return world.error();
@@ -228,6 +230,26 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         world::blockInventory::writeFor(existing->type().path(), data, one);
     } else {
         data.set("Items", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(entries)}));
+    }
+    // parity: `AbstractFurnaceBlockEntity.setItem`, which sets the cooking time from the ingredient
+    // it was handed and puts the progress back to zero. Every write to a furnace's slots goes through
+    // it, a command's included, so the invariant it leaves behind is kept here: while there is an
+    // input, the total is that input's own cooking time.
+    if (const std::optional<server::world::crafting::Cooker> cooker =
+            world::furnaces::cookerFor(existing->type().path());
+        cooker.has_value() && recipes != nullptr) {
+        world::furnaces::State state = world::furnaces::read(data);
+        if (state.items[world::furnaces::kInputSlot].has_value()) {
+            const std::int32_t wanted =
+                world::furnaces::cookTimeFor(state, [recipes, cooker](const server::world::loot::ItemStack& stack) {
+                    return recipes->cookingFor(*cooker, stack);
+                });
+            if (state.cookingTotalTime != wanted) {
+                state.cookingTotalTime = wanted;
+                state.cookingTimer = 0;
+                world::furnaces::write(state, data);
+            }
+        }
     }
     // Only the containers that say so: a hopper filled by command leaves its comparator none the
     // wiser, and a furnace speaks only for the slot it cooks from.

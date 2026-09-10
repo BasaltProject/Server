@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 
 #include <cstdint>
@@ -30,12 +31,14 @@ namespace basalt::server::runtime::command::commands::itemSlots {
 [[nodiscard]] std::vector<std::pair<std::int32_t, storage::StoredItemStack>>
 containerItems(const CommandContext& context, const std::array<std::int32_t, 3>& at);
 
-/// Writes stacks into a container's own `Items`, keeping whatever else its NBT carries.
+/// Writes stacks into a container's own `Items`, keeping whatever else its NBT carries. `replaced`
+/// slots are dropped first, which is what makes a write a replace.
 ///
-/// `replaced` slots are dropped first, which is what makes a write a replace rather than a second
-/// entry for the same slot.
+/// `recipes` is what a furnace needs: `AbstractFurnaceBlockEntity.setItem` sets the cooking time
+/// from the ingredient. A caller with no recipe book passes nothing and the furnace keeps its time.
 [[nodiscard]] std::optional<CommandSyntaxError>
 writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>& at,
-               const std::vector<std::pair<std::int32_t, storage::StoredItemStack>>& written);
+               const std::vector<std::pair<std::int32_t, storage::StoredItemStack>>& written,
+               world::RealRecipes* recipes = nullptr);
 
 } // namespace basalt::server::runtime::command::commands::itemSlots
