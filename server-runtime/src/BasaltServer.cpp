@@ -448,7 +448,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     static_cast<void>(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}),
                                                           x, y, z, 0.0F, "triggered", {}));
                 }},
-        BlockChangeBroadcaster::Options{.nextSeed = [] { return scratchSeed(); }});
+        BlockChangeBroadcaster::Options{.nextSeed = [] { return scratchSeed(); },
+                                        .blockTags = &vanillaData_.blockTags});
     explosions_ =
         std::make_unique<ExplosionSystem>(playerRegistry_, vanillaData_.lootTables, ExplosionSystem::Hooks{},
                                           ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },

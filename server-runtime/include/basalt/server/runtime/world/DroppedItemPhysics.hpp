@@ -50,6 +50,11 @@ public:
     /// And the vertical speed that counts as none, so a bounce is never mistaken for a rest.
     static constexpr double kRestingSpeed = 1.0e-3;
 
+    /// parity: `(this.tickCount + this.getId()) % 4 == 0`, the one tick in four on which an item
+    /// that is standing still moves anyway. Gravity is applied on the other three all the same, so
+    /// the speed it moves with on that fourth tick is four ticks' worth.
+    static constexpr std::int32_t kRestingMoveEvery = 4;
+
     DroppedItemPhysics(WorldMutex& mutex, entity::entityCollision::BlockAt blockAt)
         : mutex_(&mutex), blockAt_(std::move(blockAt)) {}
 

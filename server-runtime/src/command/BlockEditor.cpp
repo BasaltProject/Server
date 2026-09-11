@@ -15,6 +15,7 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -185,6 +186,21 @@ void BlockEditor::notifyNeighbours() {
                 if (environment_->options().summonGolem) {
                     environment_->options().summonGolem(*world_, world::golemPatterns::entityTypeOf(kind), gx, gy, gz);
                 }
+            },
+        // parity: `#minecraft:copper`, which is the copper golem's body. Looked up once and kept:
+        // `blockTagMembers` answers with a copy of the whole tag, and the pattern asks a few hundred
+        // times for one pumpkin.
+        .isCopper =
+            [this, members = std::optional<std::set<wire::common::Identifier>>{},
+             asked = false](std::int32_t stateId) mutable {
+                if (!asked) {
+                    asked = true;
+                    if (environment_->options().blockTagMembers) {
+                        members = environment_->options().blockTagMembers(wire::common::Identifier::vanilla("copper"));
+                    }
+                }
+                const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+                return block != nullptr && members.has_value() && members->contains(*block);
             },
         .gameTime = world_->gameTime(),
         .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes)};

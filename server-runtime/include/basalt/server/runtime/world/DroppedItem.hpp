@@ -34,6 +34,13 @@ struct DroppedItem {
     /// is caught again by its first move.
     stuckSpeed::Multiplier stuck;
 
+    /// How far it has fallen without landing.
+    ///
+    /// parity: `Entity.fallDistance`, which powder snow is the one block to read: over two and a
+    /// half blocks it turns into a lid the thing lands on. `makeStuckInBlock` puts it back to zero,
+    /// which is what lets the item through on the very next tick.
+    double fallDistance = 0.0;
+
     /// Ticks before anyone may pick this up.
     std::int32_t pickupDelay = kDefaultPickupDelay;
 

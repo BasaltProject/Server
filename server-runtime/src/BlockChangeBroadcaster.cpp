@@ -66,7 +66,8 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
 
 /// The world's own neighbour-update context, which is what the cascade reads off a world.
 [[nodiscard]] world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random,
-                                                         world::neighbourUpdates::Context::SummonGolem summonGolem) {
+                                                         world::neighbourUpdates::Context::SummonGolem summonGolem,
+                                                         world::golemPatterns::IsCopper isCopper) {
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     return world::neighbourUpdates::Context{
         .world = world.state(),
@@ -93,6 +94,7 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
                                                   stateId);
             },
         .summonGolem = std::move(summonGolem),
+        .isCopper = std::move(isCopper),
         .gameTime = world.gameTime(),
         .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
 }
@@ -109,11 +111,17 @@ void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,
                                           const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                                           std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed) {
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    const world::neighbourUpdates::Context context =
-        contextOf(world, random, [this, &world](world::golemPatterns::Golem kind, double gx, double gy, double gz) {
+    const world::neighbourUpdates::Context context = contextOf(
+        world, random,
+        [this, &world](world::golemPatterns::Golem kind, double gx, double gy, double gz) {
             if (hooks_.summonGolem) {
                 hooks_.summonGolem(world, world::golemPatterns::entityTypeOf(kind), gx, gy, gz);
             }
+        },
+        [this](std::int32_t stateId) {
+            const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+            return block != nullptr && options_.blockTags != nullptr &&
+                   world::realBlockTags::contains(*options_.blockTags, "minecraft:copper", *block);
         });
     std::vector<world::BlockChange> effects;
     world::neighbourUpdates::afterChange(

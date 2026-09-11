@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
+#include <basalt/server/runtime/world/CopperChests.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
@@ -502,7 +503,7 @@ constexpr double kGolemFootroom = 0.05;
     if (const std::string_view path = block->path(); path != "carved_pumpkin" && path != "jack_o_lantern") {
         return false;
     }
-    const std::optional<golemPatterns::Match> match = golemPatterns::find(world, x, y, z);
+    const std::optional<golemPatterns::Match> match = golemPatterns::find(world, x, y, z, context.isCopper);
     if (!match.has_value()) {
         return false;
     }
@@ -530,6 +531,25 @@ constexpr double kGolemFootroom = 0.05;
     for (std::size_t index = 0; index < match->cells.size(); ++index) {
         const std::array<std::int32_t, 3>& cell = match->cells[index];
         afterChange(context, cell[0], cell[1], cell[2], cleared[index], effects, broken, reshaped);
+    }
+    // parity: `replaceCopperBlockWithChest` is the last thing `trySpawnGolem` does, after the squares
+    // have already told their neighbours, and it writes with flag 2: the clients hear about it and
+    // nobody is asked again. Flag 2 still redraws the squares **around** it, which is what turns the
+    // chest beside it into the other half of a double one.
+    if (match->kind == golemPatterns::Golem::Copper) {
+        const wire::common::Identifier* body = registry::blockStateDefinitions::blockOf(match->bodyState);
+        const std::map<std::string, std::string> pumpkin =
+            registry::blockStateDefinitions::propertiesOf(match->pumpkinState);
+        const auto facing = pumpkin.find("facing");
+        if (body != nullptr && facing != pumpkin.end()) {
+            const std::optional<std::int32_t> chest =
+                copperChests::placedState(world, match->body[0], match->body[1], match->body[2],
+                                          copperChests::chestForBlock(body->path()), facing->second);
+            if (chest.has_value() && world.setBlockState(match->body[0], match->body[1], match->body[2], *chest)) {
+                reshaped(*chest, match->body[0], match->body[1], match->body[2]);
+                reshapeOnly(context, match->body[0], match->body[1], match->body[2], broken, reshaped);
+            }
+        }
     }
     return true;
 }

@@ -96,6 +96,9 @@ struct Context {
     WireReshape wireReshape;
     reshapes::GeyserReshape geyser;
     SummonGolem summonGolem;
+    /// parity: `#minecraft:copper`, the copper golem's body. A hook because the tag is read from the
+    /// operator's own jar and this layer has none; unset, a copper golem is never built.
+    golemPatterns::IsCopper isCopper;
     /// The world's clock, which the game events a reactor raises are stamped with: a door swinging
     /// is a `BLOCK_OPEN`, and a vibration knows which turn it was heard on.
     std::int64_t gameTime = 0;
