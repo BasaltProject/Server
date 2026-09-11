@@ -270,7 +270,11 @@ void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const wor
                                       std::int32_t bz) { dropBrokenBlock(world, bx, by, bz, stateId); },
         .onLanded = [this, &world,
                      &watchers](std::int32_t bx, std::int32_t by,
-                                std::int32_t bz) { notifyAround(world, watchers, bx, by, bz, std::nullopt); }};
+                                std::int32_t bz) { notifyAround(world, watchers, bx, by, bz, std::nullopt); },
+        .withinBorder =
+            [&world](std::int32_t bx, std::int32_t bz) {
+                return world.border().contains(static_cast<double>(bx), static_cast<double>(bz));
+            }};
     std::vector<world::BlockChange> effects;
     world::pistons::runEvent(context, event.x, event.y, event.z, event.first, event.second, effects);
     for (const world::BlockChange& effect : effects) {
@@ -304,7 +308,11 @@ BlockChangeBroadcaster::finishPiston(world::LoadedWorld& world, const std::array
                                       std::int32_t bz) { dropBrokenBlock(world, bx, by, bz, stateId); },
         .onLanded = [this, &world,
                      &watchers](std::int32_t bx, std::int32_t by,
-                                std::int32_t bz) { notifyAround(world, watchers, bx, by, bz, std::nullopt); }};
+                                std::int32_t bz) { notifyAround(world, watchers, bx, by, bz, std::nullopt); },
+        .withinBorder =
+            [&world](std::int32_t bx, std::int32_t bz) {
+                return world.border().contains(static_cast<double>(bx), static_cast<double>(bz));
+            }};
     return world::pistons::slideTick(
         context, position[0], position[1], position[2], nearby,
         [&watchers](const world::pistons::PlayerPosition& pushed) {

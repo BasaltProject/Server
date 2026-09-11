@@ -69,6 +69,10 @@ struct Context {
     /// Without it the tilled soil a piston covers never books the turn that gives way. Measured in
     /// `tierrapisada`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> onLanded;
+    /// Whether a square is inside the world border. parity: the very first question `isPushable`
+    /// asks, before it even looks at the block. A hook because the border belongs to the world and
+    /// this does not carry it; unset means "no border", which is what a test wants.
+    std::function<bool(std::int32_t x, std::int32_t z)> withinBorder;
 };
 
 [[nodiscard]] const wire::common::Identifier& block();

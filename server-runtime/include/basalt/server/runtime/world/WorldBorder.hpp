@@ -57,6 +57,12 @@ public:
     /// `damagePerBlock * (distance - buffer)`, with a floor of the per-block amount.
     [[nodiscard]] float damageAt(double x, double z) const;
 
+    /// Whether a square is inside the border at all.
+    ///
+    /// parity: `WorldBorder.isWithinBounds(double, double)`, which is closed on the low side and
+    /// open on the high one.
+    [[nodiscard]] bool contains(double x, double z) const;
+
     /// Called when a move finishes, so the stored size stops being the one it started from.
     void settle();
 
