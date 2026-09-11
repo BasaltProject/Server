@@ -89,8 +89,7 @@ world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::Ra
         // block below to say what the geyser is doing now.
         .geyser =
             [&world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
-                return world::geysers::validState(world.state(), world.metadata().seed, world.gameTime(), x, y, z,
-                                                  stateId);
+                return world::geysers::validState(world.state(), world.gameTime(), x, y, z, stateId);
             },
         .gameTime = world.gameTime(),
         .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};

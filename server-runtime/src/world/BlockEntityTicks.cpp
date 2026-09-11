@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
+#include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -94,7 +95,7 @@ namespace crafting = server::world::crafting;
 std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
                               const WorldWeather& weather, const std::int64_t gameTime,
                               const std::vector<std::array<std::int32_t, 2>>& chunks, random::RandomSource& random,
-                              const Hooks& hooks, bool hasSkylight) {
+                              const Hooks& hooks, bool hasSkylight, std::int64_t worldSeed) {
     std::vector<BlockChange> changes;
     // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
     if (clock.totalTicks() % daylightDetectors::kIntervalTicks == 0) {
@@ -133,6 +134,16 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (const std::optional<BlockChange> heard = vibrations::travelTick(world, x, y, z, gameTime);
                     heard.has_value()) {
                     changes.push_back(*heard);
+                }
+                continue;
+            }
+            // parity: `SERVER_WAITING_COUNTDOWN_TICKER`, the wait a periodic geyser keeps between
+            // going off and lying dormant: counted in the block entity, twenty ticks at a time.
+            if (path == "potent_sulfur") {
+                if (const std::optional<BlockChange> flipped =
+                        geysers::countdownTick(world, worldSeed, gameTime, x, y, z);
+                    flipped.has_value()) {
+                    changes.push_back(*flipped);
                 }
                 continue;
             }

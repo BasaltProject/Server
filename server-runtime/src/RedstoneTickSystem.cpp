@@ -458,6 +458,29 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
     return count;
 }
 
+namespace {
+
+/// parity: `Entity.checkInsideBlocks`, which walks the squares the box overlaps after deflating it
+/// by a ten-millionth so a box resting exactly on an edge is not inside the block beyond it.
+[[nodiscard]] std::vector<std::array<std::int32_t, 3>> squaresInside(double x, double y, double z, double half,
+                                                                     double height) {
+    constexpr double kEdgeSlack = 1.0e-7;
+    std::vector<std::array<std::int32_t, 3>> out;
+    for (std::int32_t bx = wire::common::mth::floor(x - half + kEdgeSlack);
+         bx <= wire::common::mth::floor(x + half - kEdgeSlack); ++bx) {
+        for (std::int32_t by = wire::common::mth::floor(y + kEdgeSlack);
+             by <= wire::common::mth::floor(y + height - kEdgeSlack); ++by) {
+            for (std::int32_t bz = wire::common::mth::floor(z - half + kEdgeSlack);
+                 bz <= wire::common::mth::floor(z + half - kEdgeSlack); ++bz) {
+                out.push_back({bx, by, bz});
+            }
+        }
+    }
+    return out;
+}
+
+} // namespace
+
 void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sched::Region& region) {
     std::vector<entity::ServerEntity*> falling;
     for (entity::ServerEntity* entity : world.state().entities()) {
@@ -471,6 +494,8 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     const bool hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight;
+    const double half = server::registry::entityTypeShapes::widthOf(world::fallingBlocks::entityType()) / 2.0;
+    const double height = server::registry::entityTypeShapes::heightOf(world::fallingBlocks::entityType());
     for (entity::ServerEntity* entity : falling) {
         const double wasX = entity->x;
         const double wasY = entity->y;
@@ -480,6 +505,20 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
             [&world, hasSkylight](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 return world::blockSurvival::isSupported(world.state(), x, y, z, stateId, {}, hasSkylight);
             });
+        // parity: `FrogspawnBlock.entityInside` is `destroyBlock(pos, false)` for a falling block and
+        // nothing else, and `checkInsideBlocks` runs inside the move, over the squares the box ends
+        // up touching: sand dropped through a nest of eggs takes it with it and drops nothing.
+        for (const std::array<std::int32_t, 3>& at : squaresInside(entity->x, entity->y, entity->z, half, height)) {
+            const std::optional<std::int32_t> here = world.state().blockState(at[0], at[1], at[2]);
+            if (!here.has_value() || server::registry::blockStateDefinitions::blockOf(*here) == nullptr ||
+                server::registry::blockStateDefinitions::blockOf(*here)->path() != "frogspawn") {
+                continue;
+            }
+            if (world.state().setBlockState(at[0], at[1], at[2], server::registry::blocks::air().stateId)) {
+                sendBlockUpdate(watchers, BlockPos{at[0], at[1], at[2]}, server::registry::blocks::air().stateId);
+                broadcaster_->notifyAround(world, watchers, at[0], at[1], at[2], *here);
+            }
+        }
         if (landed.placed.has_value()) {
             sendBlockUpdate(watchers, BlockPos{landed.placed->x, landed.placed->y, landed.placed->z},
                             landed.placed->stateId);
@@ -567,7 +606,7 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
     random::RandomSource random = freshRandom();
     std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
         world.state(), world.name(), world.clock(), world.weather(), world.gameTime(), chunks, random, hooks,
-        config::dimensionFacts(world.declaration().dimension).hasSkylight);
+        config::dimensionFacts(world.declaration().dimension).hasSkylight, world.metadata().seed);
     // parity: `PistonMovingBlockEntity` is a block entity like any other and ticks here, which is
     // why the jar books no turn while a piston slides. Every sliding square moves its own progress
     // along and lands itself.

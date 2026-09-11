@@ -524,7 +524,6 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world::BlockChange{.x = x, .y = y, .z = z, .stateId = server::registry::blocks::air().stateId});
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
-        world::geysers::tick(world.state(), world.metadata().seed, world.gameTime(), x, y, z, scheduled);
         world::scheduledBlocks::snifferEgg(world.state(), x, y, z, random, scheduled);
         if (!scheduled.empty()) {
             sendBlockUpdates(watchers, scheduled);

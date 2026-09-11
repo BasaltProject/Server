@@ -336,6 +336,12 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     // `powered` in the **block entity** and not in the state. What the rising edge sets off (loading
     // or saving a structure, starting a test) is not here: those need a structure or a test to run.
     if (path == "structure_block" || path == "test_block") {
+        // parity: `TestBlock.neighborChanged` does nothing at all for a block in `start` mode: that
+        // one is the source of the signal, and its `powered` is the test framework's to move. Only
+        // the modes that listen keep it from the world.
+        if (path == "test_block" && valueOf(properties, "mode") == "start") {
+            return;
+        }
         server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
         server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
         if (entity == nullptr) {
