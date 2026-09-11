@@ -63,6 +63,12 @@ struct Context {
     /// `Block.dropResources` on everything it destroys, so a torch or a piece of dust in the way is
     /// picked up afterwards rather than gone. Measured in the bench circuit `pistonrompe`.
     std::function<void(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z)> onDestroyed;
+    /// What a block that has just landed tells the squares around it. parity:
+    /// `PistonMovingBlockEntity.finalTick` writes with `Level.setBlock`'s flag sixty-seven, and the
+    /// one in there is `UPDATE_NEIGHBORS`: the six neighbours hear it and get their shape update.
+    /// Without it the tilled soil a piston covers never books the turn that gives way. Measured in
+    /// `tierrapisada`.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> onLanded;
 };
 
 [[nodiscard]] const wire::common::Identifier& block();

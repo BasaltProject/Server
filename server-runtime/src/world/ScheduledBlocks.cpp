@@ -19,6 +19,14 @@ namespace {
 
 /// parity: `ScaffoldingBlock`'s own reach, and `FrostedIceBlock`'s numbers.
 constexpr std::int32_t kScaffoldReach = 7;
+
+/// parity: `BaseCoralPlantTypeBlock.tryScheduleDieTick`, `60 + random.nextInt(40)`.
+constexpr std::int32_t kCoralGraceTicks = 60;
+constexpr std::int32_t kCoralGraceSpread = 40;
+
+/// parity: `LiquidBlock.BUBBLE_COLUMN_CHECK_DELAY` and `BubbleColumnBlock.updateShape`'s own five.
+constexpr std::int32_t kColumnCheckDelay = 20;
+constexpr std::int32_t kColumnStepDelay = 5;
 constexpr std::int32_t kFrostedMaxAge = 3;
 constexpr std::int32_t kFrostedNeighbours = 4;
 
@@ -232,6 +240,29 @@ const wire::common::Identifier& sugarCaneTickType() {
     return instance;
 }
 
+/// parity: `FarmlandBlock.canSurvive` over `shouldMaintainFarmland`, and `DirtPathBlock`'s, which is
+/// the same question without the crop.
+[[nodiscard]] bool soilIsCovered(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                 std::string_view path) {
+    const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
+    if (!above.has_value() || !registry::blockShapes::isSolidState(*above)) {
+        return false;
+    }
+    return path != "farmland" || !registry::blockConnections::maintainsFarmland(*above);
+}
+
+void scheduleCoveredSoil(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return;
+    }
+    const std::string path = pathOf(*stateId);
+    if ((path != "farmland" && path != "dirt_path") || !soilIsCovered(world, x, y, z, path)) {
+        return;
+    }
+    world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla(path), 1);
+}
+
 std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -241,12 +272,9 @@ std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::
     if (path != "farmland" && path != "dirt_path") {
         return std::nullopt;
     }
-    const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
-    if (!above.has_value() || !registry::blockShapes::isSolidState(*above)) {
-        return std::nullopt;
-    }
-    // parity: `shouldMaintainFarmland`, the crop that holds tilled soil together.
-    if (path == "farmland" && registry::blockConnections::maintainsFarmland(*above)) {
+    // parity: `FarmlandBlock.tick` asks again before it gives way; `DirtPathBlock.tick` does not,
+    // because nothing else books its turn.
+    if (path == "farmland" && !soilIsCovered(world, x, y, z, path)) {
         return std::nullopt;
     }
     const std::int32_t dirt = namedState("dirt");
@@ -256,17 +284,39 @@ std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::
     return dirt;
 }
 
+/// Whether this is live coral that is currently out of water.
+[[nodiscard]] bool coralIsDrying(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                 std::int32_t stateId, std::string_view path) {
+    if (!path.ends_with("coral") && !path.ends_with("coral_block") && !path.ends_with("coral_fan") &&
+        !path.ends_with("coral_wall_fan")) {
+        return false;
+    }
+    return !path.starts_with("dead_") && !waterAbout(world, x, y, z, stateId);
+}
+
+void scheduleCoralDeath(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return;
+    }
+    const std::string path = pathOf(*stateId);
+    if (!coralIsDrying(world, x, y, z, *stateId, path)) {
+        return;
+    }
+    // parity: `BaseCoralPlantTypeBlock.tryScheduleDieTick`, three seconds and a bit, never the same
+    // twice: coral out of water keeps its colour for a while before it goes white.
+    random::RandomSource random = random::RandomSource::legacy(seed);
+    world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla(path),
+                            kCoralGraceTicks + random.nextInt(kCoralGraceSpread));
+}
+
 std::optional<std::int32_t> coral(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
     }
     const std::string path = pathOf(*stateId);
-    if (!path.ends_with("coral") && !path.ends_with("coral_block") && !path.ends_with("coral_fan") &&
-        !path.ends_with("coral_wall_fan")) {
-        return std::nullopt;
-    }
-    if (path.starts_with("dead_") || waterAbout(world, x, y, z, *stateId)) {
+    if (!coralIsDrying(world, x, y, z, *stateId, path)) {
         return std::nullopt;
     }
     const std::string dead = "dead_" + path;
@@ -305,6 +355,37 @@ std::optional<std::int32_t> scaffolding(WorldState& world, std::int32_t x, std::
 
 bool scaffoldingHasFallen(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return scaffoldDistance(world, x, y, z) >= kScaffoldReach;
+}
+
+void scheduleScaffolding(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "scaffolding") {
+        return;
+    }
+    world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("scaffolding"), 1);
+}
+
+ScaffoldingTurn scaffoldingTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "scaffolding") {
+        return ScaffoldingTurn{};
+    }
+    const std::int32_t distance = scaffoldDistance(world, x, y, z);
+    // parity: `ScaffoldingBlock.tick` decides by the **new** distance, and tells apart a piece that
+    // was already at seven (it falls) from one that has just got there (it breaks).
+    if (distance >= kScaffoldReach) {
+        const bool wasOutOfReach = numberProperty(*stateId, "distance").value_or(0) >= kScaffoldReach;
+        return ScaffoldingTurn{.falls = wasOutOfReach, .breaks = !wasOutOfReach};
+    }
+    // parity: `ScaffoldingBlock.isBottom`, which a piece standing on the ground never is.
+    const bool bottom = distance > 0 && !isScaffolding(world, x, y - 1, z);
+    const std::optional<std::int32_t> reshaped = registry::blockStateDefinitions::stateIdOf(
+        wire::common::Identifier::vanilla("scaffolding"),
+        {{"distance", std::to_string(distance)}, {"bottom", bottom ? "true" : "false"}}, *stateId);
+    if (!reshaped.has_value() || *reshaped == *stateId || !world.setBlockState(x, y, z, *reshaped)) {
+        return ScaffoldingTurn{};
+    }
+    return ScaffoldingTurn{.reshaped = reshaped};
 }
 
 std::optional<BlockChange> frostedIceHeard(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
@@ -442,18 +523,34 @@ void scheduleFrogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::i
     world.scheduleBlockTick(x, y, z, frogspawnTickType(), kFrogspawnMinDelay + spread);
 }
 
-void scheduleSugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported) {
-    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (supported || !stateId.has_value() || pathOf(*stateId) != "sugar_cane") {
-        return;
-    }
-    world.scheduleBlockTick(x, y, z, sugarCaneTickType(), 1);
+bool booksItsOwnBreak(const std::string_view path) {
+    // parity: every class whose `updateShape` answers a neighbour with `scheduleTick(pos, this, 1)`
+    // and whose `tick` is `if (!canSurvive) destroyBlock(pos, true)`. Which sides wake them up is
+    // still `blockSurvival::loosenedBy`'s question; this is only about **when** they go.
+    static constexpr std::array<std::string_view, 15> kBooks{
+        "sugar_cane",          "cactus",         "big_dripleaf_stem",    "bamboo",
+        "chorus_plant",        "chorus_flower",  "pale_hanging_moss",    "kelp",
+        "kelp_plant",          "twisting_vines", "twisting_vines_plant", "weeping_vines",
+        "weeping_vines_plant", "cave_vines",     "cave_vines_plant"};
+    return std::ranges::find(kBooks, path) != kBooks.end();
 }
 
-void sugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported,
-               std::vector<BlockChange>& changes) {
+void scheduleBreakIfLoose(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (supported || !stateId.has_value() || pathOf(*stateId) != "sugar_cane") {
+    if (supported || !stateId.has_value() || !booksItsOwnBreak(pathOf(*stateId))) {
+        return;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr) {
+        return;
+    }
+    world.scheduleBlockTick(x, y, z, *block, 1);
+}
+
+void breakIfStillLoose(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported,
+                       std::vector<BlockChange>& changes) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (supported || !stateId.has_value() || !booksItsOwnBreak(pathOf(*stateId))) {
         return;
     }
     const std::int32_t empty = registry::blocks::air().stateId;
@@ -504,6 +601,29 @@ void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *cracked});
     scheduleHatch(world, x, y, z, random.nextLong());
+}
+
+void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> here = world.blockState(x, y, z);
+    if (!here.has_value()) {
+        return;
+    }
+    // parity: `BubbleColumnBlock.updateShape` books its own turn five ticks out, which is what
+    // carries a column up and what takes it apart when its source goes.
+    if (pathOf(*here) == "bubble_column") {
+        world.scheduleBlockTick(x, y, z, bubbleColumnTickType(), kColumnStepDelay);
+        return;
+    }
+    // parity: `LiquidBlock.tryScheduleBubbleBlockColumn`, twenty ticks (`BUBBLE_COLUMN_CHECK_DELAY`)
+    // booked on the **water**, not on the column: a source over soul sand or magma waits a whole
+    // second before the column appears. Doing it at once built the column on the spot.
+    if (*here != waterState()) {
+        return;
+    }
+    const std::string below = pathOf(world.blockState(x, y - 1, z).value_or(0));
+    if (below == "soul_sand" || below == "magma_block") {
+        world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("water"), kColumnCheckDelay);
+    }
 }
 
 void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,

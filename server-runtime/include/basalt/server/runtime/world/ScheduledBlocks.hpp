@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -31,6 +32,14 @@ namespace scheduledBlocks {
 
 [[nodiscard]] const wire::common::Identifier& sugarCaneTickType();
 
+/// parity: `FarmlandBlock.updateShape` and `DirtPathBlock`'s, which book a turn one tick out for the
+/// square **above** rather than giving way on the spot.
+void scheduleCoveredSoil(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: `BaseCoralPlantTypeBlock.tryScheduleDieTick`: coral out of water keeps its colour for
+/// sixty ticks and a bit before its turn turns it white.
+void scheduleCoralDeath(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed);
+
 /// parity: `FarmlandBlock.turnToDirt` and `DirtPathBlock.tick`, both of which give way to plain dirt
 /// when something solid lands on top rather than breaking.
 [[nodiscard]] std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::int32_t y,
@@ -39,6 +48,23 @@ namespace scheduledBlocks {
 /// parity: `CoralBlock.tick` and the three `BaseCoralPlantTypeBlock` ones: coral out of water turns
 /// into its dead twin instead of breaking.
 [[nodiscard]] std::optional<std::int32_t> coral(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: `ScaffoldingBlock.updateShape`, which rewrites nothing and books a turn one tick out for
+/// **any** neighbour that moved. The distance, the `bottom` and the fall all wait for that turn.
+void scheduleScaffolding(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// What `ScaffoldingBlock.tick` decides: nothing, a new shape, or that it is time to come down.
+struct ScaffoldingTurn {
+    /// The state it became, when only the distance or the `bottom` moved.
+    std::optional<std::int32_t> reshaped;
+    /// Set when the piece has to go: it was already out of reach, so it falls as an entity.
+    bool falls = false;
+    /// Set when the piece has to go and it was still in reach a moment ago, so it just breaks.
+    bool breaks = false;
+};
+
+/// parity: `ScaffoldingBlock.tick`, the turn the shape update booked.
+[[nodiscard]] ScaffoldingTurn scaffoldingTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: `ScaffoldingBlock.getDistance` and its `tick`: it counts out from whatever holds it, and
 /// at seven it comes down.
@@ -76,13 +102,20 @@ void scheduleHatch(WorldState& world, std::int32_t x, std::int32_t y, std::int32
 /// parity: `FrogspawnBlock.onPlace`, an hour or so away and never the same twice.
 void scheduleFrogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed);
 
-/// parity: `SugarCaneBlock.updateShape`, which books a turn one tick out rather than breaking the
-/// cane on the spot. `supported` is the answer `canSurvive` would give.
-void scheduleSugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported);
+/// Whether this block answers a neighbour that moved by booking a turn instead of breaking.
+///
+/// parity: `SugarCaneBlock.updateShape`, `CactusBlock.updateShape` and `BigDripleafStemBlock`'s,
+/// which are the same three lines: no `canSurvive` means a turn one tick out, and the turn is what
+/// breaks the block. A whole tower therefore comes apart one square per tick, not all at once.
+/// Measured in `cactuscana`.
+[[nodiscard]] bool booksItsOwnBreak(std::string_view path);
 
-/// parity: `SugarCaneBlock.tick`, the turn the cane booked: it breaks only if it still cannot stand.
-void sugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported,
-               std::vector<BlockChange>& changes);
+/// Books that turn. `supported` is the answer `canSurvive` would give.
+void scheduleBreakIfLoose(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported);
+
+/// The turn itself: it breaks only if the block still cannot stand.
+void breakIfStillLoose(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported,
+                       std::vector<BlockChange>& changes);
 
 /// parity: `FrogspawnBlock.tick`, which either breaks the spawn or hatches it away.
 ///
@@ -94,6 +127,10 @@ void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
 /// The sniffer that walks out of it waits for entities, like a turtle egg's turtle.
 void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
                 std::vector<BlockChange>& changes);
+
+/// parity: `LiquidBlock.tryScheduleBubbleBlockColumn`, twenty ticks booked on the water over soul
+/// sand or magma, and `BubbleColumnBlock.updateShape`'s five for a column that is already there.
+void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: `BubbleColumnBlock.updateColumn`: soul sand pushes a column up through the water above it
 /// and magma drags one down, and the column climbs while there is water to fill.

@@ -50,6 +50,24 @@ void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::i
     world.scheduleBlockTick(x, y, z, *block, kFallDelayTicks);
 }
 
+entity::ServerEntity* fallFrom(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                               const std::function<std::int32_t()>& allocateEntityId) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    const registry::EntityTypeEntry* type = registry::entityTypes::of(entityType());
+    if (!stateId.has_value() || type == nullptr) {
+        return nullptr;
+    }
+    if (!world.setBlockState(x, y, z, registry::blocks::air().stateId)) {
+        return nullptr;
+    }
+
+    // parity: `FallingBlockEntity.fall` spawns it at the middle of the block it left.
+    auto entity = std::make_unique<entity::ServerEntity>(allocateEntityId(), wire::common::Uuid::random(), entityType(),
+                                                         type->protocolId, x + 0.5, static_cast<double>(y), z + 0.5);
+    entity->objectData = *stateId;
+    return &world.spawnEntity(std::move(entity));
+}
+
 entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                    const std::function<std::int32_t()>& allocateEntityId) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -66,19 +84,7 @@ entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32
     if (!below.has_value() || !isFree(*below)) {
         return nullptr;
     }
-    const registry::EntityTypeEntry* type = registry::entityTypes::of(entityType());
-    if (type == nullptr) {
-        return nullptr;
-    }
-    if (!world.setBlockState(x, y, z, registry::blocks::air().stateId)) {
-        return nullptr;
-    }
-
-    // parity: `FallingBlockEntity.fall` spawns it at the middle of the block it left.
-    auto entity = std::make_unique<entity::ServerEntity>(allocateEntityId(), wire::common::Uuid::random(), entityType(),
-                                                         type->protocolId, x + 0.5, static_cast<double>(y), z + 0.5);
-    entity->objectData = *stateId;
-    return &world.spawnEntity(std::move(entity));
+    return fallFrom(world, x, y, z, allocateEntityId);
 }
 
 std::optional<BlockChange> tick(WorldState& world, entity::ServerEntity& entity) {
