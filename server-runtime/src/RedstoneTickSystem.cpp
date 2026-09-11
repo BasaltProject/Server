@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MiscGrowth.hpp>
+#include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
@@ -524,13 +525,32 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
                 broadcaster_->notifyAround(world, watchersOf(world), x, y, z, std::nullopt);
             }};
     random::RandomSource random = freshRandom();
-    const std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
+    std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
         world.state(), world.name(), world.clock(), world.weather(), world.gameTime(), chunks, random, hooks,
         config::dimensionFacts(world.declaration().dimension).hasSkylight);
+    // parity: `PistonMovingBlockEntity` is a block entity like any other and ticks here, which is
+    // why the jar books no turn while a piston slides. Every sliding square moves its own progress
+    // along and lands itself.
+    const std::vector<PlayerSession*> watchers = watchersOf(world);
+    for (const std::array<std::int32_t, 2>& position : chunks) {
+        const server::world::Chunk* chunk = world.state().chunkIfLoaded(position[0], position[1]);
+        if (chunk == nullptr || chunk->blockEntityCount() == 0) {
+            continue;
+        }
+        for (const server::world::ChunkBlockEntity& sliding : chunk->blockEntities()) {
+            if (sliding.type() != world::pistons::block()) {
+                continue;
+            }
+            const std::array<std::int32_t, 3> at{(position[0] << 4) + sliding.localX(), sliding.y(),
+                                                 (position[1] << 4) + sliding.localZ()};
+            const std::vector<world::BlockChange> landed = broadcaster_->finishPiston(world, at, watchers);
+            changes.insert(changes.end(), landed.begin(), landed.end());
+        }
+    }
+    world.state().clearSlidesStarted();
     if (changes.empty()) {
         return;
     }
-    const std::vector<PlayerSession*> watchers = watchersOf(world);
     for (const world::BlockChange& change : changes) {
         // parity: a block entity that rewrites its own block does it with `setBlock(..., 3)`, which
         // is `UPDATE_NEIGHBORS | UPDATE_CLIENTS`. Telling only the clients left the dust beside a

@@ -237,6 +237,8 @@ TEST_CASE("a hook that clicks tells a sculk sensor, and the click wins over the 
             for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
                 static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], now));
             }
+            // The travel is the block entity's own turn, which the world runs on every sensor.
+            static_cast<void>(vibrations::travelTick(world, 4, 64, 10, now));
         }
     };
 

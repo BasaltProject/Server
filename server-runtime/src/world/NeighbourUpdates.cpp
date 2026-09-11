@@ -638,57 +638,60 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             reacting.push_back({change.x, change.y, change.z});
         }
     }
-    // parity: `RailBlock.updateState`, the one case a rail re-bends on a neighbour change: a
-    // three-way junction with a signal arriving at it.
-    if (const std::optional<std::int32_t> changed = world.blockState(x, y, z); changed.has_value()) {
-        for (const BlockFace face : kUpdateOrder) {
-            const std::int32_t nx = x + registry::stepX(face);
-            const std::int32_t ny = y + registry::stepY(face);
-            const std::int32_t nz = z + registry::stepZ(face);
-            if (const std::optional<std::int32_t> bent =
-                    rails::onNeighbourChange(world, context.worldName, nx, ny, nz, *changed);
-                bent.has_value()) {
-                reshaped(*bent, nx, ny, nz);
-            }
-        }
-    }
     // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.
     const auto arm = [&context, &world](std::int32_t atX, std::int32_t atY, std::int32_t atZ) {
         return context.dispenser ? context.dispenser(world, atX, atY, atZ)
                                  : dispensers::onNeighbourChange(world, context.worldName, atX, atY, atZ);
     };
-    for (const BlockFace face : kUpdateOrder) {
-        if (const std::optional<BlockChange> armed =
-                arm(x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
-            armed.has_value()) {
-            reshaped(armed->stateId, armed->x, armed->y, armed->z);
-        }
-    }
-    if (const std::optional<BlockChange> armed = arm(x, y, z); armed.has_value()) {
-        reshaped(armed->stateId, armed->x, armed->y, armed->z);
-    }
-    // parity: `CrafterBlock.neighborChanged`, the same rising edge with its own four ticks.
-    if (const std::optional<BlockChange> armed = crafters::onNeighbourChange(world, context.worldName, x, y, z);
-        armed.has_value()) {
-        reshaped(armed->stateId, armed->x, armed->y, armed->z);
-    }
-    for (const BlockFace face : kUpdateOrder) {
-        if (const std::optional<BlockChange> armed =
-                crafters::onNeighbourChange(world, context.worldName, x + registry::stepX(face),
-                                            y + registry::stepY(face), z + registry::stepZ(face));
-            armed.has_value()) {
-            reshaped(armed->stateId, armed->x, armed->y, armed->z);
-        }
-    }
-    // parity: `PistonBaseBlock.checkIfExtend`, which books the move rather than making it now.
     const pistons::Context piston{.world = world,
                                   .worldName = context.worldName,
                                   .minY = context.minY,
                                   .maxY = context.maxY,
                                   .random = context.random};
+    // parity: `Level.updateNeighborsAt`, the six squares around one that changed, each hearing the
+    // whole of its own `neighborChanged`: the rail re-bends (`RailBlock.updateState`), the dispenser
+    // remembers it was triggered, the crafter does the same with its own four ticks, and the piston
+    // books its move (`PistonBaseBlock.checkIfExtend`).
+    const auto tellAround = [&](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
+        const std::optional<std::int32_t> source = world.blockState(cx, cy, cz);
+        for (const BlockFace face : kUpdateOrder) {
+            const std::int32_t nx = cx + registry::stepX(face);
+            const std::int32_t ny = cy + registry::stepY(face);
+            const std::int32_t nz = cz + registry::stepZ(face);
+            if (source.has_value()) {
+                if (const std::optional<std::int32_t> bent =
+                        rails::onNeighbourChange(world, context.worldName, nx, ny, nz, *source);
+                    bent.has_value()) {
+                    reshaped(*bent, nx, ny, nz);
+                }
+            }
+            if (const std::optional<BlockChange> armed = arm(nx, ny, nz); armed.has_value()) {
+                reshaped(armed->stateId, armed->x, armed->y, armed->z);
+            }
+            if (const std::optional<BlockChange> armed =
+                    crafters::onNeighbourChange(world, context.worldName, nx, ny, nz);
+                armed.has_value()) {
+                reshaped(armed->stateId, armed->x, armed->y, armed->z);
+            }
+            pistons::trigger(piston, nx, ny, nz);
+        }
+    };
+    tellAround(x, y, z);
+    if (const std::optional<BlockChange> armed = arm(x, y, z); armed.has_value()) {
+        reshaped(armed->stateId, armed->x, armed->y, armed->z);
+    }
+    if (const std::optional<BlockChange> armed = crafters::onNeighbourChange(world, context.worldName, x, y, z);
+        armed.has_value()) {
+        reshaped(armed->stateId, armed->x, armed->y, armed->z);
+    }
     pistons::trigger(piston, x, y, z);
-    for (const BlockFace face : kUpdateOrder) {
-        pistons::trigger(piston, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
+    // parity: and the same for every square a dust that moved reaches, which is the dust and its six
+    // squares (`DefaultRedstoneWireEvaluator.updatePowerStrength`). Without this a piston stuck to a
+    // line of dust never heard it light up: only the components did.
+    for (const BlockChange& change : settled) {
+        for (const std::array<std::int32_t, 3>& at : redstoneComponents::wireReach(change.x, change.y, change.z)) {
+            tellAround(at[0], at[1], at[2]);
+        }
     }
     // parity: `TripWireBlock.onPlace`, which tells the hooks at the ends of its line. Without it a
     // tripwire built by hand or by command hung there unattached until something stepped on it.

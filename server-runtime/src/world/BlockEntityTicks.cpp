@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <cstdint>
 #include <map>
@@ -126,6 +127,15 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             const std::int32_t y = stored.y();
             const std::int32_t z = (position[1] << 4) + stored.localZ();
             const std::string path{stored.type().path()};
+            // parity: `SculkSensorBlockEntity`'s ticker, which is `VibrationSystem.Ticker.tick`: a
+            // noise on its way moves a block closer every turn of the world and books nothing.
+            if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+                if (const std::optional<BlockChange> heard = vibrations::travelTick(world, x, y, z, gameTime);
+                    heard.has_value()) {
+                    changes.push_back(*heard);
+                }
+                continue;
+            }
             // parity: `JukeboxBlock.getTicker`, which only runs while there is a disc in.
             if (path == "jukebox") {
                 const std::optional<std::string> song = jukeboxes::songAt(world, x, y, z);

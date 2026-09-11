@@ -212,6 +212,15 @@ std::optional<std::int32_t> WorldState::queuedWriteAt(const std::int32_t worldX,
 
 void WorldState::queueBlockEvent(BlockEvent event) {
     const WorldWriteLock lock{mutex_};
+    // parity: `ServerLevel.blockEvents` is a set, so the same event booked twice in one turn happens
+    // once. A piston that hears two neighbours light up in the same tick moves once, not twice.
+    const bool already = std::ranges::any_of(blockEvents_, [&event](const BlockEvent& queued) {
+        return queued.x == event.x && queued.y == event.y && queued.z == event.z && queued.block == event.block &&
+               queued.first == event.first && queued.second == event.second;
+    });
+    if (already) {
+        return;
+    }
     blockEvents_.push_back(std::move(event));
 }
 
@@ -603,7 +612,26 @@ std::vector<std::array<std::int32_t, 3>> WorldState::dueFluidTicks() {
 }
 
 std::vector<std::array<std::int32_t, 3>> WorldState::dueBlockTicks() {
-    return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); }, true);
+    std::vector<std::array<std::int32_t, 3>> positions;
+    for (const DueTick& tick : dueBlockTicksTyped()) {
+        positions.push_back(std::array<std::int32_t, 3>{tick.x, tick.y, tick.z});
+    }
+    return positions;
+}
+
+std::vector<WorldState::DueTick> WorldState::dueBlockTicksTyped() {
+    const std::vector<std::array<std::int32_t, 3>> positions =
+        dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); }, true);
+    const WorldReadLock lock{mutex_};
+    std::vector<DueTick> due;
+    due.reserve(positions.size());
+    for (std::size_t index = 0; index < positions.size() && index < collectedBlockTicks_.size(); ++index) {
+        due.push_back(DueTick{.x = positions[index][0],
+                              .y = positions[index][1],
+                              .z = positions[index][2],
+                              .type = collectedBlockTicks_[index].type});
+    }
+    return due;
 }
 
 bool WorldState::willTickThisTick(std::int32_t x, std::int32_t y, std::int32_t z,
@@ -612,6 +640,23 @@ bool WorldState::willTickThisTick(std::int32_t x, std::int32_t y, std::int32_t z
     return std::ranges::any_of(collectedBlockTicks_, [&](const CollectedTick& one) {
         return one.x == x && one.y == y && one.z == z && one.type == type;
     });
+}
+
+void WorldState::noteSlideStarted(std::int32_t x, std::int32_t y, std::int32_t z) {
+    const WorldWriteLock lock{mutex_};
+    slidesStarted_.push_back(std::array<std::int32_t, 3>{x, y, z});
+}
+
+bool WorldState::slideStartedThisTick(std::int32_t x, std::int32_t y, std::int32_t z) const {
+    const WorldReadLock lock{mutex_};
+    return std::ranges::any_of(slidesStarted_, [x, y, z](const std::array<std::int32_t, 3>& at) {
+        return at[0] == x && at[1] == y && at[2] == z;
+    });
+}
+
+void WorldState::clearSlidesStarted() {
+    const WorldWriteLock lock{mutex_};
+    slidesStarted_.clear();
 }
 
 void WorldState::endBlockTicks() {

@@ -282,6 +282,8 @@ TEST_CASE("a sculk sensor hears a door swing, a gate swing and a note block, and
             for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
                 static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], now));
             }
+            // The travel is the block entity's own turn, which the world runs on every sensor.
+            static_cast<void>(vibrations::travelTick(world, 8, 64, 10, now));
         }
     };
 

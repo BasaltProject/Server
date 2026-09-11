@@ -334,6 +334,9 @@ TEST_CASE("a sculk sensor hears the piston, and hears what it crushed first") {
             for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
                 static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], loaded.now));
             }
+            // The travel is the block entity's own turn, which the world runs on every sensor.
+            static_cast<void>(vibrations::travelTick(world, 8, 64, 10, loaded.now));
+            static_cast<void>(vibrations::travelTick(world, 9, 64, 10, loaded.now));
         }
         CHECK(propertyOf(*world.blockState(8, 64, 10), "sculk_sensor_phase") == "active");
         CHECK(frequencyAt(world, 8, 64, 10) == 10);
@@ -355,6 +358,9 @@ TEST_CASE("a sculk sensor hears the piston, and hears what it crushed first") {
             for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
                 static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], loaded.now));
             }
+            // The travel is the block entity's own turn, which the world runs on every sensor.
+            static_cast<void>(vibrations::travelTick(world, 8, 64, 10, loaded.now));
+            static_cast<void>(vibrations::travelTick(world, 9, 64, 10, loaded.now));
         }
         // Both noises are heard on the same turn: the crushed torch is nearer, so it wins.
         CHECK(frequencyAt(world, 9, 64, 10) == 12);
@@ -374,6 +380,9 @@ TEST_CASE("a sculk sensor hears the piston, and hears what it crushed first") {
             for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
                 static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], loaded.now));
             }
+            // The travel is the block entity's own turn, which the world runs on every sensor.
+            static_cast<void>(vibrations::travelTick(world, 8, 64, 10, loaded.now));
+            static_cast<void>(vibrations::travelTick(world, 9, 64, 10, loaded.now));
         }
         CHECK(frequencyAt(world, 8, 64, 10) == 9);
     }
@@ -403,15 +412,11 @@ TEST_CASE("a powered piston books its move and says so with a sound") {
     CHECK(sound->pitch >= 0.6F);
     CHECK(sound->pitch < 0.85F);
 
-    // parity: the move lands two ticks later, and every call to dueBlockTicks is one tick. The turn
-    // in between belongs to the sliding square itself, which is where `PistonMovingBlockEntity.tick`
-    // moves its progress along.
-    const std::vector<std::array<std::int32_t, 3>> sliding = world.dueBlockTicks();
-    REQUIRE(sliding.size() == 1);
-    CHECK(sliding[0] == std::array<std::int32_t, 3>{9, 64, 8});
-    const std::vector<std::array<std::int32_t, 3>> due = world.dueBlockTicks();
-    REQUIRE(due.size() == 1);
-    CHECK(due[0] == std::array<std::int32_t, 3>{8, 64, 8});
+    // parity: the slide books nothing at all. Both turns of it are the block entity's own ticker
+    // (`PistonMovingBlockEntity.tick`), which is why the jar's chunk carries no pending tick while a
+    // piston moves.
+    CHECK(world.dueBlockTicks().empty());
+    CHECK(world.dueBlockTicks().empty());
 }
 
 TEST_CASE("a piston cannot be powered by what it is about to push") {
