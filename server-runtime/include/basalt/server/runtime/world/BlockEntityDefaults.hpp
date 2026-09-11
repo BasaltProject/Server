@@ -3,6 +3,9 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <cstdint>
+#include <optional>
+
 namespace basalt::server::runtime::world {
 
 /// What a block entity holds the moment it is put down, before anything has happened to it.
@@ -12,7 +15,10 @@ namespace basalt::server::runtime::world {
 /// half their fields. Only the types whose save writes unconditionally are here.
 namespace blockEntityDefaults {
 
-[[nodiscard]] wire::nbt::NbtCompound of(const wire::common::Identifier& block);
+/// The state is only needed by the two that copy a property into the block entity when they are
+/// built (`TestBlockEntity` and `StructureBlockEntity` both read `MODE` in their constructor).
+[[nodiscard]] wire::nbt::NbtCompound of(const wire::common::Identifier& block,
+                                        std::optional<std::int32_t> stateId = std::nullopt);
 
 } // namespace blockEntityDefaults
 

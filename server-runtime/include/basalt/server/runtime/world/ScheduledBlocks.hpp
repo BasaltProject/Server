@@ -50,6 +50,17 @@ namespace scheduledBlocks {
 
 /// parity: `FrostedIceBlock.tick`: it thins a step at a time in the light and takes its neighbours
 /// with it, and the ones that will not thin yet are asked again shortly.
+/// What a piece of frosted ice does when the neighbour that changed is more frosted ice: if it has
+/// fewer than two of them around, it melts whole.
+///
+/// parity: `FrostedIceBlock.neighborChanged`.
+[[nodiscard]] std::optional<BlockChange> frostedIceHeard(WorldState& world, std::int32_t x, std::int32_t y,
+                                                         std::int32_t z);
+
+/// The whole trail: every piece that melts tells its own six squares, and they melt too.
+void frostedIceChain(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                     std::vector<BlockChange>& changes);
+
 void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
                 std::vector<BlockChange>& changes, bool hasSkylight = true);
 

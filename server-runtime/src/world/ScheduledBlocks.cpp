@@ -20,6 +20,12 @@ namespace {
 constexpr std::int32_t kScaffoldReach = 7;
 constexpr std::int32_t kFrostedMaxAge = 3;
 constexpr std::int32_t kFrostedNeighbours = 4;
+
+/// parity: `FrostedIceBlock.neighborChanged` asks for `fewerNeigboursThan(level, pos, 2)`.
+constexpr std::int32_t kFrostedMeltNeighbours = 2;
+
+/// A trail of frost walker ice is at most a few hundred squares; this only stops a runaway.
+constexpr std::int32_t kFrostedChainLimit = 512;
 constexpr std::int32_t kFrostedRetry = 20;
 constexpr std::int32_t kMeltLight = 11;
 constexpr std::int32_t kDriedGhastMax = 3;
@@ -298,6 +304,47 @@ std::optional<std::int32_t> scaffolding(WorldState& world, std::int32_t x, std::
 
 bool scaffoldingHasFallen(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return scaffoldDistance(world, x, y, z) >= kScaffoldReach;
+}
+
+std::optional<BlockChange> frostedIceHeard(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+void frostedIceChain(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                     std::vector<BlockChange>& changes) {
+    // parity: melting is a `setBlockAndUpdate`, so each piece that goes tells its own six squares
+    // with the block that **was** there, which is more frosted ice: that is how a whole trail goes at
+    // once.
+    std::deque<std::array<std::int32_t, 3>> pending{{std::array<std::int32_t, 3>{x, y, z}}};
+    std::int32_t melted = 0;
+    while (!pending.empty() && melted < kFrostedChainLimit) {
+        const std::array<std::int32_t, 3> at = pending.front();
+        pending.pop_front();
+        for (const registry::BlockFace face : kAllFaces) {
+            const std::int32_t nx = at[0] + offsetX(face);
+            const std::int32_t ny = at[1] + offsetY(face);
+            const std::int32_t nz = at[2] + offsetZ(face);
+            if (const std::optional<BlockChange> gone = frostedIceHeard(world, nx, ny, nz); gone.has_value()) {
+                changes.push_back(*gone);
+                pending.push_back({nx, ny, nz});
+                ++melted;
+            }
+        }
+    }
+}
+
+std::optional<BlockChange> frostedIceHeard(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "frosted_ice") {
+        return std::nullopt;
+    }
+    // parity: `FrostedIceBlock.neighborChanged` melts it whole when fewer than two of its six squares
+    // are frosted ice too, and only when what changed is another piece of frosted ice.
+    if (neighbouringIce(world, x, y, z) >= kFrostedMeltNeighbours) {
+        return std::nullopt;
+    }
+    if (!world.setBlockState(x, y, z, waterState())) {
+        return std::nullopt;
+    }
+    return BlockChange{.x = x, .y = y, .z = z, .stateId = waterState()};
 }
 
 void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
