@@ -24,11 +24,33 @@ struct Kind {
     double gravity = 0.0;
     double drag = 0.0;
     bool sticks = false;
+    /// parity: `AbstractHurtingProjectile.accelerationPower`, which the inertia adds back along the
+    /// way it is going: a fireball speeds up instead of slowing down.
+    double acceleration = 0.0;
 };
 
 /// parity: `ProjectileItem.DispenseConfig`'s own defaults.
 inline constexpr float kDispenserPower = 1.1F;
 inline constexpr float kDispenserUncertainty = 6.0F;
+
+/// parity: `DispenserBlock.getDispensePosition(source, 0.7, (0, 0.1, 0))`, the default place a
+/// projectile leaves from.
+inline constexpr double kDispenserReach = 0.7;
+inline constexpr double kDispenserLift = 0.1;
+
+/// What a dispenser does with one item: which projectile, from where, and how hard.
+///
+/// parity: the `ProjectileItem.DispenseConfig` each item builds, which several of them override.
+struct DispenseShot {
+    const Kind* kind = nullptr;
+    double reach = kDispenserReach;
+    double lift = kDispenserLift;
+    float power = kDispenserPower;
+    float uncertainty = kDispenserUncertainty;
+    /// Whether the projectile travels with the stack it came from, saved as `Item`. An arrow keeps
+    /// its under the lowercase `item` of `AbstractArrow`, and a wind charge has none at all.
+    bool carries = true;
+};
 
 /// parity: `AbstractArrow.getDefaultGravity` and its 0.99 of air drag.
 [[nodiscard]] const Kind& arrow();
@@ -44,7 +66,7 @@ inline constexpr float kDispenserUncertainty = 6.0F;
 [[nodiscard]] std::span<const Kind> all();
 
 /// What a dispenser shoots for this item, or nothing when it just throws it.
-[[nodiscard]] const Kind* dispensed(const wire::common::Identifier& item);
+[[nodiscard]] std::optional<DispenseShot> dispensed(const wire::common::Identifier& item);
 
 /// The kind a flying entity of this type is, so a tick knows what it weighs.
 [[nodiscard]] const Kind* kindOf(const wire::common::Identifier& type);

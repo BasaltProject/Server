@@ -43,6 +43,12 @@ inline constexpr std::int32_t kMaxAge = 15;
 bool ignite(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
             const blockSurvival::ScaffoldingHasFallen& scaffoldingHasFallen = {}, bool hasSkylight = true);
 
+/// Puts fire where a small fireball landed, answering whether it caught.
+///
+/// parity: `SmallFireball.onHitBlock`, which asks only that the square be empty: unlike `ignite` it
+/// makes no survival check, so a fire with nothing under it is written and goes out on its own turn.
+bool igniteOnImpact(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t delay);
+
 /// Asks for the fire at these coordinates to act after the usual delay.
 void schedule(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random);
 

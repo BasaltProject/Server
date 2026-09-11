@@ -119,8 +119,10 @@ bool shouldCreateFromThunder(LoadedWorld& world, std::int32_t x, std::int32_t y,
     if (!below.has_value()) {
         return true;
     }
+    // parity: the test is against the tag `lightning_rods`, which is the eight stages of copper the
+    // rod oxidises through and not the one block: an exposed rod protects the same.
     const Identifier* block = reg::blockStateDefinitions::blockOf(*below);
-    return block == nullptr || block->path() != "lightning_rod";
+    return block == nullptr || !block->path().ends_with("lightning_rod");
 }
 
 MobSpawnForest buildActivationForest(entity::ServerEntity& horse, random::RandomSource& levelRandom,

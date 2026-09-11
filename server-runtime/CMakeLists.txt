@@ -248,6 +248,7 @@ basalt_module(server-runtime-core
         src/world/BlockEntityTicks.cpp
         src/world/Walls.cpp
         src/world/Waxing.cpp
+        src/world/WindBursts.cpp
         src/world/RedstoneWire.cpp
         src/world/Geysers.cpp
         src/world/Signs.cpp
@@ -1750,6 +1751,12 @@ basalt_test(server-runtime-dripleaves-test
 basalt_test(server-runtime-tripwires-test
     SOURCES
         test/TripwiresTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-wind-bursts-test
+    SOURCES
+        test/WindBurstsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

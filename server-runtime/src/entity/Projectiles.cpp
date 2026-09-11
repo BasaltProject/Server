@@ -7,7 +7,6 @@
 #include <memory>
 #include <numbers>
 #include <string_view>
-#include <unordered_map>
 
 namespace basalt::server::runtime::entity::projectiles {
 namespace {
@@ -17,16 +16,23 @@ constexpr double kSpreadPerUncertainty = 0.0172275;
 
 constexpr double kDegrees = 180.0 / std::numbers::pi;
 
-[[nodiscard]] Kind make(std::string_view path, double gravity, double drag, bool sticks) {
+/// parity: `AbstractHurtingProjectile.INITAL_ACCELERATION_POWER`, the misspelling included.
+constexpr double kAcceleration = 0.1;
+
+[[nodiscard]] Kind make(std::string_view path, double gravity, double drag, bool sticks, double acceleration = 0.0) {
     return Kind{.type = wire::common::Identifier::vanilla(std::string{path}),
                 .gravity = gravity,
                 .drag = drag,
-                .sticks = sticks};
+                .sticks = sticks,
+                .acceleration = acceleration};
 }
 
 /// parity: `AbstractArrow.onHitBlock` scales by a `0.05F`, and the float widened to a double is not
 /// the same number as `0.05`. The arrow ends up a fraction off otherwise.
 constexpr double kStuckBackoff = static_cast<double>(0.05F);
+
+/// parity: `Vec3.normalize`, which answers zero rather than dividing when the vector is this short.
+constexpr double kNormalizeFloor = 1.0E-4;
 
 /// parity: `Math.signum`, which is what vanilla backs the arrow off along and not the direction.
 [[nodiscard]] double signum(double value) { return value > 0.0 ? 1.0 : (value < 0.0 ? -1.0 : 0.0); }
@@ -46,7 +52,7 @@ const Kind& arrow() {
 }
 
 const Kind& fireball() {
-    static const Kind instance = make("fireball", 0.0, 0.95, false);
+    static const Kind instance = make("fireball", 0.0, 0.95, false, kAcceleration);
     return instance;
 }
 
@@ -56,39 +62,75 @@ const Kind& snowball() {
 }
 
 std::span<const Kind> all() {
-    static const std::array<Kind, 9> kinds{arrow(),
-                                           make("spectral_arrow", 0.05, 0.99, true),
-                                           snowball(),
-                                           make("egg", 0.03, 0.99, false),
-                                           make("ender_pearl", 0.03, 0.99, false),
-                                           make("experience_bottle", 0.07, 0.99, false),
-                                           make("potion", 0.05, 0.99, false),
-                                           fireball(),
-                                           make("small_fireball", 0.0, 0.95, false)};
+    static const std::array<Kind, 10> kinds{
+        arrow(), make("spectral_arrow", 0.05, 0.99, true), snowball(), make("egg", 0.03, 0.99, false),
+        make("ender_pearl", 0.03, 0.99, false), make("experience_bottle", 0.07, 0.99, false),
+        make("potion", 0.05, 0.99, false), fireball(), make("small_fireball", 0.0, 0.95, false, kAcceleration),
+        // parity: `AbstractWindCharge` neither slows down nor speeds up: inertia one, acceleration
+        // zeroed in its constructor.
+        make("wind_charge", 0.0, 1.0, false)};
     return kinds;
 }
 
-const Kind* dispensed(const wire::common::Identifier& item) {
-    /// parity: the items `DispenseItemBehavior.bootStrap` registers a projectile behaviour for. The
-    /// ones this build has no entity for (fireworks, wind charges, lingering potions) are not here
-    /// and fall back to being thrown as an item.
-    static const std::unordered_map<std::string_view, std::string_view> table{
-        {"arrow", "arrow"},
-        {"tipped_arrow", "arrow"},
-        {"spectral_arrow", "spectral_arrow"},
-        {"egg", "egg"},
-        {"blue_egg", "egg"},
-        {"brown_egg", "egg"},
-        {"snowball", "snowball"},
-        {"experience_bottle", "experience_bottle"},
-        {"splash_potion", "potion"},
+std::optional<DispenseShot> dispensed(const wire::common::Identifier& item) {
+    /// parity: the items `DispenseItemBehavior.bootStrap` registers a projectile behaviour for, each
+    /// with the `createDispenseConfig` its item overrides. The ones this build has no entity for
+    /// (fireworks and lingering potions) are not here and fall back to being thrown.
+    struct Entry {
+        std::string_view item;
+        std::string_view kind;
+        double reach = kDispenserReach;
+        double lift = kDispenserLift;
+        float power = kDispenserPower;
+        float uncertainty = kDispenserUncertainty;
+        bool carries = true;
     };
-    const auto found = table.find(item.path());
+
+    /// parity: `ThrowablePotionItem.createDispenseConfig`, a quarter harder and half as wide.
+    constexpr float kPotionPower = kDispenserPower * 1.25F;
+    constexpr float kPotionUncertainty = kDispenserUncertainty * 0.5F;
+    /// parity: `FireChargeItem.createDispenseConfig` and `WindChargeItem`'s, the same numbers: a
+    /// whole block out with no lift at all.
+    constexpr double kChargeReach = 1.0;
+    constexpr float kChargePower = 1.0F;
+    constexpr float kChargeUncertainty = 6.6666665F;
+    static const std::array<Entry, 11> table{
+        Entry{.item = "arrow", .kind = "arrow", .carries = false},
+        Entry{.item = "tipped_arrow", .kind = "arrow", .carries = false},
+        Entry{.item = "spectral_arrow", .kind = "spectral_arrow", .carries = false},
+        Entry{.item = "egg", .kind = "egg"},
+        Entry{.item = "blue_egg", .kind = "egg"},
+        Entry{.item = "brown_egg", .kind = "egg"},
+        Entry{.item = "snowball", .kind = "snowball"},
+        Entry{.item = "experience_bottle", .kind = "experience_bottle"},
+        Entry{.item = "splash_potion", .kind = "potion", .power = kPotionPower, .uncertainty = kPotionUncertainty},
+        Entry{.item = "wind_charge",
+              .kind = "wind_charge",
+              .reach = kChargeReach,
+              .lift = 0.0,
+              .power = kChargePower,
+              .uncertainty = kChargeUncertainty,
+              .carries = false},
+        Entry{.item = "fire_charge",
+              .kind = "small_fireball",
+              .reach = kChargeReach,
+              .lift = 0.0,
+              .power = kChargePower,
+              .uncertainty = kChargeUncertainty}};
+    const auto found = std::ranges::find_if(table, [&](const Entry& one) { return one.item == item.path(); });
     if (found == table.end()) {
-        return nullptr;
+        return std::nullopt;
     }
-    const auto kind = std::ranges::find_if(all(), [&](const Kind& one) { return one.type.path() == found->second; });
-    return kind == all().end() ? nullptr : &*kind;
+    const auto kind = std::ranges::find_if(all(), [&](const Kind& one) { return one.type.path() == found->kind; });
+    if (kind == all().end()) {
+        return std::nullopt;
+    }
+    return DispenseShot{.kind = &*kind,
+                        .reach = found->reach,
+                        .lift = found->lift,
+                        .power = found->power,
+                        .uncertainty = found->uncertainty,
+                        .carries = found->carries};
 }
 
 const Kind* kindOf(const wire::common::Identifier& type) {
@@ -125,6 +167,16 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
         return std::nullopt;
     }
 
+    // parity: `AbstractHurtingProjectile.applyInertia` adds the acceleration back along the way it
+    // is going before the drag, so a fireball settles at a speed rather than stopping. The other two
+    // families have no acceleration and the same line is their plain scale by the inertia.
+    const double speed = std::sqrt((entity.velocityX * entity.velocityX) + (entity.velocityY * entity.velocityY) +
+                                   (entity.velocityZ * entity.velocityZ));
+    if (kind.acceleration != 0.0 && speed >= kNormalizeFloor) {
+        entity.velocityX += (entity.velocityX / speed) * kind.acceleration;
+        entity.velocityY += (entity.velocityY / speed) * kind.acceleration;
+        entity.velocityZ += (entity.velocityZ / speed) * kind.acceleration;
+    }
     entity.velocityX *= kind.drag;
     entity.velocityY *= kind.drag;
     entity.velocityZ *= kind.drag;

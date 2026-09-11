@@ -196,6 +196,10 @@ public:
     /// What a thrown bottle leaves behind. parity: `ThrownSplashPotion`'s own contents.
     std::optional<std::string> potionEffect;
 
+    /// The item a projectile was made from, which it carries and saves. parity: `Fireball.setItem`
+    /// and `ThrowableItemProjectile.setItem`, whose stack reaches disk as `Item`.
+    std::optional<std::string> heldItem;
+
     /// How hard a fireball goes off where it lands. parity: `LargeFireball.explosionPower`.
     float explosionPower = 0.0F;
 

@@ -283,6 +283,14 @@ NbtCompound encode(const ServerEntity& entity) {
     if (entity.noGravity) {
         tag.putBoolean("NoGravity", true);
     }
+    // parity: `Fireball.addAdditionalSaveData` stores the stack it was made from under `Item`, and
+    // stores nothing when there is none: a ghast's own fireball comes from no item.
+    if (entity.heldItem.has_value()) {
+        wire::nbt::NbtCompound stack;
+        stack.putInt("count", 1);
+        stack.putString("id", Identifier::vanilla(*entity.heldItem).toString());
+        tag.set("Item", wire::nbt::NbtTag::ofCompound(std::move(stack)));
+    }
     tag.set("Pos", doubles(entity.x, entity.y, entity.z));
     tag.set("Motion", doubles(entity.velocityX, entity.velocityY, entity.velocityZ));
     tag.set("Rotation", floats(entity.yaw, entity.pitch));
@@ -441,6 +449,12 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->dying = entity->deathTime > 0;
     entity->fireTicks = numericInt(tag, "Fire");
     entity->noGravity = numericBoolean(tag, "NoGravity");
+    if (const NbtCompound* held = tag.getCompound("Item"); held != nullptr) {
+        const std::expected<Identifier, wire::common::IdentifierError> item = Identifier::parse(held->getString("id"));
+        if (item.has_value()) {
+            entity->heldItem = std::string{item->path()};
+        }
+    }
     const std::string_view path = type->path();
     entity->age = ageableMobs::usesBooleanBabyFlag(path) && numericBoolean(tag, "IsBaby") ? ageableMobs::kBabyStartAge
                                                                                           : numericInt(tag, "Age");
