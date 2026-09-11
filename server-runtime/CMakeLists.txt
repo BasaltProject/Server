@@ -321,6 +321,7 @@ basalt_module(server-runtime-core
         src/world/Shelves.cpp
         src/world/Shulkers.cpp
         src/world/SnowyBlocks.cpp
+        src/world/StuckSpeed.cpp
         src/world/Tripwires.cpp
         src/world/Vibrations.cpp
         src/world/VineGrowth.cpp
@@ -1284,6 +1285,16 @@ basalt_test(server-runtime-portal-index-test
 )
 
 target_compile_definitions(server-runtime-portal-index-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-random-sequences-test
+    SOURCES
+        test/RandomSequencesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-random-sequences-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 

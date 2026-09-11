@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/world/DroppedItemPhysics.hpp>
+#include <basalt/server/runtime/world/StuckSpeed.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
@@ -173,9 +174,23 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
     // parity: `ItemEntity.getDefaultGravity`, applied before the move rather than after it.
     item.velocityY -= kGravity;
 
+    // parity: `Entity.move` spends what caught it last tick on **this** move and then drops the
+    // speed to nothing. What holds the item is asked again after the move, not here.
+    double wantX = item.velocityX;
+    double wantY = item.velocityY;
+    double wantZ = item.velocityZ;
+    if (stuckSpeed::holds(item.stuck)) {
+        wantX *= item.stuck.x;
+        wantY *= item.stuck.y;
+        wantZ *= item.stuck.z;
+        item.stuck = stuckSpeed::Multiplier{};
+        item.velocityX = 0.0;
+        item.velocityY = 0.0;
+        item.velocityZ = 0.0;
+    }
+
     const entity::Aabb box = entity::Aabb::of(item.x, item.y, item.z, kItemWidth, kItemHeight);
-    const std::array<double, 3> moved =
-        entity::entityCollision::collide(blockAt_, box, item.velocityX, item.velocityY, item.velocityZ);
+    const std::array<double, 3> moved = entity::entityCollision::collide(blockAt_, box, wantX, wantY, wantZ);
     const double wasX = item.x;
     const double wasY = item.y;
     const double wasZ = item.z;
@@ -193,16 +208,25 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
     const std::int32_t underState = under.value_or(registry::blocks::air().stateId);
 
     // parity: `Entity.restituteMovementAfterCollisions` with no bounce: a stopped axis is zeroed.
-    const bool onGround = moved[1] != item.velocityY && item.velocityY < 0.0;
+    // It compares against what the move **asked** for, which a cobweb has already cut down.
+    const bool onGround = moved[1] != wantY && wantY < 0.0;
     const float bounciness = onGround ? registry::blockMovement::bouncinessOf(underState) * kItemBounceShare : 0.0F;
-    if (moved[0] != item.velocityX) {
+    if (moved[0] != wantX) {
         item.velocityX = 0.0;
     }
-    if (moved[2] != item.velocityZ) {
+    if (moved[2] != wantZ) {
         item.velocityZ = 0.0;
     }
-    if (moved[1] != item.velocityY) {
+    if (moved[1] != wantY) {
         item.velocityY = bounciness > 0.0F ? -item.velocityY * static_cast<double>(bounciness) : 0.0;
+    }
+
+    // parity: `checkInsideBlocks`, which runs inside the move and leaves behind what the next one
+    // gets multiplied by.
+    if (const std::optional<stuckSpeed::Multiplier> caught =
+            stuckSpeed::caughtBy(blockAt_, box.move(moved[0], moved[1], moved[2]), moved[0], moved[1], moved[2]);
+        caught.has_value()) {
+        item.stuck = *caught;
     }
 
     // parity: `ItemEntity.tick`'s own drag: the air takes its share every tick, and the block

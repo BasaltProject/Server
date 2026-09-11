@@ -43,6 +43,10 @@ public:
 
     [[nodiscard]] bool isWorldgenView() const noexcept { return bitAlgorithms_; }
 
+    /// Where a xoroshiro source stands right now. parity: `Xoroshiro128PlusPlus.CODEC`, two longs
+    /// and nothing else: the half-drawn gaussian is not part of what vanilla writes down either.
+    [[nodiscard]] Seed128bit xoroshiroState() const noexcept { return generator_.state(); }
+
     [[nodiscard]] RandomSource fork() noexcept;
 
     [[nodiscard]] PositionalRandomFactory forkPositional() noexcept;
