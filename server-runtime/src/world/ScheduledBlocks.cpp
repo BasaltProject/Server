@@ -4,6 +4,7 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 
 #include <algorithm>
@@ -380,7 +381,8 @@ void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     }
 }
 
-void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes) {
+void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
+                std::vector<BlockChange>& changes) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -408,6 +410,12 @@ void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
         return;
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *changed});
+    // parity: `DriedGhastBlock.tick` raises `BLOCK_CHANGE` on both sides of the clock, hydrating and
+    // drying, so a sculk sensor beside one hears it change.
+    if (world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        vibrations::emit(world, "block_change", static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
+                         static_cast<double>(z) + 0.5, gameTime);
+    }
     world.scheduleBlockTick(x, y, z, driedGhastTickType(), kDriedGhastDelay);
 }
 

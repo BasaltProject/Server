@@ -283,7 +283,11 @@ void add(Slots& slots, const ItemStack& stack) {
 /// item in composts it there and then: `setChanged` is what calls `addItem`.
 [[nodiscard]] bool compost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace face,
                            Slots& slots, random::RandomSource& random, const std::int64_t gameTime) {
-    if (face != registry::BlockFace::Up || !composters::levelAt(world, x, y, z).has_value()) {
+    // parity: `ComposterBlock.getContainer` hands out an `InputContainer` **only** while the level is
+    // under seven: at seven it is an `EmptyContainer` and at eight an `OutputContainer`. A hopper on
+    // top of a composter that is full or ready puts nothing in, and this one was eating the item.
+    const std::optional<std::int32_t> level = composters::levelAt(world, x, y, z);
+    if (face != registry::BlockFace::Up || !level.has_value() || *level >= composters::kFull) {
         return false;
     }
     for (std::optional<ItemStack>& slot : slots) {
