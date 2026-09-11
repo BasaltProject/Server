@@ -420,7 +420,9 @@ public final class ContentSpecs {
             Map<String, Object> fields = new LinkedHashMap<>();
             Map<String, Object> target = Nbt.map(map.get("target"));
             if (target != null && target.get("pos") instanceof int[] pos && pos.length == 3) {
-                World world = Bukkit.getWorld(org.bukkit.NamespacedKey.fromString(Nbt.string(target, "dimension", "")));
+                org.bukkit.NamespacedKey dimension = org.bukkit.NamespacedKey.fromString(
+                    Nbt.string(target, "dimension", ""));
+                World world = dimension == null ? null : Bukkit.getWorld(dimension);
                 fields.put("location", new Location(world, pos[0], pos[1], pos[2]));
             }
             fields.put("tracked", Nbt.flag(map, "tracked", true));
