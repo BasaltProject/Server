@@ -123,11 +123,25 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
 /// distance, and anything else as seven. At seven the leaves are decaying, and a random tick is what
 /// actually drops them.
 [[nodiscard]] std::optional<std::int32_t> retreeLeaves(WorldState& world, std::int32_t x, std::int32_t y,
-                                                       std::int32_t z, std::int32_t stateId) {
+                                                       std::int32_t z, std::int32_t stateId,
+                                                       std::optional<BlockFace> towards) {
     // parity: `LeavesBlock.updateShape` does **not** rewrite the leaves: it books a turn and answers
     // the state it was given. The distance moves one tick later, in `LeavesBlock.tick`.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
+        return std::nullopt;
+    }
+    // parity: the jar reads the **one** neighbour that moved, not the six, and books unless that
+    // neighbour is a trunk these leaves already sit against. So a plank laid beside a leaf already
+    // one block from its log still books a turn that changes nothing, and that turn is measurable.
+    if (towards.has_value()) {
+        const std::int32_t fromNeighbour =
+            distanceOf(stateAt(world, x + registry::stepX(*towards), y + registry::stepY(*towards),
+                               z + registry::stepZ(*towards))) +
+            1;
+        if (fromNeighbour != 1 || distanceOf(stateId) != fromNeighbour) {
+            world.scheduleBlockTick(x, y, z, *block, 1);
+        }
         return std::nullopt;
     }
     if (leafDistance(world, x, y, z) != distanceOf(stateId)) {
@@ -297,10 +311,10 @@ std::int32_t leafDistance(const WorldState& world, std::int32_t x, std::int32_t 
 }
 
 std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                                    std::int32_t stateId) {
+                                    std::int32_t stateId, std::optional<BlockFace> towards) {
     WorldState& world = context.world;
     if (registry::blockConnections::isLeaves(stateId)) {
-        return retreeLeaves(world, x, y, z, stateId);
+        return retreeLeaves(world, x, y, z, stateId, towards);
     }
     if (registry::blockConnections::isStairs(stateId)) {
         return turnStairs(world, x, y, z, stateId);
@@ -385,7 +399,7 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
         other.has_value()) {
         return other;
     }
-    return connect(context, x, y, z, *stateId);
+    return connect(context, x, y, z, *stateId, towards);
 }
 
 void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
