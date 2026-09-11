@@ -50,9 +50,10 @@ struct Loaded {
 
 /// Puts the block down and asks what its own shape makes of it.
 [[nodiscard]] std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                  std::int32_t stateId, const reshapes::GeyserReshape& geyser = {}) {
+                                                  std::int32_t stateId, const reshapes::GeyserReshape& geyser = {},
+                                                  std::optional<registry::BlockFace> towards = std::nullopt) {
     REQUIRE(world.setBlockState(x, y, z, stateId));
-    return reshapes::of(world, x, y, z, stateId, geyser);
+    return reshapes::of(world, x, y, z, stateId, geyser, towards);
 }
 
 } // namespace
@@ -125,13 +126,17 @@ TEST_CASE("a door half follows the other half and dies without it") {
     const std::int32_t lower = stateOf("oak_door", lowerProperties);
     REQUIRE(world.setBlockState(8, 65, 8, upper));
 
-    const std::optional<std::int32_t> followed = reshape(world, 8, 64, 8, lower);
+    // parity: a door only follows its other half, or comes apart, when the news arrives from the
+    // square that half stands in: up for the lower one and down for the upper one.
+    const std::optional<std::int32_t> followed = reshape(world, 8, 64, 8, lower, {}, registry::BlockFace::Up);
     REQUIRE(followed.has_value());
     CHECK(propertyOf(*followed, "half") == "lower");
     CHECK(propertyOf(*followed, "open") == "true");
 
+    CHECK_FALSE(reshape(world, 8, 64, 8, lower, {}, registry::BlockFace::North).has_value());
+
     REQUIRE(world.setBlockState(8, 65, 8, air()));
-    const std::optional<std::int32_t> gone = reshape(world, 8, 64, 8, lower);
+    const std::optional<std::int32_t> gone = reshape(world, 8, 64, 8, lower, {}, registry::BlockFace::Up);
     REQUIRE(gone.has_value());
     CHECK(*gone == air());
 }
@@ -182,7 +187,8 @@ TEST_CASE("the upper half of a door follows the lower one") {
     upperProperties.emplace("open", "false");
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("oak_door", lowerProperties)));
 
-    const std::optional<std::int32_t> followed = reshape(world, 8, 65, 8, stateOf("oak_door", upperProperties));
+    const std::optional<std::int32_t> followed =
+        reshape(world, 8, 65, 8, stateOf("oak_door", upperProperties), {}, registry::BlockFace::Down);
     REQUIRE(followed.has_value());
     CHECK(propertyOf(*followed, "half") == "upper");
     CHECK(propertyOf(*followed, "open") == "true");

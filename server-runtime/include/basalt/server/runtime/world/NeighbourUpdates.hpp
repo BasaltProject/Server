@@ -150,6 +150,12 @@ void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std:
 /// begin with, which is `server::world::leafDistances`' job when the chunk arrives.
 [[nodiscard]] std::int32_t leafDistance(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
+/// The booked turn a piece of leaves gives itself when what is around it moves: this is where the
+/// distance is written, one tick after the shape update that booked it.
+///
+/// parity: `LeavesBlock.tick`, which is `setBlock(pos, updateDistance(state, level, pos), 3)`.
+[[nodiscard]] std::optional<BlockChange> leafTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
 } // namespace neighbourUpdates
 
 } // namespace basalt::server::runtime::world

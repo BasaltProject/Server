@@ -178,6 +178,13 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
         return facing.has_value() ? std::optional{only(*facing)} : std::nullopt;
     }
+    // parity: `DoorBlock.updateShape`, which asks `canSurvive` only for the lower half and only when
+    // the news comes from **below**. The upper half never falls for lack of support: what takes it is
+    // its own half coming apart, which the reshape does.
+    if (path.ends_with("_door") && !path.ends_with("_trapdoor")) {
+        return valueOf(stateId, "half") == "lower" ? std::optional{only(BlockFace::Down)}
+                                                   : std::optional{std::uint8_t{0}};
+    }
     // parity: `CeilingHangingSignBlock`, `SporeBlossomBlock`, `HangingRootsBlock`,
     // `MangrovePropaguleBlock`, `DirtPathBlock` and `FarmlandBlock`, all gated on `UP`.
     const bool ceilingSign = path.ends_with("_hanging_sign") && !path.ends_with("_wall_hanging_sign");
@@ -247,6 +254,43 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(below);
         return registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up) ||
                (block != nullptr && block->path() == "hopper");
+    }
+    // parity: `BaseTorchBlock.canSurvive` is `canSupportCenter(below, UP)` and
+    // `WallTorchBlock.canSurvive` is `isFaceSturdy` on the wall it hangs from: both are questions
+    // about the **state** next door, and the table of block ids answers them wrong for a block whose
+    // collision box is full but whose support shape is empty. Leaves are the one that shows it: the
+    // jar drops a torch put on them and this build left it standing.
+    if (path == "torch" || path == "soul_torch" || path == "redstone_torch") {
+        return registry::blockShapes::supportsCentre(stateAt(world, x, y - 1, z), registry::BlockFace::Up);
+    }
+    if (path == "wall_torch" || path == "soul_wall_torch" || path == "redstone_wall_torch") {
+        const std::optional<registry::BlockFace> facing =
+            faceNamed(registry::blockStateDefinitions::propertiesOf(state).contains("facing")
+                          ? registry::blockStateDefinitions::propertiesOf(state).at("facing")
+                          : std::string{});
+        if (!facing.has_value()) {
+            return true;
+        }
+        const registry::BlockFace behind = registry::opposite(*facing);
+        return registry::blockShapes::isFaceSturdy(
+            stateAt(world, x + registry::stepX(behind), y + registry::stepY(behind), z + registry::stepZ(behind)),
+            *facing);
+    }
+    // parity: `DoorBlock.canSurvive`: the lower half wants a sturdy face under it and the upper half
+    // wants the lower half to be the same door, and nothing else. Half a door put down by command
+    // stands in the jar; the table's rule for it asked for both halves and swept it away.
+    if (path.ends_with("_door") && !path.ends_with("_trapdoor")) {
+        const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(state);
+        const auto half = properties.find("half");
+        if (half != properties.end()) {
+            const std::int32_t below = stateAt(world, x, y - 1, z);
+            if (half->second == "lower") {
+                return registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up);
+            }
+            const wire::common::Identifier* under = registry::blockStateDefinitions::blockOf(below);
+            const wire::common::Identifier* mine = registry::blockStateDefinitions::blockOf(state);
+            return under != nullptr && mine != nullptr && *under == *mine;
+        }
     }
     // parity: `BasePressurePlateBlock.canSurvive` is `canSupportRigidBlock(below) ||
     // canSupportCenter(below, UP)`, another question about the **state** below that the table's set
