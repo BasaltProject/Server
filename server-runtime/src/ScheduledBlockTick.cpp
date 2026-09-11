@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
+#include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
@@ -455,6 +456,51 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (const std::optional<std::int32_t> dead = world::scheduledBlocks::coral(world.state(), x, y, z);
             dead.has_value()) {
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *dead});
+        }
+        // parity: `CreakingHeartBlock.tick` over `updateState`, written with `setBlock(..., 3)`. The
+        // jar asks an environment attribute whether the creaking is active; here that is the night,
+        // which is what the vanilla timeline says at noon and at midnight.
+        if (const std::optional<std::int32_t> heart = world::scheduledBlocks::creakingHeartTick(
+                world.state(), x, y, z,
+                [this](std::int32_t stateId) {
+                    const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+                    return block != nullptr && options_.blockTags != nullptr &&
+                           world::realBlockTags::contains(*options_.blockTags, "minecraft:pale_oak_logs", *block);
+                },
+                world::beds::isNight(world.clock().totalTicks()));
+            heart.has_value()) {
+            scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *heart});
+            broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
+        }
+        // parity: `SpeleothemBlock.tick`: a stalagmite that lost its footing breaks where it stands,
+        // and a stalactite that lost its anchor comes down whole, every piece of the column an
+        // entity of its own, down to the tip. Measured in `estalactita`.
+        const bool speleothemSupported = world::blockSurvival::isSupported(
+            world.state(), x, y, z, std::nullopt,
+            [&world](const world::WorldState&, std::int32_t sx, std::int32_t sy, std::int32_t sz) {
+                return world::scheduledBlocks::scaffoldingHasFallen(world.state(), sx, sy, sz);
+            },
+            hasSkylight);
+        const world::scheduledBlocks::SpeleothemTurn spike =
+            world::scheduledBlocks::speleothemTick(world.state(), x, y, z, speleothemSupported);
+        if (spike.destroys) {
+            const std::int32_t was = world.state().blockState(x, y, z).value_or(0);
+            world.state().setBlockState(x, y, z, server::registry::blocks::air().stateId);
+            broadcaster_->dropBrokenBlock(world, x, y, z, was);
+            scheduled.push_back(
+                world::BlockChange{.x = x, .y = y, .z = z, .stateId = server::registry::blocks::air().stateId});
+            broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
+        } else if (spike.falls) {
+            for (std::int32_t at = y; world::scheduledBlocks::isStalactiteAt(world.state(), x, at, z); --at) {
+                const bool tip = world::scheduledBlocks::isStalactiteTipAt(world.state(), x, at, z);
+                static_cast<void>(world::fallingBlocks::fallFrom(world.state(), x, at, z,
+                                                                 [this] { return players_->allocateEntityId(); }));
+                scheduled.push_back(
+                    world::BlockChange{.x = x, .y = at, .z = z, .stateId = server::registry::blocks::air().stateId});
+                if (tip) {
+                    break;
+                }
+            }
         }
         // parity: `ScaffoldingBlock.tick`, the turn the shape update booked: it counts the distance
         // out again and only then decides whether the piece stays, breaks or falls. Both endings

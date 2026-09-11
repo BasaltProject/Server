@@ -33,6 +33,34 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     return block == nullptr ? std::string{} : block->path();
 }
 
+/// parity: `ChorusFlowerBlock.canSurvive` word for word: over air it asks for **exactly one** chorus
+/// plant beside it and nothing but air on the other three sides.
+[[nodiscard]] bool chorusFlowerSurvives(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::int32_t below = stateAt(world, x, y - 1, z);
+    const std::string belowPath = pathOf(below);
+    // parity: `#minecraft:supports_chorus_flower`, which is end stone and little else.
+    if (belowPath == "chorus_plant" || belowPath == "end_stone") {
+        return true;
+    }
+    if (below != registry::blocks::air().stateId) {
+        return false;
+    }
+    bool oneNeighbour = false;
+    for (const BlockFace face : {BlockFace::North, BlockFace::South, BlockFace::West, BlockFace::East}) {
+        const std::string side =
+            pathOf(stateAt(world, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face)));
+        if (side == "chorus_plant") {
+            if (oneNeighbour) {
+                return false;
+            }
+            oneNeighbour = true;
+        } else if (side != "air") {
+            return false;
+        }
+    }
+    return oneNeighbour;
+}
+
 [[nodiscard]] std::string valueOf(std::int32_t stateId, const std::string& key) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto found = properties.find(key);
@@ -152,6 +180,12 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         }
         return std::nullopt;
     }
+    // parity: `SpeleothemBlock.updateShape` leaves early for anything that is not up or down, and
+    // only the side its tip points **away** from can take it down; the other end just redraws the
+    // thickness.
+    if (std::ranges::find(kSpeleothems, path) != kSpeleothems.end()) {
+        return only(valueOf(stateId, "vertical_direction") != "up" ? BlockFace::Up : BlockFace::Down);
+    }
     // parity: `BigDripleafStemBlock`, the one that asks about both ends.
     if (path == "big_dripleaf_stem") {
         return static_cast<std::uint8_t>(only(BlockFace::Down) | only(BlockFace::Up));
@@ -236,6 +270,13 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
     }
     if (std::ranges::find(kSpeleothems, path) != kSpeleothems.end()) {
         return speleothemSurvives(world, x, y, z, state, path);
+    }
+    // parity: `ChorusFlowerBlock.canSurvive`, which the probe's table cannot express: over air it
+    // asks for **exactly one** chorus plant around it and nothing else but air on the other three
+    // sides. Without it the flower on top of a tower stayed in the air when the tower came down.
+    // Measured in `tallostorre`.
+    if (path == "chorus_flower") {
+        return chorusFlowerSurvives(world, x, y, z);
     }
     // parity: `SnowLayerBlock.canSurvive`'s last clause, snow standing on a full stack of snow. The
     // probe tries each block in its default state, and a default snow layer is one deep.

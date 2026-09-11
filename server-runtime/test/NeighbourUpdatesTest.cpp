@@ -202,26 +202,27 @@ TEST_CASE("the vertical bounds are the last word on what can break") {
 
 TEST_CASE("the cascade gives up after a thousand and twenty four neighbours") {
     Loaded loaded;
-    loaded.put(8, 265, 8, stateOf("stone"));
-    // A hanging column, because the budget is what stops a chain that reaches: a cactus tower would
-    // not do any more, since a cactus books a turn instead of breaking on the spot.
-    const std::int32_t spike = stateOf(
-        "pointed_dripstone", {{"thickness", "middle"}, {"vertical_direction", "down"}, {"waterlogged", "false"}});
+    loaded.put(8, 64, 8, stateOf("stone"));
+    // Snow on snow, because the budget is what stops a chain that breaks on the spot: a cactus or a
+    // dripstone tower would not do any more, since both book a turn instead.
+    const std::int32_t deep = stateOf("snow", {{"layers", "8"}});
     for (std::int32_t y = 65; y <= 264; ++y) {
-        loaded.put(8, y, 8, spike);
+        loaded.put(8, y, 8, deep);
     }
 
-    loaded.put(8, 265, 8, air());
+    loaded.put(8, 64, 8, air());
+    // The floor is right under the change, so a position out of bounds must be dropped rather than
+    // queued: queuing it would eat the budget the snow above needs.
     neighbourUpdates::Context context = loaded.context();
     context.minY = 64;
     Report report;
-    neighbourUpdates::afterChange(context, 8, 265, 8, std::nullopt, report.effects, report.onBroken());
+    neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
 
     // The budget is spent six at a time, so a hundred and seventy one positions come off the queue
-    // and each of them takes the one below it with it.
+    // and each of them takes the one above it with it.
     CHECK(report.broken.size() == 171);
-    CHECK(loaded.state.blockState(8, 94, 8) == air());
-    CHECK(loaded.state.blockState(8, 93, 8) == spike);
+    CHECK(loaded.state.blockState(8, 235, 8) == air());
+    CHECK(loaded.state.blockState(8, 236, 8) == deep);
 }
 
 TEST_CASE("a fence joins the fence beside it") {
@@ -365,9 +366,8 @@ TEST_CASE("the dust is asked to redraw itself where it sits") {
     loaded.put(8, 65, 8, stateOf("redstone_wire"));
 
     neighbourUpdates::Context context = loaded.context();
-    std::vector<BlockChange> bubbles;
     // The unset hook is `RedstoneWire` itself, and a lone dust on stone is already a dot.
-    CHECK_FALSE(neighbourUpdates::reshape(context, 8, 65, 8, bubbles).has_value());
+    CHECK_FALSE(neighbourUpdates::reshape(context, 8, 65, 8).has_value());
 
     std::vector<std::int32_t> asked;
     const std::int32_t drawn = stateOf(
@@ -378,7 +378,7 @@ TEST_CASE("the dust is asked to redraw itself where it sits") {
         asked = {x, y, z, stateId};
         return drawn;
     };
-    const std::optional<std::int32_t> redrawn = neighbourUpdates::reshape(context, 8, 65, 8, bubbles);
+    const std::optional<std::int32_t> redrawn = neighbourUpdates::reshape(context, 8, 65, 8);
     REQUIRE(redrawn.has_value());
     CHECK(*redrawn == drawn);
     CHECK(asked == std::vector<std::int32_t>{8, 65, 8, stateOf("redstone_wire")});
@@ -503,10 +503,8 @@ TEST_CASE("a covered patch of farmland gives way to dirt rather than breaking") 
     loaded.put(8, 65, 8, stateOf("stone"));
 
     neighbourUpdates::Context context = loaded.context();
-    std::vector<BlockChange> bubbles;
     // parity: the shape update only books the turn, so the soil is still tilled when it answers.
-    const std::optional<std::int32_t> turned =
-        neighbourUpdates::reshape(context, 8, 64, 8, bubbles, registry::BlockFace::Up);
+    const std::optional<std::int32_t> turned = neighbourUpdates::reshape(context, 8, 64, 8, registry::BlockFace::Up);
     CHECK_FALSE(turned.has_value());
     CHECK(pathAt(loaded.state, 8, 64, 8) == "farmland");
 
@@ -517,8 +515,7 @@ TEST_CASE("a covered patch of farmland gives way to dirt rather than breaking") 
 TEST_CASE("nothing is reshaped where there is no chunk") {
     Loaded loaded;
     neighbourUpdates::Context context = loaded.context();
-    std::vector<BlockChange> bubbles;
-    CHECK_FALSE(neighbourUpdates::reshape(context, 4000, 64, 4000, bubbles).has_value());
+    CHECK_FALSE(neighbourUpdates::reshape(context, 4000, 64, 4000).has_value());
 }
 
 TEST_CASE("everything the block held up comes down, whichever side it was on") {
@@ -605,25 +602,25 @@ TEST_CASE("a staircase turns its corner towards the flight it meets") {
     }
 }
 
-TEST_CASE("a column of bubbles carries the walk on as much as a block that moved") {
+TEST_CASE("a column of bubbles waits for the turn the water books") {
     Loaded loaded;
     loaded.put(8, 64, 8, stateOf("soul_sand"));
     for (std::int32_t y = 65; y <= 68; ++y) {
         loaded.put(8, y, 8, stateOf("water"));
     }
-    // Only reachable through the water the column climbed: nothing else beside the change moves. The
-    // marker is a dust and not a torch because a torch checks its footing in `updateShape`, which is
-    // gated on the news coming from below, and the dust checks it in `neighborChanged`, which arrives
-    // from every side.
-    loaded.put(7, 65, 8, stateOf("redstone_wire"));
 
     Report report;
     neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
                                   report.onReshaped());
 
+    // parity: `LiquidBlock.tryScheduleBubbleBlockColumn` books twenty ticks on the water and changes
+    // nothing now, so the column is a second away rather than already there.
+    CHECK(pathAt(loaded.state, 8, 65, 8) == "water");
+
+    std::vector<BlockChange> changes;
+    scheduledBlocks::bubbleColumn(loaded.state, 8, 65, 8, changes);
     CHECK(pathAt(loaded.state, 8, 65, 8) == "bubble_column");
     CHECK(pathAt(loaded.state, 8, 68, 8) == "bubble_column");
-    CHECK(loaded.state.blockState(7, 65, 8) == air());
 }
 
 TEST_CASE("a lone neighbour east of the change is reached, and nothing beyond it") {

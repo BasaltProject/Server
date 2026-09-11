@@ -317,6 +317,30 @@ BlockChangeBroadcaster::finishPiston(world::LoadedWorld& world, const std::array
         });
 }
 
+void BlockChangeBroadcaster::dropFallenBlock(world::LoadedWorld& world, double x, double y, double z,
+                                             std::int32_t stateId) {
+    if (!world.gameRules().get(world::gameRules::kEntityDrops)) {
+        return;
+    }
+    const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr || reg::items::registry().byName(*block) == nullptr) {
+        return;
+    }
+    random::RandomSource random = random::RandomSource::legacy(nextSeed());
+    // parity: `ItemEntity`'s own constructor, which throws whatever is spawned up at a fifth and
+    // sideways by a random tenth either way.
+    static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
+                                                                 .uuid = wire::common::Uuid::random(),
+                                                                 .item = *block,
+                                                                 .count = 1,
+                                                                 .x = x,
+                                                                 .y = y,
+                                                                 .z = z,
+                                                                 .velocityX = (random.nextDouble() * 0.2) - 0.1,
+                                                                 .velocityY = kPoppedUpwards,
+                                                                 .velocityZ = (random.nextDouble() * 0.2) - 0.1}));
+}
+
 void BlockChangeBroadcaster::dropWashedAwayBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y,
                                                  std::int32_t z, std::int32_t destroyedState) {
     if (destroyedState <= 0 || world::fluidFlow::kindOf(destroyedState).has_value()) {

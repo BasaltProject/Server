@@ -43,12 +43,22 @@ entity::ServerEntity* fallFrom(WorldState& world, std::int32_t x, std::int32_t y
 entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                    const std::function<std::int32_t()>& allocateEntityId);
 
-/// Moves one falling block a tick on, and lands it. Answers the block it became, if it landed.
-///
-/// parity: `FallingBlockEntity.tick`, which adds gravity, scales by the air drag and stops on the
-/// first block that will not give way. What vanilla does with the leftover (an anvil that cannot be
-/// placed drops as an item) is not here: this build only puts the block back.
-[[nodiscard]] std::optional<BlockChange> tick(WorldState& world, entity::ServerEntity& entity);
+/// Whether the state could stand at that square, which only `blockSurvival` can answer.
+using CanSurvive = std::function<bool(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z)>;
+
+/// How a falling block ended its fall: as a block again, or as the item it shattered into.
+struct Landing {
+    std::optional<BlockChange> placed;
+    /// parity: `FallingBlockEntity.tick`'s `spawnAtLocation(level, block)`, the block's **own** item
+    /// and not its loot table: a falling gravel that cannot be placed leaves gravel, never flint.
+    std::optional<std::int32_t> shattered;
+};
+
+/// Moves one falling block a tick on, and lands it. parity: `FallingBlockEntity.tick` adds gravity,
+/// scales by air drag and stops on the first block that will not give way. The square has to be
+/// replaceable and the state able to stand in it, or the block shatters, which is what a stalactite
+/// always does.
+[[nodiscard]] Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& canSurvive);
 
 } // namespace fallingBlocks
 

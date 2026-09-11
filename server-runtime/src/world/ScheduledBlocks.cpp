@@ -27,6 +27,10 @@ constexpr std::int32_t kCoralGraceSpread = 40;
 /// parity: `LiquidBlock.BUBBLE_COLUMN_CHECK_DELAY` and `BubbleColumnBlock.updateShape`'s own five.
 constexpr std::int32_t kColumnCheckDelay = 20;
 constexpr std::int32_t kColumnStepDelay = 5;
+
+/// parity: `SpeleothemBlock.updateShape`'s two delays.
+constexpr std::int32_t kStalactiteDelay = 2;
+constexpr std::int32_t kStalagmiteDelay = 1;
 constexpr std::int32_t kFrostedMaxAge = 3;
 constexpr std::int32_t kFrostedNeighbours = 4;
 
@@ -533,6 +537,99 @@ bool booksItsOwnBreak(const std::string_view path) {
         "kelp_plant",          "twisting_vines", "twisting_vines_plant", "weeping_vines",
         "weeping_vines_plant", "cave_vines",     "cave_vines_plant"};
     return std::ranges::find(kBooks, path) != kBooks.end();
+}
+
+bool isSpeleothem(const std::string_view path) { return path == "pointed_dripstone" || path == "sulfur_spike"; }
+
+void scheduleCreakingHeart(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "creaking_heart") {
+        return;
+    }
+    // parity: `CreakingHeartBlock.updateShape` books a turn for **any** neighbour that moved, and
+    // answers the state it was given.
+    world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("creaking_heart"), 1);
+}
+
+std::optional<std::int32_t> creakingHeartTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                              const IsPaleOakLog& isPaleOakLog, const bool creakingActive) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "creaking_heart" || !isPaleOakLog) {
+        return std::nullopt;
+    }
+    // parity: `CreakingHeartBlock.updateState` only ever wakes an uprooted heart; nothing puts one
+    // back to sleep from here.
+    if (textProperty(*stateId, "creaking_heart_state") != "uprooted") {
+        return std::nullopt;
+    }
+    // parity: `hasRequiredLogs`, both ends of its own axis and nothing else.
+    const std::string axis = textProperty(*stateId, "axis");
+    const std::int32_t stepX = axis == "x" ? 1 : 0;
+    const std::int32_t stepY = axis == "y" ? 1 : 0;
+    const std::int32_t stepZ = axis == "z" ? 1 : 0;
+    for (const std::int32_t side : {1, -1}) {
+        const std::optional<std::int32_t> end =
+            world.blockState(x + (stepX * side), y + (stepY * side), z + (stepZ * side));
+        if (!end.has_value() || !isPaleOakLog(*end)) {
+            return std::nullopt;
+        }
+    }
+    const std::optional<std::int32_t> woken = registry::blockStateDefinitions::stateIdOf(
+        wire::common::Identifier::vanilla("creaking_heart"),
+        {{"creaking_heart_state", creakingActive ? "awake" : "dormant"}}, *stateId);
+    if (!woken.has_value() || *woken == *stateId || !world.setBlockState(x, y, z, *woken)) {
+        return std::nullopt;
+    }
+    return woken;
+}
+
+void scheduleSpeleothem(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (supported || !stateId.has_value()) {
+        return;
+    }
+    const std::string path = pathOf(*stateId);
+    if (!isSpeleothem(path)) {
+        return;
+    }
+    const wire::common::Identifier type = wire::common::Identifier::vanilla(path);
+    const bool pointsDown = textProperty(*stateId, "vertical_direction") != "up";
+    // parity: `SpeleothemBlock.updateShape` leaves a stalactite alone once its turn is booked, so a
+    // second neighbour moving does not push the fall two ticks further out.
+    if (pointsDown && world.hasScheduledBlockTick(x, y, z, type)) {
+        return;
+    }
+    // parity: two ticks for a stalactite, one for a stalagmite.
+    world.scheduleBlockTick(x, y, z, type, pointsDown ? kStalactiteDelay : kStalagmiteDelay);
+}
+
+bool isStalactiteAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    return stateId.has_value() && isSpeleothem(pathOf(*stateId)) &&
+           textProperty(*stateId, "vertical_direction") != "up";
+}
+
+bool isStalactiteTipAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return false;
+    }
+    // parity: `SpeleothemBlock.isTip(state, true)`, which counts a merged tip as a tip.
+    const std::string thickness = textProperty(*stateId, "thickness");
+    return thickness == "tip" || thickness == "tip_merge";
+}
+
+SpeleothemTurn speleothemTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !isSpeleothem(pathOf(*stateId))) {
+        return SpeleothemTurn{};
+    }
+    // parity: `SpeleothemBlock.tick`: only a stalagmite is broken where it stands. Everything else
+    // that got this far is a stalactite, and a stalactite comes down as entities.
+    if (textProperty(*stateId, "vertical_direction") == "up") {
+        return supported ? SpeleothemTurn{} : SpeleothemTurn{.destroys = true};
+    }
+    return SpeleothemTurn{.falls = true};
 }
 
 void scheduleBreakIfLoose(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const bool supported) {
