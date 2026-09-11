@@ -27,6 +27,13 @@ namespace reshapes {
 /// it is ported, and then that owns it.
 [[nodiscard]] std::span<const std::string_view> chestBlocks();
 
+/// The concrete a landed powder sets into, if the square it stopped in has water in it or beside it.
+///
+/// parity: `ConcretePowderBlock.onLand`, which is the shape update's question plus the block the
+/// falling powder replaced.
+[[nodiscard]] std::optional<std::int32_t> landedConcrete(WorldState& world, std::int32_t x, std::int32_t y,
+                                                         std::int32_t z, std::int32_t stateId, std::int32_t replaced);
+
 /// What a geyser makes of itself, which has a clock of its own and so is not modelled here.
 using GeyserReshape =
     std::function<std::optional<std::int32_t>(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)>;
