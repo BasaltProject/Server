@@ -65,8 +65,8 @@ private:
         std::int32_t z = 0;
     };
 
-    void collectExplodedBlock(const wire::common::Identifier& block, std::int32_t x, std::int32_t y, std::int32_t z,
-                              float power, std::vector<Drop>& drops) const;
+    void collectExplodedBlock(const wire::common::Identifier& block, std::int32_t stateId, std::int32_t x,
+                              std::int32_t y, std::int32_t z, float power, std::vector<Drop>& drops) const;
 
     void popResource(world::LoadedWorld& world, const Drop& drop) const;
 

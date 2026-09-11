@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
+#include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
@@ -169,6 +170,13 @@ void BlockEditor::notifyNeighbours() {
                                                      .ultrawarm = world_->declaration().dimension ==
                                                                   config::WorldDimension::Nether};
                 static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
+            },
+        // parity: `PotentSulfurBlock.updateShape` is `validBlockState`, which reads the water above
+        // and the block below to say what the geyser is doing now.
+        .geyser =
+            [this](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+                return world::geysers::validState(world_->state(), world_->metadata().seed, world_->gameTime(), x, y, z,
+                                                  stateId);
             },
         .gameTime = world_->gameTime(),
         .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes)};

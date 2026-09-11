@@ -148,6 +148,13 @@ std::optional<std::int32_t> validState(WorldState& world, std::int64_t seed, std
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
+    // parity: `Level.setBlock` runs `onPlace` on every write, the state moving inside the same block
+    // included, and `PotentSulfurBlock.onPlace` raises `BLOCK_ACTIVATE` for a geyser that is going.
+    // Measured in `geiser`, where the jar's sensor hears the water land on it.
+    if ((wanted == "erupting" || wanted == "continuous") &&
+        world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        vibrations::emit(world, "block_activate", x + 0.5, y + 0.5, z + 0.5, gameTime);
+    }
     // Entering a wait starts one; leaving it means the clock is somebody else's problem.
     if (wanted == "dormant" || wanted == "erupting") {
         scheduleTurn(world, seed, gameTime, x, y, z, wanted);
@@ -175,11 +182,12 @@ void tick(WorldState& world, std::int64_t seed, std::int64_t gameTime, std::int3
         return;
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
-    // parity: `PotentSulfurBlockEntity`'s ticker raises `BLOCK_DEACTIVATE` when the geyser goes back
-    // to sleep, and **only** then: starting up says nothing from here, because the noise of starting
-    // is `onPlace`'s `BLOCK_ACTIVATE` and a geyser that was already there does not place itself.
-    if (turnedTo == "dormant" && world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
-        vibrations::emit(world, "block_deactivate", x + 0.5, y + 0.5, z + 0.5, gameTime);
+    // parity: the ticker raises `BLOCK_DEACTIVATE` itself when the geyser goes back to sleep, and
+    // the write that starts it raises `BLOCK_ACTIVATE` through `onPlace`, which `Level.setBlock`
+    // runs on every write and not only when the block changes.
+    if (world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        vibrations::emit(world, turnedTo == "dormant" ? "block_deactivate" : "block_activate", x + 0.5, y + 0.5,
+                         z + 0.5, gameTime);
     }
     scheduleTurn(world, seed, gameTime, x, y, z, turnedTo);
 }

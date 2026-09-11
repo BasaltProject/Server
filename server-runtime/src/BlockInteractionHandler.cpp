@@ -225,7 +225,7 @@ void BlockInteractionHandler::spawnDroppedItem(const Identifier& item, std::int3
                                                                    .components = std::move(components)}));
 }
 
-void BlockInteractionHandler::dropLootFor(const Identifier& block, const BlockPos& pos,
+void BlockInteractionHandler::dropLootFor(const Identifier& block, std::int32_t stateId, const BlockPos& pos,
                                           const wire::nbt::NbtCompound* carried) {
     // parity: `Block.popResource` reads the `block_drops` rule, so with it off a block broken by hand
     // leaves nothing behind either.
@@ -239,7 +239,9 @@ void BlockInteractionHandler::dropLootFor(const Identifier& block, const BlockPo
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    for (const server::world::loot::ItemStack& stack : table->generate(random)) {
+    // parity: `LootContextParams.BLOCK_STATE`: the lower half of a door is what carries the drop.
+    const server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(stateId)};
+    for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, context)) {
         wire::nbt::NbtCompound components;
         if (carried != nullptr && stack.item == block) {
             components.set(world::shulkers::kContainer, wire::nbt::NbtTag::ofCompound(*carried));
@@ -609,7 +611,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
                                          return tags != nullptr && world::realBlockTags::contains(*tags, tag, block);
                                      });
         if (correctTool) {
-            dropLootFor(*brokenBlock, action.pos, carried.has_value() ? &*carried : nullptr);
+            dropLootFor(*brokenBlock, broken.value_or(0), action.pos, carried.has_value() ? &*carried : nullptr);
         }
     }
     if (brokenBlock != nullptr) {

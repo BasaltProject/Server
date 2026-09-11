@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
+#include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
@@ -76,14 +77,23 @@ storage::StoredItemStack withCount(const storage::StoredItemStack& stack, std::i
 /// The neighbour-update context this world runs its cascades with.
 world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random) {
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    return world::neighbourUpdates::Context{.world = world.state(),
-                                            .worldName = world.name(),
-                                            .minY = facts.chunkHeight.minY(),
-                                            .maxY = facts.chunkHeight.maxY(),
-                                            .random = random,
-                                            .hasSkylight = facts.hasSkylight,
-                                            .gameTime = world.gameTime(),
-                                            .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
+    return world::neighbourUpdates::Context{
+        .world = world.state(),
+        .worldName = world.name(),
+        .minY = facts.chunkHeight.minY(),
+        .maxY = facts.chunkHeight.maxY(),
+        .random = random,
+        .hasSkylight = facts.hasSkylight,
+        // parity: `PotentSulfurBlock.updateShape` is
+        // `validBlockState`, which reads the water above and the
+        // block below to say what the geyser is doing now.
+        .geyser =
+            [&world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+                return world::geysers::validState(world.state(), world.metadata().seed, world.gameTime(), x, y, z,
+                                                  stateId);
+            },
+        .gameTime = world.gameTime(),
+        .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
 }
 
 } // namespace

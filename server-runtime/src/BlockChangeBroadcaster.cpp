@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -5,8 +6,10 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
+#include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
+#include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
@@ -63,24 +66,32 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
 /// The world's own neighbour-update context, which is what the cascade reads off a world.
 [[nodiscard]] world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random) {
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    return world::neighbourUpdates::Context{.world = world.state(),
-                                            .worldName = world.name(),
-                                            .minY = facts.chunkHeight.minY(),
-                                            .maxY = facts.chunkHeight.maxY(),
-                                            .random = random,
-                                            .hasSkylight = facts.hasSkylight,
-                                            .wakeFluids =
-                                                [&world, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
-                                                    const world::fluidFlow::Context flow{
-                                                        .world = world.state(),
-                                                        .gameRules = world.gameRules(),
-                                                        .random = random,
-                                                        .ultrawarm = world.declaration().dimension ==
-                                                                     config::WorldDimension::Nether};
-                                                    static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
-                                                },
-                                            .gameTime = world.gameTime(),
-                                            .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
+    return world::neighbourUpdates::Context{
+        .world = world.state(),
+        .worldName = world.name(),
+        .minY = facts.chunkHeight.minY(),
+        .maxY = facts.chunkHeight.maxY(),
+        .random = random,
+        .hasSkylight = facts.hasSkylight,
+        .wakeFluids =
+            [&world, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
+                const world::fluidFlow::Context flow{.world = world.state(),
+                                                     .gameRules = world.gameRules(),
+                                                     .random = random,
+                                                     .ultrawarm = world.declaration().dimension ==
+                                                                  config::WorldDimension::Nether};
+                static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
+            },
+        // parity: `PotentSulfurBlock.updateShape` is
+        // `validBlockState`, which reads the water above and the
+        // block below to say what the geyser is doing now.
+        .geyser =
+            [&world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+                return world::geysers::validState(world.state(), world.metadata().seed, world.gameTime(), x, y, z,
+                                                  stateId);
+            },
+        .gameTime = world.gameTime(),
+        .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
 }
 
 } // namespace
@@ -332,7 +343,19 @@ void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    for (const server::world::loot::ItemStack& stack : table->generate(random)) {
+    // parity: `LootContextParams.BLOCK_STATE`, which is what a door, a slab or a bed drops by, and
+    // `DecoratedPotBlock.getDrops`, which hands the roll the pot's own four sherds.
+    server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(destroyedState)};
+    if (world::decoratedPots::isPot(state->block.path())) {
+        const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* pot =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        if (pot != nullptr) {
+            context.dynamic.emplace(std::string{world::decoratedPots::kSherds},
+                                    world::decoratedPots::sherds(pot->data()));
+        }
+    }
+    for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, context)) {
         if (reg::items::registry().byName(stack.item) == nullptr) {
             continue;
         }

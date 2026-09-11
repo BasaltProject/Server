@@ -144,7 +144,7 @@ constexpr double kBellTopEdge = static_cast<double>(0.8124F);
 } // namespace
 
 std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit, bool byArrow,
-                                 bool burning, bool tntExplodes) {
+                                 bool burning, bool tntExplodes, const OnDestroyed& destroyed) {
     const std::optional<std::int32_t> stateId = world.blockState(hit.blockX, hit.blockY, hit.blockZ);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -162,8 +162,21 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
     if (path == "tnt") {
         return burning ? primeTnt(world, hit, tntExplodes) : std::nullopt;
     }
-    // parity: `ChorusFlowerBlock` and `DecoratedPotBlock`, which simply break.
+    // parity: `ChorusFlowerBlock` and `DecoratedPotBlock`, which both end in `destroyBlock` with its
+    // drop flag on. The pot writes `cracked` first, and that is the state its loot table reads: a
+    // cracked pot leaves its four sherds instead of the pot itself.
     if (path == "chorus_flower" || path == "decorated_pot") {
+        std::int32_t broken = *stateId;
+        if (path == "decorated_pot") {
+            const std::optional<std::int32_t> cracked =
+                registry::blockStateDefinitions::stateIdOf(*block, {{"cracked", "true"}}, *stateId);
+            broken = cracked.value_or(*stateId);
+        }
+        // parity: the crack is written first and `destroyBlock` rolls the drops **before** the block
+        // goes, which is what lets the pot's own block entity hand over its sherds.
+        if (destroyed) {
+            destroyed(broken, hit.blockX, hit.blockY, hit.blockZ);
+        }
         return shatter(world, hit);
     }
     // parity: a lit candle or campfire is a light source and a block state, so a flaming arrow that
