@@ -213,7 +213,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         world.state(), world.gameTime(), *hit, kind.sticks, entity.fireTicks > 0,
         world.gameRules().get(world::gameRules::kTntExplodes),
         [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
-            broadcaster_.dropBrokenBlock(world, bx, by, bz, stateId);
+            broadcaster_.dropBrokenBlock(world, bx, by, bz, stateId, true);
         });
     if (change.has_value()) {
         broadcaster_.announceRedstone(world, watchers, *change);

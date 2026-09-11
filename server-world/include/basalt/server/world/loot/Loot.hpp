@@ -58,6 +58,10 @@ private:
 /// every state predicate answers no.
 struct LootContext {
     std::map<std::string, std::string> blockState;
+    /// Whether somebody is behind the break: the player mining it or the projectile that hit it.
+    /// parity: `LootContextParams.THIS_ENTITY`, which a block broken by a neighbour or a blast has
+    /// none of. Snow and the chorus flower are the two tables that ask.
+    bool hasEntity = false;
     /// parity: `LootParams.withDynamicDrop`, the drops a block hands the roll itself rather than
     /// naming in its table. The only one in the game is a decorated pot's four sherds.
     std::map<std::string, std::vector<ItemStack>> dynamic;
@@ -75,6 +79,8 @@ public:
         MatchTool,
         /// Always false: a mob killed here is not on fire and not a baby.
         EntityProperties,
+        /// Whether there is a `THIS_ENTITY` at all, which is what an empty predicate asks.
+        ThisEntityExists,
         /// Always true: everything that dies here dies to a player or to a command.
         KilledByPlayer,
         Inverted,
@@ -92,6 +98,7 @@ public:
     [[nodiscard]] static LootCondition survivesExplosion();
     [[nodiscard]] static LootCondition matchTool();
     [[nodiscard]] static LootCondition entityProperties();
+    [[nodiscard]] static LootCondition thisEntityExists();
     [[nodiscard]] static LootCondition killedByPlayer();
     [[nodiscard]] static LootCondition inverted(LootCondition inner);
     [[nodiscard]] static LootCondition anyOf(std::vector<LootCondition> terms);

@@ -183,8 +183,16 @@ Parsed<LootCondition> parseCondition(const JsonObject& condition) {
     if (*type == "minecraft:match_tool") {
         return LootCondition::matchTool();
     }
+    // parity: `LootItemEntityPropertyCondition` with an **empty** predicate is not a question about
+    // the entity at all, it is a question about whether there is one: snow broken by a piston leaves
+    // nothing and snow mined by hand leaves snowballs. A predicate with anything in it is a gap.
+    if (*type == "minecraft:entity_properties") {
+        const JsonObject* predicate = asObject(condition.find("predicate"));
+        return predicate == nullptr || predicate->empty() ? LootCondition::thisEntityExists()
+                                                          : LootCondition::entityProperties();
+    }
     // parity: the conditions a mob's own table carries, about what died and what killed it.
-    if (*type == "minecraft:entity_properties" || *type == "minecraft:damage_source_properties") {
+    if (*type == "minecraft:damage_source_properties") {
         return LootCondition::entityProperties();
     }
     if (*type == "minecraft:killed_by_player") {

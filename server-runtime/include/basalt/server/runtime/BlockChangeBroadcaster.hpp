@@ -80,13 +80,12 @@ public:
     void dropWashedAwayBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                              std::int32_t destroyedState);
 
-    /// Drops what a block change destroyed, whatever took its place.
-    ///
-    /// parity: `Block.updateOrDestroy` ends in `level.destroyBlock(pos, true)` unless the flags say
-    /// otherwise, and `RedStoneWireBlock.neighborChanged` calls `dropResources` by name before it
-    /// removes the dust. Either way the loot table is rolled exactly as breaking it by hand would.
+    /// Drops what a block change destroyed, whatever took its place. parity: `Block.updateOrDestroy`
+    /// ends in `destroyBlock(pos, true)` unless the flags say otherwise, so the loot table is rolled
+    /// as breaking it by hand would. `byEntity` is `LootContextParams.THIS_ENTITY`: a projectile has
+    /// one, a neighbour update has none.
     void dropBrokenBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                         std::int32_t destroyedState);
+                         std::int32_t destroyedState, bool byEntity = false);
 
 private:
     /// The half of `announceRedstone` that is about a square rather than about a block: the dust

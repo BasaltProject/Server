@@ -18,6 +18,13 @@ namespace basalt::server::runtime::entity {
 /// it hits anything, an arrow sticks in the block it hit and stays there.
 namespace projectiles {
 
+/// Which of the three families a projectile belongs to, which is the order it moves in.
+///
+/// parity: the three `tick` bodies are three different orders, and the order is visible: an arrow
+/// moves with the speed it already had and only then slows and falls, a thrown projectile falls and
+/// slows **before** it moves, and a fireball speeds up before it moves.
+enum class Flight : std::uint8_t { Arrow, Thrown, Hurting };
+
 /// One kind of projectile: what it weighs, what the air does to it, and whether it sticks.
 struct Kind {
     wire::common::Identifier type;
@@ -27,6 +34,7 @@ struct Kind {
     /// parity: `AbstractHurtingProjectile.accelerationPower`, which the inertia adds back along the
     /// way it is going: a fireball speeds up instead of slowing down.
     double acceleration = 0.0;
+    Flight flight = Flight::Thrown;
 };
 
 /// parity: `ProjectileItem.DispenseConfig`'s own defaults.

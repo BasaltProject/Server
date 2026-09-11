@@ -328,7 +328,7 @@ void BlockChangeBroadcaster::dropWashedAwayBlock(world::LoadedWorld& world, std:
 }
 
 void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                             std::int32_t destroyedState) {
+                                             std::int32_t destroyedState, bool byEntity) {
     // parity: `Block.popResource` puts nothing in the world with the `block_drops` rule off, so the
     // block still goes and leaves nothing behind.
     if (destroyedState <= 0 || !world.gameRules().get(world::gameRules::kBlockDrops)) {
@@ -345,7 +345,8 @@ void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
     // parity: `LootContextParams.BLOCK_STATE`, which is what a door, a slab or a bed drops by, and
     // `DecoratedPotBlock.getDrops`, which hands the roll the pot's own four sherds.
-    server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(destroyedState)};
+    server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(destroyedState),
+                                             .hasEntity = byEntity};
     if (world::decoratedPots::isPot(state->block.path())) {
         const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
         const server::world::ChunkBlockEntity* pot =

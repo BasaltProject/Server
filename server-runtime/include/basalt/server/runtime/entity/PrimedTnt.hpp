@@ -30,9 +30,15 @@ inline constexpr float kExplosionPower = 4.0F;
 /// parity: the 1/16 of a block above its feet the explosion is centred on (`getY(0.0625)`).
 inline constexpr double kExplosionOffset = 0.0625;
 
+/// parity: the hop `PrimedTnt`'s own constructor gives it, and the crawl to one side it leaves with.
+inline constexpr double kPrimeHop = 0.2;
+inline constexpr double kPrimeDrift = 0.02;
+
 /// Lights the TNT that stood at these block coordinates, as `TntBlock.explode` spawns it.
+///
+/// `angle` is the turn its little sideways push takes, which vanilla rolls off the level's random.
 ServerEntity& prime(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t entityId,
-                    std::int32_t protocolType, std::int32_t fuse = kDefaultFuse);
+                    std::int32_t protocolType, double angle, std::int32_t fuse = kDefaultFuse);
 
 /// One tick: it moves, then the fuse burns down. True when the fuse ran out, which is when the
 /// caller explodes it.

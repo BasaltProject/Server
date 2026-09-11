@@ -239,8 +239,10 @@ void BlockInteractionHandler::dropLootFor(const Identifier& block, std::int32_t 
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    // parity: `LootContextParams.BLOCK_STATE`: the lower half of a door is what carries the drop.
-    const server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(stateId)};
+    // parity: `LootContextParams.BLOCK_STATE`: the lower half of a door is what carries the drop,
+    // and `THIS_ENTITY`, which a block broken by hand always has.
+    const server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(stateId),
+                                                   .hasEntity = true};
     for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, context)) {
         wire::nbt::NbtCompound components;
         if (carried != nullptr && stack.item == block) {
