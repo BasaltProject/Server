@@ -310,6 +310,7 @@ basalt_module(server-runtime-core
         src/world/PressurePlates.cpp
         src/world/Rails.cpp
         src/world/RespawnAnchors.cpp
+        src/world/RandomSequences.cpp
         src/world/RandomTicks.cpp
         src/world/Reshapes.cpp
         src/world/RecipeBook.cpp

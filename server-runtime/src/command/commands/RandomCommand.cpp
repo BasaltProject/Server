@@ -17,16 +17,6 @@ using wire::text::Component;
 /// Keeps the unnamed stream from repeating the world's own sequence.
 constexpr std::int64_t kAnySequenceSalt = 0x5DEECE66DLL;
 
-/// parity: `String.hashCode`, which is what vanilla mixes a sequence name in with. Wrapping is the
-/// point: it is a Java int.
-[[nodiscard]] std::int32_t javaHash(std::string_view text) {
-    std::uint32_t hash = 0;
-    for (const char c : text) {
-        hash = (hash * 31U) + static_cast<std::uint32_t>(static_cast<unsigned char>(c));
-    }
-    return static_cast<std::int32_t>(hash);
-}
-
 [[nodiscard]] std::optional<std::int32_t> toInt(std::string_view text) {
     std::int32_t value = 0;
     const auto result = std::from_chars(text.data(), text.data() + text.size(), value);
@@ -59,15 +49,17 @@ RandomCommand::RandomCommand(std::function<std::int64_t()> worldSeed)
     : Command("random", permissionLevel::kAll), worldSeed_(std::move(worldSeed)) {}
 
 void RandomCommand::build(const CommandNodeBuilder& root) const {
-    /// parity: `RandomSequences.get`, whose stream is seeded from the world seed and the name.
+    /// parity: `RandomSequence.createSequence`: the world seed upgraded but not mixed, xored with the
+    /// md5 of the name and mixed after, over xoroshiro. The same stream a loot table rolls on.
     const auto sequenceFor = [this](const Identifier& sequence) -> random::RandomSource& {
         const auto found = sequences_.find(sequence);
         if (found != sequences_.end()) {
             return found->second;
         }
-        const std::int64_t seed =
-            (worldSeed_ ? worldSeed_() : 0) ^ static_cast<std::int64_t>(javaHash(sequence.toString()));
-        return sequences_.emplace(sequence, random::RandomSource::legacy(seed)).first->second;
+        const random::Seed128bit seed = random::upgradeSeedTo128bitUnmixed(worldSeed_ ? worldSeed_() : 0)
+                                            .xorWith(random::seedFromHashOf(sequence.toString()))
+                                            .mixed();
+        return sequences_.emplace(sequence, random::RandomSource::xoroshiro(seed)).first->second;
     };
 
     const auto draw = [this, sequenceFor](const CommandContext& context, std::string_view kind,

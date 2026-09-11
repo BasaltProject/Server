@@ -486,6 +486,15 @@ std::expected<LootTable, LootTableParseError> parse(std::string_view json) {
             table.pools.push_back(std::move(*parsed));
         }
     }
+    // parity: `LootTable.randomSequence`, the name of the stream this table rolls on. Every table
+    // the game ships carries one; a datapack's may not, and then it rolls on the level's own random.
+    if (const std::optional<std::string> sequence = asString(object->find("random_sequence")); sequence.has_value()) {
+        if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> name =
+                wire::common::Identifier::parse(*sequence);
+            name.has_value()) {
+            table.randomSequence = *name;
+        }
+    }
     Parsed<std::vector<LootFunction>> functions = parseFunctions(object->find("functions"));
     if (!functions.has_value()) {
         return std::unexpected(functions.error());

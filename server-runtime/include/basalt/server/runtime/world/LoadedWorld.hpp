@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/PortalIndex.hpp>
+#include <basalt/server/runtime/world/RandomSequences.hpp>
 #include <basalt/server/runtime/world/RegionStore.hpp>
 #include <basalt/server/runtime/world/WorldBorder.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
@@ -100,6 +101,9 @@ public:
     [[nodiscard]] const WorldMetadata& metadata() const noexcept { return metadata_; }
 
     [[nodiscard]] const std::string& name() const noexcept { return declaration_.name; }
+
+    /// The named random streams this world keeps, which is what a loot table rolls on.
+    [[nodiscard]] RandomSequences& randomSequences() noexcept { return randomSequences_; }
 
     /// The region this world is ticked in. One per world while the world is in one piece.
     [[nodiscard]] sched::Region& region() const noexcept { return *region_; }
@@ -268,6 +272,7 @@ private:
     config::WorldDeclaration declaration_;
     config::WorldSettings settings_;
     WorldMetadata metadata_;
+    RandomSequences randomSequences_{metadata_.seed};
     wire::common::Logger logger_;
     wire::common::Timings ownTimings_;
     wire::common::Timings& timings_;
