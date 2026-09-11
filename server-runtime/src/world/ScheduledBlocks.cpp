@@ -40,6 +40,11 @@ constexpr std::int32_t kFrostedMeltNeighbours = 2;
 /// A trail of frost walker ice is at most a few hundred squares; this only stops a runaway.
 constexpr std::int32_t kFrostedChainLimit = 512;
 constexpr std::int32_t kFrostedRetry = 20;
+
+/// parity: `FrostedIceBlock.onPlace`'s own `Mth.nextInt(random, 60, 120)`, the wait before a fresh
+/// piece of frosted ice first looks at whether it should melt.
+constexpr std::int32_t kFrostedFirstLow = 60;
+constexpr std::int32_t kFrostedFirstHigh = 120;
 constexpr std::int32_t kMeltLight = 11;
 constexpr std::int32_t kDriedGhastMax = 3;
 constexpr std::int32_t kDriedGhastDelay = 5000;
@@ -213,6 +218,18 @@ bool thin(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std
 }
 
 } // namespace
+
+void scheduleFrostedIce(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                        random::RandomSource& random) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "frosted_ice") {
+        return;
+    }
+    // parity: `onPlace` books without asking whether one is already pending, and `LevelChunkTicks`
+    // keeps only one turn per square and type, so the second call changes nothing either way.
+    world.scheduleBlockTick(x, y, z, frostedIceTickType(),
+                            random.nextIntBetweenInclusive(kFrostedFirstLow, kFrostedFirstHigh));
+}
 
 const wire::common::Identifier& frostedIceTickType() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("frosted_ice");

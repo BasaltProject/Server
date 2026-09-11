@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
+#include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
@@ -610,6 +611,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             for (const BlockChange& change : parted) {
                 reshaped(change.stateId, change.x, change.y, change.z);
             }
+            // parity: `PistonHeadBlock.affectNeighborsAfterRemoval`, which is `destroyBlock` on the
+            // body behind it, drops and all: taking the head off takes the piston with it. It never
+            // fires when the piston pulls its own head back, because that write carries neither
+            // `UPDATE_NEIGHBORS` nor the piston flag. Measured in `pistoncabezarota`.
+            if (const std::optional<std::array<std::int32_t, 3>> body = pistons::fittingBase(world, x, y, z, *removed);
+                body.has_value()) {
+                const std::optional<std::int32_t> was = world.blockState((*body)[0], (*body)[1], (*body)[2]);
+                if (was.has_value() &&
+                    world.setBlockState((*body)[0], (*body)[1], (*body)[2], registry::blocks::air().stateId)) {
+                    broken(*was, (*body)[0], (*body)[1], (*body)[2]);
+                }
+            }
         }
         // parity: `ShelfBlock.onPlace`, which joins the chain for a shelf that arrives already
         // powered. Measured in `colocadoonplace`, where three of them link up in the jar as the
@@ -664,6 +677,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // egg is down. Re-scheduling keeps a delay already counting, so a neighbour moving nearby does
     // not put the egg back to the start.
     scheduledBlocks::scheduleHatch(world, x, y, z, context.random.nextLong());
+    // parity: `FrostedIceBlock.onPlace`, which books the melt clock of every piece that lands.
+    scheduledBlocks::scheduleFrostedIce(world, x, y, z, context.random);
+    // parity: `FireBlock.onPlace`, which books a turn for every fire that lands and does it without
+    // asking whether the block changed. Soul fire is a `BaseFireBlock` and books none, which is why
+    // it never burns out. Without this a fire put down by command sat there for ever.
+    if (const std::optional<std::int32_t> lit = world.blockState(x, y, z); lit.has_value() && fires::isFire(*lit)) {
+        fires::schedule(world, x, y, z, context.random);
+    }
     // parity: the neighbour update every redstone component listens to: the dust settles at once and
     // the components book their own turn, which is what their delay is.
     // parity: `Level.setBlock` updates the shapes around what changed before anything reads the
