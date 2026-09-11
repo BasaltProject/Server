@@ -57,6 +57,7 @@ inline constexpr GameRule kRandomTickSpeed = GameRule::integer("random_tick_spee
 
 /// Named because the vine spread asks for it by name. parity: `GameRules.SPREAD_VINES`.
 inline constexpr GameRule kSpreadVines = GameRule::boolean("spread_vines", true);
+inline constexpr GameRule kMobGriefing = GameRule::boolean("mob_griefing", true);
 
 /// Named because a nether portal asks it before spawning anything.
 inline constexpr GameRule kSpawnMonsters = GameRule::boolean("spawn_monsters", true);

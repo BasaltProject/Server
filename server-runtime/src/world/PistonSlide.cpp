@@ -490,31 +490,6 @@ const wire::common::Identifier& slideTickType() {
     return instance;
 }
 
-bool advanceSlide(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
-    server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
-    server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
-    // The block entity a sliding square carries is vanilla's `piston`, whatever the block is called.
-    if (entity == nullptr || entity->type() != block()) {
-        return false;
-    }
-    // A slide books one turn of its own, one tick after it starts, and the landing books another the
-    // tick after that. Both fall on the same square when the piston is pulling back, and the value
-    // already written is what tells them apart: the landing's turn finds the half already there.
-    if (entity->data().getFloat("progress") > 0.0F) {
-        return false;
-    }
-    // parity: `progressO = progress` and then `progress += 0.5F`. What is written down is the value
-    // from before, so the square that has just been created still says zero and this turn is the one
-    // that makes it a half.
-    entity->data().putFloat("progress", kSlideStep);
-    // parity: each `moving_piston` has its own ticker in the jar, and the turn after this one is the
-    // one that lands it. Booking it here rather than only on the piston is what lands a square that
-    // the piston can no longer reach across a gap, and it keeps the turn under the same name so the
-    // rest of the scheduled pass leaves it alone.
-    world.scheduleBlockTick(x, y, z, slideTickType(), 1);
-    return true;
-}
-
 std::vector<BlockChange> slideTick(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                                    const std::vector<PlayerPosition>& players,
                                    const std::function<void(const PlayerPosition&)>& onPlayerPushed) {

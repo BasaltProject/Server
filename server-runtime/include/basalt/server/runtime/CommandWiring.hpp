@@ -75,6 +75,9 @@ struct CommandWiring {
     std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                        std::int32_t destroyedState)>
         dropBrokenBlock;
+    /// parity: `CarvedPumpkinBlock.trySpawnGolem`. Handed over for the same reason: the command tree
+    /// has no business knowing how a mob is made.
+    std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
     std::function<void()> requestRestart;
     std::function<void()> onConfigsReloaded;
     std::function<std::int64_t()> nowNanos;

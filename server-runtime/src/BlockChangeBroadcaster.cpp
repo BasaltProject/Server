@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Geysers.hpp>
+#include <basalt/server/runtime/world/GolemPatterns.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
@@ -64,7 +65,8 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
 }
 
 /// The world's own neighbour-update context, which is what the cascade reads off a world.
-[[nodiscard]] world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random) {
+[[nodiscard]] world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random,
+                                                         world::neighbourUpdates::Context::SummonGolem summonGolem) {
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
     return world::neighbourUpdates::Context{
         .world = world.state(),
@@ -90,6 +92,7 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
                 return world::geysers::validState(world.state(), world.metadata().seed, world.gameTime(), x, y, z,
                                                   stateId);
             },
+        .summonGolem = std::move(summonGolem),
         .gameTime = world.gameTime(),
         .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
 }
@@ -106,7 +109,12 @@ void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,
                                           const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                                           std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed) {
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    const world::neighbourUpdates::Context context = contextOf(world, random);
+    const world::neighbourUpdates::Context context =
+        contextOf(world, random, [this, &world](world::golemPatterns::Golem kind, double gx, double gy, double gz) {
+            if (hooks_.summonGolem) {
+                hooks_.summonGolem(world, world::golemPatterns::entityTypeOf(kind), gx, gy, gz);
+            }
+        });
     std::vector<world::BlockChange> effects;
     world::neighbourUpdates::afterChange(
         context, x, y, z, removed, effects,

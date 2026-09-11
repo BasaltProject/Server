@@ -251,6 +251,7 @@ basalt_module(server-runtime-core
         src/world/WindBursts.cpp
         src/world/RedstoneWire.cpp
         src/world/Geysers.cpp
+        src/world/GolemPatterns.cpp
         src/world/Signs.cpp
         src/world/BiomeZoomSeed.cpp
         src/world/Beds.cpp

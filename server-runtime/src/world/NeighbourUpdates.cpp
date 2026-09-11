@@ -476,12 +476,75 @@ void reshapeOnly(const Context& context, const std::int32_t x, const std::int32_
     }
 }
 
+namespace {
+
+/// parity: `LevelEvent.PARTICLES_DESTROY_BLOCK`, the puff `clearPatternBlocks` leaves behind.
+constexpr std::int32_t kBlockDestroyedEffect = 2001;
+
+/// parity: `spawnGolemInWorld`'s `snapTo`, which stands the golem a twentieth of a block up.
+constexpr double kGolemFootroom = 0.05;
+
+/// Whether the block that just arrived finished a golem, in which case it is already gone. parity:
+/// `CarvedPumpkinBlock.onPlace` runs inside `setBlockState`, so everything `Level.setBlock` does
+/// afterwards is behind `newState == blockState` and never happens. What tells the neighbours is
+/// `updatePatternBlocks`, one `updateNeighborsAt` per square, once the golem is standing.
+[[nodiscard]] bool buildGolem(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                              std::vector<BlockChange>& effects, const OnBroken& broken, const OnReshaped& reshaped) {
+    WorldState& world = context.world;
+    const std::optional<std::int32_t> standing = world.blockState(x, y, z);
+    if (!standing.has_value()) {
+        return false;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*standing);
+    if (block == nullptr) {
+        return false;
+    }
+    if (const std::string_view path = block->path(); path != "carved_pumpkin" && path != "jack_o_lantern") {
+        return false;
+    }
+    const std::optional<golemPatterns::Match> match = golemPatterns::find(world, x, y, z);
+    if (!match.has_value()) {
+        return false;
+    }
+    // parity: `clearPatternBlocks` writes air with flag 2, which reaches the clients and tells
+    // nothing around it, and raises the break particles of whatever it took away.
+    std::vector<std::int32_t> cleared;
+    cleared.reserve(match->cells.size());
+    for (const std::array<std::int32_t, 3>& cell : match->cells) {
+        const std::int32_t was = world.blockState(cell[0], cell[1], cell[2]).value_or(0);
+        cleared.push_back(was);
+        if (!world.setBlockState(cell[0], cell[1], cell[2], registry::blocks::air().stateId)) {
+            continue;
+        }
+        reshaped(registry::blocks::air().stateId, cell[0], cell[1], cell[2]);
+        effects.push_back(BlockChange{.x = cell[0],
+                                      .y = cell[1],
+                                      .z = cell[2],
+                                      .stateId = was,
+                                      .effects = {blockEffect::Effect{.type = kBlockDestroyedEffect, .data = was}}});
+    }
+    if (context.summonGolem) {
+        context.summonGolem(match->kind, match->spawn[0] + 0.5, match->spawn[1] + kGolemFootroom,
+                            match->spawn[2] + 0.5);
+    }
+    for (std::size_t index = 0; index < match->cells.size(); ++index) {
+        const std::array<std::int32_t, 3>& cell = match->cells[index];
+        afterChange(context, cell[0], cell[1], cell[2], cleared[index], effects, broken, reshaped);
+    }
+    return true;
+}
+
+} // namespace
+
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
                  const OnReshaped& onReshaped, bool reshapeSelf, const std::function<void()>& afterShapes) {
     WorldState& world = context.world;
     const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
     const OnBroken broken = onBroken ? onBroken : OnBroken{noop};
+    if (buildGolem(context, x, y, z, effects, broken, reshaped)) {
+        return;
+    }
     // Scaffolding counts out from its footing, which is a walk over the whole row rather than
     // anything one neighbour can answer, so the survival check is handed the walk.
     const blockSurvival::ScaffoldingHasFallen scaffolding = [&world](const WorldState&, std::int32_t sx,

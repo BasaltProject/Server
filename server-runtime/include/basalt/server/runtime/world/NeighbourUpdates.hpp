@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/GolemPatterns.hpp>
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
@@ -85,11 +86,16 @@ struct Context {
     /// A hook because the flow needs the world's game rules and this does not carry them.
     using WakeFluids = std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)>;
 
+    /// parity: `CarvedPumpkinBlock.trySpawnGolem`'s `addFreshEntity`, the half of finishing a golem
+    /// that is not about blocks. A hook because making a mob belongs to the entity side.
+    using SummonGolem = std::function<void(golemPatterns::Golem kind, double x, double y, double z)>;
+
     DispenserNeighbourChange dispenser;
     WakeFluids wakeFluids;
     WallShape wallShape;
     WireReshape wireReshape;
     reshapes::GeyserReshape geyser;
+    SummonGolem summonGolem;
     /// The world's clock, which the game events a reactor raises are stamped with: a door swinging
     /// is a `BLOCK_OPEN`, and a vibration knows which turn it was heard on.
     std::int64_t gameTime = 0;

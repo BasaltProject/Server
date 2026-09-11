@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::player {
@@ -30,6 +31,10 @@ public:
         /// Whether a piston at this position may finish its move.
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
             pistonAllowed;
+
+        /// parity: `CarvedPumpkinBlock.trySpawnGolem`'s `addFreshEntity`. A callback because making
+        /// a mob belongs to the entity side and this only knows which blocks went.
+        std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
     };
 
     struct Options {

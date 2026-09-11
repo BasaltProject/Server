@@ -81,12 +81,6 @@ struct Context {
 /// beside the piston's landing turn on the same square.
 [[nodiscard]] const wire::common::Identifier& slideTickType();
 
-/// One turn of the slide at this square. parity: `PistonMovingBlockEntity.tick` copies `progress`
-/// into `progressO` then adds a half, saves `progressO`, and never calls `setChanged`, so this does
-/// not dirty the chunk either. Answers whether the turn was the slide's own: a piston pulling back
-/// is one of the sliding squares and books both.
-[[nodiscard]] bool advanceSlide(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
-
 /// parity: `PistonBaseBlock.isPushable`. Air moves, obsidian and its family never do, a block with no
 /// destroy speed (bedrock) never does, and the push reaction decides the rest.
 ///
