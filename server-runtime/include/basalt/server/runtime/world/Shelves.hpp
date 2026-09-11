@@ -59,6 +59,19 @@ bool swapHotbar(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
 void reactToSignal(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                    std::int64_t gameTime, std::vector<BlockChange>& changes);
 
+/// parity: `ShelfBlock.affectNeighborsAfterRemoval`, which runs `updateNeighborsAfterPoweringDown`
+/// with the state that **was** there: the shelves either side let go of the square that emptied.
+void leftBehind(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t wasStateId,
+                std::vector<BlockChange>& changes);
+
+/// parity: `ShelfBlock.onPlace`, which carries **no** "only when the block changed" guard and runs on
+/// every write: a shelf that arrives already powered joins the chain beside it, and one that arrives
+/// without a signal breaks the chain its square was part of. `isBeingUpdatedByNeighbor` is what keeps
+/// the chain from redoing itself while a neighbour is writing it, and that is the `wasConnected`
+/// argument: the part the shelf carried before it was written.
+void arrived(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool wasConnected,
+             std::vector<BlockChange>& changes);
+
 /// parity: `ShelfBlockEntity.setChanged()`, which raises `BLOCK_ACTIVATE` on every write to its
 /// slots. No other container makes a noise when a hopper fills it: this one does.
 void slotsChanged(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime);

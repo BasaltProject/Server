@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
+#include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/SnowyBlocks.hpp>
 #include <basalt/server/runtime/world/Sponges.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
@@ -193,6 +194,18 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     world.setBlockState(x, y, z, registry::blocks::air().stateId);
     onBroken(*stateId, x, y, z);
     return true;
+}
+
+/// parity: `SideChainPartBlock.isBeingUpdatedByNeighbor`'s second half, the part the shelf carried
+/// before the write.
+[[nodiscard]] bool wasConnectedShelf(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr || !shelves::isShelf(block->path())) {
+        return false;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto part = properties.find("side_chain");
+    return part != properties.end() && part->second != "unconnected";
 }
 
 /// parity: `BlockState.updateNeighbourShapes`, the six squares a write redraws, each told the side
@@ -500,6 +513,25 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             if (state != properties.end() && (state->second == "erupting" || state->second == "continuous") &&
                 world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
                 vibrations::emit(world, "block_activate", x + 0.5, y + 0.5, z + 0.5, context.gameTime);
+            }
+        }
+        // parity: `ShelfBlock.affectNeighborsAfterRemoval`: the square that held a shelf and holds
+        // one no longer lets its neighbours go. Measured in `estantequita`.
+        if (removed.has_value()) {
+            std::vector<BlockChange> parted;
+            shelves::leftBehind(world, x, y, z, *removed, parted);
+            for (const BlockChange& change : parted) {
+                reshaped(change.stateId, change.x, change.y, change.z);
+            }
+        }
+        // parity: `ShelfBlock.onPlace`, which joins the chain for a shelf that arrives already
+        // powered. Measured in `colocadoonplace`, where three of them link up in the jar as the
+        // third one lands and stayed apart here.
+        if (shelves::isShelf(path)) {
+            std::vector<BlockChange> joined;
+            shelves::arrived(world, x, y, z, removed.has_value() && wasConnectedShelf(*removed), joined);
+            for (const BlockChange& change : joined) {
+                reshaped(change.stateId, change.x, change.y, change.z);
             }
         }
     }

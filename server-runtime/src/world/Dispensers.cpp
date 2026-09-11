@@ -950,6 +950,9 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     const Special special = dropper ? Special{} : dispenseOnBlock(context, x, y, z, *out, stack, hooks);
     if (special.refused) {
         result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserFail, .data = 0});
+        // parity: `DispenserBlock.dispenseFrom` writes the slot back whatever the behaviour answered,
+        // and `setItem` calls `setChanged`, so even a refused turn leaves the chunk dirty.
+        chunk->markDirty();
         return result;
     }
     if (special.handled) {
@@ -976,6 +979,9 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     const std::optional<Target> into = containerInFront(world, x, y, z, *out, hooks);
     if (into.has_value()) {
         if (!insertOne(world, *into, stack, registry::opposite(*out), hooks)) {
+            // parity: `DropperBlock.dispenseFrom` writes back the stack it could not hand over, so a
+            // full container still marks the block entity changed.
+            chunk->markDirty();
             return result;
         }
     } else {

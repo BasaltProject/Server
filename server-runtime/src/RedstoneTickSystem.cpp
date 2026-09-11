@@ -36,6 +36,10 @@
 namespace basalt::server::runtime {
 namespace {
 
+/// parity: `Entity.getOnPosLegacy`, `getOnPos(0.2f)`: the square a fifth of a block under the feet is
+/// the one an entity is standing on.
+constexpr double kOnPosDepth = 0.2;
+
 using player::PlayerSession;
 using wire::protocol::play::BlockPos;
 using wire::protocol::play::ClientboundBlockUpdatePacket;
@@ -181,13 +185,24 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
 
     // parity: `BigDripleafBlock.entityInside`, which is the same question the plate asks and the
     // same sweep answers it: what is standing on the square, and is anything holding the leaf up.
-    const auto stand = [this, &world, &region, &watchers](double atX, double atY, double atZ, bool onGround) {
+    const auto stand = [this, &world, &region, &watchers](double atX, double atY, double atZ, bool onGround,
+                                                          bool carefully = false) {
         if (!onGround || !region.ownsPosition(atX, atZ)) {
             return;
         }
         const auto x = static_cast<std::int32_t>(std::floor(atX));
         const auto y = static_cast<std::int32_t>(std::floor(atY));
         const auto z = static_cast<std::int32_t>(std::floor(atZ));
+        // parity: `RedStoneOreBlock.stepOn` lights the ore under whoever walks on it, unless they are
+        // treading carefully, which is vanilla's word for crouching. The square is `getOnPosLegacy`,
+        // a fifth of a block under their feet. Measured in `pisar`.
+        if (!carefully) {
+            if (const std::optional<world::BlockChange> lit = world::miscGrowth::lightRedstoneOre(
+                    world.state(), x, static_cast<std::int32_t>(std::floor(atY - kOnPosDepth)), z);
+                lit.has_value()) {
+                broadcaster_->announceRedstone(world, watchers, *lit);
+            }
+        }
         for (const std::int32_t at : {y, y - 1}) {
             if (const std::optional<world::BlockChange> tipping =
                     world::dripleaves::stoodOn(world.state(), world.name(), x, at, z, atY, onGround, world.gameTime());
@@ -199,7 +214,7 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     };
     for (const PlayerSession* player : watchers) {
         if (player->gamemode != Gamemode::Spectator) {
-            stand(player->x, player->y, player->z, player->onGround);
+            stand(player->x, player->y, player->z, player->onGround, player->sneaking);
         }
     }
     for (const world::DroppedItem& item : items) {
