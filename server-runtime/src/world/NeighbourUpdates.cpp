@@ -43,9 +43,6 @@ using registry::BlockFace;
 /// parity: `LeavesBlock.DECAY_DISTANCE`.
 constexpr std::int32_t kDecayDistance = 7;
 
-/// How many neighbours one position of the cascade spends of its budget.
-constexpr std::int32_t kDirections = 6;
-
 constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
                                           BlockFace::South, BlockFace::West, BlockFace::East};
 
@@ -481,10 +478,10 @@ void reshapeOnly(const Context& context, const std::int32_t x, const std::int32_
     std::deque<Position> pending;
     pending.push_back({x, y, z});
     std::int32_t examined = 0;
-    while (!pending.empty() && examined < kMaxCascade) {
+    while (!pending.empty() && examined < context.maxChainedUpdates) {
         const Position at = pending.front();
         pending.pop_front();
-        examined += kDirections;
+        ++examined;
         for (const BlockFace face : kUpdateShapeOrder) {
             visit(walk, pending, at[0] + registry::stepX(face), at[1] + registry::stepY(face),
                   at[2] + registry::stepZ(face), registry::opposite(face));
@@ -722,10 +719,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     std::deque<Position> pending;
     pending.push_back({x, y, z});
     std::int32_t examined = 0;
-    while (!pending.empty() && examined < kMaxCascade) {
+    while (!pending.empty() && examined < context.maxChainedUpdates) {
         const Position at = pending.front();
         pending.pop_front();
-        examined += kDirections;
+        ++examined;
         // parity: `BlockBehaviour.updateNeighbourShapes` walks `UPDATE_SHAPE_ORDER`, which is
         // neither `Direction.values()` nor `NeighborUpdater.UPDATE_ORDER`, and hands each neighbour
         // the side the news arrives from. A dust redraws differently depending on both.
@@ -740,6 +737,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     }
     const redstoneComponents::ContainerSignalAt reading = comparatorReading::of(world);
     redstoneComponents::scheduleAround(world, context.worldName, x, y, z, true, reading);
+    // parity: `Level.setBlock` follows the neighbour updates with `updateNeighbourForOutputSignal`
+    // whenever the state that **arrived** is one a comparator reads. That is the only thing that
+    // reaches a comparator sitting one square past a block that conducts, which is how a chest
+    // behind a wall is read. It is gated on the new state, so taking the chest away tells nobody:
+    // air has no analog output, and the jar leaves that comparator where it is.
+    if (comparatorReading::exists(world, x, y, z)) {
+        redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
+    }
     // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` ends with `updateNeighborsAt` on
     // **every** piece of dust whose strength moved and on each of that dust's six squares. Without
     // the first half a lamp at the end of a line never heard that the dust had lit up; without the
@@ -777,7 +782,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             reach.push_back(at);
         }
     }
-    if (removed.has_value() && (!standing.has_value() || !sameBlock(*removed, *standing))) {
+    // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` on the state that left
+    // when the block changed **or when the one that arrived is a rail**, which is the one exception
+    // in the whole method. A rail that only redraws its shape, or a powered rail whose `powered`
+    // moves, still tells its own square and the one below, and a slope still tells the one above.
+    const bool changedBlock = !standing.has_value() || !removed.has_value() || !sameBlock(*removed, *standing);
+    const bool railArrived = standing.has_value() && rails::isRail(*standing);
+    if (removed.has_value() && (changedBlock || railArrived)) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*removed, x, y, z)) {
             reach.push_back(at);
         }
@@ -831,7 +842,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     }
     std::int32_t reacted = 0;
-    while (!reacting.empty() && reacted < kMaxCascade) {
+    while (!reacting.empty() && reacted < context.maxChainedUpdates) {
         const Position at = reacting.front();
         reacting.pop_front();
         ++reacted;

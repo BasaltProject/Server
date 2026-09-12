@@ -135,6 +135,19 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         }
     };
 
+    connection.sendCommandTree = [this] {
+        if (session_ == nullptr || !context_.commandList) {
+            return;
+        }
+        std::vector<wire::bedrock::CommandInfo> commands;
+        for (auto& [name, usage] : context_.commandList(*session_)) {
+            commands.push_back(wire::bedrock::CommandInfo{std::move(name), std::move(usage)});
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeAvailableCommands(body, commands);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AvailableCommands), body.toVector());
+    };
+
     // Bedrock draws its hearts and haunches from attributes, and is told the range of each one:
     // where Java hardcodes the bounds in the client, here the server states them.
     connection.syncHealth = [this] {
@@ -204,6 +217,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     session_->connection().syncHealth();
     session_->connection().syncExperience();
     session_->connection().sendWeather(context_.weather);
+    session_->connection().sendCommandTree();
     wire::io::ByteBuffer time;
     wire::bedrock::writeSetTime(time, context_.worldTime);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTime), time.toVector());
