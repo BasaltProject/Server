@@ -29,12 +29,31 @@ inline constexpr std::int32_t kRecheckTicks = 20;
 /// parity: `AbstractMinecart`, of which any kind presses the rail.
 [[nodiscard]] bool isMinecart(const wire::common::Identifier& type);
 
+/// What one pass of `checkPressed` left behind.
+struct Checked {
+    /// The state the rail took, when it took one.
+    std::optional<BlockChange> change;
+    /// Whether the pass ran at all. parity: `checkPressed` ends in `updateNeighbourForOutputSignal`
+    /// **whatever** it decided, so a comparator reading a container minecart parked on the rail is
+    /// told again on every pass and follows what is inside the cart. Gated on the run and not on the
+    /// change, which is the whole point.
+    bool ran = false;
+};
+
+/// Who is asking, because the jar gates the two callers differently.
+enum class Caller : std::uint8_t {
+    /// parity: `entityInside`, which asks only while the rail is **not** powered.
+    Entity,
+    /// parity: `tick`, which asks only while it **is**.
+    ScheduledTick,
+};
+
 /// Looks at what is standing on the rail and answers the change, if it changed.
 ///
 /// parity: `checkPressed` is called both by a cart arriving and by the rail's own scheduled tick,
 /// which is why this takes the whole answer rather than a direction.
-[[nodiscard]] std::optional<BlockChange> check(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                               std::span<entity::ServerEntity* const> entities);
+[[nodiscard]] Checked check(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                            std::span<entity::ServerEntity* const> entities, Caller caller);
 
 /// What a comparator beside the rail reads: how full the container minecart standing on it is.
 ///

@@ -13,6 +13,14 @@
 namespace basalt::server::runtime::world::lecterns {
 namespace {
 
+/// parity: `LecternBlock.updateBelow`. Every path that writes a lectern ends in it. The lectern's own
+/// `setBlock` has already told this square's neighbours; what this adds is the square below and its
+/// own, which is where a line of dust running under the stand reads from. A lectern written by
+/// command gets none of it, because a command never goes through these paths.
+void tellBelow(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    redstoneComponents::scheduleAround(world, {}, x, y - 1, z, false, comparatorReading::of(world));
+}
+
 constexpr std::string_view kBookKey = "Book";
 constexpr std::string_view kPageKey = "Page";
 
@@ -123,6 +131,7 @@ std::optional<BlockChange> placeBook(WorldState& world, std::int32_t x, std::int
     // parity: `setBook` resolves what it is handed before it keeps it.
     static_cast<void>(resolveBook(world, x, y, z));
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+    tellBelow(world, x, y, z);
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
@@ -173,6 +182,7 @@ std::optional<std::pair<BlockChange, server::world::loot::ItemStack>> takeBook(W
     static_cast<void>(entity->data().remove(std::string{kPageKey}));
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+    tellBelow(world, x, y, z);
     return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *turned}, *book};
 }
 
@@ -197,6 +207,7 @@ std::optional<BlockChange> turnPage(WorldState& world, std::int32_t x, std::int3
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     world.scheduleBlockTick(x, y, z, block(), kPulseTicks);
+    tellBelow(world, x, y, z);
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
@@ -211,6 +222,7 @@ std::optional<BlockChange> endPulse(WorldState& world, std::int32_t x, std::int3
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
+    tellBelow(world, x, y, z);
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 

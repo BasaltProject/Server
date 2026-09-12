@@ -454,8 +454,10 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
     for (std::int32_t offsetY = -kCalibratedRange; offsetY <= kCalibratedRange; ++offsetY) {
         for (std::int32_t offsetZ = -kCalibratedRange; offsetZ <= kCalibratedRange; ++offsetZ) {
             for (std::int32_t offsetX = -kCalibratedRange; offsetX <= kCalibratedRange; ++offsetX) {
-                // parity: `EuclideanGameEventListenerRegistry.filterInvalidListeners` measures the
-                // range between the two **blocks**, not between the exact points.
+                // parity: `EuclideanGameEventListenerRegistry.getPostableListenerPosition`, which
+                // measures `BlockPos.containing(listener).distSqr(BlockPos.containing(source))`
+                // against the radius squared: the range runs between the two **blocks** and not
+                // between the exact points, and only what is strictly greater falls outside.
                 const std::int32_t reach = (offsetX * offsetX) + (offsetY * offsetY) + (offsetZ * offsetZ);
                 if (reach > kCalibratedRange * kCalibratedRange) {
                     continue;

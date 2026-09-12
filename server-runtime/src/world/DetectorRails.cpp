@@ -58,19 +58,25 @@ bool isMinecart(const wire::common::Identifier& type) {
     return std::ranges::find(kMinecarts, type.path()) != kMinecarts.end();
 }
 
-std::optional<BlockChange> check(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                 std::span<entity::ServerEntity* const> entities) {
+Checked check(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+              std::span<entity::ServerEntity* const> entities, const Caller caller) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
-        return std::nullopt;
+        return {};
     }
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     if (block == nullptr || *block != railBlock()) {
-        return std::nullopt;
+        return {};
     }
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const auto poweredAt = properties.find("powered");
     const bool powered = poweredAt != properties.end() && poweredAt->second == "true";
+    // parity: `entityInside` asks only while the rail is not powered and `tick` only while it is, so
+    // a cart sitting on a rail that already went off does not re-ask it every tick: the twenty tick
+    // turn is what keeps looking.
+    if (powered != (caller == Caller::ScheduledTick)) {
+        return {};
+    }
 
     const bool occupied = std::ranges::any_of(entities, [x, y, z](const entity::ServerEntity* standing) {
         return standing != nullptr && isMinecart(standing->type()) && touches(*standing, x, y, z);
@@ -79,14 +85,14 @@ std::optional<BlockChange> check(WorldState& world, std::int32_t x, std::int32_t
         world.scheduleBlockTick(x, y, z, railBlock(), kRecheckTicks);
     }
     if (occupied == powered) {
-        return std::nullopt;
+        return Checked{.ran = true};
     }
     const std::optional<std::int32_t> turned =
         registry::blockStateDefinitions::stateIdOf(*block, {{"powered", occupied ? "true" : "false"}}, *stateId);
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
-        return std::nullopt;
+        return Checked{.ran = true};
     }
-    return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
+    return Checked{.change = BlockChange{.x = x, .y = y, .z = z, .stateId = *turned}, .ran = true};
 }
 
 std::int32_t comparatorSignal(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
