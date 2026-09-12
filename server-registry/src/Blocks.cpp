@@ -62,6 +62,8 @@ std::optional<std::int32_t> blockIdOf(const Identifier& block) {
     return found == tables().blockIdsByName.end() ? std::nullopt : std::optional{found->second};
 }
 
+std::optional<std::int32_t> defaultStateIdOf(const Identifier& block) { return tables().registry.idOf(block); }
+
 const BlockHardness* hardnessOf(const Identifier& block) {
     const auto found = tables().hardnessByBlock.find(block);
     return found == tables().hardnessByBlock.end() ? nullptr : &found->second;

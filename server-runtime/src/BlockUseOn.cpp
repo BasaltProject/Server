@@ -535,7 +535,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     if (againstAWall) {
         placedBlock = world::wallVariants::of(placedBlock).value_or(placedBlock);
     }
-    const std::optional<std::int32_t> defaultStateId = reg::blocks::blockIdOf(placedBlock);
+    const std::optional<std::int32_t> defaultStateId = reg::blocks::defaultStateIdOf(placedBlock);
     if (!defaultStateId.has_value()) {
         ack();
         return;
@@ -576,6 +576,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
                                          .pitch = session->pitch,
                                          .replacing = *existing,
                                          .world = world == nullptr ? nullptr : &world->state(),
+                                         .worldName = world == nullptr ? std::string_view{} : world->name(),
                                          .x = placeAt.x,
                                          .y = placeAt.y,
                                          .z = placeAt.z},

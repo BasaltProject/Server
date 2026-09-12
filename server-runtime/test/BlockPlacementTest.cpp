@@ -44,6 +44,17 @@ struct Loaded {
     Loaded() { state.getOrGenerateChunk(0, 0); }
 };
 
+/// The state a block goes down as, asked for the way the **server** asks for it rather than the way
+/// a test can fabricate. `BlockUseOn` reached for `blockIdOf` here for a long time, which is another
+/// number entirely, and no test noticed because every test wrote the right one by hand.
+[[nodiscard]] std::int32_t placedAsTheServerDoes(const std::string& path) {
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    const std::optional<std::int32_t> defaultState =
+        registry::blocks::defaultStateIdOf(basalt::wire::common::Identifier::vanilla(path));
+    REQUIRE(defaultState.has_value());
+    return blockPlacement::stateFor(block(path), *defaultState, {.face = Direction::Up}, random);
+}
+
 /// The state a block goes down as, with the placement details that matter spelled out.
 [[nodiscard]] std::int32_t placed(const std::string& path, const blockPlacement::Placement& placement) {
     rng::RandomSource random = rng::RandomSource::legacy(1);
@@ -51,6 +62,134 @@ struct Loaded {
 }
 
 } // namespace
+
+TEST_CASE("what a player puts down is the block they were holding") {
+    // The numbers a block has are two: `redstone_block` is block 475 and state 11311, and state 475
+    // is `pale_oak_leaves`. Placing used the first where the second belongs, so a piece of dust went
+    // down as `oak_wood` and a redstone block as leaves, with no error anywhere.
+    for (const std::string& path :
+         {std::string{"redstone_wire"}, std::string{"redstone_block"}, std::string{"repeater"},
+          std::string{"comparator"}, std::string{"redstone_torch"}, std::string{"lever"},
+          std::string{"stone"}, std::string{"oak_log"}, std::string{"chest"}}) {
+        const std::int32_t state = placedAsTheServerDoes(path);
+        const basalt::wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(state);
+        REQUIRE(owner != nullptr);
+        CHECK(owner->path() == path);
+    }
+}
+
+TEST_CASE("a block id handed in where a state id belongs is corrected, not obeyed") {
+    // What actually broke: `BlockUseOn` reached for `blockIdOf`. `stateFor` now checks the number
+    // against the block it was given and puts the right one back, so the same slip cannot put a
+    // different block on the ground again.
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    for (const std::string& path : {std::string{"redstone_wire"}, std::string{"redstone_block"}}) {
+        const std::optional<std::int32_t> blockId =
+            registry::blocks::blockIdOf(basalt::wire::common::Identifier::vanilla(path));
+        REQUIRE(blockId.has_value());
+        const std::int32_t state = blockPlacement::stateFor(block(path), *blockId, {.face = Direction::Up}, random);
+        const basalt::wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(state);
+        REQUIRE(owner != nullptr);
+        CHECK(owner->path() == path);
+    }
+}
+
+TEST_CASE("a repeater goes down unlocked and unpowered") {
+    // parity: the first state in a repeater's palette is `locked=true,powered=true`, because a
+    // boolean property lists `true` first. The default state is not the first state, and reaching
+    // for the wrong one put down a repeater that arrived already lit and held.
+    const std::int32_t state = placedAsTheServerDoes("repeater");
+    CHECK(propertyOf(state, "locked") == "false");
+    CHECK(propertyOf(state, "powered") == "false");
+    CHECK(propertyOf(state, "delay") == "1");
+}
+
+TEST_CASE("what lands in a powered square arrives switched on") {
+    // parity: a trapdoor and a fence gate read `hasNeighborSignal` in `getStateForPlacement`, and
+    // nothing reaches them afterwards to correct it: a block that has just landed only hears its own
+    // `onPlace`, and neither of these has one. The bench cannot see this at all, because every
+    // circuit it has builds with `/setblock`.
+    Loaded loaded;
+    REQUIRE(loaded.state.setBlockState(8, 64, 8, defaultOf("redstone_block")));
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    const auto place = [&](const std::string& path, std::int32_t x) {
+        const std::optional<std::int32_t> defaultState =
+            registry::blocks::defaultStateIdOf(basalt::wire::common::Identifier::vanilla(path));
+        REQUIRE(defaultState.has_value());
+        return blockPlacement::stateFor(block(path), *defaultState,
+                                        {.face = Direction::Up,
+                                         .world = &loaded.state,
+                                         .worldName = "overworld",
+                                         .x = x,
+                                         .y = 64,
+                                         .z = 8},
+                                        random);
+    };
+
+    const std::int32_t beside = place("oak_trapdoor", 9);
+    CHECK(propertyOf(beside, "open") == "true");
+    CHECK(propertyOf(beside, "powered") == "true");
+
+    const std::int32_t gate = place("oak_fence_gate", 7);
+    CHECK(propertyOf(gate, "open") == "true");
+    CHECK(propertyOf(gate, "powered") == "true");
+
+    // Two squares away there is no signal, and both arrive shut.
+    const std::int32_t away = place("oak_trapdoor", 12);
+    CHECK(propertyOf(away, "open") == "false");
+    CHECK(propertyOf(away, "powered") == "false");
+    const std::int32_t gateAway = place("oak_fence_gate", 12);
+    CHECK(propertyOf(gateAway, "open") == "false");
+    CHECK(propertyOf(gateAway, "powered") == "false");
+}
+
+TEST_CASE("a hopper points into the square that was clicked") {
+    // parity: `HopperBlock.getStateForPlacement`. A hopper has five facings, so it fell through both
+    // the four-way and the six-way rules and every one landed pointing down, whichever face of a
+    // chest it was stuck to.
+    CHECK(propertyOf(placed("hopper", {.face = Direction::East}), "facing") == "west");
+    CHECK(propertyOf(placed("hopper", {.face = Direction::North}), "facing") == "south");
+    // Clicking a floor or a ceiling gives the spout no sideways way to go, so it points down.
+    CHECK(propertyOf(placed("hopper", {.face = Direction::Up}), "facing") == "down");
+    CHECK(propertyOf(placed("hopper", {.face = Direction::Down}), "facing") == "down");
+}
+
+TEST_CASE("concrete powder pushed into water is already concrete") {
+    // parity: `ConcretePowderBlock.getStateForPlacement`. The square still holds the water being
+    // replaced when the question is asked, which is the whole way anybody makes concrete.
+    Loaded loaded;
+    const std::int32_t water = defaultOf("water");
+    REQUIRE(loaded.state.setBlockState(8, 64, 8, water));
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    const auto place = [&](std::int32_t x, std::int32_t replacing) {
+        const std::optional<std::int32_t> defaultState =
+            registry::blocks::defaultStateIdOf(basalt::wire::common::Identifier::vanilla("white_concrete_powder"));
+        REQUIRE(defaultState.has_value());
+        return blockPlacement::stateFor(block("white_concrete_powder"), *defaultState,
+                                        {.face = Direction::Up,
+                                         .replacing = replacing,
+                                         .world = &loaded.state,
+                                         .worldName = "overworld",
+                                         .x = x,
+                                         .y = 64,
+                                         .z = 8},
+                                        random);
+    };
+    // Into the water itself.
+    const basalt::wire::common::Identifier* into = registry::blockStateDefinitions::blockOf(place(8, water));
+    REQUIRE(into != nullptr);
+    CHECK(into->path() == "white_concrete");
+
+    // And beside it.
+    const basalt::wire::common::Identifier* beside = registry::blockStateDefinitions::blockOf(place(9, 0));
+    REQUIRE(beside != nullptr);
+    CHECK(beside->path() == "white_concrete");
+
+    // Two squares away nothing reaches it and it stays powder.
+    const basalt::wire::common::Identifier* dry = registry::blockStateDefinitions::blockOf(place(11, 0));
+    REQUIRE(dry != nullptr);
+    CHECK(dry->path() == "white_concrete_powder");
+}
 
 TEST_CASE("the quarter of a yaw a player is looking along") {
     // parity: `Direction.fromYRot`, south at zero and turning clockwise.

@@ -1,8 +1,11 @@
 #include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
+#include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
 
 #include <algorithm>
@@ -293,6 +296,39 @@ constexpr auto kGrowingHeads =
     const std::int32_t x = placement.x;
     const std::int32_t y = placement.y;
     const std::int32_t z = placement.z;
+    // parity: the blocks whose `getStateForPlacement` reads the power that is already in the square.
+    // A trapdoor or a fence gate put down where a lever is on arrives **open**, and a shelf, a skull
+    // and a crafter arrive switched on. Nothing reaches them afterwards to correct it: a block that
+    // has just landed only hears its own `onPlace`, and none of these has one.
+    const auto poweredHere = [&]() {
+        return world != nullptr && redstone::bestNeighbourSignal(*world, placement.worldName, x, y, z) > 0;
+    };
+    if (path.ends_with("_trapdoor")) {
+        // parity: the trapdoor only ever **sets** these two, so an unpowered square leaves the
+        // default alone rather than writing false over it.
+        if (poweredHere()) {
+            properties["open"] = "true";
+            properties["powered"] = "true";
+        }
+    } else if (path.ends_with("_fence_gate")) {
+        properties["open"] = properties["powered"] = poweredHere() ? "true" : "false";
+    } else if (path.ends_with("_shelf") || path == "shelf" || path.ends_with("_head") || path.ends_with("_skull")) {
+        properties["powered"] = poweredHere() ? "true" : "false";
+    } else if (path == "crafter") {
+        properties["triggered"] = poweredHere() ? "true" : "false";
+    } else if (path == "hopper") {
+        // parity: `HopperBlock.getStateForPlacement`, which points the spout **into** the square that
+        // was clicked, and straight down whenever that would be up or down. A hopper has five
+        // facings, so neither the four-way nor the six-way rule above reaches it and every one used
+        // to land pointing down.
+        const Direction back = opposite(placement.face);
+        properties["facing"] =
+            back == Direction::Up || back == Direction::Down ? std::string{"down"} : std::string{nameOf(back)};
+    } else if (path == "repeater" && world != nullptr) {
+        // parity: `RepeaterBlock.getStateForPlacement` asks `isLocked` before the block is written,
+        // so one dropped between two powered repeaters is held from its very first tick.
+        properties["locked"] = redstoneComponents::wouldBeLocked(*world, x, y, z, properties) ? "true" : "false";
+    }
     // parity: `SnowyBlock.getStateForPlacement`, grass and mycelium put down under snow.
     if (!definition.valuesOf("snowy").empty() && world != nullptr) {
         properties["snowy"] = isSnow(stateAt(*world, x, y + 1, z)) ? "true" : "false";
@@ -409,8 +445,29 @@ Direction nearestLooking(float yaw, float pitch) {
     return z > 0 ? Direction::South : Direction::North;
 }
 
-std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t defaultStateId, const Placement& placement,
+std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenDefault, const Placement& placement,
                       random::RandomSource& random) {
+    // A block has two numbers that look alike: its registry id and its default state id. Handed the
+    // wrong one this used to answer a state belonging to some other block entirely, and the caller
+    // had no way to tell. The block itself is the authority here, so the number is checked against
+    // it and replaced when it does not fit.
+    const wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(givenDefault);
+    const std::int32_t defaultStateId =
+        owner != nullptr && *owner == block
+            ? givenDefault
+            : registry::blocks::defaultStateIdOf(block).value_or(givenDefault);
+    // parity: `ConcretePowderBlock.getStateForPlacement`, the third site that asks the same question
+    // as the shape update and the landing: the square still holds the water being replaced when it
+    // is asked, which is how anybody actually makes concrete. This goes before everything else
+    // because concrete powder has no properties at all, so the state table has no entry to orient
+    // and the whole rest of this function is skipped for it.
+    if (block.path().ends_with("_concrete_powder") && placement.world != nullptr &&
+        (registry::blockFluids::hasWaterFluid(placement.replacing) ||
+         reshapes::touchesWater(*placement.world, placement.x, placement.y, placement.z))) {
+        if (const std::optional<std::int32_t> set = reshapes::concreteFor(block); set.has_value()) {
+            return *set;
+        }
+    }
     const registry::blockStateDefinitions::Definition* definition = registry::blockStateDefinitions::of(block);
     if (definition == nullptr) {
         return defaultStateId;

@@ -68,6 +68,21 @@ TEST_CASE("a block id is not a block state id") {
     CHECK(*blockId != blocks::bedrock().stateId);
 }
 
+TEST_CASE("the default state of every block belongs to that block") {
+    // The invariant that block placement and the plugin API both broke by reaching for `blockIdOf`:
+    // a block id used as a state id lands inside some other block's range without any error, and
+    // dropped a piece of redstone dust as `oak_wood` and a redstone block as `pale_oak_leaves`.
+    for (const auto& [blockId, path] : blockIdsTable()) {
+        const Identifier block = Identifier::vanilla(std::string{path});
+        const std::optional<std::int32_t> defaultState = blocks::defaultStateIdOf(block);
+        REQUIRE(defaultState.has_value());
+        const Identifier* owner = blockStateDefinitions::blockOf(*defaultState);
+        REQUIRE(owner != nullptr);
+        CHECK(owner->path() == path);
+        static_cast<void>(blockId);
+    }
+}
+
 TEST_CASE("an unknown property or value is refused rather than ignored") {
     const Identifier grass = Identifier::vanilla("grass_block");
     CHECK(blockStateDefinitions::stateIdOf(grass, {{"snowy", "true"}}).has_value());

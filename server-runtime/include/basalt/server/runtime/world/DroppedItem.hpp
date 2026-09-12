@@ -15,6 +15,9 @@ inline constexpr std::int32_t kItemLifetimeTicks = 6000;
 /// parity: what a player's own toss gets, so it does not immediately fly back into their inventory.
 inline constexpr std::int32_t kDefaultPickupDelay = 40;
 
+/// parity: `ItemEntity.health`, five for every stack.
+inline constexpr std::int32_t kItemHealth = 5;
+
 /// One stack lying on the ground.
 struct DroppedItem {
     std::int32_t entityId = 0;
@@ -46,6 +49,13 @@ struct DroppedItem {
 
     /// Ticks lived.
     std::int32_t age = 0;
+
+    /// What is left of the five hits an item entity takes before it is gone.
+    ///
+    /// parity: `ItemEntity.health`, which starts at five and goes down one per point of damage.
+    /// Only a cactus spends it here; fire and lava need the fire clock and the item's own
+    /// `damage_resistant` component, neither of which this build has.
+    std::int32_t health = kItemHealth;
 
     /// What the stack carries besides its id and count, as a shulker box carries its contents.
     ///
