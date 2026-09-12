@@ -747,6 +747,16 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (comparatorReading::exists(world, x, y, z)) {
         redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
     }
+    // parity: `Containers.updateNeighboursAfterDestroy`, which thirteen containers answer their
+    // removal with. It makes the very same call with the block that **left**, so the comparator
+    // reading a chest through a wall does hear the chest go. Same two gates as every removal hook:
+    // the block changed, and the write carried `UPDATE_NEIGHBORS`. Measured in `cofreavisapared`.
+    if (context.updateNeighbours && removed.has_value() && redstoneComponents::tellsComparatorsOnRemoval(*removed)) {
+        const std::optional<std::int32_t> nowHere = world.blockState(x, y, z);
+        if (!nowHere.has_value() || !sameBlock(*removed, *nowHere)) {
+            redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
+        }
+    }
     // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` ends with `updateNeighborsAt` on
     // **every** piece of dust whose strength moved and on each of that dust's six squares. Without
     // the first half a lamp at the end of a line never heard that the dust had lit up; without the

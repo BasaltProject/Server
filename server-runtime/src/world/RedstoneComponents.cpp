@@ -9,6 +9,8 @@
 #include <array>
 #include <charconv>
 #include <cstdint>
+#include <set>
+#include <string>
 
 namespace basalt::server::runtime::world::redstoneComponents {
 namespace {
@@ -559,6 +561,20 @@ std::vector<Reach> outputReach(const std::int32_t stateId, const std::int32_t x,
         .x = x + registry::stepX(out), .y = y + registry::stepY(out), .z = z + registry::stepZ(out), .skip = *facing}};
 }
 
+bool tellsComparatorsOnRemoval(const std::int32_t stateId) {
+    const std::string path = pathOf(stateId);
+    // parity: exactly the blocks whose `affectNeighborsAfterRemoval` is
+    // `Containers.updateNeighboursAfterDestroy`, plus the copper golem statue, which makes the call
+    // itself. Having an analog output is not the test: a lectern and a composter have one and
+    // neither overrides the hook.
+    static const std::set<std::string, std::less<>> kByName{
+        "barrel",  "blast_furnace",  "brewing_stand", "chest",     "chiseled_bookshelf",
+        "crafter", "creaking_heart", "decorated_pot", "dispenser", "dropper",
+        "furnace", "hopper",         "jukebox",       "smoker",    "trapped_chest"};
+    return kByName.contains(path) || path.ends_with("shulker_box") || path.ends_with("_shelf") ||
+           path.ends_with("copper_golem_statue");
+}
+
 std::vector<Reach> removalReach(const std::int32_t stateId, const std::int32_t x, const std::int32_t y,
                                 const std::int32_t z) {
     const std::string path = pathOf(stateId);
@@ -585,6 +601,20 @@ std::vector<Reach> removalReach(const std::int32_t stateId, const std::int32_t x
         }
         if (face == "ceiling") {
             return {Reach{.x = x, .y = y + 1, .z = z}};
+        }
+        const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
+        if (!facing.has_value()) {
+            return {};
+        }
+        const BlockFace behind = registry::opposite(*facing);
+        return {Reach{
+            .x = x + registry::stepX(behind), .y = y + registry::stepY(behind), .z = z + registry::stepZ(behind)}};
+    }
+    // parity: `LightningRodBlock.affectNeighborsAfterRemoval` and `TripWireHookBlock.onRemoved`, both
+    // gated on `POWERED` and both reaching the block they were stuck to.
+    if (path == "lightning_rod" || path == "tripwire_hook") {
+        if (valueOf(properties, "powered") != "true") {
+            return {};
         }
         const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
         if (!facing.has_value()) {

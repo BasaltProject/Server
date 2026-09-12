@@ -182,6 +182,7 @@ basalt_module(server-runtime-core
         src/player/PlayerPersistence.cpp
         src/player/PlayerBlockUpdates.cpp
         src/player/PlayerDeath.cpp
+        src/player/PlayerSounds.cpp
         src/player/PlayerRegistry.cpp
         src/player/Menu.cpp
         src/player/PlayerInventory.cpp

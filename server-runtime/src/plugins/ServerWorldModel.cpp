@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
@@ -236,9 +237,20 @@ public:
 
     bool setBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view block) override {
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{block});
-        const std::optional<std::int32_t> stateId =
-            id.has_value() ? reg::blocks::defaultStateIdOf(*id) : std::nullopt;
-        return stateId.has_value() && world_->state().setBlockState(x, y, z, *stateId);
+        const std::optional<std::int32_t> stateId = id.has_value() ? reg::blocks::defaultStateIdOf(*id) : std::nullopt;
+        if (!stateId.has_value() || !world_->state().setBlockState(x, y, z, *stateId)) {
+            return false;
+        }
+        // Told to everyone in this world, because a block that only the server knows about is one
+        // nobody can see: a client draws from the copy it was sent and never asks again.
+        if (players_) {
+            for (const player::PlayerSession* player : players_()) {
+                if (player->worldName == world_->name()) {
+                    player::sendBlockChangeTo(*player, x, y, z, *stateId);
+                }
+            }
+        }
+        return true;
     }
 
     [[nodiscard]] std::vector<std::shared_ptr<PluginEntityRef>> entities() const override {

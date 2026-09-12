@@ -63,6 +63,10 @@ struct PlayerConnection {
     /// knows how to say it on the edition this connection speaks.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> sendBlockChange;
 
+    /// Plays a sound where this player can hear it, named the way Java names it. A connection that
+    /// speaks another edition translates the name itself.
+    std::function<void(std::string_view sound, double x, double y, double z, float volume, float pitch)> playSound;
+
     /// Sends one chunk again, for a change too big to patch block by block.
     std::function<void(std::int32_t chunkX, std::int32_t chunkZ)> resendChunk;
 

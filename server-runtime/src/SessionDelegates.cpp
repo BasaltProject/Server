@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -182,16 +183,10 @@ bool ClientSession::withinAttackReach(const PlayerSession& session, const entity
 
 void ClientSession::broadcastSound(std::string_view sound, double x, double y, double z, play::SoundSource source,
                                    float volume, float pitch) {
-    const play::SoundPacket packet{.sound = std::string{sound},
-                                   .source = source,
-                                   .x = x,
-                                   .y = y,
-                                   .z = z,
-                                   .volume = volume,
-                                   .pitch = pitch,
-                                   .seed = options_.nextSeed ? options_.nextSeed() : 0};
-    sendTo(playersInSameWorld(), play::SoundPacket::kId,
-           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
+    for (const player::PlayerSession* player : playersInSameWorld()) {
+        player::playSoundFor(*player, sound, source, x, y, z, volume, pitch, seed);
+    }
 }
 
 void ClientSession::sendPluginText(const wire::text::Component& text, bool actionBar) {

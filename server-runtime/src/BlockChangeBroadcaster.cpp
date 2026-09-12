@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
@@ -153,15 +154,11 @@ void BlockChangeBroadcaster::sendEffects(const std::vector<player::PlayerSession
     const play::BlockPos pos{x, y, z};
     for (const world::BlockEffect& effect : effects) {
         if (const auto* sound = std::get_if<world::blockEffect::Sound>(&effect); sound != nullptr) {
-            const play::SoundPacket packet{.sound = sound->name,
-                                           .source = sound->source,
-                                           .x = x + 0.5,
-                                           .y = y + 0.5,
-                                           .z = z + 0.5,
-                                           .volume = sound->volume,
-                                           .pitch = sound->pitch,
-                                           .seed = nextSeed()};
-            sendTo(watchers, play::SoundPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            const std::int64_t seed = nextSeed();
+            for (const player::PlayerSession* player : watchers) {
+                player::playSoundFor(*player, sound->name, sound->source, x + 0.5, y + 0.5, z + 0.5, sound->volume,
+                                     sound->pitch, seed);
+            }
         } else if (const auto* event = std::get_if<world::blockEffect::Event>(&effect); event != nullptr) {
             const play::BlockEventPacket packet{.pos = pos,
                                                 .b0 = static_cast<std::uint8_t>(event->b0),
