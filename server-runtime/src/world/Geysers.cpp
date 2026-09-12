@@ -105,6 +105,20 @@ constexpr std::int32_t kNoCountdown = -1;
     return "wet";
 }
 
+/// parity: `PotentSulfurBlock.onPlace` for a geyser that is going: a block event with two zeroes
+/// and the sound of it starting. The event is what tells a client **when** it started, because
+/// `triggerEvent` writes `eruptionTick` and the client's own plume ticker counts from there; without
+/// it the plume comes out of step with the sound. Neither reaches the world: the field is not saved
+/// and nothing on this side reads it.
+[[nodiscard]] std::vector<BlockEffect> startingEffects(const std::string& state) {
+    if (state != "erupting" && state != "continuous") {
+        return {};
+    }
+    return {blockEffect::Event{},
+            blockEffect::Sound{.name = state == "continuous" ? "block.potent_sulfur.geyser_continuous_eruption"
+                                                             : "block.potent_sulfur.geyser_eruption"}};
+}
+
 } // namespace
 
 const wire::common::Identifier& block() {
@@ -201,7 +215,7 @@ std::optional<BlockChange> countdownTick(WorldState& world, std::int64_t seed, s
         vibrations::emit(world, turnedTo == "dormant" ? "block_deactivate" : "block_activate", x + 0.5, y + 0.5,
                          z + 0.5, gameTime);
     }
-    return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
+    return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned, .effects = startingEffects(turnedTo)};
 }
 
 } // namespace basalt::server::runtime::world::geysers
