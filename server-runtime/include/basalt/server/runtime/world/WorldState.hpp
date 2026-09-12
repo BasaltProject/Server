@@ -185,6 +185,10 @@ public:
     /// Everything booked since the last call, in the order it was booked.
     [[nodiscard]] std::vector<BlockEvent> takeBlockEvents();
 
+    /// The oldest one booked, taken out of the queue. The rest stay in, so one booked while this
+    /// runs still sees them and collapses against them.
+    [[nodiscard]] std::optional<BlockEvent> takeFirstBlockEvent();
+
     /// One more time a torch went out here.
     void addTorchToggle(TorchToggle toggle);
 
@@ -286,6 +290,9 @@ public:
     [[nodiscard]] std::vector<DroppedItem> nearbyItems(double x, double y, double z, double radius) const;
 
     [[nodiscard]] std::optional<DroppedItem> removeItem(std::int32_t entityId);
+
+    /// parity: `ItemEntity.hurtServer`. Answers whether the stack is gone.
+    bool hurtItem(std::int32_t entityId, std::int32_t amount);
 
     /// Shoves one item along, for a piston pushing whatever its blocks sweep over.
     bool shiftItem(std::int32_t entityId, double dx, double dy, double dz);

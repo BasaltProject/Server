@@ -74,6 +74,12 @@ public:
     /// Answers false when the item is already gone.
     bool shiftItem(std::int32_t entityId, double dx, double dy, double dz);
 
+    /// Spends an item's health, answering whether that finished it off.
+    ///
+    /// parity: `ItemEntity.hurtServer`, which takes the damage off the five it has and discards the
+    /// stack at zero, with no invulnerable window of any kind.
+    bool hurtItem(std::int32_t entityId, std::int32_t amount);
+
     /// One tick of item physics for the whole world, answering the entity ids that despawned. parity:
     /// `ItemEntity.tick`: gravity, the move against real block shapes, drag, ground friction, the
     /// half-damped bounce and the merge with a neighbouring stack. Floating on a fluid is a gap.

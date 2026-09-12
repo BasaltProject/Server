@@ -561,6 +561,37 @@ TEST_CASE("a block that only changed shape carries the walk on to the next one")
     CHECK(propertyAt(loaded.state, 8, 64, 10, "south") == "true");
 }
 
+TEST_CASE("a broken line of dust tells the dust it reached across a step") {
+    // parity: `Level.setBlock` runs `RedStoneWireBlock.updateIndirectNeighbourShapes` on the state
+    // that left as well as on the one that arrived. Nothing else reaches the dust up the step: the
+    // step does not change shape, so the walk over the six sides stops on it.
+    Loaded loaded;
+    loaded.put(8, 64, 8, stateOf("stone"));
+    loaded.put(9, 65, 8, stateOf("stone"));
+    const std::int32_t below = stateOf(
+        "redstone_wire", {{"north", "none"}, {"south", "none"}, {"east", "up"}, {"west", "none"}, {"power", "0"}});
+    const std::int32_t above = stateOf(
+        "redstone_wire", {{"north", "none"}, {"south", "none"}, {"east", "none"}, {"west", "side"}, {"power", "0"}});
+    loaded.put(8, 65, 8, below);
+    loaded.put(9, 66, 8, above);
+
+    loaded.put(8, 65, 8, air());
+    Report report;
+    neighbourUpdates::afterChange(loaded.context(), 8, 65, 8, below, report.effects, report.onBroken(),
+                                  report.onReshaped());
+
+    const std::optional<std::int32_t> left = loaded.state.blockState(9, 66, 8);
+    REQUIRE(left.has_value());
+    // With nothing left to connect to, the dust starts its drawing over, and `getConnectionState`
+    // over `crossState` is never a dot: the four sides come back as a cross. Without the walk on the
+    // state that left, it keeps pointing west at a square that is now air.
+    const std::map<std::string, std::string> drawn = registry::blockStateDefinitions::propertiesOf(*left);
+    CHECK(drawn.at("west") == "side");
+    CHECK(drawn.at("north") == "side");
+    CHECK(drawn.at("south") == "side");
+    CHECK(drawn.at("east") == "side");
+}
+
 TEST_CASE("a staircase turns its corner towards the flight it meets") {
     const std::int32_t straight = stateOf(
         "oak_stairs", {{"facing", "north"}, {"half", "bottom"}, {"shape", "straight"}, {"waterlogged", "false"}});

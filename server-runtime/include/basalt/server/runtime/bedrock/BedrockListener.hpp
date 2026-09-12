@@ -89,6 +89,9 @@ public:
         wire::common::Uuid uuid;
         std::string address;
         bool authenticated = false;
+        /// Which Bedrock protocol this client speaks, because several packets are shaped one way
+        /// for the newest and another for everything below it.
+        int protocol = 0;
         /// Where to leave what this player is told.
         std::shared_ptr<BedrockMailbox> mailbox;
     };

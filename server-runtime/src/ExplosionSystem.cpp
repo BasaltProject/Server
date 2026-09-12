@@ -102,6 +102,24 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         }
     }
 
+    // parity: `ServerExplosion.explode` runs `hurtEntities()` **before** `interactWithBlocks`, so a
+    // blast never hurts the items it is about to drop itself. It hurts everything else in the box,
+    // players included: a tnt blast is `DESTROY_WITH_DECAY`, which makes
+    // `shouldAffectBlocklikeEntities` true, and `ItemEntity.ignoreExplosion` only saves a stack when
+    // it is false. Five health against a charge beside it and the stack is gone. Measured in
+    // `itemtnt`, laid on obsidian so the crater's own randomness does not drown the reading.
+    for (const world::DroppedItem& item : world.state().items()) {
+        const double distance = std::sqrt((item.x - x) * (item.x - x) + (item.y - y) * (item.y - y) +
+                                          (item.z - z) * (item.z - z));
+        const float damage = world::explosions::damageAt(distance, power, power * 2.0F);
+        if (damage <= 0.0F) {
+            continue;
+        }
+        // A stack leaving the world is enough: whoever is watching it hears about it through the same
+        // pass that reports one which despawned on its own.
+        static_cast<void>(world.state().hurtItem(item.entityId, static_cast<std::int32_t>(damage)));
+    }
+
     for (const world::explosions::Broken& block : broken) {
         sendBlock(watchers, block.x, block.y, block.z, reg::blocks::air().stateId);
         if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(block.stateId); state.has_value()) {

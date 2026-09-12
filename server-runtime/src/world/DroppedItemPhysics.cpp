@@ -127,6 +127,21 @@ std::optional<DroppedItem> DroppedItemPhysics::removeItem(std::int32_t entityId)
     return taken;
 }
 
+bool DroppedItemPhysics::hurtItem(const std::int32_t entityId, const std::int32_t amount) {
+    const WorldWriteLock lock{*mutex_};
+    const auto at =
+        std::ranges::find_if(droppedItems_, [entityId](const DroppedItem& item) { return item.entityId == entityId; });
+    if (at == droppedItems_.end()) {
+        return false;
+    }
+    at->health -= amount;
+    if (at->health > 0) {
+        return false;
+    }
+    droppedItems_.erase(at);
+    return true;
+}
+
 bool DroppedItemPhysics::shiftItem(std::int32_t entityId, double dx, double dy, double dz) {
     const WorldWriteLock lock{*mutex_};
     const auto at =

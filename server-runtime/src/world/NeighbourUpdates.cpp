@@ -664,6 +664,19 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: `CreakingHeartBlock.onPlace` is `updateShape`'s own turn, booked the same way.
     scheduledBlocks::scheduleCreakingHeart(world, x, y, z);
 
+    // parity: `Level.setBlock` runs `updateIndirectNeighbourShapes` on the state that **left** as
+    // well, and before the arriving one's, so a line of dust broken on a staircase still tells the
+    // dust it used to reach across the step. Nothing else reaches it: the step itself does not
+    // change shape, so the walk over the six sides stops there.
+    if (removed.has_value()) {
+        for (const redstoneWire::Step& at : redstoneWire::acrossSteps(world, x, y, z, *removed)) {
+            if (const std::optional<std::int32_t> drawn = redstoneWire::reshape(
+                    world, at.x, at.y, at.z, world.blockState(at.x, at.y, at.z).value_or(0), at.towards);
+                drawn.has_value()) {
+                reshaped(drawn.value(), at.x, at.y, at.z);
+            }
+        }
+    }
     // The block that just arrived reaches out to what was already there, which is the other half of
     // `updateShape`: a fence put down beside a fence joins it, not only the other way.
     if (reshapeSelf) {

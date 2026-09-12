@@ -40,7 +40,7 @@ constexpr float kTurnEpsilon = 1.0F;
 } // namespace
 
 BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context context)
-    : context_(std::move(context)), mailbox_(joining.mailbox) {
+    : context_(std::move(context)), mailbox_(joining.mailbox), protocol_(joining.protocol) {
     player::PlayerConnection connection;
     // Bedrock has its own numbering, and nothing may read this as a Java protocol version. Zero is
     // what the rest of the server already treats as "no version was announced".
@@ -103,7 +103,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         wire::io::ByteBuffer body;
         wire::bedrock::writeTeleport(body, kRuntimeEntityId, static_cast<float>(x),
                                      static_cast<float>(y) + wire::bedrock::kPlayerEyeHeight, static_cast<float>(z),
-                                     yaw, pitch, 0);
+                                     yaw, pitch, 0, protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MovePlayer), body.toVector());
     };
     connection.setGamemode = [this](const wire::protocol::play::Gamemode mode) {
@@ -374,7 +374,7 @@ void BedrockPlayer::syncOthers() {
             entry.name = other->name();
             entry.skin = wire::bedrock::flatSkin(other->name());
             wire::io::ByteBuffer list;
-            wire::bedrock::writePlayerListAdd(list, std::span{&entry, 1});
+            wire::bedrock::writePlayerListAdd(list, std::span{&entry, 1}, protocol_);
             post(wire::bedrock::BedrockPacket::PlayerList, list);
 
             wire::bedrock::AddPlayerInfo spawn;
@@ -390,7 +390,7 @@ void BedrockPlayer::syncOthers() {
             spawn.pitch = now.pitch;
             spawn.gameType = static_cast<std::int32_t>(other->gamemode);
             wire::io::ByteBuffer body;
-            wire::bedrock::writeAddPlayer(body, spawn);
+            wire::bedrock::writeAddPlayer(body, spawn, protocol_);
             post(wire::bedrock::BedrockPacket::AddPlayer, body);
             continue;
         }
@@ -416,7 +416,7 @@ void BedrockPlayer::syncOthers() {
         }
         const std::pair<std::uint64_t, std::uint64_t> id{uuid.high(), uuid.low()};
         wire::io::ByteBuffer list;
-        wire::bedrock::writePlayerListRemove(list, std::span{&id, 1});
+        wire::bedrock::writePlayerListRemove(list, std::span{&id, 1}, protocol_);
         post(wire::bedrock::BedrockPacket::PlayerList, list);
 
         wire::io::ByteBuffer body;
