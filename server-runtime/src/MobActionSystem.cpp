@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -375,19 +376,13 @@ void MobActionSystem::castFangs(ServerEntity& mob, double targetX, double target
                                                            .z = mob.z,
                                                            .name = entity::entityCombat::displayName(mob)});
         }
-        for (PlayerSession* watcher : watchers) {
-            if (!watcher->connection().sendPlayPacket) {
-                continue;
-            }
-            watcher->connection().sendPlayPacket(
-                wire::protocol::play::LevelParticlesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                    wire::protocol::play::LevelParticlesPacket{.particleTypeId = ExplosionSystem::particleId("crit"),
-                                                               .x = x,
-                                                               .y = targetY + kFangParticleLift,
-                                                               .z = z,
-                                                               .count = kFangParticles}
-                        .write(buffer);
-                });
+        const wire::protocol::play::LevelParticlesPacket crit{.particleTypeId = ExplosionSystem::particleId("crit"),
+                                                              .x = x,
+                                                              .y = targetY + kFangParticleLift,
+                                                              .z = z,
+                                                              .count = kFangParticles};
+        for (const PlayerSession* watcher : watchers) {
+            player::showParticleFor(*watcher, "minecraft:crit", crit);
         }
     }
     playSound(*world, mob, kSoundFangs);

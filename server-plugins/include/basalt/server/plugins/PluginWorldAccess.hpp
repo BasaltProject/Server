@@ -129,6 +129,10 @@ public:
     virtual void particle(std::string_view particle, double x, double y, double z, std::int32_t count,
                           double spread) = 0;
 
+    /// Gives them an effect, or takes one away when the length is zero. A length below zero is
+    /// the one that never runs out. Answers false when no effect goes by that name.
+    virtual bool effect(std::string_view effect, std::int32_t durationTicks, std::int32_t amplifier) = 0;
+
     /// An attribute of theirs by its registry name, or nothing if there is no attribute by that name.
     ///
     /// The server's own, not a value drawn on the client: setting `max_health` moves what heals

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
@@ -285,6 +286,17 @@ void BasaltServer::reportOrphanedPluginData() {
     });
 }
 
+player::DamageContext BasaltServer::damageContext() {
+    player::DamageContext context;
+    context.registry = &playerRegistry_;
+    context.damageTypeTags = &vanillaData_.damageTypeTags;
+    context.enchantments = &vanillaData_.enchantments;
+    context.death.registry = &playerRegistry_;
+    context.death.logger = logger_;
+    context.death.lang = options_.lang;
+    return context;
+}
+
 void BasaltServer::startBedrockListener() {
     const config::BedrockSettings& settings = options_.compatibility.bedrock();
     if (!settings.enabled) {
@@ -449,6 +461,32 @@ void BasaltServer::startBedrockListener() {
                 death.logger = logger_;
                 death.lang = options_.lang;
                 player::killPlayer(*session, reason, std::nullopt, death);
+            });
+        };
+
+        // Hurting and healing are the same arithmetic on both editions, so both doors call the same
+        // thing; what this adds is only getting onto the thread that owns the world and the player.
+        context.hurt = [this](player::PlayerSession& player, const float amount, const std::string_view deathMessageId,
+                              const wire::common::Identifier& damageType,
+                              const std::optional<entity::DamageSource>& source) {
+            const wire::common::Uuid uuid = player.uuid();
+            const std::string reason{deathMessageId};
+            const wire::common::Identifier type = damageType;
+            worldRegistry_->scheduler().global().submit([this, uuid, amount, reason, type, source] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                player::hurtPlayer(*session, amount, reason, type, source, damageContext());
+            });
+        };
+        context.heal = [this](player::PlayerSession& player, const float amount) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, amount] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session != nullptr) {
+                    player::healPlayer(*session, amount, damageContext());
+                }
             });
         };
 

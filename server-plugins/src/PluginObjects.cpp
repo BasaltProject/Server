@@ -12,6 +12,7 @@ namespace {
 using lua::LuaArgs;
 
 constexpr std::int32_t kChunk = 16;
+constexpr double kTicksPerSecond = 20.0;
 
 // parity: what `/title` uses when nobody says otherwise, in ticks.
 constexpr std::int32_t kFadeIn = 10;
@@ -441,6 +442,20 @@ void pushPlayer(LuaArgs& lua, std::shared_ptr<PluginPlayerRef> player, PluginSto
                                      point.has_value() ? point->z : player->z(),
                                      static_cast<std::int32_t>(args.integerOr(next, 1)), args.numberOr(next + 1, 0.0));
                     return 0;
+                })
+        .method("effect",
+                [player](LuaArgs& args) {
+                    // `p:effect("minecraft:speed", seconds, level)`, with no seconds meaning for ever
+                    // and zero meaning take it away. The level a player reads is one above the
+                    // amplifier the protocol carries, so the argument follows the player.
+                    const std::int32_t base = firstArgument(args);
+                    const std::string name = args.checkString(base);
+                    const double seconds = args.numberOr(base + 1, -1.0);
+                    const std::int32_t level = static_cast<std::int32_t>(args.integerOr(base + 2, 1));
+                    const std::int32_t ticks =
+                        seconds < 0.0 ? -1 : static_cast<std::int32_t>(seconds * kTicksPerSecond);
+                    args.pushBoolean(player->effect(name, ticks, level > 0 ? level - 1 : 0));
+                    return 1;
                 })
         .method("kick",
                 [player, text](LuaArgs& args) {

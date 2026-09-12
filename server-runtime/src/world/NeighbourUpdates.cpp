@@ -980,6 +980,24 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     };
     tellAround(x, y, z);
+    // parity: the reach above is an `updateNeighborsAt` like any other, so the two nobody else asks
+    // hear it too. A diode's is `updateNeighborsAtExceptFromFacing`, which is why its own square is
+    // skipped. Measured in `pistondiodoroto`: taking away a repeater left the piston under the block
+    // it fed extended for ever, while the lamp beside that block did go out.
+    for (const redstoneComponents::Reach& at : reach) {
+        for (const BlockFace face : kFaces) {
+            if (at.skip.has_value() && face == *at.skip) {
+                continue;
+            }
+            const std::int32_t nx = at.x + registry::stepX(face);
+            const std::int32_t ny = at.y + registry::stepY(face);
+            const std::int32_t nz = at.z + registry::stepZ(face);
+            pistons::trigger(piston, nx, ny, nz);
+            if (const std::optional<BlockChange> armed = arm(nx, ny, nz); armed.has_value()) {
+                reshaped(armed->stateId, armed->x, armed->y, armed->z);
+            }
+        }
+    }
     if (const std::optional<BlockChange> armed = arm(x, y, z); armed.has_value()) {
         reshaped(armed->stateId, armed->x, armed->y, armed->z);
     }

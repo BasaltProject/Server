@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
@@ -61,12 +62,6 @@ public:
     void trackFall(player::PlayerSession& session, double y, bool onGround,
                    const std::optional<std::int32_t>& feetState);
 
-    void sendDamageEvent(const player::PlayerSession& session,
-                         const std::optional<wire::common::Identifier>& damageType, std::int32_t causeEntityId = -1);
-
-    /// parity: `LivingEntity.knockback` as it lands on a player, plus the hurt animation.
-    void pushAway(const player::PlayerSession& session, const entity::DamageSource& source);
-
     void hurt(float amount, std::string_view deathMessageId,
               const std::optional<wire::common::Identifier>& damageType = std::nullopt,
               const std::optional<entity::DamageSource>& source = std::nullopt);
@@ -76,6 +71,9 @@ public:
     void killPlayer(std::string_view deathMessageId);
 
 private:
+    /// What the edition-agnostic damage needs, built from what this connection knows.
+    [[nodiscard]] player::DamageContext damageContext() const;
+
     void die(std::string_view deathMessageId, const std::optional<wire::text::Component>& killer);
 
     void applyFallDamage(player::PlayerSession& session);
