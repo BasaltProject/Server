@@ -11,6 +11,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -35,26 +36,33 @@ struct BedrockOptions {
     wire::bedrock::BedrockGate gate;
 };
 
-/// Where a message waits until the Bedrock thread can send it.
-///
-/// The server writes to a player from wherever it happens to be: the tick thread, another player's
-/// connection, a command. None of those may touch a RakNet session, which belongs to the listener's
-/// own thread, so what they leave here is picked up there. Both sides hold it, so neither has to
-/// outlive the other.
+/// Where a message waits until the Bedrock thread can send it. The server writes to a player from
+/// the tick thread, another connection or a command, and none of those may touch a RakNet session,
+/// which belongs to the listener's thread. Both sides hold it, so neither has to outlive the other.
 class BedrockMailbox {
 public:
-    /// Leaves a line for the client. Ignored once the session is gone, which is what makes this safe
-    /// to hold after the player has left.
-    void post(std::string line);
+    /// One packet, already written. What it is does not matter here: whoever leaves it knows the
+    /// protocol, and this only has to get it to the thread that owns the socket.
+    struct Item {
+        std::uint16_t packetId = 0;
+        std::vector<std::uint8_t> body;
+        /// The last thing this client is told. What is left after it is dropped: the session is
+        /// about to be gone, and a line nobody can read is not worth the trip.
+        bool last = false;
+    };
+
+    /// Leaves a packet for the client. Ignored once the session is gone, which is what makes this
+    /// safe to hold after the player has left.
+    void post(std::uint16_t packetId, std::vector<std::uint8_t> body, bool last = false);
 
     /// Takes everything waiting. Called only on the listener's thread.
-    [[nodiscard]] std::vector<std::string> drain();
+    [[nodiscard]] std::vector<Item> drain();
 
     void close();
 
 private:
     std::mutex lock_;
-    std::vector<std::string> lines_;
+    std::vector<Item> items_;
     bool open_ = true;
 };
 
@@ -98,6 +106,12 @@ public:
 
         /// Where the client says it is now, in the server's own terms: feet, not eyes.
         virtual void move(double x, double y, double z, float yaw, float pitch) = 0;
+
+        /// What the client chose in a form, or nothing when it dismissed one.
+        virtual void formAnswer(std::uint32_t formId, const std::optional<std::string>& data) = 0;
+
+        /// A command the client typed, without its slash.
+        virtual void command(std::string_view line) = 0;
 
     protected:
         Player() = default;

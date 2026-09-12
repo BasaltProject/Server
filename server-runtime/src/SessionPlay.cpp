@@ -29,6 +29,7 @@
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/play/UiPackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
+#include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>
@@ -237,6 +238,20 @@ player::PlayerConnection ClientSession::playerConnection() {
     };
     connection.wakeUp = [this] { wakeUp(); };
     connection.sendTime = [this](const world::LoadedWorld& world) { uiState_->sendTime(world); };
+    connection.sendActionBar = [this](const wire::text::Component& message) { sendPluginText(message, true); };
+    connection.sendTitle = [this](const wire::text::Component& title, const wire::text::Component& subtitle,
+                                  std::int32_t fadeIn, std::int32_t stay, std::int32_t fadeOut) {
+        // The timings first: sent after the text, the client applies them to the *next* title.
+        const play::SetTitlesAnimationPacket timings{.fadeIn = fadeIn, .stay = stay, .fadeOut = fadeOut};
+        sendCompressed(play::SetTitlesAnimationPacket::kId,
+                       [&timings](wire::io::ByteBuffer& buffer) { timings.write(buffer); });
+        if (!wire::text::toPlainText(subtitle).empty()) {
+            const play::TitleTextPacket under{.text = subtitle};
+            sendCompressed(play::kSetSubtitleTextId, [&under](wire::io::ByteBuffer& buffer) { under.write(buffer); });
+        }
+        const play::TitleTextPacket over{.text = title};
+        sendCompressed(play::kSetTitleTextId, [&over](wire::io::ByteBuffer& buffer) { over.write(buffer); });
+    };
     connection.syncSubmersion = [this] { syncSubmersion(); };
     connection.sendCommandTree = [this] { sendCommandTree(); };
     connection.syncExperience = [this] { syncExperience(); };

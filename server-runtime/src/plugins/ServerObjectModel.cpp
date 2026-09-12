@@ -294,13 +294,9 @@ public:
 
     void actionBar(std::string_view message) override {
         player::PlayerSession* player = session();
-        if (player == nullptr || !player->connection().sendPlayPacket) {
-            return;
+        if (player != nullptr && player->connection().sendActionBar) {
+            player->connection().sendActionBar(wire::text::miniMessage::parse(std::string{message}));
         }
-        const play::SystemChatPacket packet{.content = wire::text::miniMessage::parse(std::string{message}),
-                                            .isActionBar = true};
-        player->connection().sendPlayPacket(play::SystemChatPacket::kId,
-                                            [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     }
 
     bool teleport(std::string_view world, double x, double y, double z) override {
@@ -367,21 +363,13 @@ public:
     void title(std::string_view title, std::string_view subtitle, std::int32_t fadeIn, std::int32_t stay,
                std::int32_t fadeOut) override {
         player::PlayerSession* player = session();
-        if (player == nullptr || !player->connection().sendPlayPacket) {
+        if (player == nullptr || !player->connection().sendTitle) {
             return;
         }
-        // The timings first: sent after the text, the client applies them to the *next* title.
-        const play::SetTitlesAnimationPacket timings{.fadeIn = fadeIn, .stay = stay, .fadeOut = fadeOut};
-        player->connection().sendPlayPacket(play::SetTitlesAnimationPacket::kId,
-                                            [&timings](wire::io::ByteBuffer& buffer) { timings.write(buffer); });
-        if (!subtitle.empty()) {
-            const play::TitleTextPacket under{.text = wire::text::miniMessage::parse(std::string{subtitle})};
-            player->connection().sendPlayPacket(play::kSetSubtitleTextId,
-                                                [&under](wire::io::ByteBuffer& buffer) { under.write(buffer); });
-        }
-        const play::TitleTextPacket over{.text = wire::text::miniMessage::parse(std::string{title})};
-        player->connection().sendPlayPacket(play::kSetTitleTextId,
-                                            [&over](wire::io::ByteBuffer& buffer) { over.write(buffer); });
+        player->connection().sendTitle(wire::text::miniMessage::parse(std::string{title}),
+                                       subtitle.empty() ? wire::text::Component{}
+                                                        : wire::text::miniMessage::parse(std::string{subtitle}),
+                                       fadeIn, stay, fadeOut);
     }
 
     void sound(std::string_view sound, float volume, float pitch) override {
