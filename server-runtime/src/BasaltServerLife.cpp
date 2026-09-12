@@ -440,6 +440,7 @@ void BasaltServer::startBedrockListener() {
             // What time it is right now, for a client that has just arrived and would otherwise
             // run its own clock from whatever it last saw.
             context.worldTime = static_cast<std::int32_t>(world.clock().totalTicks());
+            context.weather = world.weather();
         }
         return std::make_unique<bedrock::BedrockPlayer>(joining, std::move(context));
     };

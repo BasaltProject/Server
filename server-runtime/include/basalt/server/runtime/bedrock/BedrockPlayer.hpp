@@ -4,15 +4,18 @@
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/text/LangTable.hpp>
 
+#include <chrono>
 #include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace basalt::server::runtime::bedrock {
@@ -42,6 +45,9 @@ public:
         double spawnY = 64.0;
         double spawnZ = 0.0;
         std::int32_t worldTime = 0;
+        /// What the sky is doing where this player lands, for a client that would otherwise draw
+        /// whatever it last saw.
+        world::WorldWeather weather;
         wire::text::LangTable lang;
         wire::common::Logger logger{"Bedrock"};
     };
@@ -57,7 +63,23 @@ public:
 
     void command(std::string_view line) override;
 
+    void tick() override;
+
 private:
+    /// Everybody else, as this client has been told about them. What the registry says now and
+    /// what is in here is the whole of the difference that has to go out.
+    struct Other {
+        std::int32_t entityId = 0;
+        double x = 0.0;
+        double y = 0.0;
+        double z = 0.0;
+        float yaw = 0.0F;
+        float pitch = 0.0F;
+    };
+
+    /// Draws whoever arrived, moves whoever moved and takes away whoever left.
+    void syncOthers();
+
     /// The line, said to everyone and written to the log, once nobody has objected to it.
     void say(std::string message);
 
@@ -89,6 +111,10 @@ private:
     std::uint32_t nextFormId_ = 1;
     std::optional<OpenForm> form_;
     std::string openTitle_;
+    std::unordered_map<wire::common::Uuid, Other> others_;
+    /// When the others were last looked at. The listener turns faster than the world does, and
+    /// sending a position more often than it changes is only traffic.
+    std::chrono::steady_clock::time_point lastSync_{};
 };
 
 } // namespace basalt::server::runtime::bedrock
