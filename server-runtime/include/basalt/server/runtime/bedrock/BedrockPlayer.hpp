@@ -5,6 +5,8 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
+#include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/text/LangTable.hpp>
 
@@ -18,6 +20,10 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+}
 
 namespace basalt::server::runtime::bedrock {
 
@@ -41,6 +47,28 @@ public:
 
         /// Runs a command as this player, where commands are allowed to run.
         std::function<void(const player::PlayerSession&, std::string)> runCommand;
+
+        /// What `players.db` remembers about this player, or nothing when it knows nobody by that
+        /// name. Read once, when they arrive.
+        std::function<std::optional<storage::StoredPlayer>(const wire::common::Uuid&)> stored;
+
+        /// Writes what this player is now, for the save that runs on a timer and at shutdown.
+        std::function<void(const storage::StoredPlayer&)> save;
+
+        /// Moves this player to another world, in the world's own terms: it answers which of
+        /// Bedrock's three dimensions to draw and where the player lands, or nothing when the move
+        /// did not happen. The world itself is the caller's business; this only draws the arrival.
+        struct Arrival {
+            wire::bedrock::BedrockDimension dimension = wire::bedrock::BedrockDimension::Overworld;
+            std::string worldName;
+        };
+
+        std::function<std::optional<Arrival>(player::PlayerSession&, const world::LoadedWorld&, double, double, double)>
+            changeWorld;
+
+        /// What the rest of the server is told when this player dies: the same call the Java door
+        /// makes, so a plugin never learns which door they came in by.
+        std::function<void(player::PlayerSession&, std::string_view)> killed;
 
         /// Every command this player may use, with the usage line `/help` would print for it.
         /// Bedrock refuses to send what is not in its own list, so a client that is told nothing
@@ -70,6 +98,8 @@ public:
     void command(std::string_view line) override;
 
     void tick() override;
+
+    void respawn() override;
 
 private:
     /// Everybody else, as this client has been told about them. What the registry says now and
@@ -121,6 +151,10 @@ private:
     std::optional<OpenForm> form_;
     std::string openTitle_;
     std::unordered_map<wire::common::Uuid, Other> others_;
+    /// What this player's row said when they arrived, so the one written back keeps the totals
+    /// rather than starting them again.
+    std::int64_t firstSeenEpochSeconds_ = 0;
+    std::int64_t playTimeTicks_ = 0;
     /// When the others were last looked at. The listener turns faster than the world does, and
     /// sending a position more often than it changes is only traffic.
     std::chrono::steady_clock::time_point lastSync_{};

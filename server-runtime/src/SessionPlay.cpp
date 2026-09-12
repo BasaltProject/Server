@@ -256,6 +256,12 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.sendCommandTree = [this] { sendCommandTree(); };
     connection.syncExperience = [this] { syncExperience(); };
     connection.killPlayer = [this](std::string_view deathMessageId) { killPlayer(deathMessageId); };
+    connection.sendCombatDeath = [this](const wire::text::Component& message) {
+        sendCompressed(wire::protocol::play::PlayerCombatKillPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::PlayerCombatKillPacket{.playerId = playerSession()->entityId(), .message = message}
+                .write(buffer);
+        });
+    };
     connection.storedSnapshot = [this] { return storedSnapshot(); };
     // A window a plugin drew. The controller has had all three of these all along; without them
     // `menu:open` found no way through and returned as if it had opened one.

@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/BlockCommands.hpp>
@@ -169,6 +170,7 @@ struct Fixture {
 namespace mobEffects = basalt::server::runtime::world::mobEffects;
 
 namespace blocks = basalt::server::registry::blocks;
+namespace reg = basalt::server::registry;
 
 /// A block by name, for the ones the vanilla table does not name individually.
 [[nodiscard]] std::int32_t stateOf(const std::string& name) {
@@ -220,6 +222,30 @@ TEST_CASE("setblock of the state that is already there changes nothing") {
     CHECK(fixture.source.lastAsText().find("commands.setblock.failed") != std::string::npos);
     // parity: `destroy` breaks the old block first, so writing the same state still counts.
     CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 40 1 minecraft:stone destroy") == 1);
+}
+
+TEST_CASE("a dust written over a dust keeps the strength the command handed it") {
+    // parity: `RedStoneWireBlock.onPlace` is gated on `!oldState.is(state.getBlock())`, so only a
+    // dust that really arrives settles its own strength. Nothing else asks the square in the middle:
+    // `/setblock` writes with `2 | 256` and `updateNeighboursOnBlockSet` tells the six around it.
+    Fixture fixture{scratch("block-commands-lying-dust")};
+    static_cast<void>(fixture.world->state().getOrGenerateChunk(0, 0));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SetBlockCommand>());
+    const auto power = [&fixture](std::int32_t y) {
+        const std::optional<std::int32_t> at = fixture.world->state().blockState(1, y, 1);
+        REQUIRE(at.has_value());
+        return reg::blockStateDefinitions::propertiesOf(*at).at("power");
+    };
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 40 1 minecraft:stone") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 41 1 minecraft:redstone_wire[power=0]") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 41 1 minecraft:redstone_wire[power=5]") == 1);
+    CHECK(power(41) == "5");
+
+    // A dust that really arrives is settled by its own `onPlace`, which is the other half of the gate.
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 50 1 minecraft:stone") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "setblock 1 51 1 minecraft:redstone_wire[power=5]") == 1);
+    CHECK(power(51) == "0");
 }
 
 TEST_CASE("fill writes the whole box and answers how many blocks moved") {

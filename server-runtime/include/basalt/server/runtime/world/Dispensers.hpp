@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
+#include <basalt/server/runtime/world/GolemPatterns.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/crafting/Crafting.hpp>
 
@@ -38,6 +39,9 @@ inline constexpr std::int32_t kSize = 9;
 struct Hooks {
     /// A free entity id for whatever it throws or shoots.
     std::function<std::int32_t()> allocateEntityId;
+    /// Whether a state is in `minecraft:copper`, which the carved pumpkin entry needs to know
+    /// whether a copper golem would stand up. Unset, only snow and iron ones can.
+    golemPatterns::IsCopper isCopper;
     /// How many slots the container in front has, or nothing when it is not one. Defaults to
     /// `containers::sizeOf`.
     std::function<std::optional<std::int32_t>(std::string_view path)> containerSize;

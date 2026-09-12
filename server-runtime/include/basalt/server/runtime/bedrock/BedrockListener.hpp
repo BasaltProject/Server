@@ -116,6 +116,9 @@ public:
         /// A command the client typed, without its slash.
         virtual void command(std::string_view line) = 0;
 
+        /// The player pressed the button on the death screen.
+        virtual void respawn() = 0;
+
         /// A turn of the listener's own loop, which is where anything this player has to be told
         /// about the rest of the server gets worked out. Called from the listener's thread.
         virtual void tick() {}

@@ -179,6 +179,7 @@ basalt_module(server-runtime-core
         src/player/FoodData.cpp
         src/player/PlayerSession.cpp
         src/player/PlayerPersistence.cpp
+        src/player/PlayerDeath.cpp
         src/player/PlayerRegistry.cpp
         src/player/Menu.cpp
         src/player/PlayerInventory.cpp

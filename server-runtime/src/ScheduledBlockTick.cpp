@@ -265,6 +265,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             const world::dispensers::Result result = world::dispensers::fire(
                 context, x, y, z,
                 {.allocateEntityId = [this] { return players_->allocateEntityId(); },
+                 .isCopper =
+                     [this](std::int32_t stateId) {
+                         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+                         return block != nullptr && options_.blockTags != nullptr &&
+                                world::realBlockTags::contains(*options_.blockTags, "minecraft:copper", *block);
+                     },
                  .recipeFor =
                      [this](server::world::crafting::Cooker cooker, const server::world::loot::ItemStack& stack) {
                          return recipes_ == nullptr ? nullptr : recipes_->cookingFor(cooker, stack);

@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
@@ -344,40 +345,15 @@ void CombatHandler::die(std::string_view deathMessageId, const std::optional<Com
     if (session == nullptr) {
         return;
     }
-    session->dead = true;
-    session->setHealth(0.0F);
-    // parity: `LivingEntity.die` empties the absorption pool, so respawning starts without it.
-    session->absorption = 0.0F;
-    session->stats.increment(storage::stats::deaths());
-    session->stats.reset(storage::stats::timeSinceRest());
-    owner_->uiState().syncHealth();
-    // parity: `DamageSource.getLocalizedDeathMessage`, whose second argument is whoever did it.
-    // Half of vanilla's death messages name them, and one built without it reads as `%2$s`.
-    std::vector<Component> arguments{Component::text(session->name())};
-    if (killer.has_value()) {
-        arguments.push_back(*killer);
-    }
-    const Component message = Component::translatable("death.attack." + std::string{deathMessageId}, arguments);
-    if (hooks_.died) {
-        hooks_.died(*session, wire::text::resolvePlainText(message, owner_->consoleLang()));
-    }
-    owner_->sendCompressed(wire::protocol::play::PlayerCombatKillPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::PlayerCombatKillPacket{.playerId = session->entityId(), .message = message}.write(buffer);
-    });
-    owner_->logger().info([&] { return wire::text::resolvePlainText(message, owner_->consoleLang()); });
-    player::PlayerRegistry* registry = owner_->options().playerRegistry;
-    if (registry == nullptr) {
-        return;
-    }
-    for (PlayerSession* player : registry->snapshot()) {
-        if (!player->connection().sendPlayPacket) {
-            continue;
-        }
-        player->connection().sendPlayPacket(
-            wire::protocol::play::SystemChatPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                wire::protocol::play::SystemChatPacket{.content = message, .isActionBar = false}.write(buffer);
-            });
-    }
+    // The death itself is the same on every edition, so it lives where a player who never had one
+    // of these connections can reach it. What is left here is only which plugins to tell and where
+    // to write the line.
+    player::DeathContext context;
+    context.registry = owner_->options().playerRegistry;
+    context.logger = owner_->logger();
+    context.lang = owner_->consoleLang();
+    context.died = hooks_.died;
+    player::killPlayer(*session, deathMessageId, killer, context);
 }
 
 } // namespace basalt::server::runtime

@@ -268,6 +268,13 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
+        if (packet == BedrockPacket::Respawn && entry.player) {
+            const auto state = wire::bedrock::readRespawn(body);
+            if (state == wire::bedrock::RespawnState::ClientReady) {
+                entry.player->respawn();
+            }
+            return;
+        }
         if (packet == BedrockPacket::Text && entry.player) {
             const auto text = wire::bedrock::readText(body);
             if (text.has_value() && !text->message.empty()) {

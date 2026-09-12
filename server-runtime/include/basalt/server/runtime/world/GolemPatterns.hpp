@@ -44,6 +44,12 @@ using IsCopper = std::function<bool(std::int32_t stateId)>;
 [[nodiscard]] std::optional<Match> find(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                         const IsCopper& isCopper = {});
 
+/// Whether a carved pumpkin put at these coordinates would finish a figure, asked **before** the
+/// pumpkin is there. parity: `CarvedPumpkinBlock.canSpawnGolem`, which matches the three `*Base`
+/// patterns, the ones without the pumpkin in them. It is what a dispenser asks before it places one.
+[[nodiscard]] bool canComplete(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                               const IsCopper& isCopper = {});
+
 /// The entity each figure is made of.
 [[nodiscard]] std::string_view entityTypeOf(Golem kind);
 

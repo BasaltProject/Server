@@ -39,7 +39,10 @@ constexpr std::int32_t kFrostedMeltNeighbours = 2;
 
 /// A trail of frost walker ice is at most a few hundred squares; this only stops a runaway.
 constexpr std::int32_t kFrostedChainLimit = 512;
-constexpr std::int32_t kFrostedRetry = 20;
+/// parity: `Mth.nextInt(random, 20, 40)`, inclusivo por los dos lados, que es el que el hielo
+/// fragil se reserva a si mismo y a cada vecino que sobrevive.
+constexpr std::int32_t kFrostedRetryLow = 20;
+constexpr std::int32_t kFrostedRetryHigh = 40;
 
 /// parity: `FrostedIceBlock.onPlace`'s own `Mth.nextInt(random, 60, 120)`, the wait before a fresh
 /// piece of frosted ice first looks at whether it should melt.
@@ -187,18 +190,18 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return count;
 }
 
-/// One step thinner, or gone. parity: `FrostedIceBlock.slightlyMelt`.
+/// One step thinner, or gone. parity: `FrostedIceBlock.slightlyMelt`, which answers **true only when
+/// the ice went**: thinning it by one is a `false`, and that answer is what decides whether the caller
+/// goes on to the neighbours or just books itself another turn. It books nothing of its own.
 bool thin(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t age,
           std::vector<BlockChange>& changes) {
     if (age < kFrostedMaxAge) {
         const std::optional<std::int32_t> thinner = registry::blockStateDefinitions::stateIdOf(
             frostedIceTickType(), {{"age", std::to_string(age + 1)}}, std::nullopt);
-        if (!thinner.has_value() || !world.setBlockState(x, y, z, *thinner)) {
-            return false;
+        if (thinner.has_value() && world.setBlockState(x, y, z, *thinner)) {
+            changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *thinner});
         }
-        changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *thinner});
-        world.scheduleBlockTick(x, y, z, frostedIceTickType(), kFrostedRetry);
-        return true;
+        return false;
     }
     if (!world.setBlockState(x, y, z, waterState())) {
         return false;
@@ -464,27 +467,37 @@ void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     if (!age.has_value()) {
         return;
     }
-    if (random.nextInt(3) != 0 && neighbouringIce(world, x, y, z) >= kFrostedNeighbours) {
-        world.scheduleBlockTick(x, y, z, frostedIceTickType(), kFrostedRetry);
-        return;
-    }
-    if (worldLight::rawBrightness(world, x, y, z, hasSkylight) <=
-        kMeltLight - *age - registry::blockShapes::dampening(*stateId)) {
-        world.scheduleBlockTick(x, y, z, frostedIceTickType(), kFrostedRetry);
-        return;
-    }
-    if (!thin(world, x, y, z, *age, changes)) {
-        return;
-    }
-    for (const registry::BlockFace face : kAllFaces) {
-        const std::int32_t nx = x + offsetX(face);
-        const std::int32_t ny = y + offsetY(face);
-        const std::int32_t nz = z + offsetZ(face);
-        if (pathOf(world.blockState(nx, ny, nz).value_or(0)) != "frosted_ice") {
-            continue;
+    // parity: `FrostedIceBlock.tick`. One roll in three, **or** fewer than four frosted neighbours,
+    // is what lets it look at the light at all; the roll is spent either way because it comes first.
+    const bool looks = random.nextInt(3) == 0 || neighbouringIce(world, x, y, z) < kFrostedNeighbours;
+    if (looks &&
+        worldLight::rawBrightness(world, x, y, z, hasSkylight) >
+            kMeltLight - *age - registry::blockShapes::dampening(*stateId) &&
+        thin(world, x, y, z, *age, changes)) {
+        // parity: only a piece that went **whole** reaches its neighbours, and it thins each of them
+        // on the spot. The one that survives that thinning is the one that books a turn; the one that
+        // went with it books nothing, because it is water now.
+        for (const registry::BlockFace face : kAllFaces) {
+            const std::int32_t nx = x + offsetX(face);
+            const std::int32_t ny = y + offsetY(face);
+            const std::int32_t nz = z + offsetZ(face);
+            const std::optional<std::int32_t> neighbour = world.blockState(nx, ny, nz);
+            if (!neighbour.has_value() || pathOf(*neighbour) != "frosted_ice") {
+                continue;
+            }
+            const std::optional<std::int32_t> neighbourAge = numberProperty(*neighbour, "age");
+            if (!neighbourAge.has_value()) {
+                continue;
+            }
+            if (!thin(world, nx, ny, nz, *neighbourAge, changes)) {
+                world.scheduleBlockTick(nx, ny, nz, frostedIceTickType(),
+                                        random.nextIntBetweenInclusive(kFrostedRetryLow, kFrostedRetryHigh));
+            }
         }
-        world.scheduleBlockTick(nx, ny, nz, frostedIceTickType(), kFrostedRetry + random.nextInt(kFrostedRetry));
+        return;
     }
+    world.scheduleBlockTick(x, y, z, frostedIceTickType(),
+                            random.nextIntBetweenInclusive(kFrostedRetryLow, kFrostedRetryHigh));
 }
 
 void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
