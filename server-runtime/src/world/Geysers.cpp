@@ -100,6 +100,17 @@ constexpr std::int32_t kNoCountdown = -1;
         return "continuous";
     }
     if (registry::blockConnections::eruptsPeriodically(*below) && stillOrSolid) {
+        // parity: `validBlockState` calls `resetCountdown()` on the block entity when what was here
+        // was **not** a geyser yet, so a geyser that has just been built starts its wait from
+        // scratch instead of carrying whatever number it had from an earlier life.
+        if (current != "erupting" && current != "dormant") {
+            if (server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
+                if (server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+                    entity != nullptr) {
+                    entity->data().putInt("countdown", kNoCountdown);
+                }
+            }
+        }
         return current == "erupting" ? "erupting" : "dormant";
     }
     return "wet";
