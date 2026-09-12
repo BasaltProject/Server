@@ -40,6 +40,14 @@ namespace redstoneWire {
 /// The shape a dust has as it lands, written if it moved. parity:
 /// `RedStoneWireBlock.getStateForPlacement`, which draws from the cross rather than from the state
 /// it starts with, so a dust put down on its own is a cross and never a dot.
+/// What a right click turns this dust into: a cross becomes a dot and a dot becomes a cross, and
+/// anything already drawn as a line is left alone.
+///
+/// parity: `RedStoneWireBlock.useWithoutItem`, which only answers for `isCross` or `isDot`, keeps the
+/// power and then redraws with `getConnectionState`.
+[[nodiscard]] std::optional<std::int32_t> toggleShape(WorldState& world, std::int32_t x, std::int32_t y,
+                                                     std::int32_t z, std::int32_t stateId);
+
 [[nodiscard]] std::optional<std::int32_t> shapeOnPlacement(WorldState& world, std::int32_t x, std::int32_t y,
                                                            std::int32_t z, std::int32_t stateId);
 

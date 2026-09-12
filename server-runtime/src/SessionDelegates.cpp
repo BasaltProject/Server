@@ -225,9 +225,19 @@ void ClientSession::broadcastToEveryone(const wire::text::Component& message) {
     if (options_.playerRegistry == nullptr) {
         return;
     }
-    sendTo(options_.playerRegistry->snapshot(), play::SystemChatPacket::kId, [&text](wire::io::ByteBuffer& buffer) {
-        play::SystemChatPacket{.content = text, .isActionBar = false}.write(buffer);
-    });
+    // Same reason as in broadcastChat: what reaches everyone has to reach both editions, and each
+    // connection knows how its own client is told something.
+    for (const PlayerSession* player : options_.playerRegistry->snapshot()) {
+        if (player->connection().sendSystemMessage) {
+            player->connection().sendSystemMessage(text);
+            continue;
+        }
+        if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(play::SystemChatPacket::kId, [&text](wire::io::ByteBuffer& buffer) {
+                play::SystemChatPacket{.content = text, .isActionBar = false}.write(buffer);
+            });
+        }
+    }
 }
 
 void ClientSession::swapWithOffhand() {

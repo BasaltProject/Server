@@ -70,7 +70,10 @@ struct BlockRelease {
 ///
 /// Both halves of a door move together, which is why this reads the world rather than answering
 /// from the state alone.
-[[nodiscard]] std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+/// Right-clicking the block there. `playerYaw` is only read by a fence gate, which turns to face
+/// whoever opened it from the wrong side.
+[[nodiscard]] std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                std::optional<float> playerYaw = std::nullopt);
 
 /// The right click that moves a repeater's delay on a notch or flips a comparator's mode.
 ///

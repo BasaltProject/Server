@@ -72,12 +72,72 @@ TEST_CASE("a hand moves levers, buttons, doors, trapdoors and fence gates and no
     CHECK_FALSE(blockInteractions::isToggleable(stateOf("repeater")));
 }
 
-TEST_CASE("only a repeater and a comparator move on a notch") {
+TEST_CASE("the four components a click sets up") {
     CHECK(blockInteractions::isCycleable(stateOf("repeater")));
     CHECK(blockInteractions::isCycleable(stateOf("comparator")));
+    // parity: `DaylightDetectorBlock.useWithoutItem` cycles `inverted` and
+    // `RedStoneWireBlock.useWithoutItem` turns a cross into a dot. Both are set up by clicking them,
+    // and the redstone bench cannot press anything, so neither was reachable at all.
+    CHECK(blockInteractions::isCycleable(stateOf("daylight_detector")));
+    CHECK(blockInteractions::isCycleable(stateOf("redstone_wire")));
     CHECK_FALSE(blockInteractions::isCycleable(stateOf("lever")));
     CHECK_FALSE(blockInteractions::isCycleable(stateOf("oak_door")));
     CHECK_FALSE(blockInteractions::isCycleable(stateOf("stone")));
+}
+
+TEST_CASE("a click turns a daylight detector over") {
+    Loaded loaded;
+    REQUIRE(loaded.state.setBlockState(8, 64, 8, stateOf("daylight_detector", {{"inverted", "false"}})));
+    REQUIRE(blockInteractions::cycle(loaded.state, 8, 64, 8).has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "inverted") == "true");
+    REQUIRE(blockInteractions::cycle(loaded.state, 8, 64, 8).has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "inverted") == "false");
+}
+
+TEST_CASE("a click turns a dust cross into a dot and back") {
+    // parity: `RedStoneWireBlock.useWithoutItem` only answers for a cross or a dot, and redraws with
+    // `getConnectionState` afterwards, so with nothing around the cross becomes a dot and the dot
+    // becomes a cross again.
+    Loaded loaded;
+    const Properties cross{{"north", "side"}, {"south", "side"}, {"east", "side"}, {"west", "side"}};
+    REQUIRE(loaded.state.setBlockState(8, 64, 8, stateOf("redstone_wire", cross)));
+    REQUIRE(blockInteractions::cycle(loaded.state, 8, 64, 8).has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "north") == "none");
+    REQUIRE(blockInteractions::cycle(loaded.state, 8, 64, 8).has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "north") == "side");
+    // A dust already drawn as a line is left alone: it is neither a cross nor a dot. The two sides
+    // that are not part of the line have to be named: what a state id is not asked for comes from the
+    // block's **first** state, and a dust's first state has all four sides up.
+    REQUIRE(loaded.state.setBlockState(
+        8, 64, 10,
+        stateOf("redstone_wire",
+                {{"north", "side"}, {"south", "side"}, {"east", "none"}, {"west", "none"}})));
+    CHECK_FALSE(blockInteractions::cycle(loaded.state, 8, 64, 10).has_value());
+}
+
+TEST_CASE("a fence gate opened from the wrong side swings out of the way") {
+    // parity: `FenceGateBlock.useWithoutItem`. Only on the way open, and only when the gate faces
+    // **away** from whoever opened it.
+    Loaded loaded;
+    const auto gate = [&](const std::string& facing, const std::string& open) {
+        return stateOf("oak_fence_gate", {{"facing", facing}, {"open", open}});
+    };
+    // Yaw zero is looking south. A gate facing north is facing away, so it turns.
+    REQUIRE(loaded.state.setBlockState(8, 64, 8, gate("north", "false")));
+    REQUIRE(blockInteractions::toggle(loaded.state, 8, 64, 8, 0.0F).has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "facing") == "south");
+    CHECK(propertyAt(loaded.state, 8, 64, 8, "open") == "true");
+
+    // One facing the player already is left where it is.
+    REQUIRE(loaded.state.setBlockState(8, 64, 10, gate("south", "false")));
+    REQUIRE(blockInteractions::toggle(loaded.state, 8, 64, 10, 0.0F).has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 10, "facing") == "south");
+
+    // And one that is closing never turns, whichever way it faces.
+    REQUIRE(loaded.state.setBlockState(8, 64, 12, gate("north", "true")));
+    REQUIRE(blockInteractions::toggle(loaded.state, 8, 64, 12, 0.0F).has_value());
+    CHECK(propertyAt(loaded.state, 8, 64, 12, "facing") == "north");
+    CHECK(propertyAt(loaded.state, 8, 64, 12, "open") == "false");
 }
 
 TEST_CASE("a state id no block owns answers no to everything") {

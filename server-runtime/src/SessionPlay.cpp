@@ -144,13 +144,19 @@ void ClientSession::broadcastChat(const std::string& message) {
     if (options_.playerRegistry == nullptr) {
         return;
     }
+    // Through the connection's own way of saying something rather than through a Java packet: a
+    // Bedrock player is in this registry too, and that edition writes its chat differently. For a
+    // Java player the two are the same call.
     for (const PlayerSession* player : options_.playerRegistry->snapshot()) {
-        if (!player->connection().sendPlayPacket) {
+        if (player->connection().sendSystemMessage) {
+            player->connection().sendSystemMessage(text);
             continue;
         }
-        player->connection().sendPlayPacket(play::SystemChatPacket::kId, [&text](wire::io::ByteBuffer& buffer) {
-            play::SystemChatPacket{.content = text, .isActionBar = false}.write(buffer);
-        });
+        if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(play::SystemChatPacket::kId, [&text](wire::io::ByteBuffer& buffer) {
+                play::SystemChatPacket{.content = text, .isActionBar = false}.write(buffer);
+            });
+        }
     }
 }
 

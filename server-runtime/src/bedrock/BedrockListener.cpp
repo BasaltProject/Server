@@ -57,15 +57,38 @@ constexpr std::int32_t kInitialRadius = 4;
 
 } // namespace
 
-/// One client: its transport, its protocol state, and whether it has been told about a world yet.
+/// One client: its transport, its protocol state, the player the server made of it, and the
+/// mailbox anyone else writes to.
 struct BedrockListener::Session {
     RakSession& transport;
     BedrockConnection connection;
+    std::shared_ptr<BedrockMailbox> mailbox = std::make_shared<BedrockMailbox>();
+    std::unique_ptr<BedrockListener::Player> player;
+    wire::bedrock::LoginRequest login;
     bool started = false;
 
     Session(RakSession& session, std::shared_ptr<const wire::bedrock::EcKeyPair> keys, std::string gameVersion)
         : transport(session), connection(session, std::move(keys), std::move(gameVersion)) {}
 };
+
+void BedrockMailbox::post(std::string line) {
+    const std::lock_guard<std::mutex> guard{lock_};
+    if (!open_) {
+        return;
+    }
+    lines_.push_back(std::move(line));
+}
+
+std::vector<std::string> BedrockMailbox::drain() {
+    const std::lock_guard<std::mutex> guard{lock_};
+    return std::exchange(lines_, {});
+}
+
+void BedrockMailbox::close() {
+    const std::lock_guard<std::mutex> guard{lock_};
+    open_ = false;
+    lines_.clear();
+}
 
 BedrockListener::BedrockListener(BedrockOptions options, Hooks hooks, std::string gameVersion,
                                  wire::common::Logger logger)
@@ -162,6 +185,11 @@ std::size_t BedrockListener::sessionCount() const { return sessions_.size(); }
 
 void BedrockListener::run() {
     while (running_.load()) {
+        // Before the poll rather than after it: what the poll flushes is what is queued now, so a
+        // line left by another thread goes out on this turn instead of the next.
+        for (const auto& [peer, session] : sessions_) {
+            deliverMail(*session);
+        }
         server_->poll(nowMillis(), kPollTimeoutMillis);
     }
 }
@@ -171,7 +199,8 @@ void BedrockListener::onConnect(RakSession& session) {
     Session& entry = *owned;
     sessions_.emplace(session.peer(), std::move(owned));
 
-    entry.connection.onLogin([this](const wire::bedrock::LoginRequest& login) {
+    entry.connection.onLogin([this, &entry](const wire::bedrock::LoginRequest& login) {
+        entry.login = login;
         logger_.info([this, &login] {
             return prefixedName(login.name) + " is joining from Bedrock" +
                    (login.authenticated ? "" : " (unauthenticated)") + ".";
@@ -179,19 +208,33 @@ void BedrockListener::onConnect(RakSession& session) {
     });
     entry.connection.onReady([this, &entry] { onReady(entry); });
     entry.connection.onPacket([&entry](BedrockPacket packet, wire::io::ByteBuffer& body) {
-        // The client asks for a draw distance of its own once it is in; everything else waits for
-        // the world to exist on this side.
-        if (packet != BedrockPacket::RequestChunkRadius) {
+        if (packet == BedrockPacket::RequestChunkRadius) {
+            // The client asks for a draw distance of its own once it is in.
+            const auto radius = wire::bedrock::readRequestChunkRadius(body);
+            if (!radius) {
+                return;
+            }
+            wire::io::ByteBuffer answer;
+            wire::bedrock::writeChunkRadiusUpdated(answer, *radius);
+            entry.connection.sendPacket(BedrockPacket::ChunkRadiusUpdated, answer.readable());
+            entry.connection.flush();
             return;
         }
-        const auto radius = wire::bedrock::readRequestChunkRadius(body);
-        if (!radius) {
+        if (packet == BedrockPacket::PlayerAuthInput && entry.player) {
+            const auto input = wire::bedrock::readPlayerAuthInput(body);
+            if (input.has_value()) {
+                entry.player->move(static_cast<double>(input->x),
+                                   static_cast<double>(input->y) - static_cast<double>(wire::bedrock::kPlayerEyeHeight),
+                                   static_cast<double>(input->z), input->yaw, input->pitch);
+            }
             return;
         }
-        wire::io::ByteBuffer answer;
-        wire::bedrock::writeChunkRadiusUpdated(answer, *radius);
-        entry.connection.sendPacket(BedrockPacket::ChunkRadiusUpdated, answer.readable());
-        entry.connection.flush();
+        if (packet == BedrockPacket::Text && entry.player) {
+            const auto text = wire::bedrock::readText(body);
+            if (text.has_value() && !text->message.empty()) {
+                entry.player->chat(text->message);
+            }
+        }
     });
 }
 
@@ -212,6 +255,9 @@ void BedrockListener::onReady(Session& session) {
     session.started = true;
 
     wire::bedrock::StartGameInfo info;
+    // The client is told where its eyes are, not its feet, which is the same offset it reports
+    // back on every movement.
+    info.y += wire::bedrock::kPlayerEyeHeight;
     info.vanillaVersion = gameVersion_;
     info.serverId = "basalt";
     info.worldId = "basalt";
@@ -243,6 +289,33 @@ void BedrockListener::onReady(Session& session) {
     body.clear();
     wire::bedrock::writePlayStatus(body, wire::bedrock::PlayStatus::PlayerSpawn);
     session.connection.sendPacket(BedrockPacket::PlayStatus, body.readable());
+    session.connection.flush();
+
+    if (!hooks_.join) {
+        return;
+    }
+    Joining joining;
+    joining.gamertag = session.login.name;
+    joining.name = prefixedName(session.login.name);
+    joining.xuid = session.login.xuid;
+    joining.uuid = uuidOf(session.login.xuid.empty() ? session.login.name : session.login.xuid);
+    joining.address = session.transport.peer().toString();
+    joining.authenticated = session.login.authenticated;
+    joining.mailbox = session.mailbox;
+    session.player = hooks_.join(joining);
+}
+
+void BedrockListener::deliverMail(Session& session) {
+    const std::vector<std::string> lines = session.mailbox->drain();
+    if (lines.empty()) {
+        return;
+    }
+    wire::io::ByteBuffer body;
+    for (const std::string& line : lines) {
+        body.clear();
+        wire::bedrock::writeText(body, wire::bedrock::TextType::Raw, "", line);
+        session.connection.sendPacket(BedrockPacket::Text, body.readable());
+    }
     session.connection.flush();
 }
 

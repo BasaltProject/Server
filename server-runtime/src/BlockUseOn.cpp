@@ -438,7 +438,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             return;
         }
         if (clickedState.has_value() && world::blockInteractions::isToggleable(*clickedState)) {
-            toggleBlock(hit.pos);
+            toggleBlock(hit.pos, session->yaw);
             ack();
             return;
         }
