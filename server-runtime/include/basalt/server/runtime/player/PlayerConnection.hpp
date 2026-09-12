@@ -59,6 +59,10 @@ struct PlayerConnection {
                        const std::vector<world::BlockEffect>& effects)>
         broadcastEffects;
 
+    /// One block that changed, to this player alone. The caller decides who is watching; this only
+    /// knows how to say it on the edition this connection speaks.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> sendBlockChange;
+
     /// Sends one chunk again, for a change too big to patch block by block.
     std::function<void(std::int32_t chunkX, std::int32_t chunkZ)> resendChunk;
 

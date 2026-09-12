@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -38,12 +39,8 @@ constexpr double kItemHalfHeight = 0.125;
 
 void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t x, std::int32_t y, std::int32_t z,
                std::int32_t stateId) {
-    const play::ClientboundBlockUpdatePacket packet{.pos = play::BlockPos{x, y, z}, .blockStateId = stateId};
     for (const player::PlayerSession* player : watchers) {
-        if (player->connection().sendPlayPacket) {
-            player->connection().sendPlayPacket(play::ClientboundBlockUpdatePacket::kId,
-                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-        }
+        player::sendBlockChangeTo(*player, x, y, z, stateId);
     }
 }
 
@@ -102,15 +99,13 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         }
     }
 
-    // parity: `ServerExplosion.explode` runs `hurtEntities()` **before** `interactWithBlocks`, so a
-    // blast never hurts the items it is about to drop itself. It hurts everything else in the box,
-    // players included: a tnt blast is `DESTROY_WITH_DECAY`, which makes
-    // `shouldAffectBlocklikeEntities` true, and `ItemEntity.ignoreExplosion` only saves a stack when
-    // it is false. Five health against a charge beside it and the stack is gone. Measured in
-    // `itemtnt`, laid on obsidian so the crater's own randomness does not drown the reading.
+    // parity: `ServerExplosion.explode` runs `hurtEntities()` before `interactWithBlocks`, so a blast
+    // never hurts the items it is about to drop itself. It hurts everything else in the box: a tnt
+    // blast is `DESTROY_WITH_DECAY`, and `ItemEntity.ignoreExplosion` only saves a stack when that is
+    // false, so five health against a charge beside it and the stack is gone.
     for (const world::DroppedItem& item : world.state().items()) {
-        const double distance = std::sqrt((item.x - x) * (item.x - x) + (item.y - y) * (item.y - y) +
-                                          (item.z - z) * (item.z - z));
+        const double distance =
+            std::sqrt((item.x - x) * (item.x - x) + (item.y - y) * (item.y - y) + (item.z - z) * (item.z - z));
         const float damage = world::explosions::damageAt(distance, power, power * 2.0F);
         if (damage <= 0.0F) {
             continue;

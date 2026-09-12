@@ -12,6 +12,7 @@ basalt_module(server-runtime-core
     SOURCES
         src/Connection.cpp
         src/LoginHandler.cpp
+        src/bedrock/BedrockChunks.cpp
         src/bedrock/BedrockListener.cpp
         src/bedrock/BedrockPlayer.cpp
         src/config/AnimationsConfig.cpp
@@ -179,6 +180,7 @@ basalt_module(server-runtime-core
         src/player/FoodData.cpp
         src/player/PlayerSession.cpp
         src/player/PlayerPersistence.cpp
+        src/player/PlayerBlockUpdates.cpp
         src/player/PlayerDeath.cpp
         src/player/PlayerRegistry.cpp
         src/player/Menu.cpp

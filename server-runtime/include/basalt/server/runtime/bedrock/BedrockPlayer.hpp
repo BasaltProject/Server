@@ -16,6 +16,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -47,6 +48,13 @@ public:
 
         /// Runs a command as this player, where commands are allowed to run.
         std::function<void(const player::PlayerSession&, std::string)> runCommand;
+
+        /// Builds the columns around a point and hands each one back already written, in the shape
+        /// a client reads. Runs where the world runs, not on the door's own thread, which is why it
+        /// answers through a callback instead of returning.
+        std::function<void(std::vector<std::pair<std::int32_t, std::int32_t>> columns, int protocol,
+                           std::function<void(std::vector<std::uint8_t>)> send, std::function<void()> done)>
+            sendChunks;
 
         /// What `players.db` remembers about this player, or nothing when it knows nobody by that
         /// name. Read once, when they arrive.
@@ -116,6 +124,11 @@ private:
     /// Draws whoever arrived, moves whoever moved and takes away whoever left.
     void syncOthers();
 
+    /// Asks the world for the columns around this player that it has not sent yet, and says where
+    /// to expect them. `done` runs once they are all on their way. False when there is no world to
+    /// ask, which is the only reason it would not happen.
+    bool sendColumnsAround(std::function<void()> done);
+
     /// The line, said to everyone and written to the log, once nobody has objected to it.
     void say(std::string message);
 
@@ -151,6 +164,12 @@ private:
     std::optional<OpenForm> form_;
     std::string openTitle_;
     std::unordered_map<wire::common::Uuid, Other> others_;
+    /// Which columns this client already has, so walking sends only what is new. A column that
+    /// falls out of range is forgotten, which is what makes coming back send it again.
+    std::set<std::pair<std::int32_t, std::int32_t>> columns_;
+    /// Where the player was when the columns were last worked out. The unset value is deliberate:
+    /// it is what makes the first turn after arriving do the work.
+    std::optional<std::pair<std::int32_t, std::int32_t>> lastColumn_;
     /// What this player's row said when they arrived, so the one written back keeps the totals
     /// rather than starting them again.
     std::int64_t firstSeenEpochSeconds_ = 0;

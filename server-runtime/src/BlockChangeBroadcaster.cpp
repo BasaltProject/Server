@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
@@ -59,9 +60,9 @@ void sendTo(const std::vector<player::PlayerSession*>& watchers, std::int32_t pa
 
 void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t x, std::int32_t y, std::int32_t z,
                std::int32_t stateId) {
-    const play::ClientboundBlockUpdatePacket packet{.pos = play::BlockPos{x, y, z}, .blockStateId = stateId};
-    sendTo(watchers, play::ClientboundBlockUpdatePacket::kId,
-           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    for (const player::PlayerSession* player : watchers) {
+        player::sendBlockChangeTo(*player, x, y, z, stateId);
+    }
 }
 
 /// The world's own neighbour-update context, which is what the cascade reads off a world.

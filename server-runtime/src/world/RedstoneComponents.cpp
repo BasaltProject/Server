@@ -569,6 +569,46 @@ std::vector<Reach> removalReach(const std::int32_t stateId, const std::int32_t x
                    ? std::vector<Reach>{Reach{.x = x, .y = y - 1, .z = z}}
                    : std::vector<Reach>{};
     }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    // parity: `LeverBlock`, `ButtonBlock` and `BasePressurePlateBlock` all answer their removal with
+    // `updateNeighbours`, which tells their own square **and the one they were stuck to**. It only
+    // runs when they left powered, which is the whole point: what they were feeding has to hear it.
+    if (path == "lever" || path.ends_with("_button")) {
+        if (valueOf(properties, "powered") != "true") {
+            return {};
+        }
+        // parity: `getConnectedDirection`, the face it hangs on, and `updateNeighbours` walks the
+        // opposite way to reach the block behind it.
+        const std::string_view face = valueOf(properties, "face");
+        if (face == "floor") {
+            return {Reach{.x = x, .y = y - 1, .z = z}};
+        }
+        if (face == "ceiling") {
+            return {Reach{.x = x, .y = y + 1, .z = z}};
+        }
+        const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
+        if (!facing.has_value()) {
+            return {};
+        }
+        const BlockFace behind = registry::opposite(*facing);
+        return {Reach{
+            .x = x + registry::stepX(behind), .y = y + registry::stepY(behind), .z = z + registry::stepZ(behind)}};
+    }
+    // parity: `SculkSensorBlock.affectNeighborsAfterRemoval`, the same shape: only while it is
+    // listening does it tell its own square and the one below.
+    if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+        return valueOf(properties, "sculk_sensor_phase") == "active"
+                   ? std::vector<Reach>{Reach{.x = x, .y = y - 1, .z = z}}
+                   : std::vector<Reach>{};
+    }
+    if (path.ends_with("_pressure_plate")) {
+        // parity: `getSignalForState`, which is the boolean for the plain plates and the count for
+        // the two weighted ones.
+        const std::string_view powered = valueOf(properties, "powered");
+        const std::string_view power = valueOf(properties, "power");
+        const bool on = powered == "true" || (!power.empty() && power != "0");
+        return on ? std::vector<Reach>{Reach{.x = x, .y = y - 1, .z = z}} : std::vector<Reach>{};
+    }
     // parity: `isStraight` is the constructor flag, false for the plain rail and true for the three
     // that only ever lie flat.
     const bool straight = path == "powered_rail" || path == "detector_rail" || path == "activator_rail";
@@ -576,7 +616,7 @@ std::vector<Reach> removalReach(const std::int32_t stateId, const std::int32_t x
         return {};
     }
     std::vector<Reach> out;
-    if (valueOf(registry::blockStateDefinitions::propertiesOf(stateId), "shape").starts_with("ascending_")) {
+    if (valueOf(properties, "shape").starts_with("ascending_")) {
         out.push_back(Reach{.x = x, .y = y + 1, .z = z});
     }
     if (straight) {

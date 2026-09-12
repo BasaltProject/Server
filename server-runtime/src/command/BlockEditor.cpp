@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/runtime/command/BlockEditor.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -77,8 +78,8 @@ bool BlockEditor::write(std::int32_t x, std::int32_t y, std::int32_t z, std::int
     if (!world_->state().setBlockState(x, y, z, stateId, sideEffects)) {
         return false;
     }
-    // parity: `Level.updateNeighboursOnBlockSet` runs `affectNeighborsAfterRemoval` on what was here,
-    // so the cascade needs the old state and not only the new one.
+    // The cascade needs the old state and not only the new one: it decides what changed, what the
+    // state that left was still feeding, and whether the square counts as an arrival at all.
     replaced_.insert_or_assign(std::array<std::int32_t, 3>{x, y, z}, before);
     record(x, y, z, stateId);
     written_.push_back({x, y, z});
@@ -126,6 +127,9 @@ bool BlockEditor::destroy(std::int32_t x, std::int32_t y, std::int32_t z) {
     if (environment_->options().dropBrokenBlock) {
         environment_->options().dropBrokenBlock(*world_, x, y, z, *old);
     }
+    // parity: `SetBlockCommand` in `destroy` mode runs `level.destroyBlock(pos, true)` **before** the
+    // write, and that one carries flags 3, so this square is owed the removal side effects.
+    destroyed_.insert({x, y, z});
     return write(x, y, z, leftBehindBy(*old), world::WorldState::SideEffects::kRun);
 }
 
@@ -229,8 +233,11 @@ void BlockEditor::notifyNeighbours() {
         bool shapedToAir = false;
         bool unsupported = false;
         const auto wasHere = replaced_.find(at);
+        neighbourUpdates::Context broke = context;
+        broke.updateNeighbours = true;
         neighbourUpdates::afterChange(
-            context, at[0], at[1], at[2], wasHere == replaced_.end() ? std::nullopt : wasHere->second, effects_,
+            destroyed_.contains(at) ? broke : context, at[0], at[1], at[2],
+            wasHere == replaced_.end() ? std::nullopt : wasHere->second, effects_,
             [this, &at, &unsupported](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 if (x == at[0] && y == at[1] && z == at[2]) {
                     unsupported = true;
@@ -337,11 +344,7 @@ void BlockEditor::flush() {
                                           (sectionZ << 4) + ((packed >> 4) & 15)},
                     .blockStateId = stateId};
                 for (const player::PlayerSession* player : watchers) {
-                    if (player->connection().sendPlayPacket) {
-                        player->connection().sendPlayPacket(
-                            play::ClientboundBlockUpdatePacket::kId,
-                            [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-                    }
+                    player::sendBlockChangeTo(*player, packet.pos.x, packet.pos.y, packet.pos.z, packet.blockStateId);
                 }
                 continue;
             }
@@ -350,10 +353,18 @@ void BlockEditor::flush() {
                 packet.changes.push_back({.position = position, .blockStateId = stateId});
             }
             for (const player::PlayerSession* player : watchers) {
+                // One packet for a whole section where the edition has one, and the same changes one
+                // at a time where it has not: a Bedrock client has no way to hear them together.
                 if (player->connection().sendPlayPacket) {
                     player->connection().sendPlayPacket(
                         play::SectionBlocksUpdatePacket::kId,
                         [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                } else {
+                    for (const auto& [position, stateId] : changes) {
+                        player::sendBlockChangeTo(*player, (sectionX << 4) + ((position >> 8) & 15),
+                                                  (sectionY << 4) + (position & 15),
+                                                  (sectionZ << 4) + ((position >> 4) & 15), stateId);
+                    }
                 }
             }
         }
