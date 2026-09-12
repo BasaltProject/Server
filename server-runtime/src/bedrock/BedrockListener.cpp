@@ -67,8 +67,9 @@ struct BedrockListener::Session {
     wire::bedrock::LoginRequest login;
     bool started = false;
 
-    Session(RakSession& session, std::shared_ptr<const wire::bedrock::EcKeyPair> keys, std::string gameVersion)
-        : transport(session), connection(session, std::move(keys), std::move(gameVersion)) {}
+    Session(RakSession& session, std::shared_ptr<const wire::bedrock::EcKeyPair> keys, std::string gameVersion,
+            wire::bedrock::BedrockGate gate)
+        : transport(session), connection(session, std::move(keys), std::move(gameVersion), std::move(gate)) {}
 };
 
 void BedrockMailbox::post(std::string line) {
@@ -162,8 +163,15 @@ bool BedrockListener::start() {
     running_.store(true);
     thread_ = std::jthread{[this] { run(); }};
     logger_.info([this] {
-        return "Bedrock clients are welcome on UDP port " + std::to_string(port()) + " (protocol " +
-               std::to_string(wire::bedrock::kNativeBedrockProtocol) + ", " + gameVersion_ + ").";
+        std::string protocols;
+        for (const std::int32_t protocol : options_.gate.supported()) {
+            if (!protocols.empty()) {
+                protocols += ", ";
+            }
+            protocols += std::to_string(protocol);
+        }
+        return "Bedrock clients are welcome on UDP port " + std::to_string(port()) + " (" + gameVersion_ +
+               ", protocol " + protocols + ").";
     });
     return true;
 }
@@ -195,7 +203,7 @@ void BedrockListener::run() {
 }
 
 void BedrockListener::onConnect(RakSession& session) {
-    auto owned = std::make_unique<Session>(session, keys_, gameVersion_);
+    auto owned = std::make_unique<Session>(session, keys_, gameVersion_, options_.gate);
     Session& entry = *owned;
     sessions_.emplace(session.peer(), std::move(owned));
 
@@ -204,6 +212,17 @@ void BedrockListener::onConnect(RakSession& session) {
         logger_.info([this, &login] {
             return prefixedName(login.name) + " is joining from Bedrock" +
                    (login.authenticated ? "" : " (unauthenticated)") + ".";
+        });
+    });
+    entry.connection.onRefused([this](const int protocol, const std::string& told) {
+        logger_.info([protocol, &told] {
+            return "A Bedrock client on protocol " + std::to_string(protocol) + " was turned away: " + told;
+        });
+    });
+    entry.connection.onWarning([this](const int protocol) {
+        logger_.warn([protocol] {
+            return "A Bedrock client on protocol " + std::to_string(protocol) +
+                   " is newer than this server speaks and was let in anyway; it may not get far.";
         });
     });
     entry.connection.onReady([this, &entry] { onReady(entry); });
