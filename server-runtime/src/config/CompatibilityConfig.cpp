@@ -76,8 +76,22 @@ std::expected<CompatibilityConfig, std::string> CompatibilityConfig::load(const 
     }
     const bool nameSubstitutes = java == nullptr ? true : java->boolean("name-substitutes").value_or(true);
 
+    BedrockSettings bedrock;
+    if (const TomlTable* table = root->table("bedrock"); table != nullptr) {
+        bedrock.enabled = table->boolean("enabled").value_or(bedrock.enabled);
+        if (const std::optional<std::int64_t> port = table->integer("port"); port.has_value()) {
+            if (*port <= 0 || *port > 65535) {
+                return std::unexpected(path + ": the bedrock port must be between 1 and 65535");
+            }
+            bedrock.port = static_cast<std::uint16_t>(*port);
+        }
+        if (const std::optional<std::string_view> prefix = table->string("prefix"); prefix.has_value()) {
+            bedrock.prefix = std::string{*prefix};
+        }
+    }
+
     logger.debug([&path] { return "Loaded " + path + "."; });
-    return CompatibilityConfig{std::move(backwards), *future, *snapshots, nameSubstitutes};
+    return CompatibilityConfig{std::move(backwards), *future, *snapshots, nameSubstitutes, std::move(bedrock)};
 }
 
 wire::multiversion::ProtocolGate CompatibilityConfig::gate(const std::set<std::int32_t>& translatable,

@@ -32,3 +32,18 @@ snapshots = "refuse"
 # reads "Cinnabar (26.2)" in the inventory rather than "Red Sandstone". An item
 # somebody named themselves keeps that name.
 name-substitutes = true
+
+[bedrock]
+# Minecraft Bedrock clients (phone, console, Windows) connect to the same
+# server. On by default: nobody should have to configure being able to join.
+enabled = true
+
+# Bedrock speaks its own protocol on UDP, so it needs its own port. 19132 is
+# the one every Bedrock client tries first.
+port = 19132
+
+# What goes in front of a Bedrock player's name inside the server, so a Steve
+# from each edition is two people and not one. Set it to "" on a server where
+# only Bedrock players join, and then two accounts with the same name are two
+# players shown with the same name.
+prefix = "."

@@ -172,6 +172,26 @@ TEST_CASE("a file with nothing in it is every default") {
     CHECK_FALSE(accepting.nameSubstitutes());
 }
 
+TEST_CASE("bedrock is on with nothing written, and off only when somebody says so") {
+    const CompatibilityConfig defaults = compatibility("compat-bedrock-default", "# nothing\n");
+    CHECK(defaults.bedrock().enabled);
+    CHECK(defaults.bedrock().port == 19132);
+    CHECK(defaults.bedrock().prefix == ".");
+
+    const CompatibilityConfig chosen =
+        compatibility("compat-bedrock-written", "[bedrock]\nenabled = false\nport = 19200\nprefix = \"\"\n");
+    CHECK_FALSE(chosen.bedrock().enabled);
+    CHECK(chosen.bedrock().port == 19200);
+    CHECK(chosen.bedrock().prefix.empty());
+
+    // A port outside what a port can be is the operator meaning something, and it is said rather
+    // than rounded into range.
+    const auto refused =
+        CompatibilityConfig::load(written("compat-bedrock-port", "compatibility.toml", "[bedrock]\nport = 70000\n"));
+    REQUIRE_FALSE(refused.has_value());
+    CHECK(refused.error().find("between 1 and 65535") != std::string::npos);
+}
+
 TEST_CASE("a command nobody configured is a command with nothing changed") {
     const CommandsConfig config = commands("commands-default", kCommandsDefaultToml);
     const CommandOverride& untouched = config.get("teleport");

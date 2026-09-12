@@ -2,12 +2,14 @@
 
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/VanillaBlocks.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 
 using namespace basalt::server::runtime::world;
@@ -191,6 +193,111 @@ TEST_CASE("concrete powder pushed into water is already concrete") {
     CHECK(dry->path() == "white_concrete_powder");
 }
 
+TEST_CASE("a string laid beside a string joins it") {
+    // parity: `TripWireBlock.getStateForPlacement` sets all four sides from `shouldConnectTo`, the
+    // same question `updateShape` asks one side at a time. Only fences and panes were joined on
+    // placement, so a tripwire line laid by hand stayed a row of stubs until something else touched
+    // it, and a stub is a different line to walk for the hook at the end.
+    Loaded loaded;
+    const std::int32_t wire = defaultOf("tripwire");
+    REQUIRE(loaded.state.setBlockState(9, 64, 8, wire));
+    REQUIRE(loaded.state.setBlockState(8, 63, 8, defaultOf("stone")));
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    const std::int32_t laid = blockPlacement::stateFor(block("tripwire"), wire,
+                                                       {.face = Direction::Up,
+                                                        .world = &loaded.state,
+                                                        .worldName = "overworld",
+                                                        .x = 8,
+                                                        .y = 64,
+                                                        .z = 8},
+                                                       random);
+    CHECK(propertyOf(laid, "east") == "true");
+    CHECK(propertyOf(laid, "north") == "false");
+    CHECK(propertyOf(laid, "south") == "false");
+    CHECK(propertyOf(laid, "west") == "false");
+}
+
+TEST_CASE("an observer put down looks away from whoever put it down") {
+    // parity: `ObserverBlock.getStateForPlacement` writes
+    // `getNearestLookingDirection().getOpposite().getOpposite()`. The two opposites cancel, which
+    // makes the observer the one six-way block that does **not** turn to face the player: it watches
+    // the square beyond, which is the whole point of pointing one at something.
+    // A piston takes the single opposite and does face back, and is here to keep the two apart.
+    for (const auto& [yaw, watching, pistonFaces] :
+         std::array<std::tuple<float, std::string_view, std::string_view>, 4>{{{0.0F, "south", "north"},
+                                                                               {90.0F, "west", "east"},
+                                                                               {180.0F, "north", "south"},
+                                                                               {270.0F, "east", "west"}}}) {
+        CHECK(propertyOf(placed("observer", {.face = Direction::Up, .yaw = yaw}), "facing") == watching);
+        CHECK(propertyOf(placed("piston", {.face = Direction::Up, .yaw = yaw}), "facing") == pistonFaces);
+    }
+}
+
+TEST_CASE("a fence gate dropped between two walls sits down into them") {
+    // parity: `FenceGateBlock.getStateForPlacement`'s `IN_WALL`, which looks along the axis the gate
+    // opens **across**, not the one it faces. A gate is in neither the fence nor the pane family, so
+    // nothing joined it as it landed.
+    Loaded loaded;
+    REQUIRE(loaded.state.setBlockState(7, 64, 8, defaultOf("cobblestone_wall")));
+    REQUIRE(loaded.state.setBlockState(9, 64, 8, defaultOf("cobblestone_wall")));
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    const auto place = [&](std::int32_t x, float yaw) {
+        const std::optional<std::int32_t> defaultState =
+            registry::blocks::defaultStateIdOf(basalt::wire::common::Identifier::vanilla("oak_fence_gate"));
+        REQUIRE(defaultState.has_value());
+        return blockPlacement::stateFor(block("oak_fence_gate"), *defaultState,
+                                        {.face = Direction::Up,
+                                         .yaw = yaw,
+                                         .world = &loaded.state,
+                                         .worldName = "overworld",
+                                         .x = x,
+                                         .y = 64,
+                                         .z = 8},
+                                        random);
+    };
+    // Facing south, so it opens across x, which is where the two walls are.
+    CHECK(propertyOf(place(8, 0.0F), "in_wall") == "true");
+    // Facing east, so it opens across z and the same two walls are now in front and behind.
+    CHECK(propertyOf(place(8, 270.0F), "in_wall") == "false");
+    // And with no wall anywhere near.
+    CHECK(propertyOf(place(14, 0.0F), "in_wall") == "false");
+}
+
+TEST_CASE("every block in the game goes down as itself") {
+    // The sweep this surface never had. The bench cannot reach placement at all, because every
+    // circuit it has builds with `/setblock`, so the only way to cover all 1196 blocks is from here.
+    // A world with a redstone block and a wall in it, so the branches that read power and the ones
+    // that look for a neighbour are exercised rather than skipped.
+    Loaded loaded;
+    REQUIRE(loaded.state.setBlockState(7, 64, 8, defaultOf("redstone_block")));
+    REQUIRE(loaded.state.setBlockState(9, 64, 8, defaultOf("cobblestone_wall")));
+    REQUIRE(loaded.state.setBlockState(8, 63, 8, defaultOf("stone")));
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    // Concrete powder answers a different block on purpose, and so does bamboo on the ground.
+    const std::set<std::string> answersAnother = {"bamboo"};
+    for (const auto& [blockId, path] : registry::blockIdsTable()) {
+        static_cast<void>(blockId);
+        const std::string name{path};
+        if (name.ends_with("_concrete_powder") || answersAnother.contains(name)) {
+            continue;
+        }
+        const basalt::wire::common::Identifier id = basalt::wire::common::Identifier::vanilla(name);
+        const std::optional<std::int32_t> defaultState = registry::blocks::defaultStateIdOf(id);
+        REQUIRE(defaultState.has_value());
+        const std::int32_t landed = blockPlacement::stateFor(id, *defaultState,
+                                                             {.face = Direction::Up,
+                                                              .world = &loaded.state,
+                                                              .worldName = "overworld",
+                                                              .x = 8,
+                                                              .y = 64,
+                                                              .z = 8},
+                                                             random);
+        const basalt::wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(landed);
+        REQUIRE(owner != nullptr);
+        CHECK(owner->path() == name);
+    }
+}
+
 TEST_CASE("the quarter of a yaw a player is looking along") {
     // parity: `Direction.fromYRot`, south at zero and turning clockwise.
     CHECK(blockPlacement::playerDirection(0.0F) == Direction::South);
@@ -238,8 +345,13 @@ TEST_CASE("an anvil lands sideways to whoever put it down") {
     CHECK(propertyOf(placed("chipped_anvil", {.face = Direction::Up, .yaw = 180.0F}), "facing") == "east");
 }
 
-TEST_CASE("a six-way block points away from the player, and a rod at the face it was clicked") {
-    CHECK(propertyOf(placed("observer", {.face = Direction::Up, .yaw = 0.0F, .pitch = 0.0F}), "facing") == "north");
+TEST_CASE("a six-way block faces the player, and a rod the face it was clicked") {
+    // parity: `getNearestLookingDirection().getOpposite()`. At yaw zero the player looks south, so
+    // the front lands north, pointing back at them: that is a chest, a furnace and a dispenser. The
+    // observer is the one exception and has its own case; this used to assert the observer's value
+    // here, which is how it went unnoticed that every observer placed by hand watched backwards.
+    CHECK(propertyOf(placed("dispenser", {.face = Direction::Up, .yaw = 0.0F, .pitch = 0.0F}), "facing") == "north");
+    CHECK(propertyOf(placed("piston", {.face = Direction::Up, .yaw = 0.0F, .pitch = 0.0F}), "facing") == "north");
     // parity: the handful that take the clicked face instead.
     CHECK(propertyOf(placed("end_rod", {.face = Direction::Up, .yaw = 0.0F}), "facing") == "up");
     CHECK(propertyOf(placed("lightning_rod", {.face = Direction::North, .yaw = 0.0F}), "facing") == "north");

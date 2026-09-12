@@ -83,8 +83,8 @@ bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX
 }
 
 /// parity: `TripWireBlock.shouldConnectTo`: another string, or a hook whose face points back at us.
-[[nodiscard]] bool connectsTo(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                              BlockFace towards) {
+bool connectsTo(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                const BlockFace towards) {
     const std::optional<std::int32_t> beside =
         world.blockState(x + registry::stepX(towards), y + registry::stepY(towards), z + registry::stepZ(towards));
     if (!beside.has_value()) {

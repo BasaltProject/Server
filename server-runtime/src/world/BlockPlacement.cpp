@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -7,6 +8,7 @@
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
+#include <basalt/server/runtime/world/Tripwires.hpp>
 
 #include <algorithm>
 #include <array>
@@ -312,10 +314,34 @@ constexpr auto kGrowingHeads =
         }
     } else if (path.ends_with("_fence_gate")) {
         properties["open"] = properties["powered"] = poweredHere() ? "true" : "false";
+        // parity: `FenceGateBlock.getStateForPlacement`'s `IN_WALL`, which looks along the axis the
+        // gate opens **across**, not the one it faces. A gate is in neither the fence nor the pane
+        // family, so nothing joined it as it landed and one dropped between two walls sat a block
+        // too high until something else touched it.
+        if (world != nullptr) {
+            const bool acrossZ = properties["facing"] == "north" || properties["facing"] == "south";
+            const std::int32_t first = acrossZ ? stateAt(*world, x - 1, y, z) : stateAt(*world, x, y, z - 1);
+            const std::int32_t second = acrossZ ? stateAt(*world, x + 1, y, z) : stateAt(*world, x, y, z + 1);
+            properties["in_wall"] = registry::blockConnections::isWall(first) ||
+                                            registry::blockConnections::isWall(second)
+                                        ? "true"
+                                        : "false";
+        }
     } else if (path.ends_with("_shelf") || path == "shelf" || path.ends_with("_head") || path.ends_with("_skull")) {
         properties["powered"] = poweredHere() ? "true" : "false";
     } else if (path == "crafter") {
         properties["triggered"] = poweredHere() ? "true" : "false";
+    } else if (path == "tripwire" && world != nullptr) {
+        // parity: `TripWireBlock.getStateForPlacement` sets all four sides from `shouldConnectTo`,
+        // the same question `updateShape` asks one side at a time. Only fences and panes were joined
+        // as they landed, so a line of string laid by hand stayed a row of stubs.
+        for (const auto& [face, name] : std::array<std::pair<registry::BlockFace, std::string_view>, 4>{
+                 {{registry::BlockFace::North, "north"},
+                  {registry::BlockFace::South, "south"},
+                  {registry::BlockFace::West, "west"},
+                  {registry::BlockFace::East, "east"}}}) {
+            properties[std::string{name}] = tripwires::connectsTo(*world, x, y, z, face) ? "true" : "false";
+        }
     } else if (path == "hopper") {
         // parity: `HopperBlock.getStateForPlacement`, which points the spout **into** the square that
         // was clicked, and straight down whenever that would be up or down. A hopper has five
@@ -495,9 +521,15 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
 
     const std::size_t facings = definition->valuesOf("facing").size();
     if (facings == 6) {
-        properties["facing"] = named(path, kClickedFaceBlocks)
-                                   ? nameOf(face)
-                                   : nameOf(opposite(nearestLooking(placement.yaw, placement.pitch)));
+        // parity: `ObserverBlock.getStateForPlacement` is
+        // `getNearestLookingDirection().getOpposite().getOpposite()`, two opposites that cancel, so
+        // alone among the six-way blocks an observer faces **away** from whoever put it down and
+        // watches the square beyond. A piston, a dispenser, a barrel and a command block all take the
+        // single opposite and face back. Every observer placed by hand used to look the wrong way.
+        const Direction looking = nearestLooking(placement.yaw, placement.pitch);
+        properties["facing"] = named(path, kClickedFaceBlocks)  ? nameOf(face)
+                               : path == "observer"             ? nameOf(looking)
+                                                                : nameOf(opposite(looking));
     } else if (facings == 4 && path.contains("wall") && face != Direction::Up && face != Direction::Down) {
         properties["facing"] = nameOf(face);
     } else if (facings == 4 && attached) {
