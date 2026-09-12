@@ -98,7 +98,11 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                               const Hooks& hooks, bool hasSkylight, std::int64_t worldSeed) {
     std::vector<BlockChange> changes;
     // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
-    if (clock.totalTicks() % daylightDetectors::kIntervalTicks == 0) {
+    // parity: `DaylightDetectorBlock.tickEntity` is `level.getGameTime() % 20L == 0L`, the world's
+    // **age**, not its time of day. The two are different counters in the jar and only the second is
+    // what `/time set` moves, so reading the clock here put the detector's twenty ticks on the wrong
+    // beat after any time change, and froze it altogether wherever the day is not advancing.
+    if (gameTime % daylightDetectors::kIntervalTicks == 0) {
         for (const std::array<std::int32_t, 2>& position : chunks) {
             const server::world::Chunk* chunk = world.chunkIfLoaded(position[0], position[1]);
             if (chunk == nullptr) {
