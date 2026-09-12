@@ -183,10 +183,9 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
     settleFrom(world, watchers, change.x, change.y, change.z, true);
     // parity: a rod and a hook reach one square further than their own write does, and what is on
     // the far side of the wall they hang on only hears them through that second update.
-    const std::optional<registry::BlockFace> behind = world::redstone::alsoTells(change.stateId);
-    if (behind.has_value()) {
-        settleFrom(world, watchers, change.x + registry::stepX(*behind), change.y + registry::stepY(*behind),
-                   change.z + registry::stepZ(*behind), false);
+    for (const registry::BlockFace behind : world::redstone::alsoTells(change.stateId)) {
+        settleFrom(world, watchers, change.x + registry::stepX(behind), change.y + registry::stepY(behind),
+                   change.z + registry::stepZ(behind), false);
     }
 }
 

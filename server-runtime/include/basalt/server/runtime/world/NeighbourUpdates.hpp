@@ -110,6 +110,10 @@ struct Context {
     /// default is the rule's own so that a site which forgets it still behaves like vanilla: passed
     /// as a hardcoded false, no signal ever lit a tnt at all.
     bool tntExplodes = true;
+    /// parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` only under
+    /// `(flags & UPDATE_NEIGHBORS) != 0 || movedByPiston`, and `/setblock` writes with `2 | 256`, so
+    /// a command never gets the removal side effects: only the six squares its tail tells.
+    bool updateNeighbours = true;
 };
 
 /// Breaks whatever `x`, `y`, `z` stopped holding up, and whatever that in turn stopped holding.

@@ -475,24 +475,35 @@ bool isSignalSource(std::int32_t stateId) {
            path.ends_with("_pressure_plate") || isLightningRod(path);
 }
 
-std::optional<registry::BlockFace> alsoTells(std::int32_t stateId) {
+std::vector<registry::BlockFace> alsoTells(std::int32_t stateId) {
     const std::string path = pathOf(stateId);
     // parity: `SculkSensorBlock.updateNeighbours` tells its own square **and the one below**. A
     // sensor only feeds strongly upwards, so what is under it would never hear it otherwise.
     if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
-        return registry::BlockFace::Down;
+        return {registry::BlockFace::Down};
+    }
+    // parity: `PoweredRailBlock.updateState` ends by telling the square **below**, and the one above
+    // as well when the shape is a slope; `DetectorRailBlock.checkPressed` tells the one below too.
+    // The rail feeds nobody, so this changes no signal: what it changes is a neighbour that was left
+    // out of step, which is exactly what a lamp written `lit=false` beside a block of redstone is.
+    if (path == "powered_rail" || path == "activator_rail" || path == "detector_rail") {
+        std::vector<registry::BlockFace> tells{registry::BlockFace::Down};
+        if (valueOf(registry::blockStateDefinitions::propertiesOf(stateId), "shape").starts_with("ascending_")) {
+            tells.push_back(registry::BlockFace::Up);
+        }
+        return tells;
     }
     if (path != "tripwire_hook" && !isLightningRod(path)) {
-        return std::nullopt;
+        return {};
     }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const std::string_view facing = valueOf(properties, "facing");
     for (const BlockFace candidate : kFaces) {
         if (nameOf(candidate) == facing) {
-            return registry::opposite(candidate);
+            return {registry::opposite(candidate)};
         }
     }
-    return std::nullopt;
+    return {};
 }
 
 std::vector<std::array<std::int32_t, 3>> reachOf(const WorldState& world, std::int32_t x, std::int32_t y,

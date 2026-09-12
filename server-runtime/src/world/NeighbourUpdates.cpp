@@ -584,19 +584,15 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         return scheduledBlocks::scaffoldingHasFallen(world, sx, sy, sz);
     };
 
-    // parity: `RedStoneWireBlock.onPlace` tells the blocks over and under it to update their own
-    // neighbours, and this dust is one of those, so a dust with nothing to sit on goes at once,
-    // before anything around it has been reshaped. That is what leaves the dust beside it a dot
-    // instead of a cross: it never sees this one arrive.
-    //
-    // parity: and it only runs when the **block** changed (`!oldState.is(state.getBlock())`), so a
-    // dust written over a dust settles nothing. Nothing else asks it either: `/setblock` writes with
-    // `2 | 256` and its tail, `updateNeighboursOnBlockSet`, tells the six squares around and not the
-    // one in the middle. A dust handed a strength it could not have keeps it, the same way a
-    // repeater does in `repetidormentira`.
+    // parity: `RedStoneWireBlock.onPlace` tells the blocks over and under it, so a dust with nothing
+    // to sit on goes at once, before anything around it is reshaped: that is what leaves the dust
+    // beside it a dot. It only runs when the block changed, so a dust written over a dust settles
+    // nothing, and a dust handed a strength it could not have keeps it.
+    bool wireArrived = false;
     if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
         arrived.has_value() && redstoneWire::isWire(*arrived) &&
         !(removed.has_value() && redstoneWire::isWire(*removed))) {
+        wireArrived = true;
         // parity: `onPlace` settles this dust's own strength before it tells anybody, and that write
         // redraws the squares around it while this dust is still there. It is the whole difference
         // between leaving the dust beside it a dot and leaving it a cross: with no signal the
@@ -672,14 +668,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             }
         }
     }
-    // The block that just arrived reaches out to what was already there, which is the other half of
-    // `updateShape`: a fence put down beside a fence joins it, not only the other way.
-    //
-    // parity: `CreakingHeartBlock` has **no** `onPlace`, only `updateShape`, so its turn belongs in
-    // here and not outside: `BlockInput.place` runs `updateFromNeighbourShapes` on the state it is
-    // about to write, which books it, and `Level.setBlock` never calls `updateShape` on the square it
-    // wrote. Booked outside, a heart re-booked itself every time its own turn changed its state, and
-    // the chain took three ticks to die down.
+    // The block that just arrived reaches out to what was already there, the other half of
+    // `updateShape`. parity: `CreakingHeartBlock` has no `onPlace`, only `updateShape`, so its turn
+    // belongs here: booked outside, a heart re-booked itself every time its own turn changed its
+    // state and the chain took three ticks to die down.
     if (reshapeSelf) {
         if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
             reshaped(*moved, x, y, z);
@@ -780,6 +772,17 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         afterShapes();
     }
     std::deque<Position> reacting;
+    // parity: a block that changed is asked again, and so are the squares its own update reaches past
+    // its six sides: a rail the one below, a sensor the one below, a rod or a hook the wall behind.
+    // None feeds a signal that way; what it reaches is a neighbour left out of step. Every place
+    // that collects what a reactor changed goes through here.
+    const auto reactsAt = [&reacting](const BlockChange& change) {
+        reacting.push_back({change.x, change.y, change.z});
+        for (const registry::BlockFace also : redstone::alsoTells(change.stateId)) {
+            reacting.push_back(
+                {change.x + registry::stepX(also), change.y + registry::stepY(also), change.z + registry::stepZ(also)});
+        }
+    };
     reacting.push_back({x, y, z});
     // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from
     // `affectNeighborsAfterRemoval`, plus `RedstoneTorchBlock.notifyNeighbors`, which tell the square
@@ -798,7 +801,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // moves, still tells its own square and the one below, and a slope still tells the one above.
     const bool changedBlock = !standing.has_value() || !removed.has_value() || !sameBlock(*removed, *standing);
     const bool railArrived = standing.has_value() && rails::isRail(*standing);
-    if (removed.has_value() && (changedBlock || railArrived)) {
+    // parity: `affectNeighborsAfterRemoval` for a dust, under the same two gates as every other one:
+    // the block has to have changed, and the write has to carry `UPDATE_NEIGHBORS`.
+    const bool wireLeft =
+        context.updateNeighbours && changedBlock && removed.has_value() && redstoneWire::isWire(*removed);
+    if (removed.has_value() && context.updateNeighbours && (changedBlock || railArrived)) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*removed, x, y, z)) {
             reach.push_back(at);
         }
@@ -807,6 +814,39 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         for (const redstoneComponents::Reach& at : redstoneComponents::removalReach(*removed, x, y, z)) {
             reach.push_back(at);
         }
+    }
+    // parity: the rest of `RedStoneWireBlock.onPlace`, which is not only its own strength. It runs
+    // `updateNeighborsAt` on the square over it and the one under it, and that reaches the six
+    // around **those**, then `updateNeighborsOfNeighboringWires` does the same for every dust in the
+    // four horizontals. Measured in `polvollegaabajo`: a lamp beside the block a fresh dust feeds
+    // from above never heard about it.
+    const auto wireSpread = [&reach, &world, x, y, z](const std::span<const BlockFace> sides) {
+        for (const BlockFace face : sides) {
+            reach.push_back(redstoneComponents::Reach{
+                .x = x + registry::stepX(face), .y = y + registry::stepY(face), .z = z + registry::stepZ(face)});
+        }
+        for (const BlockFace side : {BlockFace::North, BlockFace::South, BlockFace::West, BlockFace::East}) {
+            const std::int32_t cx = x + registry::stepX(side);
+            const std::int32_t cy = y + registry::stepY(side);
+            const std::int32_t cz = z + registry::stepZ(side);
+            // parity: `checkCornerChangeAt` does nothing unless that square really holds a dust.
+            const std::optional<std::int32_t> corner = world.blockState(cx, cy, cz);
+            if (!corner.has_value() || !redstoneWire::isWire(*corner)) {
+                continue;
+            }
+            reach.push_back(redstoneComponents::Reach{.x = cx, .y = cy, .z = cz});
+            for (const BlockFace face : kFaces) {
+                reach.push_back(redstoneComponents::Reach{
+                    .x = cx + registry::stepX(face), .y = cy + registry::stepY(face), .z = cz + registry::stepZ(face)});
+            }
+        }
+    };
+    if (wireArrived) {
+        static constexpr std::array<BlockFace, 2> kVertical{BlockFace::Down, BlockFace::Up};
+        wireSpread(kVertical);
+    }
+    if (wireLeft) {
+        wireSpread(kFaces);
     }
     for (const redstoneComponents::Reach& at : reach) {
         std::vector<BlockChange> ahead;
@@ -827,20 +867,20 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 effects.push_back(change);
             }
             redstoneComponents::watchFor(world, change.x, change.y, change.z);
-            reacting.push_back({change.x, change.y, change.z});
+            reactsAt(change);
         }
     }
     // parity: `onPlace`, the only half of a write the square that changed can answer for itself.
     // Everything else reacts from `neighborChanged`, and `Level.updateNeighborsAt` never tells the
     // square it is called for: a lamp put down beside a lit torch stays dark until something pokes it.
     for (const BlockChange& change : redstoneReactors::placed(world, context.worldName, x, y, z, context.gameTime,
-                                                              context.random, context.tntExplodes)) {
+                                                              context.random, context.tntExplodes, removed)) {
         reshaped(change.stateId, change.x, change.y, change.z);
         if (!change.effects.empty()) {
             effects.push_back(change);
         }
         redstoneComponents::watchFor(world, change.x, change.y, change.z);
-        reacting.push_back({change.x, change.y, change.z});
+        reactsAt(change);
     }
     // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` runs `updateNeighborsAt` on the dust
     // that moved **and on each of its six squares**, so a lamp stuck to a block the dust powers from
@@ -864,7 +904,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 effects.push_back(change);
             }
             redstoneComponents::watchFor(world, change.x, change.y, change.z);
-            reacting.push_back({change.x, change.y, change.z});
+            reactsAt(change);
         }
     }
     // parity: `DispenserBlock.neighborChanged`, which remembers it was triggered and books a turn.

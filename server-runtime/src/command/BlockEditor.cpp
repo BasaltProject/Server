@@ -202,7 +202,10 @@ void BlockEditor::notifyNeighbours() {
                 return block != nullptr && members.has_value() && members->contains(*block);
             },
         .gameTime = world_->gameTime(),
-        .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes)};
+        .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes),
+        // parity: `/setblock` and `/fill` write with `2 | 256`, no `UPDATE_NEIGHBORS`, so the state
+        // that left gets no `affectNeighborsAfterRemoval`.
+        .updateNeighbours = false};
     for (const std::array<std::int32_t, 3>& at : positions) {
         const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
         // parity: `onPlace` runs inside the write, and everything `Level.setBlock` does afterwards is
