@@ -751,7 +751,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // removal with. It makes the very same call with the block that **left**, so the comparator
     // reading a chest through a wall does hear the chest go. Same two gates as every removal hook:
     // the block changed, and the write carried `UPDATE_NEIGHBORS`. Measured in `cofreavisapared`.
-    if (context.updateNeighbours && removed.has_value() && redstoneComponents::tellsComparatorsOnRemoval(*removed)) {
+    if (removed.has_value() && redstoneComponents::tellsComparatorsOnRemoval(*removed)) {
         const std::optional<std::int32_t> nowHere = world.blockState(x, y, z);
         if (!nowHere.has_value() || !sameBlock(*removed, *nowHere)) {
             redstoneComponents::scheduleComparatorsAround(world, context.worldName, x, y, z, reading);
@@ -799,10 +799,12 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // they feed **and its own neighbours**. The state that has just gone is what says where a
     // component that somebody took out was feeding, so both states are asked.
     const std::optional<std::int32_t> standing = world.blockState(x, y, z);
-    std::vector<redstoneComponents::Reach> reach;
+    // Each reach remembers the state that made it: the jar hands that block along to every square it
+    // tells, and a rail reads it to decide whether to re-bend.
+    std::vector<std::pair<redstoneComponents::Reach, std::int32_t>> reach;
     if (standing.has_value() && !isObserverState(*standing)) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*standing, x, y, z)) {
-            reach.push_back(at);
+            reach.emplace_back(at, *standing);
         }
     }
     // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` on the state that left
@@ -812,17 +814,19 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     const bool changedBlock = !standing.has_value() || !removed.has_value() || !sameBlock(*removed, *standing);
     const bool railArrived = standing.has_value() && rails::isRail(*standing);
     // parity: `affectNeighborsAfterRemoval` for a dust, under the same two gates as every other one:
-    // the block has to have changed, and the write has to carry `UPDATE_NEIGHBORS`.
-    const bool wireLeft =
-        context.updateNeighbours && changedBlock && removed.has_value() && redstoneWire::isWire(*removed);
-    if (removed.has_value() && context.updateNeighbours && (changedBlock || railArrived)) {
+    // the block has to have changed. That gate is the same on both roads.
+    const bool wireLeft = changedBlock && removed.has_value() && redstoneWire::isWire(*removed);
+    // parity: and this is the one line the two roads do not share: `LevelChunk.setBlockState` lets a
+    // rail that **arrives** run them anyway, and `updateNeighboursOnBlockSet`, the tail a command
+    // uses, does not.
+    if (removed.has_value() && (changedBlock || (railArrived && context.railArrivalTells))) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*removed, x, y, z)) {
-            reach.push_back(at);
+            reach.emplace_back(at, *removed);
         }
         // parity: the two `affectNeighborsAfterRemoval` that reach past their own square, a rail's
         // and a lectern's.
         for (const redstoneComponents::Reach& at : redstoneComponents::removalReach(*removed, x, y, z)) {
-            reach.push_back(at);
+            reach.emplace_back(at, *removed);
         }
     }
     // parity: the rest of `RedStoneWireBlock.onPlace`, which is not only its own strength. It runs
@@ -830,10 +834,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // around **those**, then `updateNeighborsOfNeighboringWires` does the same for every dust in the
     // four horizontals. Measured in `polvollegaabajo`: a lamp beside the block a fresh dust feeds
     // from above never heard about it.
-    const auto wireSpread = [&reach, &world, x, y, z](const std::span<const BlockFace> sides) {
+    const auto wireSpread = [&reach, &world, x, y, z](const std::span<const BlockFace> sides,
+                                                      const std::int32_t wireState) {
         for (const BlockFace face : sides) {
-            reach.push_back(redstoneComponents::Reach{
-                .x = x + registry::stepX(face), .y = y + registry::stepY(face), .z = z + registry::stepZ(face)});
+            reach.emplace_back(redstoneComponents::Reach{.x = x + registry::stepX(face),
+                                                         .y = y + registry::stepY(face),
+                                                         .z = z + registry::stepZ(face)},
+                               wireState);
         }
         for (const BlockFace side : {BlockFace::North, BlockFace::South, BlockFace::West, BlockFace::East}) {
             const std::int32_t cx = x + registry::stepX(side);
@@ -844,21 +851,24 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             if (!corner.has_value() || !redstoneWire::isWire(*corner)) {
                 continue;
             }
-            reach.push_back(redstoneComponents::Reach{.x = cx, .y = cy, .z = cz});
+            reach.emplace_back(redstoneComponents::Reach{.x = cx, .y = cy, .z = cz}, wireState);
             for (const BlockFace face : kFaces) {
-                reach.push_back(redstoneComponents::Reach{
-                    .x = cx + registry::stepX(face), .y = cy + registry::stepY(face), .z = cz + registry::stepZ(face)});
+                reach.emplace_back(redstoneComponents::Reach{.x = cx + registry::stepX(face),
+                                                             .y = cy + registry::stepY(face),
+                                                             .z = cz + registry::stepZ(face)},
+                                   wireState);
             }
         }
     };
     if (wireArrived) {
         static constexpr std::array<BlockFace, 2> kVertical{BlockFace::Down, BlockFace::Up};
-        wireSpread(kVertical);
+        wireSpread(kVertical, standing.value_or(0));
     }
     if (wireLeft) {
-        wireSpread(kFaces);
+        wireSpread(kFaces, removed.value_or(0));
     }
-    for (const redstoneComponents::Reach& at : reach) {
+    for (const auto& [at, told] : reach) {
+        static_cast<void>(told);
         std::vector<BlockChange> ahead;
         if (at.skip.has_value()) {
             redstoneComponents::scheduleInFront(world, context.worldName, at.x, at.y, at.z, *at.skip, reading);
@@ -933,70 +943,95 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // books its move (`PistonBaseBlock.checkIfExtend`).
     const bool wasIce = removed.has_value() && registry::blockStateDefinitions::blockOf(*removed) != nullptr &&
                         registry::blockStateDefinitions::blockOf(*removed)->path() == "frosted_ice";
-    const auto tellAround = [&](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
-        const std::optional<std::int32_t> source = world.blockState(cx, cy, cz);
-        for (const BlockFace face : kUpdateOrder) {
-            const std::int32_t nx = cx + registry::stepX(face);
-            const std::int32_t ny = cy + registry::stepY(face);
-            const std::int32_t nz = cz + registry::stepZ(face);
-            if (source.has_value()) {
+    // `skip` is the one side a diode's reach leaves out (`updateNeighborsAtExceptFromFacing`), which
+    // is the square the diode itself sits on. Everything else tells all six.
+    const auto tellAround =
+        [&](std::int32_t cx, std::int32_t cy, std::int32_t cz, std::optional<BlockFace> skip = std::nullopt,
+            std::optional<std::int32_t> from = std::nullopt, std::optional<std::int32_t> told = std::nullopt) {
+            // parity: `updateNeighborsAt(pos, block)` carries the block that **told**, not the one that
+            // is there. A rail only re-bends when that block is a signal source, so a diode's reach has
+            // to hand the diode along and not the square it is pointing at, and the square that changed
+            // has to hand along whichever of the two blocks its road carries.
+            const std::optional<std::int32_t> source =
+                from.has_value() ? from : (told.has_value() ? told : world.blockState(cx, cy, cz));
+            // parity: `updateNeighborsInFront` is two calls, and the first one is
+            // `neighborChanged(front)`: the square at the end of the reach hears it too, not only its
+            // neighbours. Measured in `railpordiodo`, where the junction is that square.
+            if (from.has_value()) {
+                pistons::trigger(piston, cx, cy, cz);
+                if (const std::optional<BlockChange> armed = arm(cx, cy, cz); armed.has_value()) {
+                    reshaped(armed->stateId, armed->x, armed->y, armed->z);
+                }
+                if (const std::optional<BlockChange> armed =
+                        crafters::onNeighbourChange(world, context.worldName, cx, cy, cz);
+                    armed.has_value()) {
+                    reshaped(armed->stateId, armed->x, armed->y, armed->z);
+                }
                 if (const std::optional<std::int32_t> bent =
-                        rails::onNeighbourChange(world, context.worldName, nx, ny, nz, *source);
+                        rails::onNeighbourChange(world, context.worldName, cx, cy, cz, *from);
                     bent.has_value()) {
-                    reshaped(*bent, nx, ny, nz);
+                    reshaped(*bent, cx, cy, cz);
                 }
             }
-            if (const std::optional<BlockChange> armed = arm(nx, ny, nz); armed.has_value()) {
-                reshaped(armed->stateId, armed->x, armed->y, armed->z);
-            }
-            if (const std::optional<BlockChange> armed =
-                    crafters::onNeighbourChange(world, context.worldName, nx, ny, nz);
-                armed.has_value()) {
-                reshaped(armed->stateId, armed->x, armed->y, armed->z);
-            }
-            pistons::trigger(piston, nx, ny, nz);
-            // parity: `SpongeBlock.neighborChanged` drinks when the **neighbour** changes too, not
-            // only when the sponge itself arrives. A sponge put down before the water stayed dry.
-            sponges::absorb(world, nx, ny, nz, reshaped);
-            // parity: `FrostedIceBlock.neighborChanged`, which only listens to other frosted ice.
-            // Which block the news carries is not the same on both roads: `Level.setBlock` hands the
-            // **old** one (`updateNeighborsAt(pos, oldState.getBlock())`) and a command hands the new
-            // one (`ServerLevel.updateNeighboursOnBlockSet`). Frosted ice is the only block that asks,
-            // and it melts either way, so both are enough here.
-            const bool icy =
-                wasIce || (source.has_value() && registry::blockStateDefinitions::blockOf(*source) != nullptr &&
-                           registry::blockStateDefinitions::blockOf(*source)->path() == "frosted_ice");
-            if (icy) {
-                if (const std::optional<BlockChange> melted = scheduledBlocks::frostedIceHeard(world, nx, ny, nz);
-                    melted.has_value()) {
-                    reshaped(melted->stateId, melted->x, melted->y, melted->z);
-                    std::vector<BlockChange> chained;
-                    scheduledBlocks::frostedIceChain(world, nx, ny, nz, chained);
-                    for (const BlockChange& gone : chained) {
-                        reshaped(gone.stateId, gone.x, gone.y, gone.z);
+            for (const BlockFace face : kUpdateOrder) {
+                if (skip.has_value() && face == *skip) {
+                    continue;
+                }
+                const std::int32_t nx = cx + registry::stepX(face);
+                const std::int32_t ny = cy + registry::stepY(face);
+                const std::int32_t nz = cz + registry::stepZ(face);
+                if (source.has_value()) {
+                    if (const std::optional<std::int32_t> bent =
+                            rails::onNeighbourChange(world, context.worldName, nx, ny, nz, *source);
+                        bent.has_value()) {
+                        reshaped(*bent, nx, ny, nz);
+                    }
+                }
+                if (const std::optional<BlockChange> armed = arm(nx, ny, nz); armed.has_value()) {
+                    reshaped(armed->stateId, armed->x, armed->y, armed->z);
+                }
+                if (const std::optional<BlockChange> armed =
+                        crafters::onNeighbourChange(world, context.worldName, nx, ny, nz);
+                    armed.has_value()) {
+                    reshaped(armed->stateId, armed->x, armed->y, armed->z);
+                }
+                pistons::trigger(piston, nx, ny, nz);
+                // parity: `SpongeBlock.neighborChanged` drinks when the **neighbour** changes too, not
+                // only when the sponge itself arrives. A sponge put down before the water stayed dry.
+                sponges::absorb(world, nx, ny, nz, reshaped);
+                // parity: `FrostedIceBlock.neighborChanged`, which only listens to other frosted ice.
+                // Which block the news carries is not the same on both roads: `Level.setBlock` hands the
+                // **old** one (`updateNeighborsAt(pos, oldState.getBlock())`) and a command hands the new
+                // one (`ServerLevel.updateNeighboursOnBlockSet`). Frosted ice is the only block that asks,
+                // and it melts either way, so both are enough here.
+                const bool icy =
+                    wasIce || (source.has_value() && registry::blockStateDefinitions::blockOf(*source) != nullptr &&
+                               registry::blockStateDefinitions::blockOf(*source)->path() == "frosted_ice");
+                if (icy) {
+                    if (const std::optional<BlockChange> melted = scheduledBlocks::frostedIceHeard(world, nx, ny, nz);
+                        melted.has_value()) {
+                        reshaped(melted->stateId, melted->x, melted->y, melted->z);
+                        std::vector<BlockChange> chained;
+                        scheduledBlocks::frostedIceChain(world, nx, ny, nz, chained);
+                        for (const BlockChange& gone : chained) {
+                            reshaped(gone.stateId, gone.x, gone.y, gone.z);
+                        }
                     }
                 }
             }
-        }
-    };
-    tellAround(x, y, z);
+        };
+    // parity: the two roads hand along different blocks. `Level.setBlock` tells with
+    // `updateNeighborsAt(pos, oldState.getBlock())`, the state that **left**; the tail a command uses
+    // tells with the one that arrived. Only two blocks ask who told them, and they disagree about
+    // this: frosted ice melts either way, and a rail junction re-bends only for a signal source.
+    // Measured in `railfuentequitada`.
+    tellAround(x, y, z, std::nullopt, std::nullopt, context.railArrivalTells ? removed : std::nullopt);
     // parity: the reach above is an `updateNeighborsAt` like any other, so the two nobody else asks
     // hear it too. A diode's is `updateNeighborsAtExceptFromFacing`, which is why its own square is
     // skipped. Measured in `pistondiodoroto`: taking away a repeater left the piston under the block
     // it fed extended for ever, while the lamp beside that block did go out.
-    for (const redstoneComponents::Reach& at : reach) {
-        for (const BlockFace face : kFaces) {
-            if (at.skip.has_value() && face == *at.skip) {
-                continue;
-            }
-            const std::int32_t nx = at.x + registry::stepX(face);
-            const std::int32_t ny = at.y + registry::stepY(face);
-            const std::int32_t nz = at.z + registry::stepZ(face);
-            pistons::trigger(piston, nx, ny, nz);
-            if (const std::optional<BlockChange> armed = arm(nx, ny, nz); armed.has_value()) {
-                reshaped(armed->stateId, armed->x, armed->y, armed->z);
-            }
-        }
+    for (const auto& [at, from] : reach) {
+        tellAround(at.x, at.y, at.z, at.skip, from);
     }
     if (const std::optional<BlockChange> armed = arm(x, y, z); armed.has_value()) {
         reshaped(armed->stateId, armed->x, armed->y, armed->z);

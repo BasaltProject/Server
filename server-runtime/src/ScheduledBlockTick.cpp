@@ -27,6 +27,7 @@
 #include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
+#include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
@@ -393,6 +394,31 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     world.state(), world.name(), at.x, at.y, at.z, *at.skip, world.gameTime(), random,
                     world.gameRules().get(world::gameRules::kTntExplodes));
                 scheduled.insert(scheduled.end(), ahead.begin(), ahead.end());
+                // parity: `updateNeighborsInFront` is two calls, `neighborChanged(front)` and
+                // `updateNeighborsAtExceptFromFacing(front)`, so the square itself hears it as well
+                // as its neighbours. Measured in `railpordiodo`, where the junction **is** that
+                // square.
+                {
+                    const std::int32_t fx = at.x;
+                    const std::int32_t fy = at.y;
+                    const std::int32_t fz = at.z;
+                    world::pistons::trigger(pistonContext, fx, fy, fz);
+                    if (const std::optional<world::BlockChange> armed =
+                            world::dispensers::onNeighbourChange(world.state(), world.name(), fx, fy, fz);
+                        armed.has_value()) {
+                        scheduled.push_back(*armed);
+                    }
+                    if (const std::optional<world::BlockChange> armed =
+                            world::crafters::onNeighbourChange(world.state(), world.name(), fx, fy, fz);
+                        armed.has_value()) {
+                        scheduled.push_back(*armed);
+                    }
+                    if (const std::optional<std::int32_t> bent =
+                            world::rails::onNeighbourChange(world.state(), world.name(), fx, fy, fz, moved->stateId);
+                        bent.has_value()) {
+                        scheduled.push_back(world::BlockChange{.x = fx, .y = fy, .z = fz, .stateId = *bent});
+                    }
+                }
                 // parity: that reach is an `updateNeighborsAtExceptFromFacing`, so the two nobody
                 // else asks hear it as well. Measured in `pistonpordiodo`: a piston stuck under the
                 // block a repeater feeds never extended, because only the dust reached this far.
@@ -411,6 +437,20 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                             world::dispensers::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
                         armed.has_value()) {
                         scheduled.push_back(*armed);
+                    }
+                    // parity: `CrafterBlock.neighborChanged`, the third one nobody else asks.
+                    // Measured in `crafterpordiodo`.
+                    if (const std::optional<world::BlockChange> armed =
+                            world::crafters::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
+                        armed.has_value()) {
+                        scheduled.push_back(*armed);
+                    }
+                    // parity: `RailBlock.updateState`, which re-bends a three-way junction when the
+                    // block that told it is a signal source. Measured in `railpordiodo`.
+                    if (const std::optional<std::int32_t> bent =
+                            world::rails::onNeighbourChange(world.state(), world.name(), nx, ny, nz, moved->stateId);
+                        bent.has_value()) {
+                        scheduled.push_back(world::BlockChange{.x = nx, .y = ny, .z = nz, .stateId = *bent});
                     }
                 }
             }
@@ -441,6 +481,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                 world::crafters::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
                             armed.has_value()) {
                             scheduled.push_back(*armed);
+                        }
+                        // parity: the same for the dust, which is a signal source too.
+                        if (const std::optional<std::int32_t> bent = world::rails::onNeighbourChange(
+                                world.state(), world.name(), nx, ny, nz, change.stateId);
+                            bent.has_value()) {
+                            scheduled.push_back(world::BlockChange{.x = nx, .y = ny, .z = nz, .stateId = *bent});
                         }
                     }
                 }
