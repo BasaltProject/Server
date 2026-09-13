@@ -111,8 +111,32 @@ std::vector<PlayerSession*> RedstoneTickSystem::watchersOf(const world::LoadedWo
     return watchers;
 }
 
+/// The chunks whose turns run this tick. parity: `ChunkMap.onFullChunkStatusChange` gives a chunk its
+/// `LevelTicks` container at block ticking and takes it away below that, so a chunk that is loaded
+/// and not ticking is frozen. Ours are the ones around a player plus the forced ones, which is the
+/// same set.
+world::WorldState::Ticking RedstoneTickSystem::tickingChunks(const world::LoadedWorld& world,
+                                                             const sched::Region& region,
+                                                             const std::int32_t extraRadius) const {
+    // Worked out on the first question and not before: `dueTicks` skips a chunk with nothing booked
+    // before it asks, so an idle world never builds the set at all. With a full view distance it is
+    // four hundred and forty one entries, twice a tick, for nothing.
+    auto keys = std::make_shared<std::optional<std::unordered_set<std::int64_t>>>();
+    return [this, keys, &world, &region, extraRadius](std::int32_t chunkX, std::int32_t chunkZ) {
+        if (!keys->has_value()) {
+            std::unordered_set<std::int64_t> built;
+            for (const std::array<std::int32_t, 2>& position :
+                 chunkSimulation_->simulatedChunks(world, &region, extraRadius)) {
+                built.insert((static_cast<std::int64_t>(position[0]) << 32) | static_cast<std::uint32_t>(position[1]));
+            }
+            *keys = std::move(built);
+        }
+        return (*keys)->contains((static_cast<std::int64_t>(chunkX) << 32) | static_cast<std::uint32_t>(chunkZ));
+    };
+}
+
 void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Region& region) {
-    const std::vector<std::array<std::int32_t, 3>> due = world.state().dueFluidTicks();
+    const std::vector<std::array<std::int32_t, 3>> due = world.state().dueFluidTicks(tickingChunks(world, region, 1));
     if (due.empty()) {
         return;
     }
@@ -482,10 +506,16 @@ namespace {
 } // namespace
 
 void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sched::Region& region) {
+    // parity: a falling block is a `FallingBlockEntity` and takes its turn off `entityTickList`, so
+    // it stops where it is when its chunk falls out of `ENTITY_TICKING`. This one does not go through
+    // the world's entity loop, so it needs the same gate of its own.
+    const world::WorldState::Ticking ticking = tickingChunks(world, region, 0);
     std::vector<entity::ServerEntity*> falling;
     for (entity::ServerEntity* entity : world.state().entities()) {
         if (!entity->removed && entity->type() == world::fallingBlocks::entityType() &&
-            region.ownsPosition(entity->x, entity->z)) {
+            region.ownsPosition(entity->x, entity->z) &&
+            ticking(static_cast<std::int32_t>(std::floor(entity->x)) >> 4,
+                    static_cast<std::int32_t>(std::floor(entity->z)) >> 4)) {
             falling.push_back(entity);
         }
     }
@@ -539,7 +569,7 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
     if (speed <= 0) {
         return;
     }
-    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region);
+    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region, 1);
     if (chunks.empty()) {
         return;
     }
@@ -575,7 +605,7 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
 }
 
 void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sched::Region& region) {
-    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region);
+    const std::vector<std::array<std::int32_t, 2>> chunks = chunkSimulation_->simulatedChunks(world, &region, 1);
     if (chunks.empty()) {
         return;
     }
@@ -611,8 +641,9 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             }};
     random::RandomSource random = freshRandom();
     std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
-        world.state(), world.name(), world.clock(), world.weather(), world.gameTime(), chunks, random, hooks,
-        config::dimensionFacts(world.declaration().dimension).hasSkylight, world.metadata().seed);
+        world.state(), world.name(), world.clock(), world.skyDarken(), world.gameTime(), chunks, random, hooks,
+        config::dimensionFacts(world.declaration().dimension).hasSkylight,
+        config::dimensionFacts(world.declaration().dimension).hasDayTimeline, world.metadata().seed);
     // parity: `PistonMovingBlockEntity` is a block entity like any other and ticks here, which is
     // why the jar books no turn while a piston slides. Every sliding square moves its own progress
     // along and lands itself.

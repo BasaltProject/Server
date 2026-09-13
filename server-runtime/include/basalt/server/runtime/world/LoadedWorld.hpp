@@ -170,6 +170,16 @@ public:
 
     [[nodiscard]] const WorldWeather& weather() const noexcept { return weather_; }
 
+    /// How much the sky is dimmed right now, as it stood when this turn began.
+    ///
+    /// parity: `Level.getSkyDarken`, a field `updateSkyBrightness` writes once a turn before the
+    /// clock moves. Everything that reads the sky, a detector and the spawning rules, reads this and
+    /// not a fresh sum, so they all agree within a turn.
+    [[nodiscard]] std::int32_t skyDarken() const noexcept { return skyDarken_; }
+
+    /// parity: `Level.updateSkyBrightness`.
+    void updateSkyBrightness();
+
     [[nodiscard]] GameRuleValues& gameRules() noexcept { return gameRules_; }
 
     [[nodiscard]] const GameRuleValues& gameRules() const noexcept { return gameRules_; }
@@ -309,6 +319,7 @@ private:
     WorldBorder border_;
     std::set<std::int64_t> forcedChunks_;
     std::int64_t gameTime_ = 0;
+    std::int32_t skyDarken_ = 0;
     std::string difficulty_;
     bool difficultyLocked_ = false;
     std::optional<std::string> defaultGamemode_;

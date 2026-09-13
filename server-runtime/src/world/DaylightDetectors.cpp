@@ -138,17 +138,20 @@ constexpr float kRampTicks = 1803.0F;
     return static_cast<std::int32_t>(std::floor(static_cast<double>(value) + 0.5));
 }
 
-/// parity: `LevelReader.getEffectiveSkyBrightness`, the sky light above the block minus what the weather
-/// takes off it.
-[[nodiscard]] std::int32_t skyBrightness(WorldState& world, const WorldClock& clock, const WorldWeather& weather,
-                                         std::int32_t x, std::int32_t y, std::int32_t z, bool hasSkylight) {
-    return std::clamp(worldLight::skyLight(world, x, y + 1, z, hasSkylight) - skyDarken(clock, weather), 0, kMax);
+/// parity: `LevelReader.getEffectiveSkyBrightness`, the sky light above the block minus the world's
+/// stored `skyDarken`.
+[[nodiscard]] std::int32_t skyBrightness(WorldState& world, std::int32_t darken, std::int32_t x, std::int32_t y,
+                                         std::int32_t z, bool hasSkylight) {
+    return std::clamp(worldLight::skyLight(world, x, y + 1, z, hasSkylight) - darken, 0, kMax);
 }
 
 } // namespace
 
-std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather) {
-    float value = static_cast<float>(kMax) * skyLightShare(clock);
+std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather, const Sky sky) {
+    // parity: the dimension's own `SKY_LIGHT_LEVEL` is the starting value and the day timeline is a
+    // `FloatModifier.MULTIPLY` track on top of it. Where that timeline is not tagged there is nothing
+    // to multiply by, so the constant stands.
+    float value = sky.dayTimeline ? sky.level * skyLightShare(clock) : sky.level;
     // parity: `WeatherAttributes.addLayer` takes the thunder level **off** the rain level before
     // blending, so a full thunderstorm skips the rain layer altogether instead of stacking on it.
     const float thunder = weather.thunderLevel();
@@ -166,15 +169,15 @@ std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather) {
     return static_cast<std::int32_t>(static_cast<float>(kMax) - value);
 }
 
-std::int32_t signalFor(WorldState& world, const WorldClock& clock, const WorldWeather& weather, std::int32_t x,
-                       std::int32_t y, std::int32_t z, bool inverted, bool hasSkylight) {
-    std::int32_t target = skyBrightness(world, clock, weather, x, y, z, hasSkylight);
+std::int32_t signalFor(WorldState& world, const WorldClock& clock, std::int32_t darken, std::int32_t x, std::int32_t y,
+                       std::int32_t z, bool inverted, bool hasSkylight, bool sunMoves) {
+    std::int32_t target = skyBrightness(world, darken, x, y, z, hasSkylight);
     if (inverted) {
         target = kMax - target;
     } else if (target > 0) {
         // parity: `DaylightDetectorBlock.updateSignalStrength` reads `SUN_ANGLE` off the track and
         // turns it into radians, then pulls it towards zero or towards a full turn by a fifth.
-        float angle = sunAngleDegrees(clock) * (std::numbers::pi_v<float> / 180.0F);
+        float angle = (sunMoves ? sunAngleDegrees(clock) : 0.0F) * (std::numbers::pi_v<float> / 180.0F);
         const float offset = angle < std::numbers::pi_v<float> ? 0.0F : std::numbers::pi_v<float> * 2.0F;
         angle += (offset - angle) * 0.2F;
         // parity: `Mth.cos`, the 65536-entry table, not the platform's cosine.
@@ -183,8 +186,8 @@ std::int32_t signalFor(WorldState& world, const WorldClock& clock, const WorldWe
     return std::clamp(target, 0, kMax);
 }
 
-std::optional<BlockChange> update(WorldState& world, const WorldClock& clock, const WorldWeather& weather,
-                                  std::int32_t x, std::int32_t y, std::int32_t z, bool hasSkylight) {
+std::optional<BlockChange> update(WorldState& world, const WorldClock& clock, std::int32_t darken, std::int32_t x,
+                                  std::int32_t y, std::int32_t z, bool hasSkylight, bool sunMoves) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -195,8 +198,9 @@ std::optional<BlockChange> update(WorldState& world, const WorldClock& clock, co
     }
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const auto invertedAt = properties.find("inverted");
-    const std::int32_t wanted = signalFor(world, clock, weather, x, y, z,
-                                          invertedAt != properties.end() && invertedAt->second == "true", hasSkylight);
+    const std::int32_t wanted =
+        signalFor(world, clock, darken, x, y, z, invertedAt != properties.end() && invertedAt->second == "true",
+                  hasSkylight, sunMoves);
 
     std::int32_t showing = 0;
     if (const auto powerAt = properties.find("power"); powerAt != properties.end()) {

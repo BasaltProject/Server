@@ -6,7 +6,6 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/World.hpp>
-#include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnPredicates.hpp>
@@ -176,9 +175,7 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
     const bool surfaceBiome = biome.has_value() && surfaceSlimeBiomes().contains(biome->path());
     if (surfaceBiome && y > 50 && y < 70) {
         if (random.nextFloat() < surfaceSlimeChance(world.clock().totalTicks()) &&
-            worldLight::rawBrightness(world.state(), x, y, z, true,
-                                      daylightDetectors::skyDarken(world.clock(), world.weather())) <=
-                random.nextInt(8)) {
+            worldLight::rawBrightness(world.state(), x, y, z, true, world.skyDarken()) <= random.nextInt(8)) {
             return true;
         }
     }

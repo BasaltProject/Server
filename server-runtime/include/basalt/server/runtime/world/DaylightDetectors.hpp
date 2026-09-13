@@ -19,24 +19,33 @@ namespace daylightDetectors {
 /// How often vanilla lets one look, which is once every twenty ticks in its block-entity ticker.
 inline constexpr std::int32_t kIntervalTicks = 20;
 
+/// What the sky over a world is made of, which tells the three dimensions apart. parity:
+/// `SKY_LIGHT_LEVEL` starts at the dimension's constant and only the `minecraft:day` timeline bends
+/// it, tagged `#minecraft:in_overworld` alone: the Nether sits at four and the End at fifteen.
+struct Sky {
+    float level = 15.0F;
+    bool dayTimeline = true;
+};
+
 /// How much of the sky light the time of day and the weather take away.
 ///
 /// parity: `Level.updateSkyBrightness`, which is what makes a detector read zero at night rather
 /// than the fifteen the sky light itself still says.
-[[nodiscard]] std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather);
+[[nodiscard]] std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather, Sky sky = {});
 
-/// The power the detector at these coordinates should be showing.
+/// The power the detector at these coordinates should be showing. parity: `Level.getSunAngle` bends
+/// the reading, so the light sits at fifteen for hours around noon and the detector does not.
 ///
-/// parity: `Level.getSunAngle`, which is what bends the reading: the light is at fifteen for hours
-/// around noon, and the detector is not.
-[[nodiscard]] std::int32_t signalFor(WorldState& world, const WorldClock& clock, const WorldWeather& weather,
-                                     std::int32_t x, std::int32_t y, std::int32_t z, bool inverted,
-                                     bool hasSkylight = true);
+/// `darken` is the world's stored reading, written once per tick before the clock moves, while the
+/// sun angle is read live. Where `sunMoves` is absent the angle defaults to zero and nothing bends.
+[[nodiscard]] std::int32_t signalFor(WorldState& world, const WorldClock& clock, std::int32_t darken, std::int32_t x,
+                                     std::int32_t y, std::int32_t z, bool inverted, bool hasSkylight = true,
+                                     bool sunMoves = true);
 
 /// Updates the block if its reading moved, answering the change.
-[[nodiscard]] std::optional<BlockChange> update(WorldState& world, const WorldClock& clock, const WorldWeather& weather,
-                                                std::int32_t x, std::int32_t y, std::int32_t z,
-                                                bool hasSkylight = true);
+[[nodiscard]] std::optional<BlockChange> update(WorldState& world, const WorldClock& clock, std::int32_t darken,
+                                                std::int32_t x, std::int32_t y, std::int32_t z, bool hasSkylight = true,
+                                                bool sunMoves = true);
 
 } // namespace daylightDetectors
 

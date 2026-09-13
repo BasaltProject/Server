@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
+#include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 
 #include <doctest.h>
@@ -70,7 +71,8 @@ struct Loaded {
     }
 
     [[nodiscard]] std::vector<BlockChange> tick(const blockEntityTicks::Hooks& hooks = {}) {
-        return blockEntityTicks::tick(state, "overworld", clock, weather, 0, {{kChunkX, kChunkZ}}, random, hooks);
+        return blockEntityTicks::tick(state, "overworld", clock, daylightDetectors::skyDarken(clock, weather), 0,
+                                      {{kChunkX, kChunkZ}}, random, hooks);
     }
 
     basalt::server::random::RandomSource random = basalt::server::random::RandomSource::legacy(1);
@@ -318,10 +320,12 @@ TEST_CASE("a chunk that is not loaded, and a block entity with no ticker, are bo
     static_cast<void>(loaded.place("chest", stateOf("chest"), kX, 64, kZ));
 
     CHECK(loaded.tick({.recipeFor = book.lookup()}).empty());
-    CHECK(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock, loaded.weather, 0, {{9, 9}}, loaded.random)
+    CHECK(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock,
+                                 daylightDetectors::skyDarken(loaded.clock, loaded.weather), 0, {{9, 9}}, loaded.random)
               .empty());
-    CHECK(
-        blockEntityTicks::tick(loaded.state, "overworld", loaded.clock, loaded.weather, 0, {}, loaded.random).empty());
+    CHECK(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock,
+                                 daylightDetectors::skyDarken(loaded.clock, loaded.weather), 0, {}, loaded.random)
+              .empty());
 }
 
 TEST_CASE("a furnace that keeps burning says nothing, and one that goes out says so") {

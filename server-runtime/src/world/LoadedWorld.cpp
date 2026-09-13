@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
+#include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
@@ -101,6 +102,9 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     if (overworldRouter_ != nullptr && declaration_.dimension == config::WorldDimension::Overworld) {
         biomeSource_ = std::make_unique<terrain::OverworldBiomeSource>(*overworldRouter_, biomeZoomSeed_);
     }
+    // parity: `ServerLevel`'s constructor ends on `updateSkyBrightness()`, so a world that has not
+    // ticked yet already has a reading.
+    updateSkyBrightness();
 }
 
 LoadedWorld::~LoadedWorld() = default;
@@ -115,16 +119,26 @@ void LoadedWorld::setSpawn(std::int32_t x, std::int32_t y, std::int32_t z, float
     spawnOverride_ = std::array<std::int32_t, 3>{x, y, z};
 }
 
+void LoadedWorld::updateSkyBrightness() {
+    const config::DimensionFacts& facts = config::dimensionFacts(declaration_.dimension);
+    skyDarken_ = daylightDetectors::skyDarken(
+        clock_, weather_, daylightDetectors::Sky{.level = facts.skyLightLevel, .dayTimeline = facts.hasDayTimeline});
+}
+
 bool LoadedWorld::tickTime(random::RandomSource& random) {
-    gameTime_++;
-    // parity: only a dimension with a clock of its own has time to advance.
-    const bool advanced =
-        config::hasClock(declaration_.dimension) && clock_.tick(gameRules_.get(gameRules::kAdvanceTime));
+    // parity: `ServerLevel.tick` runs the weather, then `updateSkyBrightness()`, then `tickTime()`,
+    // so the reading every block takes this turn is the one the clock had **before** it moved and
+    // the weather has after. A detector that worked it out live read a turn ahead.
     // parity: `ServerLevel.advanceWeatherCycle` runs only where the dimension can have weather, and
     // the game rule stops the counters inside it, not the whole thing: the levels keep ramping.
     if (config::canHaveWeather(declaration_.dimension)) {
         weather_.tick(random, gameRules_.get(gameRules::kAdvanceWeather));
     }
+    updateSkyBrightness();
+    gameTime_++;
+    // parity: only a dimension with a clock of its own has time to advance.
+    const bool advanced =
+        config::hasClock(declaration_.dimension) && clock_.tick(gameRules_.get(gameRules::kAdvanceTime));
     return advanced;
 }
 

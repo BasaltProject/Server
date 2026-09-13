@@ -57,21 +57,15 @@ struct Hooks {
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> songStopped;
 };
 
-/// Ticks every block entity in `chunks` that has something to do, answering the blocks that changed
-/// so the caller can tell whoever is watching.
-///
-/// `random` is the world's own, needed by the one block entity that rolls for anything: a hopper
-/// feeding a composter. Required rather than defaulted, so a new caller cannot forget it.
-///
-/// `gameTime` is the world's turn counter, not the clock's time of day: a hopper filling a shelf
-/// raises a game event, and a vibration is booked for the turn it arrives.
-///
-/// `worldSeed` is what a geyser forks its own rhythm from at its own square.
+/// Ticks every block entity in `chunks` that has something to do, answering the blocks that changed.
+/// `random` is the world's, needed by the one that rolls for anything: a hopper feeding a composter.
+/// `gameTime` is the turn counter, not the time of day. `worldSeed` is what a geyser forks its
+/// rhythm from, and `skyDarken` is the world's stored reading. parity: `Level.getSkyDarken`.
 [[nodiscard]] std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
-                                            const WorldWeather& weather, std::int64_t gameTime,
+                                            std::int32_t skyDarken, std::int64_t gameTime,
                                             const std::vector<std::array<std::int32_t, 2>>& chunks,
                                             random::RandomSource& random, const Hooks& hooks = {},
-                                            bool hasSkylight = true, std::int64_t worldSeed = 0);
+                                            bool hasSkylight = true, bool sunMoves = true, std::int64_t worldSeed = 0);
 
 } // namespace blockEntityTicks
 

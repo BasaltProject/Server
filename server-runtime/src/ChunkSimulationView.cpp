@@ -13,8 +13,9 @@ namespace basalt::server::runtime {
 ChunkSimulationView::ChunkSimulationView(player::PlayerRegistry& players) : players_(&players) {}
 
 std::vector<std::array<std::int32_t, 2>> ChunkSimulationView::simulatedChunks(const world::LoadedWorld& world,
-                                                                              const sched::Region* region) const {
-    const std::int32_t radius = std::min(world.settings().viewDistance, kVanillaSimulationDistance);
+                                                                              const sched::Region* region,
+                                                                              const std::int32_t extraRadius) const {
+    const std::int32_t radius = std::min(world.settings().viewDistance, kVanillaSimulationDistance) + extraRadius;
     std::unordered_set<std::int64_t> seen;
     std::vector<std::array<std::int32_t, 2>> chunks;
     for (const player::PlayerSession* player : players_->snapshot()) {

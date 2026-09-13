@@ -10,6 +10,8 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <array>
+#include <map>
+#include <string>
 #include <cstdint>
 #include <memory>
 #include <string_view>
@@ -20,6 +22,61 @@ namespace {
 /// parity: `Entity.getGravity` for a falling block, and `Entity.getAirDrag`.
 constexpr double kGravity = 0.04;
 constexpr double kAirDrag = 0.98;
+
+
+/// parity: `FluidTags.WATER` at a square, which is the water itself and anything waterlogged.
+[[nodiscard]] bool waterAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> at = world.blockState(x, y, z);
+    if (!at.has_value()) {
+        return false;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*at);
+    if (block != nullptr && block->path() == "water") {
+        return true;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*at);
+    const auto logged = properties.find("waterlogged");
+    return logged != properties.end() && logged->second == "true";
+}
+
+[[nodiscard]] bool isConcretePowder(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && block->path().ends_with("_concrete_powder");
+}
+
+/// parity: the `clip` of `FallingBlockEntity.tick`, which only runs for concrete powder moving faster
+/// than one block a tick: it looks back along the way it came for the water it went through, so a
+/// long fall into a pool sets at the surface instead of under it. The fall is straight down here, so
+/// walking the column is that ray exactly.
+[[nodiscard]] bool waterSource(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> at = world.blockState(x, y, z);
+    if (!at.has_value()) {
+        return false;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*at);
+    if (block == nullptr || block->path() != "water") {
+        return false;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*at);
+    const auto level = properties.find("level");
+    return level == properties.end() || level->second == "0";
+}
+
+[[nodiscard]] std::optional<std::int32_t> waterCrossed(WorldState& world, std::int32_t x, std::int32_t z,
+                                                       std::int32_t fromY, std::int32_t toY) {
+    for (std::int32_t y = fromY; y >= toY; --y) {
+        // `ClipContext.Fluid.SOURCE_ONLY` stops the ray at a **source**, so water that is only
+        // flowing is passed straight through; `Block.COLLIDER` stops it at anything in the way.
+        const std::optional<std::int32_t> at = world.blockState(x, y, z);
+        const bool stops = waterSource(world, x, y, z) || (at.has_value() && !isFree(*at));
+        if (!stops) {
+            continue;
+        }
+        // And then the jar asks whether **that** square holds water, which a waterlogged block does.
+        return waterAt(world, x, y, z) ? std::optional{y} : std::nullopt;
+    }
+    return std::nullopt;
+}
 
 } // namespace
 
@@ -130,10 +187,23 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
     const bool onGround = moved[1] != entity.velocityY && entity.velocityY < 0.0;
     entity.y += moved[1];
 
-    const std::int32_t blockX = wire::common::mth::floor(entity.x);
-    const std::int32_t blockY = wire::common::mth::floor(entity.y);
+    std::int32_t blockX = wire::common::mth::floor(entity.x);
+    std::int32_t blockY = wire::common::mth::floor(entity.y);
     const std::int32_t blockZ = wire::common::mth::floor(entity.z);
-    if (!onGround) {
+    // parity: `FallingBlockEntity.tick`. Concrete powder standing in water lands **there and then**,
+    // in mid air if need be: the landing branch is `if (!onGround && !isStuckInWater)` inverted, not
+    // `onGround` alone. Without it the powder sank to the floor of the pool and set seven ticks late.
+    const bool concrete = isConcretePowder(entity.objectData);
+    bool stuckInWater = concrete && waterAt(world, blockX, blockY, blockZ);
+    if (concrete && (entity.velocityY * entity.velocityY) > 1.0 && !stuckInWater) {
+        const std::int32_t fromY = wire::common::mth::floor(entity.y - moved[1]);
+        if (const std::optional<std::int32_t> crossed = waterCrossed(world, blockX, blockZ, fromY, blockY);
+            crossed.has_value()) {
+            blockY = *crossed;
+            stuckInWater = true;
+        }
+    }
+    if (!onGround && !stuckInWater) {
         const server::world::Chunk* chunk = world.chunkIfLoaded(blockX >> 4, blockZ >> 4);
         if (chunk != nullptr && blockY < chunk->verticalBounds().minY()) {
             entity.removed = true;
