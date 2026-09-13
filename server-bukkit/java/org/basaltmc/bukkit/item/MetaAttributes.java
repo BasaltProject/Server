@@ -30,6 +30,9 @@ public final class MetaAttributes {
 
     public static AttributeModifier modifier(Map<String, Object> entry) {
         NamespacedKey id = NamespacedKey.fromString(Nbt.string(entry, "id", "minecraft:unnamed"));
+        if (id == null) {
+            id = NamespacedKey.minecraft("unnamed");
+        }
         AttributeModifier.Operation operation;
         switch (Nbt.string(entry, "operation", "add_value")) {
             case "add_multiplied_base":
