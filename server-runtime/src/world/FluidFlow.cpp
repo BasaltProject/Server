@@ -166,7 +166,7 @@ public:
                 const std::int32_t delay = spreadDelay(*kind, state, settled, x, y, z);
                 state = settled;
                 set(x, y, z, settled);
-                context_.world.scheduleFluidTick(x, y, z, fluidId(*kind), delay);
+                context_.world.scheduleFluidTick(x, y, z, fluidId(*kind, isSource(settled)), delay);
             }
         }
         spread(x, y, z, state, *kind);
@@ -213,7 +213,7 @@ private:
         if (!kind.has_value() || solidify(x, y, z, state, *kind)) {
             return;
         }
-        context_.world.scheduleFluidTick(x, y, z, fluidId(*kind), tickDelay(*kind));
+        context_.world.scheduleFluidTick(x, y, z, fluidId(*kind, isSource(state)), tickDelay(*kind));
     }
 
     /// parity: `WaterFluid.getTickDelay`, and `LavaFluid`'s override for an ultrawarm dimension.
@@ -481,10 +481,20 @@ private:
 
 } // namespace
 
-const wire::common::Identifier& fluidId(FluidKind kind) {
+bool isSourceFluid(const std::int32_t stateId) { return isSource(stateId); }
+
+const wire::common::Identifier& fluidId(const FluidKind kind, const bool source) {
     static const wire::common::Identifier water = wire::common::Identifier::vanilla("water");
     static const wire::common::Identifier lava = wire::common::Identifier::vanilla("lava");
-    return kind == FluidKind::Water ? water : lava;
+    static const wire::common::Identifier flowingWater = wire::common::Identifier::vanilla("flowing_water");
+    static const wire::common::Identifier flowingLava = wire::common::Identifier::vanilla("flowing_lava");
+    // parity: `LiquidBlock` books with `state.getFluidState().getType()`, and a square that is not a
+    // source answers `FLOWING_WATER` or `FLOWING_LAVA`. The turn runs the same either way; the name
+    // is what reaches the disk, so a world of ours opened in vanilla carried the wrong one.
+    if (kind == FluidKind::Water) {
+        return source ? water : flowingWater;
+    }
+    return source ? lava : flowingLava;
 }
 
 std::int32_t baseStateId(FluidKind kind) {

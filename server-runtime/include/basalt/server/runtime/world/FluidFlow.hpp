@@ -13,7 +13,14 @@ namespace basalt::server::runtime::world {
 /// The two fluids that flow, and the sixteen block states each of them owns.
 enum class FluidKind : std::uint8_t { Water, Lava };
 
-[[nodiscard]] const wire::common::Identifier& fluidId(FluidKind kind);
+/// parity: `FlowingFluid.isSource`, which is the square holding a full amount and not flowing.
+[[nodiscard]] bool isSourceFluid(std::int32_t stateId);
+
+/// The name a fluid's scheduled turn is stored under.
+///
+/// parity: `LiquidBlock` books with `state.getFluidState().getType()`, and a square that is not a
+/// source answers `FLOWING_WATER` or `FLOWING_LAVA` rather than the still fluid.
+[[nodiscard]] const wire::common::Identifier& fluidId(FluidKind kind, bool source);
 
 [[nodiscard]] std::int32_t baseStateId(FluidKind kind);
 
