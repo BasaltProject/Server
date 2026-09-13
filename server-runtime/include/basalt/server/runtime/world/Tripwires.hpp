@@ -68,9 +68,15 @@ inline constexpr std::int32_t kHookRecheckTicks = 10;
 /// `wireSource` is the square whose state to read from `wireSourceState` instead of the world, `-1`
 /// for none: that is how vanilla tells a hook about a wire that has already gone, handing the
 /// removed string over as still there and powered so the line fires.
+///
+/// `destroyedState` is the state of the hook that has just gone: with it set, its own square is
+/// neither read from the world nor rewritten, and the line is taken as loose. parity:
+/// `TripWireHookBlock.onRemoved` calls with `isBeingDestroyed`, and without it the hook at the other
+/// end stays stuck for good.
 void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
                    std::vector<BlockChange>& changes, std::int32_t wireSource = -1,
-                   std::optional<std::int32_t> wireSourceState = std::nullopt);
+                   std::optional<std::int32_t> wireSourceState = std::nullopt,
+                   std::optional<std::int32_t> destroyedState = std::nullopt);
 
 /// parity: `TripWireBlock.updateSource`, which a wire runs when it is placed, when it goes and when
 /// it is stepped on. It walks **south and west only**, because `calculateHook` writes both ends of

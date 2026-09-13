@@ -394,3 +394,28 @@ TEST_CASE("a string draws its own line, and a hook only falls from the side it h
         CHECK_FALSE(tripwires::hookFalls(world, 4, 64, 8, hook, registry::BlockFace::West));
     }
 }
+
+TEST_CASE("quitar un gancho deja suelto al del otro extremo") {
+    // parity: `TripWireHookBlock.onRemoved` calls `calculateState` with `isBeingDestroyed`, which
+    // takes the line as loose and writes the hook at the other end. Without it that other one stayed
+    // stuck for good. The bench does not catch it because no circuit removes a hook.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    layLine(world, 3);
+
+    std::vector<BlockChange> changes;
+    const std::int32_t wire = *world.blockState(5, 64, 8);
+    tripwires::updateSource(world, 5, 64, 8, wire, 1, changes);
+    REQUIRE(propertyAt(world, 4, 64, 8, "attached") == "true");
+    REQUIRE(propertyAt(world, 8, 64, 8, "attached") == "true");
+
+    // The hook at one end goes, with the state it had.
+    const std::int32_t gone = *world.blockState(4, 64, 8);
+    REQUIRE(world.setBlockState(4, 64, 8, registry::blocks::air().stateId));
+    changes.clear();
+    tripwires::calculateHook(world, 4, 64, 8, 2, changes, -1, std::nullopt, gone);
+
+    CHECK(propertyAt(world, 8, 64, 8, "attached") == "false");
+    // And the square of the one that left is not rewritten: it is still air.
+    CHECK(world.blockState(4, 64, 8) == registry::blocks::air().stateId);
+}

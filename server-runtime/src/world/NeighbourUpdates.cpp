@@ -1081,16 +1081,35 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     }
     // parity: `TripWireBlock.onPlace`, which tells the hooks at the ends of its line. Without it a
     // tripwire built by hand or by command hung there unattached until something stepped on it.
-    if (const std::optional<std::int32_t> laid = world.blockState(x, y, z);
-        laid.has_value() && tripwires::isWire(*laid)) {
+    const std::optional<std::int32_t> laid = world.blockState(x, y, z);
+    if (laid.has_value() && tripwires::isWire(*laid)) {
         tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
     }
+    // parity: `LevelChunk.setBlockState` solo corre `affectNeighborsAfterRemoval` cuando **cambia el
+    // bloque**, no cuando cambia su estado. Sin esta puerta, reescribir una cuerda con otro estado
+    // se tomaba por una cuerda arrancada y encendia los dos ganchos de la linea: medido en
+    // `cuerdadesigual`, donde el jar los deja apagados.
+    const bool tripwireBlockChanged = !laid.has_value() || !removed.has_value() || !sameBlock(*removed, *laid);
     // parity: `TripWireBlock.affectNeighborsAfterRemoval`, which hands the line the string that has
     // just gone **as if it were still there and powered**, so the hooks fire and each books itself a
     // look ten ticks later to find the gap. Every other block's version of this hook is a plain "tell
     // the neighbours", which the cascade above already does; this is the only one that substitutes a
     // state, and without it a cut wire left both hooks hanging loose at once.
-    if (removed.has_value() && tripwires::isWire(*removed)) {
+    // parity: `TripWireHookBlock.onRemoved`, que solo hace algo si el gancho se fue pegado o
+    // encendido: recorre la linea con `isBeingDestroyed` y deja **suelto al gancho del otro
+    // extremo**. Sin esto el otro se quedaba pegado para siempre, porque quitar un gancho no es
+    // quitar una cuerda y nada mas volvia a mirar la linea.
+    if (tripwireBlockChanged && removed.has_value() && tripwires::isHook(*removed)) {
+        const std::map<std::string, std::string> gone = registry::blockStateDefinitions::propertiesOf(*removed);
+        const auto attachedAt = gone.find("attached");
+        const auto poweredAt = gone.find("powered");
+        const bool wasAttached = attachedAt != gone.end() && attachedAt->second == "true";
+        const bool wasPowered = poweredAt != gone.end() && poweredAt->second == "true";
+        if (wasAttached || wasPowered) {
+            tripwires::calculateHook(world, x, y, z, context.gameTime, effects, -1, std::nullopt, *removed);
+        }
+    }
+    if (tripwireBlockChanged && removed.has_value() && tripwires::isWire(*removed)) {
         if (const std::optional<std::int32_t> live =
                 registry::blockStateDefinitions::stateIdOf(tripwires::wireBlock(), {{"powered", "true"}}, *removed);
             live.has_value()) {

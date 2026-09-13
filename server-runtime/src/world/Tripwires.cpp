@@ -190,8 +190,11 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
 
 void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
                    std::vector<BlockChange>& changes, std::int32_t wireSource,
-                   std::optional<std::int32_t> wireSourceState) {
-    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+                   std::optional<std::int32_t> wireSourceState, std::optional<std::int32_t> destroyedState) {
+    // parity: `isBeingDestroyed`. With the hook already out of the world the state it had is what is
+    // worked with, its square is not rewritten, and the whole line comes out loose.
+    const bool beingDestroyed = destroyedState.has_value();
+    const std::optional<std::int32_t> stateId = beingDestroyed ? destroyedState : world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
     }
@@ -207,7 +210,7 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
         return;
     }
 
-    bool attached = true;
+    bool attached = !beingDestroyed;
     bool powered = false;
     std::int32_t receiver = 0;
     // parity: `BlockState[] wireStates`, the states the scan **read**, which is what the pass writes
@@ -269,7 +272,9 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
         event = "block_detach";
     }
 
-    write(world, x, y, z, *stateId, *block, attached, powered, changes);
+    if (!beingDestroyed) {
+        write(world, x, y, z, *stateId, *block, attached, powered, changes);
+    }
     if (receiver > 0) {
         const std::int32_t ox = x + (registry::stepX(*direction) * receiver);
         const std::int32_t oz = z + (registry::stepZ(*direction) * receiver);
@@ -309,9 +314,9 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             continue;
         }
         write(world, tx, y, tz, read->second, *along, attached, std::nullopt, changes);
-        // parity: ese `setBlock` redibuja a los **vecinos** de la cuerda, no a la cuerda: medido con
-        // `cuerdasola`, donde el jar deja la cuerda de al lado del gancho tal y como la escribio el
-        // comando. Redibujarla aqui la unia al gancho y el jar no lo hace.
+        // parity: that `setBlock` redraws the string's neighbours, not the string: measured with
+        // `cuerdasola`, where the jar leaves the string beside the hook exactly as the command wrote
+        // it. Redrawing it here joined it to the hook, which the jar does not do.
     }
 }
 
