@@ -565,8 +565,9 @@ bool tellsComparatorsOnRemoval(const std::int32_t stateId) {
     const std::string path = pathOf(stateId);
     // parity: exactly the blocks whose `affectNeighborsAfterRemoval` is
     // `Containers.updateNeighboursAfterDestroy`, plus the copper golem statue, which makes the call
-    // itself. Having an analog output is not the test: a lectern and a composter have one and
-    // neither overrides the hook.
+    // itself. Having an analog output is not the test: a composter has one and does not override the
+    // hook at all, and a lectern overrides it with something else entirely, `updateBelow`, which is
+    // why it lives in `removalReach` instead of here.
     static const std::set<std::string, std::less<>> kByName{
         "barrel",  "blast_furnace",  "brewing_stand", "chest",     "chiseled_bookshelf",
         "crafter", "creaking_heart", "decorated_pot", "dispenser", "dropper",
