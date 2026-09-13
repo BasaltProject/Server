@@ -137,19 +137,16 @@ private:
     };
 
     void adopt(std::vector<ScheduledTask> tasks);
-    std::size_t drain(std::deque<ScheduledTask>& queue, std::deque<ScheduledTask>& spare,
-                      const FailureHandler& onFailure);
+    std::size_t drain(std::deque<ScheduledTask>& queue, const FailureHandler& onFailure);
 
     std::string name_;
     mutable std::mutex mutex_;
 
-    /// Where new work lands. Swapped with `running_` on every turn rather than allocated again.
+    /// Where new work lands.
     std::deque<ScheduledTask> incoming_;
-    std::deque<ScheduledTask> running_;
 
     /// What asked to run at the end of the turn rather than at its start.
     std::deque<ScheduledTask> atEnd_;
-    std::deque<ScheduledTask> atEndRunning_;
 
     /// What is waiting for a number of ticks to pass. Scanned once a turn, so a list is enough.
     std::vector<ScheduledTask> delayed_;

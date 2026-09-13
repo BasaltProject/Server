@@ -38,6 +38,9 @@ bool WorldMetadata::writeTo(const std::string& worldRoot) const {
         root.putString("DefaultGamemode", *defaultGamemode);
     }
     wire::nbt::NbtCompound trader;
+    if (!forcedChunks.empty()) {
+        root.set("ForcedChunks", wire::nbt::NbtTag::ofLongArray(forcedChunks));
+    }
     trader.putInt("spawn_delay", wanderingTraderSpawnDelay);
     trader.putInt("spawn_chance", wanderingTraderSpawnChance);
     root.set("WanderingTrader", wire::nbt::NbtTag::ofCompound(std::move(trader)));
@@ -91,6 +94,10 @@ std::optional<WorldMetadata> WorldMetadata::read(const std::string& worldRoot) {
     metadata.difficultyLocked = root->getBoolean("DifficultyLocked");
     if (root->contains("DefaultGamemode")) {
         metadata.defaultGamemode = std::string{root->getString("DefaultGamemode")};
+    }
+    if (root->contains("ForcedChunks")) {
+        const std::span<const std::int64_t> forced = root->getLongArray("ForcedChunks");
+        metadata.forcedChunks.assign(forced.begin(), forced.end());
     }
     if (const wire::nbt::NbtCompound* trader = root->getCompound("WanderingTrader"); trader != nullptr) {
         metadata.wanderingTraderSpawnDelay = trader->getInt("spawn_delay", 24000);

@@ -24,7 +24,7 @@ namespace basalt::server::runtime::bedrock {
 /// the protocol number.
 inline constexpr std::string_view kBedrockGameVersion = "1.26.45";
 
-/// What an operator writes under `[bedrock]` in `config/compatibility.toml`.
+/// What an operator writes under `[network.bedrock]` in `config/server.toml`.
 struct BedrockOptions {
     bool enabled = true;
     std::uint16_t port = 19132;

@@ -5,7 +5,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <filesystem>
 #include <utility>
 
 namespace basalt::server::runtime::config {
@@ -42,12 +41,6 @@ policyOf(std::optional<std::string_view> written, std::string_view key, const st
 
 std::expected<CompatibilityConfig, std::string> CompatibilityConfig::load(const ConfigDirectory& directory,
                                                                           const wire::common::Logger& logger) {
-    // The file this used to live in. Left where it was, its values would quietly stop counting and
-    // the operator would have no way of telling, so it is named instead.
-    if (const std::string old = directory.pathOf("compatibility.toml"); std::filesystem::exists(old)) {
-        return std::unexpected(old + ": this file is gone. What was in it now lives in server.toml, under " +
-                               "[network.java] and [network.bedrock]; move your values there and delete it");
-    }
     const std::string path = directory.pathOf(kFileName);
     const std::expected<TomlTable, std::string> root = directory.load(kFileName, kServerDefaultToml);
     if (!root.has_value()) {
@@ -137,7 +130,7 @@ wire::multiversion::ProtocolGate CompatibilityConfig::gate(const std::set<std::i
                 }
                 named += wire::multiversion::protocolVersions::describe(protocol);
             }
-            return "compatibility.toml asks for protocols this build cannot translate: " + named;
+            return "server.toml asks for protocols this build cannot translate: " + named;
         });
     }
 

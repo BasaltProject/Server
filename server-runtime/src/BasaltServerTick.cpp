@@ -148,6 +148,12 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 }
                 static_cast<void>(region.owner().runPending(onTaskFailure));
             });
+            // `/stop` and `/restart` run on this queue and wind the whole server down before they
+            // return: players gone, worlds written, scheduler closed. What follows would give a turn
+            // to a world that is already saved and shut, so the turn ends where the server did.
+            if (shuttingDown_.load()) {
+                return;
+            }
             // Whatever those commands killed or lit goes off now, frozen or not.
             //
             // KNOWN GAP, not parity: vanilla runs queued tasks after `processPacketsAndTick`, so a

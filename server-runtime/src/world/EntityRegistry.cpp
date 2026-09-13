@@ -63,8 +63,12 @@ std::vector<std::pair<std::int32_t, std::int32_t>> EntityRegistry::chunksWithEnt
 void EntityRegistry::forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ) {
     const WorldWriteLock lock{*mutex_};
     // Removed or not: the chunk is going, and what was in it has just been written to disk.
-    std::erase_if(entities_, [chunkX, chunkZ](const std::unique_ptr<entity::ServerEntity>& entity) {
-        return chunkOf(entity->x) == chunkX && chunkOf(entity->z) == chunkZ;
+    std::erase_if(entities_, [this, chunkX, chunkZ](const std::unique_ptr<entity::ServerEntity>& entity) {
+        if (chunkOf(entity->x) != chunkX || chunkOf(entity->z) != chunkZ) {
+            return false;
+        }
+        byId_.erase(entity->entityId());
+        return true;
     });
 }
 
@@ -84,12 +88,8 @@ std::vector<wire::nbt::NbtCompound> EntityRegistry::takePendingEntities() {
 
 entity::ServerEntity* EntityRegistry::entity(std::int32_t entityId) const {
     const WorldWriteLock lock{*mutex_};
-    for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
-        if (entity->entityId() == entityId) {
-            return entity.get();
-        }
-    }
-    return nullptr;
+    const auto found = byId_.find(entityId);
+    return found == byId_.end() ? nullptr : found->second;
 }
 
 entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::ServerEntity> entity) {
@@ -97,11 +97,17 @@ entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::Server
     // A cube's speed, health and damage all derive from the size chosen when it was finalized.
     entity::cubeMobs::applySize(*entity);
     const std::int32_t id = entity->entityId();
-    // Spawning the same id twice replaces, as putting into a map by id did.
-    std::erase_if(entities_,
-                  [id](const std::unique_ptr<entity::ServerEntity>& existing) { return existing->entityId() == id; });
+    // Spawning the same id twice replaces, as putting into a map by id did. The index says whether
+    // there is anything to replace, so the usual case never walks the list.
+    if (byId_.erase(id) != 0) {
+        std::erase_if(entities_, [id](const std::unique_ptr<entity::ServerEntity>& existing) {
+            return existing->entityId() == id;
+        });
+    }
+    entity::ServerEntity& spawned = *entity;
     entities_.push_back(std::move(entity));
-    return *entities_.back();
+    byId_.emplace(id, &spawned);
+    return spawned;
 }
 
 std::vector<std::int32_t> EntityRegistry::collectRemovedEntities() {
@@ -112,7 +118,13 @@ std::vector<std::int32_t> EntityRegistry::collectRemovedEntities() {
             gone.push_back(entity->entityId());
         }
     }
-    std::erase_if(entities_, [](const std::unique_ptr<entity::ServerEntity>& entity) { return entity->removed; });
+    std::erase_if(entities_, [this](const std::unique_ptr<entity::ServerEntity>& entity) {
+        if (!entity->removed) {
+            return false;
+        }
+        byId_.erase(entity->entityId());
+        return true;
+    });
     return gone;
 }
 
