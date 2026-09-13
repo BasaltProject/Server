@@ -54,36 +54,42 @@ std::int64_t WorldClock::timeOfNextMarker(std::int64_t from, std::int32_t marker
     return from + (delta > 0 ? delta : kDayLength + delta);
 }
 
-void WorldWeather::tick(random::RandomSource& random) {
-    if (clearWeatherTime > 0) {
-        --clearWeatherTime;
-        // parity: the counters are left at a flip that is one tick away, so the cycle resumes the
-        // moment the clear spell ends rather than drawing a fresh delay.
-        thunderTime = thundering ? 0 : 1;
-        rainTime = raining ? 0 : 1;
-        thundering = false;
-        raining = false;
-        return;
-    }
-    if (thunderTime > 0) {
-        if (--thunderTime == 0) {
-            thundering = !thundering;
-        }
-    } else if (thundering) {
-        thunderTime = randomDuration(kThunderDuration, random);
-    } else {
-        thunderTime = randomDuration(kThunderDelay, random);
-    }
+void WorldWeather::tick(random::RandomSource& random, const bool advanceCycle) {
+    if (advanceCycle) {
+        if (clearWeatherTime > 0) {
+            --clearWeatherTime;
+            // parity: the counters are left at a flip that is one tick away, so the cycle resumes
+            // the moment the clear spell ends rather than drawing a fresh delay.
+            thunderTime = thundering ? 0 : 1;
+            rainTime = raining ? 0 : 1;
+            thundering = false;
+            raining = false;
+        } else {
+            if (thunderTime > 0) {
+                if (--thunderTime == 0) {
+                    thundering = !thundering;
+                }
+            } else if (thundering) {
+                thunderTime = randomDuration(kThunderDuration, random);
+            } else {
+                thunderTime = randomDuration(kThunderDelay, random);
+            }
 
-    if (rainTime > 0) {
-        if (--rainTime == 0) {
-            raining = !raining;
+            if (rainTime > 0) {
+                if (--rainTime == 0) {
+                    raining = !raining;
+                }
+            } else if (raining) {
+                rainTime = randomDuration(kRainDuration, random);
+            } else {
+                rainTime = randomDuration(kRainDelay, random);
+            }
         }
-    } else if (raining) {
-        rainTime = randomDuration(kRainDuration, random);
-    } else {
-        rainTime = randomDuration(kRainDelay, random);
     }
+    // parity: a hundredth per tick towards the flag, thunder first, both clamped to [0,1]. This is
+    // outside the game rule on purpose: the jar ramps even with the cycle frozen.
+    thunderLevel_ = std::clamp(thunderLevel_ + (thundering ? kLevelStep : -kLevelStep), 0.0F, 1.0F);
+    rainLevel_ = std::clamp(rainLevel_ + (raining ? kLevelStep : -kLevelStep), 0.0F, 1.0F);
 }
 
 void WorldWeather::set(std::int32_t clearTime, std::int32_t weatherTime, bool nowRaining, bool nowThundering) {

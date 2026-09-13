@@ -7,6 +7,31 @@
 namespace basalt::server::runtime::bedrock {
 namespace {
 
+/// What one line of a stack request is called, for the log line that says what a client asked for.
+[[nodiscard]] std::string stackActionName(const wire::bedrock::BedrockStackActionType type) {
+    switch (type) {
+    case wire::bedrock::BedrockStackActionType::Take:
+        return "take";
+    case wire::bedrock::BedrockStackActionType::Place:
+        return "place";
+    case wire::bedrock::BedrockStackActionType::Swap:
+        return "swap";
+    case wire::bedrock::BedrockStackActionType::Drop:
+        return "drop";
+    case wire::bedrock::BedrockStackActionType::Destroy:
+        return "destroy";
+    case wire::bedrock::BedrockStackActionType::Consume:
+        return "consume";
+    case wire::bedrock::BedrockStackActionType::Create:
+        return "create";
+    case wire::bedrock::BedrockStackActionType::CraftResults:
+        return "craft results";
+    case wire::bedrock::BedrockStackActionType::Other:
+        break;
+    }
+    return "one this build does not act on";
+}
+
 using wire::bedrock::BedrockConnection;
 using wire::bedrock::BedrockPacket;
 using wire::bedrock::RakSession;
@@ -130,7 +155,7 @@ std::string BedrockListener::advertisement() const {
 
 bool BedrockListener::start() {
     if (!options_.enabled) {
-        logger_.info([] { return "Bedrock is off in compatibility.toml."; });
+        logger_.info([] { return "Bedrock is off in server.toml."; });
         return false;
     }
 
@@ -162,18 +187,18 @@ bool BedrockListener::start() {
 
     running_.store(true);
     thread_ = std::jthread{[this] { run(); }};
-    logger_.info([this] {
-        std::string protocols;
-        for (const std::int32_t protocol : options_.gate.supported()) {
-            if (!protocols.empty()) {
-                protocols += ", ";
-            }
-            protocols += std::to_string(protocol);
-        }
-        return "Bedrock clients are welcome on UDP port " + std::to_string(port()) + " (" + gameVersion_ +
-               ", protocol " + protocols + ").";
-    });
     return true;
+}
+
+std::string BedrockListener::welcome() const {
+    std::string protocols;
+    for (const std::int32_t protocol : options_.gate.supported()) {
+        if (!protocols.empty()) {
+            protocols += ", ";
+        }
+        protocols += std::to_string(protocol);
+    }
+    return "Bedrock on UDP port " + std::to_string(port()) + " (" + gameVersion_ + ", protocol " + protocols + ")";
 }
 
 void BedrockListener::stop() {
@@ -229,7 +254,7 @@ void BedrockListener::onConnect(RakSession& session) {
         });
     });
     entry.connection.onReady([this, &entry] { onReady(entry); });
-    entry.connection.onPacket([&entry](BedrockPacket packet, wire::io::ByteBuffer& body) {
+    entry.connection.onPacket([this, &entry](BedrockPacket packet, wire::io::ByteBuffer& body) {
         if (packet == BedrockPacket::RequestChunkRadius) {
             // The client asks for a draw distance of its own once it is in.
             const auto radius = wire::bedrock::readRequestChunkRadius(body);
@@ -255,6 +280,17 @@ void BedrockListener::onConnect(RakSession& session) {
                                             input->itemUse->clickZ, input->itemUse->hotbarSlot);
                 }
                 if (input->stackRequest.has_value()) {
+                    // What the client asked for, by line, before anything acts on it. A request
+                    // this build refuses says why here rather than only failing: the lines that
+                    // craft are the ones this server cannot answer yet.
+                    logger_.debug([&input] {
+                        std::string lines;
+                        for (const wire::bedrock::BedrockStackAction& action : input->stackRequest->actions) {
+                            lines += (lines.empty() ? "" : ", ") + stackActionName(action.type) + " (" +
+                                     std::to_string(action.line) + ")";
+                        }
+                        return "stack request " + std::to_string(input->stackRequest->requestId) + ": " + lines;
+                    });
                     entry.player->stackRequest(*input->stackRequest);
                 }
                 for (const wire::bedrock::BedrockBlockAction& action : input->blockActions) {

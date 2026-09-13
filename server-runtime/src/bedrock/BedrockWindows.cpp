@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DoubleChests.hpp>
+#include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/world/Chunk.hpp>
 
@@ -71,8 +72,24 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return std::nullopt;
     }
     const std::string path{block->path()};
-    // Only the blocks that hold and nothing else, for now: a furnace and a table have machinery of
-    // their own and address their slots by their own containers, not the block's.
+    // A cooker is a window of its own kind, with its three slots and its two bars. Everything else
+    // this build opens is a box: rows of slots and nothing behind them.
+    if (world::furnaces::cookerFor(path).has_value()) {
+        return OpenWindow{.type = path == "blast_furnace" ? wire::bedrock::BedrockContainerType::BlastFurnace
+                                  : path == "smoker"      ? wire::bedrock::BedrockContainerType::Smoker
+                                                          : wire::bedrock::BedrockContainerType::Furnace,
+                          .x = x,
+                          .y = y,
+                          .z = z,
+                          .size = world::furnaces::kSize,
+                          .block = path};
+    }
+    // A table's nine cells are not the block's: they belong to whoever is standing at it, so the
+    // window has none of the block's own slots.
+    if (path == "crafting_table") {
+        return OpenWindow{
+            .type = wire::bedrock::BedrockContainerType::Workbench, .x = x, .y = y, .z = z, .size = 0, .block = path};
+    }
     if (!world::containers::isPlain(path)) {
         return std::nullopt;
     }
@@ -99,6 +116,42 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         window.size = world::containers::kChestSize * 2;
     }
     return window;
+}
+
+std::optional<std::int32_t> blockSlotOf(const OpenWindow& window, const std::int32_t container,
+                                        const std::int32_t slot) {
+    const auto named = static_cast<wire::bedrock::BedrockContainerSlot>(container);
+    if (window.size == 0) {
+        return std::nullopt; // Nothing in this window is the block's.
+    }
+    if (window.type == wire::bedrock::BedrockContainerType::Container) {
+        return named == wire::bedrock::BedrockContainerSlot::LevelEntity ? std::optional{slot} : std::nullopt;
+    }
+    // A cooker gives each of its three slots a container of its own, so the slot number inside it
+    // says nothing: which container it is *is* the slot.
+    switch (named) {
+    case wire::bedrock::BedrockContainerSlot::FurnaceIngredient:
+        return world::furnaces::kInputSlot;
+    case wire::bedrock::BedrockContainerSlot::FurnaceFuel:
+        return world::furnaces::kFuelSlot;
+    case wire::bedrock::BedrockContainerSlot::FurnaceResult:
+        return world::furnaces::kResultSlot;
+    default:
+        return std::nullopt;
+    }
+}
+
+std::optional<FurnaceNumbers> furnaceNumbers(world::LoadedWorld& world, const OpenWindow& window) {
+    if (window.type == wire::bedrock::BedrockContainerType::Container) {
+        return std::nullopt;
+    }
+    const server::world::ChunkBlockEntity* entity = entityAt(world, {window.x, window.y, window.z});
+    if (entity == nullptr) {
+        return std::nullopt;
+    }
+    const world::furnaces::State state = world::furnaces::read(entity->data());
+    return FurnaceNumbers{
+        .cookTime = state.cookingTimer, .litTime = state.litTimeRemaining, .litDuration = state.litTotalTime};
 }
 
 std::vector<std::optional<storage::StoredItemStack>> readWindow(world::LoadedWorld& world, const OpenWindow& window) {

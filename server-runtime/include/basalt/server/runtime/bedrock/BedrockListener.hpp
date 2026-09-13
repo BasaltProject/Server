@@ -169,6 +169,10 @@ public:
 
     [[nodiscard]] std::uint16_t port() const noexcept;
 
+    /// The half of the startup line that is this door's: where it listens and what it speaks. The
+    /// server says it all in one line rather than each door announcing itself.
+    [[nodiscard]] std::string welcome() const;
+
     [[nodiscard]] std::size_t sessionCount() const;
 
     /// The name this server knows a Bedrock player by: the prefix and what Xbox Live calls them.

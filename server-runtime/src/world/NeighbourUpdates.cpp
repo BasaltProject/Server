@@ -245,8 +245,8 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return part != properties.end() && part->second != "unconnected";
 }
 
-/// parity: `BlockState.updateNeighbourShapes`, the six squares a write redraws, each told the side
-/// the news arrives from and walked in vanilla's own order.
+/// parity: `BlockBehaviour.BlockStateBase.updateNeighbourShapes`, the six squares a write redraws, each told
+/// the side the news arrives from and walked in vanilla's own order.
 void shapeAround(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, const OnReshaped& reshaped) {
     for (const BlockFace face : kUpdateShapeOrder) {
         const std::int32_t nx = x + registry::stepX(face);

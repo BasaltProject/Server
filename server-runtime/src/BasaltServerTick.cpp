@@ -106,8 +106,14 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
     const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
     for (player::PlayerSession* player : playerRegistry_.snapshot()) {
         const auto found = worlds.find(player->worldName);
-        if (found != worlds.end() && player->connection().handOverToRegion) {
+        if (found == worlds.end()) {
+            continue;
+        }
+        if (player->connection().handOverToRegion) {
             player->connection().handOverToRegion(*found->second);
+        }
+        if (player->connection().syncOpenWindow) {
+            player->connection().syncOpenWindow(*found->second);
         }
     }
 

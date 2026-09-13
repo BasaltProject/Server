@@ -238,11 +238,13 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return changed(world, x, y, z, stateId, block, "occupied", occupied);
 }
 
-/// parity: `DoorBlock.updateShape`: each half copies the other's whole state but for its own half,
-/// which is what keeps a door open on both halves and closes it on both.
+/// parity: `DoorBlock.updateShape`: each half copies the other's **whole state** but for its own
+/// half, which is what keeps a door open on both halves and closes it on both. The check is
+/// `instanceof DoorBlock`, so any door will do and the block travels with the state: an oak half
+/// under an iron one turns into iron rather than breaking. The bed, which has the same shape, is the
+/// opposite on both counts (`neighbourState.is(this)`, and it copies only `OCCUPIED`).
 [[nodiscard]] std::optional<std::int32_t> door(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                               std::int32_t stateId, const wire::common::Identifier& block,
-                                               std::optional<registry::BlockFace> towards) {
+                                               std::int32_t stateId, std::optional<registry::BlockFace> towards) {
     const std::string half = propertyOf(stateId, "half");
     if (half.empty()) {
         return std::nullopt;
@@ -251,17 +253,28 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     // from the side its other half is on**: `half == LOWER` listens up and `half == UPPER` listens
     // down. From anywhere else a lone half stays put, which is what a command can leave behind.
     const registry::BlockFace mine = half == "lower" ? registry::BlockFace::Up : registry::BlockFace::Down;
-    if (!towards.has_value() || *towards != mine) {
+    // No side at all is a block settling as it arrives, which in the jar is
+    // `Block.updateFromNeighbourShapes` walking all six: for a door only the twin's side answers, so
+    // that walk lands here.
+    const bool arriving = !towards.has_value();
+    if (!arriving && *towards != mine) {
         return std::nullopt;
     }
     const std::int32_t other = stateAt(world, x, half == "lower" ? y + 1 : y - 1, z);
     const wire::common::Identifier* otherBlock = registry::blockStateDefinitions::blockOf(other);
-    if (otherBlock == nullptr || *otherBlock != block || propertyOf(other, "half") == half) {
+    const bool isDoor = otherBlock != nullptr && otherBlock->path().ends_with("_door");
+    if (!isDoor || propertyOf(other, "half") == half) {
+        // parity: `BlockInput.place` falls back to what was written when the shape walk answers air
+        // (`if (state.isAir()) state = this.state`), so a half that arrives alone stays where it is.
+        // Only news from the twin's side can break one.
+        if (arriving) {
+            return std::nullopt;
+        }
         const std::int32_t empty = registry::blocks::air().stateId;
         return world.setBlockState(x, y, z, empty) ? std::optional{empty} : std::nullopt;
     }
     const std::optional<std::int32_t> wanted =
-        registry::blockStateDefinitions::stateIdOf(block, {{"half", half}}, other);
+        registry::blockStateDefinitions::stateIdOf(*otherBlock, {{"half", half}}, other);
     if (!wanted.has_value()) {
         return std::nullopt;
     }
@@ -688,7 +701,7 @@ std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y
         return bed(world, x, y, z, stateId, *block);
     }
     if (endsWith(path, "_door")) {
-        return door(world, x, y, z, stateId, *block, towards);
+        return door(world, x, y, z, stateId, towards);
     }
     if (std::ranges::find(chestBlocks(), path) != chestBlocks().end()) {
         return chest(world, x, y, z, stateId, *block);

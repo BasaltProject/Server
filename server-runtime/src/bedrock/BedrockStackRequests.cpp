@@ -20,10 +20,14 @@ using wire::bedrock::BedrockStackAction;
 using wire::bedrock::BedrockStackActionType;
 using wire::bedrock::BedrockStackSlot;
 
+/// Where that edition starts numbering a table's grid. parity: Geyser's own `slot + 31`, which is
+/// the number a client sends for the first cell.
+constexpr std::int32_t kFirstGridSlot = 32;
+
 /// Where one end of a move really is. Bedrock names a window and a slot of it; this server has one
-/// list of slots per player, one stack being dragged, and whatever block is open.
+/// list of slots per player, one stack being dragged, a table's grid and whatever block is open.
 struct Place {
-    enum class Kind : std::uint8_t { None, Storage, Cursor, Block };
+    enum class Kind : std::uint8_t { None, Storage, Cursor, Block, Grid };
 
     Kind kind = Kind::None;
     std::int32_t slot = 0;
@@ -36,11 +40,28 @@ struct Place {
                                                : slot - PlayerInventory::kHotbarSize;
 }
 
-[[nodiscard]] Place placeOf(const BedrockStackSlot& named) {
+/// Where one end of a move is, given what this player has open: which of the block's own slots a
+/// container names is the window's business, not this table's.
+[[nodiscard]] Place placeOf(const BedrockStackSlot& named, const BedrockWindows& windows) {
     if (named.container < 0 || named.container > 0xFF) {
         return {};
     }
+    if (windows.open.has_value()) {
+        if (const std::optional<std::int32_t> slot = blockSlotOf(*windows.open, named.container, named.slot);
+            slot.has_value()) {
+            return {.kind = Place::Kind::Block, .slot = *slot};
+        }
+    }
     const auto container = static_cast<BedrockContainerSlot>(named.container);
+    if (container == BedrockContainerSlot::CraftingInput) {
+        // That edition numbers a table's nine cells from 32, left to right and then down, which is
+        // the same order as here with the number moved.
+        const std::int32_t cell = named.slot - kFirstGridSlot;
+        if (cell < 0 || cell >= static_cast<std::int32_t>(kGridCells)) {
+            return {};
+        }
+        return {.kind = Place::Kind::Grid, .slot = cell};
+    }
     switch (container) {
     case BedrockContainerSlot::HotbarAndInventory:
         if (named.slot < 0 || named.slot >= PlayerInventory::kMainSlots) {
@@ -70,8 +91,6 @@ struct Place {
         return {.kind = Place::Kind::Storage, .slot = PlayerInventory::kOffhandSlot};
     case BedrockContainerSlot::Cursor:
         return {.kind = Place::Kind::Cursor};
-    case BedrockContainerSlot::LevelEntity:
-        return {.kind = Place::Kind::Block, .slot = named.slot};
     default:
         return {};
     }
@@ -88,6 +107,7 @@ struct Reach {
     world::LoadedWorld* world = nullptr;
     std::map<std::int32_t, std::optional<storage::StoredItemStack>> inventory;
     std::map<std::int32_t, std::optional<storage::StoredItemStack>> block;
+    std::map<std::int32_t, std::optional<storage::StoredItemStack>> grid;
     std::optional<std::optional<storage::StoredItemStack>> cursor;
     std::vector<storage::StoredItemStack> dropped;
 };
@@ -100,6 +120,10 @@ struct Reach {
     }
     case Place::Kind::Cursor:
         return reach.cursor.has_value() ? *reach.cursor : reach.windows.cursor;
+    case Place::Kind::Grid: {
+        const auto staged = reach.grid.find(place.slot);
+        return staged == reach.grid.end() ? reach.windows.grid[static_cast<std::size_t>(place.slot)] : staged->second;
+    }
     case Place::Kind::Block: {
         const auto staged = reach.block.find(place.slot);
         if (staged != reach.block.end()) {
@@ -125,6 +149,9 @@ struct Reach {
     case Place::Kind::Cursor:
         reach.cursor = std::move(stack);
         return true;
+    case Place::Kind::Grid:
+        reach.grid[place.slot] = std::move(stack);
+        return true;
     case Place::Kind::Block:
         if (reach.world == nullptr || !reach.windows.open.has_value() || place.slot < 0 ||
             place.slot >= reach.windows.open->size) {
@@ -142,6 +169,9 @@ struct Reach {
 void commit(Reach& reach, const std::function<void(const storage::StoredItemStack&)>& drop) {
     for (const auto& [slot, stack] : reach.inventory) {
         reach.session.inventory.set(slot, stack);
+    }
+    for (const auto& [cell, stack] : reach.grid) {
+        reach.windows.grid[static_cast<std::size_t>(cell)] = stack;
     }
     if (reach.cursor.has_value()) {
         reach.windows.cursor = *reach.cursor;
@@ -178,7 +208,7 @@ public:
             BedrockResponseContainer entry;
             entry.container = container;
             for (const std::int32_t slot : slots) {
-                const Place place = placeOf({.container = container, .slot = slot});
+                const Place place = placeOf({.container = container, .slot = slot}, reach.windows);
                 const std::optional<storage::StoredItemStack> stack = stackAt(reach, place);
                 entry.slots.push_back({.slot = slot, .count = stack.has_value() ? stack->count : 0});
             }
@@ -244,15 +274,16 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
         switch (action.type) {
         case BedrockStackActionType::Take:
         case BedrockStackActionType::Place:
-            if (!moveStack(reach, placeOf(action.source), placeOf(action.destination), action.count)) {
+            if (!moveStack(reach, placeOf(action.source, windows), placeOf(action.destination, windows),
+                           action.count)) {
                 return {};
             }
             touched.add(action.source);
             touched.add(action.destination);
             break;
         case BedrockStackActionType::Swap: {
-            const Place from = placeOf(action.source);
-            const Place to = placeOf(action.destination);
+            const Place from = placeOf(action.source, windows);
+            const Place to = placeOf(action.destination, windows);
             if (from.kind == Place::Kind::None || to.kind == Place::Kind::None) {
                 return {};
             }
@@ -270,7 +301,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
                 return {};
             }
             const std::optional<storage::StoredItemStack> thrown =
-                takeStack(reach, placeOf(action.source), action.count);
+                takeStack(reach, placeOf(action.source, windows), action.count);
             if (!thrown.has_value()) {
                 return {};
             }
@@ -279,7 +310,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             break;
         }
         case BedrockStackActionType::Destroy:
-            if (!takeStack(reach, placeOf(action.source), action.count).has_value()) {
+            if (!takeStack(reach, placeOf(action.source, windows), action.count).has_value()) {
                 return {};
             }
             touched.add(action.source);

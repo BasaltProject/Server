@@ -137,28 +137,34 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                                           std::chrono::steady_clock::now() - startedAt)
                                                           .count()) /
                                   1000.0;
-    logger_.info([this, elapsedSeconds] {
-        const std::string where = config_->javaEnabled ? "Listening on port " + std::to_string(config_->port)
-                                                       : "Bedrock only: no Java port is open";
-        return "Done (" + std::to_string(elapsedSeconds) + "s)! " + where + " (" +
-               (options_.sessionService != nullptr ? "online" : "offline") + "-mode).";
-    });
-    config::forwardingConfig::announce(config_->forwarding, config_->onlineMode, config_->port, logger_);
-
     std::set<std::int32_t> translated = config_->javaEnabled ? protocolGate_.supported() : std::set<std::int32_t>{};
     translated.erase(wire::multiversion::protocolVersions::kNative);
-    if (!translated.empty()) {
-        // The range and the count, not the list: forty eight of them is a wall of text nobody reads,
-        // and `/version` prints the whole thing for whoever wants it.
-        const std::int32_t oldest = *translated.begin();
-        const std::int32_t newest = *translated.rbegin();
-        logger_.info([&translated, oldest, newest] {
-            return "Also accepting " + std::to_string(translated.size()) + " older client versions, " +
-                   wire::multiversion::protocolVersions::describe(oldest) + " to " +
-                   wire::multiversion::protocolVersions::describe(newest) + " (protocols " + std::to_string(oldest) +
-                   " to " + std::to_string(newest) + ").";
-        });
-    }
+    // One line, and it starts with the part everybody waits for: whether it is up and how long it
+    // took. Where it listens and what it speaks follow in the same breath, because three lines for
+    // one fact is three lines to read.
+    logger_.info([this, elapsedSeconds, &translated] {
+        std::string line = "Done (" + std::to_string(elapsedSeconds) + "s)! ";
+        const bool java = config_->javaEnabled && listener_.has_value();
+        if (java) {
+            line += "Java on TCP port " + std::to_string(config_->port) + " (" +
+                    (options_.sessionService != nullptr ? "online" : "offline") + "-mode)";
+            if (!translated.empty()) {
+                // The range and the count, not the list: forty eight of them is a wall of text
+                // nobody reads, and `/version` prints the whole thing for whoever wants it.
+                line += " with " + std::to_string(translated.size()) + " older versions down to " +
+                        wire::multiversion::protocolVersions::describe(*translated.begin());
+            }
+        }
+        // What is open, and nothing about what is not: the two editions are two doors and neither
+        // is the default the other is measured against. Both shut is refused when the config is
+        // read, so there is always one to name.
+        if (bedrockListener_ != nullptr) {
+            line += java ? ", and " : "";
+            line += bedrockListener_->welcome();
+        }
+        return line + ".";
+    });
+    config::forwardingConfig::announce(config_->forwarding, config_->onlineMode, config_->port, logger_);
 
     while (accepting_.load() && listener_.has_value()) {
         std::expected<wire::io::TcpConnection, wire::io::SocketError> accepted = listener_->accept();
@@ -575,7 +581,12 @@ void BasaltServer::startBedrockListener() {
                                 windows->nextContainerId >= bedrock::kMaxContainerId ? 1 : windows->nextContainerId + 1;
                             window->containerId = windows->nextContainerId;
                             windows->open = *window;
-                            opened(*window, bedrock::readWindow(*found->second, *window));
+                            // The next window is a different window: what was said about the last
+                            // one says nothing about this one.
+                            windows->saidSlots = bedrock::readWindow(*found->second, *window);
+                            windows->saidNumbers.reset();
+                            windows->sinceRead = 0;
+                            opened(*window, windows->saidSlots);
                             openersChanged(*found->second, *window, true);
                             return;
                         }
@@ -617,6 +628,21 @@ void BasaltServer::startBedrockListener() {
                     openersChanged(*found->second, *windows->open, false);
                 }
                 windows->open.reset();
+                windows->saidSlots.clear();
+                windows->saidNumbers.reset();
+                // parity: `AbstractContainerMenu.removed`, which empties the grid into the player
+                // rather than leaving it in a table the next person opens.
+                bool returned = false;
+                for (std::optional<storage::StoredItemStack>& cell : windows->grid) {
+                    if (cell.has_value()) {
+                        static_cast<void>(session->inventory.add(*cell));
+                        cell.reset();
+                        returned = true;
+                    }
+                }
+                if (returned && session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
                 if (windows->cursor.has_value()) {
                     static_cast<void>(session->inventory.add(*windows->cursor));
                     windows->cursor.reset();
@@ -789,7 +815,11 @@ void BasaltServer::startBedrockListener() {
 
     bedrockListener_ = std::make_unique<bedrock::BedrockListener>(std::move(options), std::move(hooks),
                                                                   std::string{bedrock::kBedrockGameVersion});
-    static_cast<void>(bedrockListener_->start());
+    if (!bedrockListener_->start()) {
+        // It said why in the log already. Dropping it here is what keeps the startup line honest:
+        // a port that never opened is not one to announce.
+        bedrockListener_.reset();
+    }
 }
 
 } // namespace basalt::server::runtime

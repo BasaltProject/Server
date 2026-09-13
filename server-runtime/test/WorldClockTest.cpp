@@ -117,7 +117,7 @@ TEST_CASE("a fresh world draws a delay before it rains") {
     CHECK(weather.rainTime == 0);
 
     // Every counter at zero means the first tick draws a delay rather than flipping the weather on.
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK_FALSE(weather.raining);
     CHECK_FALSE(weather.thundering);
     CHECK(weather.rainTime >= WorldWeather::kRainDelay.first);
@@ -132,15 +132,15 @@ TEST_CASE("a countdown that reaches zero flips the weather, and then draws a dur
     weather.rainTime = 2;
     weather.thunderTime = 1000000;
 
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.rainTime == 1);
     CHECK_FALSE(weather.raining);
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.rainTime == 0);
     CHECK(weather.raining);
 
     // Now that it is raining, the next draw is how long it lasts, not how long until it starts.
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.raining);
     CHECK(weather.rainTime >= WorldWeather::kRainDuration.first);
     CHECK(weather.rainTime <= WorldWeather::kRainDuration.second);
@@ -156,14 +156,14 @@ TEST_CASE("thunder starts when its own countdown runs out") {
     weather.thunderTime = 2;
     weather.rainTime = 1000000;
 
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.thunderTime == 1);
     CHECK_FALSE(weather.thundering);
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.thunderTime == 0);
     CHECK(weather.thundering);
     // And the next tick draws how long the storm lasts.
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.thunderTime >= WorldWeather::kThunderDuration.first);
 }
 
@@ -193,7 +193,7 @@ TEST_CASE("thunder has its own duration once it starts") {
     weather.thunderTime = 0;
     weather.rainTime = 1000000;
 
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.thundering);
     CHECK(weather.thunderTime >= WorldWeather::kThunderDuration.first);
     CHECK(weather.thunderTime <= WorldWeather::kThunderDuration.second);
@@ -209,7 +209,7 @@ TEST_CASE("a clear spell holds the sky open and leaves the cycle one tick from r
     CHECK(weather.raining);
     CHECK(weather.thundering);
 
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.clearWeatherTime == 999);
     CHECK_FALSE(weather.raining);
     CHECK_FALSE(weather.thundering);
@@ -219,21 +219,50 @@ TEST_CASE("a clear spell holds the sky open and leaves the cycle one tick from r
     CHECK(weather.thunderTime == 0);
 
     // While it runs, nothing else moves.
-    weather.tick(source);
+    weather.tick(source, true);
     CHECK(weather.clearWeatherTime == 998);
     CHECK(weather.rainTime == 1);
     CHECK(weather.thunderTime == 1);
     CHECK_FALSE(weather.raining);
 }
 
-TEST_CASE("what the client is shown is on or off, not a slope") {
+TEST_CASE("the two levels are a slope, not a switch") {
+    rng::RandomSource source = rng::RandomSource::legacy(7);
     WorldWeather weather;
     CHECK(weather.rainLevel() == doctest::Approx(0.0F));
-    CHECK(weather.thunderLevel() == doctest::Approx(0.0F));
+    CHECK_FALSE(weather.isRaining());
     weather.raining = true;
     weather.thundering = true;
+    weather.rainTime = 100000;
+    weather.thunderTime = 100000;
+    // parity: `Level.isRaining` is `getRainLevel(1) > 0.2`, and adding a float hundredth twenty
+    // times lands on 0.20000002, which is already past it. The jar drifts the same way, so rain
+    // starts counting on tick twenty and the storm on tick ninety-one, not on twenty-one and ninety.
+    for (std::int32_t i = 0; i < 19; ++i) {
+        weather.tick(source, true);
+    }
+    CHECK_FALSE(weather.isRaining());
+    weather.tick(source, true);
+    CHECK(weather.isRaining());
+    CHECK_FALSE(weather.isThundering());
+    for (std::int32_t i = 0; i < 70; ++i) {
+        weather.tick(source, true);
+    }
+    CHECK_FALSE(weather.isThundering());
+    weather.tick(source, true);
+    CHECK(weather.isThundering());
+    // parity: clamped at one, and the game rule never stops the slope.
+    for (std::int32_t i = 0; i < 100; ++i) {
+        weather.tick(source, false);
+    }
     CHECK(weather.rainLevel() == doctest::Approx(1.0F));
-    CHECK(weather.thunderLevel() == doctest::Approx(1.0F));
+    weather.raining = false;
+    weather.thundering = false;
+    for (std::int32_t i = 0; i < 200; ++i) {
+        weather.tick(source, false);
+    }
+    CHECK(weather.rainLevel() == doctest::Approx(0.0F));
+    CHECK(weather.thunderLevel() == doctest::Approx(0.0F));
 }
 
 TEST_CASE("a duration drawn for a command that gave none") {
