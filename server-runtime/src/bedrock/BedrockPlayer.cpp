@@ -501,11 +501,14 @@ BedrockPlayer::~BedrockPlayer() {
     if (context_.quit) {
         context_.quit(*session_);
     }
-    if (context_.registry != nullptr) {
-        context_.registry->remove(session_->uuid());
-    }
     announce(Component::translatable("multiplayer.player.left", {Component::text(session_->name())})
                  .color(wire::text::kYellow));
+    if (context_.registry != nullptr) {
+        context_.registry->remove(session_->uuid());
+        // Handed over rather than deleted here: this runs on the listener's thread, and the tick
+        // loop may be halfway through a list of players that still has this one in it.
+        context_.registry->retire(std::move(session_));
+    }
 }
 
 void BedrockPlayer::chat(const std::string_view message) {

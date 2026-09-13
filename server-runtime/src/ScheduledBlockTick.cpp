@@ -535,8 +535,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *dead});
         }
         // parity: `CreakingHeartBlock.tick` over `updateState`, written with `setBlock(..., 3)`. The
-        // jar asks an environment attribute whether the creaking is active; here that is the night,
-        // which is what the vanilla timeline says at noon and at midnight.
+        // jar asks `EnvironmentAttributes.CREAKING_ACTIVE`, whose track runs 12600 to 23401: a
+        // narrower window than a bed's, and reading the bed's was wrong on 116 ticks a day.
         if (const std::optional<std::int32_t> heart = world::scheduledBlocks::creakingHeartTick(
                 world.state(), x, y, z,
                 [this](std::int32_t stateId) {
@@ -544,7 +544,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     return block != nullptr && options_.blockTags != nullptr &&
                            world::realBlockTags::contains(*options_.blockTags, "minecraft:pale_oak_logs", *block);
                 },
-                world::beds::isNight(world.clock().totalTicks()));
+                world::scheduledBlocks::creakingIsActive(world.clock().totalTicks()));
             heart.has_value()) {
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *heart});
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);

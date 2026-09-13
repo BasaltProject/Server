@@ -35,6 +35,30 @@ void PlayerRegistry::remove(const wire::common::Uuid& uuid) {
     sessions_.erase(found);
 }
 
+void PlayerRegistry::retire(std::unique_ptr<PlayerSession> session) {
+    if (session == nullptr) {
+        return;
+    }
+    const std::lock_guard<std::mutex> guard{lock_};
+    retired_.emplace_back(std::chrono::steady_clock::now(), std::move(session));
+}
+
+void PlayerRegistry::collect() {
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    // Moved out and dropped outside the lock: a session's own destructor is nobody's business here
+    // and may take as long as it likes.
+    std::vector<std::unique_ptr<PlayerSession>> letGo;
+    {
+        const std::lock_guard<std::mutex> guard{lock_};
+        for (auto& gone : retired_) {
+            if (now - gone.first > kRetirement) {
+                letGo.push_back(std::move(gone.second));
+            }
+        }
+        std::erase_if(retired_, [](const auto& gone) { return gone.second == nullptr; });
+    }
+}
+
 PlayerSession* PlayerRegistry::get(const wire::common::Uuid& uuid) const {
     const std::lock_guard<std::mutex> guard{lock_};
     const auto found = sessions_.find(uuid);

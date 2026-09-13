@@ -31,7 +31,17 @@ struct BasaltConfig {
     /// The file this configuration lives in, inside a `ConfigDirectory`.
     static constexpr std::string_view kFileName = "server.toml";
 
+    /// The two editions are two doors into the same server, and either can be shut: a server for
+    /// phones and consoles only is a real thing to want, and so is one nobody on a phone reaches.
+    /// Shutting both is refused, because then nobody can join at all.
+    bool javaEnabled = true;
     std::int32_t port = 25565;
+
+    bool bedrockEnabled = true;
+    std::int32_t bedrockPort = 19132;
+    /// What goes in front of a Bedrock player's name inside the server, so a Steve from each
+    /// edition is two people. Empty is a real choice on a server where only Bedrock players join.
+    std::string bedrockPrefix = ".";
     std::int32_t maxPlayers = 80;
     bool onlineMode = true;
     std::string gamemode = "survival";

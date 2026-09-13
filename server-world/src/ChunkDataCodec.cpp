@@ -129,17 +129,19 @@ std::vector<std::int64_t> encodeHeightmap(const Chunk& chunk) {
 }
 
 LightData encodeLight(Chunk& chunk, bool hasSkylight, const light::LightWindow& window) {
-    const Chunk::PackedLight* sky = nullptr;
+    // Held by value: what the chunk keeps is thrown away the moment a block moves, on another
+    // thread, and this one is about to spend a while turning it into a packet.
+    std::optional<Chunk::PackedLight> sky;
     if (hasSkylight) {
-        sky = &chunk.skyLight([&window] { return packAll(light::skyLight::compute(window)); });
+        sky = chunk.skyLight([&window] { return packAll(light::skyLight::compute(window)); });
     }
-    const Chunk::PackedLight& block = chunk.blockLight([&window] {
+    const Chunk::PackedLight block = chunk.blockLight([&window] {
         const std::optional<std::vector<light::SectionLight>> computed = light::blockLight::compute(window);
         return computed.has_value() ? packAll(*computed) : Chunk::PackedLight{};
     });
 
     LightData data;
-    std::tie(data.skyLightMask, data.emptySkyLightMask, data.skyLight) = masked(sky);
+    std::tie(data.skyLightMask, data.emptySkyLightMask, data.skyLight) = masked(sky.has_value() ? &*sky : nullptr);
     std::tie(data.blockLightMask, data.emptyBlockLightMask, data.blockLight) = masked(&block);
     return data;
 }

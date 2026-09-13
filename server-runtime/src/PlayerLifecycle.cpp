@@ -373,6 +373,9 @@ void PlayerLifecycle::leavePlayIfPresent() {
                 wire::protocol::play::PlayerInfoRemovePacket{.players = {session->uuid()}}.write(buffer);
             });
     }
+    // Handed over rather than left to die with this connection: the tick loop may be halfway
+    // through a list of players that still has this one in it, on its own thread.
+    registry->retire(owner_->takePlayerSession());
 }
 
 void PlayerLifecycle::savePlayerState() {

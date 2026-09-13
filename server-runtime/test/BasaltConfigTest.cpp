@@ -89,7 +89,7 @@ TEST_CASE("the commented default is what a vanilla server would have been") {
 }
 
 TEST_CASE("an option the file does not mention keeps its default") {
-    const BasaltConfig config = parsed("[server]\nport = 25566\n");
+    const BasaltConfig config = parsed("[network.java]\nport = 25566\n");
     CHECK(config.port == 25566);
     CHECK(config.maxPlayers == 80);
     CHECK(config.onlineMode);
@@ -104,11 +104,13 @@ TEST_CASE("an option the file does not mention keeps its default") {
 TEST_CASE("what the file says, read back") {
     const BasaltConfig config = parsed(R"(
 [server]
-port = 25570
 max-players = 12
 online-mode = false
 gamemode = "creative"
 whitelist = true
+
+[network.java]
+port = 25570
 
 [logging]
 level = "debug"
@@ -258,7 +260,7 @@ property-name = "custom"
     CHECK(disabled->secret.empty());
 
     // Nothing configured at all is nobody forwarding, which is what a server without a proxy is.
-    const std::expected<toml::TomlTable, toml::TomlError> bare = toml::parse("[server]\nport = 1\n");
+    const std::expected<toml::TomlTable, toml::TomlError> bare = toml::parse("[network.java]\nport = 1\n");
     REQUIRE(bare.has_value());
     const std::expected<forwarding::ProxyForwarding, std::string> none =
         forwardingConfig::fromToml(*bare, "config/server.toml");

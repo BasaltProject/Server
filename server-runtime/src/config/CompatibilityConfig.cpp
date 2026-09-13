@@ -4,6 +4,7 @@
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 
 #include <algorithm>
+#include <filesystem>
 #include <cstdint>
 #include <utility>
 
@@ -41,12 +42,21 @@ policyOf(std::optional<std::string_view> written, std::string_view key, const st
 
 std::expected<CompatibilityConfig, std::string> CompatibilityConfig::load(const ConfigDirectory& directory,
                                                                           const wire::common::Logger& logger) {
+    // The file this used to live in. Left where it was, its values would quietly stop counting and
+    // the operator would have no way of telling, so it is named instead.
+    if (const std::string old = directory.pathOf("compatibility.toml"); std::filesystem::exists(old)) {
+        return std::unexpected(old + ": this file is gone. What was in it now lives in server.toml, under " +
+                               "[network.java] and [network.bedrock]; move your values there and delete it");
+    }
     const std::string path = directory.pathOf(kFileName);
-    const std::expected<TomlTable, std::string> root = directory.load(kFileName, kCompatibilityDefaultToml);
+    const std::expected<TomlTable, std::string> root = directory.load(kFileName, kServerDefaultToml);
     if (!root.has_value()) {
         return std::unexpected(root.error());
     }
-    const TomlTable* java = root->table("java");
+    // How old a client may be is asked once per edition, in the same table as that edition's port:
+    // the two doors are the same kind of thing and read the same way.
+    const TomlTable* network = root->table("network");
+    const TomlTable* java = network == nullptr ? nullptr : network->table("java");
 
     BackwardsSelection backwards;
     if (java != nullptr) {
@@ -77,17 +87,7 @@ std::expected<CompatibilityConfig, std::string> CompatibilityConfig::load(const 
     const bool nameSubstitutes = java == nullptr ? true : java->boolean("name-substitutes").value_or(true);
 
     BedrockSettings bedrock;
-    if (const TomlTable* table = root->table("bedrock"); table != nullptr) {
-        bedrock.enabled = table->boolean("enabled").value_or(bedrock.enabled);
-        if (const std::optional<std::int64_t> port = table->integer("port"); port.has_value()) {
-            if (*port <= 0 || *port > 65535) {
-                return std::unexpected(path + ": the bedrock port must be between 1 and 65535");
-            }
-            bedrock.port = static_cast<std::uint16_t>(*port);
-        }
-        if (const std::optional<std::string_view> prefix = table->string("prefix"); prefix.has_value()) {
-            bedrock.prefix = std::string{*prefix};
-        }
+    if (const TomlTable* table = network == nullptr ? nullptr : network->table("bedrock"); table != nullptr) {
         if (const std::optional<std::string_view> written = table->string("protocols"); written.has_value()) {
             if (lowercaseAscii(trim(*written)) != "all") {
                 return std::unexpected(path + ": the bedrock protocols must be \"all\" or a list of numbers");

@@ -585,6 +585,15 @@ void scheduleCreakingHeart(WorldState& world, std::int32_t x, std::int32_t y, st
     world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("creaking_heart"), 1);
 }
 
+bool creakingIsActive(const std::int64_t timeOfDay) {
+    constexpr std::int64_t kNightStart = 12600;
+    constexpr std::int64_t kNightEnd = 23401;
+    constexpr std::int64_t kDay = 24000;
+    const std::int64_t inDay = ((timeOfDay % kDay) + kDay) % kDay;
+    // parity: the keyframe at 23401 carries `false`, so the last active tick is the one before it.
+    return inDay >= kNightStart && inDay < kNightEnd;
+}
+
 std::optional<std::int32_t> creakingHeartTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                               const IsPaleOakLog& isPaleOakLog, const bool creakingActive) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);

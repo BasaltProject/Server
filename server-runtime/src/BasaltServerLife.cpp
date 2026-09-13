@@ -51,16 +51,20 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
     logger_.info([this] {
         return "Player database ready: " + std::to_string(playerStore_->players().count()) + " player(s) known.";
     });
-    std::expected<wire::io::TcpListener, wire::io::SocketError> bound =
-        wire::io::TcpListener::bind(static_cast<std::uint16_t>(config_->port));
-    if (!bound.has_value()) {
-        // Almost always another server already on that port, which is worth saying rather than
-        // leaving the operator with an error number.
-        throw std::runtime_error("Could not bind port " + std::to_string(config_->port) +
-                                 ". Another server is probably already running on it; stop it or change `port` in "
-                                 "config/server.toml.");
+    // A server for one edition only is a real thing to want, so the door that is shut is simply not
+    // opened: nothing else in here knows which of the two a player came through.
+    if (config_->javaEnabled) {
+        std::expected<wire::io::TcpListener, wire::io::SocketError> bound =
+            wire::io::TcpListener::bind(static_cast<std::uint16_t>(config_->port));
+        if (!bound.has_value()) {
+            // Almost always another server already on that port, which is worth saying rather than
+            // leaving the operator with an error number.
+            throw std::runtime_error("Could not bind port " + std::to_string(config_->port) +
+                                     ". Another server is probably already running on it; stop it or change `port` in "
+                                     "[network.java] of config/server.toml.");
+        }
+        listener_ = std::move(*bound);
     }
-    listener_ = std::move(*bound);
     startBedrockListener();
 
     // Said once at startup, because it changes the order of tick and an operator reading a bug
@@ -122,12 +126,14 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                                           .count()) /
                                   1000.0;
     logger_.info([this, elapsedSeconds] {
-        return "Done (" + std::to_string(elapsedSeconds) + "s)! Listening on port " + std::to_string(config_->port) +
-               " (" + (options_.sessionService != nullptr ? "online" : "offline") + "-mode).";
+        const std::string where = config_->javaEnabled ? "Listening on port " + std::to_string(config_->port)
+                                                       : "Bedrock only: no Java port is open";
+        return "Done (" + std::to_string(elapsedSeconds) + "s)! " + where + " (" +
+               (options_.sessionService != nullptr ? "online" : "offline") + "-mode).";
     });
     config::forwardingConfig::announce(config_->forwarding, config_->onlineMode, config_->port, logger_);
 
-    std::set<std::int32_t> translated = protocolGate_.supported();
+    std::set<std::int32_t> translated = config_->javaEnabled ? protocolGate_.supported() : std::set<std::int32_t>{};
     translated.erase(wire::multiversion::protocolVersions::kNative);
     if (!translated.empty()) {
         // The range and the count, not the list: forty eight of them is a wall of text nobody reads,
@@ -142,7 +148,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
         });
     }
 
-    while (accepting_.load()) {
+    while (accepting_.load() && listener_.has_value()) {
         std::expected<wire::io::TcpConnection, wire::io::SocketError> accepted = listener_->accept();
         if (!accepted.has_value()) {
             break;
@@ -325,14 +331,14 @@ player::DamageContext BasaltServer::damageContext() {
 
 void BasaltServer::startBedrockListener() {
     const config::BedrockSettings& settings = options_.compatibility.bedrock();
-    if (!settings.enabled) {
+    if (!config_->bedrockEnabled) {
         return;
     }
 
     bedrock::BedrockOptions options;
     options.enabled = true;
-    options.port = settings.port;
-    options.prefix = settings.prefix;
+    options.port = static_cast<std::uint16_t>(config_->bedrockPort);
+    options.prefix = config_->bedrockPrefix;
 
     // What this build speaks, narrowed to what the operator asked for. A list that names a protocol
     // this build has no codec for is said out loud rather than accepted and then failed at.
@@ -356,7 +362,7 @@ void BasaltServer::startBedrockListener() {
                     }
                     named += std::to_string(protocol);
                 }
-                return "compatibility.toml asks for Bedrock protocols this build cannot speak: " + named;
+                return "server.toml asks for Bedrock protocols this build cannot speak: " + named;
             });
         }
         speakable = std::move(chosen);
