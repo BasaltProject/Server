@@ -163,9 +163,10 @@ public:
                 return;
             }
             if (settled != state) {
+                const std::int32_t delay = spreadDelay(*kind, state, settled, x, y, z);
                 state = settled;
                 set(x, y, z, settled);
-                context_.world.scheduleFluidTick(x, y, z, fluidId(*kind), spreadDelay(*kind));
+                context_.world.scheduleFluidTick(x, y, z, fluidId(*kind), delay);
             }
         }
         spread(x, y, z, state, *kind);
@@ -235,13 +236,26 @@ private:
         return kind == FluidKind::Water || context_.ultrawarm ? 1 : 2;
     }
 
-    /// parity: `LavaFluid.getSpreadDelay`: lava rising into a block usually takes four times as long.
-    [[nodiscard]] std::int32_t spreadDelay(FluidKind kind) const {
+    /// parity: `LavaFluid.getSpreadDelay`: lava whose square **rises** usually takes four times as
+    /// long. Three conditions come first and the roll last: both states have to hold liquid, neither
+    /// can be falling, and the new height has to beat the old one. Applying it to every change made a
+    /// lava that drains take four times too long in three of every four squares.
+    [[nodiscard]] std::int32_t spreadDelay(FluidKind kind, std::int32_t was, std::int32_t now, std::int32_t x,
+                                           std::int32_t y, std::int32_t z) {
         const std::int32_t base = tickDelay(kind);
+        if (kind != FluidKind::Lava || was == kEmpty || now == kEmpty || !isLiquidBlock(was) || !isLiquidBlock(now) ||
+            isFalling(was) || isFalling(now)) {
+            return base;
+        }
+        // parity: `FluidState.getHeight` answers a full block whenever the square above holds the
+        // same fluid, and it is the same square for both states, so there is nothing to beat.
+        if (fluidFlow::kindOf(at(x, y + 1, z)) == kind || amountOf(now) <= amountOf(was)) {
+            return base;
+        }
         // Not a parity gap despite the look of it: vanilla rolls this on `Level.random`, which is a
         // `RandomSource.create()` with no seed of its own, so the same lava does not reproduce its
         // own timing there either.
-        return kind == FluidKind::Lava && context_.random.nextInt(4) != 0 ? base * 4 : base;
+        return context_.random.nextInt(4) != 0 ? base * 4 : base;
     }
 
     /// parity: `LiquidBlock.shouldSpreadLiquid`: lava that touches water turns to rock instead of

@@ -453,3 +453,50 @@ TEST_CASE("a settled ocean stops asking to be ticked") {
     }
     CHECK(moved == 0);
 }
+
+TEST_CASE("a square that has just settled is booked again at the plain delay") {
+    // What this pins is the rebooking: when a square drops a level its next turn falls to the flat
+    // distance, thirty. It also pins that `LavaFluid.getSpreadDelay`'s fourfold multiplier does not
+    // reach this engine today: writing the fluid wakes the square at thirty and `scheduleTick`
+    // refuses the later duplicate, so the turn lands on thirty whoever wins the roll. The fix aligns
+    // the code with the jar without changing anything observable yet.
+    const auto turnsUntilBookedAgain = [](std::int64_t seed) {
+        Fixture fixture;
+        fixture.random = rng::RandomSource::legacy(seed);
+        floor(fixture.world);
+        REQUIRE(fixture.world.setBlockState(4, 64, 8, stateOf("lava")));
+        REQUIRE(fixture.world.setBlockState(8, 64, 8, stateOf("lava")));
+        static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 4, 64, 8));
+        static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 8, 64, 8));
+        settle(fixture.context());
+        const std::int32_t before = levelAt(fixture.world, 5, 64, 8);
+        REQUIRE(before >= 0);
+        REQUIRE(fixture.world.setBlockState(4, 64, 8, air()));
+        static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 4, 64, 8));
+
+        std::int32_t changed = -1;
+        for (std::int32_t turn = 0; turn < 2000; ++turn) {
+            bool mineIsDue = false;
+            for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
+                if (position == std::array<std::int32_t, 3>{5, 64, 8}) {
+                    mineIsDue = true;
+                }
+                static_cast<void>(fluidFlow::tick(fixture.context(), position[0], position[1], position[2]));
+            }
+            if (changed < 0 && levelAt(fixture.world, 5, 64, 8) != before) {
+                changed = turn;
+            } else if (changed >= 0 && mineIsDue) {
+                return turn - changed;
+            }
+        }
+        return -1;
+    };
+
+    const std::int32_t first = turnsUntilBookedAgain(1);
+    CHECK(first == 30);
+    // And it does not depend on the seed, which is what has to keep holding if the multiplier ever
+    // does get applied.
+    CHECK(turnsUntilBookedAgain(2) == first);
+    CHECK(turnsUntilBookedAgain(7) == first);
+    CHECK(turnsUntilBookedAgain(11) == first);
+}
