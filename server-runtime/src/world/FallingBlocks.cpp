@@ -118,7 +118,7 @@ bool isFree(std::int32_t stateId) {
     return block != nullptr && block->path() == "fire";
 }
 
-void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const Asked asked) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || !falls(*stateId)) {
         return;
@@ -130,10 +130,10 @@ void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::i
     if (block == nullptr) {
         return;
     }
-    // parity: `ConcretePowderBlock.updateShape` devuelve el hormigon **sin llamar a super**, y es
-    // super quien reserva el turno de caida. O sea que un polvo al que le llega agua no reserva nada:
-    // se endurece y ya. Reservarlo dejaba un turno de mas que el jar no tiene, medido en `hormigon`.
-    if (reshapes::concreteFor(*block).has_value() && reshapes::touchesWater(world, x, y, z)) {
+    // parity: only `ConcretePowderBlock.updateShape` short-circuits, and it is super that books the
+    // fall. `onPlace` is `FallingBlock`'s own and books powder that water has already reached.
+    if (asked == Asked::updateShape && reshapes::concreteFor(*block).has_value() &&
+        reshapes::touchesWater(world, x, y, z)) {
         return;
     }
     world.scheduleBlockTick(x, y, z, *block, kFallDelayTicks);
@@ -176,7 +176,8 @@ entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32
     return fallFrom(world, x, y, z, allocateEntityId);
 }
 
-Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& canSurvive) {
+Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& canSurvive,
+             const OnArrival& onArrival) {
     entity.velocityY -= kGravity;
     entity.velocityY *= kAirDrag;
     // parity: `Entity.move`, which is real collision and not a question about the block below. A
@@ -233,8 +234,16 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
         std::int32_t landed = entity.objectData;
         if (const std::optional<std::int32_t> set =
                 reshapes::landedConcrete(world, blockX, blockY, blockZ, entity.objectData, *at);
-            set.has_value() && world.setBlockState(blockX, blockY, blockZ, *set)) {
-            landed = *set;
+            set.has_value()) {
+            // parity: `onLand` runs **after** the entity's own `setBlock`, so the powder is really
+            // there for a moment and gets the neighbour update, and the `onPlace` of that update is
+            // what leaves the fall turn the jar keeps on the square.
+            if (onArrival) {
+                onArrival(entity.objectData, blockX, blockY, blockZ);
+            }
+            if (world.setBlockState(blockX, blockY, blockZ, *set)) {
+                landed = *set;
+            }
         }
         return Landing{.placed = BlockChange{.x = blockX, .y = blockY, .z = blockZ, .stateId = landed}};
     }

@@ -152,8 +152,19 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
         }
         return std::nullopt;
     }
-    if (leafDistance(world, x, y, z) != distanceOf(stateId)) {
-        world.scheduleBlockTick(x, y, z, *block, 1);
+    // parity: sin direccion es el caso de `updateFromNeighbourShapes`, que aplica `updateShape`
+    // **una vez por cada lado**, y cada aplicacion puede reservar por su cuenta. Recontar la
+    // distancia una sola vez no es lo mismo: una hoja colocada a distancia 1 de su tronco no
+    // reservaba nada, y el jar reserva igualmente por los otros cinco lados, que son aire. Medido en
+    // `hojaturno`, donde el jar tiene los tres turnos en la primera foto y nosotros ninguno.
+    for (const BlockFace face : kUpdateShapeOrder) {
+        const std::int32_t fromNeighbour = distanceOf(stateAt(world, x + registry::stepX(face),
+                                                              y + registry::stepY(face), z + registry::stepZ(face))) +
+                                           1;
+        if (fromNeighbour != 1 || distanceOf(stateId) != fromNeighbour) {
+            world.scheduleBlockTick(x, y, z, *block, 1);
+            break;
+        }
     }
     return std::nullopt;
 }
@@ -270,7 +281,7 @@ struct Walk {
 /// Reshapes the block there, breaks it if nothing holds it, and follows on from what it held.
 void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std::int32_t y, std::int32_t z,
            BlockFace towards) {
-    fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z);
+    fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z, fallingBlocks::Asked::updateShape);
     bool changed = false;
     const std::optional<std::int32_t> before = walk.context.world.blockState(x, y, z);
     if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, towards); reshaped.has_value()) {
@@ -722,8 +733,8 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: `FallingBlock.onPlace` and its `updateShape`, which both do nothing but ask to be
     // looked at again in two ticks. The block that just arrived counts: sand put down in mid air
     // used to sit there for good, because only its neighbours were ever asked.
-    fallingBlocks::scheduleIfFalling(world, x, y, z);
-    fallingBlocks::scheduleIfFalling(world, x, y + 1, z);
+    fallingBlocks::scheduleIfFalling(world, x, y, z, fallingBlocks::Asked::onPlace);
+    fallingBlocks::scheduleIfFalling(world, x, y + 1, z, fallingBlocks::Asked::updateShape);
     // parity: `SnifferEggBlock.onPlace`, which asks for the first of its three turns as soon as the
     // egg is down. Re-scheduling keeps a delay already counting, so a neighbour moving nearby does
     // not put the egg back to the start.
@@ -794,7 +805,9 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it
     // just as much as a block somebody placed.
     redstoneComponents::watchFor(world, x, y, z);
-    redstoneComponents::watchOnPlace(world, x, y, z);
+    if (const std::optional<BlockChange> woke = redstoneComponents::watchOnPlace(world, x, y, z); woke.has_value()) {
+        reshaped(woke->stateId, woke->x, woke->y, woke->z);
+    }
     for (const BlockChange& change : settled) {
         redstoneComponents::watchFor(world, change.x, change.y, change.z);
     }
