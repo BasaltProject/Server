@@ -56,8 +56,11 @@ public:
     /// safe to hold after the player has left.
     void post(std::uint16_t packetId, std::vector<std::uint8_t> body, bool last = false);
 
-    /// Takes everything waiting. Called only on the listener's thread.
-    [[nodiscard]] std::vector<Item> drain();
+    /// Takes what is waiting, up to a budget of bytes, and leaves the rest for the next turn. A
+    /// join hands over every column of the world at once, and a client on a phone reads them far
+    /// better spread over a few turns than as one burst it has to hold whole before any of it is
+    /// worth anything. Called only on the listener's thread.
+    [[nodiscard]] std::vector<Item> drain(std::size_t maxBytes);
 
     void close();
 
