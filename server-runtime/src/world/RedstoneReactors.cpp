@@ -86,7 +86,13 @@ void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32
 /// opens from a signal reaching either end of it.
 void door(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
           std::int32_t stateId, const Properties& properties, std::int64_t gameTime, std::vector<BlockChange>& changes,
-          random::RandomSource& random) {
+          random::RandomSource& random, std::optional<std::int32_t> told) {
+    // parity: `if (!this.defaultBlockState().is(block) && ...)`, the first half of the condition. A
+    // door does not answer another door of its own kind, which is what keeps its two halves from
+    // setting each other off. The trapdoor and the fence gate carry no such guard.
+    if (told.has_value() && pathOf(*told) == pathOf(stateId)) {
+        return;
+    }
     const std::int32_t otherHalf = valueOf(properties, "half") == "lower" ? 1 : -1;
     const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0 ||
                         redstone::bestNeighbourSignal(world, worldName, x, y + otherHalf, z) > 0;
@@ -276,7 +282,8 @@ void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int
 }
 
 void react(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-           std::int64_t gameTime, bool tntExplodes, std::vector<BlockChange>& changes, random::RandomSource& random) {
+           std::int64_t gameTime, bool tntExplodes, std::vector<BlockChange>& changes, random::RandomSource& random,
+           std::optional<std::int32_t> told = std::nullopt) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -288,7 +295,7 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
 
     if (path.ends_with("_door") && properties.contains("half")) {
-        door(world, worldName, x, y, z, *stateId, properties, gameTime, changes, random);
+        door(world, worldName, x, y, z, *stateId, properties, gameTime, changes, random, told);
         return;
     }
     if (path.ends_with("_trapdoor") || path.ends_with("_fence_gate")) {
@@ -414,14 +421,14 @@ std::vector<BlockChange> placed(WorldState& world, const std::string_view worldN
 
 std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                                 std::int32_t z, std::int64_t gameTime, random::RandomSource& random,
-                                const bool tntExplodes, const bool itself) {
+                                const bool tntExplodes, const bool itself, const std::optional<std::int32_t> told) {
     std::vector<BlockChange> changes;
     if (itself) {
-        react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random);
+        react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random, told);
     }
     for (const BlockFace face : kUpdateOrder) {
         react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
-              gameTime, tntExplodes, changes, random);
+              gameTime, tntExplodes, changes, random, told);
     }
     return changes;
 }

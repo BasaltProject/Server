@@ -66,6 +66,13 @@ struct Fixture {
             write(buffer);
             packets.push_back(id);
         };
+        // The two a block's own effects take, bound the way the Java door binds them: the
+        // broadcaster asks the connection now rather than writing that edition's packet itself.
+        connection.sendBlockEvent = [this](std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t,
+                                           std::int32_t) { packets.push_back(play::BlockEventPacket::kId); };
+        connection.sendLevelEvent = [this](std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t) {
+            packets.push_back(play::LevelEventPacket::kId);
+        };
         player = std::make_unique<PlayerSession>(Uuid{1, 1}, "Steve", 1, std::move(connection));
         player->worldName = "world";
         registry.add(player.get());

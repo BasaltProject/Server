@@ -46,6 +46,14 @@ constexpr std::int32_t kDecayDistance = 7;
 constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
                                           BlockFace::South, BlockFace::West, BlockFace::East};
 
+/// The axis a facing property names, in the same numbering `registry::axisOf` uses.
+[[nodiscard]] std::int32_t axisOfName(std::string_view name) {
+    if (name == "up" || name == "down") {
+        return 1;
+    }
+    return name == "north" || name == "south" ? 2 : 0;
+}
+
 /// parity: `NeighborUpdater.UPDATE_ORDER`, the order in which the six squares around a change are
 /// told. It is not `Direction.values()`, and it decides who books first when two of them answer.
 constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
@@ -355,8 +363,14 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     scheduledBlocks::scheduleScaffolding(world, x, y, z);
     // A column is more than one block, so it reports through the caller rather than as one state.
     scheduledBlocks::scheduleBubbleColumn(world, x, y, z);
-    if (const std::optional<std::int32_t> tuned = noteBlocks::retune(world, x, y, z, *stateId); tuned.has_value()) {
-        return tuned;
+    // parity: `NoteBlock.updateShape` rewrites the instrument **only** when the news comes from above
+    // or below (`directionToNeighbour.getAxis() == Y`); from a side it keeps whatever it has. So a
+    // note block written with an instrument that does not match what it stands on keeps it until
+    // something over or under it moves. Measured in `ejedelaviso`.
+    if (!towards.has_value() || registry::axisOf(*towards) == 1) {
+        if (const std::optional<std::int32_t> tuned = noteBlocks::retune(world, x, y, z, *stateId); tuned.has_value()) {
+            return tuned;
+        }
     }
     // parity: `SnowyBlock.updateShape`, the white top grass wears while snow sits on it.
     if (const std::optional<std::int32_t> snowy = snowyBlocks::updated(world, x, y, z); snowy.has_value()) {
@@ -364,9 +378,17 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
             return snowy;
         }
     }
-    // parity: `RepeaterBlock.updateShape`, which rewrites `locked` from what the sides say.
-    if (const std::optional<std::int32_t> held = redstoneComponents::relock(world, x, y, z); held.has_value()) {
-        return held;
+    // parity: `RepeaterBlock.updateShape`, which rewrites `locked` from what the sides say, and only
+    // when the news comes from a **side**: `directionToNeighbour.getAxis() != FACING.getAxis()`. One
+    // written `locked` with nothing locking it keeps the lie until a side moves. Measured in
+    // `ejedelaviso`.
+    const std::map<std::string, std::string> diodeProperties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    const auto diodeFacing = diodeProperties.find("facing");
+    if (!towards.has_value() || diodeFacing == diodeProperties.end() ||
+        registry::axisOf(*towards) != axisOfName(diodeFacing->second)) {
+        if (const std::optional<std::int32_t> held = redstoneComponents::relock(world, x, y, z); held.has_value()) {
+            return held;
+        }
     }
     // parity: `TripWireHookBlock.updateShape`, which drops the hook **only** when the news comes from
     // the side it hangs on. From anywhere else it stays, which is why one put down in mid air by
@@ -784,19 +806,24 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (afterShapes) {
         afterShapes();
     }
-    std::deque<Position> reacting;
+    // Each square waiting to react remembers **who told it**, which one block reads: a door does not
+    // answer another door of its own kind.
+    std::deque<std::pair<Position, std::optional<std::int32_t>>> reacting;
     // parity: a block that changed is asked again, and so are the squares its own update reaches past
     // its six sides: a rail the one below, a sensor the one below, a rod or a hook the wall behind.
     // None feeds a signal that way; what it reaches is a neighbour left out of step. Every place
     // that collects what a reactor changed goes through here.
     const auto reactsAt = [&reacting](const BlockChange& change) {
-        reacting.push_back({change.x, change.y, change.z});
+        reacting.push_back({{change.x, change.y, change.z}, change.stateId});
         for (const registry::BlockFace also : redstone::alsoTells(change.stateId)) {
             reacting.push_back(
-                {change.x + registry::stepX(also), change.y + registry::stepY(also), change.z + registry::stepZ(also)});
+                {{change.x + registry::stepX(also), change.y + registry::stepY(also), change.z + registry::stepZ(also)},
+                 change.stateId});
         }
     };
-    reacting.push_back({x, y, z});
+    // parity: the square that changed tells with the block that **left** on the world's road and with
+    // the one that arrived on a command's, the same as every other notice.
+    reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z)});
     // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from
     // `affectNeighborsAfterRemoval`, plus `RedstoneTorchBlock.notifyNeighbors`, which tell the square
     // they feed **and its own neighbours**. The state that has just gone is what says where a
@@ -911,17 +938,17 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // order is the map's and `wireReach` is what works it out.
     for (const BlockChange& change : settled) {
         for (const std::array<std::int32_t, 3>& at : redstoneComponents::wireReach(change.x, change.y, change.z)) {
-            reacting.push_back({at[0], at[1], at[2]});
+            reacting.push_back({{at[0], at[1], at[2]}, std::nullopt});
         }
     }
     std::int32_t reacted = 0;
     while (!reacting.empty() && reacted < context.maxChainedUpdates) {
-        const Position at = reacting.front();
+        const auto [at, told] = reacting.front();
         reacting.pop_front();
         ++reacted;
         for (const BlockChange& change :
              redstoneReactors::update(world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random,
-                                      context.tntExplodes, false)) {
+                                      context.tntExplodes, false, told)) {
             reshaped(change.stateId, change.x, change.y, change.z);
             if (!change.effects.empty()) {
                 effects.push_back(change);

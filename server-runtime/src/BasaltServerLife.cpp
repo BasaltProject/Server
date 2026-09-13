@@ -7,8 +7,12 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
+#include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/text/Serializers.hpp>
@@ -41,6 +45,14 @@ constexpr std::int64_t kShutdownDrainTimeoutMillis = 5000;
 /// Generous on purpose: saving a large world legitimately takes a while, and cutting a save short is
 /// far worse than waiting for one.
 constexpr std::int64_t kShutdownWaitTimeoutMillis = 120000;
+
+/// parity: `Player.drop`, which lifts a thrown stack a tenth of a block and lets it fall in front
+/// of the eyes rather than at the feet.
+constexpr double kThrowEyeHeight = 1.5;
+constexpr double kThrowLift = 0.1;
+
+/// parity: `ItemEntity`'s own delay, so a dropped stack is not picked straight back up.
+constexpr std::int32_t kPickupDelay = 40;
 
 } // namespace
 
@@ -329,6 +341,25 @@ player::DamageContext BasaltServer::damageContext() {
     return context;
 }
 
+/// Tells the world that one more, or one fewer, is looking into that block: the lid of a chest,
+/// the state of a barrel, the sound and what a sculk sensor hears. A double chest counts as two,
+/// because a lid is per block entity.
+void BasaltServer::openersChanged(world::LoadedWorld& world, const bedrock::OpenWindow& window, const bool opened) {
+    player::OpenersContext context;
+    context.blocks = breakContext();
+    context.nextFloat = [] { return std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()); };
+    context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
+    const auto tell = [&](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+        const std::int32_t openers = opened ? world::containerOpeners::open(world.name(), x, y, z)
+                                            : world::containerOpeners::close(world.name(), x, y, z);
+        player::announceOpeners(context, world, x, y, z, window.block, openers);
+    };
+    tell(window.x, window.y, window.z);
+    if (window.second.has_value()) {
+        tell((*window.second)[0], (*window.second)[1], (*window.second)[2]);
+    }
+}
+
 void BasaltServer::startBedrockListener() {
     const config::BedrockSettings& settings = options_.compatibility.bedrock();
     if (!config_->bedrockEnabled) {
@@ -514,6 +545,125 @@ void BasaltServer::startBedrockListener() {
                 static_cast<void>(player::breakBlockFor(*session, *found->second, x, y, z, breakContext()));
             });
         };
+
+        // Putting a block down, where the world is. What the client says it holds is not asked:
+        // the slot is, and what is in it here is what goes down.
+        context.useOn =
+            [this](player::PlayerSession& player, const player::BlockHit& hit, const std::int32_t hotbarSlot,
+                   std::shared_ptr<bedrock::BedrockWindows> windows,
+                   std::function<void(const bedrock::OpenWindow&, std::vector<std::optional<storage::StoredItemStack>>)>
+                       opened) {
+                const wire::common::Uuid uuid = player.uuid();
+                worldRegistry_->scheduler().global().submit([this, uuid, hit, hotbarSlot, windows = std::move(windows),
+                                                             opened = std::move(opened)] {
+                    player::PlayerSession* session = playerRegistry_.get(uuid);
+                    if (session == nullptr) {
+                        return;
+                    }
+                    const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                    const auto found = worlds.find(session->worldName);
+                    if (found == worlds.end() || found->second == nullptr) {
+                        return;
+                    }
+                    // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it
+                    // considers what is held as something to place, and sneaking overrides that.
+                    if (!session->sneaking && windows != nullptr && opened) {
+                        if (std::optional<bedrock::OpenWindow> window =
+                                bedrock::windowFor(*found->second, hit.x, hit.y, hit.z);
+                            window.has_value()) {
+                            windows->nextContainerId =
+                                windows->nextContainerId >= bedrock::kMaxContainerId ? 1 : windows->nextContainerId + 1;
+                            window->containerId = windows->nextContainerId;
+                            windows->open = *window;
+                            opened(*window, bedrock::readWindow(*found->second, *window));
+                            openersChanged(*found->second, *window, true);
+                            return;
+                        }
+                    }
+                    const std::int32_t slot = player::PlayerInventory::kHotbarStart + hotbarSlot;
+                    const std::optional<storage::StoredItemStack> held = session->inventory.at(slot);
+                    if (!held.has_value()) {
+                        return;
+                    }
+                    const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+                        wire::common::Identifier::parse(held->id);
+                    if (!item.has_value()) {
+                        return;
+                    }
+                    player::PlaceContext placing;
+                    placing.blocks = breakContext();
+                    placing.sendInventory = [](const player::PlayerSession& who) {
+                        if (who.connection().sendInventoryAll) {
+                            who.connection().sendInventoryAll();
+                        }
+                    };
+                    static_cast<void>(
+                        player::placeBlockFor(*session, *found->second, hit, *item, slot, *held, placing));
+                });
+            };
+
+        // A window closing, which is the client's decision: whatever was being dragged goes back
+        // in the bag rather than staying in a window nobody is looking at.
+        context.closeWindow = [this](player::PlayerSession& player, std::shared_ptr<bedrock::BedrockWindows> windows) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, windows = std::move(windows)] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr || windows == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (windows->open.has_value() && found != worlds.end() && found->second != nullptr) {
+                    openersChanged(*found->second, *windows->open, false);
+                }
+                windows->open.reset();
+                if (windows->cursor.has_value()) {
+                    static_cast<void>(session->inventory.add(*windows->cursor));
+                    windows->cursor.reset();
+                    if (session->connection().sendInventoryAll) {
+                        session->connection().sendInventoryAll();
+                    }
+                }
+            });
+        };
+
+        // Tidying a bag, where the world is: a refused request is answered with the whole
+        // inventory, which is the same thing a Java click gets.
+        context.moveStacks =
+            [this](player::PlayerSession& player, wire::bedrock::BedrockStackRequest request,
+                   std::shared_ptr<bedrock::BedrockWindows> windows,
+                   std::function<void(bool, std::vector<wire::bedrock::BedrockResponseContainer>)> answer) {
+                const wire::common::Uuid uuid = player.uuid();
+                worldRegistry_->scheduler().global().submit([this, uuid, request = std::move(request),
+                                                             windows = std::move(windows), answer = std::move(answer)] {
+                    player::PlayerSession* session = playerRegistry_.get(uuid);
+                    if (session == nullptr) {
+                        return;
+                    }
+                    const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                    const auto found = worlds.find(session->worldName);
+                    std::function<void(const storage::StoredItemStack&)> drop;
+                    if (found != worlds.end() && found->second != nullptr) {
+                        drop = [this, session, world = found->second](const storage::StoredItemStack& stack) {
+                            const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+                                wire::common::Identifier::parse(stack.id);
+                            if (!item.has_value()) {
+                                return;
+                            }
+                            player::spawnDroppedItem(breakContext(), *world, *item, stack.count, session->x,
+                                                     session->y + kThrowEyeHeight, session->z, 0.0, kThrowLift, 0.0,
+                                                     kPickupDelay, stack.components);
+                        };
+                    }
+                    world::LoadedWorld* const where = found == worlds.end() ? nullptr : found->second;
+                    const bedrock::StackRequestAnswer applied =
+                        bedrock::applyStackRequest(*session, *windows, where, request, drop);
+                    answer(applied.accepted, applied.containers);
+                    if (!applied.accepted && session->connection().sendInventoryAll) {
+                        session->connection().sendInventoryAll();
+                    }
+                });
+            };
 
         // Hurting and healing are the same arithmetic on both editions, so both doors call the same
         // thing; what this adds is only getting onto the thread that owns the world and the player.

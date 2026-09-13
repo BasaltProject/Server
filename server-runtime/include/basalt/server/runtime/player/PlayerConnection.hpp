@@ -59,6 +59,20 @@ struct PlayerConnection {
                        const std::vector<world::BlockEffect>& effects)>
         broadcastEffects;
 
+    /// What a block told this player alone to do with it: the lid of a chest, the note of a note
+    /// block, the shove of a piston. parity: `Level.blockEvent`, whose two numbers mean whatever
+    /// the block says they mean, and which both editions read the same way.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, std::int32_t b0,
+                       std::int32_t b1)>
+        sendBlockEvent;
+
+    /// One of the numbered one-off effects, to this player alone. parity: `Level.levelEvent`.
+    ///
+    /// The numbers are Java's, and Bedrock's are its own: a connection that cannot translate one
+    /// leaves this unset rather than drawing the wrong thing.
+    std::function<void(std::int32_t type, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t data)>
+        sendLevelEvent;
+
     /// One block that changed, to this player alone. The caller decides who is watching; this only
     /// knows how to say it on the edition this connection speaks.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> sendBlockChange;

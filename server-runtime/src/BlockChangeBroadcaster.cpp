@@ -50,15 +50,6 @@ namespace reg = server::registry;
 
 using wire::common::Identifier;
 
-void sendTo(const std::vector<player::PlayerSession*>& watchers, std::int32_t packetId,
-            const std::function<void(wire::io::ByteBuffer&)>& write) {
-    for (const player::PlayerSession* player : watchers) {
-        if (player->connection().sendPlayPacket) {
-            player->connection().sendPlayPacket(packetId, write);
-        }
-    }
-}
-
 void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t x, std::int32_t y, std::int32_t z,
                std::int32_t stateId) {
     for (const player::PlayerSession* player : watchers) {
@@ -151,7 +142,6 @@ void BlockChangeBroadcaster::announceBlock(const std::vector<player::PlayerSessi
 void BlockChangeBroadcaster::sendEffects(const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                                          std::int32_t y, std::int32_t z, std::int32_t stateId,
                                          const std::vector<world::BlockEffect>& effects) const {
-    const play::BlockPos pos{x, y, z};
     for (const world::BlockEffect& effect : effects) {
         if (const auto* sound = std::get_if<world::blockEffect::Sound>(&effect); sound != nullptr) {
             const std::int64_t seed = nextSeed();
@@ -160,16 +150,17 @@ void BlockChangeBroadcaster::sendEffects(const std::vector<player::PlayerSession
                                      sound->pitch, seed);
             }
         } else if (const auto* event = std::get_if<world::blockEffect::Event>(&effect); event != nullptr) {
-            const play::BlockEventPacket packet{.pos = pos,
-                                                .b0 = static_cast<std::uint8_t>(event->b0),
-                                                .b1 = static_cast<std::uint8_t>(event->b1),
-                                                .blockId = reg::blockSupport::blockRegistryIdOf(stateId)};
-            sendTo(watchers, play::BlockEventPacket::kId,
-                   [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            for (const player::PlayerSession* player : watchers) {
+                if (player->connection().sendBlockEvent) {
+                    player->connection().sendBlockEvent(x, y, z, stateId, event->b0, event->b1);
+                }
+            }
         } else if (const auto* level = std::get_if<world::blockEffect::Effect>(&effect); level != nullptr) {
-            const play::LevelEventPacket packet{.event = level->type, .pos = pos, .data = level->data};
-            sendTo(watchers, play::LevelEventPacket::kId,
-                   [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            for (const player::PlayerSession* player : watchers) {
+                if (player->connection().sendLevelEvent) {
+                    player->connection().sendLevelEvent(level->type, x, y, z, level->data);
+                }
+            }
         }
     }
 }

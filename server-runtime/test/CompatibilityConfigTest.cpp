@@ -179,8 +179,8 @@ TEST_CASE("which bedrock versions may in, which is all of them unless somebody s
     CHECK_FALSE(defaults.bedrock().protocols.has_value());
     CHECK(defaults.bedrock().futureProtocols == basalt::wire::bedrock::BedrockFuturePolicy::Warn);
 
-    const CompatibilityConfig window =
-        compatibility("compat-bedrock-window", "[network.bedrock]\nprotocols = [2168]\nfuture-protocols = \"refuse\"\n");
+    const CompatibilityConfig window = compatibility(
+        "compat-bedrock-window", "[network.bedrock]\nprotocols = [2168]\nfuture-protocols = \"refuse\"\n");
     REQUIRE(window.bedrock().protocols.has_value());
     CHECK(window.bedrock().protocols->contains(2168));
     CHECK(window.bedrock().futureProtocols == basalt::wire::bedrock::BedrockFuturePolicy::Refuse);
@@ -189,7 +189,6 @@ TEST_CASE("which bedrock versions may in, which is all of them unless somebody s
         written("compat-bedrock-policy", "server.toml", "[network.bedrock]\nfuture-protocols = \"maybe\"\n"));
     REQUIRE_FALSE(badPolicy.has_value());
     CHECK(badPolicy.error().find("accept, warn or refuse") != std::string::npos);
-
 }
 
 TEST_CASE("a command nobody configured is a command with nothing changed") {

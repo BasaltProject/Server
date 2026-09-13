@@ -110,8 +110,7 @@ TEST_CASE("a click turns a dust cross into a dot and back") {
     // block's **first** state, and a dust's first state has all four sides up.
     REQUIRE(loaded.state.setBlockState(
         8, 64, 10,
-        stateOf("redstone_wire",
-                {{"north", "side"}, {"south", "side"}, {"east", "none"}, {"west", "none"}})));
+        stateOf("redstone_wire", {{"north", "side"}, {"south", "side"}, {"east", "none"}, {"west", "none"}})));
     CHECK_FALSE(blockInteractions::cycle(loaded.state, 8, 64, 10).has_value());
 }
 

@@ -592,8 +592,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
         return std::nullopt;
     }
     // parity: `canAttachTo` asks the neighbour for a full face on the side that looks back here.
-    const std::int32_t neighbour =
-        stateAt(world, x + offsetX(*towards), y + offsetY(*towards), z + offsetZ(*towards));
+    const std::int32_t neighbour = stateAt(world, x + offsetX(*towards), y + offsetY(*towards), z + offsetZ(*towards));
     if (registry::blockShapes::isFaceSturdy(neighbour, facing(*towards))) {
         return std::nullopt;
     }
@@ -603,9 +602,9 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
         const auto found = faces.find(std::string{nameOf(face)});
         return found != faces.end() && found->second == "true";
     });
-    const std::optional<std::int32_t> written =
-        anyLeft ? registry::blockStateDefinitions::stateIdOf(block, faces, stateId)
-                : std::optional{registry::blocks::air().stateId};
+    const std::optional<std::int32_t> written = anyLeft
+                                                    ? registry::blockStateDefinitions::stateIdOf(block, faces, stateId)
+                                                    : std::optional{registry::blocks::air().stateId};
     if (!written.has_value() || *written == stateId || !world.setBlockState(x, y, z, *written)) {
         return std::nullopt;
     }
@@ -617,8 +616,8 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 /// curtain of vines hang off a single block. `updateShape` recomputes every face, not just the one
 /// the news came from, and answers air when none is left.
 [[nodiscard]] std::optional<std::int32_t> vine(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                std::int32_t stateId, const wire::common::Identifier& block,
-                                                std::optional<registry::BlockFace> towards) {
+                                               std::int32_t stateId, const wire::common::Identifier& block,
+                                               std::optional<registry::BlockFace> towards) {
     // parity: from below `updateShape` hands the state straight back without looking at anything.
     if (towards == registry::BlockFace::Down) {
         return std::nullopt;
@@ -647,12 +646,11 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
         }
         side->second = holds ? "true" : "false";
     }
-    const bool anyLeft = std::ranges::any_of(faces, [](const auto& one) {
-        return one.second == "true" && one.first != "waterlogged";
-    });
-    const std::optional<std::int32_t> written =
-        anyLeft ? registry::blockStateDefinitions::stateIdOf(block, faces, stateId)
-                : std::optional{registry::blocks::air().stateId};
+    const bool anyLeft =
+        std::ranges::any_of(faces, [](const auto& one) { return one.second == "true" && one.first != "waterlogged"; });
+    const std::optional<std::int32_t> written = anyLeft
+                                                    ? registry::blockStateDefinitions::stateIdOf(block, faces, stateId)
+                                                    : std::optional{registry::blocks::air().stateId};
     if (!written.has_value() || *written == stateId || !world.setBlockState(x, y, z, *written)) {
         return std::nullopt;
     }

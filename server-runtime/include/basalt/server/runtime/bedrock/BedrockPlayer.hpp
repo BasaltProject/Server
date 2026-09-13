@@ -2,6 +2,8 @@
 
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
+#include <basalt/server/runtime/bedrock/BedrockStackRequests.hpp>
+#include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
@@ -92,6 +94,25 @@ public:
         /// `player/PlayerBlockBreak`; what happens here is only getting onto the right thread.
         std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z)> breakBlock;
 
+        /// Puts down whatever that slot holds, where the world is, unless the block that was
+        /// clicked opens a window of its own: then `opened` is called with it and nothing is
+        /// placed. The arithmetic of placing is the same on both editions and lives in
+        /// `player/PlayerBlockPlace`.
+        std::function<void(
+            player::PlayerSession&, const player::BlockHit&, std::int32_t hotbarSlot, std::shared_ptr<BedrockWindows>,
+            std::function<void(const OpenWindow&, std::vector<std::optional<storage::StoredItemStack>>)> opened)>
+            useOn;
+
+        /// Forgets the window this player had open, and puts back whatever they were dragging.
+        std::function<void(player::PlayerSession&, std::shared_ptr<BedrockWindows>)> closeWindow;
+
+        /// Moves stacks around this player's own windows, where the world is. The answer goes
+        /// back through the callback because it is the client's own request number that has to
+        /// come back to it, and by then the call is on another thread.
+        std::function<void(player::PlayerSession&, wire::bedrock::BedrockStackRequest, std::shared_ptr<BedrockWindows>,
+                           std::function<void(bool, std::vector<wire::bedrock::BedrockResponseContainer>)>)>
+            moveStacks;
+
         /// Every command this player may use, with the usage line `/help` would print for it.
         /// Bedrock refuses to send what is not in its own list, so a client that is told nothing
         /// can run nothing.
@@ -120,6 +141,15 @@ public:
     void command(std::string_view line) override;
 
     void blockAction(std::int32_t action, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face) override;
+
+    void useItemOn(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face, float clickX, float clickY,
+                   float clickZ, std::int32_t hotbarSlot) override;
+
+    void stackRequest(const wire::bedrock::BedrockStackRequest& request) override;
+
+    void setSneaking(bool sneaking) override;
+
+    void closeWindow(std::int32_t containerId) override;
 
     void tick() override;
 
@@ -170,6 +200,15 @@ private:
     /// too big to patch block by block both ask for.
     void sendColumn(std::int32_t chunkX, std::int32_t chunkZ);
 
+    /// Everything this player can be told, built once when they arrive. Its own file, because it
+    /// is the whole of the translation into that edition and nothing else.
+    [[nodiscard]] player::PlayerConnection buildConnection(const BedrockListener::Joining& joining);
+
+    /// Draws a block's window: the window itself, then everything in it. Static because it runs
+    /// where the world runs, and by then the player it was asked for may have left.
+    static void drawWindow(const std::shared_ptr<BedrockMailbox>& mailbox, int protocol, const OpenWindow& window,
+                           const std::vector<std::optional<storage::StoredItemStack>>& slots);
+
     /// One stack as the other edition carries it, or air when it has no such item.
     [[nodiscard]] wire::bedrock::BedrockItemStack stackFor(const std::optional<storage::StoredItemStack>& stack) const;
 
@@ -188,6 +227,9 @@ private:
     /// newest and another for everything below it.
     int protocol_ = 0;
     std::unique_ptr<player::PlayerSession> session_;
+    /// What this player is dragging and which block they have open. Shared because the world
+    /// thread is what moves both, and a call already on its way there outlives the player.
+    std::shared_ptr<BedrockWindows> windows_ = std::make_shared<BedrockWindows>();
     bool moved_ = false;
     /// Written by whoever opens a menu and read by the thread the answer arrives on, which are
     /// never the same one.
