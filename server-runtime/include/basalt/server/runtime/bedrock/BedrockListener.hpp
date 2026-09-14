@@ -134,6 +134,17 @@ public:
         /// is five times slower, so a player whose feet are never on the ground mines at a crawl.
         virtual void setStance(bool onGround, bool sprinting) = 0;
 
+        /// The client hit something. The number is that client's own, one more than the server's.
+        virtual void attack(std::uint64_t runtimeEntityId) = 0;
+
+        /// Which of the nine the client just switched to. What is in that slot is what everything
+        /// else reads as "what they are holding".
+        virtual void setHeldSlot(std::int32_t slot) = 0;
+
+        /// The client asked for its own bag. This edition does not open it by itself: it asks,
+        /// and a client whose ask goes unanswered never sees an inventory at all.
+        virtual void openOwnInventory() = 0;
+
         /// The client closed a window, by the number this server gave it.
         virtual void closeWindow(std::int32_t containerId) = 0;
 

@@ -139,11 +139,11 @@ void scheduleAroundWire(WorldState& world, std::string_view worldName, std::int3
 /// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, so one books
 /// a turn as soon as it is placed and a chain of them is otherwise a turn out of step.
 ///
-/// `ObserverBlock.onPlace` is the other hook, the only one that acts when it arrives powered: it
-/// switches off and tells what it feeds, without which a lamp behind it stayed lit for good.
-/// `removed` is what stood there before. Answers the change, output reach included.
-[[nodiscard]] std::optional<BlockChange> watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                      std::optional<std::int32_t> removed);
+/// `removed` is what stood there before: an observer written over an observer books nothing, the way
+/// `onPlace` does nothing for a block that did not change. One that arrives powered belongs to
+/// `neighbourUpdates::settleArrivedSignal`, which can also give the notice that goes with it.
+void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                  std::optional<std::int32_t> removed);
 
 /// parity: `ObserverBlock.updateShape`, which only fires for the block it faces: an observer
 /// watches one direction and ignores everything else that moves around it.

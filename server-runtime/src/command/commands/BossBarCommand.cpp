@@ -139,6 +139,26 @@ void BossBarCommand::build(const CommandNodeBuilder& root) const {
         return found;
     };
     const auto send = [](const player::PlayerSession& player, const play::BossEventPacket& packet) {
+        if (player.connection().showBossBar) {
+            if (const auto* add = std::get_if<play::BossEventPacket::Add>(&packet.operation); add != nullptr) {
+                player.connection().showBossBar(packet.id, add->name, add->progress, true);
+                return;
+            }
+            if (const auto* named = std::get_if<play::BossEventPacket::UpdateName>(&packet.operation);
+                named != nullptr) {
+                player.connection().showBossBar(packet.id, named->name, 1.0F, true);
+                return;
+            }
+            if (const auto* progress = std::get_if<play::BossEventPacket::UpdateProgress>(&packet.operation);
+                progress != nullptr) {
+                player.connection().showBossBar(packet.id, Component::empty(), progress->progress, true);
+                return;
+            }
+            if (std::holds_alternative<play::BossEventPacket::Remove>(packet.operation)) {
+                player.connection().showBossBar(packet.id, Component::empty(), 0.0F, false);
+            }
+            return;
+        }
         if (player.connection().sendPlayPacket) {
             player.connection().sendPlayPacket(play::BossEventPacket::kId,
                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });

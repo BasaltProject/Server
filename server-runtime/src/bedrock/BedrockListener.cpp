@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <set>
 #include <utility>
 
 namespace basalt::server::runtime::bedrock {
@@ -102,6 +103,9 @@ struct BedrockListener::Session {
     bool started = false;
     /// TEMPORARY: said once per client, not once per packet.
     bool saidBadInput = false;
+    /// Which kinds of packet this server has already been seen to ignore, so the log names each one
+    /// once rather than every tick.
+    std::set<std::uint16_t> unanswered;
 
     Session(RakSession& session, std::shared_ptr<const wire::bedrock::EcKeyPair> keys, std::string gameVersion,
             wire::bedrock::BedrockGate gate)
@@ -380,6 +384,34 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
+        if (packet == BedrockPacket::InventoryTransaction && entry.player) {
+            /// Zero interacts with the entity, one hits it.
+            constexpr std::int32_t kAttack = 1;
+
+            const auto use = wire::bedrock::readEntityUse(body, entry.connection.protocolVersion());
+            if (use.has_value() && use->action == kAttack) {
+                entry.player->attack(use->runtimeEntityId);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::MobEquipment && entry.player) {
+            const auto slot = wire::bedrock::readHeldSlot(body, entry.connection.protocolVersion());
+            if (slot.has_value()) {
+                entry.player->setHeldSlot(*slot);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::Interact && entry.player) {
+            /// What the client calls asking for its own bag. The others are mouse-overs and
+            /// vehicles, which this server settles without being told.
+            constexpr std::int32_t kOpenInventory = 6;
+
+            const auto interact = wire::bedrock::readInteract(body);
+            if (interact.has_value() && interact->action == kOpenInventory) {
+                entry.player->openOwnInventory();
+            }
+            return;
+        }
         if (packet == BedrockPacket::ContainerClose && entry.player) {
             const auto close = wire::bedrock::readContainerClose(body);
             if (close.has_value()) {
@@ -413,6 +445,17 @@ void BedrockListener::onConnect(RakSession& session) {
             if (text.has_value() && !text->message.empty()) {
                 entry.player->chat(text->message);
             }
+            return;
+        }
+        // Everything this server has no answer for, named once each. A client asks for far more
+        // than it is told, and which of those asks go unanswered is not something the reference
+        // implementation's own list can say: only a real client can.
+        if (entry.unanswered.insert(static_cast<std::uint16_t>(packet)).second) {
+            logger_.debug([packet] {
+                return "Nothing answers Bedrock " +
+                       std::string{wire::bedrock::bedrockPacketName(static_cast<std::uint16_t>(packet))} + " (" +
+                       std::to_string(static_cast<std::int32_t>(packet)) + ").";
+            });
         }
     });
 }

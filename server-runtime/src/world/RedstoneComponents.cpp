@@ -825,35 +825,25 @@ std::vector<BlockChange> relockAround(WorldState& world, const std::int32_t x, c
     return changes;
 }
 
-std::optional<BlockChange> watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                        const std::optional<std::int32_t> removed) {
+void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                  const std::optional<std::int32_t> removed) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || pathOf(*stateId) != "observer") {
-        return std::nullopt;
+        return;
     }
     // parity: `ObserverBlock.onPlace` opens with `!state.is(oldState.getBlock())`, so it answers a
     // block that changed and not a state that moved. An observer written over an observer runs none
     // of this, however its `facing` or its `powered` differ.
     if (removed.has_value() && pathOf(*removed) == pathOf(*stateId)) {
-        return std::nullopt;
+        return;
     }
+    // parity: an observer that arrives **powered** is `settleArrivedSignal`'s, which is where the
+    // notice it owes the square in front of it can be given. By the time the cascade gets here that
+    // one has already gone quiet, so only the booking below is left.
     if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
-        // parity: `ObserverBlock.onPlace` is the only hook that looks at arriving **powered**: it
-        // switches it off with `setBlock(..., 18)` and then runs `updateNeighborsInFront`. Flag 18
-        // carries the 16, so that write redraws no shapes; it only changes the state. The notice is
-        // the caller's half, and without it the lamp it was feeding never hears that it went out.
-        if (world.hasScheduledBlockTick(x, y, z, observer())) {
-            return std::nullopt;
-        }
-        const std::optional<std::int32_t> off =
-            registry::blockStateDefinitions::stateIdOf(observer(), {{"powered", "false"}}, *stateId);
-        if (!off.has_value() || !world.setBlockState(x, y, z, *off)) {
-            return std::nullopt;
-        }
-        return BlockChange{.x = x, .y = y, .z = z, .stateId = *off};
+        return;
     }
     world.scheduleBlockTick(x, y, z, observer(), kObserverDelay);
-    return std::nullopt;
 }
 
 void watchFor(WorldState& world, std::int32_t changedX, std::int32_t changedY, std::int32_t changedZ) {

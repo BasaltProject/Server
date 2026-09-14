@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/text/Component.hpp>
@@ -73,6 +74,11 @@ struct PlayerConnection {
     std::function<void(std::int32_t type, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t data)>
         sendLevelEvent;
 
+    /// A boss bar this player should see, by the id whoever raised it knows it under. An empty
+    /// title with a progress of zero takes it away again.
+    std::function<void(const wire::common::Uuid& id, const wire::text::Component& title, float progress, bool show)>
+        showBossBar;
+
     /// How hard the world is now. Both editions draw it in their own menu and neither reads the
     /// other's packet for it.
     std::function<void(std::int32_t difficulty, bool locked)> setDifficulty;
@@ -100,6 +106,9 @@ struct PlayerConnection {
     /// Somebody else's arm swinging, which is what makes a hit look like a hit. The client that
     /// swung animates itself, so this only ever carries somebody else's entity.
     std::function<void(std::int32_t entityId, bool offhand)> sendSwing;
+
+    /// The stars over something that just took a critical hit.
+    std::function<void(std::int32_t entityId)> showCriticalHit;
 
     /// A stack flying into whoever picked it up, by the two entities involved.
     std::function<void(std::int32_t itemEntityId, std::int32_t collectorEntityId)> sendPickupAnimation;

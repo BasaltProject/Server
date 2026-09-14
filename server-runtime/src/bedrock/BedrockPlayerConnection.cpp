@@ -413,6 +413,30 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         say(wire::bedrock::BedrockContainerData::FurnaceLitDuration, numbers->litDuration);
     };
 
+    connection.showBossBar = [this](const wire::common::Uuid& id, const Component& title, const float progress,
+                                    const bool show) {
+        // One entity id per bar, taken from the uuid: over here a bar belongs to something in the
+        // world rather than to an id of its own, and two bars may not share one.
+        const auto bossId = static_cast<std::int64_t>((id.high() ^ id.low()) | 1U);
+        wire::io::ByteBuffer body;
+        const bool drawn = shownBars_.contains(bossId);
+        if (!show) {
+            if (!drawn) {
+                return;
+            }
+            wire::bedrock::writeBossEvent(body, bossId, wire::bedrock::BedrockBossAction::Remove, "", 0.0F);
+            shownBars_.erase(bossId);
+        } else {
+            const std::string text = wire::text::toLegacyText(wire::text::resolveComponent(title, context_.lang));
+            wire::bedrock::writeBossEvent(body, bossId,
+                                          drawn ? wire::bedrock::BedrockBossAction::UpdatePercentage
+                                                : wire::bedrock::BedrockBossAction::Create,
+                                          text, progress);
+            shownBars_.insert(bossId);
+        }
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), body.toVector());
+    };
+
     connection.setDifficulty = [mailbox = joining.mailbox](const std::int32_t difficulty, bool) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeSetDifficulty(body, difficulty);
@@ -476,6 +500,12 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         // worse than drawing the one everybody expects.
         wire::io::ByteBuffer body;
         wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::SwingArm);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Animate), body.toVector());
+    };
+
+    connection.showCriticalHit = [mailbox = joining.mailbox](const std::int32_t entityId) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::CriticalHit);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Animate), body.toVector());
     };
 
