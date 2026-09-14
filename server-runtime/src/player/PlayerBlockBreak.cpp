@@ -334,11 +334,17 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         const play::LevelEventPacket effect{
             .event = play::LevelEventPacket::kParticlesDestroyBlock, .pos = pos, .data = *broken};
         for (const PlayerSession* other : watchers) {
-            if (other->entityId() == session->entityId() || !other->connection().sendPlayPacket) {
+            if (other->entityId() == session->entityId()) {
                 continue;
             }
-            other->connection().sendPlayPacket(play::LevelEventPacket::kId,
-                                               [&effect](wire::io::ByteBuffer& buffer) { effect.write(buffer); });
+            if (other->connection().sendLevelEvent) {
+                other->connection().sendLevelEvent(play::LevelEventPacket::kParticlesDestroyBlock, x, y, z, *broken);
+                continue;
+            }
+            if (other->connection().sendPlayPacket) {
+                other->connection().sendPlayPacket(play::LevelEventPacket::kId,
+                                                   [&effect](wire::io::ByteBuffer& buffer) { effect.write(buffer); });
+            }
         }
     }
     stopDigging(context);

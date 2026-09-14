@@ -35,6 +35,10 @@ inline constexpr std::size_t kMaxLineLength = 384;
 [[nodiscard]] wire::nbt::NbtCompound withText(const wire::nbt::NbtCompound& data, bool isFront,
                                               const std::vector<std::string>& lines);
 
+/// One face as plain lines run together, newline between them. What is stored is four components
+/// in json; what anything outside the protocol wants is the words.
+[[nodiscard]] std::string plainText(const wire::nbt::NbtCompound& data, bool front);
+
 /// Whether this sign refuses to be edited. parity: `SignBlockEntity.isWaxed`.
 [[nodiscard]] bool isWaxed(const wire::nbt::NbtCompound& data);
 

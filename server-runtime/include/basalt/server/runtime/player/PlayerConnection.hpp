@@ -73,6 +73,42 @@ struct PlayerConnection {
     std::function<void(std::int32_t type, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t data)>
         sendLevelEvent;
 
+    /// How hard the world is now. Both editions draw it in their own menu and neither reads the
+    /// other's packet for it.
+    std::function<void(std::int32_t difficulty, bool locked)> setDifficulty;
+
+    /// Who is riding what. Java says it as the whole list of passengers a vehicle carries; the
+    /// other edition says it one rider at a time, so the caller hands over the list and each
+    /// connection says it its own way. An empty list takes everybody off.
+    std::function<void(std::int32_t vehicleId, const std::vector<std::int32_t>& riders)> sendPassengers;
+
+    /// Opens the editor over a sign this player just put down. Java asks for it with a packet of
+    /// its own and so does the other edition, but neither reaches the other's client.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> openSignEditor;
+
+    /// A sign whose text changed, with both faces as plain lines. Java carries the whole block
+    /// entity in one shape and the other edition in another, so the caller hands over the text and
+    /// each connection says it the way its client reads it.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& front,
+                       const std::string& back, bool waxed)>
+        sendSignText;
+
+    /// Sends this player to another server, host and port. A connection that cannot be moved
+    /// leaves this unset and the command says so rather than pretending it worked.
+    std::function<void(const std::string& host, std::int32_t port)> transferTo;
+
+    /// Somebody else's arm swinging, which is what makes a hit look like a hit. The client that
+    /// swung animates itself, so this only ever carries somebody else's entity.
+    std::function<void(std::int32_t entityId, bool offhand)> sendSwing;
+
+    /// A stack flying into whoever picked it up, by the two entities involved.
+    std::function<void(std::int32_t itemEntityId, std::int32_t collectorEntityId)> sendPickupAnimation;
+
+    /// The flash and the bang of an explosion. Java has a packet of its own for it and does not
+    /// set this; the other edition draws it off a numbered effect, so it is asked separately
+    /// rather than translated from a packet that has no counterpart.
+    std::function<void(double x, double y, double z)> sendExplosion;
+
     /// One block that changed, to this player alone. The caller decides who is watching; this only
     /// knows how to say it on the edition this connection speaks.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> sendBlockChange;

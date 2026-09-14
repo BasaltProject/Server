@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/ui/PlayerUi.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
@@ -29,6 +30,23 @@ class LoadedWorld;
 }
 
 namespace basalt::server::runtime::bedrock {
+
+/// One thing in the world that is not a player: a mob, or a stack on the floor. Filled in where the
+/// world runs and read on the door's thread, which is why it travels behind a lock.
+struct Seen {
+    std::int32_t entityId = 0;
+    /// What the client draws it as, in Bedrock's own names. Empty for a dropped stack.
+    std::string type;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    float yaw = 0.0F;
+    float pitch = 0.0F;
+    float width = 0.6F;
+    float height = 1.8F;
+    /// What is lying there, for a stack. Nothing for anything alive.
+    std::optional<storage::StoredItemStack> stack;
+};
 
 /// A player who arrived through the Bedrock door: the same `PlayerSession` in the same registry, so
 /// anything asking who is online finds them. Only how text reaches them differs, which lives in the
@@ -93,6 +111,25 @@ public:
         /// everything that hears it are the same on both editions and live in
         /// `player/PlayerBlockBreak`; what happens here is only getting onto the right thread.
         std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z)> breakBlock;
+        /// What the files say a sidebar, a tab list and a boss bar should hold. The same renderer
+        /// the Java door uses: only where the drawing ends up is different.
+        std::function<config::UiConfigs()> uiConfigs;
+        const wire::common::placeholder::PlaceholderRegistry* placeholders = nullptr;
+
+        /// What the world holds around this player, taken where the world is and handed back on
+        /// that same thread. A Bedrock client is told about mobs and dropped stacks by packet, so a
+        /// server that never looks draws an empty world with nothing on the floor.
+        std::function<void(const player::PlayerSession&, std::function<void(std::vector<Seen>)>)> lookAround;
+        /// Picks up whatever this player is standing on, where the world is. Java does the same
+        /// thing once per tick from its own session; a Bedrock player has none, and without this
+        /// nothing they break ever reaches their bag.
+        std::function<void(player::PlayerSession&)> pickupItems;
+        /// How fast this player takes the block at those coordinates apart, answered where the
+        /// world is. Bedrock is told the pace rather than deciding it, which is what draws the
+        /// cracks: a client that is told nothing digs at a guess of its own and shows no cracks.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::function<void(float perTick)> answer)>
+            digSpeed;
 
         /// Puts down whatever that slot holds, where the world is, unless the block that was
         /// clicked opens a window of its own: then `opened` is called with it and nothing is
@@ -148,6 +185,7 @@ public:
     void stackRequest(const wire::bedrock::BedrockStackRequest& request) override;
 
     void setSneaking(bool sneaking) override;
+    void setStance(bool onGround, bool sprinting) override;
 
     void closeWindow(std::int32_t containerId) override;
 
@@ -165,10 +203,27 @@ private:
         double z = 0.0;
         float yaw = 0.0F;
         float pitch = 0.0F;
+        /// What they are holding, so a sword that changes hands is drawn changing hands.
+        std::string held;
+        /// And what they are wearing, as the four ids run together: cheaper to compare than four
+        /// stacks, and the only thing this needs to know is whether it changed.
+        std::string worn;
     };
 
     /// Draws whoever arrived, moves whoever moved and takes away whoever left.
     void syncOthers();
+
+    /// The same, for what is not a player: mobs and the stacks on the floor.
+    void syncSurroundings();
+
+    /// The sidebar, drawn whole: over here a line is a fake player with a number beside it.
+    void drawSidebar(const std::string& title, const std::vector<std::string>& lines);
+
+    void clearSidebar();
+
+    /// What this player's hands may do and whether the world will take a change from them. Sent
+    /// together because the client reads them as one answer, and again whenever the mode changes.
+    void sendAbilities();
 
     /// Asks the world for the columns around this player that it has not sent yet, and says where
     /// to expect them. `done` runs once they are all on their way. False when there is no world to
@@ -188,6 +243,10 @@ private:
 
     /// A line for everyone on the server, whichever edition they are on.
     void announce(const wire::text::Component& message) const;
+
+    /// The same, and a line on the console with it: what an operator watches for rather than what a
+    /// player says.
+    void announceAndSay(const wire::text::Component& message) const;
 
     /// The form this player is looking at: which button is which slot, and who to tell.
     struct OpenForm {
@@ -241,6 +300,27 @@ private:
     /// receiver may not be in, so they carry it rather than assuming the overworld.
     wire::bedrock::BedrockDimension dimension_ = wire::bedrock::BedrockDimension::Overworld;
     std::unordered_map<wire::common::Uuid, Other> others_;
+
+    /// The last look the world took, and the lock it crosses threads behind. Shared rather than
+    /// owned: the answer comes back on another thread, and by then this player may be gone.
+    struct Surroundings {
+        std::mutex lock;
+        std::vector<Seen> latest;
+        bool fresh = false;
+    };
+
+    /// The sidebar and the boss bar, drawn by the same renderer the other door uses. Absent when
+    /// this build was handed no files to draw from.
+    std::unique_ptr<ui::PlayerUi> ui_;
+    std::int64_t uiTick_ = 0;
+    bool bossBarShown_ = false;
+    /// What the sidebar is showing right now, line by line, so only what changed goes out.
+    std::vector<std::string> sidebarShown_;
+    std::optional<std::string> sidebarTitle_;
+
+    std::shared_ptr<Surroundings> surroundings_ = std::make_shared<Surroundings>();
+    /// What this client has already been shown, by entity id. The door's thread owns it.
+    std::unordered_map<std::int32_t, Seen> shown_;
     /// Which columns this client already has, so walking sends only what is new. A column that
     /// falls out of range is forgotten, which is what makes coming back send it again.
     std::set<std::pair<std::int32_t, std::int32_t>> columns_;

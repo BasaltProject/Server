@@ -2,6 +2,7 @@
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
 #include <chrono>
+#include <cstdlib>
 #include <utility>
 
 namespace basalt::server::runtime::bedrock {
@@ -99,6 +100,8 @@ struct BedrockListener::Session {
     std::unique_ptr<BedrockListener::Player> player;
     wire::bedrock::LoginRequest login;
     bool started = false;
+    /// TEMPORARY: said once per client, not once per packet.
+    bool saidBadInput = false;
 
     Session(RakSession& session, std::shared_ptr<const wire::bedrock::EcKeyPair> keys, std::string gameVersion,
             wire::bedrock::BedrockGate gate)
@@ -109,6 +112,11 @@ void BedrockMailbox::post(const std::uint16_t packetId, std::vector<std::uint8_t
     const std::lock_guard<std::mutex> guard{lock_};
     if (!open_) {
         return;
+    }
+    if (last) {
+        // Ahead of everything still waiting, and the drain is bounded: a goodbye queued behind a
+        // world's worth of columns would take several turns to reach, and there are none left.
+        items_.clear();
     }
     items_.push_back(Item{packetId, std::move(body), last});
     if (last) {
@@ -225,12 +233,25 @@ std::string BedrockListener::welcome() const {
     return "Bedrock on UDP port " + std::to_string(port()) + " (" + gameVersion_ + ", protocol " + protocols + ")";
 }
 
+void BedrockListener::closeDoor() { accepting_.store(false); }
+
 void BedrockListener::stop() {
     if (!running_.exchange(false)) {
         return;
     }
     if (thread_.joinable()) {
         thread_.join();
+    }
+    // One last turn of the post, now that nobody else can touch a session: whoever was told the
+    // server is closing was told it after the thread had stopped, and their goodbye is still here.
+    for (const auto& [peer, session] : sessions_) {
+        deliverMail(*session);
+    }
+    // And one turn of the socket to put it on the wire. Everything above only queues: the bytes of
+    // a session reach the network inside the poll, and the thread that was doing the polling is the
+    // one that just stopped.
+    if (server_ != nullptr) {
+        server_->poll(nowMillis(), 0);
     }
     sessions_.clear();
     server_.reset();
@@ -244,8 +265,11 @@ void BedrockListener::run() {
     while (running_.load()) {
         // Before the poll rather than after it: what the poll flushes is what is queued now, so a
         // line left by another thread goes out on this turn instead of the next.
+        const bool open = accepting_.load();
         for (const auto& [peer, session] : sessions_) {
-            if (session->player != nullptr) {
+            // Once the door is closed the server is saving these same players: the post keeps
+            // running so their goodbye reaches them, but nothing here touches them any more.
+            if (session->player != nullptr && open) {
                 session->player->tick();
             }
             deliverMail(*session);
@@ -255,6 +279,10 @@ void BedrockListener::run() {
 }
 
 void BedrockListener::onConnect(RakSession& session) {
+    // Shutting down. Letting one in here means a player who joins mid-save and is never saved.
+    if (!accepting_.load()) {
+        return;
+    }
     auto owned = std::make_unique<Session>(session, keys_, gameVersion_, options_.gate);
     Session& entry = *owned;
     sessions_.emplace(session.peer(), std::move(owned));
@@ -293,11 +321,31 @@ void BedrockListener::onConnect(RakSession& session) {
         }
         if (packet == BedrockPacket::PlayerAuthInput && entry.player) {
             const auto input = wire::bedrock::readPlayerAuthInput(body, entry.connection.protocolVersion());
+            // TEMPORARY: an input this server cannot read is a player who never moves, never digs
+            // and never places anything, and nothing else in the log says so.
+            if (!input.has_value() && !entry.saidBadInput) {
+                entry.saidBadInput = true;
+                logger_.warn([&entry] {
+                    return "Could not read player_auth_input from a client on protocol " +
+                           std::to_string(entry.connection.protocolVersion()) + ".";
+                });
+            }
             if (input.has_value()) {
                 // Before the click, because it is what decides what the click means.
                 entry.player->setSneaking(input->sneaking);
+                entry.player->setStance(input->onGround, input->sprinting);
                 // Zero is a click on a block; one is a click on the air and two is breaking, and
                 // neither of those puts anything down.
+                // TEMPORARY: what the client says it did with what it holds, which is the only way
+                // to tell a placement this server refuses from one it never heard.
+                if (input->itemUse.has_value()) {
+                    logger_.debug([&input] {
+                        return "item use " + std::to_string(input->itemUse->action) + " at " +
+                               std::to_string(input->itemUse->x) + ", " + std::to_string(input->itemUse->y) + ", " +
+                               std::to_string(input->itemUse->z) + " face " + std::to_string(input->itemUse->face) +
+                               " slot " + std::to_string(input->itemUse->hotbarSlot);
+                    });
+                }
                 if (input->itemUse.has_value() && input->itemUse->action == 0) {
                     entry.player->useItemOn(input->itemUse->x, input->itemUse->y, input->itemUse->z,
                                             input->itemUse->face, input->itemUse->clickX, input->itemUse->clickY,
@@ -318,6 +366,12 @@ void BedrockListener::onConnect(RakSession& session) {
                     entry.player->stackRequest(*input->stackRequest);
                 }
                 for (const wire::bedrock::BedrockBlockAction& action : input->blockActions) {
+                    // TEMPORARY: what the client actually asks for when somebody digs, which is the
+                    // only way to tell a break this server refuses from one it never heard.
+                    logger_.debug([&action] {
+                        return "block action " + std::to_string(action.action) + " at " + std::to_string(action.x) +
+                               ", " + std::to_string(action.y) + ", " + std::to_string(action.z);
+                    });
                     entry.player->blockAction(action.action, action.x, action.y, action.z, action.face);
                 }
                 entry.player->move(static_cast<double>(input->x),
@@ -395,6 +449,16 @@ void BedrockListener::onReady(Session& session) {
     }
     session.started = true;
 
+    // TEMPORARY, to find the one a real client refuses: `BASALT_BEDROCK_DROP=items` leaves that one
+    // out and sends the other four. One missing is a burst a client can still make sense of; five
+    // missing is not a test, which is what the last round of this measured by mistake.
+    const char* const dropped = std::getenv("BASALT_BEDROCK_DROP");
+    const std::string drop = dropped == nullptr ? std::string{} : std::string{dropped};
+    const auto dropping = [&drop](const std::string_view what) { return drop.find(what) != std::string::npos; };
+    if (!drop.empty()) {
+        logger_.warn([&drop] { return "Leaving out of the Bedrock join: " + drop; });
+    }
+
     // How big each piece of the burst is, which is what says whether a client that never answers
     // is choking on one packet's contents or on the size of it.
     const auto note = [this](const std::string_view what, const std::size_t bytes) {
@@ -403,7 +467,16 @@ void BedrockListener::onReady(Session& session) {
         });
     };
 
+    const wire::common::Uuid uuid = uuidOf(session.login.xuid.empty() ? session.login.name : session.login.xuid);
+    const Spawn spawn = hooks_.spawn ? hooks_.spawn(uuid) : Spawn{};
+
     wire::bedrock::StartGameInfo info;
+    info.x = static_cast<float>(spawn.x);
+    info.y = static_cast<float>(spawn.y);
+    info.z = static_cast<float>(spawn.z);
+    info.yaw = spawn.yaw;
+    info.pitch = spawn.pitch;
+    info.playerGameType = spawn.gamemode;
     // The client is told where its eyes are, not its feet, which is the same offset it reports
     // back on every movement.
     info.y += wire::bedrock::kPlayerEyeHeight;
@@ -419,31 +492,58 @@ void BedrockListener::onReady(Session& session) {
     // What a client is told about the world before it is told it is in it. A real client reads
     // start_game, finds it knows nothing about what lives here, and leaves without a word.
     body.clear();
-    wire::bedrock::writeBiomeDefinitionList(body);
-    session.connection.sendPacket(BedrockPacket::BiomeDefinitionList, body.readable());
-    note("biomes", body.readableBytes());
+    if (!dropping("biomes")) {
+        wire::bedrock::writeBiomeDefinitionList(body);
+        session.connection.sendPacket(BedrockPacket::BiomeDefinitionList, body.readable());
+        note("biomes", body.readableBytes());
+    }
 
     // Which item is which number, said by the server rather than agreed by version. It goes before
     // anything that could carry an item, which is everything after this point.
     body.clear();
-    wire::bedrock::writeItemComponent(body);
-    session.connection.sendPacket(BedrockPacket::ItemComponent, body.readable());
-    note("items", body.readableBytes());
+    if (!dropping("items")) {
+        wire::bedrock::writeItemComponent(body);
+        session.connection.sendPacket(BedrockPacket::ItemComponent, body.readable());
+        note("items", body.readableBytes());
+    }
 
     body.clear();
-    wire::bedrock::writeAvailableEntityIdentifiers(body);
-    session.connection.sendPacket(BedrockPacket::AvailableEntityIdentifiers, body.readable());
-    note("entities", body.readableBytes());
+    if (!dropping("entities")) {
+        wire::bedrock::writeAvailableEntityIdentifiers(body);
+        session.connection.sendPacket(BedrockPacket::AvailableEntityIdentifiers, body.readable());
+        note("entities", body.readableBytes());
+    }
 
     body.clear();
-    wire::bedrock::writeCreativeContent(body, session.connection.protocolVersion());
-    session.connection.sendPacket(BedrockPacket::CreativeContent, body.readable());
-    note("creative", body.readableBytes());
+    if (!dropping("creative")) {
+        // TEMPORARY: `BASALT_BEDROCK_CREATIVE=n` offers only the first n items, which is how to ask
+        // a client which entry it refuses when the packet is otherwise well formed.
+        const char* const most = std::getenv("BASALT_BEDROCK_CREATIVE");
+        const std::size_t offered = most == nullptr ? SIZE_MAX : static_cast<std::size_t>(std::atoll(most));
+        wire::bedrock::writeCreativeContent(body, session.connection.protocolVersion(), offered);
+        session.connection.sendPacket(BedrockPacket::CreativeContent, body.readable());
+        note("creative", body.readableBytes());
+    }
+
+    // The handful of rules that stop the client acting where this server already does.
+    body.clear();
+    wire::bedrock::writeGameRulesChanged(body, session.connection.protocolVersion());
+    session.connection.sendPacket(BedrockPacket::GameRulesChanged, body.readable());
+    note("gamerules", body.readableBytes());
+
+    // The recipe book, empty for now. The inventory screen is built around it, and a client that
+    // was never sent one has nothing to open.
+    body.clear();
+    wire::bedrock::writeCraftingData(body);
+    session.connection.sendPacket(BedrockPacket::CraftingData, body.readable());
+    note("recipes", body.readableBytes());
 
     body.clear();
-    wire::bedrock::writeSetCommandsEnabled(body, true);
-    session.connection.sendPacket(BedrockPacket::SetCommandsEnabled, body.readable());
-    note("commands", body.readableBytes());
+    if (!dropping("commands")) {
+        wire::bedrock::writeSetCommandsEnabled(body, true);
+        session.connection.sendPacket(BedrockPacket::SetCommandsEnabled, body.readable());
+        note("commands", body.readableBytes());
+    }
 
     body.clear();
     wire::bedrock::writeChunkRadiusUpdated(body, kInitialRadius);
@@ -468,7 +568,7 @@ void BedrockListener::onReady(Session& session) {
     joining.gamertag = session.login.name;
     joining.name = prefixedName(session.login.name);
     joining.xuid = session.login.xuid;
-    joining.uuid = uuidOf(session.login.xuid.empty() ? session.login.name : session.login.xuid);
+    joining.uuid = uuid;
     joining.address = session.transport.peer().toString();
     joining.authenticated = session.login.authenticated;
     joining.protocol = session.connection.protocolVersion();

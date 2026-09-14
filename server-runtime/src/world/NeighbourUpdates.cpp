@@ -839,6 +839,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: the square that changed tells with the block that **left** on the world's road and with
     // the one that arrived on a command's, the same as every other notice.
     reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z)});
+    // parity: the first of the two calls in `ObserverBlock.updateNeighborsInFront` is
+    // `neighborChanged(front)`, so the square it feeds hears it directly and books its own turn.
+    if (woke.has_value()) {
+        for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(woke->stateId, x, y, z)) {
+            reacting.push_back({{at.x, at.y, at.z}, woke->stateId});
+        }
+    }
     // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from
     // `affectNeighborsAfterRemoval`, plus `RedstoneTorchBlock.notifyNeighbors`, which tell the square
     // they feed **and its own neighbours**. The state that has just gone is what says where a

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
@@ -55,14 +56,9 @@ using wire::protocol::play::SoundSource;
 void sendBlockUpdates(const std::vector<PlayerSession*>& watchers, const std::vector<world::BlockChange>& changes) {
     for (const world::BlockChange& change : changes) {
         for (PlayerSession* player : watchers) {
-            if (!player->connection().sendPlayPacket) {
-                continue;
-            }
-            player->connection().sendPlayPacket(ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                ClientboundBlockUpdatePacket{.pos = BlockPos{change.x, change.y, change.z},
-                                             .blockStateId = change.stateId}
-                    .write(buffer);
-            });
+            // Through the shared one: water finding its level, a crop growing or a fire spreading
+            // is a block change like any other, and only one of the two editions was being told.
+            player::sendBlockChangeTo(*player, change.x, change.y, change.z, change.stateId);
         }
     }
 }
@@ -648,6 +644,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         }
         sendBlockUpdates(watchers, {world::BlockChange{.x = x, .y = y, .z = z, .stateId = released->stateId}});
         for (PlayerSession* player : watchers) {
+            if (player->connection().playSound) {
+                player->connection().playSound(released->sound, x + 0.5, y + 0.5, z + 0.5, 1.0F, 1.0F);
+                continue;
+            }
             if (!player->connection().sendPlayPacket) {
                 continue;
             }

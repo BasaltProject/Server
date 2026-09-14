@@ -130,6 +130,10 @@ public:
         /// one against it.
         virtual void setSneaking(bool sneaking) = 0;
 
+        /// Whether they are standing on something and whether they are running. Digging in the air
+        /// is five times slower, so a player whose feet are never on the ground mines at a crawl.
+        virtual void setStance(bool onGround, bool sprinting) = 0;
+
         /// The client closed a window, by the number this server gave it.
         virtual void closeWindow(std::int32_t containerId) = 0;
 
@@ -151,8 +155,22 @@ public:
     };
 
     /// What the listener needs of the server, without needing the server.
+    /// Where somebody starts, answered before the world is described to them. `start_game` names a
+    /// position, and a client puts its player there: told the origin and corrected a moment later,
+    /// it stays where it was first put, which is the same place every time.
+    struct Spawn {
+        double x = 0.0;
+        double y = 64.0;
+        double z = 0.0;
+        float yaw = 0.0F;
+        float pitch = 0.0F;
+        std::int32_t gamemode = 0;
+    };
+
     struct Hooks {
         std::function<Status()> status;
+        /// Asked once per join, on the door's thread, before anything is sent.
+        std::function<Spawn(const wire::common::Uuid&)> spawn;
         /// Makes a player out of a client that got in. Unset, or answering nothing, leaves the door
         /// open and the client alone: it sees a world and nobody sees it.
         std::function<std::unique_ptr<Player>(const Joining&)> join;
@@ -167,6 +185,10 @@ public:
     /// Binds and starts the thread. False when the port was taken, which is said in the log and is
     /// never fatal: a server without its Bedrock door is still a server.
     [[nodiscard]] bool start();
+
+    /// Turns away anybody new while the rest of the server winds down, without stopping the thread
+    /// that is still carrying goodbyes to the clients already in. `stop` is what ends it.
+    void closeDoor();
 
     void stop();
 
@@ -205,6 +227,7 @@ private:
     std::unique_ptr<wire::bedrock::RakServer> server_;
     std::unordered_map<wire::io::UdpEndpoint, std::unique_ptr<Session>> sessions_;
     std::atomic<bool> running_{false};
+    std::atomic<bool> accepting_{true};
     std::jthread thread_;
 };
 

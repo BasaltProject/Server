@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
+#include <basalt/server/runtime/player/PlayerDigSpeed.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -102,32 +103,11 @@ bool BlockInteractionHandler::eyesInWater() const {
 
 float BlockInteractionHandler::destroyProgressPerTick(const Identifier& block,
                                                       const reg::BlockHardness* hardness) const {
-    if (hardness == nullptr || hardness->isUnbreakable()) {
+    const PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
         return 0.0F;
     }
-    const PlayerSession* session = owner_->playerSession();
-    const std::optional<storage::StoredItemStack> held =
-        session == nullptr ? std::nullopt : session->inventory.heldItem();
-    const std::optional<Identifier> heldItem = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    const auto amplifierOf = [session](const Identifier& effect) {
-        if (session == nullptr) {
-            return -1;
-        }
-        const auto found = session->effects.find(effect);
-        return found == session->effects.end() ? -1 : found->second.amplifier;
-    };
-    const reg::itemTools::DigConditions conditions{
-        .efficiencyLevel = held.has_value() ? player::enchantmentLevel(*held, Identifier::vanilla("efficiency")) : 0,
-        .hasteAmplifier = amplifierOf(world::mobEffects::haste()),
-        .miningFatigueAmplifier = amplifierOf(world::mobEffects::miningFatigue()),
-        .underwater = eyesInWater(),
-        .inAir = session != nullptr && !session->onGround};
-    const world::realBlockTags::TagMembers* tags = owner_->options().blockTags;
-    return reg::itemTools::destroyProgressPerTick(
-        heldItem.has_value() ? &*heldItem : nullptr, block, hardness->destroyTime, hardness->requiresCorrectTool,
-        conditions, [tags](std::string_view tag, const Identifier& tagged) {
-            return tags != nullptr && world::realBlockTags::contains(*tags, tag, tagged);
-        });
+    return player::destroyProgressPerTickFor(*session, block, hardness, owner_->options().blockTags, eyesInWater());
 }
 
 bool BlockInteractionHandler::breaksInOneTick(const Identifier* block, const reg::BlockHardness* hardness) const {
@@ -270,11 +250,17 @@ void BlockInteractionHandler::handleSwing(std::int32_t hand) {
                                      .action = hand == kOffhand ? play::AnimatePacket::kSwingOffHand
                                                                 : play::AnimatePacket::kSwingMainHand};
     for (const PlayerSession* other : owner_->playersInSameWorld()) {
-        if (other->entityId() == session->entityId() || !other->connection().sendPlayPacket) {
+        if (other->entityId() == session->entityId()) {
             continue;
         }
-        other->connection().sendPlayPacket(play::AnimatePacket::kId,
-                                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        if (other->connection().sendSwing) {
+            other->connection().sendSwing(session->entityId(), hand == kOffhand);
+            continue;
+        }
+        if (other->connection().sendPlayPacket) {
+            other->connection().sendPlayPacket(play::AnimatePacket::kId,
+                                               [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
     }
 }
 

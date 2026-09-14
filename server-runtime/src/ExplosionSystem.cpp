@@ -93,6 +93,9 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
             play::ExplosionParticle{
                 .particleId = particleId("smoke"), .scaling = play::ExplodePacket::kSmokeScaling, .speed = 1.0F}}};
     for (const player::PlayerSession* player : watchers) {
+        if (player->connection().sendExplosion) {
+            player->connection().sendExplosion(x, y, z);
+        }
         if (player->connection().sendPlayPacket) {
             player->connection().sendPlayPacket(play::ExplodePacket::kId,
                                                 [&explode](wire::io::ByteBuffer& buffer) { explode.write(buffer); });

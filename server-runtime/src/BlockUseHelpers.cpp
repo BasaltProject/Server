@@ -118,7 +118,16 @@ void BlockInteractionHandler::broadcastSound(const BlockPos& pos, const std::str
     owner_->sendPlayPacket(play::SoundPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     const PlayerSession* session = owner_->playerSession();
     for (const PlayerSession* other : owner_->playersInSameWorld()) {
-        if ((session != nullptr && other->entityId() == session->entityId()) || !other->connection().sendPlayPacket) {
+        if (session != nullptr && other->entityId() == session->entityId()) {
+            continue;
+        }
+        // A door, a chest or a button on the other edition: told by name, since that client has no
+        // packet of this shape and hears nothing at all without it.
+        if (other->connection().playSound) {
+            other->connection().playSound(sound, pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, volume, pitch);
+            continue;
+        }
+        if (!other->connection().sendPlayPacket) {
             continue;
         }
         other->connection().sendPlayPacket(play::SoundPacket::kId,
@@ -207,6 +216,11 @@ void BlockInteractionHandler::writeSign(const play::SignUpdatePacket& update) {
     }
     const play::BlockEntityDataPacket packet{.pos = pos, .typeId = *typeId, .tag = data};
     for (const PlayerSession* player : owner_->playersInSameWorld()) {
+        if (player->connection().sendSignText) {
+            player->connection().sendSignText(pos.x, pos.y, pos.z, world::signs::plainText(data, true),
+                                              world::signs::plainText(data, false), world::signs::isWaxed(data));
+            continue;
+        }
         if (!player->connection().sendPlayPacket) {
             continue;
         }

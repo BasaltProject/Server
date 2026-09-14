@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/wire/bedrock/BedrockBlocks.hpp>
@@ -14,15 +15,27 @@
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdlib>
 #include <limits>
+#include <map>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 namespace basalt::server::runtime::bedrock {
+
+namespace {
+
+/// parity: `Attributes.MOVEMENT_SPEED`'s default for a player, which is what vanilla sends.
+constexpr float kWalkSpeed = 0.1F;
+
+} // namespace
+
 namespace {
 
 /// What a client will take as the line under a command in its suggestion list. Since 1.21.130 it
@@ -72,7 +85,9 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     connection.disconnect = [mailbox = joining.mailbox, lang = context_.lang](const Component& reason) {
         wire::io::ByteBuffer body;
-        wire::bedrock::writeDisconnect(body, wire::text::toLegacyText(wire::text::resolveComponent(reason, lang)));
+        // Plain, not legacy: the screen a client draws when it is turned away prints the section
+        // signs rather than acting on them, so the colour arrives as litter in front of the words.
+        wire::bedrock::writeDisconnect(body, wire::text::toPlainText(wire::text::resolveComponent(reason, lang)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Disconnect), body.toVector(), true);
     };
     connection.sendTime = [mailbox = joining.mailbox](const world::LoadedWorld& world) {
@@ -124,6 +139,9 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (session_ != nullptr) {
             session_->gamemode = mode;
         }
+        // What the hands may do changes with the mode, and this edition is told in two packets:
+        // without them a client keeps whatever it was granted when it arrived.
+        sendAbilities();
         wire::io::ByteBuffer body;
         wire::bedrock::writeSetPlayerGameType(body, static_cast<std::int32_t>(mode));
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetPlayerGameType), body.toVector());
@@ -215,7 +233,11 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         std::uint64_t flags = wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasCollision) |
                               wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasGravity) |
                               wire::bedrock::flagBit(wire::bedrock::EntityFlag::Breathing) |
-                              wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanShowName);
+                              wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanShowName) |
+                              wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanClimb);
+        // Pushed out of a block over a moment rather than thrown out of it at once, which is what a
+        // player who spawns inside one should feel. It lives in the second field, past the 64th.
+        const std::uint64_t moreFlags = wire::bedrock::flagBit2(wire::bedrock::EntityFlag::PushTowardsClosestSpace);
         if (session_->fireTicks > 0) {
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::OnFire);
         }
@@ -226,8 +248,9 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sprinting);
         }
         wire::io::ByteBuffer body;
-        wire::bedrock::writeSubmersion(body, kRuntimeEntityId, static_cast<std::int16_t>(session_->airSupply), flags,
-                                       protocol_);
+        wire::bedrock::writeSelfMetadata(body, kRuntimeEntityId, static_cast<std::int16_t>(session_->airSupply),
+                                         static_cast<std::int16_t>(world::fluids::kMaxAir), flags, moreFlags,
+                                         protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
     };
 
@@ -332,10 +355,13 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                                     const std::int32_t z, const std::int32_t data) {
         const wire::bedrock::BedrockLevelEffect effect = wire::bedrock::bedrockLevelEffect(type, data);
         if (effect.event != 0) {
+            const std::int32_t carried = effect.translatesBlock
+                                             ? static_cast<std::int32_t>(wire::bedrock::bedrockBlockId(data, protocol))
+                                             : data;
             wire::io::ByteBuffer body;
             wire::bedrock::writeLevelEvent(body, effect.event, static_cast<float>(x) + effect.x,
                                            static_cast<float>(y) + effect.y, static_cast<float>(z) + effect.z,
-                                           effect.keepsData ? data : 0);
+                                           effect.keepsData ? carried : 0);
             mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
         }
         if (effect.sound.empty()) {
@@ -387,6 +413,90 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         say(wire::bedrock::BedrockContainerData::FurnaceLitDuration, numbers->litDuration);
     };
 
+    connection.setDifficulty = [mailbox = joining.mailbox](const std::int32_t difficulty, bool) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetDifficulty(body, difficulty);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetDifficulty), body.toVector());
+    };
+
+    connection.sendPassengers = [mailbox = joining.mailbox,
+                                 seen = std::make_shared<std::map<std::int32_t, std::vector<std::int32_t>>>()](
+                                    const std::int32_t vehicleId, const std::vector<std::int32_t>& riders) {
+        const auto post = [&mailbox](const std::int64_t vehicle, const std::int64_t rider,
+                                     const wire::bedrock::BedrockRide how) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeSetEntityLink(body, vehicle, rider, how, true);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityLink), body.toVector());
+        };
+        // Whoever was on it and is not any more has to be taken off by name: this edition has no
+        // packet that says "these are all of them now".
+        std::vector<std::int32_t>& before = (*seen)[vehicleId];
+        for (const std::int32_t was : before) {
+            if (std::ranges::find(riders, was) == riders.end()) {
+                post(static_cast<std::int64_t>(runtimeIdFor(vehicleId)), static_cast<std::int64_t>(runtimeIdFor(was)),
+                     wire::bedrock::BedrockRide::Remove);
+            }
+        }
+        for (std::size_t at = 0; at < riders.size(); ++at) {
+            if (std::ranges::find(before, riders[at]) != before.end()) {
+                continue;
+            }
+            // The first one steers; anybody after that is along for the trip.
+            post(static_cast<std::int64_t>(runtimeIdFor(vehicleId)),
+                 static_cast<std::int64_t>(runtimeIdFor(riders[at])),
+                 at == 0 ? wire::bedrock::BedrockRide::Rider : wire::bedrock::BedrockRide::Passenger);
+        }
+        before = riders;
+    };
+
+    connection.openSignEditor = [mailbox = joining.mailbox](const std::int32_t x, const std::int32_t y,
+                                                            const std::int32_t z) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeOpenSign(body, x, y, z, true);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::OpenSign), body.toVector());
+    };
+
+    connection.sendSignText = [mailbox = joining.mailbox](const std::int32_t x, const std::int32_t y,
+                                                          const std::int32_t z, const std::string& front,
+                                                          const std::string& back, const bool waxed) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSignData(body, x, y, z, front, back, waxed);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BlockEntityData), body.toVector());
+    };
+
+    connection.transferTo = [mailbox = joining.mailbox, protocol = joining.protocol](const std::string& host,
+                                                                                     const std::int32_t port) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeTransfer(body, host, static_cast<std::uint16_t>(port), protocol);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Transfer), body.toVector(), true);
+    };
+
+    connection.sendSwing = [mailbox = joining.mailbox](const std::int32_t entityId, bool) {
+        // One arm on Bedrock: there is no packet for the other hand, and drawing the wrong arm is
+        // worse than drawing the one everybody expects.
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeAnimate(body, runtimeIdFor(entityId), wire::bedrock::BedrockAnimation::SwingArm);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Animate), body.toVector());
+    };
+
+    connection.sendPickupAnimation = [mailbox = joining.mailbox](const std::int32_t itemEntityId,
+                                                                 const std::int32_t collectorEntityId) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeTakeItemEntity(body, runtimeIdFor(itemEntityId), runtimeIdFor(collectorEntityId));
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::TakeItemEntity), body.toVector());
+    };
+
+    connection.sendExplosion = [mailbox = joining.mailbox, protocol = joining.protocol](const double x, const double y,
+                                                                                        const double z) {
+        wire::io::ByteBuffer effect;
+        wire::bedrock::writeLevelEvent(effect, wire::bedrock::LevelEventType::ParticleExplosion, static_cast<float>(x),
+                                       static_cast<float>(y), static_cast<float>(z), 0);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), effect.toVector());
+        wire::io::ByteBuffer sound;
+        wire::bedrock::writePlaySound(sound, "random.explode", x, y, z, 4.0F, 1.0F, protocol);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), sound.toVector());
+    };
+
     // A block that changed under somebody's feet. Only reaches a client that already has the
     // column: one that does not will get it whole when it comes into range.
     connection.sendBlockChange = [mailbox = joining.mailbox,
@@ -401,10 +511,51 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (session_ == nullptr || !context_.commandList) {
             return;
         }
+        // TEMPORARY: the one packet the join burst never contained, and the only thing `/op` sends.
+        if (const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
+            drop != nullptr && std::string_view{drop}.find("commandtree") != std::string_view::npos) {
+            context_.logger.warn([] { return "Leaving out of the Bedrock join: commandtree"; });
+            return;
+        }
+        // TEMPORARY: six of the names a server operator is offered carry a hyphen, and Bedrock has
+        // no native command that does. The thirteen a plain player gets have none, which is the
+        // difference between the tree that worked and the tree that did not.
+        const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
+        const bool withoutHyphens = drop != nullptr && std::string_view{drop}.find("hyphens") != std::string_view::npos;
         std::vector<wire::bedrock::CommandInfo> commands;
         for (auto& [name, usage] : context_.commandList(*session_)) {
+            if (withoutHyphens && name.find('-') != std::string::npos) {
+                continue;
+            }
             commands.push_back(wire::bedrock::CommandInfo{std::move(name), fitsInACommandTip(usage)});
         }
+        if (withoutHyphens) {
+            context_.logger.warn([] { return "Leaving out of the Bedrock command tree: hyphenated names"; });
+        }
+        // TEMPORARY: `BASALT_BEDROCK_COMMANDS=n` offers only the first n, which is how to ask a
+        // client which entry it cannot take when the packet is otherwise well formed.
+        if (const char* const most = std::getenv("BASALT_BEDROCK_COMMANDS"); most != nullptr) {
+            const auto kept = static_cast<std::size_t>(std::atoll(most));
+            if (commands.size() > kept) {
+                commands.resize(kept);
+            }
+            context_.logger.warn([&commands] {
+                std::string names;
+                for (std::size_t at = commands.size() >= 8 ? commands.size() - 8 : 0; at < commands.size(); ++at) {
+                    names += (names.empty() ? "" : ", ") + commands[at].name;
+                }
+                return "Offering only " + std::to_string(commands.size()) +
+                       " Bedrock command(s), the last of them: " + names;
+            });
+        }
+        // TEMPORARY: the whole list in order, which is how to name the one a client will not take.
+        context_.logger.debug([&commands] {
+            std::string named;
+            for (std::size_t at = 0; at < commands.size(); ++at) {
+                named += (named.empty() ? "" : " ") + std::to_string(at) + ":" + commands[at].name;
+            }
+            return "Bedrock commands offered: " + named;
+        });
         wire::io::ByteBuffer body;
         wire::bedrock::writeAvailableCommands(body, commands);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AvailableCommands), body.toVector());
@@ -430,11 +581,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (session_ == nullptr) {
             return;
         }
-        const std::array<wire::bedrock::AttributeValue, 4> values{{
+        const std::array<wire::bedrock::AttributeValue, 5> values{{
             {"minecraft:health", 0.0F, session_->maxHealth(), session_->health(), session_->maxHealth()},
             {"minecraft:player.hunger", 0.0F, 20.0F, static_cast<float>(session_->food.foodLevel()), 20.0F},
             {"minecraft:player.saturation", 0.0F, 20.0F, session_->food.saturationLevel(), 20.0F},
             {"minecraft:absorption", 0.0F, 1024.0F, session_->absorption, 0.0F},
+            // How fast they walk. Bedrock takes this from the attribute and not from the speed in
+            // the ability layer, and a client never told it walks at a pace of its own choosing.
+            {"minecraft:movement", 0.0F, 1024.0F, kWalkSpeed, kWalkSpeed},
         }};
         wire::io::ByteBuffer body;
         wire::bedrock::writeUpdateAttributes(body, kRuntimeEntityId, values, 0);

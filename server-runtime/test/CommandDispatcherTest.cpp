@@ -408,6 +408,25 @@ TEST_CASE("unregistering takes the command and its aliases with it") {
     CHECK(fixture.dispatcher.execute(fixture.console, "tp") == 0);
 }
 
+TEST_CASE("registering a name twice replaces it rather than offering it twice") {
+    // The server does this on purpose: a plain `/whitelist` goes in with the rest, and the one that
+    // can reach the running server replaces it once there is a server to reach. Two root children
+    // with one name is a tree a Bedrock client refuses outright.
+    Fixture fixture;
+    const auto plain = [](const CommandNodeBuilder& builder) {
+        builder.executes([](const CommandContext&) { return Parsed<std::int32_t>{1}; });
+    };
+    REQUIRE(fixture.dispatcher.registerCommand(std::make_shared<TestCommand>("whitelist", plain)) != nullptr);
+    CommandNode* wired = fixture.dispatcher.registerCommand(
+        std::make_shared<TestCommand>("whitelist", [](const CommandNodeBuilder& builder) {
+            builder.executes([](const CommandContext&) { return Parsed<std::int32_t>{2}; });
+        }));
+    REQUIRE(wired != nullptr);
+
+    CHECK(fixture.dispatcher.rootNode().children().size() == 1);
+    CHECK(fixture.dispatcher.execute(fixture.console, "whitelist") == 2);
+}
+
 TEST_CASE("every argument that can complete is one the client will ask about") {
     // The invariant: a provider nobody will ever call is a completion the player never sees.
     Fixture fixture;

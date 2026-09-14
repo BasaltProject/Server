@@ -147,8 +147,18 @@ void DifficultyCommand::build(const CommandNodeBuilder& root) const {
                 (*world)->setDifficulty(name);
                 const wire::protocol::play::ChangeDifficultyPacket packet{
                     .difficulty = static_cast<std::uint8_t>(ordinal), .locked = (*world)->difficultyLocked()};
-                sendToWorld(context, **world, wire::protocol::play::ChangeDifficultyPacket::kId,
+                for (player::PlayerSession* player : context.environment().playersIn(**world)) {
+                    if (player->connection().setDifficulty) {
+                        player->connection().setDifficulty(static_cast<std::int32_t>(ordinal),
+                                                           (*world)->difficultyLocked());
+                        continue;
+                    }
+                    if (player->connection().sendPlayPacket) {
+                        player->connection().sendPlayPacket(
+                            wire::protocol::play::ChangeDifficultyPacket::kId,
                             [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                    }
+                }
                 context.success(Component::translatable("commands.difficulty.success",
                                                         {Component::translatable("options.difficulty." + name)}),
                                 true);

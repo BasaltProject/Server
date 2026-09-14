@@ -71,6 +71,12 @@ void CommandEnvironment::blockEffects(const world::LoadedWorld& world, std::int3
 void CommandEnvironment::syncTime(const world::LoadedWorld& world) const {
     const wire::protocol::play::SetTimePacket packet = timePacketOf(world);
     for (player::PlayerSession* player : playersIn(world)) {
+        // A client that speaks the other edition is told the same thing its own way: left out of
+        // this, its sun stops where it stood when they arrived and never moves again.
+        if (player->connection().sendTime) {
+            player->connection().sendTime(world);
+            continue;
+        }
         if (player->connection().sendPlayPacket) {
             player->connection().sendPlayPacket(wire::protocol::play::SetTimePacket::kId,
                                                 [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });

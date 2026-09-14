@@ -46,6 +46,16 @@ public:
         std::function<std::optional<SurfaceContent>()> bossBar;
     };
 
+    /// Where the drawing goes when the client does not speak Java's packets. Every one of these is
+    /// optional: an edition that leaves one unset gets the Java packet for it, which is what makes
+    /// this the same renderer for both doors rather than two.
+    struct Surfaces {
+        std::function<void(const std::string& title, const std::vector<std::string>& lines)> scoreboard;
+        std::function<void()> clearScoreboard;
+        std::function<void(const std::string& title, float progress)> bossBar;
+        std::function<void()> clearBossBar;
+    };
+
     PlayerUi(std::function<config::UiConfigs()> configs,
              const wire::common::placeholder::PlaceholderRegistry& placeholders, Send send, Plugin plugin = {},
              wire::common::Logger logger = wire::common::Logger{"Ui"});
@@ -59,6 +69,9 @@ public:
 
     /// Takes down anything this player was shown. Called when they leave or change worlds.
     void clear();
+
+    /// Where the drawing goes. Set once, before the first tick.
+    void drawInto(Surfaces surfaces) { surfaces_ = std::move(surfaces); }
 
 private:
     void updateTabList(const wire::common::placeholder::PlaceholderContext& context);
@@ -92,6 +105,7 @@ private:
     std::function<config::UiConfigs()> configs_;
     const wire::common::placeholder::PlaceholderRegistry* placeholders_;
     Send send_;
+    Surfaces surfaces_;
     Plugin plugin_;
     wire::common::Logger logger_;
     config::OnceReporter reporter_;
