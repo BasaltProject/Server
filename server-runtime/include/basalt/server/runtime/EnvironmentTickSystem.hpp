@@ -47,11 +47,17 @@ public:
             weatherChangeAllowed;
         std::function<bool(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
             lightningAllowed;
+        /// What a plugin says about a food level that changed on its own.
+        std::function<std::optional<std::int32_t>(const player::PlayerSession& player, std::int32_t now,
+                                                  std::int32_t before)>
+            foodChanged;
     };
 
     /// The storm's own stream, which is not the level's: a strike must not shift what else spawns.
     struct Options {
         std::function<std::int64_t()> nextSeed;
+        /// The word the config carries, read fresh every tick: an operator can change it.
+        std::function<std::string()> difficulty;
     };
 
     using Worlds = std::function<std::vector<world::LoadedWorld*>()>;
@@ -60,6 +66,10 @@ public:
                           ChunkSimulationView& chunkSimulation, BlockChangeBroadcaster& broadcaster,
                           const command::CommandEnvironment& environment, NaturalSpawningSystem& spawning, Hooks hooks,
                           Options options, wire::common::Logger logger = wire::common::Logger{"World"});
+
+    /// One tick of every player's own body in this world: the hurt cooldown, the swing clock and
+    /// hunger. Here rather than in a session's own turn because only one of the two doors has one.
+    void tickPlayers(world::LoadedWorld& world);
 
     /// Skips the night when enough of the world's players have held a bed for five seconds.
     void tickSleep(world::LoadedWorld& world);

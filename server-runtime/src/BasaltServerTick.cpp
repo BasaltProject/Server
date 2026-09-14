@@ -223,6 +223,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             if (region.isPrimary()) {
                 step("Effect tick", [this, &world] { statusEffects_->tickEffects(world); });
                 step("Raid tick", [this, &world] { raids_->tickRaids(world); });
+                step("Player tick", [this, &world] { environment_->tickPlayers(world); });
                 step("Sleep tick", [this, &world] { environment_->tickSleep(world); });
             }
             // The end of the turn: what has to see everything it did, rather than a tick late.

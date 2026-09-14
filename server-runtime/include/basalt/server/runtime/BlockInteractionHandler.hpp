@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Identifier.hpp>
@@ -117,6 +118,10 @@ public:
     [[nodiscard]] double tossLift() const;
 
     /// Gets this player out of the bed they are in.
+    /// What sleeping needs of the session: the spawn point, the plugin's say, and the bang a bed
+    /// makes where it will not have one.
+    [[nodiscard]] player::SleepContext sleepContext();
+
     void wakeUp();
 
     void spawnDroppedItem(const wire::common::Identifier& item, std::int32_t count, double x, double y, double z,
@@ -232,9 +237,6 @@ private:
 
     void useShelf(player::PlayerSession& session, const wire::protocol::play::BlockHitResult& hit);
 
-    void swapHotbarWithShelf(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
-                             std::int32_t stateId);
-
     void usePot(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
     [[nodiscard]] bool placeOnCampfire(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
@@ -265,10 +267,6 @@ private:
     void cycleBlock(const wire::protocol::play::BlockPos& pos);
 
     void useBed(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t state);
-
-    [[nodiscard]] std::optional<world::BedProblem> bedReachProblem(const player::PlayerSession& session,
-                                                                   const wire::protocol::play::BlockPos& head,
-                                                                   std::int32_t headState) const;
 
     void setSpawnPointAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& bed);
 

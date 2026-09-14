@@ -250,6 +250,13 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.teleportTo = [this](double x, double y, double z, float yaw, float pitch) {
         teleportTo(x, y, z, yaw, pitch);
     };
+    connection.showSleeping = [this](const std::int32_t entityId,
+                                     const std::optional<std::array<std::int32_t, 3>> bed) {
+        const play::SetEntityDataPacket packet = play::SetEntityDataPacket::sleeping(
+            entityId, bed.has_value() ? std::optional{play::BlockPos{(*bed)[0], (*bed)[1], (*bed)[2]}} : std::nullopt);
+        sendPlayPacket(play::SetEntityDataPacket::kId,
+                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    };
     connection.wakeUp = [this] { wakeUp(); };
     connection.sendTime = [this](const world::LoadedWorld& world) { uiState_->sendTime(world); };
     connection.sendActionBar = [this](const wire::text::Component& message) { sendPluginText(message, true); };

@@ -130,6 +130,18 @@ public:
         /// A click on something alive that is not a hit: sitting in a cart, feeding an animal.
         std::function<void(player::PlayerSession&, std::int32_t entityId)> useEntity;
 
+        /// Gets this player out of the bed they are in, where the world is. Morning asks every
+        /// connection for this, and a Bedrock player who is never asked stays asleep for good.
+        std::function<void(player::PlayerSession&)> wakeUp;
+
+        /// Puts a bed back down when its sleeper leaves without waking. Takes the square rather
+        /// than the player: by the time this is called there is no player left to wake.
+        std::function<void(std::string worldName, std::int32_t x, std::int32_t y, std::int32_t z)> freeBed;
+
+        /// Swallows what is in that slot, where the world is: the food, the effects and the stack
+        /// it comes off. The clock for it belongs to the client on this door.
+        std::function<void(player::PlayerSession&, std::int32_t slot)> eat;
+
         /// Picks up whatever this player is standing on, where the world is. Java does the same
         /// thing once per tick from its own session; a Bedrock player has none, and without this
         /// nothing they break ever reaches their bag.
@@ -200,6 +212,8 @@ public:
     void attack(std::uint64_t runtimeEntityId) override;
     void useOnEntity(std::uint64_t runtimeEntityId) override;
     void setHeldSlot(std::int32_t slot) override;
+
+    void finishEating(std::int32_t hotbarSlot) override;
     void openOwnInventory() override;
     void closeWindow(std::int32_t containerId) override;
 

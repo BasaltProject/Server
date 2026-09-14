@@ -204,6 +204,33 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::EntityEvent), body.toVector());
     };
 
+    // Morning, or a plugin, getting this player up. The world owns the bed and the pose, so this
+    // only asks: the answer comes back as the packet above.
+    connection.wakeUp = [this] {
+        if (session_ != nullptr && context_.wakeUp) {
+            context_.wakeUp(*session_);
+        }
+    };
+
+    // Somebody lying down or standing up, which this edition draws off a flag and the bed's own
+    // square rather than off a pose.
+    connection.showSleeping = [this](const std::int32_t entityId,
+                                     const std::optional<std::array<std::int32_t, 3>> bed) {
+        const bool itself = session_ != nullptr && entityId == session_->entityId();
+        const std::uint64_t runtime = itself ? kRuntimeEntityId : runtimeIdFor(entityId);
+        // The second word of flags carries the sleeping bit. Only this player's own carries anything
+        // else, so everybody else's is that bit and nothing more.
+        std::uint64_t moreFlags =
+            itself ? wire::bedrock::flagBit2(wire::bedrock::EntityFlag::PushTowardsClosestSpace) : 0ULL;
+        if (bed.has_value()) {
+            moreFlags |= wire::bedrock::flagBit2(wire::bedrock::EntityFlag::Sleeping);
+        }
+        const std::array<std::int32_t, 3> where = bed.value_or(std::array<std::int32_t, 3>{0, 0, 0});
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSleeping(body, runtime, moreFlags, where[0], where[1], where[2], protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+    };
+
     // The shove. Bedrock turns the red on the screen itself from where the motion came, so the
     // angle the Java animation carries has nowhere to go here.
     connection.pushBack = [this](const double velocityX, const double velocityY, const double velocityZ, float) {

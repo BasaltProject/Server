@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerVitals.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/EndPortals.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -50,6 +51,17 @@ EnvironmentTickSystem::EnvironmentTickSystem(player::PlayerRegistry& players, co
       broadcaster_(&broadcaster), environment_(&environment), spawning_(&spawning), hooks_(std::move(hooks)),
       options_(std::move(options)), logger_(std::move(logger)) {}
 
+void EnvironmentTickSystem::tickPlayers(world::LoadedWorld& world) {
+    player::VitalsContext vitals;
+    vitals.difficulty = player::difficultyOf(options_.difficulty ? options_.difficulty() : std::string{"easy"});
+    vitals.foodChanged = hooks_.foodChanged;
+    for (PlayerSession* player : players_->snapshot()) {
+        if (player->worldName == world.name()) {
+            player::tickVitals(*player, vitals);
+        }
+    }
+}
+
 void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
     std::vector<PlayerSession*> players;
     std::vector<PlayerSession*> awake;
@@ -64,6 +76,10 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
         }
         awake.push_back(player);
         if (player->sleepingBed.has_value()) {
+            // parity: `ServerPlayer.tick` counts this while a player is in bed. Counted here rather
+            // than in the Java session's own turn because a Bedrock player has no such turn, and a
+            // sleeper nobody counts never sees morning.
+            player->sleepTicks++;
             sleeping.push_back(player);
         }
     }

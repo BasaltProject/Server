@@ -495,7 +495,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     environment_ = std::make_unique<EnvironmentTickSystem>(
         playerRegistry_, worldsConfig, model.allWorlds, chunkSimulation_, *broadcaster_, *wired_.environment,
         *spawning_, EnvironmentTickSystem::Hooks{},
-        EnvironmentTickSystem::Options{.nextSeed = [] { return scratchSeed(); }}, logger_);
+        EnvironmentTickSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                       .difficulty = [this] { return difficulty_; }},
+        logger_);
     mobActions_ =
         std::make_unique<MobActionSystem>(playerRegistry_, *broadcaster_, *explosions_, *spawning_, *combat_, *raids_,
                                           vanillaData_.lootTables, model.allWorlds, MobActionSystem::Hooks{},

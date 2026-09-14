@@ -217,6 +217,13 @@ BedrockPlayer::~BedrockPlayer() {
             context_.save(*row);
         }
     }
+    // parity: `ServerPlayer.disconnect` stops the sleeping, which is what puts the bed back down.
+    // The world is not this thread's to touch, so the square goes over rather than the state.
+    if (session_->sleepingBed.has_value() && context_.freeBed) {
+        const std::array<std::int32_t, 3> bed = *session_->sleepingBed;
+        session_->sleepingBed.reset();
+        context_.freeBed(session_->worldName, bed[0], bed[1], bed[2]);
+    }
     if (context_.quit) {
         context_.quit(*session_);
     }
@@ -430,6 +437,13 @@ void BedrockPlayer::setHeldSlot(const std::int32_t slot) {
         return;
     }
     session_->inventory.setHeldSlot(slot);
+}
+
+void BedrockPlayer::finishEating(const std::int32_t hotbarSlot) {
+    if (session_ == nullptr || !context_.eat || hotbarSlot < 0 || hotbarSlot >= player::PlayerInventory::kHotbarSize) {
+        return;
+    }
+    context_.eat(*session_, player::PlayerInventory::kHotbarStart + hotbarSlot);
 }
 
 void BedrockPlayer::openOwnInventory() {

@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/EnchantmentAttributes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -354,36 +355,7 @@ void UiStateSync::sendStats() {
 void UiStateSync::applyConsumeEffects(PlayerSession& session,
                                       const std::vector<server::registry::ConsumeEffect>& effects,
                                       const std::function<float()>& nextFloat) {
-    for (const server::registry::ConsumeEffect& effect : effects) {
-        if (effect.as<server::registry::ConsumeEffect::ClearAll>() != nullptr) {
-            std::vector<Identifier> held;
-            for (const auto& [id, active] : session.effects) {
-                held.push_back(id);
-            }
-            for (const Identifier& id : held) {
-                session.effects.erase(id);
-                sendEffectRemoved(id);
-            }
-            continue;
-        }
-        if (const auto* removed = effect.as<server::registry::ConsumeEffect::Remove>(); removed != nullptr) {
-            if (session.effects.erase(removed->effect) > 0) {
-                sendEffectRemoved(removed->effect);
-            }
-            continue;
-        }
-        const auto* applied = effect.as<server::registry::ConsumeEffect::Apply>();
-        if (applied == nullptr) {
-            continue;
-        }
-        if (applied->probability < 1.0F && (!nextFloat || nextFloat() >= applied->probability)) {
-            continue;
-        }
-        const world::ActiveEffect active{
-            .effect = applied->effect, .amplifier = applied->amplifier, .remainingTicks = applied->durationTicks};
-        session.effects.insert_or_assign(applied->effect, active);
-        sendEffect(active);
-    }
+    player::applyConsumeEffectsFor(session, effects, nextFloat);
 }
 
 } // namespace basalt::server::runtime

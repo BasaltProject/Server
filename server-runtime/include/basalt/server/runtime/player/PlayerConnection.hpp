@@ -12,6 +12,7 @@
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/text/Component.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -200,6 +201,10 @@ struct PlayerConnection {
     /// Moves the player and tells their client, which is the only way a position set on the server
     /// is believed: a client that was not told rubber-bands straight back.
     std::function<void(double x, double y, double z, float yaw, float pitch)> teleportTo;
+
+    /// Draws somebody lying in a bed, or standing up out of one, on **this** player's screen: the
+    /// sleeper is named by entity, so the same call serves the sleeper and everyone watching them.
+    std::function<void(std::int32_t entityId, std::optional<std::array<std::int32_t, 3>> bed)> showSleeping;
 
     /// Gets this player out of the bed they are in, which is a packet and a pose at once.
     std::function<void()> wakeUp;
