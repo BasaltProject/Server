@@ -1,5 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -86,9 +88,39 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
     }
     // A table's nine cells are not the block's: they belong to whoever is standing at it, so the
     // window has none of the block's own slots.
+    // parity: `EnderChestBlock.useWithoutItem` refuses under a block that would trap the lid, and
+    // then shows the player's own slots rather than anything in the world.
+    if (path == "ender_chest") {
+        const std::optional<std::int32_t> above = world.state().blockState(x, y + 1, z);
+        if (!above.has_value() || server::registry::blockSupport::conductsRedstone(*above)) {
+            return std::nullopt;
+        }
+        return OpenWindow{.type = wire::bedrock::BedrockContainerType::Container,
+                          .x = x,
+                          .y = y,
+                          .z = z,
+                          .size = storage::StoredPlayer::kEnderChestSlots,
+                          .block = path,
+                          .playerOwned = true};
+    }
     if (path == "crafting_table") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Workbench, .x = x, .y = y, .z = z, .size = 0, .block = path};
+    }
+    // Three of the boxes below have a screen of their own over there, and a brewing stand and a
+    // crafter are not boxes at all: a client sent the wrong kind draws the wrong shape.
+    if (path == "brewing_stand" || path == "crafter") {
+        const std::optional<std::int32_t> size = world::containers::sizeOf(path);
+        if (!size.has_value()) {
+            return std::nullopt;
+        }
+        return OpenWindow{.type = path == "crafter" ? wire::bedrock::BedrockContainerType::Crafter
+                                                    : wire::bedrock::BedrockContainerType::BrewingStand,
+                          .x = x,
+                          .y = y,
+                          .z = z,
+                          .size = *size,
+                          .block = path};
     }
     if (!world::containers::isPlain(path)) {
         return std::nullopt;
@@ -98,7 +130,10 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return std::nullopt;
     }
     OpenWindow window;
-    window.type = wire::bedrock::BedrockContainerType::Container;
+    window.type = path == "hopper"      ? wire::bedrock::BedrockContainerType::Hopper
+                  : path == "dispenser" ? wire::bedrock::BedrockContainerType::Dispenser
+                  : path == "dropper"   ? wire::bedrock::BedrockContainerType::Dropper
+                                        : wire::bedrock::BedrockContainerType::Container;
     window.x = x;
     window.y = y;
     window.z = z;
@@ -154,17 +189,25 @@ std::optional<FurnaceNumbers> furnaceNumbers(world::LoadedWorld& world, const Op
         .cookTime = state.cookingTimer, .litTime = state.litTimeRemaining, .litDuration = state.litTotalTime};
 }
 
-std::vector<std::optional<storage::StoredItemStack>> readWindow(world::LoadedWorld& world, const OpenWindow& window) {
+std::vector<std::optional<storage::StoredItemStack>> readWindow(world::LoadedWorld& world, const OpenWindow& window,
+                                                                const player::PlayerSession* owner) {
     std::vector<std::optional<storage::StoredItemStack>> slots;
     slots.reserve(static_cast<std::size_t>(window.size));
     for (std::int32_t slot = 0; slot < window.size; ++slot) {
-        slots.push_back(readWindowSlot(world, window, slot));
+        slots.push_back(readWindowSlot(world, window, slot, owner));
     }
     return slots;
 }
 
 std::optional<storage::StoredItemStack> readWindowSlot(world::LoadedWorld& world, const OpenWindow& window,
-                                                       const std::int32_t slot) {
+                                                       const std::int32_t slot, const player::PlayerSession* owner) {
+    // An ender chest is a window over the player rather than over the block that opened it.
+    if (window.playerOwned) {
+        if (owner == nullptr || slot < 0 || static_cast<std::size_t>(slot) >= owner->enderChest.size()) {
+            return std::nullopt;
+        }
+        return owner->enderChest[static_cast<std::size_t>(slot)];
+    }
     const std::optional<std::pair<std::array<std::int32_t, 3>, std::int32_t>> half = halfFor(window, slot);
     if (!half.has_value()) {
         return std::nullopt;
@@ -183,7 +226,14 @@ std::optional<storage::StoredItemStack> readWindowSlot(world::LoadedWorld& world
 }
 
 bool writeWindowSlot(world::LoadedWorld& world, const OpenWindow& window, const std::int32_t slot,
-                     const std::optional<storage::StoredItemStack>& stack) {
+                     const std::optional<storage::StoredItemStack>& stack, player::PlayerSession* owner) {
+    if (window.playerOwned) {
+        if (owner == nullptr || slot < 0 || static_cast<std::size_t>(slot) >= owner->enderChest.size()) {
+            return false;
+        }
+        owner->enderChest[static_cast<std::size_t>(slot)] = stack;
+        return true;
+    }
     const std::optional<std::pair<std::array<std::int32_t, 3>, std::int32_t>> half = halfFor(window, slot);
     if (!half.has_value()) {
         return false;

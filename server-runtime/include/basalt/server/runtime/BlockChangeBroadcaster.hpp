@@ -63,6 +63,14 @@ public:
     void notifyAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                       std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed);
 
+    /// Redraws the six squares around one that changed and tells nobody else.
+    ///
+    /// parity: `Level.setBlock` runs the shape updates under `(flags & 16) == 0`, which is outside
+    /// the `UPDATE_NEIGHBORS` gate, so a component writing its own state with flag two redraws the
+    /// shapes without telling a single neighbour.
+    void reshapeAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                       std::int32_t y, std::int32_t z);
+
     /// One block, its new state, and whatever it asked the clients to hear or see while they are at
     /// it: a note, a bell, a door swinging, a dispenser clicking at nothing.
     void announceBlock(const std::vector<player::PlayerSession*>& watchers, const world::BlockChange& change) const;

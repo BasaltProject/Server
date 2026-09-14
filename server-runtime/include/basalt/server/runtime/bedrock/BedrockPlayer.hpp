@@ -138,6 +138,12 @@ public:
         /// than the player: by the time this is called there is no player left to wake.
         std::function<void(std::string worldName, std::int32_t x, std::int32_t y, std::int32_t z)> freeBed;
 
+        /// What a block that changed asks everyone in this player's world to hear: a door, a note,
+        /// a bell. Answered where the world is, because the list of who is there lives with it.
+        std::function<void(std::string worldName, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                           std::vector<world::BlockEffect> effects)>
+            blockEffects;
+
         /// Swallows what is in that slot, where the world is: the food, the effects and the stack
         /// it comes off. The clock for it belongs to the client on this door.
         std::function<void(player::PlayerSession&, std::int32_t slot)> eat;

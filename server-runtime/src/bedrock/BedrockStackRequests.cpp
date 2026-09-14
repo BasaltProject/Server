@@ -132,7 +132,7 @@ struct Reach {
         if (reach.world == nullptr || !reach.windows.open.has_value()) {
             return std::nullopt;
         }
-        return readWindowSlot(*reach.world, *reach.windows.open, place.slot);
+        return readWindowSlot(*reach.world, *reach.windows.open, place.slot, &reach.session);
     }
     case Place::Kind::None:
         break;
@@ -178,7 +178,7 @@ void commit(Reach& reach, const std::function<void(const storage::StoredItemStac
     }
     if (reach.world != nullptr && reach.windows.open.has_value()) {
         for (const auto& [slot, stack] : reach.block) {
-            static_cast<void>(writeWindowSlot(*reach.world, *reach.windows.open, slot, stack));
+            static_cast<void>(writeWindowSlot(*reach.world, *reach.windows.open, slot, stack, &reach.session));
         }
     }
     for (const storage::StoredItemStack& stack : reach.dropped) {

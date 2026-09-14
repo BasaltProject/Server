@@ -272,9 +272,8 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
         event = "block_detach";
     }
 
-    if (!beingDestroyed) {
-        write(world, x, y, z, *stateId, *block, attached, powered, changes);
-    }
+    // parity: the jar writes the hook at the **other** end first and its own last, with the two
+    // events in between. The order matters because of the guard below, which sits between them.
     if (receiver > 0) {
         const std::int32_t ox = x + (registry::stepX(*direction) * receiver);
         const std::int32_t oz = z + (registry::stepZ(*direction) * receiver);
@@ -287,9 +286,20 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             return;
         }
         write(world, ox, y, oz, *otherId, *other, attached, powered, changes);
+        // parity: `if (!level.getBlockState(pos).is(Blocks.TRIPWIRE_HOOK)) { onRemoved(...); return; }`.
+        // With the near hook already gone this walk stops here, so the string in the middle keeps the
+        // `attached` it had instead of being rewritten. Measured in `ganchoquitado3`, where the jar
+        // leaves the line taut after one hook goes and we were slackening it.
+        const std::optional<std::int32_t> stillHere = world.blockState(x, y, z);
+        if (!stillHere.has_value() || !isHook(*stillHere)) {
+            return;
+        }
         heard(world, event, ox, y, oz, gameTime);
     }
     heard(world, event, x, y, z, gameTime);
+    if (!beingDestroyed) {
+        write(world, x, y, z, *stateId, *block, attached, powered, changes);
+    }
     // parity: the wires themselves follow the pair, which is what draws them taut, and the jar does
     // this **only when `attached` moved**: a line that was already taut is left alone, however out of
     // step a single string in it may be.

@@ -914,6 +914,20 @@ void BasaltServer::startBedrockListener() {
         };
 
         // What they are standing on, gathered where the world is and told to them where they are.
+        // A block a command changed, heard by everyone in that world. The broadcaster owns both the
+        // list and the sending, so this only has to find the world.
+        context.blockEffects = [this](const std::string& worldName, const std::int32_t x, const std::int32_t y,
+                                      const std::int32_t z, const std::int32_t stateId,
+                                      const std::vector<world::BlockEffect>& effects) {
+            std::vector<player::PlayerSession*> watchers;
+            for (player::PlayerSession* other : playerRegistry_.snapshot()) {
+                if (other->worldName == worldName) {
+                    watchers.push_back(other);
+                }
+            }
+            broadcaster_->sendEffects(watchers, x, y, z, stateId, effects);
+        };
+
         // A bed whose sleeper left: this arrives from the door's own thread, so the world is
         // reached the way everything else from there is.
         context.freeBed = [this](const std::string& worldName, const std::int32_t x, const std::int32_t y,
@@ -1050,7 +1064,7 @@ void BasaltServer::startBedrockListener() {
                             windows->open = *window;
                             // The next window is a different window: what was said about the last
                             // one says nothing about this one.
-                            windows->saidSlots = bedrock::readWindow(*found->second, *window);
+                            windows->saidSlots = bedrock::readWindow(*found->second, *window, session);
                             windows->saidNumbers.reset();
                             windows->sinceRead = 0;
                             opened(*window, windows->saidSlots);
