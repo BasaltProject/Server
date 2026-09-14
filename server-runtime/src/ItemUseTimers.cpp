@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -32,26 +33,9 @@ using wire::protocol::play::SoundSource;
 constexpr std::string_view kBow = "bow";
 constexpr std::string_view kArrowItem = "minecraft:arrow";
 constexpr std::string_view kEnderPearl = "ender_pearl";
-constexpr std::string_view kSoundArrowShoot = "entity.arrow.shoot";
-constexpr std::string_view kSoundPearlThrow = "entity.ender_pearl.throw";
 
 /// parity: `LivingEntity`'s own using-item bit.
 constexpr std::int8_t kLivingFlagUsingItem = 1;
-
-/// parity: `BowItem`, twenty ticks to a full draw and a tenth of it before anything flies.
-constexpr float kBowDrawTicks = 20.0F;
-constexpr float kMinBowPower = 0.1F;
-constexpr float kBowPowerScale = 3.0F;
-constexpr float kBowUncertainty = 1.0F;
-
-/// parity: `EnderpearlItem.use`, thrown at one and a half with a degree of spread.
-constexpr float kPearlPower = 1.5F;
-constexpr float kPearlUncertainty = 1.0F;
-
-/// parity: `Entity.getEyeHeight` for a standing player, which is where a throw leaves from.
-constexpr double kThrowEyeHeight = 1.62;
-
-constexpr float kHalfCircle = 180.0F;
 
 /// A stored stack's id as an identifier, or nothing when the row holds something unparseable.
 std::optional<Identifier> parsedOrNothing(const std::string& id) {
@@ -162,110 +146,32 @@ void ItemUseTimers::tickDrawing(PlayerSession& session) {
     drawingTicks_++;
 }
 
-float ItemUseTimers::bowPower(std::int32_t ticks) {
-    const float drawn = static_cast<float>(ticks) / kBowDrawTicks;
-    return std::min(((drawn * drawn) + (drawn * 2.0F)) / 3.0F, 1.0F);
-}
+float ItemUseTimers::bowPower(std::int32_t ticks) { return player::bowPowerOf(ticks); }
 
 void ItemUseTimers::releaseBow() {
     PlayerSession* session = owner_->playerSession();
+    world::LoadedWorld* world = owner_->currentWorld();
     if (session == nullptr || drawingSlot_ < 0) {
         return;
     }
-    const std::optional<storage::StoredItemStack> held = session->inventory.at(drawingSlot_);
+    const std::int32_t slot = drawingSlot_;
     const std::int32_t drawn = drawingTicks_;
     stopDrawing();
-    const std::optional<Identifier> heldId = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    if (!heldId.has_value() || heldId->path() != kBow) {
-        return;
+    if (world != nullptr) {
+        player::shootBowFor(owner_->blockInteraction().breakContext(), *session, *world, slot, drawn,
+                            hooks_.shootAllowed);
     }
-    const float power = bowPower(drawn);
-    if (power < kMinBowPower) {
-        return;
-    }
-    const bool creative = session->gamemode == Gamemode::Creative;
-    const std::optional<std::int32_t> arrowSlot = session->inventory.indexOf(kArrowItem);
-    if (!creative && !arrowSlot.has_value()) {
-        return;
-    }
-    world::LoadedWorld* world = owner_->currentWorld();
-    player::PlayerRegistry* registry = owner_->options().playerRegistry;
-    const entity::projectiles::Kind& kind = entity::projectiles::arrow();
-    const server::registry::EntityTypeEntry* entry = server::registry::entityTypes::of(kind.type);
-    if (world == nullptr || registry == nullptr || entry == nullptr) {
-        return;
-    }
-    if (hooks_.shootAllowed && !hooks_.shootAllowed(*session, kind.type, power)) {
-        return;
-    }
-    const float pitch = session->pitch * std::numbers::pi_v<float> / kHalfCircle;
-    const float yaw = session->yaw * std::numbers::pi_v<float> / kHalfCircle;
-    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-    entity::ServerEntity& arrow = entity::projectiles::spawn(
-        world->state(), kind, registry->allocateEntityId(), entry->protocolId, session->x, session->y + kThrowEyeHeight,
-        session->z, static_cast<double>(-std::sin(yaw) * std::cos(pitch)), static_cast<double>(-std::sin(pitch)),
-        static_cast<double>(std::cos(yaw) * std::cos(pitch)), power * kBowPowerScale, kBowUncertainty, random);
-    arrow.ownerId = session->entityId();
-    arrow.critical = power >= 1.0F;
-    const float roll = options_.nextFloat ? options_.nextFloat() : 0.5F;
-    owner_->broadcastSound(kSoundArrowShoot, session->x, session->y, session->z, SoundSource::Players, 1.0F,
-                           (1.0F / ((roll * 0.4F) + 1.2F)) + (power * 0.5F));
-    if (creative || !arrowSlot.has_value()) {
-        return;
-    }
-    const std::optional<storage::StoredItemStack>& stack = session->inventory.at(*arrowSlot);
-    if (!stack.has_value()) {
-        return;
-    }
-    if (stack->count <= 1) {
-        session->inventory.set(*arrowSlot, std::nullopt);
-    } else {
-        storage::StoredItemStack left = *stack;
-        left.count = stack->count - 1;
-        session->inventory.set(*arrowSlot, left);
-    }
-    owner_->sendInventorySlot(*arrowSlot);
 }
 
 bool ItemUseTimers::throwEnderPearl(PlayerSession& session, const Identifier& item, std::int32_t slot) {
-    if (item.path() != kEnderPearl) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr || item.path() != kEnderPearl) {
+        return item.path() == kEnderPearl;
+    }
+    if (!player::throwItemFor(owner_->blockInteraction().breakContext(), session, *world, item, slot)) {
         return false;
     }
-    world::LoadedWorld* world = owner_->currentWorld();
-    player::PlayerRegistry* registry = owner_->options().playerRegistry;
-    const entity::projectiles::Kind* kind = entity::projectiles::kindOf(Identifier::vanilla("ender_pearl"));
-    const server::registry::EntityTypeEntry* entry =
-        kind == nullptr ? nullptr : server::registry::entityTypes::of(kind->type);
-    if (world == nullptr || registry == nullptr || entry == nullptr) {
-        return true;
-    }
-    const float pitch = session.pitch * std::numbers::pi_v<float> / kHalfCircle;
-    const float yaw = session.yaw * std::numbers::pi_v<float> / kHalfCircle;
-    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
-    entity::ServerEntity& pearl = entity::projectiles::spawn(
-        world->state(), *kind, registry->allocateEntityId(), entry->protocolId, session.x, session.y + kThrowEyeHeight,
-        session.z, static_cast<double>(-std::sin(yaw) * std::cos(pitch)), static_cast<double>(-std::sin(pitch)),
-        static_cast<double>(std::cos(yaw) * std::cos(pitch)), kPearlPower, kPearlUncertainty, random);
-    pearl.ownerId = session.entityId();
     startCooldown(item);
-    const float roll = options_.nextFloat ? options_.nextFloat() : 0.5F;
-    owner_->broadcastSound(kSoundPearlThrow, session.x, session.y, session.z, SoundSource::Neutral, 0.5F,
-                           0.4F / ((roll * 0.4F) + 0.8F));
-    if (session.gamemode == Gamemode::Creative) {
-        return true;
-    }
-    const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
-    if (!held.has_value()) {
-        return true;
-    }
-    if (held->count <= 1) {
-        session.inventory.set(slot, std::nullopt);
-    } else {
-        storage::StoredItemStack left = *held;
-        left.count = held->count - 1;
-        session.inventory.set(slot, left);
-    }
-    owner_->sendInventorySlot(slot);
     return true;
 }
 

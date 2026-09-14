@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
+#include <basalt/server/runtime/player/PlayerBuckets.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
@@ -466,49 +467,8 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         return;
     }
 
-    if (hooks_.bucketAllowed &&
-        !hooks_.bucketAllowed(*session, static_cast<std::int32_t>(session->x), static_cast<std::int32_t>(session->y),
-                              static_cast<std::int32_t>(session->z), item->toString(), item->path() == "bucket")) {
-        owner_->sendInventory();
-        return;
-    }
-    random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    const world::fluidFlow::Context context{.world = world->state(),
-                                            .gameRules = world->gameRules(),
-                                            .random = random,
-                                            .ultrawarm =
-                                                world->declaration().dimension == config::WorldDimension::Nether};
-    const std::optional<world::buckets::Result> result =
-        world::buckets::use(context, *item, session->x, session->y + world::fluids::eyeHeight(session->sneaking),
-                            session->z, useItem.yaw, useItem.pitch, session->gamemode == Gamemode::Creative);
-    if (!result.has_value()) {
-        return;
-    }
-    // parity: `BucketItem` raises `FLUID_PICKUP` where it took the fluid from and `FLUID_PLACE`
-    // where it put it, and a sculk sensor hears both. Which of the two it is comes from the item:
-    // an empty bucket is the one that picks up.
-    if (!result->changes.empty()) {
-        const world::FluidChange& at = result->changes.front();
-        if (world->state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kCalibratedRange)) {
-            world::vibrations::emit(world->state(), item->path() == "bucket" ? "fluid_pickup" : "fluid_place",
-                                    at.x + 0.5, at.y + 0.5, at.z + 0.5, world->gameTime());
-        }
-    }
-    for (const world::FluidChange& change : result->changes) {
-        broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);
-    }
-    // parity: `BucketItem.emptyContents` calls `setBlock`, so what was around it hears about it:
-    // grass that had a snow layer over it until the water took its place stops wearing snow.
-    for (const world::FluidChange& change : result->changes) {
-        notifyNeighbours(BlockPos{change.x, change.y, change.z});
-    }
-    if (!result->replacement.has_value()) {
-        return;
-    }
-    session->inventory.set(
-        heldSlot,
-        storage::StoredItemStack{.id = result->replacement->toString(), .count = 1, .components = held->components});
-    owner_->sendInventorySlot(heldSlot);
+    static_cast<void>(player::useBucketFor(breakContext(), *session, *world, *item, heldSlot, *held, useItem.yaw,
+                                           useItem.pitch, hooks_.bucketAllowed));
 }
 
 } // namespace basalt::server::runtime
