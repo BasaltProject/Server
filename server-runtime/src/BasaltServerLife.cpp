@@ -16,7 +16,10 @@
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
+#include <basalt/server/runtime/player/PlayerBlockSlots.hpp>
+#include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
@@ -25,7 +28,9 @@
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
+#include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
+#include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
@@ -1008,6 +1013,20 @@ void BasaltServer::startBedrockListener() {
                             return;
                         }
                     }
+                    // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use first. A
+                    // door, a gate, a lever, a button, a repeater or a comparator answers the hand
+                    // rather than letting whatever is held be placed against it.
+                    if (!session->sneaking) {
+                        const player::BreakContext blocks = breakContext();
+                        if (player::ringBellFor(blocks, *found->second, hit.x, hit.y, hit.z, hit.direction,
+                                                hit.clickY) ||
+                            player::tuneNoteBlockFor(blocks, *found->second, hit.x, hit.y, hit.z) ||
+                            player::toggleBlockFor(blocks, *found->second, hit.x, hit.y, hit.z, session->yaw) ||
+                            player::cycleBlockFor(blocks, *found->second, hit.x, hit.y, hit.z)) {
+                            return;
+                        }
+                    }
+
                     const std::int32_t slot = player::PlayerInventory::kHotbarStart + hotbarSlot;
                     const std::optional<storage::StoredItemStack> held = session->inventory.at(slot);
                     if (!held.has_value()) {
@@ -1018,6 +1037,64 @@ void BasaltServer::startBedrockListener() {
                     if (!item.has_value()) {
                         return;
                     }
+                    // parity: `ServerPlayerGameMode.useItemOn` with something in hand: these are
+                    // the item's own use, which happens sneaking or not, unlike the block's.
+                    const player::BreakContext blocks = breakContext();
+                    // parity: `TntBlock.useItemOn` runs before anything a flint and steel would do
+                    // to the square beside it, and a fire charge is spent where the lighter is worn.
+                    const bool lighter = *item == wire::common::Identifier::vanilla("flint_and_steel");
+                    const bool charge = *item == wire::common::Identifier::vanilla("fire_charge");
+                    const wire::common::Identifier* clicked = registry::blockStateDefinitions::blockOf(
+                        found->second->state().blockState(hit.x, hit.y, hit.z).value_or(0));
+                    if ((lighter || charge) && clicked != nullptr && clicked->path() == "tnt") {
+                        player::primeTntFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, *held,
+                                            lighter);
+                        return;
+                    }
+
+                    if (lighter) {
+                        // parity: `FlintAndSteelItem.useOn` lights the square beside the face that
+                        // was clicked, not the block itself.
+                        const wire::protocol::play::BlockPos beside =
+                            wire::protocol::play::BlockPos{hit.x, hit.y, hit.z}.offset(hit.direction);
+                        player::igniteFor(blocks, *session, *found->second, beside.x, beside.y, beside.z, slot, *held);
+                        return;
+                    }
+                    // parity: `ChiseledBookShelfBlock.useItemOn` and `DecoratedPotBlock.useItemOn`,
+                    // both of which move one item by hand and neither of which opens a screen.
+                    if (!session->sneaking && clicked != nullptr) {
+                        const player::FaceHit face{
+                            .face = hit.direction, .x = hit.clickX, .y = hit.clickY, .z = hit.clickZ};
+                        if (world::chiseledBookshelves::isBookshelf(clicked->path())) {
+                            player::useBookshelfFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, face, slot,
+                                                    held, &vanillaData_.itemTags);
+                            return;
+                        }
+                        if (world::decoratedPots::isPot(clicked->path())) {
+                            player::usePotFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held);
+                            return;
+                        }
+                    }
+
+                    // parity: a composter and a lit campfire take what is offered without a screen,
+                    // and answer the click whether or not it changed anything.
+                    if (!session->sneaking &&
+                        (player::useComposterFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held) ||
+                         player::placeOnCampfireFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held,
+                                                    &vanillaData_.recipes))) {
+                        return;
+                    }
+                    const bool answered =
+                        (*item == wire::common::Identifier::vanilla("bone_meal") &&
+                         player::useBoneMealFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, *held)) ||
+                        (*item == wire::common::Identifier::vanilla("honeycomb") &&
+                         player::useHoneycombFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, *held)) ||
+                        (item->path().ends_with("_axe") &&
+                         player::useAxeFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, *held));
+                    if (answered) {
+                        return;
+                    }
+
                     player::PlaceContext placing;
                     placing.blocks = breakContext();
                     // A sign that has just gone down opens its own editor, the same as on the other

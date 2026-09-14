@@ -181,9 +181,6 @@ private:
     [[nodiscard]] bool useAxe(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
                               std::int32_t heldSlot, const storage::StoredItemStack& held);
 
-    /// Writes what a tool turned a block into, and tells the clients and the neighbours about it.
-    void reshapeBlock(const wire::protocol::play::BlockPos& pos, std::int32_t stateId, std::int32_t effect);
-
     /// Arms an end portal frame, and opens the portal when that was the twelfth eye.
     void placeEnderEye(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
                        const storage::StoredItemStack& held);
@@ -237,10 +234,6 @@ private:
 
     void swapHotbarWithShelf(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
                              std::int32_t stateId);
-
-    /// Into the player's inventory if it fits, and onto the floor if it does not.
-    void giveOrDrop(player::PlayerSession& session, const storage::StoredItemStack& stack,
-                    const wire::protocol::play::BlockPos& pos);
 
     void usePot(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
