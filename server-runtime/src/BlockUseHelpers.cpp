@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
+#include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -58,15 +59,6 @@ using play::Gamemode;
 using player::PlayerInventory;
 using player::PlayerSession;
 using wire::common::Identifier;
-
-/// parity: `MinecartItem.useOn`, a sixteenth of a block above the rail.
-constexpr double kMinecartRestHeight = 0.0625;
-
-storage::StoredItemStack withCount(const storage::StoredItemStack& stack, std::int32_t count) {
-    storage::StoredItemStack copy = stack;
-    copy.count = count;
-    return copy;
-}
 
 } // namespace
 
@@ -281,122 +273,57 @@ bool BlockInteractionHandler::useJukebox(PlayerSession& session, const BlockPos&
                                  session.inventory.at(heldSlot));
 }
 
-bool BlockInteractionHandler::spawnFromItem(PlayerSession& session, const Identifier& type, std::int32_t heldSlot,
-                                            const storage::StoredItemStack& held, double x, double y, double z) {
-    world::LoadedWorld* world = owner_->currentWorld();
-    const reg::EntityTypeEntry* entry = reg::entityTypes::of(type);
-    player::PlayerRegistry* registry = owner_->options().playerRegistry;
-    if (world == nullptr || entry == nullptr || registry == nullptr) {
-        return false;
-    }
-    world->state().spawnEntity(std::make_unique<entity::ServerEntity>(
-        registry->allocateEntityId(), wire::common::Uuid::random(), type, entry->protocolId, x, y, z));
-    if (session.gamemode != Gamemode::Creative) {
-        session.inventory.set(heldSlot,
-                              held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
-        owner_->sendInventorySlot(heldSlot);
-    }
-    return true;
-}
-
 bool BlockInteractionHandler::hangFrame(PlayerSession& session, const play::BlockHitResult& hit,
                                         const std::int32_t heldSlot, const storage::StoredItemStack& held,
                                         const Identifier& type) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const reg::EntityTypeEntry* entry = reg::entityTypes::of(type);
-    player::PlayerRegistry* registry = owner_->options().playerRegistry;
-    if (world == nullptr || entry == nullptr || registry == nullptr) {
-        return false;
-    }
-    const BlockPos at = hit.pos.offset(hit.direction);
-    // The two enums are both in vanilla's `Direction` order, which is what makes this a cast.
-    const auto facing = static_cast<reg::BlockFace>(static_cast<std::uint8_t>(hit.direction));
-    if (!world::itemFrames::canHang(world->state(), at.x, at.y, at.z, facing)) {
-        return false;
-    }
-    const std::array<double, 3> hangs = world::itemFrames::hangingAt(at.x, at.y, at.z, facing);
-    auto frame = std::make_unique<entity::ServerEntity>(registry->allocateEntityId(), wire::common::Uuid::random(),
-                                                        type, entry->protocolId, hangs[0], hangs[1], hangs[2]);
-    frame->sourceNbt = world::itemFrames::freshTag(facing);
-    // parity: the spawn packet carries the face a hanging entity is on, which is what the client
-    // draws it against.
-    frame->objectData = static_cast<std::int32_t>(facing);
-    world->state().spawnEntity(std::move(frame));
-    // parity: `GameEvent.ENTITY_PLACE` from where the frame ended up.
-    world::vibrations::emit(world->state(), "entity_place", hangs[0], hangs[1], hangs[2], world->gameTime());
-    if (session.gamemode != Gamemode::Creative) {
-        session.inventory.set(heldSlot,
-                              held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
-        owner_->sendInventorySlot(heldSlot);
-    }
-    return true;
+    return world != nullptr && player::hangFrameFor(breakContext(), session, *world, type, heldSlot, held,
+                                                    player::BlockHit{.x = hit.pos.x,
+                                                                     .y = hit.pos.y,
+                                                                     .z = hit.pos.z,
+                                                                     .direction = hit.direction,
+                                                                     .clickX = hit.clickX,
+                                                                     .clickY = hit.clickY,
+                                                                     .clickZ = hit.clickZ});
 }
 
 bool BlockInteractionHandler::placeMinecart(PlayerSession& session, const Identifier& item, std::int32_t heldSlot,
                                             const storage::StoredItemStack& held, const play::BlockHitResult& hit) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> rail =
-        world == nullptr ? std::nullopt : world->state().blockState(hit.pos.x, hit.pos.y, hit.pos.z);
-    if (!rail.has_value() || !world::rails::isRail(*rail)) {
-        return false;
-    }
-    const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*rail);
-    const auto shape = properties.find("shape");
-    if (shape == properties.end()) {
-        return false;
-    }
-    const double slope = shape->second.starts_with("ascending") ? 0.5 : 0.0;
-    // The item and the entity share a name except for the plain cart, whose entity keeps the suffix.
-    const std::string path{item.path()};
-    const Identifier type =
-        path == "minecart"
-            ? item
-            : Identifier::vanilla(path.substr(0, path.size() - std::string_view{"_minecart"}.size()) + "_minecart");
-    if (!spawnFromItem(session, type, heldSlot, held, hit.pos.x + 0.5, hit.pos.y + kMinecartRestHeight + slope,
-                       hit.pos.z + 0.5)) {
-        return false;
-    }
-    // parity: `MinecartItem` raises `ENTITY_PLACE` at the rail's own square, not at the cart.
-    heardBySculk("entity_place", hit.pos);
-    return true;
+    return world != nullptr && player::placeMinecartFor(breakContext(), session, *world, item, heldSlot, held,
+                                                        player::BlockHit{.x = hit.pos.x,
+                                                                         .y = hit.pos.y,
+                                                                         .z = hit.pos.z,
+                                                                         .direction = hit.direction,
+                                                                         .clickX = hit.clickX,
+                                                                         .clickY = hit.clickY,
+                                                                         .clickZ = hit.clickZ});
 }
 
 bool BlockInteractionHandler::placeBoat(PlayerSession& session, const Identifier& item, std::int32_t heldSlot,
                                         const storage::StoredItemStack& held, const play::BlockHitResult& hit) {
-    // parity: `getBoat` puts it at the hit itself, which is the face of the block clicked.
-    const BlockPos at = hit.pos.offset(hit.direction);
-    if (!spawnFromItem(session, item, heldSlot, held, at.x + 0.5, static_cast<double>(at.y), at.z + 0.5)) {
-        return false;
-    }
-    // parity: `BoatItem` raises `ENTITY_PLACE` at the exact point clicked, not at the square.
-    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
-        world::vibrations::emit(world->state(), "entity_place", hit.pos.x + static_cast<double>(hit.clickX),
-                                hit.pos.y + static_cast<double>(hit.clickY),
-                                hit.pos.z + static_cast<double>(hit.clickZ), world->gameTime());
-    }
-    return true;
+    world::LoadedWorld* world = owner_->currentWorld();
+    return world != nullptr && player::placeBoatFor(breakContext(), session, *world, item, heldSlot, held,
+                                                    player::BlockHit{.x = hit.pos.x,
+                                                                     .y = hit.pos.y,
+                                                                     .z = hit.pos.z,
+                                                                     .direction = hit.direction,
+                                                                     .clickX = hit.clickX,
+                                                                     .clickY = hit.clickY,
+                                                                     .clickZ = hit.clickZ});
 }
 
 bool BlockInteractionHandler::useSpawnEgg(PlayerSession& session, const Identifier& egg, std::int32_t heldSlot,
                                           const storage::StoredItemStack& held, const play::BlockHitResult& hit) {
     world::LoadedWorld* world = owner_->currentWorld();
-    if (world == nullptr) {
-        return false;
-    }
-    const std::string path{egg.path()};
-    const Identifier type = Identifier::vanilla(path.substr(0, path.size() - std::string_view{"_spawn_egg"}.size()));
-    const std::optional<std::int32_t> clicked = world->state().blockState(hit.pos.x, hit.pos.y, hit.pos.z);
-    if (reg::entityTypes::of(type) == nullptr || !clicked.has_value()) {
-        return false;
-    }
-    // parity: the mob lands on the face that was clicked, unless the block has no collision at all.
-    const BlockPos at = reg::blockShapes::isEmptyShape(*clicked) ? hit.pos : hit.pos.offset(hit.direction);
-    if (!spawnFromItem(session, type, heldSlot, held, at.x + 0.5, static_cast<double>(at.y), at.z + 0.5)) {
-        return false;
-    }
-    // parity: `SpawnEggItem.spawnsFrom` raises `ENTITY_PLACE` at the square the mob lands on.
-    heardBySculk("entity_place", at);
-    return true;
+    return world != nullptr && player::useSpawnEggFor(breakContext(), session, *world, egg, heldSlot, held,
+                                                      player::BlockHit{.x = hit.pos.x,
+                                                                       .y = hit.pos.y,
+                                                                       .z = hit.pos.z,
+                                                                       .direction = hit.direction,
+                                                                       .clickX = hit.clickX,
+                                                                       .clickY = hit.clickY,
+                                                                       .clickZ = hit.clickZ});
 }
 
 void BlockInteractionHandler::useBookshelf(PlayerSession& session, const play::BlockHitResult& hit) {

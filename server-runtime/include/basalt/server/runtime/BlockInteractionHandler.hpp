@@ -225,10 +225,6 @@ private:
                                  std::int32_t heldSlot, const storage::StoredItemStack& held,
                                  const wire::protocol::play::BlockHitResult& hit);
 
-    [[nodiscard]] bool spawnFromItem(player::PlayerSession& session, const wire::common::Identifier& type,
-                                     std::int32_t heldSlot, const storage::StoredItemStack& held, double x, double y,
-                                     double z);
-
     [[nodiscard]] bool useSpawnEgg(player::PlayerSession& session, const wire::common::Identifier& egg,
                                    std::int32_t heldSlot, const storage::StoredItemStack& held,
                                    const wire::protocol::play::BlockHitResult& hit);

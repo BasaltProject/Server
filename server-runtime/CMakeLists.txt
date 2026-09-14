@@ -196,6 +196,7 @@ basalt_module(server-runtime-core
         src/player/PlayerEating.cpp
         src/player/PlayerItemPickup.cpp
         src/player/PlayerSleep.cpp
+        src/player/PlayerSpawnItems.cpp
         src/player/PlayerSweep.cpp
         src/player/PlayerThrown.cpp
         src/player/PlayerVitals.cpp

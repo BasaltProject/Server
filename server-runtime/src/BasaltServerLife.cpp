@@ -32,6 +32,7 @@
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
@@ -354,6 +355,23 @@ void BasaltServer::reportOrphanedPluginData() {
     });
 }
 
+const bedrock::BedrockRecipeList& BasaltServer::bedrockRecipeBook() {
+    if (!bedrockRecipes_.has_value()) {
+        bedrockRecipes_ = bedrock::bedrockRecipes(vanillaData_.recipes);
+        logger_.debug([this] {
+            return "Bedrock recipes: " + std::to_string(bedrockRecipes_->recipes.size()) + " sent, " +
+                   std::to_string(bedrockRecipes_->unnamed) + " left out for want of a name over there.";
+        });
+    }
+    return *bedrockRecipes_;
+}
+
+std::optional<storage::StoredItemStack> BasaltServer::bedrockRecipeResult(const std::int32_t netId) {
+    const bedrock::BedrockRecipeList& book = bedrockRecipeBook();
+    const auto found = book.results.find(netId);
+    return found == book.results.end() ? std::nullopt : std::optional{found->second};
+}
+
 player::BreakContext BasaltServer::breakContext() {
     player::BreakContext context;
     context.blocks = broadcaster_.get();
@@ -460,14 +478,7 @@ void BasaltServer::startBedrockListener() {
 
     // The recipe book, built once and handed to every client that joins: on that door the list the
     // server sends is the only crafting a client knows.
-    hooks.recipes = [this] {
-        static const bedrock::BedrockRecipeList built = bedrock::bedrockRecipes(vanillaData_.recipes);
-        logger_.debug([] {
-            return "Bedrock recipes: " + std::to_string(built.recipes.size()) + " sent, " +
-                   std::to_string(built.unnamed) + " left out for want of a name over there.";
-        });
-        return built.recipes;
-    };
+    hooks.recipes = [this] { return bedrockRecipeBook().recipes; };
 
     // Where this player left off, asked before the world is described to them: `start_game` names a
     // position and the client puts its player there for good. A saved position that arrives after
@@ -1278,6 +1289,24 @@ void BasaltServer::startBedrockListener() {
                         return;
                     }
 
+                    // parity: `MinecartItem.useOn`, `BoatItem.use` and `SpawnEggItem.useOn`, the
+                    // three items that put something alive down rather than a block.
+                    const std::string path{item->path()};
+                    const bool boat = path.ends_with("_boat") || path == "bamboo_raft" || path == "bamboo_chest_raft";
+                    // parity: `HangingEntityItem.useOn`, which hangs it on the face that was clicked
+                    // and answers nothing at all where it will not hold.
+                    if ((path == "item_frame" || path == "glow_item_frame" || path == "painting") &&
+                        player::hangFrameFor(blocks, *session, *found->second, *item, slot, *held, hit)) {
+                        return;
+                    }
+                    if ((path.ends_with("minecart") &&
+                         player::placeMinecartFor(blocks, *session, *found->second, *item, slot, *held, hit)) ||
+                        (boat && player::placeBoatFor(blocks, *session, *found->second, *item, slot, *held, hit)) ||
+                        (path.ends_with("_spawn_egg") &&
+                         player::useSpawnEggFor(blocks, *session, *found->second, *item, slot, *held, hit))) {
+                        return;
+                    }
+
                     player::PlaceContext placing;
                     placing.blocks = breakContext();
                     // A sign that has just gone down opens its own editor, the same as on the other
@@ -1373,8 +1402,11 @@ void BasaltServer::startBedrockListener() {
                         };
                     }
                     world::LoadedWorld* const where = found == worlds.end() ? nullptr : found->second;
-                    const bedrock::StackRequestAnswer applied =
-                        bedrock::applyStackRequest(*session, *windows, where, request, drop);
+                    const bedrock::StackRequestAnswer applied = bedrock::applyStackRequest(
+                        *session, *windows, where, request,
+                        bedrock::StackRequestContext{.drop = drop, .resultOf = [this](const std::int32_t netId) {
+                                                         return bedrockRecipeResult(netId);
+                                                     }});
                     answer(applied.accepted, applied.containers);
                     if (!applied.accepted && session->connection().sendInventoryAll) {
                         session->connection().sendInventoryAll();

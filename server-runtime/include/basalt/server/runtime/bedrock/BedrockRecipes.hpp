@@ -1,8 +1,10 @@
 #pragma once
 
+#include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
 #include <cstddef>
+#include <map>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -18,6 +20,9 @@ namespace basalt::server::runtime::bedrock {
 /// cooking, stonecutting and smithing have screens of their own that this door does not draw yet.
 struct BedrockRecipeList {
     std::vector<wire::bedrock::BedrockRecipe> recipes;
+    /// What each of them makes, by the number it was sent under: a client asks to craft by that
+    /// number and nothing else, so this is what turns the ask into a stack.
+    std::map<std::int32_t, storage::StoredItemStack> results;
     /// How many a table could make but this door could not name: an item that edition has no name
     /// for makes the whole recipe unsendable.
     std::size_t unnamed = 0;

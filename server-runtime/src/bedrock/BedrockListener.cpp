@@ -28,6 +28,8 @@ namespace {
         return "create";
     case wire::bedrock::BedrockStackActionType::CraftResults:
         return "craft results";
+    case wire::bedrock::BedrockStackActionType::Craft:
+        return "craft";
     case wire::bedrock::BedrockStackActionType::Other:
         break;
     }

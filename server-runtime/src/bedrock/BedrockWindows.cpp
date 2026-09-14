@@ -103,6 +103,12 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
                           .block = path,
                           .playerOwned = true};
     }
+    // parity: `StonecutterBlock.useWithoutItem`. Its one slot belongs to the screen rather than to
+    // the block, the same as a table's grid does.
+    if (path == "stonecutter") {
+        return OpenWindow{
+            .type = wire::bedrock::BedrockContainerType::Stonecutter, .x = x, .y = y, .z = z, .size = 0, .block = path};
+    }
     if (path == "crafting_table") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Workbench, .x = x, .y = y, .z = z, .size = 0, .block = path};
