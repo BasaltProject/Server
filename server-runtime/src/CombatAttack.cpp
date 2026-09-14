@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
+#include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
@@ -48,10 +49,6 @@ constexpr float kVehicleDamagePerPoint = 10.0F;
 constexpr float kVehicleBreakDamage = 40.0F;
 
 constexpr double kSprintKnockback = 0.5;
-constexpr float kSweepDamage = 1.0F;
-constexpr double kSweepRange = 1.0;
-constexpr double kSweepHeight = 0.25;
-constexpr double kSweepPlayerRange = 9.0;
 constexpr double kSweepSpeedLimit = 0.003;
 constexpr double kSweepParticleHeight = 1.0;
 constexpr std::string_view kSwordSuffix = "_sword";
@@ -191,42 +188,16 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
 void CombatHandler::sweepAround(PlayerSession& session, const ServerEntity& target, world::LoadedWorld& world,
                                 float strength) {
     owner_->broadcastSound(kSoundAttackSweep, session.x, session.y, session.z, SoundSource::Players);
-    const float damage = kSweepDamage * strength;
-    for (ServerEntity* nearby : world.state().entities()) {
-        if (nearby->entityId() == target.entityId() || nearby->removed ||
-            !server::registry::entityAttributes::isLiving(nearby->type())) {
+    for (const player::SweepHit& hit : player::sweepAround(session, world, target, strength)) {
+        ServerEntity* caught = world.state().entity(hit.entityId);
+        if (caught == nullptr) {
             continue;
         }
-        if (std::abs(nearby->x - target.x) > kSweepRange + (nearby->width() / 2.0) ||
-            std::abs(nearby->z - target.z) > kSweepRange + (nearby->width() / 2.0)) {
-            continue;
+        broadcastDamageEvent(*caught, world::damageTypes::kPlayerAttack, session.entityId());
+        broadcastMotion(*caught);
+        if (hit.died) {
+            killEntity(*caught);
         }
-        if (nearby->y > target.y + target.height() + kSweepHeight ||
-            nearby->y + nearby->height() < target.y - kSweepHeight) {
-            continue;
-        }
-        const double dx = nearby->x - session.x;
-        const double dz = nearby->z - session.z;
-        if ((dx * dx) + (dz * dz) >= kSweepPlayerRange) {
-            continue;
-        }
-        const entity::entityCombat::Result result =
-            entity::entityCombat::hurt(*nearby, damage, session.x, session.z, {}, "sweep", session.name());
-        if (!result.landed) {
-            continue;
-        }
-        world::vibrations::emit(world.state(), "entity_damage", nearby->x, nearby->y, nearby->z, world.gameTime());
-        broadcastDamageEvent(*nearby, world::damageTypes::kPlayerAttack, session.entityId());
-        broadcastMotion(*nearby);
-        if (result.died) {
-            killEntity(*nearby);
-            continue;
-        }
-        nearby->hurtBy = session.entityId();
-        if (entity::wardens::isWarden(nearby->type())) {
-            entity::wardens::anger(*nearby, session.entityId(), entity::wardens::kHurt);
-        }
-        nearby->panicTicks = kPanicTicks;
     }
     // parity: the sweep's own particle, a block ahead of where the player is looking.
     const float yaw = session.yaw * std::numbers::pi_v<float> / kHalfCircle;

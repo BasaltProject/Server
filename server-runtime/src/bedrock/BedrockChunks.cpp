@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/bedrock/BedrockBlockEntities.hpp>
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/server/world/Chunk.hpp>
@@ -7,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 namespace basalt::server::runtime::bedrock {
 
@@ -25,6 +27,17 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
         }
     }
 
+    // Where the beds are, picked up while the blocks are being read: this edition keeps a bed's
+    // colour in a block entity, and scanning the column a second time for them would be daft.
+    struct Bed {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::int32_t z = 0;
+        std::uint8_t colour = 0;
+    };
+
+    std::vector<Bed> beds;
+
     wire::io::ByteBuffer packed{static_cast<std::size_t>(sent) * 1024};
     std::array<std::int32_t, wire::bedrock::kSubChunkBlocks> blocks{};
     for (std::int32_t section = 0; section < sent; ++section) {
@@ -34,6 +47,9 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
                     const std::size_t at = (static_cast<std::size_t>(y) << 8U) | (static_cast<std::size_t>(z) << 4U) |
                                            static_cast<std::size_t>(x);
                     blocks[at] = chunk.blockStateId(x, bottom + (section * 16) + y, z);
+                    if (const auto colour = bedColourOf(blocks[at]); colour) {
+                        beds.push_back({x, bottom + (section * 16) + y, z, *colour});
+                    }
                 }
             }
         }
@@ -43,9 +59,13 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
                                      static_cast<std::int8_t>(chunk.verticalBounds().minSection() + section), protocol);
     }
 
-    // What the column holds that is more than a block. Only signs for now: the rest of the block
-    // entities are drawn from the block itself over there, and a sign with no text is a blank sign.
+    // What the column holds that is more than a block: the signs this edition keeps text in, and
+    // the beds it keeps a colour in. The rest are drawn from the block itself over there.
     wire::io::ByteBuffer extras;
+    for (const Bed& bed : beds) {
+        wire::bedrock::writeBedTag(extras, (chunk.chunkX() * 16) + bed.x, bed.y, (chunk.chunkZ() * 16) + bed.z,
+                                   bed.colour);
+    }
     for (const server::world::ChunkBlockEntity& entity : chunk.blockEntities()) {
         if (!world::signs::isSign(chunk.blockStateId(entity.localX(), entity.y(), entity.localZ()))) {
             continue;

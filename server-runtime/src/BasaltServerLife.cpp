@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -23,7 +24,9 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
+#include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -762,6 +765,31 @@ void BasaltServer::startBedrockListener() {
                 if (swing.knockbackAttack) {
                     entity::entityCombat::knockback(*target, 0.5, session->x - target->x, session->z - target->z);
                 }
+                // parity: `isSweepAttack`: a sword, on the ground, a swing that is neither critical
+                // nor a sprinting one. The sweep itself is the same code the other door runs.
+                if (swing.fullStrength && !swing.critical && !swing.knockbackAttack && session->onGround &&
+                    weapon.has_value() && weapon->path().ends_with("_sword")) {
+                    const std::vector<player::SweepHit> caught =
+                        player::sweepAround(*session, world, *target, strength);
+                    for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
+                        if (watcher->worldName != session->worldName || !watcher->connection().playSound) {
+                            continue;
+                        }
+                        watcher->connection().playSound("entity.player.attack.sweep", session->x, session->y,
+                                                        session->z, 1.0F, 1.0F);
+                        // Everything the sweep caught sounds for itself, the same as what was aimed
+                        // at: a silent sweep looks like it missed.
+                        for (const player::SweepHit& hit : caught) {
+                            const entity::ServerEntity* struck = world.state().entity(hit.entityId);
+                            if (struck == nullptr) {
+                                continue;
+                            }
+                            watcher->connection().playSound(hit.died ? entity::entityCombat::deathSound(struck->type())
+                                                                     : entity::entityCombat::hurtSound(struck->type()),
+                                                            struck->x, struck->y, struck->z, 1.0F, 1.0F);
+                        }
+                    }
+                }
                 // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
                 target->hurtBy = session->entityId();
                 // parity: `Player.attack` wears the weapon by one point per hit, and unbreaking
@@ -809,6 +837,68 @@ void BasaltServer::startBedrockListener() {
                                              wire::protocol::play::SoundSource::Players, session->x, session->y,
                                              session->z, 1.0F, 1.0F, 0);
                     }
+                }
+            });
+        };
+
+        // A click on something alive that is not a hit. Only the two that need nothing of the other
+        // door's own machinery: sitting in a cart and feeding an animal. Trades and item frames
+        // still live inside the java session and come with their own screens.
+        context.useEntity = [this](player::PlayerSession& player, const std::int32_t entityId) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, entityId] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr || session->gamemode == wire::protocol::play::Gamemode::Spectator) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                entity::ServerEntity* target = found->second->state().entity(entityId);
+                if (target == nullptr || target->removed) {
+                    return;
+                }
+                // parity: `AbstractMinecart.interact`, which seats whoever clicked it.
+                if (world::detectorRails::isMinecart(target->type())) {
+                    if (session->vehicleId.has_value()) {
+                        return;
+                    }
+                    session->vehicleId = target->entityId();
+                    target->passengerIds.push_back(session->entityId());
+                    for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
+                        if (watcher->worldName == session->worldName && watcher->connection().sendPassengers) {
+                            watcher->connection().sendPassengers(target->entityId(), target->passengerIds);
+                        }
+                    }
+                    return;
+                }
+                // parity: `Animal.mobInteract`, which only takes the food an animal of that kind eats.
+                const std::optional<storage::StoredItemStack>& held = session->inventory.heldItem();
+                if (!held.has_value()) {
+                    return;
+                }
+                const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+                    wire::common::Identifier::parse(held->id);
+                if (!item.has_value() || !entity::breeding::isFood(target->type(), *item) ||
+                    !entity::breeding::canFallInLove(*target)) {
+                    return;
+                }
+                entity::breeding::feed(*target);
+                if (session->gamemode == wire::protocol::play::Gamemode::Creative) {
+                    return;
+                }
+                const std::int32_t slot = player::PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+                if (held->count <= 1) {
+                    session->inventory.set(slot, std::nullopt);
+                } else {
+                    storage::StoredItemStack left = *held;
+                    left.count = held->count - 1;
+                    session->inventory.set(slot, left);
+                }
+                if (session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
                 }
             });
         };

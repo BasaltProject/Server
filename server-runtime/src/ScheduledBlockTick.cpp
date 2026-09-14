@@ -568,10 +568,15 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         } else if (spike.falls) {
             for (std::int32_t at = y; world::scheduledBlocks::isStalactiteAt(world.state(), x, at, z); --at) {
                 const bool tip = world::scheduledBlocks::isStalactiteTipAt(world.state(), x, at, z);
+                const std::int32_t was = world.state().blockState(x, at, z).value_or(0);
                 static_cast<void>(world::fallingBlocks::fallFrom(world.state(), x, at, z,
                                                                  [this] { return players_->allocateEntityId(); }));
                 scheduled.push_back(
                     world::BlockChange{.x = x, .y = at, .z = z, .stateId = server::registry::blocks::air().stateId});
+                // parity: `FallingBlockEntity.fall` writes with flag three, so **each** piece leaving
+                // redraws the shapes under it, and that is what books the turn of the piece below.
+                // Measured in `estalactita`, where the jar held two turns nobody here had booked.
+                broadcaster_->notifyAround(world, watchers, x, at, z, was);
                 if (tip) {
                     break;
                 }
