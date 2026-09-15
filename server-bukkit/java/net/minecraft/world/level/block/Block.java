@@ -26,7 +26,7 @@ public class Block extends BlockBehaviour implements ItemLike {
     private final Identifier key;
     private final int first;
     private final int count;
-    private Property<?>[] properties;
+    private volatile Property<?>[] properties;
     private int[] strides;
     private volatile BlockState[] states;
     private StateDefinition<Block, BlockState> definition;

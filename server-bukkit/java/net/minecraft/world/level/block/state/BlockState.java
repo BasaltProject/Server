@@ -111,7 +111,10 @@ public class BlockState extends BlockBehaviour.BlockStateBase {
 
     public PushReaction getPistonPushReaction() {
         double[] found = WorldNatives.blockInfo(stateId());
-        return found == null ? PushReaction.PUSH_PULL : kReactions[(int) found[3]];
+        if (found == null || found.length < 4 || found[3] < 0 || found[3] >= kReactions.length) {
+            return PushReaction.PUSH_PULL;
+        }
+        return kReactions[(int) found[3]];
     }
 
     public boolean isSignalSource() {
