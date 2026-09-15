@@ -140,6 +140,8 @@ basalt_module(server-runtime-core
         src/ContainerClicks.cpp
         src/ContainerMenuController.cpp
         src/ContainerAnvil.cpp
+        src/ContainerGrindstone.cpp
+        src/ContainerEnchantment.cpp
         src/ContainerSlots.cpp
         src/MobActionSystem.cpp
         src/ItemUseTimers.cpp
@@ -295,6 +297,9 @@ basalt_module(server-runtime-core
         src/world/AdvancementTriggers.cpp
         src/world/Anvils.cpp
         src/world/AnvilEnchantments.cpp
+        src/world/EnchantmentBooks.cpp
+        src/world/Enchanting.cpp
+        src/world/Grindstones.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -1537,6 +1542,18 @@ basalt_test(server-runtime-anvils-test
 basalt_test(server-runtime-anvil-enchantments-test
     SOURCES
         test/AnvilEnchantmentsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-grindstones-test
+    SOURCES
+        test/GrindstonesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-enchanting-test
+    SOURCES
+        test/EnchantingTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

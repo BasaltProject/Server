@@ -77,6 +77,15 @@ public:
     static constexpr std::int32_t kAnvilAddition = 1;
     static constexpr std::int32_t kAnvilResult = 2;
 
+    /// parity: `EnchantmentMenu`'s two: what is being enchanted, and what is paying for it.
+    static constexpr std::int32_t kEnchantmentInput = 0;
+    static constexpr std::int32_t kEnchantmentLapis = 1;
+
+    /// parity: `GrindstoneMenu`'s own three, which are numbered like an anvil's.
+    static constexpr std::int32_t kGrindstoneInput = 0;
+    static constexpr std::int32_t kGrindstoneAddition = 1;
+    static constexpr std::int32_t kGrindstoneResult = 2;
+
     static constexpr std::int32_t kSmithingTemplate = 0;
     static constexpr std::int32_t kSmithingBase = 1;
     static constexpr std::int32_t kSmithingAddition = 2;
@@ -128,6 +137,12 @@ public:
 
     /// parity: `AnvilMenu`: input, addition, result, then the player's 36.
     [[nodiscard]] static Menu anvil(std::int32_t containerId);
+
+    /// parity: `GrindstoneMenu`: the same three slots, and no price to pay for them.
+    [[nodiscard]] static Menu grindstone(std::int32_t containerId);
+
+    /// parity: `EnchantmentMenu`: what is being enchanted and the lapis, then the player's 36.
+    [[nodiscard]] static Menu enchantment(std::int32_t containerId);
 
     /// A villager's window. The three trading slots are the menu's own rather than any block's, so
     /// nothing behind them is a container: the trade itself is what moves the items.

@@ -95,6 +95,10 @@ public:
 
     void openAnvilMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    void openGrindstoneMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    void openEnchantmentMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
     /// parity: `ServerboundRenameItemPacket`, which arrives on every keystroke and works the result
     /// out again each time.
     void setAnvilName(const std::string& name);
@@ -173,6 +177,18 @@ private:
 
     void takeSmithingResult();
 
+    /// parity: `EnchantmentMenu.slotsChanged`, which rolls all three rows off the player's seed.
+    void rollEnchantmentOffers();
+
+    /// parity: `EnchantmentMenu.clickMenuButton`, the row they pressed.
+    void takeEnchantmentOffer(player::PlayerSession& session, std::int32_t row);
+
+    void sendEnchantmentNumbers();
+
+    void recomputeGrindstoneResult();
+
+    void takeGrindstoneResult(player::PlayerSession& session);
+
     void recomputeAnvilResult();
 
     void takeAnvilResult(player::PlayerSession& session);
@@ -239,6 +255,19 @@ private:
 
     bool openSmithing_ = false;
     std::array<std::optional<storage::StoredItemStack>, 4> smithingSlots_;
+
+    bool openEnchantment_ = false;
+    std::array<std::optional<storage::StoredItemStack>, 2> enchantmentSlots_;
+    /// What each of the three rows costs, and what it is hinting at: the enchantment's protocol id
+    /// and the level it would come at, or -1 for a row with nothing behind it.
+    std::array<std::int32_t, 3> enchantmentCosts_{0, 0, 0};
+    std::array<std::int32_t, 3> enchantmentClues_{-1, -1, -1};
+    std::array<std::int32_t, 3> enchantmentLevels_{-1, -1, -1};
+
+    bool openGrindstone_ = false;
+    std::array<std::optional<storage::StoredItemStack>, 3> grindstoneSlots_;
+    /// What the two things in it were worth at a table, which is what grinding them hands back.
+    std::int32_t grindstoneWorth_ = 0;
 
     bool openAnvil_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> anvilSlots_;

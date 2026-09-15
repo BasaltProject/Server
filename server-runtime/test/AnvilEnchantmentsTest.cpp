@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
+#include <basalt/server/runtime/world/EnchantmentBooks.hpp>
 
 #include <doctest.h>
 

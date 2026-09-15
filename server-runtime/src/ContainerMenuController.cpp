@@ -391,6 +391,41 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
         std::ranges::fill(smithingSlots_, std::nullopt);
         openSmithing_ = false;
     }
+    // parity: `EnchantmentMenu.removed`, which hands both slots back.
+    if (openEnchantment_) {
+        for (std::optional<storage::StoredItemStack>& leftover : enchantmentSlots_) {
+            if (!leftover.has_value()) {
+                continue;
+            }
+            const std::int32_t left = session.inventory.add(*leftover);
+            if (left > 0) {
+                storage::StoredItemStack dropped = *leftover;
+                dropped.count = left;
+                dropStack(session, dropped);
+            }
+            leftover.reset();
+        }
+        enchantmentCosts_ = {0, 0, 0};
+        openEnchantment_ = false;
+    }
+    // parity: `GrindstoneMenu.removed`, which hands the two inputs back.
+    if (openGrindstone_) {
+        for (const std::int32_t slot : {Menu::kGrindstoneInput, Menu::kGrindstoneAddition}) {
+            const std::optional<storage::StoredItemStack>& leftover = grindstoneSlots_[static_cast<std::size_t>(slot)];
+            if (!leftover.has_value()) {
+                continue;
+            }
+            const std::int32_t left = session.inventory.add(*leftover);
+            if (left > 0) {
+                storage::StoredItemStack dropped = *leftover;
+                dropped.count = left;
+                dropStack(session, dropped);
+            }
+        }
+        std::ranges::fill(grindstoneSlots_, std::nullopt);
+        grindstoneWorth_ = 0;
+        openGrindstone_ = false;
+    }
     // parity: `ItemCombinerMenu.removed`, which hands the two inputs back.
     if (openAnvil_) {
         for (const std::int32_t slot : {Menu::kAnvilInput, Menu::kAnvilAddition}) {
@@ -448,6 +483,11 @@ void ContainerMenuController::clickContainerButton(std::int32_t button) {
     // whatever is in the input slot, in the order the client was sent them.
     if (openStonecutter_) {
         selectStonecutterRecipe(button);
+        return;
+    }
+    // parity: `EnchantmentMenu.clickMenuButton`, whose button is which of the three rows was pressed.
+    if (openEnchantment_) {
+        takeEnchantmentOffer(*session, button);
         return;
     }
     if (!openLecternAt.has_value()) {

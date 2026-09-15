@@ -43,7 +43,9 @@
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
+#include <basalt/server/runtime/world/EnchantmentBooks.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/Grindstones.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -1399,97 +1401,167 @@ void BasaltServer::startBedrockListener() {
 
         // Tidying a bag, where the world is: a refused request is answered with the whole
         // inventory, which is the same thing a Java click gets.
-        context.moveStacks =
-            [this](player::PlayerSession& player, wire::bedrock::BedrockStackRequest request,
-                   std::shared_ptr<bedrock::BedrockWindows> windows,
-                   std::function<void(bool, std::vector<wire::bedrock::BedrockResponseContainer>)> answer) {
-                const wire::common::Uuid uuid = player.uuid();
-                worldRegistry_->scheduler().global().submit([this, uuid, request = std::move(request),
-                                                             windows = std::move(windows), answer = std::move(answer)] {
-                    player::PlayerSession* session = playerRegistry_.get(uuid);
-                    if (session == nullptr) {
-                        return;
-                    }
-                    const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
-                    const auto found = worlds.find(session->worldName);
-                    std::function<void(const storage::StoredItemStack&)> drop;
-                    if (found != worlds.end() && found->second != nullptr) {
-                        drop = [this, session, world = found->second](const storage::StoredItemStack& stack) {
-                            const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
-                                wire::common::Identifier::parse(stack.id);
-                            if (!item.has_value()) {
-                                return;
+        context.moveStacks = [this](player::PlayerSession& player, wire::bedrock::BedrockStackRequest request,
+                                    std::shared_ptr<bedrock::BedrockWindows> windows,
+                                    std::function<void(bool, std::vector<wire::bedrock::BedrockResponseContainer>)>
+                                        answer) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, request = std::move(request),
+                                                         windows = std::move(windows), answer = std::move(answer)] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                std::function<void(const storage::StoredItemStack&)> drop;
+                if (found != worlds.end() && found->second != nullptr) {
+                    drop = [this, session, world = found->second](const storage::StoredItemStack& stack) {
+                        const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
+                            wire::common::Identifier::parse(stack.id);
+                        if (!item.has_value()) {
+                            return;
+                        }
+                        player::spawnDroppedItem(breakContext(), *world, *item, stack.count, session->x,
+                                                 session->y + kThrowEyeHeight, session->z, 0.0, kThrowLift, 0.0,
+                                                 kPickupDelay, stack.components);
+                    };
+                }
+                world::LoadedWorld* const where = found == worlds.end() ? nullptr : found->second;
+                const bool free = session->gamemode == wire::protocol::play::Gamemode::Creative;
+                const bedrock::StackRequestAnswer applied = bedrock::applyStackRequest(
+                    *session, *windows, where, request,
+                    bedrock::StackRequestContext{
+                        .drop = drop,
+                        .resultOf = [this](const std::int32_t netId) { return bedrockRecipeResult(netId); },
+                        .anvilResult =
+                            [this](const storage::StoredItemStack* input, const storage::StoredItemStack* addition,
+                                   const std::optional<std::string>& name) {
+                                return world::anvils::combine(input, addition, name, world::anvils::isRepairMaterialFor,
+                                                              world::anvils::enchantmentMerge(
+                                                                  {.enchantments = &vanillaData_.enchantments,
+                                                                   .itemTags = &vanillaData_.itemTags,
+                                                                   .enchantmentTags = &vanillaData_.enchantmentTags}));
+                            },
+                        .canPay = [free, session](
+                                      const std::int32_t cost) { return free || session->experience.level() >= cost; },
+                        .grindstoneResult =
+                            [this](const storage::StoredItemStack* input, const storage::StoredItemStack* addition) {
+                                const world::EnchantmentBooks books{.enchantments = &vanillaData_.enchantments,
+                                                                    .itemTags = &vanillaData_.itemTags,
+                                                                    .enchantmentTags = &vanillaData_.enchantmentTags};
+                                return world::grindstones::combine(
+                                    input, addition,
+                                    [books](const wire::common::Identifier& id) { return books.isCurse(id); },
+                                    [books](const wire::common::Identifier& id, const std::int32_t level) {
+                                        return books.minCost(id, level);
+                                    });
+                            },
+                        .smithingResult =
+                            [this](
+                                const storage::StoredItemStack* templateStack, const storage::StoredItemStack* base,
+                                const storage::StoredItemStack* addition) -> std::optional<storage::StoredItemStack> {
+                            const auto asCrafting = [](const storage::StoredItemStack* stack)
+                                -> std::optional<server::world::loot::ItemStack> {
+                                if (stack == nullptr) {
+                                    return std::nullopt;
+                                }
+                                const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+                                    wire::common::Identifier::parse(stack->id);
+                                if (!id.has_value()) {
+                                    return std::nullopt;
+                                }
+                                return server::world::loot::ItemStack{
+                                    .item = *id, .count = stack->count, .components = stack->components};
+                            };
+                            const std::optional<server::world::loot::ItemStack> pattern = asCrafting(templateStack);
+                            const std::optional<server::world::loot::ItemStack> under = asCrafting(base);
+                            const std::optional<server::world::loot::ItemStack> onto = asCrafting(addition);
+                            if (!under.has_value() || !onto.has_value()) {
+                                return std::nullopt;
                             }
-                            player::spawnDroppedItem(breakContext(), *world, *item, stack.count, session->x,
-                                                     session->y + kThrowEyeHeight, session->z, 0.0, kThrowLift, 0.0,
-                                                     kPickupDelay, stack.components);
-                        };
+                            const server::world::crafting::Recipe* recipe = vanillaData_.recipes.smithingFor(
+                                pattern.has_value() ? &*pattern : nullptr, &*under, &*onto);
+                            const std::optional<server::world::loot::ItemStack> made =
+                                recipe == nullptr ? std::nullopt : recipe->assembleSmithing(*under, *onto);
+                            if (!made.has_value()) {
+                                return std::nullopt;
+                            }
+                            return storage::StoredItemStack{
+                                .id = made->item.toString(), .count = made->count, .components = made->components};
+                        }});
+                answer(applied.accepted, applied.containers);
+                if (!applied.accepted && session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
+                if (applied.tradedWith.has_value()) {
+                    // parity: `MerchantMenu` hands the experience to the merchant, not to the
+                    // buyer, and the book is drawn again so the used offer stops being offered.
+                    if (where != nullptr) {
+                        entity::ServerEntity* merchant = where->state().entity(*applied.tradedWith);
+                        if (merchant != nullptr) {
+                            merchant->villagerExperience += applied.tradeExperience;
+                        }
                     }
-                    world::LoadedWorld* const where = found == worlds.end() ? nullptr : found->second;
-                    const bool free = session->gamemode == wire::protocol::play::Gamemode::Creative;
-                    const bedrock::StackRequestAnswer applied = bedrock::applyStackRequest(
-                        *session, *windows, where, request,
-                        bedrock::StackRequestContext{
-                            .drop = drop,
-                            .resultOf = [this](const std::int32_t netId) { return bedrockRecipeResult(netId); },
-                            .anvilResult =
-                                [this](const storage::StoredItemStack* input, const storage::StoredItemStack* addition,
-                                       const std::optional<std::string>& name) {
-                                    return world::anvils::combine(
-                                        input, addition, name, world::anvils::isRepairMaterialFor,
-                                        world::anvils::enchantmentMerge(
-                                            {.enchantments = &vanillaData_.enchantments,
-                                             .itemTags = &vanillaData_.itemTags,
-                                             .enchantmentTags = &vanillaData_.enchantmentTags}));
-                                },
-                            .canPay =
-                                [free, session](const std::int32_t cost) {
-                                    return free || session->experience.level() >= cost;
-                                }});
-                    answer(applied.accepted, applied.containers);
-                    if (!applied.accepted && session->connection().sendInventoryAll) {
+                    if (session->connection().sendInventoryAll) {
                         session->connection().sendInventoryAll();
                     }
-                    if (applied.tradedWith.has_value()) {
-                        // parity: `MerchantMenu` hands the experience to the merchant, not to the
-                        // buyer, and the book is drawn again so the used offer stops being offered.
-                        if (where != nullptr) {
-                            entity::ServerEntity* merchant = where->state().entity(*applied.tradedWith);
-                            if (merchant != nullptr) {
-                                merchant->villagerExperience += applied.tradeExperience;
-                            }
-                        }
-                        if (session->connection().sendInventoryAll) {
-                            session->connection().sendInventoryAll();
-                        }
-                        if (session->connection().sendTrades) {
-                            session->connection().sendTrades();
+                    if (session->connection().sendTrades) {
+                        session->connection().sendTrades();
+                    }
+                }
+                if (applied.grindstoneWorth.has_value() && windows->open.has_value()) {
+                    // parity: `GrindstoneMenu.ResultSlot.onTake` drops the experience as orbs;
+                    // those are not modelled yet, so the points go straight to whoever ground
+                    // it rather than lying on the floor.
+                    const std::int32_t half = (*applied.grindstoneWorth + 1) / 2;
+                    const auto roll = static_cast<std::int32_t>(
+                        std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()) * static_cast<double>(half));
+                    const std::int32_t points = world::grindstones::experienceFor(*applied.grindstoneWorth, roll);
+                    if (points > 0) {
+                        session->experience.givePoints(points);
+                        if (session->connection().syncExperience) {
+                            session->connection().syncExperience();
                         }
                     }
-                    if (applied.anvilCost.has_value() && windows->open.has_value()) {
-                        if (!free) {
-                            session->experience.giveLevels(-*applied.anvilCost);
-                            if (session->connection().syncExperience) {
-                                session->connection().syncExperience();
-                            }
-                        }
-                        // parity: `AnvilMenu.onTake`: creative wears nothing out, and a block that
-                        // goes takes the screen standing over it with it.
-                        const bool gone =
-                            !free && where != nullptr &&
-                            player::wearAnvilAt(breakContext(), *where, windows->open->x, windows->open->y,
-                                                windows->open->z,
-                                                std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()));
-                        if (gone) {
-                            windows->open.reset();
-                            windows->saidSlots.clear();
-                        }
-                        if (session->connection().sendInventoryAll) {
-                            session->connection().sendInventoryAll();
+                    if (where != nullptr) {
+                        const std::int32_t stateId =
+                            where->state().blockState(windows->open->x, windows->open->y, windows->open->z).value_or(0);
+                        broadcaster_->sendEffects(
+                            player::playersIn(breakContext(), session->worldName), windows->open->x, windows->open->y,
+                            windows->open->z, stateId,
+                            {world::blockEffect::Sound{.name = "block.grindstone.use",
+                                                       .source = wire::protocol::play::SoundSource::Blocks,
+                                                       .volume = 1.0F,
+                                                       .pitch = 1.0F}});
+                    }
+                    if (session->connection().sendInventoryAll) {
+                        session->connection().sendInventoryAll();
+                    }
+                }
+                if (applied.anvilCost.has_value() && windows->open.has_value()) {
+                    if (!free) {
+                        session->experience.giveLevels(-*applied.anvilCost);
+                        if (session->connection().syncExperience) {
+                            session->connection().syncExperience();
                         }
                     }
-                });
-            };
+                    // parity: `AnvilMenu.onTake`: creative wears nothing out, and a block that
+                    // goes takes the screen standing over it with it.
+                    const bool gone = !free && where != nullptr &&
+                                      player::wearAnvilAt(
+                                          breakContext(), *where, windows->open->x, windows->open->y, windows->open->z,
+                                          std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()));
+                    if (gone) {
+                        windows->open.reset();
+                        windows->saidSlots.clear();
+                    }
+                    if (session->connection().sendInventoryAll) {
+                        session->connection().sendInventoryAll();
+                    }
+                }
+            });
+        };
 
         // Hurting and healing are the same arithmetic on both editions, so both doors call the same
         // thing; what this adds is only getting onto the thread that owns the world and the player.

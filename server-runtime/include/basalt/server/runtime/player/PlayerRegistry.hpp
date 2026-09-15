@@ -31,6 +31,12 @@ public:
     /// sanitiser, a Bedrock client leaving while the world ticked took the whole server down.
     void retire(std::unique_ptr<PlayerSession> session);
 
+    /// Holds whatever a retired session points into for the same window. A session's callbacks
+    /// reach back into the connection it was talking through, and that connection dies on its own
+    /// thread the moment the socket closes: without this the tick loop reads a destroyed socket
+    /// milliseconds later, which is a crash and not a maybe.
+    void keepAlive(std::shared_ptr<void> owner);
+
     /// Lets go of what has been retired. Call it from the tick thread between turns: nothing that
     /// thread handed out can still be in use there, which is what makes it safe rather than likely.
     /// The other threads that take a snapshot are covered by the floor below, since they share no
@@ -55,6 +61,8 @@ private:
     std::int32_t nextEntityId_ = 1;
     /// Sessions that have left, with the moment they did. Swept whenever the list is read.
     std::vector<std::pair<std::chrono::steady_clock::time_point, std::unique_ptr<PlayerSession>>> retired_;
+    /// What those sessions were talking through, held for the same window and nothing more.
+    std::vector<std::pair<std::chrono::steady_clock::time_point, std::shared_ptr<void>>> kept_;
 };
 
 } // namespace basalt::server::runtime::player

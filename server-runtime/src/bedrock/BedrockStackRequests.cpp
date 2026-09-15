@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -96,6 +97,19 @@ struct Place {
             return {};
         }
         return {.kind = Place::Kind::Storage, .slot = PlayerInventory::kOffhandSlot};
+    case BedrockContainerSlot::SmithingTemplate:
+        // A smithing table's four slots are the screen's, so its three inputs live where a grid's
+        // first cells do and what it makes is nowhere until it is taken.
+        return {.kind = Place::Kind::Grid, .slot = 0};
+    case BedrockContainerSlot::SmithingInput:
+        return {.kind = Place::Kind::Grid, .slot = 1};
+    case BedrockContainerSlot::SmithingMaterial:
+        return {.kind = Place::Kind::Grid, .slot = 2};
+    case BedrockContainerSlot::GrindstoneInput:
+        // A grindstone's two slots are the screen's, so they live where a grid's first cells do.
+        return {.kind = Place::Kind::Grid, .slot = 0};
+    case BedrockContainerSlot::GrindstoneAdditional:
+        return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::AnvilInput:
         // An anvil's two slots belong to the screen, so they live where a grid's first cells do:
         // only one screen is ever open.
@@ -118,6 +132,8 @@ struct Place {
     case BedrockContainerSlot::StonecutterResult:
     case BedrockContainerSlot::TradeResult:
     case BedrockContainerSlot::AnvilResult:
+    case BedrockContainerSlot::GrindstoneResult:
+    case BedrockContainerSlot::SmithingResult:
         // What a craft just made, which is nowhere until the line that takes it says where.
         return {.kind = Place::Kind::Created};
     default:
@@ -148,6 +164,8 @@ struct Reach {
     std::int32_t trades = 0;
     /// What the open anvil charged, once the request has taken what it made.
     std::optional<std::int32_t> anvilCost;
+    /// What the open grindstone took off, once the request has taken what it left.
+    std::optional<std::int32_t> grindstoneWorth;
 };
 
 [[nodiscard]] std::optional<storage::StoredItemStack> stackAt(const Reach& reach, const Place& place) {
@@ -365,6 +383,35 @@ private:
     return true;
 }
 
+/// Stages what a smithing table makes and eats one of each of its three, which is what taking the
+/// result does. parity: `SmithingMenu.onTake`.
+[[nodiscard]] bool forge(Reach& reach, const StackRequestContext& context) {
+    if (!context.smithingResult) {
+        return false;
+    }
+    std::array<Place, 3> cells{Place{.kind = Place::Kind::Grid, .slot = 0}, Place{.kind = Place::Kind::Grid, .slot = 1},
+                               Place{.kind = Place::Kind::Grid, .slot = 2}};
+    std::array<std::optional<storage::StoredItemStack>, 3> held{stackAt(reach, cells[0]), stackAt(reach, cells[1]),
+                                                                stackAt(reach, cells[2])};
+    const std::optional<storage::StoredItemStack> made =
+        context.smithingResult(held[0].has_value() ? &*held[0] : nullptr, held[1].has_value() ? &*held[1] : nullptr,
+                               held[2].has_value() ? &*held[2] : nullptr);
+    if (!made.has_value()) {
+        return false;
+    }
+    for (std::size_t at = 0; at < cells.size(); ++at) {
+        if (!held[at].has_value()) {
+            continue;
+        }
+        const std::int32_t left = held[at]->count - 1;
+        if (!writeStack(reach, cells[at], left <= 0 ? std::nullopt : std::optional{withCount(*held[at], left)})) {
+            return false;
+        }
+    }
+    reach.created = *made;
+    return true;
+}
+
 } // namespace
 
 StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows, world::LoadedWorld* world,
@@ -376,14 +423,21 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
     for (const BedrockStackAction& action : request.actions) {
         switch (action.type) {
         case BedrockStackActionType::Take:
-        case BedrockStackActionType::Place:
-            if (!moveStack(reach, placeOf(action.source, windows), placeOf(action.destination, windows),
-                           action.count)) {
+        case BedrockStackActionType::Place: {
+            const Place from = placeOf(action.source, windows);
+            // A smithing table is the one screen whose result the client takes without asking for
+            // it first, so what it makes is worked out the moment somebody reaches for it.
+            if (from.kind == Place::Kind::Created && !reach.created.has_value() && windows.open.has_value() &&
+                windows.open->type == wire::bedrock::BedrockContainerType::SmithingTable && !forge(reach, context)) {
+                return {};
+            }
+            if (!moveStack(reach, from, placeOf(action.destination, windows), action.count)) {
                 return {};
             }
             touched.add(action.source);
             touched.add(action.destination);
             break;
+        }
         case BedrockStackActionType::Swap: {
             const Place from = placeOf(action.source, windows);
             const Place to = placeOf(action.destination, windows);
@@ -495,6 +549,29 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             reach.anvilCost = made.cost;
             break;
         }
+        case BedrockStackActionType::CraftGrindstone: {
+            // A grindstone, which names no recipe either: what it makes is what is in it, and what
+            // it hands back is what it took off.
+            if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Grindstone ||
+                !context.grindstoneResult) {
+                return {};
+            }
+            const Place input{.kind = Place::Kind::Grid, .slot = 0};
+            const Place addition{.kind = Place::Kind::Grid, .slot = 1};
+            const std::optional<storage::StoredItemStack> left = stackAt(reach, input);
+            const std::optional<storage::StoredItemStack> right = stackAt(reach, addition);
+            const world::grindstones::Result made =
+                context.grindstoneResult(left.has_value() ? &*left : nullptr, right.has_value() ? &*right : nullptr);
+            if (!made.output.has_value()) {
+                return {};
+            }
+            if (!writeStack(reach, input, std::nullopt) || !writeStack(reach, addition, std::nullopt)) {
+                return {};
+            }
+            reach.created = *made.output;
+            reach.grindstoneWorth = made.experience;
+            break;
+        }
         case BedrockStackActionType::CraftResults:
             // The client repeating what it thinks it made, which this server already knows.
             break;
@@ -505,7 +582,8 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
     }
     // Work nobody took the result of is work nobody paid for: the client asks for both in one
     // request, so a half of it left over means the whole of it is refused.
-    if ((reach.trade.has_value() || reach.anvilCost.has_value()) && reach.created.has_value()) {
+    if ((reach.trade.has_value() || reach.anvilCost.has_value() || reach.grindstoneWorth.has_value()) &&
+        reach.created.has_value()) {
         return {};
     }
     const std::vector<BedrockResponseContainer> containers = touched.answer(reach);
@@ -524,6 +602,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
         answer.tradeExperience = offer.experience * reach.trades;
     }
     answer.anvilCost = reach.anvilCost;
+    answer.grindstoneWorth = reach.grindstoneWorth;
     return answer;
 }
 
