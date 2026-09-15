@@ -5,13 +5,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.basaltmc.bukkit.WorldEnvNatives;
 import org.bukkit.Bukkit;
 
-final class Lids {
+public final class Lids {
     private static final Set<String> kOpen = ConcurrentHashMap.newKeySet();
 
     private Lids() {}
 
     private static String key(Tile tile) {
         return tile.world.getName() + ":" + tile.x + "," + tile.y + "," + tile.z;
+    }
+
+    public static void forget(String world) {
+        kOpen.removeIf(key -> key.startsWith(world + ":"));
     }
 
     static Object set(Tile tile, boolean open) {
