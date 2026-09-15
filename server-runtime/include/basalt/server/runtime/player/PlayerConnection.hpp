@@ -217,6 +217,11 @@ struct PlayerConnection {
     /// out of the window's own numbers instead.
     std::function<void()> sendEnchantOptions;
 
+    /// Draws somebody's emote on this player's screen. Unset on a door whose clients have none, so
+    /// an emote reaches only the clients that can draw one.
+    std::function<void(std::int32_t entityId, const std::string& emoteId, std::int32_t duration, std::uint8_t flags)>
+        showEmote;
+
     /// Pushes the world's clock, which the client runs on its own between updates.
     std::function<void(const world::LoadedWorld& world)> sendTime;
 

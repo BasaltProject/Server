@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerPick.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 
@@ -598,35 +599,11 @@ void ContainerMenuController::handlePickItemFromEntity(const wire::protocol::pla
 }
 
 void ContainerMenuController::pickItem(PlayerSession& session, const std::string& id) {
-    PlayerInventory& inventory = session.inventory;
-    const std::optional<std::int32_t> existing = inventory.indexOf(id);
-    if (existing.has_value() && *existing >= PlayerInventory::kHotbarStart) {
-        // Already in the hotbar: vanilla only moves the selection, it does not touch a slot.
-        inventory.setHeldSlot(*existing - PlayerInventory::kHotbarStart);
-    } else if (existing.has_value()) {
-        // Elsewhere in the inventory: swapped into a suitable hotbar slot, not duplicated.
-        inventory.setHeldSlot(inventory.suitableHotbarSlot());
-        inventory.swap(PlayerInventory::kHotbarStart + inventory.heldSlot(), *existing);
-    } else if (session.gamemode == Gamemode::Creative) {
-        // Not carried at all: only creative may conjure one, and only ever a single item.
-        inventory.setHeldSlot(inventory.suitableHotbarSlot());
-        const std::int32_t target = PlayerInventory::kHotbarStart + inventory.heldSlot();
-        // Every hotbar slot was full, so whatever is in the way moves to a free slot rather than
-        // being destroyed; if nothing is free, vanilla overwrites it too.
-        const std::optional<storage::StoredItemStack> displaced = inventory.at(target);
-        if (displaced.has_value()) {
-            const std::optional<std::int32_t> free = inventory.firstFreeSlot();
-            if (free.has_value()) {
-                inventory.set(*free, displaced);
-            }
-        }
-        inventory.set(target, storage::StoredItemStack{.id = id, .count = 1, .components = {}});
-    } else {
+    if (!player::pickItemFor(session, id)) {
         return;
     }
-
-    owner_->sendCompressed(wire::protocol::play::SetHeldSlotPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::SetHeldSlotPacket{.slot = inventory.heldSlot()}.write(buffer);
+    owner_->sendCompressed(wire::protocol::play::SetHeldSlotPacket::kId, [&session](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::SetHeldSlotPacket{.slot = session.inventory.heldSlot()}.write(buffer);
     });
     sendInventoryAll();
 }

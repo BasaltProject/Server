@@ -141,6 +141,39 @@ public:
                            const std::string& text)>
             writeSign;
 
+        /// An arm swung at nothing, told to everybody else where the world is.
+        std::function<void(player::PlayerSession&)> swing;
+
+        /// The middle click, answered where the world is: what block is there decides what is
+        /// handed over.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t hotbarSlot)>
+            pickBlock;
+
+        /// The same click on something alive, which answers with that mob's own spawn egg.
+        std::function<void(player::PlayerSession&, std::int32_t entityId)> pickEntity;
+
+        /// A page turned on a lectern, where the world is: the block keeps which page it is on.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t page)>
+            turnLecternPage;
+
+        /// One of a crafter's nine switched off, where the world is.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t slot,
+                           bool disabled)>
+            toggleCrafterSlot;
+
+        /// An emote, handed to everybody who can draw one. The other edition has none, so it goes
+        /// to that edition's clients and nowhere else.
+        std::function<void(player::PlayerSession&, const std::string& emoteId, std::int32_t duration,
+                           std::uint8_t flags)>
+            emote;
+
+        /// A command block being programmed, where the world is. Whether they may at all is decided
+        /// there too, because that is where the permissions live.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t mode,
+                           const std::string& command, bool trackOutput, bool conditional, bool needsRedstone)>
+            programCommandBlock;
+
         /// Gets this player out of the bed they are in, where the world is. Morning asks every
         /// connection for this, and a Bedrock player who is never asked stays asleep for good.
         std::function<void(player::PlayerSession&)> wakeUp;
@@ -250,6 +283,25 @@ public:
 
     /// What a client typed into a sign's editor, sent back when they close it.
     void editSign(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& text) override;
+
+    void swing() override;
+
+    void pickBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t hotbarSlot) override;
+
+    void pickEntity(std::uint64_t runtimeEntityId) override;
+
+    void turnLecternPage(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t page) override;
+
+    void toggleCrafterSlot(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t slot, bool disabled) override;
+
+    void emote(const std::string& emoteId, std::int32_t duration, std::uint8_t flags) override;
+
+    /// Draws somebody else's emote on this client.
+    void showEmote(std::int32_t entityId, const std::string& emoteId, std::int32_t duration, std::uint8_t flags);
+
+    void programCommandBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t mode,
+                             const std::string& command, bool trackOutput, bool conditional,
+                             bool needsRedstone) override;
 
     void useItemInAir(std::int32_t hotbarSlot) override;
 

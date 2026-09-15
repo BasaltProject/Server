@@ -488,6 +488,67 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
+        if (packet == BedrockPacket::LevelSoundEvent && entry.player) {
+            // That edition asks the server to play back a sound its own client already decided on:
+            // eating, swinging, a bucket. It goes back to whoever asked and to nobody else, which is
+            // what stops one client's noise reaching everybody.
+            entry.mailbox->post(static_cast<std::uint16_t>(packet),
+                                std::vector<std::uint8_t>{body.readable().begin(), body.readable().end()});
+            return;
+        }
+        if (packet == BedrockPacket::Animate && entry.player) {
+            /// parity: `AnimatePacket.Action.SWING_ARM`, the only one of the seven a server acts on.
+            constexpr std::int32_t kSwingArm = 1;
+
+            const auto animation = wire::bedrock::readAnimate(body);
+            if (animation.has_value() && animation->action == kSwingArm) {
+                entry.player->swing();
+            }
+            return;
+        }
+        if (packet == BedrockPacket::BlockPickRequest && entry.player) {
+            const auto pick = wire::bedrock::readBlockPickRequest(body);
+            if (pick.has_value()) {
+                entry.player->pickBlock(pick->x, pick->y, pick->z, pick->hotbarSlot);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::EntityPickRequest && entry.player) {
+            const auto pick = wire::bedrock::readEntityPickRequest(body);
+            if (pick.has_value()) {
+                entry.player->pickEntity(pick->runtimeEntityId);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::ToggleCrafterSlotRequest && entry.player) {
+            const auto toggle = wire::bedrock::readCrafterSlotToggle(body);
+            if (toggle.has_value()) {
+                entry.player->toggleCrafterSlot(toggle->x, toggle->y, toggle->z, toggle->slot, toggle->disabled);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::Emote && entry.player) {
+            const auto made = wire::bedrock::readEmote(body, entry.connection.protocolVersion());
+            if (made.has_value()) {
+                entry.player->emote(made->emoteId, made->duration, made->flags);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::CommandBlockUpdate && entry.player) {
+            const auto update = wire::bedrock::readCommandBlockUpdate(body);
+            if (update.has_value()) {
+                entry.player->programCommandBlock(update->x, update->y, update->z, update->mode, update->command,
+                                                  update->trackOutput, update->conditional, update->needsRedstone);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::LecternUpdate && entry.player) {
+            const auto page = wire::bedrock::readLecternUpdate(body, entry.connection.protocolVersion());
+            if (page.has_value()) {
+                entry.player->turnLecternPage(page->x, page->y, page->z, page->page);
+            }
+            return;
+        }
         if (packet == BedrockPacket::BlockEntityData && entry.player) {
             // The only block whose own data a client sends back: what was typed into a sign.
             const auto edit = wire::bedrock::readSignEdit(body);

@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Items.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -14,6 +15,7 @@
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -32,6 +34,7 @@
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
+#include <basalt/server/runtime/player/PlayerPick.hpp>
 #include <basalt/server/runtime/player/PlayerSigns.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -41,14 +44,19 @@
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
+#include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Enchanting.hpp>
 #include <basalt/server/runtime/world/EnchantmentBooks.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/Grindstones.hpp>
+#include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
@@ -1019,6 +1027,210 @@ void BasaltServer::startBedrockListener() {
                 }
             }
             broadcaster_->sendEffects(watchers, x, y, z, stateId, effects);
+        };
+
+        // An arm swung at nothing: everybody else has to be told, and the swinger draws its own.
+        context.swing = [this](player::PlayerSession& player) {
+            const std::int32_t who = player.entityId();
+            const std::string worldName = player.worldName;
+            for (player::PlayerSession* other : playerRegistry_.snapshot()) {
+                if (other->entityId() == who || other->worldName != worldName) {
+                    continue;
+                }
+                if (other->connection().sendSwing) {
+                    other->connection().sendSwing(who, false);
+                    continue;
+                }
+                if (other->connection().sendPlayPacket) {
+                    const wire::protocol::play::AnimatePacket packet{
+                        .entityId = who, .action = wire::protocol::play::AnimatePacket::kSwingMainHand};
+                    other->connection().sendPlayPacket(
+                        wire::protocol::play::AnimatePacket::kId,
+                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                }
+            }
+        };
+
+        // The middle click, answered where the world is: what block is there decides what is handed
+        // over, and only creative may be handed one it is not already carrying.
+        context.pickBlock = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                   const std::int32_t z, const std::int32_t hotbarSlot) {
+            static_cast<void>(hotbarSlot);
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                const std::optional<std::int32_t> stateId = found->second->state().blockState(x, y, z);
+                const std::optional<server::registry::BlockState> block =
+                    stateId.has_value() ? server::registry::blocks::byStateId(*stateId) : std::nullopt;
+                if (!block.has_value()) {
+                    return;
+                }
+                // parity: `Block.asItem`, which is not the block's own name for dust, crops or cocoa.
+                const server::registry::Item* item =
+                    server::registry::items::registry().byName(server::registry::itemBlocks::itemOf(block->block));
+                if (item == nullptr || !player::pickItemFor(*session, item->id.toString())) {
+                    return;
+                }
+                if (session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
+            });
+        };
+
+        // The same click on something alive: a mob answers with its own spawn egg and most other
+        // things answer with nothing at all.
+        context.pickEntity = [this](player::PlayerSession& player, const std::int32_t entityId) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, entityId] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                const entity::ServerEntity* target = found->second->state().entity(entityId);
+                if (target == nullptr || target->removed) {
+                    return;
+                }
+                // parity: `Entity.getPickResult`: a mob answers with its own spawn egg, a boat or a
+                // minecart with what it was placed from, and everything else with nothing.
+                const std::optional<wire::common::Identifier> item = entity::entityPickResults::itemFor(target->type());
+                if (!item.has_value() || !player::pickItemFor(*session, item->toString())) {
+                    return;
+                }
+                if (session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
+            });
+        };
+
+        // One of a crafter's nine switched off, where the world is. The block keeps it, and a
+        // comparator counts a slot that is off as a full one.
+        context.toggleCrafterSlot = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                           const std::int32_t z, const std::int32_t slot, const bool disabled) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z, slot, disabled] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                const std::optional<std::int32_t> stateId = found->second->state().blockState(x, y, z);
+                const wire::common::Identifier* block =
+                    stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+                // parity: the packet reaches `CrafterBlockEntity` and nothing else.
+                if (block == nullptr || *block != world::crafters::block()) {
+                    return;
+                }
+                if (!world::crafters::setSlotState(found->second->state(), x, y, z, slot, !disabled)) {
+                    return;
+                }
+                world::redstoneComponents::scheduleComparatorsAround(
+                    found->second->state(), found->second->name(), x, y, z,
+                    world::comparatorReading::of(found->second->state()));
+            });
+        };
+
+        // An emote. The other edition has none, so it goes to the clients that can draw one and
+        // nowhere else.
+        context.emote = [this](player::PlayerSession& player, const std::string& emoteId, const std::int32_t duration,
+                               const std::uint8_t flags) {
+            const std::int32_t who = player.entityId();
+            const std::string worldName = player.worldName;
+            for (player::PlayerSession* other : playerRegistry_.snapshot()) {
+                // The one who made it is already drawing it; this is for everybody else.
+                if (other->entityId() == who || other->worldName != worldName || !other->connection().showEmote) {
+                    continue;
+                }
+                other->connection().showEmote(who, emoteId, duration, flags);
+            }
+        };
+
+        // A command block being programmed. The permission check is the other door's own, because it
+        // is the same question: creative, and operator through their own command source.
+        context.programCommandBlock = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                             const std::int32_t z, const std::int32_t mode, const std::string& command,
+                                             const bool trackOutput, const bool conditional, const bool needsRedstone) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z, mode, command, trackOutput, conditional,
+                                                         needsRedstone] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                command::CommandDispatcher* dispatcher = wired_.dispatcher.get();
+                if (session == nullptr || dispatcher == nullptr) {
+                    return;
+                }
+                // parity: `Player.canUseGameMasterBlocks`, which is permission two and creative.
+                const command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
+                if (session->gamemode != wire::protocol::play::Gamemode::Creative ||
+                    source.permissionLevel() < command::permissionLevel::kGamemasters) {
+                    session->sendSystemMessage(wire::text::Component::translatable("advMode.notAllowed"));
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                // That edition numbers the three the same way this server does: impulse, then
+                // repeating, then chain.
+                const world::commandBlocks::Mode kind = mode == 1   ? world::commandBlocks::Mode::Repeating
+                                                        : mode == 2 ? world::commandBlocks::Mode::Chain
+                                                                    : world::commandBlocks::Mode::Impulse;
+                const std::optional<world::BlockChange> moved = world::commandBlocks::program(
+                    found->second->state(), x, y, z, command, kind, trackOutput, conditional, !needsRedstone);
+                if (moved.has_value()) {
+                    player::announceBlock(breakContext(), session->worldName, moved->x, moved->y, moved->z,
+                                          moved->stateId);
+                }
+                if (command.empty()) {
+                    return;
+                }
+                const bool works = found->second->gameRules().get(world::gameRules::kCommandBlocksWork);
+                session->sendSystemMessage(wire::text::Component::translatable(works ? "advMode.setCommand.success"
+                                                                                     : "advMode.setCommand.disabled",
+                                                                               {wire::text::Component::text(command)}));
+            });
+        };
+
+        // A page turned on a lectern. That edition sends the page it wants rather than a direction,
+        // which is the only difference: the block keeps the page either way.
+        context.turnLecternPage = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                         const std::int32_t z, const std::int32_t page) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z, page] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr || page < 0) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                const std::optional<world::BlockChange> change =
+                    world::lecterns::turnPage(found->second->state(), x, y, z, page);
+                if (!change.has_value()) {
+                    return;
+                }
+                const player::BreakContext blocks = breakContext();
+                player::announceBlock(blocks, session->worldName, change->x, change->y, change->z, change->stateId);
+                player::notifyAround(blocks, *found->second, x, y, z, std::nullopt);
+            });
         };
 
         // What a client typed into a sign's editor, written where the world is.

@@ -526,6 +526,64 @@ void BedrockPlayer::editSign(const std::int32_t x, const std::int32_t y, const s
     context_.writeSign(*session_, x, y, z, text);
 }
 
+void BedrockPlayer::swing() {
+    if (session_ != nullptr && context_.swing) {
+        context_.swing(*session_);
+    }
+}
+
+void BedrockPlayer::pickBlock(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                              const std::int32_t hotbarSlot) {
+    if (session_ != nullptr && context_.pickBlock) {
+        context_.pickBlock(*session_, x, y, z, hotbarSlot);
+    }
+}
+
+void BedrockPlayer::pickEntity(const std::uint64_t runtimeEntityId) {
+    if (session_ == nullptr || !context_.pickEntity || runtimeEntityId == 0) {
+        return;
+    }
+    // The client counts entities from one where this server counts from zero.
+    context_.pickEntity(*session_, static_cast<std::int32_t>(runtimeEntityId - 1));
+}
+
+void BedrockPlayer::turnLecternPage(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                    const std::int32_t page) {
+    if (session_ != nullptr && context_.turnLecternPage) {
+        context_.turnLecternPage(*session_, x, y, z, page);
+    }
+}
+
+void BedrockPlayer::programCommandBlock(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                        const std::int32_t mode, const std::string& command, const bool trackOutput,
+                                        const bool conditional, const bool needsRedstone) {
+    if (session_ != nullptr && context_.programCommandBlock) {
+        context_.programCommandBlock(*session_, x, y, z, mode, command, trackOutput, conditional, needsRedstone);
+    }
+}
+
+void BedrockPlayer::toggleCrafterSlot(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                      const std::int32_t slot, const bool disabled) {
+    if (session_ != nullptr && context_.toggleCrafterSlot) {
+        context_.toggleCrafterSlot(*session_, x, y, z, slot, disabled);
+    }
+}
+
+void BedrockPlayer::emote(const std::string& emoteId, const std::int32_t duration, const std::uint8_t flags) {
+    if (session_ != nullptr && context_.emote) {
+        context_.emote(*session_, emoteId, duration, flags);
+    }
+}
+
+void BedrockPlayer::showEmote(const std::int32_t entityId, const std::string& emoteId, const std::int32_t duration,
+                              const std::uint8_t flags) {
+    const std::uint64_t runtime =
+        session_ != nullptr && entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeEmote(body, runtime, emoteId, duration, flags, protocol_);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Emote), body.toVector());
+}
+
 void BedrockPlayer::setHeldSlot(const std::int32_t slot) {
     if (session_ == nullptr || slot < 0 || slot >= player::PlayerInventory::kHotbarSize) {
         return;

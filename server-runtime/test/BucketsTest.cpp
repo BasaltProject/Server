@@ -86,7 +86,7 @@ TEST_CASE("an empty bucket will not scoop a flow") {
     static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 8, 64, 8));
     for (std::int32_t turn = 0; turn < 200; ++turn) {
         fixture.world.openTurn();
-            for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
+        for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
             static_cast<void>(fluidFlow::tick(fixture.context(), position[0], position[1], position[2]));
         }
     }
@@ -223,9 +223,92 @@ TEST_CASE("emptying a bucket wakes the fluid around what it filled") {
     // It spreads on its own from here, without anything else asking it to.
     for (std::int32_t turn = 0; turn < 200; ++turn) {
         fixture.world.openTurn();
-            for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
+        for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
             static_cast<void>(fluidFlow::tick(fixture.context(), position[0], position[1], position[2]));
         }
     }
     CHECK(fluidFlow::kindOf(*fixture.world.blockState(11, 64, 8)) == FluidKind::Water);
+}
+
+TEST_CASE("a bucket emptied on a block that can hold water fills the block itself") {
+    // parity: `BucketItem.emptyContents` asks the `LiquidBlockContainer` branch **before** the one
+    // that writes a block of water, so a stair takes the water inside and stays a stair. Without it
+    // the bucket poured onto the face instead, and a waterlogged stair was unreachable by hand.
+    Fixture fixture;
+    const std::int32_t dry = stateOf("oak_stairs");
+    REQUIRE(fixture.world.setBlockState(8, 64, 8, dry));
+
+    const std::optional<buckets::Result> result =
+        buckets::useOn(fixture.context(), item("water_bucket"), 8, 64, 8, Direction::Up, false);
+
+    REQUIRE(result.has_value());
+    CHECK(result->replacement == item("bucket"));
+    CHECK(fixture.world.blockState(8, 65, 8) == air());
+    const std::optional<std::int32_t> soaked = fixture.world.blockState(8, 64, 8);
+    REQUIRE(soaked.has_value());
+    CHECK(registry::blockStateDefinitions::propertiesOf(*soaked)["waterlogged"] == "true");
+    // parity: `SimpleWaterloggedBlock.placeLiquid` books water's own turn right after the write, so
+    // it comes due five turns later and not before.
+    bool due = false;
+    for (std::int32_t turn = 0; turn < fluidFlow::kWaterTickDelay; ++turn) {
+        fixture.world.openTurn();
+        for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
+            due = due || (position == std::array<std::int32_t, 3>{8, 64, 8});
+        }
+    }
+    CHECK(due);
+}
+
+TEST_CASE("an empty bucket takes the water back out of a block that was holding it") {
+    // parity: `SimpleWaterloggedBlock.pickupBlock`, which leaves the block standing and dry.
+    Fixture fixture;
+    const std::optional<std::int32_t> soaked = registry::blockStateDefinitions::stateIdOf(
+        basalt::wire::common::Identifier::vanilla("oak_stairs"), {{"waterlogged", "true"}}, std::nullopt);
+    REQUIRE(soaked.has_value());
+    REQUIRE(fixture.world.setBlockState(8, 64, 8, *soaked));
+
+    const std::optional<buckets::Result> result =
+        buckets::useOn(fixture.context(), item("bucket"), 8, 64, 8, Direction::Up, false);
+
+    REQUIRE(result.has_value());
+    CHECK(result->replacement == item("water_bucket"));
+    const std::optional<std::int32_t> dried = fixture.world.blockState(8, 64, 8);
+    REQUIRE(dried.has_value());
+    CHECK(registry::blockStateDefinitions::propertiesOf(*dried)["waterlogged"] == "false");
+}
+
+TEST_CASE("lava does not go inside a block that only takes water") {
+    // parity: `SimpleWaterloggedBlock.canPlaceLiquid` is `type == WATER` and nothing else, so a
+    // bucket of lava falls through to the face it hit.
+    Fixture fixture;
+    REQUIRE(fixture.world.setBlockState(8, 64, 8, stateOf("oak_stairs")));
+
+    const std::optional<buckets::Result> result =
+        buckets::useOn(fixture.context(), item("lava_bucket"), 8, 64, 8, Direction::Up, false);
+
+    REQUIRE(result.has_value());
+    CHECK(fixture.world.blockState(8, 65, 8) == stateOf("lava"));
+    const std::optional<std::int32_t> stairs = fixture.world.blockState(8, 64, 8);
+    REQUIRE(stairs.has_value());
+    CHECK(registry::blockStateDefinitions::propertiesOf(*stairs)["waterlogged"] == "false");
+}
+
+TEST_CASE("a bucket emptied on a block that is already full is spent for nothing") {
+    // parity: `canPlaceLiquid` only asks whether the fluid is water, never whether the block still
+    // has room, so `emptyContents` takes the bucket and answers true even though `placeLiquid`
+    // changed nothing. Pouring onto the face instead would be the easy reading and it is wrong.
+    Fixture fixture;
+    const std::optional<std::int32_t> soaked = registry::blockStateDefinitions::stateIdOf(
+        basalt::wire::common::Identifier::vanilla("oak_stairs"), {{"waterlogged", "true"}}, std::nullopt);
+    REQUIRE(soaked.has_value());
+    REQUIRE(fixture.world.setBlockState(8, 64, 8, *soaked));
+
+    const std::optional<buckets::Result> result =
+        buckets::useOn(fixture.context(), item("water_bucket"), 8, 64, 8, Direction::Up, false);
+
+    REQUIRE(result.has_value());
+    CHECK(result->replacement == item("bucket"));
+    CHECK(result->changes.empty());
+    CHECK(fixture.world.blockState(8, 64, 8) == *soaked);
+    CHECK(fixture.world.blockState(8, 65, 8) == air());
 }

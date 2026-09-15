@@ -227,6 +227,10 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     // The three rows of an open enchanting table, which that edition draws from its own packet.
     connection.sendEnchantOptions = [this] { sendEnchantOptions(); };
 
+    // Somebody's emote, which only this edition's clients can draw.
+    connection.showEmote = [this](const std::int32_t entityId, const std::string& emoteId, const std::int32_t duration,
+                                  const std::uint8_t flags) { showEmote(entityId, emoteId, duration, flags); };
+
     // Somebody lying down or standing up, which this edition draws off a flag and the bed's own
     // square rather than off a pose.
     connection.showSleeping = [this](const std::int32_t entityId,
