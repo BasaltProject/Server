@@ -209,6 +209,10 @@ struct PlayerConnection {
     /// Gets this player out of the bed they are in, which is a packet and a pose at once.
     std::function<void()> wakeUp;
 
+    /// Draws the merchant's book again on a client that has one open, which is how an offer that
+    /// has just been used stops being offered. Unset where a window of its own carries the offers.
+    std::function<void()> sendTrades;
+
     /// Pushes the world's clock, which the client runs on its own between updates.
     std::function<void(const world::LoadedWorld& world)> sendTime;
 

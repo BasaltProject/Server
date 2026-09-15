@@ -66,6 +66,11 @@ std::int32_t ContainerMenuController::halfSize() const {
 }
 
 std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(std::int32_t index) const {
+    if (openAnvil_) {
+        return index >= 0 && static_cast<std::size_t>(index) < anvilSlots_.size()
+                   ? anvilSlots_[static_cast<std::size_t>(index)]
+                   : std::nullopt;
+    }
     if (openSmithing_) {
         return index >= 0 && static_cast<std::size_t>(index) < smithingSlots_.size()
                    ? smithingSlots_[static_cast<std::size_t>(index)]
@@ -106,6 +111,22 @@ std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(s
 }
 
 void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack) {
+    if (openAnvil_) {
+        if (index < 0 || static_cast<std::size_t>(index) >= anvilSlots_.size()) {
+            return;
+        }
+        if (index == Menu::kAnvilResult) {
+            // Taking the result is the only way this slot is written, and it costs the levels.
+            PlayerSession* session = owner_->playerSession();
+            if (!stack.has_value() && session != nullptr) {
+                takeAnvilResult(*session);
+            }
+            return;
+        }
+        anvilSlots_[static_cast<std::size_t>(index)] = stack;
+        recomputeAnvilResult();
+        return;
+    }
     if (openSmithing_) {
         if (index < 0 || static_cast<std::size_t>(index) >= smithingSlots_.size()) {
             return;
@@ -326,11 +347,14 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
     if (openStonecutter_ && block->index == Menu::kStonecutterResult) {
         return false;
     }
+    if (openAnvil_ && block->index == Menu::kAnvilResult) {
+        return false;
+    }
     return !(openSmithing_ && block->index == Menu::kSmithingResult);
 }
 
 bool ContainerMenuController::hasBlockSlots() const {
-    return openBlock.has_value() || openEnderChest_ || openStonecutter_ || openSmithing_;
+    return openBlock.has_value() || openEnderChest_ || openStonecutter_ || openSmithing_ || openAnvil_;
 }
 
 bool ContainerMenuController::accepts(const MenuSlot& target, const storage::StoredItemStack& stack) const {
@@ -345,6 +369,10 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
     // parity: `SmithingMenu.quickMoveStack`, which tries the three inputs and never the result.
     if (openSmithing_) {
         return block->index != Menu::kSmithingResult;
+    }
+    // parity: `ItemCombinerMenu.quickMoveStack`, which tries the two inputs and never the result.
+    if (openAnvil_) {
+        return block->index != Menu::kAnvilResult;
     }
     if (openBlockSize != world::furnaces::kSize) {
         return true;

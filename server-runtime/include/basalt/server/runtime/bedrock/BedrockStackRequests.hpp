@@ -2,11 +2,13 @@
 
 #include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/Anvils.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
 #include <functional>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace basalt::server::runtime::bedrock {
@@ -16,6 +18,14 @@ namespace basalt::server::runtime::bedrock {
 struct StackRequestAnswer {
     bool accepted = false;
     std::vector<wire::bedrock::BedrockResponseContainer> containers;
+    /// The merchant this request bought from, when it was a trade, and what the deal was worth to
+    /// it. The offer's own use is counted where the window keeps it; the experience belongs to the
+    /// mob, which lives where the world is.
+    std::optional<std::int32_t> tradedWith;
+    std::int32_t tradeExperience = 0;
+    /// What an anvil charged, when the request took its result. The levels and the block wearing
+    /// out belong where the world is, so only the number comes back.
+    std::optional<std::int32_t> anvilCost;
 };
 
 /// Moves stacks around one player's windows, as their client asked. Every line is applied in order
@@ -27,6 +37,13 @@ struct StackRequestContext {
     std::function<void(const storage::StoredItemStack&)> drop;
     /// The stack that recipe makes, by the number this server sent the client at login.
     std::function<std::optional<storage::StoredItemStack>(std::int32_t recipeNetId)> resultOf;
+    /// What an anvil makes of the two things in it and what it charges, asked where the registries
+    /// are. Unset leaves an anvil making nothing.
+    std::function<world::anvils::Result(const storage::StoredItemStack* input, const storage::StoredItemStack* addition,
+                                        const std::optional<std::string>& name)>
+        anvilResult;
+    /// Whether this player can pay that many levels, which only survival ever answers no to.
+    std::function<bool(std::int32_t cost)> canPay;
 };
 
 [[nodiscard]] StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows,

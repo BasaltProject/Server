@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
 #include <cstddef>
@@ -29,5 +30,9 @@ struct BedrockRecipeList {
 };
 
 [[nodiscard]] BedrockRecipeList bedrockRecipes(const world::RealRecipes& recipes);
+
+/// One stack as a trade carries it: the name that edition knows it by, how many, and which of them.
+/// A stack this door has no name for comes back empty, which is how a client draws nothing.
+[[nodiscard]] wire::bedrock::BedrockTradeItem tradeItemOf(const server::world::loot::ItemStack& stack);
 
 } // namespace basalt::server::runtime::bedrock

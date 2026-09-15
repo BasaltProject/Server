@@ -44,6 +44,9 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       entityTags(world::realEntityTypeTags::load(readerOf<world::realEntityTypeTags::JarReader>(jar), logger)),
       advancements(world::RealAdvancements::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText}),
       enchantments({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
+      enchantmentTags(world::realEnchantmentTags::load(
+          readerOf<world::realEnchantmentTags::JarReader>(jar),
+          [this](const Identifier& id) { return enchantments.contains(id); }, logger)),
       dialogs({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       timelines({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       testInstances({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),

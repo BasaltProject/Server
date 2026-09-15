@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/ui/PlayerUi.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/RealEnchantmentTags.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 #include <basalt/server/runtime/world/RealFluidTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
@@ -207,6 +208,8 @@ public:
         world::AdvancementTriggers* advancementTriggers = nullptr;
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         const world::realItemTags::TagMembers* itemTags = nullptr;
+        /// Which enchantments will not sit beside each other, which only an anvil asks about.
+        const world::realEnchantmentTags::TagMembers* enchantmentTags = nullptr;
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         const world::realFluidTags::TagMembers* fluidTags = nullptr;
         const world::realTimelineTags::TagMembers* timelineTags = nullptr;

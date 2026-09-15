@@ -130,6 +130,11 @@ public:
         /// A click on something alive that is not a hit: sitting in a cart, feeding an animal.
         std::function<void(player::PlayerSession&, std::int32_t entityId)> useEntity;
 
+        /// What that villager has to offer, asked where the world is. Nothing when it is no
+        /// merchant. The offers come as the world keeps them, not as the wire draws them: taking
+        /// one of them later is priced off the same list.
+        std::function<std::optional<OpenTrades>(player::PlayerSession&, std::int32_t entityId)> trades;
+
         /// Gets this player out of the bed they are in, where the world is. Morning asks every
         /// connection for this, and a Bedrock player who is never asked stays asleep for good.
         std::function<void(player::PlayerSession&)> wakeUp;
@@ -225,6 +230,13 @@ public:
     void setHeldSlot(std::int32_t slot) override;
 
     void finishEating(std::int32_t hotbarSlot) override;
+
+    /// Draws a villager's book on this client, which is a window of its own kind.
+    void openTrades(std::uint64_t runtimeEntityId, OpenTrades offers);
+
+    /// Draws the open book again, which is how an offer that has just been used stops being
+    /// offered. The window number does not move, or the client would take the screen down.
+    void sendTrades();
 
     void useItemInAir(std::int32_t hotbarSlot) override;
 
@@ -368,6 +380,10 @@ private:
     /// When this player started holding an item down, which is the only clock there is for a draw:
     /// the client bends the bow itself and says nothing until it lets go.
     std::optional<std::chrono::steady_clock::time_point> drawingSince_;
+
+    /// The merchant whose book is open, by the number that client counts entities with. Nought
+    /// when there is none: the book is drawn over the mob, so it cannot be sent without one.
+    std::uint64_t tradingWith_ = 0;
 
     /// Every Bedrock player's skin, so this client can be shown the others as they described
     /// themselves rather than as a flat colour.

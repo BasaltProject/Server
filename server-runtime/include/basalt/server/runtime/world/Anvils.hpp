@@ -29,12 +29,18 @@ struct Result {
     std::optional<storage::StoredItemStack> output;
     std::int32_t cost = 0;
     std::int32_t materialCount = 0;
+    /// parity: `onlyRenaming`. The naming was the whole of the work, which is what leaves the prior
+    /// work alone, lifts the forty-level wall, and leaves whatever is in the second slot there.
+    bool onlyRenaming = false;
 };
 
 /// What merging two stacks' enchantments comes to: the components to keep, and what they cost.
 struct Merge {
     std::optional<wire::nbt::NbtCompound> components;
     std::int32_t cost = 0;
+    /// parity: every enchantment offered went on something that cannot take it, which is the one
+    /// way a merge refuses the pair outright rather than just charging nothing for it.
+    bool refused = false;
 };
 
 using IsRepairMaterial =

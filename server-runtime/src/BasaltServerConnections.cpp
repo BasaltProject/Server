@@ -79,6 +79,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.advancementTriggers = advancementTriggers_.get();
     options.blockTags = &vanillaData_.blockTags;
     options.itemTags = &vanillaData_.itemTags;
+    options.enchantmentTags = &vanillaData_.enchantmentTags;
     options.damageTypeTags = &vanillaData_.damageTypeTags;
     options.fluidTags = &vanillaData_.fluidTags;
     options.timelineTags = &vanillaData_.timelineTags;

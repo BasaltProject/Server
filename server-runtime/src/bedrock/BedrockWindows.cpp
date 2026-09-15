@@ -109,6 +109,12 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Stonecutter, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
+    // parity: `AnvilBlock.useWithoutItem`. Its three slots belong to the screen, and the block
+    // wears out under whoever uses it.
+    if (path == "anvil" || path == "chipped_anvil" || path == "damaged_anvil") {
+        return OpenWindow{
+            .type = wire::bedrock::BedrockContainerType::Anvil, .x = x, .y = y, .z = z, .size = 0, .block = path};
+    }
     if (path == "crafting_table") {
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Workbench, .x = x, .y = y, .z = z, .size = 0, .block = path};

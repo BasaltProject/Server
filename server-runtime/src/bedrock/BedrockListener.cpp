@@ -30,6 +30,8 @@ namespace {
         return "craft results";
     case wire::bedrock::BedrockStackActionType::Craft:
         return "craft";
+    case wire::bedrock::BedrockStackActionType::CraftOptional:
+        return "craft optional";
     case wire::bedrock::BedrockStackActionType::Other:
         break;
     }
