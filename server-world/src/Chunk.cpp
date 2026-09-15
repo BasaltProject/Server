@@ -292,17 +292,25 @@ void Chunk::advanceBlockTicks(std::vector<ChunkScheduledTick>& due) { advance(bl
 
 void Chunk::advanceFluidTicks(std::vector<ChunkScheduledTick>& due) { advance(fluidTicks_, due); }
 
+void Chunk::openTurn() {
+    for (ChunkScheduledTick& tick : blockTicks_) {
+        tick.delay--;
+    }
+    for (ChunkScheduledTick& tick : fluidTicks_) {
+        tick.delay--;
+    }
+}
+
 void Chunk::advance(std::vector<ChunkScheduledTick>& pending, std::vector<ChunkScheduledTick>& due) {
     if (pending.empty()) {
         return;
     }
     std::size_t index = 0;
     while (index < pending.size()) {
-        if (pending[index].delay <= 1) {
+        if (pending[index].delay <= 0) {
             due.push_back(pending[index]);
             pending.erase(pending.begin() + static_cast<std::ptrdiff_t>(index));
         } else {
-            pending[index].delay--;
             index++;
         }
     }

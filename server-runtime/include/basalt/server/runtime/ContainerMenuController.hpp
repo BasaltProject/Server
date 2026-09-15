@@ -263,6 +263,9 @@ private:
     std::array<std::int32_t, 3> enchantmentCosts_{0, 0, 0};
     std::array<std::int32_t, 3> enchantmentClues_{-1, -1, -1};
     std::array<std::int32_t, 3> enchantmentLevels_{-1, -1, -1};
+    /// How much power the open table had when its rows were rolled, so taking one works the same
+    /// row out again rather than a different one.
+    std::int32_t shelvesAround_ = 0;
 
     bool openGrindstone_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> grindstoneSlots_;

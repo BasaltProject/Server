@@ -348,9 +348,13 @@ TEST_CASE("a dried ghast asks to be looked at in five thousand ticks") {
     REQUIRE(world.setBlockState(8, 64, 8, wet));
 
     miscGrowth::driedGhast(world, 8, 64, 8, wet);
+    // parity: a turn counts down once when it opens, so the turn that books a tick never shortens
+    // it. That is the `openTurn` here, which is what the tick loop does before running anything.
     for (std::int32_t turn = 0; turn < 4999; ++turn) {
+        world.openTurn();
         CHECK(world.dueBlockTicks().empty());
     }
+    world.openTurn();
     CHECK(world.dueBlockTicks().size() == 1);
 }
 

@@ -76,6 +76,11 @@ void announceBlock(const BreakContext& context, std::string_view worldName, std:
 void notifyAround(const BreakContext& context, world::LoadedWorld& world, std::int32_t x, std::int32_t y,
                   std::int32_t z, std::optional<std::int32_t> removed);
 
+/// The six squares around a change, redrawn and nothing else: the shape half of `notifyAround`, for
+/// a write that goes in without `UPDATE_NEIGHBORS`.
+void reshapeAround(const BreakContext& context, world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                   std::int32_t z);
+
 /// What a vibration-sensitive block hears, and whatever that shakes loose.
 void heardBySculk(const BreakContext& context, world::LoadedWorld& world, std::string_view event, std::int32_t x,
                   std::int32_t y, std::int32_t z);

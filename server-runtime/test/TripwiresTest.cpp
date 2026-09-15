@@ -234,6 +234,8 @@ TEST_CASE("a hook that clicks tells a sculk sensor, and the click wins over the 
     const auto settle = [](WorldState& world, std::int64_t& now, std::int32_t turns) {
         for (std::int32_t turn = 0; turn < turns; ++turn) {
             ++now;
+            // parity: the turn opens before anything runs, and that is where the countdown happens.
+            world.openTurn();
             for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
                 static_cast<void>(vibrations::tick(world, at[0], at[1], at[2], now));
             }
@@ -319,8 +321,10 @@ TEST_CASE("a hook told about a wire holds on for ten ticks and then lets go") {
     // And it booked itself a look ten ticks out, which is what finds the gap.
     CHECK(world.hasScheduledBlockTick(4, 64, 8, Identifier::vanilla("tripwire_hook")));
     for (std::int32_t turn = 0; turn < 9; ++turn) {
+        world.openTurn();
         CHECK(world.dueBlockTicks().empty());
     }
+    world.openTurn();
     REQUIRE(world.dueBlockTicks().size() == 1);
 
     tripwires::calculateHook(world, 4, 64, 8, 1, changes);

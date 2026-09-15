@@ -489,6 +489,43 @@ void BedrockPlayer::sendTrades() {
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateTrade), body.toVector());
 }
 
+void BedrockPlayer::sendEnchantOptions() {
+    /// What the client draws in its own made-up alphabet. The words mean nothing: vanilla picks
+    /// them at random out of a list nobody reads.
+    constexpr std::string_view kRowName = "enchant";
+
+    std::vector<wire::bedrock::BedrockEnchantOption> options;
+    if (windows_->enchanting.has_value()) {
+        for (const EnchantRow& row : windows_->enchanting->rows) {
+            if (row.cost <= 0 || row.offers.empty()) {
+                continue;
+            }
+            wire::bedrock::BedrockEnchantOption option;
+            option.cost = row.cost;
+            option.netId = row.netId;
+            option.name = kRowName;
+            for (const world::enchanting::Offer& offer : row.offers) {
+                const std::optional<std::int32_t> type = wire::bedrock::bedrockEnchantment(offer.enchantment.path());
+                if (type.has_value()) {
+                    option.enchants.push_back({.type = *type, .level = offer.level});
+                }
+            }
+            options.push_back(std::move(option));
+        }
+    }
+    wire::io::ByteBuffer body;
+    wire::bedrock::writePlayerEnchantOptions(body, options, protocol_);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayerEnchantOptions), body.toVector());
+}
+
+void BedrockPlayer::editSign(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                             const std::string& text) {
+    if (session_ == nullptr || !context_.writeSign) {
+        return;
+    }
+    context_.writeSign(*session_, x, y, z, text);
+}
+
 void BedrockPlayer::setHeldSlot(const std::int32_t slot) {
     if (session_ == nullptr || slot < 0 || slot >= player::PlayerInventory::kHotbarSize) {
         return;

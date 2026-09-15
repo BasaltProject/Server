@@ -82,59 +82,37 @@ void ContainerMenuController::rollEnchantmentOffers() {
         sendEnchantmentNumbers();
         return;
     }
-    // parity: `EnchantingTableBlock.isValidBookShelf`: a shelf two out with nothing between it and
-    // the table.
-    std::int32_t shelves = 0;
-    for (const std::array<std::int32_t, 3>& offset : world::enchanting::bookshelfOffsets()) {
-        const std::optional<std::int32_t> shelf =
-            world->state().blockState(openBlock->x + offset[0], openBlock->y + offset[1], openBlock->z + offset[2]);
-        const std::optional<std::int32_t> between = world->state().blockState(
-            openBlock->x + (offset[0] / 2), openBlock->y + offset[1], openBlock->z + (offset[2] / 2));
-        const Identifier* shelfBlock =
-            shelf.has_value() ? server::registry::blockStateDefinitions::blockOf(*shelf) : nullptr;
-        const Identifier* betweenBlock =
-            between.has_value() ? server::registry::blockStateDefinitions::blockOf(*between) : nullptr;
-        const world::realBlockTags::TagMembers* tags = owner_->options().blockTags;
-        if (shelfBlock == nullptr || betweenBlock == nullptr || tags == nullptr) {
-            continue;
-        }
-        if (world::realBlockTags::contains(*tags, "minecraft:enchantment_power_provider", *shelfBlock) &&
-            world::realBlockTags::contains(*tags, "minecraft:enchantment_power_transmitter", *betweenBlock)) {
-            ++shelves;
-        }
-    }
+    // parity: `EnchantingTableBlock.isValidBookShelf`: a shelf two out with nothing between it
+    // and the table.
+    const world::realBlockTags::TagMembers* tags = owner_->options().blockTags;
+    const std::int32_t shelves = world::enchanting::bookshelvesAround(
+        [world](const std::int32_t x, const std::int32_t y, const std::int32_t z) -> std::optional<Identifier> {
+            const std::optional<std::int32_t> state = world->state().blockState(x, y, z);
+            const Identifier* block =
+                state.has_value() ? server::registry::blockStateDefinitions::blockOf(*state) : nullptr;
+            return block == nullptr ? std::nullopt : std::optional{*block};
+        },
+        [tags](const std::string_view tag, const Identifier& block) {
+            return tags != nullptr && world::realBlockTags::contains(*tags, tag, block);
+        },
+        openBlock->x, openBlock->y, openBlock->z);
+    shelvesAround_ = shelves;
 
     const world::EnchantmentBooks books{.enchantments = owner_->options().enchantments,
                                         .itemTags = owner_->options().itemTags,
                                         .enchantmentTags = owner_->options().enchantmentTags};
-    random::RandomSource random = random::RandomSource::legacy(session->enchantmentSeed);
+    const std::array<world::enchanting::Row, 3> rows =
+        world::enchanting::roll(books, *input, session->enchantmentSeed, shelves);
     for (std::size_t row = 0; row < kRows; ++row) {
-        enchantmentCosts_[row] = world::enchanting::costFor(random, static_cast<std::int32_t>(row), shelves);
-        if (enchantmentCosts_[row] < static_cast<std::int32_t>(row) + 1) {
-            enchantmentCosts_[row] = 0;
-        }
-    }
-    for (std::size_t row = 0; row < kRows; ++row) {
-        if (enchantmentCosts_[row] <= 0) {
+        enchantmentCosts_[row] = rows[row].cost;
+        if (!rows[row].clue.has_value()) {
             continue;
         }
-        random::RandomSource rowRandom =
-            random::RandomSource::legacy(session->enchantmentSeed + static_cast<std::int64_t>(row));
-        std::vector<world::enchanting::Offer> offers =
-            world::enchanting::select(rowRandom, books, *input, enchantmentCosts_[row]);
-        // parity: a plain book is offered one fewer than everything else, drawn out at random.
-        if (input->id == "minecraft:book" && offers.size() > 1) {
-            offers.erase(offers.begin() + rowRandom.nextInt(static_cast<std::int32_t>(offers.size())));
-        }
-        if (offers.empty()) {
-            continue;
-        }
-        const world::enchanting::Offer& shown =
-            offers[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(offers.size())))];
-        const std::optional<std::int32_t> id =
-            books.enchantments == nullptr ? std::nullopt : books.enchantments->protocolIdOf(shown.enchantment);
+        const std::optional<std::int32_t> id = books.enchantments == nullptr
+                                                   ? std::nullopt
+                                                   : books.enchantments->protocolIdOf(rows[row].clue->enchantment);
         enchantmentClues_[row] = id.value_or(-1);
-        enchantmentLevels_[row] = shown.level;
+        enchantmentLevels_[row] = rows[row].clue->level;
     }
     sendEnchantmentNumbers();
 }
@@ -161,33 +139,15 @@ void ContainerMenuController::takeEnchantmentOffer(PlayerSession& session, const
     const world::EnchantmentBooks books{.enchantments = owner_->options().enchantments,
                                         .itemTags = owner_->options().itemTags,
                                         .enchantmentTags = owner_->options().enchantmentTags};
-    random::RandomSource random =
-        random::RandomSource::legacy(session.enchantmentSeed + static_cast<std::int64_t>(row));
-    std::vector<world::enchanting::Offer> offers =
-        world::enchanting::select(random, books, *input, enchantmentCosts_[static_cast<std::size_t>(row)]);
-    if (input->id == "minecraft:book" && offers.size() > 1) {
-        offers.erase(offers.begin() + random.nextInt(static_cast<std::int32_t>(offers.size())));
-    }
+    // parity: the row is worked out again from the same seed, which is what makes what was shown
+    // and what goes on the item the same thing.
+    const std::array<world::enchanting::Row, 3> rows =
+        world::enchanting::roll(books, *input, session.enchantmentSeed, shelvesAround_);
+    const std::vector<world::enchanting::Offer>& offers = rows[static_cast<std::size_t>(row)].offers;
     if (offers.empty()) {
         return;
     }
-    // parity: a plain book becomes an enchanted one, and what goes on it is stored rather than worn.
-    storage::StoredItemStack made = *input;
-    if (made.id == "minecraft:book") {
-        made.id = "minecraft:enchanted_book";
-    }
-    const std::string_view component =
-        made.id == "minecraft:enchanted_book" ? itemComponents::kStoredEnchantments : itemComponents::kEnchantments;
-    NbtCompound levels;
-    if (const NbtCompound* existing = made.components.getCompound(component); existing != nullptr) {
-        levels = *existing;
-    }
-    for (const world::enchanting::Offer& offer : offers) {
-        const std::string name = offer.enchantment.toString();
-        levels.putInt(name, std::max(levels.contains(name) ? levels.getInt(name) : 0, offer.level));
-    }
-    made.components.set(component, NbtTag::ofCompound(std::move(levels)));
-    input = made;
+    input = world::enchanting::applied(*input, offers);
 
     if (!free) {
         session.experience.giveLevels(-price);

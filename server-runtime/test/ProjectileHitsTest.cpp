@@ -49,9 +49,11 @@ namespace {
     return BlockHit{.x = x, .y = y, .z = z, .blockX = 8, .blockY = 64, .blockZ = 8, .face = face};
 }
 
-/// How many calls to `dueBlockTicks` it takes for this position to come due, or zero within `limit`.
+/// How many turns it takes for this position to come due, or zero within `limit`.
 [[nodiscard]] std::int32_t ticksUntilDue(WorldState& world, std::int32_t limit) {
     for (std::int32_t tick = 1; tick <= limit; ++tick) {
+        // parity: the turn opens before anything runs, and that is where the countdown happens.
+        world.openTurn();
         const std::vector<std::array<std::int32_t, 3>> due = world.dueBlockTicks();
         if (!due.empty()) {
             CHECK(due.size() == 1);

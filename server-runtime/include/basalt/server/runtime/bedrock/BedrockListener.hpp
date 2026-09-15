@@ -183,6 +183,9 @@ public:
         /// What the client chose in a form, or nothing when it dismissed one.
         virtual void formAnswer(std::uint32_t formId, const std::optional<std::string>& data) = 0;
 
+        /// What the client typed into a sign's editor, as one string with newlines in it.
+        virtual void editSign(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& text) = 0;
+
         /// A command the client typed, without its slash.
         virtual void command(std::string_view line) = 0;
 

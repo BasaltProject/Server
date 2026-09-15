@@ -194,6 +194,7 @@ basalt_module(server-runtime-core
         src/player/PlayerBlockItemUse.cpp
         src/player/PlayerBlockSlots.cpp
         src/player/PlayerAnvil.cpp
+        src/player/PlayerSigns.cpp
         src/player/PlayerBlockToggle.cpp
         src/player/PlayerBuckets.cpp
         src/player/PlayerDigSpeed.cpp

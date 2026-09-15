@@ -22,6 +22,7 @@
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
+#include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 
 #include <array>
@@ -254,6 +255,19 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
             world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), placeAt.x, placeAt.y,
                                                                  placeAt.z,
                                                                  world::comparatorReading::of(world.state()));
+        }
+    }
+    // parity: `DiodeBlock.setPlacedBy`: a repeater or comparator that lands on a live signal books
+    // its turn here and nowhere else.
+    world::redstoneComponents::bookOnPlacement(world.state(), world.name(), placeAt.x, placeAt.y, placeAt.z,
+                                               world::comparatorReading::of(world.state()));
+    // parity: `TripWireHookBlock.setPlacedBy` calls `calculateState`, which is what attaches a hook
+    // to a line of string that was already there.
+    if (placedPath != nullptr && placedPath->path() == "tripwire_hook") {
+        std::vector<world::BlockChange> hookChanges;
+        world::tripwires::calculateHook(world.state(), placeAt.x, placeAt.y, placeAt.z, world.gameTime(), hookChanges);
+        for (const world::BlockChange& change : hookChanges) {
+            announceBlock(context.blocks, world.name(), change.x, change.y, change.z, change.stateId);
         }
     }
     // parity: `MossyCarpetBlock.setPlacedBy`, which grows a second carpet over the one placed.

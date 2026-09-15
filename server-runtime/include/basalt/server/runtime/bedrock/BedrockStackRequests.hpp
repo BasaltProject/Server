@@ -30,6 +30,9 @@ struct StackRequestAnswer {
     /// What a grindstone took off, when the request took its result. The halving, the roll and the
     /// points belong where the world is.
     std::optional<std::int32_t> grindstoneWorth;
+    /// The levels an enchanting table charged, when the request took one of its rows. The rows are
+    /// rolled again and the seed moved on where the world is.
+    std::optional<std::int32_t> enchantCost;
 };
 
 /// Moves stacks around one player's windows, as their client asked. Every line is applied in order

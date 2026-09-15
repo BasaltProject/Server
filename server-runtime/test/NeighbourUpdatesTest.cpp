@@ -325,6 +325,7 @@ TEST_CASE("leaves take their distance from the trunk that turned up, on their ow
     CHECK_FALSE(neighbourUpdates::connect(context, 8, 65, 8, *loaded.state.blockState(8, 65, 8)).has_value());
     CHECK(propertyAt(loaded.state, 8, 65, 8, "distance") == "7");
 
+    loaded.state.openTurn();
     const std::vector<std::array<std::int32_t, 3>> due = loaded.state.dueBlockTicks();
     REQUIRE(due.size() == 1);
     CHECK(due[0] == std::array<std::int32_t, 3>{8, 65, 8});

@@ -96,6 +96,13 @@ void notifyAround(const BreakContext& context, world::LoadedWorld& world, const 
     }
 }
 
+void reshapeAround(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
+                   const std::int32_t z) {
+    if (context.blocks != nullptr) {
+        context.blocks->reshapeAround(world, playersIn(context, world.name()), x, y, z);
+    }
+}
+
 std::vector<PlayerSession*> playersIn(const BreakContext& context, const std::string_view worldName) {
     std::vector<PlayerSession*> found;
     if (context.registry == nullptr) {

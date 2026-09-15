@@ -139,8 +139,10 @@ TEST_CASE("a weighted plate books a shorter turn than a plain one") {
     // Ten ticks, not twenty: it comes due on the tenth call and not before.
     for (std::int32_t at = 0; at < 9; ++at) {
         CAPTURE(at);
+        world.openTurn();
         CHECK(world.dueBlockTicks().empty());
     }
+    world.openTurn();
     CHECK(world.dueBlockTicks().size() == 1);
 }
 

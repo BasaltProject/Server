@@ -186,6 +186,11 @@ private:
     /// Tells a world that one more, or one fewer, is looking into the block that window belongs to.
     void openersChanged(world::LoadedWorld& world, const bedrock::OpenWindow& window, bool opened);
 
+    /// Rolls what the open enchanting table offers this player and leaves it in their window, for
+    /// the door whose screen reads the rows out of a packet rather than out of the window.
+    void rollBedrockEnchantment(player::PlayerSession& session, world::LoadedWorld& world,
+                                bedrock::BedrockWindows& windows);
+
     VanillaGameData vanillaData_;
     ChunkSimulationView chunkSimulation_;
     /// What a mob spawns holding, out of the operator's own jar.

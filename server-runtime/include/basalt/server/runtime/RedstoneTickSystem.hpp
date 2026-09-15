@@ -88,6 +88,12 @@ public:
 
     void tickFluids(world::LoadedWorld& world, const sched::Region& region);
 
+    /// Opens the turn for the scheduled turns of this region, before any of them runs.
+    ///
+    /// parity: the jar books an absolute `triggerTick`; counting every turn down once, here, says
+    /// the same with a countdown and keeps a pass from shortening what its own turn booked.
+    void openTurn(world::LoadedWorld& world, const sched::Region& region);
+
     /// Runs the block ticks that have come due: buttons letting themselves back up, redstone
     /// components spending their delay, pistons landing, plates coming back up.
     void tickScheduledBlocks(world::LoadedWorld& world, const sched::Region& region);

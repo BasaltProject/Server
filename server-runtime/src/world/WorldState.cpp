@@ -629,6 +629,18 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
     return positions;
 }
 
+void WorldState::openTurn(const Ticking& ticking) {
+    const WorldWriteLock lock{mutex_};
+    for (const auto& [chunkKey, chunk] : chunksByPos_) {
+        // The same two gates the passes use: nothing booked here, or a chunk that is frozen because
+        // nobody is ticking it, and its turns neither run nor count down.
+        if (chunk->scheduledTickCount() == 0 || (ticking && !ticking(chunk->chunkX(), chunk->chunkZ()))) {
+            continue;
+        }
+        chunk->openTurn();
+    }
+}
+
 std::vector<std::array<std::int32_t, 3>> WorldState::dueFluidTicks(const Ticking& ticking) {
     return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceFluidTicks(due); }, false,
                     ticking);

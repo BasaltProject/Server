@@ -5,8 +5,11 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <iterator>
+#include <limits>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <string>
 #include <utility>
@@ -97,6 +100,12 @@ struct Place {
             return {};
         }
         return {.kind = Place::Kind::Storage, .slot = PlayerInventory::kOffhandSlot};
+    case BedrockContainerSlot::EnchantingInput:
+        // An enchanting table's two slots are the screen's, so they live where a grid's first cells
+        // do: only one screen is ever open.
+        return {.kind = Place::Kind::Grid, .slot = 0};
+    case BedrockContainerSlot::EnchantingMaterial:
+        return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::SmithingTemplate:
         // A smithing table's four slots are the screen's, so its three inputs live where a grid's
         // first cells do and what it makes is nowhere until it is taken.
@@ -166,6 +175,8 @@ struct Reach {
     std::optional<std::int32_t> anvilCost;
     /// What the open grindstone took off, once the request has taken what it left.
     std::optional<std::int32_t> grindstoneWorth;
+    /// What the open enchanting table charged, once the request has taken one of its rows.
+    std::optional<std::int32_t> enchantCost;
 };
 
 [[nodiscard]] std::optional<storage::StoredItemStack> stackAt(const Reach& reach, const Place& place) {
@@ -412,6 +423,49 @@ private:
     return true;
 }
 
+/// Puts one of the open table's rows onto what is in it: the lapis goes, the item is written on,
+/// and what it costs in levels is answered rather than taken, because the levels live elsewhere.
+///
+/// parity: `EnchantmentMenu.clickMenuButton`, which charges the row's own number plus one in both
+/// levels and lapis, and only asks that the cost shown is affordable.
+[[nodiscard]] bool takeEnchantment(Reach& reach, const std::int32_t netId, const StackRequestContext& context) {
+    if (!reach.windows.enchanting.has_value()) {
+        return false;
+    }
+    const std::array<EnchantRow, 3>& rows = reach.windows.enchanting->rows;
+    const auto found = std::ranges::find_if(rows, [netId](const EnchantRow& row) { return row.netId == netId; });
+    if (found == rows.end() || found->offers.empty() || found->cost <= 0) {
+        return false;
+    }
+    const auto price = static_cast<std::int32_t>(std::distance(rows.begin(), found)) + 1;
+    const Place input{.kind = Place::Kind::Grid, .slot = 0};
+    const Place lapis{.kind = Place::Kind::Grid, .slot = 1};
+    const std::optional<storage::StoredItemStack> held = stackAt(reach, input);
+    const std::optional<storage::StoredItemStack> paying = stackAt(reach, lapis);
+    if (!held.has_value()) {
+        return false;
+    }
+    // Creative answers yes to any price at all, which is how "nothing is charged" is asked here.
+    const bool free = !context.canPay || context.canPay(std::numeric_limits<std::int32_t>::max());
+    if (!free) {
+        if (!context.canPay(std::max(found->cost, price))) {
+            return false;
+        }
+        if (!paying.has_value() || paying->count < price) {
+            return false;
+        }
+        const std::int32_t left = paying->count - price;
+        if (!writeStack(reach, lapis, left <= 0 ? std::nullopt : std::optional{withCount(*paying, left)})) {
+            return false;
+        }
+    }
+    if (!writeStack(reach, input, world::enchanting::applied(*held, found->offers))) {
+        return false;
+    }
+    reach.enchantCost = price;
+    return true;
+}
+
 } // namespace
 
 StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows, world::LoadedWorld* world,
@@ -473,6 +527,17 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             touched.add(action.source);
             break;
         case BedrockStackActionType::Craft: {
+            // An enchanting table names one of its three rows by the number it was given, which is
+            // the only thing that number means: what the row puts on was decided when it was rolled.
+            if (windows.enchanting.has_value() && windows.open.has_value() &&
+                windows.open->type == wire::bedrock::BedrockContainerType::Enchantment) {
+                if (!takeEnchantment(reach, action.recipeNetId, context)) {
+                    return {};
+                }
+                touched.add({.container = static_cast<std::int32_t>(BedrockContainerSlot::EnchantingInput)});
+                touched.add({.container = static_cast<std::int32_t>(BedrockContainerSlot::EnchantingMaterial)});
+                break;
+            }
             // A merchant's book names a trade where a table names a recipe, and the number is the
             // offer's place in the list that was sent, counted from one.
             if (windows.trades.has_value()) {
@@ -603,6 +668,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
     }
     answer.anvilCost = reach.anvilCost;
     answer.grindstoneWorth = reach.grindstoneWorth;
+    answer.enchantCost = reach.enchantCost;
     return answer;
 }
 

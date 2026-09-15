@@ -488,6 +488,14 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
+        if (packet == BedrockPacket::BlockEntityData && entry.player) {
+            // The only block whose own data a client sends back: what was typed into a sign.
+            const auto edit = wire::bedrock::readSignEdit(body);
+            if (edit.has_value()) {
+                entry.player->editSign(edit->x, edit->y, edit->z, edit->text);
+            }
+            return;
+        }
         if (packet == BedrockPacket::Text && entry.player) {
             const auto text = wire::bedrock::readText(body);
             if (text.has_value() && !text->message.empty()) {

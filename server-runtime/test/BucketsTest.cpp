@@ -85,7 +85,8 @@ TEST_CASE("an empty bucket will not scoop a flow") {
     REQUIRE(fixture.world.setBlockState(8, 64, 8, stateOf("water")));
     static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 8, 64, 8));
     for (std::int32_t turn = 0; turn < 200; ++turn) {
-        for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
+        fixture.world.openTurn();
+            for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
             static_cast<void>(fluidFlow::tick(fixture.context(), position[0], position[1], position[2]));
         }
     }
@@ -221,7 +222,8 @@ TEST_CASE("emptying a bucket wakes the fluid around what it filled") {
     CHECK(fixture.world.blockState(8, 64, 8) == stateOf("water"));
     // It spreads on its own from here, without anything else asking it to.
     for (std::int32_t turn = 0; turn < 200; ++turn) {
-        for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
+        fixture.world.openTurn();
+            for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
             static_cast<void>(fluidFlow::tick(fixture.context(), position[0], position[1], position[2]));
         }
     }

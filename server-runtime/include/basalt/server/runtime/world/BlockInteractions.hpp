@@ -70,6 +70,12 @@ struct BlockRelease {
 ///
 /// Both halves of a door move together, which is why this reads the world rather than answering
 /// from the state alone.
+/// Whether a hand toggle on this block tells the neighbours. parity: only `LeverBlock` and
+/// `ButtonBlock` write with flag three. `DoorBlock` and `FenceGateBlock` write with ten and
+/// `TrapDoorBlock` with two, and none of those carries `UPDATE_NEIGHBORS`: a door opened **by hand**
+/// redraws the shapes around it and tells nobody.
+[[nodiscard]] bool handToggleTellsNeighbours(std::int32_t stateId);
+
 /// Right-clicking the block there. `playerYaw` is only read by a fence gate, which turns to face
 /// whoever opened it from the wrong side.
 [[nodiscard]] std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,

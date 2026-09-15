@@ -109,6 +109,12 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Stonecutter, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
+    // parity: `EnchantingTableBlock.useWithoutItem`. Its two slots belong to the screen, and what
+    // it offers comes off the shelves around it.
+    if (path == "enchanting_table") {
+        return OpenWindow{
+            .type = wire::bedrock::BedrockContainerType::Enchantment, .x = x, .y = y, .z = z, .size = 0, .block = path};
+    }
     // parity: `SmithingTableBlock.useWithoutItem`. Its four slots belong to the screen too.
     if (path == "smithing_table") {
         return OpenWindow{.type = wire::bedrock::BedrockContainerType::SmithingTable,

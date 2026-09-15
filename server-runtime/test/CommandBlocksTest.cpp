@@ -96,6 +96,7 @@ TEST_CASE("a signal books a turn for an impulse block, and only on the way up") 
     REQUIRE(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
     // parity: `setPoweredAndUpdate` does nothing at all when the signal has not moved.
     commandBlocks::onSignal(loaded.state, 8, 64, 8, true);
+    loaded.state.openTurn();
     static_cast<void>(loaded.state.dueBlockTicks());
     CHECK_FALSE(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
 
