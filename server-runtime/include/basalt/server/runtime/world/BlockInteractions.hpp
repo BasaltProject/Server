@@ -65,19 +65,16 @@ struct BlockRelease {
 /// Whether a hand moves this block on a notch rather than flipping it.
 [[nodiscard]] bool isCycleable(std::int32_t stateId);
 
-/// Flips the block at these coordinates and whatever else goes with it, or nothing when a hand does
-/// not move it.
-///
-/// Both halves of a door move together, which is why this reads the world rather than answering
-/// from the state alone.
-/// Whether a hand toggle on this block tells the neighbours. parity: only `LeverBlock` and
-/// `ButtonBlock` write with flag three. `DoorBlock` and `FenceGateBlock` write with ten and
-/// `TrapDoorBlock` with two, and none of those carries `UPDATE_NEIGHBORS`: a door opened **by hand**
-/// redraws the shapes around it and tells nobody.
+/// parity: `CopperGolemStatueBlock.useItemOn` answers PASS to an axe, so an axe scrapes the statue
+/// rather than turning its pose. It is the only cycleable block that looks at what the hand holds.
+[[nodiscard]] bool cycleYieldsToAxe(std::int32_t stateId);
+
+/// parity: only `LeverBlock` and `ButtonBlock` toggle with `UPDATE_NEIGHBORS`; a door, gate or
+/// trapdoor opened by hand redraws shapes and tells nobody.
 [[nodiscard]] bool handToggleTellsNeighbours(std::int32_t stateId);
 
-/// Right-clicking the block there. `playerYaw` is only read by a fence gate, which turns to face
-/// whoever opened it from the wrong side.
+/// Flips the block there and whatever moves with it, such as a door's other half. `playerYaw` is
+/// only read by a fence gate, which turns to face whoever opened it.
 [[nodiscard]] std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                 std::optional<float> playerYaw = std::nullopt);
 

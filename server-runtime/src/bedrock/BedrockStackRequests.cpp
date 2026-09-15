@@ -125,6 +125,16 @@ struct Place {
         return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::AnvilMaterial:
         return {.kind = Place::Kind::Grid, .slot = 1};
+    case BedrockContainerSlot::LoomInput:
+        // A loom's three inputs are the screen's, so they live where a grid's first cells do.
+        return {.kind = Place::Kind::Grid, .slot = 0};
+    case BedrockContainerSlot::LoomDye:
+        return {.kind = Place::Kind::Grid, .slot = 1};
+    case BedrockContainerSlot::LoomMaterial:
+        return {.kind = Place::Kind::Grid, .slot = 2};
+    case BedrockContainerSlot::BeaconPayment:
+        // A beacon's one slot is the screen's, so it lives where a grid's first cell does.
+        return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::StonecutterInput:
         // One slot, which lives where the grid's first cell does: only one screen is ever open.
         return {.kind = Place::Kind::Grid, .slot = 0};
@@ -143,6 +153,7 @@ struct Place {
     case BedrockContainerSlot::AnvilResult:
     case BedrockContainerSlot::GrindstoneResult:
     case BedrockContainerSlot::SmithingResult:
+    case BedrockContainerSlot::LoomResult:
         // What a craft just made, which is nowhere until the line that takes it says where.
         return {.kind = Place::Kind::Created};
     default:
@@ -173,6 +184,8 @@ struct Reach {
     std::int32_t trades = 0;
     /// What the open anvil charged, once the request has taken what it made.
     std::optional<std::int32_t> anvilCost;
+    /// What the open beacon was set to, once the request has paid for it.
+    std::optional<BeaconChoice> beacon;
     /// What the open grindstone took off, once the request has taken what it left.
     std::optional<std::int32_t> grindstoneWorth;
     /// What the open enchanting table charged, once the request has taken one of its rows.
@@ -637,6 +650,64 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             reach.grindstoneWorth = made.experience;
             break;
         }
+        case BedrockStackActionType::BeaconPayment: {
+            // parity: `BeaconMenu.updateEffects`, which does nothing at all without a payment and
+            // eats one of it when it works.
+            if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Beacon) {
+                return {};
+            }
+            const Place payment{.kind = Place::Kind::Grid, .slot = 0};
+            const std::optional<storage::StoredItemStack> paying = stackAt(reach, payment);
+            if (!paying.has_value()) {
+                return {};
+            }
+            if (!writeStack(reach, payment,
+                            paying->count > 1 ? withCount(*paying, paying->count - 1)
+                                              : std::optional<storage::StoredItemStack>{})) {
+                return {};
+            }
+            // That edition numbers the effects one higher than this one does, and calls nothing
+            // zero.
+            const auto ours = [](const std::int32_t theirs) {
+                return theirs == 0 ? std::optional<std::int32_t>{} : std::optional{theirs - 1};
+            };
+            reach.beacon =
+                BeaconChoice{.primary = ours(action.primaryEffect), .secondary = ours(action.secondaryEffect)};
+            break;
+        }
+        case BedrockStackActionType::CraftLoom: {
+            // A loom, which names a pattern rather than a recipe: what it makes is the banner in it
+            // with one more layer.
+            if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Loom ||
+                !context.loomResult) {
+                return {};
+            }
+            const Place banner{.kind = Place::Kind::Grid, .slot = 0};
+            const Place dye{.kind = Place::Kind::Grid, .slot = 1};
+            const Place pattern{.kind = Place::Kind::Grid, .slot = 2};
+            const std::optional<storage::StoredItemStack> woven = stackAt(reach, banner);
+            const std::optional<storage::StoredItemStack> colour = stackAt(reach, dye);
+            const std::optional<storage::StoredItemStack> named = stackAt(reach, pattern);
+            if (!woven.has_value() || !colour.has_value()) {
+                return {};
+            }
+            const std::optional<storage::StoredItemStack> made =
+                context.loomResult(*woven, *colour, named.has_value() ? &*named : nullptr, action.pattern);
+            if (!made.has_value()) {
+                return {};
+            }
+            // parity: `LoomMenu.ResultSlot.onTake`: one banner and one dye, and the pattern stays.
+            const auto eat = [&reach](const Place& where, const storage::StoredItemStack& held) {
+                return writeStack(reach, where,
+                                  held.count > 1 ? withCount(held, held.count - 1)
+                                                 : std::optional<storage::StoredItemStack>{});
+            };
+            if (!eat(banner, *woven) || !eat(dye, *colour)) {
+                return {};
+            }
+            reach.created = *made;
+            break;
+        }
         case BedrockStackActionType::CraftResults:
             // The client repeating what it thinks it made, which this server already knows.
             break;
@@ -669,6 +740,7 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
     answer.anvilCost = reach.anvilCost;
     answer.grindstoneWorth = reach.grindstoneWorth;
     answer.enchantCost = reach.enchantCost;
+    answer.beacon = reach.beacon;
     return answer;
 }
 

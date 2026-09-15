@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/player/Menu.hpp>
+#include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
@@ -99,6 +100,14 @@ public:
 
     void openEnchantmentMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    void openBeaconMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    void openLoomMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    /// parity: `BeaconMenu.updateEffects`, which takes the payment and writes both choices onto the
+    /// block. Either effect is the mob effect's registry id, or nothing for "none".
+    void setBeaconEffects(const std::optional<std::int32_t>& primary, const std::optional<std::int32_t>& secondary);
+
     /// parity: `ServerboundRenameItemPacket`, which arrives on every keystroke and works the result
     /// out again each time.
     void setAnvilName(const std::string& name);
@@ -185,6 +194,22 @@ private:
 
     void sendEnchantmentNumbers();
 
+    /// parity: `BeaconMenu`'s three data slots: the pyramid and the two effects it is set to.
+    void sendBeaconNumbers();
+
+    /// parity: `LoomMenu.slotsChanged`, which works out what it may offer and what it would weave.
+    void recomputeLoomResult();
+
+    /// parity: `LoomMenu.clickMenuButton`, whose button is a place in the patterns on offer.
+    void selectLoomPattern(std::int32_t button);
+
+    void takeLoomResult();
+
+    void sendLoomNumbers();
+
+    /// What the beacon this window belongs to has on it right now.
+    [[nodiscard]] world::beacons::Stored beaconState() const;
+
     void recomputeGrindstoneResult();
 
     void takeGrindstoneResult(player::PlayerSession& session);
@@ -266,6 +291,16 @@ private:
     /// How much power the open table had when its rows were rolled, so taking one works the same
     /// row out again rather than a different one.
     std::int32_t shelvesAround_ = 0;
+
+    bool openBeacon_ = false;
+    std::optional<storage::StoredItemStack> beaconPayment_;
+
+    bool openLoom_ = false;
+    std::array<std::optional<storage::StoredItemStack>, 4> loomSlots_;
+    /// What the screen may offer right now, in the order its buttons are numbered by, and which of
+    /// them is picked. parity: `selectablePatterns` and `selectedBannerPatternIndex`.
+    std::vector<std::string> loomPatterns_;
+    std::int32_t loomPattern_ = -1;
 
     bool openGrindstone_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> grindstoneSlots_;

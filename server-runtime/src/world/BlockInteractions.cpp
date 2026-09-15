@@ -111,6 +111,14 @@ enum class Toggle { Door, Trapdoor, FenceGate, Lever, Button };
     return face == "west" ? "east" : "west";
 }
 
+/// parity: `CopperGolemStatueBlock`'s four poses, in the order the enum declares them, which is what
+/// `getAnalogOutputSignal` turns into one to four. The eight copper stages share the block.
+constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "running", "star"};
+
+[[nodiscard]] bool isCopperGolemStatue(std::string_view path) {
+    return path == "copper_golem_statue" || path.ends_with("_copper_golem_statue");
+}
+
 [[nodiscard]] std::optional<Toggle> toggleOf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
@@ -197,7 +205,15 @@ bool isCycleable(std::int32_t stateId) {
     // parity: `DaylightDetectorBlock.useWithoutItem` cycles `inverted`, and
     // `RedStoneWireBlock.useWithoutItem` turns a cross into a dot and back. Both are components you
     // set up by clicking them, and the bench cannot press anything, so neither was here.
-    return path == "repeater" || path == "comparator" || path == "daylight_detector" || redstoneWire::isWire(stateId);
+    // parity: `CopperGolemStatueBlock.useItemOn` turns the statue one pose on for anything that is
+    // not an axe, an empty hand included, and the pose is what a comparator beside it reads.
+    return path == "repeater" || path == "comparator" || path == "daylight_detector" || isCopperGolemStatue(path) ||
+           redstoneWire::isWire(stateId);
+}
+
+bool cycleYieldsToAxe(const std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && isCopperGolemStatue(block->path());
 }
 
 bool handToggleTellsNeighbours(const std::int32_t stateId) {
@@ -304,6 +320,22 @@ std::optional<BlockCycle> cycle(WorldState& world, std::int32_t x, std::int32_t 
                           .sound = std::string{"block.comparator.click"},
                           .pitch = subtracting ? kComparePitch : kSubtractPitch,
                           .volume = kComparatorVolume};
+    }
+    // parity: `CopperGolemStatueBlock.updatePose`, `POSE.getNextPose()` written with flag three. The
+    // next pose wraps round, because `getNextPose` is a `ByIdMap.continuous` with `ZERO` out of
+    // bounds: after `star` comes `standing` again.
+    if (isCopperGolemStatue(path)) {
+        const std::string pose{valueOf(properties, "copper_golem_pose")};
+        const auto found = std::ranges::find(kGolemPoses, pose);
+        const std::size_t next = found == kGolemPoses.end()
+                                     ? 0
+                                     : (static_cast<std::size_t>(found - kGolemPoses.begin()) + 1) % kGolemPoses.size();
+        const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(
+            *block, Properties{{"copper_golem_pose", std::string{kGolemPoses[next]}}}, *stateId);
+        if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
+            return std::nullopt;
+        }
+        return BlockCycle{.stateId = *turned, .sound = std::string{"block.copper_golem_statue.become_statue"}};
     }
     if (path == "daylight_detector") {
         // parity: the detector writes `inverted` on its own with `setBlock(..., 2)` and then lets

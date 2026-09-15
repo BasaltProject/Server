@@ -391,6 +391,34 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
         std::ranges::fill(smithingSlots_, std::nullopt);
         openSmithing_ = false;
     }
+    // parity: `BeaconMenu.removed`, which drops the payment on the floor rather than putting it
+    // back into the player.
+    if (openBeacon_) {
+        if (beaconPayment_.has_value()) {
+            dropStack(session, *beaconPayment_);
+            beaconPayment_.reset();
+        }
+        openBeacon_ = false;
+    }
+    // parity: `LoomMenu.removed`, which hands its three inputs back.
+    if (openLoom_) {
+        for (const std::int32_t slot : {Menu::kLoomBanner, Menu::kLoomDye, Menu::kLoomPattern}) {
+            const std::optional<storage::StoredItemStack>& leftover = loomSlots_[static_cast<std::size_t>(slot)];
+            if (!leftover.has_value()) {
+                continue;
+            }
+            const std::int32_t left = session.inventory.add(*leftover);
+            if (left > 0) {
+                storage::StoredItemStack dropped = *leftover;
+                dropped.count = left;
+                dropStack(session, dropped);
+            }
+        }
+        std::ranges::fill(loomSlots_, std::nullopt);
+        loomPatterns_.clear();
+        loomPattern_ = -1;
+        openLoom_ = false;
+    }
     // parity: `EnchantmentMenu.removed`, which hands both slots back.
     if (openEnchantment_) {
         for (std::optional<storage::StoredItemStack>& leftover : enchantmentSlots_) {
@@ -483,6 +511,11 @@ void ContainerMenuController::clickContainerButton(std::int32_t button) {
     // whatever is in the input slot, in the order the client was sent them.
     if (openStonecutter_) {
         selectStonecutterRecipe(button);
+        return;
+    }
+    // parity: `LoomMenu.clickMenuButton`, whose button is a place in the patterns on offer.
+    if (openLoom_) {
+        selectLoomPattern(button);
         return;
     }
     // parity: `EnchantmentMenu.clickMenuButton`, whose button is which of the three rows was pressed.

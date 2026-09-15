@@ -140,6 +140,8 @@ basalt_module(server-runtime-core
         src/ContainerClicks.cpp
         src/ContainerMenuController.cpp
         src/ContainerAnvil.cpp
+        src/ContainerBeacon.cpp
+        src/ContainerLoom.cpp
         src/ContainerGrindstone.cpp
         src/ContainerEnchantment.cpp
         src/ContainerSlots.cpp
@@ -236,6 +238,7 @@ basalt_module(server-runtime-core
         src/ui/PlayerUi.cpp
         src/timings/TimingsReport.cpp
         src/world/ChorusFlowerGrowth.cpp
+        src/world/RealBannerPatterns.cpp
         src/world/RealBiomeSpawns.cpp
         src/world/RealBlockTags.cpp
         src/world/RealItemTags.cpp
@@ -298,10 +301,12 @@ basalt_module(server-runtime-core
         src/world/Explosions.cpp
         src/world/AdvancementTriggers.cpp
         src/world/Anvils.cpp
+        src/world/Beacons.cpp
         src/world/AnvilEnchantments.cpp
         src/world/EnchantmentBooks.cpp
         src/world/Enchanting.cpp
         src/world/Grindstones.cpp
+        src/world/Looms.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -1538,6 +1543,18 @@ target_compile_definitions(server-runtime-argument-types-test
 basalt_test(server-runtime-anvils-test
     SOURCES
         test/AnvilsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-beacons-test
+    SOURCES
+        test/BeaconsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-looms-test
+    SOURCES
+        test/LoomsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

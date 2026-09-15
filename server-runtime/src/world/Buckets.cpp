@@ -105,6 +105,17 @@ struct Hit {
     if (!clicked.has_value()) {
         return std::nullopt;
     }
+    // parity: the `WATER_EVAPORATES` branch of `BucketItem.emptyContents`, which goes **before** the
+    // one that soaks a block and before the one that writes water: in the Nether a bucket of water
+    // hisses, leaves nothing at all, and is spent all the same. Putting it after would waterlog a
+    // Nether stair, which vanilla never does.
+    if (content == FluidKind::Water && context.ultrawarm) {
+        Result hissed;
+        if (!creative) {
+            hissed.replacement = emptyBucket();
+        }
+        return hissed;
+    }
     // parity: `BucketItem.emptyContents`' `LiquidBlockContainer` branch, which comes **before** the
     // one that writes a block of water: a stair, a slab or a fence takes the water inside itself and
     // stays where it is. `canPlaceLiquid` is `type == WATER`, so lava never goes in and falls through

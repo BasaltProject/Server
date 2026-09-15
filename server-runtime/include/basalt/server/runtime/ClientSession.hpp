@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/ui/PlayerUi.hpp>
+#include <basalt/server/runtime/world/RealBannerPatterns.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantmentTags.hpp>
@@ -214,6 +215,8 @@ public:
         const world::realFluidTags::TagMembers* fluidTags = nullptr;
         const world::realTimelineTags::TagMembers* timelineTags = nullptr;
         const world::realEntityTypeTags::TagMembers* entityTypeTags = nullptr;
+        /// Which patterns a loom may offer, in the order its buttons are numbered by.
+        const world::realBannerPatterns::TagOrder* bannerPatterns = nullptr;
         /// The two registries a client is sent that this build loads from the jar.
         world::RealDialogs* dialogs = nullptr;
         world::RealTimelines* timelines = nullptr;

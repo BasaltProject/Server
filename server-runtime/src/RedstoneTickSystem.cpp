@@ -8,11 +8,12 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
-#include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
+#include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
+#include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/BlockEntityTicks.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
@@ -637,6 +638,41 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         .songLength = [this](const std::string& song) -> std::int64_t {
             return options_.jukeboxes == nullptr ? 0 : options_.jukeboxes->lengthOf(song);
         },
+        .isBeaconBase =
+            [this](const wire::common::Identifier& block) {
+                return options_.blockTags != nullptr &&
+                       world::realBlockTags::contains(*options_.blockTags, "minecraft:beacon_base_blocks", block);
+            },
+        // parity: `BeaconBlockEntity.applyEffects`: everybody inside the square it reaches, at any
+        // height, gets the effect again for as long as the pyramid is worth.
+        .beaconPulse =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t levels,
+                           const std::string& primary, const std::string& secondary) {
+                const world::beacons::Beam beam = world::beacons::beamOf(levels, primary == secondary);
+                const std::expected<wire::common::Identifier, wire::common::IdentifierError> first =
+                    wire::common::Identifier::parse(primary);
+                if (!first.has_value()) {
+                    return;
+                }
+                const std::optional<wire::common::Identifier> second =
+                    secondary.empty() || secondary == primary
+                        ? std::optional<wire::common::Identifier>{}
+                        : [&secondary]() -> std::optional<wire::common::Identifier> {
+                    const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+                        wire::common::Identifier::parse(secondary);
+                    return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
+                }();
+                for (PlayerSession* player : watchersOf(world)) {
+                    if (!world::beacons::reaches(beam, x, y, z, player->x, player->y, player->z) ||
+                        !player->connection().addEffect) {
+                        continue;
+                    }
+                    player->connection().addEffect(*first, beam.durationTicks, beam.amplifier);
+                    if (levels >= world::beacons::kMaxLevels && second.has_value()) {
+                        player->connection().addEffect(*second, beam.durationTicks, 0);
+                    }
+                }
+            },
         .songStopped =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 broadcaster_->notifyAround(world, watchersOf(world), x, y, z, std::nullopt);

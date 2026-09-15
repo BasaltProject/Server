@@ -34,6 +34,10 @@ namespace {
         return "craft optional";
     case wire::bedrock::BedrockStackActionType::CraftGrindstone:
         return "craft grindstone";
+    case wire::bedrock::BedrockStackActionType::BeaconPayment:
+        return "beacon payment";
+    case wire::bedrock::BedrockStackActionType::CraftLoom:
+        return "craft loom";
     case wire::bedrock::BedrockStackActionType::Other:
         break;
     }

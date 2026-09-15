@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
+#include <basalt/server/runtime/world/RealBannerPatterns.hpp>
 #include <basalt/server/runtime/world/RealBiomeSpawns.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -70,6 +71,8 @@ public:
     world::realTimelineTags::TagMembers timelineTags;
     world::realDamageTypeTags::TagMembers damageTypeTags;
     world::realEntityTypeTags::TagMembers entityTags;
+    /// The banner-pattern tags, kept in their own order because a loom's buttons are numbered by it.
+    world::realBannerPatterns::TagOrder bannerPatterns;
     world::RealAdvancements advancements;
     world::RealEnchantments enchantments;
     /// Which enchantments will not sit beside each other, which is what an anvil asks. Declared

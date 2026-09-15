@@ -12,7 +12,9 @@
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/Looms.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
+#include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
@@ -68,6 +70,14 @@ std::int32_t ContainerMenuController::halfSize() const {
 }
 
 std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(std::int32_t index) const {
+    if (openBeacon_) {
+        return index == Menu::kBeaconPayment ? beaconPayment_ : std::nullopt;
+    }
+    if (openLoom_) {
+        return index >= 0 && static_cast<std::size_t>(index) < loomSlots_.size()
+                   ? loomSlots_[static_cast<std::size_t>(index)]
+                   : std::nullopt;
+    }
     if (openEnchantment_) {
         return index >= 0 && static_cast<std::size_t>(index) < enchantmentSlots_.size()
                    ? enchantmentSlots_[static_cast<std::size_t>(index)]
@@ -123,6 +133,25 @@ std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(s
 }
 
 void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack) {
+    if (openBeacon_) {
+        if (index == Menu::kBeaconPayment) {
+            beaconPayment_ = stack;
+        }
+        return;
+    }
+    if (openLoom_) {
+        if (index < 0 || static_cast<std::size_t>(index) >= loomSlots_.size()) {
+            return;
+        }
+        if (index == Menu::kLoomResult) {
+            takeLoomResult();
+            return;
+        }
+        loomSlots_[static_cast<std::size_t>(index)] = stack;
+        // parity: `slotsChanged`, which works the offer out again whenever any of the three moves.
+        recomputeLoomResult();
+        return;
+    }
     if (openEnchantment_) {
         if (index < 0 || static_cast<std::size_t>(index) >= enchantmentSlots_.size()) {
             return;
@@ -389,18 +418,37 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
     if (openGrindstone_ && block->index == Menu::kGrindstoneResult) {
         return false;
     }
+    if (openLoom_ && block->index == Menu::kLoomResult) {
+        return false;
+    }
     return !(openSmithing_ && block->index == Menu::kSmithingResult);
 }
 
 bool ContainerMenuController::hasBlockSlots() const {
     return openBlock.has_value() || openEnderChest_ || openStonecutter_ || openSmithing_ || openAnvil_ ||
-           openGrindstone_ || openEnchantment_;
+           openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_;
 }
 
 bool ContainerMenuController::accepts(const MenuSlot& target, const storage::StoredItemStack& stack) const {
     const auto* block = std::get_if<player::menuSlot::Block>(&target);
     if (block == nullptr) {
         return true;
+    }
+    // parity: `BeaconMenu.PaymentSlot.mayPlace`, which is the `beacon_payment_items` tag.
+    if (openBeacon_) {
+        const std::optional<Identifier> payment = parsedOrNothing(stack.id);
+        return block->index == Menu::kBeaconPayment && payment.has_value() && owner_->options().itemTags != nullptr &&
+               world::realItemTags::contains(*owner_->options().itemTags, "minecraft:beacon_payment_items", *payment);
+    }
+    // parity: `LoomMenu`'s three inputs, each of which takes one kind of thing and nothing else.
+    if (openLoom_) {
+        if (block->index == Menu::kLoomBanner) {
+            return world::looms::isBanner(stack.id);
+        }
+        if (block->index == Menu::kLoomDye) {
+            return world::looms::dyeColourOf(stack.id).has_value();
+        }
+        return block->index == Menu::kLoomPattern && world::looms::patternTagOf(stack.id).has_value();
     }
     // parity: `StonecutterMenu.quickMoveStack` only ever moves into the input.
     if (openStonecutter_) {

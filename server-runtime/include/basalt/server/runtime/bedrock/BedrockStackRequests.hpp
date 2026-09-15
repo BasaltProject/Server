@@ -16,6 +16,13 @@ namespace basalt::server::runtime::bedrock {
 
 /// What to tell the client after its request: whether it stood, and what the windows it named hold
 /// now. A refused request carries nothing, and the caller re-sends the whole inventory instead.
+/// The two effects a beacon's screen was set to, as this server's own registry ids. Nothing is
+/// "none", which either of them may be.
+struct BeaconChoice {
+    std::optional<std::int32_t> primary;
+    std::optional<std::int32_t> secondary;
+};
+
 struct StackRequestAnswer {
     bool accepted = false;
     std::vector<wire::bedrock::BedrockResponseContainer> containers;
@@ -33,6 +40,9 @@ struct StackRequestAnswer {
     /// The levels an enchanting table charged, when the request took one of its rows. The rows are
     /// rolled again and the seed moved on where the world is.
     std::optional<std::int32_t> enchantCost;
+    /// What a beacon was set to, when the request paid for it. Writing it onto the block belongs
+    /// where the world is.
+    std::optional<BeaconChoice> beacon;
 };
 
 /// Moves stacks around one player's windows, as their client asked. Every line is applied in order
@@ -61,6 +71,12 @@ struct StackRequestContext {
                                                           const storage::StoredItemStack* base,
                                                           const storage::StoredItemStack* addition)>
         smithingResult;
+    /// What a loom weaves: the banner with one more layer on it, or nothing when the pattern is one
+    /// this loom may not offer. The pattern is already named the way this edition names them.
+    std::function<std::optional<storage::StoredItemStack>(
+        const storage::StoredItemStack& banner, const storage::StoredItemStack& dye,
+        const storage::StoredItemStack* patternItem, const std::string& pattern)>
+        loomResult;
 };
 
 [[nodiscard]] StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows,
