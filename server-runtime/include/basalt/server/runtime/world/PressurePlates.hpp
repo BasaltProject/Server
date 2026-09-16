@@ -48,6 +48,13 @@ enum class Trigger : std::uint8_t {
 [[nodiscard]] std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                 Trigger from, std::int32_t standing, std::int64_t gameTime = 0);
 
+/// Whether an entity of this size here touches the plate at these coordinates.
+///
+/// parity: `BasePressurePlateBlock` crosses the entity's box with `TOUCH_AABB` by the strict
+/// `AABB.intersects`, so one entity can press two plates.
+[[nodiscard]] bool touches(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
+                           double entityZ, double halfWidth, double height);
+
 /// Whether this position is inside the box that presses the plate at these coordinates.
 [[nodiscard]] bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
                                 double entityZ);

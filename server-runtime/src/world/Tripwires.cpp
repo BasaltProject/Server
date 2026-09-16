@@ -77,6 +77,22 @@ const wire::common::Identifier& hookBlock() {
     return instance;
 }
 
+bool crosses(const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::int32_t stateId,
+             const double entityX, const double entityY, const double entityZ, const double halfWidth,
+             const double height) {
+    // parity: the two shapes are full width and differ only in how tall they are. A strung wire is a
+    // tripwire you walk through at ankle height; a loose one fills half the block.
+    const bool attached = valueOf(registry::blockStateDefinitions::propertiesOf(stateId), "attached") == "true";
+    const double low = attached ? 1.0 / 16.0 : 0.0;
+    const double high = attached ? 2.5 / 16.0 : 8.0 / 16.0;
+    const auto overlaps = [](double lowA, double highA, double lowB, double highB) {
+        return lowA < highB && highA > lowB;
+    };
+    return overlaps(entityX - halfWidth, entityX + halfWidth, x, x + 1.0) &&
+           overlaps(entityY, entityY + height, y + low, y + high) &&
+           overlaps(entityZ - halfWidth, entityZ + halfWidth, z, z + 1.0);
+}
+
 bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY, double entityZ) {
     return entityX >= x && entityX <= x + 1 && entityZ >= z && entityZ <= z + 1 && entityY >= y - kCrossingSlack &&
            entityY <= y + 1;

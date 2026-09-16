@@ -37,15 +37,6 @@ constexpr std::array<std::string_view, 4> kDifficulties{"peaceful", "easy", "nor
     return found == kDifficulties.end() ? 0 : static_cast<std::int32_t>(found - kDifficulties.begin());
 }
 
-void sendToWorld(const CommandContext& context, const world::LoadedWorld& world, std::int32_t packetId,
-                 const std::function<void(wire::io::ByteBuffer&)>& write) {
-    for (player::PlayerSession* player : context.environment().playersIn(world)) {
-        if (player->connection().sendPlayPacket) {
-            player->connection().sendPlayPacket(packetId, write);
-        }
-    }
-}
-
 /// parity: `WeatherCommand.setClear`, `setRain` and `setThunder`, which differ only in the range
 /// they sample and in which of the two countdowns they set.
 [[nodiscard]] std::int32_t setWeather(const CommandContext& context, std::string_view kind,
@@ -185,13 +176,11 @@ namespace {
                                                              static_cast<std::int32_t>(std::floor(from[2]))};
     (*world)->setSpawn(at[0], at[1], at[2], angle);
 
-    const wire::protocol::play::SpawnPositionPacket packet{
-        .globalPos = {.dimensionName = (*world)->levelKey(),
-                      .location = wire::protocol::play::BlockPos{at[0], at[1], at[2]}},
-        .yaw = angle,
-        .pitch = 0.0F};
-    sendToWorld(context, **world, wire::protocol::play::SpawnPositionPacket::kId,
-                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    for (player::PlayerSession* player : context.environment().playersIn(**world)) {
+        if (player->connection().sendSpawnPosition) {
+            player->connection().sendSpawnPosition(**world, at[0], at[1], at[2], angle);
+        }
+    }
     context.success(
         Component::translatable("commands.setworldspawn.success",
                                 {Component::text(std::to_string(at[0])), Component::text(std::to_string(at[1])),

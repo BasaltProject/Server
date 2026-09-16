@@ -157,23 +157,40 @@ TEST_CASE("what is not a plate, and what is not there") {
     CHECK_FALSE(pressurePlates::update(world, 0, 64, 0, pressurePlates::Trigger::Touched, 1).has_value());
 }
 
-TEST_CASE("the box that presses a plate is narrower than the block") {
-    // parity: fourteen sixteenths across, so brushing the very edge does not press it.
-    CHECK(pressurePlates::isStandingOn(0, 64, 0, 0.5, 64.0, 0.5));
-    CHECK(pressurePlates::isStandingOn(0, 64, 0, 0.0625, 64.0, 0.9375));
-    CHECK_FALSE(pressurePlates::isStandingOn(0, 64, 0, 0.0, 64.0, 0.5));
-    CHECK_FALSE(pressurePlates::isStandingOn(0, 64, 0, 1.0, 64.0, 0.5));
-    CHECK_FALSE(pressurePlates::isStandingOn(0, 64, 0, 0.5, 64.0, 0.0));
-    CHECK_FALSE(pressurePlates::isStandingOn(0, 64, 0, 0.5, 64.0, 1.0));
+TEST_CASE("a plate is pressed by a box, not by a point") {
+    // parity: `TOUCH_AABB = Block.column(14.0, 0.0, 4.0)`, crossed with `AABB.intersects`. A player
+    // is 0.6 wide and 1.8 tall, so half a width is 0.3.
+    constexpr double kHalf = 0.3;
+    constexpr double kTall = 1.8;
 
-    // A quarter of a block tall, and nothing below it counts.
-    CHECK(pressurePlates::isStandingOn(0, 64, 0, 0.5, 64.25, 0.5));
-    CHECK_FALSE(pressurePlates::isStandingOn(0, 64, 0, 0.5, 64.3, 0.5));
-    CHECK_FALSE(pressurePlates::isStandingOn(0, 64, 0, 0.5, 63.9, 0.5));
+    // Dead centre, and the two ends of the box.
+    CHECK(pressurePlates::touches(0, 64, 0, 0.5, 64.0, 0.5, kHalf, kTall));
+    CHECK(pressurePlates::touches(0, 64, 0, 0.0625, 64.0, 0.9375, kHalf, kTall));
+
+    // The whole point of the change: a navel over the next square still presses this one, because
+    // the body reaches back into it. The old point test called both of these a miss.
+    CHECK(pressurePlates::touches(0, 64, 0, 1.1, 64.0, 0.5, kHalf, kTall));
+    CHECK(pressurePlates::touches(0, 64, 0, -0.1, 64.0, 0.5, kHalf, kTall));
+
+    // And far enough away it really is a miss: the box ends at a sixteenth from the edge, so a body
+    // whose own edge stops short of that touches nothing.
+    CHECK_FALSE(pressurePlates::touches(0, 64, 0, 1.4, 64.0, 0.5, kHalf, kTall));
+    CHECK_FALSE(pressurePlates::touches(0, 64, 0, 0.5, 64.0, -0.4, kHalf, kTall));
+
+    // `AABB.intersects` is strict, so the boundary is exact: the plate's box ends at 0.9375 and half
+    // a body is 0.3, so 1.2375 is the first place that no longer touches it.
+    CHECK(pressurePlates::touches(0, 64, 0, 1.2, 64.0, 0.5, kHalf, kTall));
+    CHECK_FALSE(pressurePlates::touches(0, 64, 0, 1.2375, 64.0, 0.5, kHalf, kTall));
+
+    // A quarter of a block tall, measured from the plate's own floor. Feet above it miss; a body
+    // standing in it reaches down into it.
+    CHECK(pressurePlates::touches(0, 64, 0, 0.5, 64.0, 0.5, kHalf, kTall));
+    CHECK_FALSE(pressurePlates::touches(0, 64, 0, 0.5, 64.25, 0.5, kHalf, kTall));
+    CHECK(pressurePlates::touches(0, 64, 0, 0.5, 63.9, 0.5, kHalf, kTall));
 
     // And it is measured from the plate's own coordinates, wherever they are.
-    CHECK(pressurePlates::isStandingOn(-5, 10, 7, -4.5, 10.0, 7.5));
-    CHECK_FALSE(pressurePlates::isStandingOn(-5, 10, 7, -5.0, 10.0, 7.5));
+    CHECK(pressurePlates::touches(-5, 10, 7, -4.5, 10.0, 7.5, kHalf, kTall));
+    CHECK_FALSE(pressurePlates::touches(-5, 10, 7, -6.5, 10.0, 7.5, kHalf, kTall));
 }
 
 TEST_CASE("the block under a thing is the one its feet are in") {

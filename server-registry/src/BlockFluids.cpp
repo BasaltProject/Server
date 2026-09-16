@@ -11,9 +11,10 @@
 namespace basalt::server::registry::blockFluids {
 namespace {
 
-/// The blocks whose fluid state is water whatever their properties say, because they carry no
-/// `waterlogged` to say it with.
-constexpr std::array<std::string_view, 4> kAlwaysInWater = {"seagrass", "tall_seagrass", "kelp", "kelp_plant"};
+/// parity: blocks whose `getFluidState` is water without a `waterlogged` property: the four plants
+/// and `BubbleColumnBlock`.
+constexpr std::array<std::string_view, 5> kAlwaysInWater = {"seagrass", "tall_seagrass", "kelp", "kelp_plant",
+                                                            "bubble_column"};
 
 /// Every level of the block, not just the source: flowing water is water, and reading it as anything
 /// else leaves it out of the section's fluid count and out of the flow engine.

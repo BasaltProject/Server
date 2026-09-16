@@ -469,3 +469,32 @@ TEST_CASE("a command that needs a player says so rather than crashing") {
 
     CHECK(fixture.dispatcher.execute(fixture.console, "suicide") == 0);
 }
+
+TEST_CASE("the second registration of a name is the one that stays alive") {
+    Fixture fixture;
+
+    // The tree keeps references into the command object it was built from, so the object has to
+    // outlive the nodes: a dropped one leaves every run of that command reading freed memory.
+    struct Watched final : Command {
+        Watched(std::shared_ptr<bool> alive, std::int32_t answer)
+            : Command("count", 0), alive_(std::move(alive)), answer_(answer) {}
+
+        ~Watched() override { *alive_ = false; }
+
+        void build(const CommandNodeBuilder& root) const override {
+            root.executes([this](const CommandContext&) -> Parsed<std::int32_t> { return answer_; });
+        }
+
+        std::shared_ptr<bool> alive_;
+        std::int32_t answer_;
+    };
+
+    const auto first = std::make_shared<bool>(true);
+    const auto second = std::make_shared<bool>(true);
+    fixture.dispatcher.registerCommand(std::make_shared<Watched>(first, 1));
+    fixture.dispatcher.registerCommand(std::make_shared<Watched>(second, 2));
+
+    CHECK_FALSE(*first);
+    CHECK(*second);
+    CHECK(fixture.dispatcher.execute(fixture.console, "count") == 2);
+}

@@ -84,6 +84,12 @@ struct Client {
             write(buffer);
             packets.push_back(id);
         };
+        // The command asks the connection where the spawn went rather than writing the packet
+        // itself, because the two doors write different ones.
+        connection.sendSpawnPosition = [this](const basalt::server::runtime::world::LoadedWorld&, std::int32_t,
+                                              std::int32_t, std::int32_t, float) {
+            packets.push_back(basalt::wire::protocol::play::SpawnPositionPacket::kId);
+        };
         return connection;
     }
 

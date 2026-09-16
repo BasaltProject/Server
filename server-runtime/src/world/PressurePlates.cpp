@@ -120,6 +120,17 @@ std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
+bool touches(const std::int32_t x, const std::int32_t y, const std::int32_t z, const double entityX,
+             const double entityY, const double entityZ, const double halfWidth, const double height) {
+    // parity: `AABB.intersects`, strict at both ends: touching is not pressing.
+    const auto overlaps = [](double lowA, double highA, double lowB, double highB) {
+        return lowA < highB && highA > lowB;
+    };
+    return overlaps(entityX - halfWidth, entityX + halfWidth, x + kEdge, x + 1 - kEdge) &&
+           overlaps(entityY, entityY + height, y, y + kHeight) &&
+           overlaps(entityZ - halfWidth, entityZ + halfWidth, z + kEdge, z + 1 - kEdge);
+}
+
 bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY, double entityZ) {
     return entityX >= x + kEdge && entityX <= x + 1 - kEdge && entityZ >= z + kEdge && entityZ <= z + 1 - kEdge &&
            entityY >= y && entityY <= y + kHeight;

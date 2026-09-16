@@ -180,13 +180,20 @@ void CommandDispatcher::registerCustom() {
 CommandNode* CommandDispatcher::registerCommand(std::shared_ptr<const Command> command) {
     // Remembered before the override is consulted, so a command switched off in the file can be
     // switched back on by a later reload.
-    const bool known = std::ranges::any_of(registered_, [&command](const std::shared_ptr<const Command>& held) {
+    const auto same = std::ranges::find_if(registered_, [&command](const std::shared_ptr<const Command>& held) {
         return held->name() == command->name();
     });
     const Command& definition = *command;
-    if (!known) {
+    // The one that arrives last is the one the tree is built from, so it is the one that has to be
+    // held: the nodes keep references into the command object, and dropping it leaves the tree
+    // reading freed memory the next time somebody runs it.
+    std::shared_ptr<const Command> replaced;
+    if (same == registered_.end()) {
         registered_.push_back(std::move(command));
+    } else {
+        replaced = std::exchange(*same, std::move(command));
     }
+    // The one it took the place of outlives its own nodes, which `registerBuilt` takes out first.
     return registerBuilt(definition);
 }
 

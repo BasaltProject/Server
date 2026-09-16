@@ -67,23 +67,31 @@ void sendBlockUpdate(const std::vector<PlayerSession*>& watchers, const BlockPos
     }
 }
 
-/// The tripwire block a thing at these coordinates is standing in, if it is standing in one.
-void crossingsOf(world::LoadedWorld& world, double x, double y, double z, std::set<std::int64_t>& into) {
-    const auto blockX = static_cast<std::int32_t>(std::floor(x));
-    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
-    const auto from = static_cast<std::int32_t>(std::floor(y - 0.1));
-    const auto to = static_cast<std::int32_t>(std::floor(y));
-    for (std::int32_t blockY = from; blockY <= to; blockY++) {
-        const std::optional<std::int32_t> stateId = world.state().blockState(blockX, blockY, blockZ);
-        if (!stateId.has_value()) {
-            continue;
-        }
-        const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(*stateId);
-        if (block == nullptr || *block != world::tripwires::wireBlock()) {
-            continue;
-        }
-        if (world::tripwires::isStandingOn(blockX, blockY, blockZ, x, y, z)) {
-            into.insert(pack(blockX, blockY, blockZ));
+/// Every tripwire block an entity of this size is crossing.
+///
+/// parity: the wire collects with the bounds of its **own** shape, so the sweep is over the squares
+/// the entity's box reaches and the test is box against box. A string one square over still fires
+/// when a shoulder is in it.
+void crossingsOf(world::LoadedWorld& world, double x, double y, double z, double halfWidth, double height,
+                 std::set<std::int64_t>& into) {
+    for (std::int32_t blockX = wire::common::mth::floor(x - halfWidth);
+         blockX <= wire::common::mth::floor(x + halfWidth); ++blockX) {
+        for (std::int32_t blockY = wire::common::mth::floor(y); blockY <= wire::common::mth::floor(y + height);
+             ++blockY) {
+            for (std::int32_t blockZ = wire::common::mth::floor(z - halfWidth);
+                 blockZ <= wire::common::mth::floor(z + halfWidth); ++blockZ) {
+                const std::optional<std::int32_t> stateId = world.state().blockState(blockX, blockY, blockZ);
+                if (!stateId.has_value()) {
+                    continue;
+                }
+                const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(*stateId);
+                if (block == nullptr || *block != world::tripwires::wireBlock()) {
+                    continue;
+                }
+                if (world::tripwires::crosses(blockX, blockY, blockZ, *stateId, x, y, z, halfWidth, height)) {
+                    into.insert(pack(blockX, blockY, blockZ));
+                }
+            }
         }
     }
 }
@@ -169,42 +177,59 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     // parity: `entityInside` is the entity's doing, not the player's. An item lying on a wooden
     // plate presses it with nobody around, so this cannot start by asking whether anybody is here.
     const std::vector<world::DroppedItem> items = world.state().items();
-    const auto touch = [this, &world, &region, &watchers, &items](double atX, double atY, double atZ,
-                                                                  std::size_t movedThrough) {
-        if (!region.ownsPosition(atX, atZ)) {
-            return;
-        }
-        const auto x = static_cast<std::int32_t>(std::floor(atX));
-        const auto z = static_cast<std::int32_t>(std::floor(atZ));
-        const std::int32_t y = world::pressurePlates::blockUnder(atY);
-        const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
-        if (!stateId.has_value() || !world::pressurePlates::isPlate(*stateId) ||
-            !world::pressurePlates::isStandingOn(x, y, z, atX, atY, atZ)) {
-            return;
-        }
-        if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
-                world.state(), x, y, z, world::pressurePlates::Trigger::Touched,
-                standingOn(world, x, y, z, watchers, items, movedThrough), world.gameTime());
-            change.has_value()) {
-            broadcaster_->announceRedstone(world, watchers, *change);
+    // parity: a plate is pressed by a **box**, so an entity reaches every square its own box crosses
+    // and not only the one its navel is over. Same sweep the arrow buttons already do.
+    const auto touch = [this, &world, &region, &watchers, &items](double atX, double atY, double atZ, double halfWidth,
+                                                                  double height, std::size_t movedThrough) {
+        // The `y` is a range and not the square under the feet: a body is taller than a block, and
+        // the jar's box test counts a plate it reaches **upwards** too, which is how a plate on top
+        // of a step presses for somebody standing beside it.
+        for (std::int32_t x = wire::common::mth::floor(atX - halfWidth); x <= wire::common::mth::floor(atX + halfWidth);
+             ++x) {
+            for (std::int32_t y = wire::common::mth::floor(atY); y <= wire::common::mth::floor(atY + height); ++y) {
+                for (std::int32_t z = wire::common::mth::floor(atZ - halfWidth);
+                     z <= wire::common::mth::floor(atZ + halfWidth); ++z) {
+                    if (!region.ownsPosition(static_cast<double>(x) + 0.5, static_cast<double>(z) + 0.5)) {
+                        continue;
+                    }
+                    const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
+                    if (!stateId.has_value() || !world::pressurePlates::isPlate(*stateId) ||
+                        !world::pressurePlates::touches(x, y, z, atX, atY, atZ, halfWidth, height)) {
+                        continue;
+                    }
+                    if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
+                            world.state(), x, y, z, world::pressurePlates::Trigger::Touched,
+                            standingOn(world, x, y, z, watchers, items, movedThrough), world.gameTime());
+                        change.has_value()) {
+                        broadcaster_->announceRedstone(world, watchers, *change);
+                    }
+                }
+            }
         }
     };
+    const auto sizeOf = [](const wire::common::Identifier& type) {
+        return std::pair{server::registry::entityTypeShapes::widthOf(type) / 2.0,
+                         server::registry::entityTypeShapes::heightOf(type)};
+    };
+    const auto [playerHalf, playerHeight] = sizeOf(wire::common::Identifier::vanilla("player"));
+    const auto [itemHalf, itemHeight] = sizeOf(wire::common::Identifier::vanilla("item"));
     for (const PlayerSession* player : watchers) {
         if (player->gamemode != Gamemode::Spectator) {
-            touch(player->x, player->y, player->z, items.size());
+            touch(player->x, player->y, player->z, playerHalf, playerHeight, items.size());
         }
     }
     // parity: `entityInside` runs for whoever is inside the square, and a mob is inside it just the
     // same. Only players and items ever asked here.
     for (const entity::ServerEntity* standing : world.state().entities()) {
         if (!standing->removed && !entity::blockTriggers::ignored(standing->type())) {
-            touch(standing->x, standing->y, standing->z, items.size());
+            const auto [half, height] = sizeOf(standing->type());
+            touch(standing->x, standing->y, standing->z, half, height, items.size());
         }
     }
     // parity: an item presses the plate on its own turn, so what it counts is itself and whoever
     // moved before it. The ones still to move are counted where they were when the tick began.
     for (std::size_t index = 0; index < items.size(); ++index) {
-        touch(items[index].x, items[index].y, items[index].z, index + 1);
+        touch(items[index].x, items[index].y, items[index].z, itemHalf, itemHeight, index + 1);
     }
 
     // parity: `BigDripleafBlock.entityInside`, which is the same question the plate asks and the
@@ -407,15 +432,21 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     std::vector<world::BlockChange> changes;
     std::set<std::int64_t> crossed;
+    const auto sizeOf = [](const wire::common::Identifier& type) {
+        return std::pair{server::registry::entityTypeShapes::widthOf(type) / 2.0,
+                         server::registry::entityTypeShapes::heightOf(type)};
+    };
+    const auto [playerHalf, playerHeight] = sizeOf(wire::common::Identifier::vanilla("player"));
+    const auto [itemHalf, itemHeight] = sizeOf(wire::common::Identifier::vanilla("item"));
     for (const PlayerSession* player : watchers) {
         if (player->gamemode == Gamemode::Spectator || !region.ownsPosition(player->x, player->z)) {
             continue;
         }
-        crossingsOf(world, player->x, player->y, player->z, crossed);
+        crossingsOf(world, player->x, player->y, player->z, playerHalf, playerHeight, crossed);
     }
     for (const world::DroppedItem& item : world.state().items()) {
         if (region.ownsPosition(item.x, item.z)) {
-            crossingsOf(world, item.x, item.y, item.z, crossed);
+            crossingsOf(world, item.x, item.y, item.z, itemHalf, itemHeight, crossed);
         }
     }
     // parity: `TripWireBlock.entityInside` runs for whatever is inside the square, and `checkPressed`
@@ -426,7 +457,8 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
             !region.ownsPosition(crossing->x, crossing->z)) {
             continue;
         }
-        crossingsOf(world, crossing->x, crossing->y, crossing->z, crossed);
+        const auto [half, height] = sizeOf(crossing->type());
+        crossingsOf(world, crossing->x, crossing->y, crossing->z, half, height, crossed);
     }
     for (const std::int64_t packed : crossed) {
         world::tripwires::press(world.state(), unpackX(packed), unpackY(packed), unpackZ(packed), true,
@@ -441,9 +473,18 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
                                             const std::vector<PlayerSession*>& watchers,
                                             const std::vector<world::DroppedItem>& items, std::size_t movedThrough) {
     std::int32_t count = 0;
+    // parity: `getEntityCount(level, TOUCH_AABB.move(pos), ...)` counts every entity whose **box**
+    // crosses the plate's, so the same entity can be counted by two plates at once and a weighted
+    // plate reads what is over its edge.
+    const auto sizeOf = [](const wire::common::Identifier& type) {
+        return std::pair{server::registry::entityTypeShapes::widthOf(type) / 2.0,
+                         server::registry::entityTypeShapes::heightOf(type)};
+    };
+    const auto [playerHalf, playerHeight] = sizeOf(wire::common::Identifier::vanilla("player"));
+    const auto [itemHalf, itemHeight] = sizeOf(wire::common::Identifier::vanilla("item"));
     for (const PlayerSession* player : watchers) {
         if (player->gamemode != Gamemode::Spectator &&
-            world::pressurePlates::isStandingOn(x, y, z, player->x, player->y, player->z)) {
+            world::pressurePlates::touches(x, y, z, player->x, player->y, player->z, playerHalf, playerHeight)) {
             count++;
         }
     }
@@ -464,7 +505,8 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
             (livingOnly && !server::registry::entityAttributes::isLiving(standing->type()))) {
             continue;
         }
-        if (world::pressurePlates::isStandingOn(x, y, z, standing->x, standing->y, standing->z)) {
+        const auto [half, height] = sizeOf(standing->type());
+        if (world::pressurePlates::touches(x, y, z, standing->x, standing->y, standing->z, half, height)) {
             count++;
         }
     }
@@ -472,8 +514,9 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
         for (std::size_t index = 0; index < items.size(); ++index) {
             const world::DroppedItem& item = items[index];
             const bool taken = index < movedThrough;
-            if (world::pressurePlates::isStandingOn(x, y, z, taken ? item.x : item.previousX,
-                                                    taken ? item.y : item.previousY, taken ? item.z : item.previousZ)) {
+            if (world::pressurePlates::touches(x, y, z, taken ? item.x : item.previousX,
+                                               taken ? item.y : item.previousY, taken ? item.z : item.previousZ,
+                                               itemHalf, itemHeight)) {
                 count++;
             }
         }

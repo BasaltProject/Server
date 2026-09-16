@@ -86,6 +86,22 @@ struct Client {
             write(buffer);
             packets.push_back(id);
         };
+        // The four go out through the connection rather than as packets, because the two doors
+        // draw a board out of different ones.
+        namespace play = basalt::wire::protocol::play;
+        connection.sendObjective = [this](const std::string&, std::uint8_t,
+                                          const std::optional<basalt::wire::text::Component>&) {
+            packets.push_back(play::SetObjectivePacket::kId);
+        };
+        connection.sendDisplayObjective = [this](play::DisplaySlot, const std::string&) {
+            packets.push_back(play::SetDisplayObjectivePacket::kId);
+        };
+        connection.sendScore = [this](const std::string&, const std::string&, std::int32_t) {
+            packets.push_back(play::SetScorePacket::kId);
+        };
+        connection.sendScoreRemoved = [this](const std::string&, const std::optional<std::string>&) {
+            packets.push_back(play::ResetScorePacket::kId);
+        };
         connection.switchWorld = [this](basalt::server::runtime::world::LoadedWorld& world, double, double, double) {
             switched.push_back(world.name());
             if (session != nullptr) {

@@ -10,6 +10,7 @@
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
+#include <basalt/wire/protocol/play/UiPackets.hpp>
 #include <basalt/wire/text/Component.hpp>
 
 #include <array>
@@ -190,6 +191,25 @@ struct PlayerConnection {
     /// Starts an effect on this player, which is what a splash potion and a command both do.
     std::function<void(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier)>
         addEffect;
+
+    /// A scoreboard objective being made, renamed or unmade, and which slot shows it. parity:
+    /// `ClientboundSetObjectivePacket` and `ClientboundSetDisplayObjectivePacket`, split this way
+    /// because the other edition has no packet for an objective nobody is shown.
+    std::function<void(const std::string& objective, std::uint8_t method,
+                       const std::optional<wire::text::Component>& title)>
+        sendObjective;
+    std::function<void(wire::protocol::play::DisplaySlot slot, const std::string& objective)> sendDisplayObjective;
+
+    /// One score, and the same score taken away. An objective nobody named takes every score that
+    /// holder has, which is what the other door's own packet means by leaving it out.
+    std::function<void(const std::string& holder, const std::string& objective, std::int32_t value)> sendScore;
+    std::function<void(const std::string& holder, const std::optional<std::string>& objective)> sendScoreRemoved;
+
+    /// Where the world's spawn moved to, which is what a compass points at. The world travels with
+    /// it because each door names the place differently: one by its level key, the other by a
+    /// number for its dimension.
+    std::function<void(const world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, float angle)>
+        sendSpawnPosition;
 
     /// Silences a sound, or every sound when no name is given. The mixer is the other door's own
     /// idea: this edition cannot pick one, so a stop that only names a mixer stops everything.
