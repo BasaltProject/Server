@@ -1,7 +1,7 @@
 package org.basaltmc.bukkit.player;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
+import java.util.WeakHashMap;
 import org.bukkit.Bukkit;
 import org.bukkit.conversations.Conversation;
 import org.bukkit.entity.Player;
@@ -12,7 +12,7 @@ import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.Plugin;
 
 final class ConversationRouter implements Listener {
-    private static final Set<Plugin> kWatching = new HashSet<>();
+    private static final Map<Plugin, ConversationRouter> kWatching = new WeakHashMap<>();
 
     private ConversationRouter() {}
 
@@ -21,12 +21,14 @@ final class ConversationRouter implements Listener {
         if (plugin == null) {
             return;
         }
+        ConversationRouter router = new ConversationRouter();
         synchronized (kWatching) {
-            if (!kWatching.add(plugin)) {
+            ConversationRouter known = kWatching.get(plugin);
+            if (known != null && known.listening(plugin)) {
                 return;
             }
+            kWatching.put(plugin, router);
         }
-        ConversationRouter router = new ConversationRouter();
         Bukkit.getPluginManager().registerEvent(AsyncPlayerChatEvent.class, router, EventPriority.LOWEST,
             (listener, event) -> router.chat((AsyncPlayerChatEvent) event), plugin);
         Bukkit.getPluginManager().registerEvent(org.bukkit.event.server.ServerCommandEvent.class, router,
@@ -41,6 +43,16 @@ final class ConversationRouter implements Listener {
         } catch (ClassNotFoundException e) {
             return;
         }
+    }
+
+    private boolean listening(Plugin plugin) {
+        for (org.bukkit.plugin.RegisteredListener registered : AsyncPlayerChatEvent.getHandlerList()
+                .getRegisteredListeners(plugin)) {
+            if (registered.getListener() == this) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void chat(AsyncPlayerChatEvent event) {
