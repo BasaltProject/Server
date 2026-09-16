@@ -154,6 +154,14 @@ void BlockEditor::notifyNeighbours() {
     if (written_.empty()) {
         return;
     }
+    // parity: in strict mode none of this runs. All flag `2` leaves on is the write itself and the
+    // packet to the clients, and `flush` is what does that.
+    if (strict_) {
+        written_.clear();
+        written_properties_.clear();
+        replaced_.clear();
+        return;
+    }
     const std::vector<std::array<std::int32_t, 3>> positions = std::move(written_);
     written_.clear();
     random::RandomSource random = random::RandomSource::legacy(0);
@@ -229,8 +237,12 @@ void BlockEditor::notifyNeighbours() {
         // behind `newState == blockState`: if what ended up there is not what was asked for, the
         // neighbours are never told at all. A target put down with `power=15` zeroes itself as it
         // lands, so the dust beside it stays the dot it was instead of drawing a line to it.
+        // The state this command replaced, so the four guarded arrivals can ask whether the block
+        // really changed. A position the command has not touched before is not in `replaced_`, and
+        // then they all run, which is what `Level.setBlock` does when there is nothing to compare.
+        const auto replacedHere = replaced_.find(at);
         neighbourUpdates::settleArrivedSignal(
-            context, at[0], at[1], at[2],
+            context, at[0], at[1], at[2], replacedHere == replaced_.end() ? std::nullopt : replacedHere->second,
             [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) { record(x, y, z, stateId); });
         if (world_->state().blockState(at[0], at[1], at[2]) != written) {
             // The jar skips the shape updates and the packet here, but `updateNeighboursOnBlockSet`
@@ -275,7 +287,7 @@ void BlockEditor::notifyNeighbours() {
                     written_properties_.erase(at);
                 }
             },
-            adjustToNeighbours_,
+            true,
             // parity: `BlockInput.place` settles the state it is going to write, shaping and named
             // properties both, and only then does the block land and set off whatever it sets off.
             // Doing this after the reactions instead undid them: a hopper written `enabled=true`

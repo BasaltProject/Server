@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/server/runtime/command/commands/RemainingCommands.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -32,6 +33,7 @@ using basalt::server::runtime::player::PlayerSession;
 using basalt::server::runtime::world::LoadedWorld;
 using basalt::server::runtime::world::WorldMetadata;
 using basalt::wire::common::Uuid;
+using RuntimeDialog = basalt::server::runtime::world::dialogs::Dialog;
 using basalt::wire::text::Component;
 namespace commands = basalt::server::runtime::command::commands;
 namespace config = basalt::server::runtime::config;
@@ -82,6 +84,7 @@ struct Client {
     std::vector<std::int32_t> packets;
     std::int32_t syncs = 0;
     std::int32_t waypoints = 0;
+    std::vector<std::int32_t> dialogs;
 
     [[nodiscard]] PlayerConnection connection() {
         PlayerConnection connection;
@@ -93,6 +96,7 @@ struct Client {
             packets.push_back(id);
         };
         connection.syncExperience = [this] { syncs++; };
+        connection.showDialog = [this](std::int32_t id, const RuntimeDialog&) { dialogs.push_back(id); };
         connection.sendWaypoint = [this](const Uuid&, std::int32_t, const std::string&,
                                          const std::optional<std::int32_t>&, double, double, double,
                                          bool) { waypoints++; };
@@ -286,7 +290,7 @@ TEST_CASE("dialog shows one the registry knows and clears whatever is open") {
     fixture.dispatcher.registerCommand(std::make_shared<commands::DialogCommand>(dialogs));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "dialog show Steve minecraft:server_links") == 1);
-    CHECK(fixture.clients[0]->sent(play::ShowDialogPacket::kId));
+    CHECK(fixture.clients[0]->dialogs == std::vector<std::int32_t>{0});
     CHECK(fixture.source.lastAsText().find("commands.dialog.show.single") != std::string::npos);
 
     CHECK(fixture.dispatcher.execute(fixture.source, "dialog show Steve minecraft:nothing") == 0);

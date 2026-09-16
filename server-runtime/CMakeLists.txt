@@ -253,6 +253,7 @@ basalt_module(server-runtime-core
         src/world/RealEnchantments.cpp
         src/world/RealEnchantmentTags.cpp
         src/world/RealDamageTypeTags.cpp
+        src/world/Dialogs.cpp
         src/world/RealDialogs.cpp
         src/world/RealTestInstances.cpp
         src/world/RealNoiseParameters.cpp
@@ -537,6 +538,12 @@ basalt_test(server-runtime-real-enchantments-test
 basalt_test(server-runtime-real-damage-type-tags-test
     SOURCES
         test/RealDamageTypeTagsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-dialogs-test
+    SOURCES
+        test/DialogsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

@@ -30,6 +30,10 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 }
 
+namespace basalt::server::runtime::world::dialogs {
+struct Dialog;
+}
+
 namespace basalt::server::runtime::bedrock {
 
 /// One thing in the world that is not a player: a mob, or a stack on the floor. Filled in where the
@@ -381,6 +385,11 @@ private:
     /// A menu is a grid with holes and a form is a list, so what a Bedrock player sees is the items
     /// in slot order and nothing where the holes were. The plugin is told the slot it meant, never
     /// the button number, so it never learns which edition is looking.
+    /// One dialog as a screen of buttons, which is the nearest thing this edition has. A button
+    /// that leads to another dialog opens it in place; one that runs a command runs it as this
+    /// player; anything else is a line they are shown and can act on themselves.
+    void showDialog(const world::dialogs::Dialog& dialog);
+
     void showMenu(const std::string& title, const std::map<std::int32_t, server::plugins::PluginItem>& items,
                   std::function<void(std::int32_t)> onClick);
 

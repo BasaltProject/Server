@@ -278,6 +278,41 @@ struct Walk {
     const OnBroken& onBroken;
 };
 
+/// Whether one of the three plant families that book water on a shape update does so this time.
+///
+/// parity: `SeagrassBlock`, `GrowingPlantHeadBlock` and `GrowingPlantBodyBlock`. Only `kelp` and
+/// `kelp_plant` pass `scheduleFluidTicks`, both growing upwards: the twisting, weeping and cave vines
+/// pass false and never book, and `tall_seagrass` is a `DoublePlantBlock` with no such `updateShape`.
+[[nodiscard]] bool plantBooksWater(const Context& context, const std::int32_t x, const std::int32_t y,
+                                   const std::int32_t z, const std::string_view path, const BlockFace towards) {
+    // parity: `SeagrassBlock.updateShape` books unless the shape update left it air, and its super
+    // `VegetationBlock.updateShape` returns air exactly when the block cannot survive.
+    if (path == "seagrass") {
+        return blockSurvival::isSupported(context.world, x, y, z, std::nullopt, {}, context.hasSkylight);
+    }
+    const bool head = path == "kelp";
+    if (!head && path != "kelp_plant") {
+        return false;
+    }
+    const std::optional<std::int32_t> above = context.world.blockState(x, y + 1, z);
+    const wire::common::Identifier* grown =
+        above.has_value() ? registry::blockStateDefinitions::blockOf(*above) : nullptr;
+    const bool kelpAbove = grown != nullptr && (grown->path() == "kelp" || grown->path() == "kelp_plant");
+    if (head) {
+        // parity: news from below turns a head into a body when the column carries on above, and that
+        // branch returns before the booking.
+        if (towards == BlockFace::Down && kelpAbove &&
+            blockSurvival::isSupported(context.world, x, y, z, std::nullopt, {}, context.hasSkylight)) {
+            return false;
+        }
+        // The head converts when the square above **is** kelp, so it books when it is not.
+        return towards != BlockFace::Up || !kelpAbove;
+    }
+    // parity: and the body converts back into a head when the square above stops being kelp, which is
+    // the opposite test. The two look alike and are not.
+    return towards != BlockFace::Up || kelpAbove;
+}
+
 /// Reshapes the block there, breaks it if nothing holds it, and follows on from what it held.
 /// parity: `LiquidBlock.updateShape`, which books the fluid's own turn whenever this square or the
 /// one the news came from is a **source**. It hangs off the shape walk and not off `neighborChanged`,
@@ -300,7 +335,8 @@ void bookLiquidTurn(const Context& context, const std::int32_t x, const std::int
         const auto logged = properties.find("waterlogged");
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*here);
         const bool column = block != nullptr && block->path() == "bubble_column";
-        if (column || (logged != properties.end() && logged->second == "true")) {
+        if (column || (logged != properties.end() && logged->second == "true") ||
+            (block != nullptr && plantBooksWater(context, x, y, z, block->path(), towards))) {
             context.world.scheduleFluidTick(x, y, z, fluidId(FluidKind::Water, true), fluidFlow::kWaterTickDelay);
         }
         return;
@@ -498,7 +534,7 @@ void tellInFront(const Context& context, const std::int32_t stateId, const std::
 } // namespace
 
 void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                         const OnReshaped& onReshaped) {
+                         const std::optional<std::int32_t> removed, const OnReshaped& onReshaped) {
     WorldState& world = context.world;
     // parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines:
     // a block that arrives already carrying a signal and with no turn booked to spend it puts that
@@ -513,6 +549,25 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
         return;
     }
     const std::string_view path = block->path();
+    // parity: four of the five below open with `!state.is(oldState.getBlock())`, so a write that only
+    // moves the state of a block that was already here runs none of them: a `/setblock` of
+    // `target[power=15]` over a `target[power=0]` keeps the fifteen in the jar. The composter is the
+    // one without a guard, so it is asked before this and not after.
+    const bool blockStayed = removed.has_value() && sameBlock(*removed, *arrived);
+    // parity: `ComposterBlock.onPlace`, which books the twenty turns that finish a composter that
+    // arrives one layer short of ready. This one books without asking whether a turn is already
+    // there, and without asking whether the block changed: it has no guard in the jar either.
+    if (path == "composter") {
+        const std::map<std::string, std::string> heap = registry::blockStateDefinitions::propertiesOf(*arrived);
+        const auto level = heap.find("level");
+        if (level != heap.end() && level->second == std::to_string(composters::kFull)) {
+            world.scheduleBlockTick(x, y, z, *block, composters::kReadyDelay);
+        }
+        return;
+    }
+    if (blockStayed) {
+        return;
+    }
     // parity: `LightningRodBlock.onPlace`, the same idea with the other answer: a rod that arrives
     // powered keeps its signal and books the eight turns that spend it, instead of dropping it.
     if (path.ends_with("lightning_rod")) {
@@ -520,17 +575,6 @@ void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y,
         const auto powered = rod.find("powered");
         if (powered != rod.end() && powered->second == "true" && !world.hasScheduledBlockTick(x, y, z, *block)) {
             world.scheduleBlockTick(x, y, z, *block, lightning::kRodTicks);
-        }
-        return;
-    }
-    // parity: `ComposterBlock.onPlace`, which books the twenty turns that finish a composter that
-    // arrives one layer short of ready. This one books without asking whether a turn is already
-    // there: two of the same never fit anyway.
-    if (path == "composter") {
-        const std::map<std::string, std::string> heap = registry::blockStateDefinitions::propertiesOf(*arrived);
-        const auto level = heap.find("level");
-        if (level != heap.end() && level->second == std::to_string(composters::kFull)) {
-            world.scheduleBlockTick(x, y, z, *block, composters::kReadyDelay);
         }
         return;
     }
@@ -759,7 +803,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (context.arrivedFluid) {
         context.arrivedFluid(x, y, z);
     }
-    settleArrivedSignal(context, x, y, z, reshaped);
+    settleArrivedSignal(context, x, y, z, removed, reshaped);
     // parity: `ScaffoldingBlock.onPlace` really is an `onPlace`, `level.scheduleTick(pos, this, 1)`,
     // so it runs on **every** write of the piece and not only on a placement. That is why it stays
     // out here while the cane and the coral below went in with the shape walk.
@@ -1165,16 +1209,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             tellAround(at[0], at[1], at[2]);
         }
     }
-    // parity: `TripWireBlock.onPlace`, which tells the hooks at the ends of its line. Without it a
-    // tripwire built by hand or by command hung there unattached until something stepped on it.
     const std::optional<std::int32_t> laid = world.blockState(x, y, z);
-    if (laid.has_value() && tripwires::isWire(*laid)) {
-        tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
-    }
     // parity: `LevelChunk.setBlockState` only runs `affectNeighborsAfterRemoval` when the block
     // changes, not when its state does. Without this gate, rewriting a string with another state was
     // taken for a string torn out and lit both hooks of the line: measured in `cuerdadesigual`.
     const bool tripwireBlockChanged = !laid.has_value() || !removed.has_value() || !sameBlock(*removed, *laid);
+    // parity: `TripWireBlock.onPlace`, which tells the hooks at the ends of its line. Without it a
+    // tripwire built by hand or by command hung there unattached until something stepped on it. It
+    // opens with `!oldState.is(state.getBlock())` like eleven other `onPlace` do, so a string
+    // rewritten with another state tells the hooks nothing.
+    if (tripwireBlockChanged && laid.has_value() && tripwires::isWire(*laid)) {
+        tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
+    }
     // parity: `TripWireBlock.affectNeighborsAfterRemoval`, which hands the line the string that has
     // just gone **as if it were still there and powered**, so the hooks fire and each books itself a
     // look ten ticks later to find the gap. Every other block's version of this hook is a plain "tell

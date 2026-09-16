@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -544,6 +545,10 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             wall(session_->x, session_->y, minZ - 0.5, false);
         }
     };
+
+    // parity: Geyser's own dialog cache, which turns a dialog into the only screen this edition
+    // has for one: a title, the text, and a button per action.
+    connection.showDialog = [this](std::int32_t, const world::dialogs::Dialog& dialog) { showDialog(dialog); };
 
     // parity: Geyser's own waypoint cache. The other edition draws its bar from a list of its own
     // rather than from one packet per waypoint, and the dot's icon is picked here from how far
