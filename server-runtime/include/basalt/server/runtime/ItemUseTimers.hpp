@@ -95,7 +95,6 @@ private:
     std::int32_t eatingSlot_ = -1;
     std::int32_t eatingTicks_ = 0;
     /// What cannot be used again yet, by item path and the tick it frees up on.
-    std::map<std::string, std::int64_t, std::less<>> itemCooldowns_;
     /// The bow being drawn, and for how long.
     std::int32_t drawingSlot_ = -1;
     std::int32_t drawingTicks_ = 0;

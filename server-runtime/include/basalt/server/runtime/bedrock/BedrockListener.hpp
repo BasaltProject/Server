@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/Books.hpp>
 #include <basalt/wire/bedrock/BedrockConnection.hpp>
 #include <basalt/wire/bedrock/BedrockGate.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
@@ -185,6 +186,11 @@ public:
 
         /// What the client typed into a sign's editor, as one string with newlines in it.
         virtual void editSign(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& text) = 0;
+
+        virtual void editBookPage(std::int32_t slot, world::books::PageEdit what, std::int32_t page, std::int32_t other,
+                                  const std::string& text) = 0;
+
+        virtual void signBook(std::int32_t slot, const std::string& title) = 0;
 
         /// The client swung its arm at nothing, which everybody else has to be told about.
         virtual void swing() = 0;

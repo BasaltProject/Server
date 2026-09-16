@@ -171,6 +171,12 @@ public:
 
     std::int32_t fireTicks = 0;
 
+    /// What this player may not use yet, and the turn of the world each one frees up on.
+    ///
+    /// parity: `ItemCooldowns`, which belongs to the player and not to the connection: both doors
+    /// throw the same pearl, so both wait the same.
+    std::map<std::string, std::int64_t, std::less<>> itemCooldowns;
+
     /// Status effects this player carries, by effect id. parity: `LivingEntity.activeEffects`.
     std::map<wire::common::Identifier, world::ActiveEffect> effects;
 

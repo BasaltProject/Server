@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
@@ -176,26 +177,17 @@ bool ItemUseTimers::throwEnderPearl(PlayerSession& session, const Identifier& it
 }
 
 bool ItemUseTimers::onCooldown(const Identifier& item) {
-    const auto found = itemCooldowns_.find(item.path());
-    if (found == itemCooldowns_.end()) {
-        return false;
-    }
-    if (found->second > owner_->playTimeTicks) {
-        return true;
-    }
-    itemCooldowns_.erase(found);
-    return false;
+    PlayerSession* session = owner_->playerSession();
+    const world::LoadedWorld* world = owner_->currentWorld();
+    return session != nullptr && world != nullptr && player::onCooldownFor(*session, item, world->gameTime());
 }
 
 void ItemUseTimers::startCooldown(const Identifier& item) {
-    const std::int32_t ticks = server::registry::itemStacking::cooldownTicks(item);
-    if (ticks <= 0) {
-        return;
+    PlayerSession* session = owner_->playerSession();
+    const world::LoadedWorld* world = owner_->currentWorld();
+    if (session != nullptr && world != nullptr) {
+        player::startCooldownFor(*session, item, world->gameTime());
     }
-    itemCooldowns_[std::string{item.path()}] = owner_->playTimeTicks + ticks;
-    owner_->sendPlayPacket(wire::protocol::play::CooldownPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::CooldownPacket{.cooldownGroup = item.toString(), .durationTicks = ticks}.write(buffer);
-    });
 }
 
 void ItemUseTimers::emitAt(std::string_view event) {

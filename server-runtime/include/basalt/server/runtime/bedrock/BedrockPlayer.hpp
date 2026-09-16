@@ -141,6 +141,13 @@ public:
                            const std::string& text)>
             writeSign;
 
+        /// A page of the book in their hand, written where the player's own slots are. Signing it
+        /// carries a title and nothing else: the author is the player, never what the client says.
+        std::function<void(player::PlayerSession&, std::int32_t slot, world::books::PageEdit what, std::int32_t page,
+                           std::int32_t other, const std::string& text)>
+            writeBookPage;
+        std::function<void(player::PlayerSession&, std::int32_t slot, const std::string& title)> signBook;
+
         /// An arm swung at nothing, told to everybody else where the world is.
         std::function<void(player::PlayerSession&)> swing;
 
@@ -204,9 +211,14 @@ public:
         /// How fast this player takes the block at those coordinates apart, answered where the
         /// world is. Bedrock is told the pace rather than deciding it, which is what draws the
         /// cracks: a client that is told nothing digs at a guess of its own and shows no cracks.
-        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z,
+        /// `ticks` is how many turns the client has been at it, which is what everybody else's
+        /// cracks are counted from: this edition never says how far along it is.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t ticks,
                            std::function<void(float perTick)> answer)>
             digSpeed;
+
+        /// Given up on the block: everybody else's cracks come off it.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z)> digStopped;
 
         /// Puts down whatever that slot holds, where the world is, unless the block that was
         /// clicked opens a window of its own: then `opened` is called with it and nothing is
@@ -283,6 +295,11 @@ public:
 
     /// What a client typed into a sign's editor, sent back when they close it.
     void editSign(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& text) override;
+
+    void editBookPage(std::int32_t slot, world::books::PageEdit what, std::int32_t page, std::int32_t other,
+                      const std::string& text) override;
+
+    void signBook(std::int32_t slot, const std::string& title) override;
 
     void swing() override;
 
@@ -402,6 +419,11 @@ private:
 
     Context context_;
     std::shared_ptr<BedrockMailbox> mailbox_;
+
+    /// Where this player is digging and for how many turns. Only this door keeps it: the client
+    /// says it is still digging and nothing else.
+    std::optional<std::array<std::int32_t, 3>> diggingAt_;
+    std::int32_t diggingTicks_ = 0;
     /// Which Bedrock protocol this client speaks: several packets are shaped one way for the
     /// newest and another for everything below it.
     int protocol_ = 0;

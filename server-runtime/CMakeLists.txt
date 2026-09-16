@@ -197,6 +197,8 @@ basalt_module(server-runtime-core
         src/player/PlayerBlockSlots.cpp
         src/player/PlayerAnvil.cpp
         src/player/PlayerSigns.cpp
+        src/player/PlayerBooks.cpp
+        src/player/PlayerCooldowns.cpp
         src/player/PlayerPick.cpp
         src/player/PlayerBlockToggle.cpp
         src/player/PlayerBuckets.cpp
@@ -302,6 +304,7 @@ basalt_module(server-runtime-core
         src/world/AdvancementTriggers.cpp
         src/world/Anvils.cpp
         src/world/Beacons.cpp
+        src/world/Books.cpp
         src/world/AnvilEnchantments.cpp
         src/world/EnchantmentBooks.cpp
         src/world/Enchanting.cpp
@@ -1549,6 +1552,12 @@ basalt_test(server-runtime-anvils-test
 basalt_test(server-runtime-beacons-test
     SOURCES
         test/BeaconsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-books-test
+    SOURCES
+        test/BooksTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

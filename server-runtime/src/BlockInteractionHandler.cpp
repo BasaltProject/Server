@@ -284,7 +284,7 @@ void BlockInteractionHandler::stopDigging() {
     const BlockPos pos = *diggingAt_;
     diggingAt_.reset();
     diggingStage_ = -1;
-    broadcastDestruction(pos, play::BlockDestructionPacket::kNone);
+    broadcastDestruction(pos, play::BlockDestructionPacket::kNone, 0.0F);
 }
 
 void BlockInteractionHandler::tickDigging(PlayerSession& session) {
@@ -314,22 +314,19 @@ void BlockInteractionHandler::tickDigging(PlayerSession& session) {
         return;
     }
     diggingStage_ = stage;
-    broadcastDestruction(pos, stage);
+    broadcastDestruction(pos, stage, perTick);
 }
 
-void BlockInteractionHandler::broadcastDestruction(const BlockPos& pos, std::int32_t stage) {
+void BlockInteractionHandler::broadcastDestruction(const BlockPos& pos, std::int32_t stage, float perTick) {
     const PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
         return;
     }
-    const play::BlockDestructionPacket packet{
-        .entityId = session->entityId(), .pos = pos, .stage = static_cast<std::uint8_t>(stage)};
     for (const PlayerSession* other : owner_->playersInSameWorld()) {
-        if (other->entityId() == session->entityId() || !other->connection().sendPlayPacket) {
+        if (other->entityId() == session->entityId() || !other->connection().sendBlockDestruction) {
             continue;
         }
-        other->connection().sendPlayPacket(play::BlockDestructionPacket::kId,
-                                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        other->connection().sendBlockDestruction(session->entityId(), pos.x, pos.y, pos.z, stage, perTick);
     }
 }
 

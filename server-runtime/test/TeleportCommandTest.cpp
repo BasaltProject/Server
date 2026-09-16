@@ -88,6 +88,12 @@ struct Client {
             write(buffer);
             packets.push_back(id);
         };
+        // The command asks the connection to silence a sound rather than writing the packet itself,
+        // because the two doors write different ones.
+        connection.stopSound = [this](const std::optional<std::string>&,
+                                      const std::optional<basalt::wire::protocol::play::SoundSource>&) {
+            packets.push_back(basalt::wire::protocol::play::StopSoundPacket::kId);
+        };
         connection.teleportTo = [this](double x, double y, double z, float yaw, float pitch) {
             teleports.push_back({x, y, z, static_cast<double>(yaw), static_cast<double>(pitch)});
         };

@@ -26,8 +26,10 @@
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerBlockSlots.hpp>
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
+#include <basalt/server/runtime/player/PlayerBooks.hpp>
 #include <basalt/server/runtime/player/PlayerBuckets.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
+#include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/server/runtime/player/PlayerDigSpeed.hpp>
@@ -1236,6 +1238,42 @@ void BasaltServer::startBedrockListener() {
         };
 
         // What a client typed into a sign's editor, written where the world is.
+        // The book is the player's own, so both of these only need the thread that owns them.
+        context.writeBookPage = [this](player::PlayerSession& player, const std::int32_t slot,
+                                       const world::books::PageEdit what, const std::int32_t page,
+                                       const std::int32_t other, const std::string& text) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, slot, what, page, other, text] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session != nullptr && player::editBookPageFor(*session, slot, what, page, other, text) &&
+                    session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
+            });
+        };
+        context.signBook = [this](player::PlayerSession& player, const std::int32_t slot, const std::string& title) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, slot, title] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                // parity: `signBook` keeps whatever pages the book already carries.
+                const std::optional<std::int32_t> where =
+                    slot >= 0 && slot < player::PlayerInventory::kHotbarSize
+                        ? std::optional{player::PlayerInventory::kHotbarStart + slot}
+                        : std::nullopt;
+                const std::optional<storage::StoredItemStack>* held =
+                    where.has_value() ? &session->inventory.at(*where) : nullptr;
+                if (held == nullptr || !held->has_value()) {
+                    return;
+                }
+                if (player::editBookFor(*session, slot, world::books::pagesOf(**held), title) &&
+                    session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
+            });
+        };
         context.writeSign = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
                                    const std::int32_t z, const std::string& text) {
             const wire::common::Uuid uuid = player.uuid();
@@ -1293,8 +1331,13 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
                 const auto item = wire::common::Identifier::parse(held->id);
-                if (item.has_value()) {
-                    static_cast<void>(player::throwItemFor(breakContext(), *session, *found->second, *item, slot));
+                // parity: `ItemCooldowns` gates the throw itself, not only the icon: a pearl that is
+                // still cooling down goes nowhere on either door.
+                if (!item.has_value() || player::onCooldownFor(*session, *item, found->second->gameTime())) {
+                    return;
+                }
+                if (player::throwItemFor(breakContext(), *session, *found->second, *item, slot)) {
+                    player::startCooldownFor(*session, *item, found->second->gameTime());
                 }
             });
         };
@@ -1366,9 +1409,9 @@ void BasaltServer::startBedrockListener() {
         // How fast this player digs, answered where the world is: the block, its hardness and
         // whether the eyes are under water all live over there.
         context.digSpeed = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
-                                  const std::int32_t z, std::function<void(float)> answer) {
+                                  const std::int32_t z, const std::int32_t ticks, std::function<void(float)> answer) {
             const wire::common::Uuid uuid = player.uuid();
-            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z, answer = std::move(answer)] {
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z, ticks, answer = std::move(answer)] {
                 player::PlayerSession* session = playerRegistry_.get(uuid);
                 if (session == nullptr) {
                     return;
@@ -1392,8 +1435,38 @@ void BasaltServer::startBedrockListener() {
                     static_cast<std::int32_t>(std::floor(session->x)), static_cast<std::int32_t>(std::floor(eyeY)),
                     static_cast<std::int32_t>(std::floor(session->z)));
                 const bool underwater = around.has_value() && world::fluids::of(*around) == world::Submersion::Water;
-                answer(player::destroyProgressPerTickFor(*session, *block, registry::blocks::hardnessOf(*block),
-                                                         breakContext().blockTags, underwater));
+                const float perTick = player::destroyProgressPerTickFor(
+                    *session, *block, registry::blocks::hardnessOf(*block), breakContext().blockTags, underwater);
+                answer(perTick);
+                // parity: `ServerPlayerGameMode.destroyProgress` tells everybody else how far along
+                // it is. The step is worked out from the turns because this edition never says.
+                constexpr std::int32_t kStages = 10;
+                const auto stage = std::min(kStages - 1, static_cast<std::int32_t>(static_cast<float>(ticks) * perTick *
+                                                                                   static_cast<float>(kStages)));
+                for (player::PlayerSession* other : player::playersIn(breakContext(), session->worldName)) {
+                    if (other->entityId() == session->entityId() || !other->connection().sendBlockDestruction) {
+                        continue;
+                    }
+                    other->connection().sendBlockDestruction(session->entityId(), x, y, z, stage, perTick);
+                }
+            });
+        };
+
+        context.digStopped = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                    const std::int32_t z) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                constexpr std::int32_t kNoCracks = 10;
+                for (player::PlayerSession* other : player::playersIn(breakContext(), session->worldName)) {
+                    if (other->entityId() == session->entityId() || !other->connection().sendBlockDestruction) {
+                        continue;
+                    }
+                    other->connection().sendBlockDestruction(session->entityId(), x, y, z, kNoCracks, 0.0F);
+                }
             });
         };
 
