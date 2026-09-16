@@ -5,7 +5,6 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/storage/AccessRepository.hpp>
 #include <basalt/wire/common/placeholder/PlaceholderText.hpp>
-#include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <cmath>
@@ -16,16 +15,7 @@
 namespace basalt::server::runtime::command::commands {
 namespace {
 
-namespace play = wire::protocol::play;
-
 using wire::text::Component;
-
-void sendTo(const player::PlayerSession& player, std::int32_t packetId,
-            const std::function<void(wire::io::ByteBuffer&)>& write) {
-    if (player.connection().sendPlayPacket) {
-        player.connection().sendPlayPacket(packetId, write);
-    }
-}
 
 [[nodiscard]] const std::vector<player::PlayerSession*>& targetsOf(const CommandContext& context,
                                                                    std::string_view name) {
@@ -73,10 +63,12 @@ void TitleCommand::build(const CommandNodeBuilder& root) const {
             targets.literal(resetTimes ? "reset" : "clear", [resetTimes](const CommandNodeBuilder& form) {
                 form.executes([resetTimes](const CommandContext& context) -> Parsed<std::int32_t> {
                     const std::vector<player::PlayerSession*>& matched = targetsOf(context, "targets");
-                    const play::ClearTitlesPacket packet{.resetTimes = resetTimes};
                     for (const player::PlayerSession* target : matched) {
-                        sendTo(*target, play::ClearTitlesPacket::kId,
-                               [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                        if (target->connection().sendTitlePiece) {
+                            target->connection().sendTitlePiece(resetTimes ? player::TitlePiece::Reset
+                                                                           : player::TitlePiece::Clear,
+                                                                Component{}, 0, 0, 0);
+                        }
                     }
                     reportTitle(context, matched, resetTimes ? "reset" : "cleared");
                     return static_cast<std::int32_t>(matched.size());
@@ -89,12 +81,14 @@ void TitleCommand::build(const CommandNodeBuilder& root) const {
                     text.executes([kind](const CommandContext& context) -> Parsed<std::int32_t> {
                         const std::vector<player::PlayerSession*>& matched = targetsOf(context, "targets");
                         const auto* body = context.get<Component>("title");
-                        const play::TitleTextPacket packet{.text = body == nullptr ? Component{} : *body};
-                        const std::int32_t id = kind == "title"      ? play::kSetTitleTextId
-                                                : kind == "subtitle" ? play::kSetSubtitleTextId
-                                                                     : play::kSetActionBarTextId;
+                        const Component text = body == nullptr ? Component{} : *body;
+                        const player::TitlePiece piece = kind == "title"      ? player::TitlePiece::Title
+                                                         : kind == "subtitle" ? player::TitlePiece::Subtitle
+                                                                              : player::TitlePiece::ActionBar;
                         for (const player::PlayerSession* target : matched) {
-                            sendTo(*target, id, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                            if (target->connection().sendTitlePiece) {
+                                target->connection().sendTitlePiece(piece, text, 0, 0, 0);
+                            }
                         }
                         reportTitle(context, matched, "show." + std::string{kind});
                         return static_cast<std::int32_t>(matched.size());
@@ -112,11 +106,12 @@ void TitleCommand::build(const CommandNodeBuilder& root) const {
                                 const auto* value = context.get<std::int32_t>(name);
                                 return value == nullptr ? 0 : *value;
                             };
-                            const play::SetTitlesAnimationPacket packet{
-                                .fadeIn = ticks("fadeIn"), .stay = ticks("stay"), .fadeOut = ticks("fadeOut")};
                             for (const player::PlayerSession* target : matched) {
-                                sendTo(*target, play::SetTitlesAnimationPacket::kId,
-                                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                                if (target->connection().sendTitlePiece) {
+                                    target->connection().sendTitlePiece(player::TitlePiece::Times, Component{},
+                                                                        ticks("fadeIn"), ticks("stay"),
+                                                                        ticks("fadeOut"));
+                                }
                             }
                             reportTitle(context, matched, "times");
                             return static_cast<std::int32_t>(matched.size());

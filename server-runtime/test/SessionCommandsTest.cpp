@@ -72,10 +72,12 @@ public:
 struct Client {
     std::vector<Component> messages;
     std::vector<std::int32_t> packets;
+    std::vector<std::int32_t> cameras;
 
     [[nodiscard]] PlayerConnection connection() {
         PlayerConnection connection;
         connection.sendSystemMessage = [this](const Component& message) { messages.push_back(message); };
+        connection.setCamera = [this](std::int32_t entityId) { cameras.push_back(entityId); };
         connection.sendPlayPacket = [this](std::int32_t id,
                                            const std::function<void(basalt::wire::io::ByteBuffer&)>& write) {
             basalt::wire::io::ByteBuffer buffer;
@@ -213,7 +215,7 @@ TEST_CASE("spectate needs the spectator to be in spectator mode") {
 
     steve.gamemode = basalt::wire::protocol::play::Gamemode::Spectator;
     CHECK(fixture.dispatcher.execute(asSteve, "spectate Alex") == 1);
-    CHECK(fixture.clients[0]->sent(play::SetCameraPacket::kId));
+    CHECK(fixture.clients[0]->cameras.size() == 1);
 }
 
 TEST_CASE("spectate with no target puts the camera back and refuses spectating yourself") {

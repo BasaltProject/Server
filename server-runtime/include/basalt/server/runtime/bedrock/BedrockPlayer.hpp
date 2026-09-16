@@ -355,6 +355,9 @@ private:
         /// And what they are wearing, as the four ids run together: cheaper to compare than four
         /// stacks, and the only thing this needs to know is whether it changed.
         std::string worn;
+        /// How they are drawn: crouched, running, on fire. The other door sends these as one byte
+        /// of metadata and this edition as a word of flags on the entity.
+        std::uint64_t flags = 0;
     };
 
     /// Draws whoever arrived, moves whoever moved and takes away whoever left.
@@ -362,6 +365,10 @@ private:
 
     /// The same, for what is not a player: mobs and the stacks on the floor.
     void syncSurroundings();
+
+    /// Moves the camera to wherever the watched entity is now, and takes it back when the second
+    /// half of a stop is due.
+    void tickCamera();
 
     /// The sidebar, drawn whole: over here a line is a fake player with a number beside it.
     void drawSidebar(const std::string& title, const std::vector<std::string>& lines);
@@ -385,6 +392,11 @@ private:
     /// A menu is a grid with holes and a form is a list, so what a Bedrock player sees is the items
     /// in slot order and nothing where the holes were. The plugin is told the slot it meant, never
     /// the button number, so it never learns which edition is looking.
+    /// Puts this player's camera behind another entity, or back behind their own eyes when the id
+    /// is their own. parity: that edition has no spectating of its own, so Geyser moves a free
+    /// camera by hand every turn and this does the same.
+    void setCamera(std::int32_t entityId);
+
     /// One dialog as a screen of buttons, which is the nearest thing this edition has. A button
     /// that leads to another dialog opens it in place; one that runs a command runs it as this
     /// player; anything else is a line they are shown and can act on themselves.
@@ -465,6 +477,14 @@ private:
     /// Which waypoints are on this client's locator bar, so a second word about one is a move
     /// rather than a second dot, and so the bar can be hidden again once nothing is on it.
     std::unordered_set<wire::common::Uuid> waypoints_;
+
+    /// Who this player is watching, or nought for nobody. The camera follows them every turn,
+    /// because the client has no idea it is spectating anything.
+    std::int32_t spectating_ = 0;
+    /// Taking the camera back is two packets: the first hands the near view back as the default,
+    /// and the second, a turn later, takes the instruction away. Sent together the second is
+    /// ignored while the first is still on its way.
+    bool clearCamera_ = false;
 
     /// The last look the world took, and the lock it crosses threads behind. Shared rather than
     /// owned: the answer comes back on another thread, and by then this player may be gone.

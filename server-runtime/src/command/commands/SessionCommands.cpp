@@ -34,10 +34,9 @@ void sendTo(const player::PlayerSession& player, std::int32_t packetId,
                                                                     {Component::text(spectator.name())})}};
     }
     // Their own entity id puts the camera back, which is how vanilla stops spectating.
-    const wire::protocol::play::SetCameraPacket packet{.cameraEntityId = target != nullptr ? target->entityId()
-                                                                                           : spectator.entityId()};
-    sendTo(spectator, wire::protocol::play::SetCameraPacket::kId,
-           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    if (spectator.connection().setCamera) {
+        spectator.connection().setCamera(target != nullptr ? target->entityId() : spectator.entityId());
+    }
     context.success(target != nullptr ? Component::translatable("commands.spectate.success.started",
                                                                 {Component::text(target->name())})
                                       : Component::translatable("commands.spectate.success.stopped"));

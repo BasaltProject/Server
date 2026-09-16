@@ -304,6 +304,36 @@ player::PlayerConnection ClientSession::playerConnection() {
                 .write(buffer);
         });
     };
+    connection.sendTitlePiece = [this](const player::TitlePiece piece, const wire::text::Component& text,
+                                       const std::int32_t fadeIn, const std::int32_t stay, const std::int32_t fadeOut) {
+        switch (piece) {
+        case player::TitlePiece::Times:
+            sendPlayPacket(play::SetTitlesAnimationPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                play::SetTitlesAnimationPacket{.fadeIn = fadeIn, .stay = stay, .fadeOut = fadeOut}.write(buffer);
+            });
+            return;
+        case player::TitlePiece::Clear:
+        case player::TitlePiece::Reset:
+            sendPlayPacket(play::ClearTitlesPacket::kId, [piece](wire::io::ByteBuffer& buffer) {
+                play::ClearTitlesPacket{.resetTimes = piece == player::TitlePiece::Reset}.write(buffer);
+            });
+            return;
+        case player::TitlePiece::Title:
+        case player::TitlePiece::Subtitle:
+        case player::TitlePiece::ActionBar:
+            break;
+        }
+        const std::int32_t id = piece == player::TitlePiece::Title      ? play::kSetTitleTextId
+                                : piece == player::TitlePiece::Subtitle ? play::kSetSubtitleTextId
+                                                                        : play::kSetActionBarTextId;
+        sendPlayPacket(id,
+                       [&text](wire::io::ByteBuffer& buffer) { play::TitleTextPacket{.text = text}.write(buffer); });
+    };
+    connection.setCamera = [this](const std::int32_t entityId) {
+        sendPlayPacket(play::SetCameraPacket::kId, [entityId](wire::io::ByteBuffer& buffer) {
+            play::SetCameraPacket{.cameraEntityId = entityId}.write(buffer);
+        });
+    };
     connection.showDialog = [this](const std::int32_t dialogId, const world::dialogs::Dialog&) {
         sendPlayPacket(play::ShowDialogPacket::kId, [dialogId](wire::io::ByteBuffer& buffer) {
             play::ShowDialogPacket{.dialogId = dialogId}.write(buffer);

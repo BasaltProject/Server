@@ -46,17 +46,31 @@ constexpr double kEyeHeight = 1.62;
     return matched.size() == 1 ? &matched.front() : nullptr;
 }
 
-void sendToWorld(const CommandContext& context, std::int32_t packetId,
-                 const std::function<void(wire::io::ByteBuffer&)>& write) {
+/// Who is riding what, to everybody in the world. The edition with no packet for a whole load is
+/// told one link at a time, which is what the hook is for; the other one is sent the load itself.
+void tellTheWorldWhoIsOn(const CommandContext& context, std::int32_t vehicleId,
+                         const std::vector<std::int32_t>& riders) {
     const Parsed<world::LoadedWorld*> world = context.world();
     if (!world.has_value()) {
         return;
     }
     for (const player::PlayerSession* player : context.environment().playersIn(**world)) {
+        if (player->connection().sendPassengers) {
+            player->connection().sendPassengers(vehicleId, riders);
+            continue;
+        }
         if (player->connection().sendPlayPacket) {
-            player->connection().sendPlayPacket(packetId, write);
+            const play::SetPassengersPacket packet{.vehicleId = vehicleId, .passengerIds = riders};
+            player->connection().sendPlayPacket(play::SetPassengersPacket::kId,
+                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         }
     }
+}
+
+void tellTheWorldWhoIsOn(const CommandContext& context, const CommandTarget& vehicle) {
+    const entity::ServerEntity* entity = vehicle.entity();
+    tellTheWorldWhoIsOn(context, vehicle.entityId(),
+                        entity == nullptr ? std::vector<std::int32_t>{} : entity->passengerIds);
 }
 
 /// `CustomName` is a text component; only its plain text survives into an entity name here.
@@ -244,10 +258,7 @@ void RideCommand::build(const CommandNodeBuilder& root) const {
                     if (entity::ServerEntity* riderEntity = rider->entity(); riderEntity != nullptr) {
                         riderEntity->vehicleId = onto->entityId();
                     }
-                    const play::SetEntityLinkPacket packet{.sourceId = rider->entityId(),
-                                                           .destinationId = onto->entityId()};
-                    sendToWorld(context, play::SetEntityLinkPacket::kId,
-                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                    tellTheWorldWhoIsOn(context, *onto);
                     context.success(
                         Component::translatable("commands.ride.mount.success",
                                                 {Component::text(rider->name()), Component::text(onto->name())}),
@@ -276,10 +287,11 @@ void RideCommand::build(const CommandNodeBuilder& root) const {
                         vehicleName = vehicle->customName.value_or(std::string{vehicle->type().path()});
                     }
                 }
-                const play::SetEntityLinkPacket packet{.sourceId = rider->entityId(),
-                                                       .destinationId = play::SetEntityLinkPacket::kNoVehicle};
-                sendToWorld(context, play::SetEntityLinkPacket::kId,
-                            [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                if (world.has_value()) {
+                    if (const entity::ServerEntity* vehicle = (*world)->state().entity(vehicleId); vehicle != nullptr) {
+                        tellTheWorldWhoIsOn(context, vehicleId, vehicle->passengerIds);
+                    }
+                }
                 context.success(Component::translatable("commands.ride.dismount.success",
                                                         {Component::text(rider->name()), Component::text(vehicleName)}),
                                 true);
@@ -377,8 +389,20 @@ void SwingCommand::build(const CommandNodeBuilder& root) const {
         const std::uint8_t action = offhand ? play::AnimatePacket::kSwingOffHand : play::AnimatePacket::kSwingMainHand;
         for (const CommandTarget& target : targets) {
             const play::AnimatePacket packet{.entityId = target.entityId(), .action = action};
-            sendToWorld(context, play::AnimatePacket::kId,
-                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            const Parsed<world::LoadedWorld*> world = context.world();
+            if (!world.has_value()) {
+                continue;
+            }
+            for (const player::PlayerSession* player : context.environment().playersIn(**world)) {
+                if (player->connection().sendSwing) {
+                    player->connection().sendSwing(target.entityId(), offhand);
+                    continue;
+                }
+                if (player->connection().sendPlayPacket) {
+                    player->connection().sendPlayPacket(
+                        play::AnimatePacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                }
+            }
         }
         context.success(
             targets.size() == 1

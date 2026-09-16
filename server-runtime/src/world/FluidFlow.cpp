@@ -86,15 +86,9 @@ struct SolidStates {
     return stateId >= base && stateId <= base + 15 ? stateId - base : 0;
 }
 
-[[nodiscard]] bool isLiquidBlock(std::int32_t stateId) {
-    for (const FluidKind kind : {FluidKind::Water, FluidKind::Lava}) {
-        const std::int32_t base = baseStateId(kind);
-        if (stateId >= base && stateId <= base + 15) {
-            return true;
-        }
-    }
-    return false;
-}
+/// One range of states per fluid, written once: `liquidBlockKindOf` is the same walk and answering
+/// **which** fluid is strictly more than answering whether there is one.
+[[nodiscard]] bool isLiquidBlock(std::int32_t stateId) { return fluidFlow::liquidBlockKindOf(stateId).has_value(); }
 
 /// parity: `FlowingFluid.getLegacyLevel` read backwards: block level to fluid amount.
 [[nodiscard]] std::int32_t amountOf(std::int32_t stateId) {
@@ -209,6 +203,11 @@ private:
         blockChanged(x, y, z);
     }
 
+    /// The jar hooks this stands for, `LiquidBlock.onPlace` and `LiquidBlock.neighborChanged`, live
+    /// on **`LiquidBlock`**, so asking the narrow `liquidBlockKindOf` here looks right and is not:
+    /// this one call also carries the flow of every waterlogged square, which the jar moves through
+    /// `updateShape` on paths `bookLiquidTurn` does not reach yet. Narrowed it once and `anegadoforma`
+    /// went from 0 cells and 5 turns to 152 and 215. Narrow it again only with those paths covered.
     void wake(std::int32_t x, std::int32_t y, std::int32_t z) {
         const std::int32_t state = at(x, y, z);
         const std::optional<FluidKind> kind = fluidFlow::kindOf(state);

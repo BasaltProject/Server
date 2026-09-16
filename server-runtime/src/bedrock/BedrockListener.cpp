@@ -790,6 +790,13 @@ void BedrockListener::onReady(Session& session) {
     session.connection.sendPacket(BedrockPacket::GameRulesChanged, body.readable());
     note("gamerules", body.readableBytes());
 
+    // The cameras a client may be put behind. Named once and never again: an instruction that
+    // points at a preset the client was not told about is dropped.
+    body.clear();
+    wire::bedrock::writeCameraPresets(body);
+    session.connection.sendPacket(BedrockPacket::CameraPresets, body.readable());
+    note("camera presets", body.readableBytes());
+
     // What can be crafted, which on this door is the client's own copy of the recipe book: a grid
     // shows no result at all unless the recipe behind it came from here.
     body.clear();

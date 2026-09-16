@@ -274,7 +274,7 @@ TEST_CASE("ride mounts and dismounts, and refuses riding yourself") {
     REQUIRE(pig->vehicleId.has_value());
     CHECK(*pig->vehicleId == boat->entityId());
     CHECK(boat->passengerIds.size() == 1);
-    CHECK(fixture.clients[0]->sent(play::SetEntityLinkPacket::kId));
+    CHECK(fixture.clients[0]->sent(play::SetPassengersPacket::kId));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "ride @e[type=minecraft:pig] dismount") == 1);
     CHECK_FALSE(pig->vehicleId.has_value());

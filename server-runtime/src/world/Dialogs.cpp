@@ -52,6 +52,8 @@ void readBodyInto(const NbtTag& tag, std::vector<Component>& body) {
 [[nodiscard]] std::optional<Dialog> readAt(const NbtCompound& nbt, const ByName& byName, int depth);
 
 /// The dialog a `show_dialog` points at, which is either written out where it is used or named.
+/// A name beginning with a hash is a tag, and this server loads no dialog tags: vanilla's own two
+/// lists are tags, and both are empty until a datapack fills them.
 [[nodiscard]] std::shared_ptr<const Dialog> pointedAt(const NbtTag& tag, const ByName& byName, const int depth) {
     const NbtCompound* inline_ = tag.get<NbtCompound>();
     if (inline_ == nullptr) {

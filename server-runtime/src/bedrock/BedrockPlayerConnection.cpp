@@ -294,6 +294,38 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                                      wire::bedrock::kActionBarTicks, 0);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTitle), body.toVector());
     };
+    // parity: the other door sends a packet per piece and this edition one kind with a type, so
+    // the two lists line up one for one. Its action bar lasts as long as it is told rather than a
+    // fixed while, which is why the one with no times of its own carries vanilla's.
+    connection.sendTitlePiece = [mailbox = joining.mailbox, lang = context_.lang](
+                                    const player::TitlePiece piece, const Component& text, const std::int32_t fadeIn,
+                                    const std::int32_t stay, const std::int32_t fadeOut) {
+        wire::bedrock::TitleType type = wire::bedrock::TitleType::Title;
+        switch (piece) {
+        case player::TitlePiece::Title:
+            break;
+        case player::TitlePiece::Subtitle:
+            type = wire::bedrock::TitleType::Subtitle;
+            break;
+        case player::TitlePiece::ActionBar:
+            type = wire::bedrock::TitleType::ActionBar;
+            break;
+        case player::TitlePiece::Times:
+            type = wire::bedrock::TitleType::Times;
+            break;
+        case player::TitlePiece::Clear:
+            type = wire::bedrock::TitleType::Clear;
+            break;
+        case player::TitlePiece::Reset:
+            type = wire::bedrock::TitleType::Reset;
+            break;
+        }
+        const std::int32_t hold = piece == player::TitlePiece::ActionBar ? wire::bedrock::kActionBarTicks : stay;
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetTitle(body, type, wire::text::toLegacyText(wire::text::resolveComponent(text, lang)),
+                                     fadeIn, hold, fadeOut);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTitle), body.toVector());
+    };
     connection.sendTitle = [mailbox = joining.mailbox, lang = context_.lang](
                                const Component& title, const Component& subtitle, const std::int32_t fadeIn,
                                const std::int32_t stay, const std::int32_t fadeOut) {
@@ -545,6 +577,8 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             wall(session_->x, session_->y, minZ - 0.5, false);
         }
     };
+
+    connection.setCamera = [this](const std::int32_t entityId) { setCamera(entityId); };
 
     // parity: Geyser's own dialog cache, which turns a dialog into the only screen this edition
     // has for one: a title, the text, and a button per action.
