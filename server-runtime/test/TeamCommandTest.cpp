@@ -86,6 +86,14 @@ struct Client {
             write(buffer);
             packets.push_back(id);
         };
+        // The team goes out through the connection rather than as a packet, because the edition
+        // that has no teams is told the names instead.
+        connection.sendPlayerTeam =
+            [this](const std::string&, std::uint8_t,
+                   const std::optional<basalt::wire::protocol::play::SetPlayerTeamPacket::Parameters>&,
+                   const std::vector<std::string>&) {
+                packets.push_back(basalt::wire::protocol::play::SetPlayerTeamPacket::kId);
+            };
         connection.switchWorld = [this](basalt::server::runtime::world::LoadedWorld& world, double, double, double) {
             switched.push_back(world.name());
             if (session != nullptr) {

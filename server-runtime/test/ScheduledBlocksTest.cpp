@@ -428,6 +428,48 @@ TEST_CASE("a column with nothing feeding it goes back to water") {
     }
 }
 
+TEST_CASE("a column already built does not reach past itself to the water on top") {
+    // parity: `updateColumn` throws away the answer of its **first** write and then stops at the
+    // first one that changes nothing, because `Level.setBlock` says false when the state does not
+    // move. So a column that is already there ends the walk at its own second square, and the water
+    // sitting on top has to wait for its own notice. No bench circuit can reach this: everything
+    // that gives the bottom square a turn also changes the state it is about to write.
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    const std::int32_t column = stateOf("bubble_column", {{"drag", "false"}});
+    REQUIRE(world.setBlockState(8, 63, 8, stateOf("soul_sand")));
+    for (std::int32_t y = 64; y < 67; ++y) {
+        REQUIRE(world.setBlockState(8, y, 8, column));
+    }
+    REQUIRE(world.setBlockState(8, 67, 8, stateOf("water")));
+    std::vector<BlockChange> changes;
+
+    scheduledBlocks::bubbleColumn(world, 8, 64, 8, changes);
+
+    CHECK(changes.empty());
+    CHECK(world.blockState(8, 67, 8) == stateOf("water"));
+}
+
+TEST_CASE("the water under a column carries itself up and washes the column away") {
+    // parity: the last branch of `getColumnState` is `occupyState`, the square's own state. When the
+    // turn belongs to `LiquidBlock.tick` and nothing feeds the column any more, what walks upwards is
+    // the water, and it turns whatever is over it back into water.
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    const std::int32_t column = stateOf("bubble_column", {{"drag", "false"}});
+    REQUIRE(world.setBlockState(8, 63, 8, stateOf("stone")));
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("water")));
+    REQUIRE(world.setBlockState(8, 65, 8, column));
+    REQUIRE(world.setBlockState(8, 66, 8, column));
+    std::vector<BlockChange> changes;
+
+    scheduledBlocks::bubbleColumn(world, 8, 64, 8, changes);
+
+    CHECK(changes.size() == 2);
+    CHECK(world.blockState(8, 65, 8) == stateOf("water"));
+    CHECK(world.blockState(8, 66, 8) == stateOf("water"));
+}
+
 TEST_CASE("a column stops where the water does") {
     Loaded loaded;
     WorldState& world = loaded.state;

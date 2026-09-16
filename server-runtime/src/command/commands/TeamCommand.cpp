@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/TeamCommand.hpp>
+#include <basalt/server/runtime/scoreboard/TeamNameTags.hpp>
 
 #include <cstdint>
 #include <string>
@@ -51,11 +52,21 @@ void TeamCommand::build(const CommandNodeBuilder& root) const {
         }
         return team;
     };
-    const auto broadcast = [](const CommandContext& context, const play::SetPlayerTeamPacket& packet) {
-        for (const player::PlayerSession* player : context.environment().players().snapshot()) {
-            if (player->connection().sendPlayPacket) {
-                player->connection().sendPlayPacket(play::SetPlayerTeamPacket::kId,
-                                                    [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    // The edition that has teams is told the team; the one that has none is told what the names
+    // over the heads read as now, which is the only part of a team it can draw.
+    const auto broadcast = [this](const CommandContext& context, const play::SetPlayerTeamPacket& packet) {
+        const std::vector<player::PlayerSession*> online = context.environment().players().snapshot();
+        for (const player::PlayerSession* player : online) {
+            if (player->connection().sendPlayerTeam) {
+                player->connection().sendPlayerTeam(packet.teamName, packet.method, packet.parameters, packet.members);
+            }
+        }
+        for (const player::PlayerSession* named : online) {
+            for (const player::PlayerSession* player : online) {
+                if (player->connection().sendNameTag) {
+                    player->connection().sendNameTag(named->entityId(),
+                                                     scoreboard::nameTagFor(*teams_, named->name(), player->name()));
+                }
             }
         }
     };

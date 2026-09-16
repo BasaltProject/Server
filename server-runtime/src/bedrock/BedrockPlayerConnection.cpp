@@ -482,6 +482,66 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
     };
 
+    // parity: Geyser's own wall, which is the only way to show a border to a client that has none:
+    // a patch of refusal particles at the face the player is near, six wide and five tall.
+    connection.drawBorderWall = [this](const double minX, const double maxX, const double minZ, const double maxZ,
+                                       const std::int32_t warningBlocks) {
+        if (session_ == nullptr) {
+            return;
+        }
+        /// How close to a face counts as near it, on top of the border's own warning distance.
+        constexpr double kCloseToBorder = 5.0;
+        constexpr std::int32_t kHalfWidth = 3;
+        constexpr std::int32_t kHeight = 5;
+
+        const double warning = static_cast<double>(warningBlocks) + kCloseToBorder;
+        const auto puff = [this](const double x, const double y, const double z) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeLevelEvent(body, wire::bedrock::LevelEventType::ParticleDenyBlock,
+                                           static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), 0);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
+        };
+        const auto wall = [&puff, minX, maxX, minZ, maxZ](const double x, const double y, const double z,
+                                                          const bool alongZ) {
+            const auto base = static_cast<std::int32_t>(y) - 1;
+            for (std::int32_t up = base; up < base + kHeight; ++up) {
+                const auto middle = static_cast<std::int32_t>(alongZ ? z : x);
+                for (std::int32_t at = middle - kHalfWidth; at < middle + kHalfWidth; ++at) {
+                    const double other = static_cast<double>(at);
+                    if (alongZ && (other < minZ || other > maxZ)) {
+                        continue;
+                    }
+                    if (!alongZ && (other < minX || other > maxX)) {
+                        continue;
+                    }
+                    puff(alongZ ? x : other, static_cast<double>(up), alongZ ? other : z);
+                }
+            }
+        };
+        if (session_->x > maxX - warning) {
+            wall(maxX + 0.5, session_->y, session_->z, true);
+        }
+        if (session_->x < minX + warning) {
+            wall(minX - 0.5, session_->y, session_->z, true);
+        }
+        if (session_->z > maxZ - warning) {
+            wall(session_->x, session_->y, maxZ + 0.5, false);
+        }
+        if (session_->z < minZ + warning) {
+            wall(session_->x, session_->y, minZ - 0.5, false);
+        }
+    };
+
+    // parity: the other edition's client builds the name over a head out of the team packet. This
+    // one has no teams at all, so it is told the line already built.
+    connection.sendNameTag = [this](const std::int32_t entityId, const std::string& nameTag) {
+        const std::uint64_t runtime =
+            session_ != nullptr && entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeNameTag(body, runtime, nameTag, true, protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+    };
+
     // Everything they carry. Bedrock numbers its own inventory the other way round from Java: the
     // hotbar is the first nine slots there and the last nine here.
     connection.sendInventoryAll = [this] {
