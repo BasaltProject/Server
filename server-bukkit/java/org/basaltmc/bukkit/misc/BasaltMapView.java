@@ -20,6 +20,7 @@ import org.bukkit.map.MapView;
 
 public final class BasaltMapView implements MapView {
     private static final Map<Integer, BasaltMapView> kViews = new HashMap<>();
+    private static final int kPruneAbove = 1024;
     private static final int kRenderPeriod = 10;
     private static final long kResendTicks = 100;
     private static boolean kTicking;
@@ -47,8 +48,15 @@ public final class BasaltMapView implements MapView {
             return null;
         }
         BasaltMapView view = new BasaltMapView(id, false);
+        pruneViews();
         kViews.put(id, view);
         return view;
+    }
+
+    private static void pruneViews() {
+        if (kViews.size() > kPruneAbove) {
+            kViews.values().removeIf(view -> view.renderers.isEmpty());
+        }
     }
 
     public static synchronized MapView create(World world) {
