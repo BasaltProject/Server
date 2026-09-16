@@ -188,7 +188,12 @@ void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std
 /// and magma drags one down, and the column climbs while there is water to fill.
 ///
 /// What the column then does to whoever swims into it is `entityInside`, which waits for entities.
-void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes);
+///
+/// `written` runs right after each square lands, because the jar's `setBlock(..., 2)` does its shape
+/// walk there and not once the whole column is up: the square above is still water when the one below
+/// is written, so it never hears a bubble column arriving underneath it.
+void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes,
+                  const std::function<void(std::int32_t, std::int32_t, std::int32_t)>& written = {});
 
 } // namespace scheduledBlocks
 

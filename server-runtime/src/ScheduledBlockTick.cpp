@@ -4,8 +4,8 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
-#include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
+#include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
@@ -178,8 +178,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                         continue;
                     }
                     const auto [half, height] = sizeOf(standing->type());
-                    if (world::tripwires::crosses(x, y, z, here, standing->x, standing->y, standing->z, half,
-                                                  height)) {
+                    if (world::tripwires::crosses(x, y, z, here, standing->x, standing->y, standing->z, half, height)) {
                         stillOn = true;
                         break;
                     }
@@ -549,17 +548,16 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         // parity: `LiquidBlock.tick` and `BubbleColumnBlock.tick`, both of which end in
         // `BubbleColumnBlock.updateColumn`: the column is built, carried on or taken apart here and
         // not inside the shape cascade. Measured in `columnaburbujas`.
-        const std::size_t beforeColumn = scheduled.size();
-        world::scheduledBlocks::bubbleColumn(world.state(), x, y, z, scheduled);
         // parity: `updateColumn` writes every square of the column with `setBlock(..., 2)`, and a
         // flag two write still runs the three shape walks: bit one only carries the neighbour notice.
         // That walk is where `BubbleColumnBlock.updateShape` books the water's turn for the whole
         // column, and without it the turns never appear on our side however well the booking itself
-        // is written. Measured in `columnaburbujas`.
-        for (std::size_t column = beforeColumn, raised = scheduled.size(); column < raised; ++column) {
-            broadcaster_->reshapeAround(world, watchers, scheduled[column].x, scheduled[column].y,
-                                        scheduled[column].z);
-        }
+        // is written. It goes square by square, because the jar's does. Measured in `columnaburbujas`.
+        world::scheduledBlocks::bubbleColumn(
+            world.state(), x, y, z, scheduled,
+            [this, &world, &watchers](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
+                broadcaster_->reshapeAround(world, watchers, cx, cy, cz);
+            });
         // parity: `CoralBlock.tick` is one line, `level.setBlock(pos, deadBlock, 2)`: it goes white
         // without telling a single neighbour. But flag two still redraws the six squares around it,
         // which is where a coral fan stuck to it books the turn of the water it is holding.

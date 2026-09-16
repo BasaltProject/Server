@@ -1,6 +1,8 @@
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/bedrock/BedrockSeen.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
+#include <basalt/wire/bedrock/BedrockItems.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
@@ -8,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -121,6 +124,35 @@ void lookFrom(const wire::nbt::NbtCompound& data, const std::string_view path, S
         line.look.markVariant = idOf(pandaGenes(), data.getString("HiddenGene"));
         return;
     }
+    if (path == "cat") {
+        // parity: the two editions list the eleven coats in different orders, and the collar is a
+        // dye number that travels as it is. Fourteen is the red every cat is tamed with.
+        static constexpr std::array<std::string_view, 11> kCoats{
+            "white",   "black", "red",       "siamese", "british_shorthair", "calico", "persian",
+            "ragdoll", "tabby", "all_black", "jellie"};
+        line.look.variant = placeOf(kCoats, data.getString("variant"));
+        line.look.colour = static_cast<std::int8_t>(data.getByte("CollarColor", 14) & 0x0F);
+        return;
+    }
+    if (path == "axolotl") {
+        // parity: the two editions agree on every colour but two, which they have the other way
+        // round: the wild brown one and the cyan one.
+        const std::int32_t colour = data.getInt("Variant");
+        line.look.variant = colour == 1 ? 3 : colour == 3 ? 1 : colour;
+        return;
+    }
+    if (path == "fox") {
+        // The only one that is not the red fox is the snowy one, and it is the second on both.
+        line.look.variant = data.getString("Type") == "snow" ? 1 : 0;
+        return;
+    }
+    if (path == "pig" || path == "cow" || path == "chicken") {
+        // parity: the three the other edition gave a climate to in 26.2. This one keeps it as a
+        // property of the entity rather than a field of its metadata.
+        static constexpr std::array<std::string_view, 3> kClimates{"temperate", "warm", "cold"};
+        line.look.climate = placeOf(kClimates, data.getString("variant"));
+        return;
+    }
     if (path == "wolf") {
         // parity: 26.2 moved a wolf's coat into a datapack registry, so what is saved is a name.
         // The two editions list the nine in different orders, and this one draws the place in its
@@ -173,6 +205,62 @@ void lookFrom(const wire::nbt::NbtCompound& data, const std::string_view path, S
     }
 }
 
+/// An item frame as the other edition holds one: a block on a wall with what it carries inside.
+void frameFrom(const entity::ServerEntity& hung, const bool glowing, Seen& line) {
+    Seen::Frame frame;
+    frame.glowing = glowing;
+    frame.x = static_cast<std::int32_t>(std::floor(hung.x));
+    frame.y = static_cast<std::int32_t>(std::floor(hung.y));
+    frame.z = static_cast<std::int32_t>(std::floor(hung.z));
+    if (hung.sourceNbt.has_value()) {
+        const wire::nbt::NbtCompound& data = *hung.sourceNbt;
+        frame.face = data.getByte("Facing", 3);
+        frame.rotation = data.getByte("ItemRotation", 0);
+        if (const wire::nbt::NbtCompound* held = data.getCompound("Item"); held != nullptr) {
+            const wire::bedrock::ItemName* named = wire::bedrock::bedrockItem(held->getString("id"));
+            if (named != nullptr) {
+                frame.item = wire::bedrock::bedrockItemPalette()[static_cast<std::size_t>(named->palettePlace)];
+                frame.count = held->getByte("count", 1);
+            }
+        }
+    }
+    line.frame = std::move(frame);
+}
+
+/// A painting as the other edition hangs one: a picture by name, a way of facing in its own
+/// numbering, and the middle of the picture rather than the middle of the block it hangs on.
+void paintingFrom(const entity::ServerEntity& painting, Seen& line) {
+    /// parity: `PaintingVariant`. This server's registry holds the one, two blocks by two, so both
+    /// halves of the offset are half a block; a picture of another size would want its own.
+    constexpr double kHalf = 0.5;
+
+    line.motive = "humble";
+    const std::int8_t face =
+        painting.sourceNbt.has_value() ? painting.sourceNbt->getByte("Facing", 3) : static_cast<std::int8_t>(3);
+    // parity: the two editions number the four walls differently, and this one starts at south.
+    switch (static_cast<server::registry::BlockFace>(face)) {
+    case server::registry::BlockFace::North:
+        line.facing = 2;
+        line.x -= kHalf;
+        break;
+    case server::registry::BlockFace::West:
+        line.facing = 1;
+        line.z += kHalf;
+        break;
+    case server::registry::BlockFace::East:
+        line.facing = 3;
+        line.z -= kHalf;
+        break;
+    case server::registry::BlockFace::South:
+    case server::registry::BlockFace::Down:
+    case server::registry::BlockFace::Up:
+        line.facing = 0;
+        line.x += kHalf;
+        break;
+    }
+    line.y += kHalf;
+}
+
 } // namespace
 
 Seen seenOf(const entity::ServerEntity& entity) {
@@ -196,6 +284,12 @@ Seen seenOf(const entity::ServerEntity& entity) {
     }
     if (entity.sourceNbt.has_value()) {
         lookFrom(*entity.sourceNbt, path, line);
+    }
+    if (path == "painting") {
+        paintingFrom(entity, line);
+    }
+    if (path == "item_frame" || path == "glow_item_frame") {
+        frameFrom(entity, path == "glow_item_frame", line);
     }
     if (entity.customName.has_value()) {
         // Drawn when it is looked at, as vanilla draws a name nobody made visible.
