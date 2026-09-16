@@ -226,6 +226,9 @@ void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item)
     if (session == nullptr) {
         return;
     }
+    // Kept on the session as well as sent: the door with no metadata of its own reads it from here
+    // to draw somebody else eating.
+    session->usingItem = usingItem;
     // The owner's own client needs this as much as the onlookers do: `LocalPlayer.isUsingItem` is
     // its own flag, and the only thing that clears it is this metadata coming back saying the
     // server is no longer using anything.

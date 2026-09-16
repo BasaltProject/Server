@@ -78,6 +78,11 @@ public:
     /// tells "place a block against this one" apart from "open this one's screen".
     bool sneaking = false;
 
+    /// Whether they are in the middle of using something: eating, drinking, drawing a bow, holding
+    /// a shield up. parity: `LivingEntity.isUsingItem`, which is what draws the animation on
+    /// everybody else's screen.
+    bool usingItem = false;
+
     /// What they are riding, by entity id. parity: `Entity.vehicle`.
     std::optional<std::int32_t> vehicleId;
 

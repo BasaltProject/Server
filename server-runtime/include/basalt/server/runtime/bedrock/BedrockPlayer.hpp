@@ -54,6 +54,11 @@ struct Seen {
     /// What it is doing, as the flags that edition draws it by: burning, small, sitting. A mob that
     /// is only ever drawn once stays as it arrived, so a lamb never grows and a fire never shows.
     std::uint64_t flags = 0;
+    /// The line drawn over it, already flattened: a mob that was named, or the words of a text
+    /// display, which this edition has no entity for and draws as a name over nothing.
+    std::string name;
+    /// Whether that line is drawn from any distance rather than only when it is looked at.
+    bool alwaysShowName = false;
 };
 
 /// A player who arrived through the Bedrock door: the same `PlayerSession` in the same registry, so
@@ -280,6 +285,10 @@ public:
 
     void setSneaking(bool sneaking) override;
     void setStance(bool onGround, bool sprinting) override;
+
+    /// Whether they are flying. parity: the other edition sends a whole packet of abilities and
+    /// this one an edge on one turn's input, and both are believed only when the mode allows it.
+    void setFlying(bool flying) override;
 
     void attack(std::uint64_t runtimeEntityId) override;
     void useOnEntity(std::uint64_t runtimeEntityId) override;

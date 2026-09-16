@@ -749,7 +749,30 @@ void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     scheduleHatch(world, x, y, z, random.nextLong());
 }
 
-void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+/// parity: `BubbleColumnBlock.updateShape` books the **water** on every shape update but its own turn
+/// only in the three cases below. Booking it always left turns the jar never has: fifteen of them in
+/// `columnalado`, three squares across five ticks while the column was still forming.
+[[nodiscard]] bool columnBooksItsTurn(WorldState& world, const std::int32_t x, const std::int32_t y,
+                                      const std::int32_t z, const std::optional<registry::BlockFace> towards) {
+    // No direction is the arriving block reshaping itself, and in the jar that is the pre-shape
+    // walking all six sides: `DOWN` is one of them, so the booking happens either way.
+    if (!towards.has_value() || *towards == registry::BlockFace::Down) {
+        return true;
+    }
+    // parity: `canSurvive` is `below.is(this)` or one of the two tags, which are soul sand and magma.
+    const std::string below = pathOf(world.blockState(x, y - 1, z).value_or(0));
+    if (below != "bubble_column" && below != "soul_sand" && below != "magma_block") {
+        return true;
+    }
+    if (*towards != registry::BlockFace::Up) {
+        return false;
+    }
+    const std::int32_t above = world.blockState(x, y + 1, z).value_or(0);
+    return pathOf(above) != "bubble_column" && canOccupy(above);
+}
+
+void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                          const std::optional<registry::BlockFace> towards) {
     const std::optional<std::int32_t> here = world.blockState(x, y, z);
     if (!here.has_value()) {
         return;
@@ -757,7 +780,9 @@ void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std
     // parity: `BubbleColumnBlock.updateShape` books its own turn five ticks out, which is what
     // carries a column up and what takes it apart when its source goes.
     if (pathOf(*here) == "bubble_column") {
-        world.scheduleBlockTick(x, y, z, bubbleColumnTickType(), kColumnStepDelay);
+        if (columnBooksItsTurn(world, x, y, z, towards)) {
+            world.scheduleBlockTick(x, y, z, bubbleColumnTickType(), kColumnStepDelay);
+        }
         return;
     }
     // parity: `LiquidBlock.tryScheduleBubbleBlockColumn`, twenty ticks (`BUBBLE_COLUMN_CHECK_DELAY`)

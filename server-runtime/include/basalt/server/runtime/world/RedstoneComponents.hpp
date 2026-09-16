@@ -142,11 +142,11 @@ void scheduleAroundWire(WorldState& world, std::string_view worldName, std::int3
 /// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, so one books
 /// a turn as soon as it is placed and a chain of them is otherwise a turn out of step.
 ///
-/// `removed` is what stood there before: an observer written over an observer books nothing, the way
-/// `onPlace` does nothing for a block that did not change. One that arrives powered belongs to
+/// The booking is `updateShape`'s `startSignal`, **not** `onPlace`'s, so the guard that opens
+/// `ObserverBlock.onPlace` does not apply to it: turning an observer on the spot books a turn in the
+/// jar because the pre-shape still walks its facing side. One that arrives powered belongs to
 /// `neighbourUpdates::settleArrivedSignal`, which can also give the notice that goes with it.
-void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                  std::optional<std::int32_t> removed);
+void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: `ObserverBlock.updateShape`, which only fires for the block it faces: an observer
 /// watches one direction and ignores everything else that moves around it.

@@ -387,6 +387,9 @@ void BedrockListener::onConnect(RakSession& session) {
                 // Before the click, because it is what decides what the click means.
                 entry.player->setSneaking(input->sneaking);
                 entry.player->setStance(input->onGround, input->sprinting);
+                if (input->flying.has_value()) {
+                    entry.player->setFlying(*input->flying);
+                }
                 // Zero is a click on a block; one is a click on the air and two is breaking, and
                 // neither of those puts anything down.
                 // TEMPORARY: what the client says it did with what it holds, which is the only way
