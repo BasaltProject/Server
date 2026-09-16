@@ -59,6 +59,9 @@ struct Seen {
     std::string name;
     /// Whether that line is drawn from any distance rather than only when it is looked at.
     bool alwaysShowName = false;
+    /// How it is drawn beyond its kind, in that edition's own numbering: a villager's trade, a
+    /// rabbit's coat, a sheep's wool, a slime's size.
+    wire::bedrock::BedrockLook look;
 };
 
 /// A player who arrived through the Bedrock door: the same `PlayerSession` in the same registry, so

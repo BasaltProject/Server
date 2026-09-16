@@ -1094,6 +1094,13 @@ void BedrockPlayer::syncSurroundings() {
         now = std::move(surroundings_->latest);
     }
 
+    /// How it is drawn, which this edition keeps in a handful of fields shared by every mob.
+    const auto drawLook = [this](const std::int32_t id, const Seen& seen) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeEntityLook(body, runtimeIdFor(id), seen.look, protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+    };
+
     /// The line over an entity, which is its own packet here rather than a field of the spawn.
     const auto drawName = [this](const std::int32_t id, const Seen& seen) {
         wire::io::ByteBuffer body;
@@ -1124,6 +1131,9 @@ void BedrockPlayer::syncSurroundings() {
             if (!seen.name.empty()) {
                 drawName(id, seen);
             }
+            if (wire::bedrock::hasAnything(seen.look)) {
+                drawLook(id, seen);
+            }
             present.emplace(id, std::move(seen));
             continue;
         }
@@ -1143,6 +1153,9 @@ void BedrockPlayer::syncSurroundings() {
         }
         if (before.name != seen.name || before.alwaysShowName != seen.alwaysShowName) {
             drawName(id, seen);
+        }
+        if (before.look != seen.look) {
+            drawLook(id, seen);
         }
         present.emplace(id, std::move(seen));
     }
