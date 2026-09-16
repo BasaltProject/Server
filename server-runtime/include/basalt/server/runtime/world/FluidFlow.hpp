@@ -55,11 +55,22 @@ struct Context {
 
 [[nodiscard]] std::optional<FluidKind> kindOf(std::int32_t stateId);
 
+/// Like `kindOf`, but only for a square that **is** the liquid: a waterlogged stair holds water and
+/// answers `kindOf`, and it is not a `LiquidBlock`, so the hooks that hang off that class skip it.
+[[nodiscard]] std::optional<FluidKind> liquidBlockKindOf(std::int32_t stateId);
+
 /// Runs the fluid at this position, returning every block it changed.
 ///
 /// parity: `FlowingFluid.tick`: a flowing block first settles to whatever its neighbours now
 /// justify (which is how a cut-off flow drains), and then spreads from there. A source only spreads.
 [[nodiscard]] std::vector<FluidChange> tick(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// Wakes the fluid **on this square only**, which is what `LiquidBlock.onPlace` is: the block that
+/// just landed books its own turn (and lava turns to rock against water) before anybody else hears
+/// about the change. Separate from `onBlockChanged` because the order matters: the jar books inside
+/// `LevelChunk.setBlockState` and tells the neighbours afterwards, so a sponge that drinks the water
+/// away still leaves the turn behind. Measured in `esponja`.
+void onArrived(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// Wakes the fluids around a block that just changed, returning whatever changed on the spot.
 ///

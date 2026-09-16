@@ -186,6 +186,19 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
     if (std::ranges::find(kSpeleothems, path) != kSpeleothems.end()) {
         return only(valueOf(stateId, "vertical_direction") != "up" ? BlockFace::Up : BlockFace::Down);
     }
+    // parity: `CoralPlantBlock`, `CoralFanBlock` and their dead pair in `BaseCoralPlantTypeBlock`,
+    // all four gated on `directionToNeighbour == Direction.DOWN`. None of them has a
+    // `neighborChanged`, so that shape update is their **only** way of going, and a coral fan hears
+    // nothing from the sides. The wall fan is a different question and lives in `kBehindTheFace`.
+    if (path.ends_with("_coral") || path.ends_with("_coral_fan")) {
+        return only(BlockFace::Down);
+    }
+    // parity: `ChorusFlowerBlock.updateShape` is `directionToNeighbour != Direction.UP`, the only one
+    // of the fifty-seven written as an exclusion: a flower answers every side but the one over it.
+    if (path == "chorus_flower") {
+        return static_cast<std::uint8_t>(only(BlockFace::Down) | only(BlockFace::North) | only(BlockFace::South) |
+                                         only(BlockFace::West) | only(BlockFace::East));
+    }
     // parity: `BigDripleafStemBlock`, the one that asks about both ends.
     if (path == "big_dripleaf_stem") {
         return static_cast<std::uint8_t>(only(BlockFace::Down) | only(BlockFace::Up));

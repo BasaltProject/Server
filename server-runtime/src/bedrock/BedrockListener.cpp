@@ -9,6 +9,29 @@
 namespace basalt::server::runtime::bedrock {
 namespace {
 
+/// A client's own words, cut down to what a log line can carry: plain ascii, colour codes gone,
+/// and short enough to read at a glance.
+[[nodiscard]] std::string printable(const std::string_view said) {
+    constexpr std::size_t kMaxLength = 100;
+    std::string out;
+    for (std::size_t at = 0; at < said.size(); ++at) {
+        const auto letter = static_cast<unsigned char>(said[at]);
+        // The other edition's colour escape is two bytes of utf-8, and what follows it is the code.
+        if (letter == 0xc2U && at + 2 < said.size() && static_cast<unsigned char>(said[at + 1]) == 0xa7U) {
+            at += 2;
+            continue;
+        }
+        if (letter >= 32 && letter <= 126) {
+            out.push_back(said[at]);
+        }
+        if (out.size() == kMaxLength) {
+            out += "...";
+            break;
+        }
+    }
+    return out;
+}
+
 /// What one line of a stack request is called, for the log line that says what a client asked for.
 [[nodiscard]] std::string stackActionName(const wire::bedrock::BedrockStackActionType type) {
     switch (type) {
@@ -558,6 +581,24 @@ void BedrockListener::onConnect(RakSession& session) {
             const auto edit = wire::bedrock::readSignEdit(body);
             if (edit.has_value()) {
                 entry.player->editSign(edit->x, edit->y, edit->z, edit->text);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::PacketViolationWarning) {
+            // parity: Geyser logs this and nothing else, because it is the one packet a client
+            // sends about the server's own writing. It does not go further here: a line the client
+            // could not read is this door's bug to fix, and throwing the player out over it turns
+            // one wrong field into a disconnection.
+            const std::optional<wire::bedrock::BedrockPacketViolation> violation =
+                wire::bedrock::readPacketViolationWarning(body);
+            if (violation.has_value()) {
+                logger_.warn([&violation] {
+                    const std::string_view named =
+                        wire::bedrock::bedrockPacketName(static_cast<std::uint16_t>(violation->packetId));
+                    return "A Bedrock client refused " +
+                           (named.empty() ? "packet " + std::to_string(violation->packetId) : std::string{named}) +
+                           " (severity " + std::to_string(violation->severity) + "): " + printable(violation->context);
+                });
             }
             return;
         }

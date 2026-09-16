@@ -68,7 +68,11 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
         .minY = facts.chunkHeight.minY(),
         .maxY = facts.chunkHeight.maxY(),
         .random = random,
+        // parity: the `water_evaporates` attribute, which `WetSpongeBlock.onPlace` reads. Only the
+        // Nether carries it: water stays put in the End, so `!hasSkylight` is the wrong test.
+        .evaporates = world.declaration().dimension == config::WorldDimension::Nether,
         .hasSkylight = facts.hasSkylight,
+        .ultrawarm = world.declaration().dimension == config::WorldDimension::Nether,
         .wakeFluids =
             [&world, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
                 const world::fluidFlow::Context flow{.world = world.state(),
@@ -77,6 +81,15 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
                                                      .ultrawarm = world.declaration().dimension ==
                                                                   config::WorldDimension::Nether};
                 static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
+            },
+        .arrivedFluid =
+            [&world, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
+                const world::fluidFlow::Context flow{.world = world.state(),
+                                                     .gameRules = world.gameRules(),
+                                                     .random = random,
+                                                     .ultrawarm = world.declaration().dimension ==
+                                                                  config::WorldDimension::Nether};
+                world::fluidFlow::onArrived(flow, x, y, z);
             },
         // parity: `PotentSulfurBlock.updateShape` is
         // `validBlockState`, which reads the water above and the

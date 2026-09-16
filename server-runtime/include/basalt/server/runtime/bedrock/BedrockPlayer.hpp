@@ -22,6 +22,7 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -296,6 +297,11 @@ public:
     /// What a client typed into a sign's editor, sent back when they close it.
     void editSign(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& text) override;
 
+    /// Keeps something invisible standing at each border face this player is near, and takes it
+    /// away again once they are not. parity: nothing in the jar, whose client collides with the
+    /// border itself.
+    void showBorderColliders(double minX, double maxX, double minZ, double maxZ, std::int32_t warningBlocks);
+
     void editBookPage(std::int32_t slot, world::books::PageEdit what, std::int32_t page, std::int32_t other,
                       const std::string& text) override;
 
@@ -420,6 +426,11 @@ private:
     Context context_;
     std::shared_ptr<BedrockMailbox> mailbox_;
 
+    /// Whether something is standing at the border face on each axis right now. The ids are this
+    /// session's own and belong to no world entity.
+    bool borderColliderX_ = false;
+    bool borderColliderZ_ = false;
+
     /// Where this player is digging and for how many turns. Only this door keeps it: the client
     /// says it is still digging and nothing else.
     std::optional<std::array<std::int32_t, 3>> diggingAt_;
@@ -442,6 +453,9 @@ private:
     /// receiver may not be in, so they carry it rather than assuming the overworld.
     wire::bedrock::BedrockDimension dimension_ = wire::bedrock::BedrockDimension::Overworld;
     std::unordered_map<wire::common::Uuid, Other> others_;
+    /// Which waypoints are on this client's locator bar, so a second word about one is a move
+    /// rather than a second dot, and so the bar can be hidden again once nothing is on it.
+    std::unordered_set<wire::common::Uuid> waypoints_;
 
     /// The last look the world took, and the lock it crosses threads behind. Shared rather than
     /// owned: the answer comes back on another thread, and by then this player may be gone.

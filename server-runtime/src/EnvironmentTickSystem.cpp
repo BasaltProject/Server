@@ -132,21 +132,19 @@ void EnvironmentTickSystem::tickBorderDamage(world::LoadedWorld& world) {
 }
 
 void EnvironmentTickSystem::tickBorderWall(world::LoadedWorld& world) {
-    /// Once a second, which is what Geyser settled on: the wall is a puff of particles and drawing
-    /// it every tick is a stream of packets for a thing that does not move.
+    /// The wall is a puff of particles that does not move, so once a second is enough; what stands
+    /// in the way has to keep up with the player and goes every turn.
     constexpr std::int64_t kWallIntervalTicks = 20;
 
-    if (world.gameTime() % kWallIntervalTicks != 0) {
-        return;
-    }
     const world::WorldBorder& border = world.border();
     const double half = border.size() / 2.0;
+    const bool withWall = world.gameTime() % kWallIntervalTicks == 0;
     for (PlayerSession* player : players_->snapshot()) {
-        if (player->worldName != world.name() || !player->connection().drawBorderWall) {
+        if (player->worldName != world.name() || !player->connection().showBorder) {
             continue;
         }
-        player->connection().drawBorderWall(border.centerX() - half, border.centerX() + half, border.centerZ() - half,
-                                            border.centerZ() + half, border.warningBlocks);
+        player->connection().showBorder(border.centerX() - half, border.centerX() + half, border.centerZ() - half,
+                                        border.centerZ() + half, border.warningBlocks, withWall);
     }
 }
 

@@ -164,7 +164,11 @@ void BlockEditor::notifyNeighbours() {
         .minY = bounds_.minY(),
         .maxY = bounds_.maxY(),
         .random = random,
+        // parity: the `water_evaporates` attribute, which `WetSpongeBlock.onPlace` reads. Only the
+        // Nether carries it: water stays put in the End, so `!hasSkylight` is the wrong test.
+        .evaporates = world_->declaration().dimension == config::WorldDimension::Nether,
         .hasSkylight = facts.hasSkylight,
+        .ultrawarm = world_->declaration().dimension == config::WorldDimension::Nether,
         // parity: a `/setblock` of water is a block change like any other, and what makes water
         // flow is a block change. Without this it stood where the command put it for ever.
         .wakeFluids =
@@ -175,6 +179,15 @@ void BlockEditor::notifyNeighbours() {
                                                      .ultrawarm = world_->declaration().dimension ==
                                                                   config::WorldDimension::Nether};
                 static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
+            },
+        .arrivedFluid =
+            [this, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
+                const world::fluidFlow::Context flow{.world = world_->state(),
+                                                     .gameRules = world_->gameRules(),
+                                                     .random = random,
+                                                     .ultrawarm = world_->declaration().dimension ==
+                                                                  config::WorldDimension::Nether};
+                world::fluidFlow::onArrived(flow, x, y, z);
             },
         // parity: `PotentSulfurBlock.updateShape` is `validBlockState`, which reads the water above
         // and the block below to say what the geyser is doing now.

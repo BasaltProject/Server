@@ -502,10 +502,20 @@ TEST_CASE("the box a hopper eats from is its own width, from eleven sixteenths u
         return hoppers::tick(world, 8, 64, 8, hopperRandom);
     };
 
-    // parity: `Hopper.SUCK_AABB`, from 11/16 of a block up to two whole blocks.
+    // parity: `Hopper.SUCK_AABB`, from 11/16 of a block up to two whole blocks, crossed against the
+    // **box** of the item and not its middle: the jar collects with
+    // `getEntitiesOfClass(ItemEntity.class, aabb, ...)`, which is `AABB.intersects`, strict at both
+    // ends. A stack is a quarter of a block tall, so it reaches an eighth of a block further down
+    // than its own coordinates say, and stops reaching the moment its **bottom** touches the top.
     CHECK(sucks(8.5, 64.0 + 11.0 / 16.0, 8.5));
-    CHECK_FALSE(sucks(8.5, 64.0 + 10.0 / 16.0, 8.5));
-    CHECK(sucks(8.5, 66.0, 8.5));
+    // Below the floor of the box by a sixteenth, which the old point test called a miss: the stack's
+    // top is at 64.875 and the box starts at 64.6875, so it is inside.
+    CHECK(sucks(8.5, 64.0 + 10.0 / 16.0, 8.5));
+    // And the first height that really misses, where the top lands exactly on the floor of the box.
+    CHECK_FALSE(sucks(8.5, 64.0 + 7.0 / 16.0, 8.5));
+    // Sitting exactly on the ceiling is **not** a crossing, which the point test got backwards.
+    CHECK(sucks(8.5, 65.9375, 8.5));
+    CHECK_FALSE(sucks(8.5, 66.0, 8.5));
     CHECK_FALSE(sucks(8.5, 66.5, 8.5));
 
     // And its own width, which is closed at both ends.

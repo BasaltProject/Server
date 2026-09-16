@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
@@ -278,9 +279,48 @@ struct Walk {
 };
 
 /// Reshapes the block there, breaks it if nothing holds it, and follows on from what it held.
+/// parity: `LiquidBlock.updateShape`, which books the fluid's own turn whenever this square or the
+/// one the news came from is a **source**. It hangs off the shape walk and not off `neighborChanged`,
+/// so a write that carries no `UPDATE_NEIGHBORS` books it too: that is what keeps a still column of
+/// water holding a pending turn. Measured in `columnaburbujas` and `esponja`, where the jar held the
+/// whole column booked and we held nothing.
+void bookLiquidTurn(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                    const BlockFace towards) {
+    const std::optional<std::int32_t> here = context.world.blockState(x, y, z);
+    if (!here.has_value()) {
+        return;
+    }
+    const std::optional<FluidKind> kind = fluidFlow::liquidBlockKindOf(*here);
+    if (!kind.has_value()) {
+        // parity: two families book water on a shape update with no condition at all.
+        // `BubbleColumnBlock.updateShape` opens with the booking, before it asks anything; and the
+        // forty-eight `SimpleWaterloggedBlock` classes open with `if (WATERLOGGED)`, which is the
+        // same thing for a block that is holding water. What they book is the still `water`.
+        const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*here);
+        const auto logged = properties.find("waterlogged");
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*here);
+        const bool column = block != nullptr && block->path() == "bubble_column";
+        if (column || (logged != properties.end() && logged->second == "true")) {
+            context.world.scheduleFluidTick(x, y, z, fluidId(FluidKind::Water, true), fluidFlow::kWaterTickDelay);
+        }
+        return;
+    }
+    const std::optional<std::int32_t> from = context.world.blockState(
+        x + registry::stepX(towards), y + registry::stepY(towards), z + registry::stepZ(towards));
+    const bool sourceHere = isSourceFluid(*here);
+    if (!sourceHere && !(from.has_value() && isSourceFluid(*from))) {
+        return;
+    }
+    const std::int32_t delay = *kind == FluidKind::Water ? fluidFlow::kWaterTickDelay
+                               : context.ultrawarm       ? fluidFlow::kFastLavaTickDelay
+                                                         : fluidFlow::kLavaTickDelay;
+    context.world.scheduleFluidTick(x, y, z, fluidId(*kind, sourceHere), delay);
+}
+
 void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std::int32_t y, std::int32_t z,
            BlockFace towards) {
     fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z, fallingBlocks::Asked::updateShape);
+    bookLiquidTurn(walk.context, x, y, z, towards);
     bool changed = false;
     const std::optional<std::int32_t> before = walk.context.world.blockState(x, y, z);
     if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, towards); reshaped.has_value()) {
@@ -711,6 +751,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 reshaped(change.stateId, change.x, change.y, change.z);
             }
         }
+    }
+    // parity: `LiquidBlock.onPlace` books inside the write, before the neighbours hear anything, so a
+    // sponge that drinks the water away in its own `neighborChanged` still leaves the turn booked.
+    // Ours used to book at the end of the cascade, by which time the square was already air: four
+    // turns of `esponja` were exactly that.
+    if (context.arrivedFluid) {
+        context.arrivedFluid(x, y, z);
     }
     settleArrivedSignal(context, x, y, z, reshaped);
     // parity: `ScaffoldingBlock.onPlace` really is an `onPlace`, `level.scheduleTick(pos, this, 1)`,

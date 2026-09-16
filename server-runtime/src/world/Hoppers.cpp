@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
@@ -517,6 +518,24 @@ void noteChange(const Around& around, const BlockChange& change) {
 
 /// parity: `getItemsAtAndAbove`: whatever lies in the box goes in, whole stack at a time. The box
 /// travels with the hopper rather than with a square, which is what lets a cart use the same one.
+/// Whether a dropped stack's own box crosses the one given.
+///
+/// parity: `HopperBlockEntity.getItemsAtAndAbove` asks the level with
+/// `getEntitiesOfClass(ItemEntity.class, aabb, ...)`, so what decides is the **box** of the item and
+/// not where its middle is. A stack measures a quarter of a block, so it sticks out an eighth each
+/// way and one lying just outside the column still goes in. Crossed with `AABB.intersects`, strict at
+/// both ends, the same way `arrowButtons::reaches` and `pressurePlates::touches` do it.
+[[nodiscard]] bool itemCrosses(const DroppedItem& item, double minX, double minY, double minZ, double maxX,
+                               double maxY, double maxZ) {
+    static const double half = registry::entityTypeShapes::widthOf(wire::common::Identifier::vanilla("item")) / 2.0;
+    static const double height = registry::entityTypeShapes::heightOf(wire::common::Identifier::vanilla("item"));
+    const auto overlaps = [](double lowA, double highA, double lowB, double highB) {
+        return lowA < highB && highA > lowB;
+    };
+    return overlaps(item.x - half, item.x + half, minX, maxX) && overlaps(item.y, item.y + height, minY, maxY) &&
+           overlaps(item.z - half, item.z + half, minZ, maxZ);
+}
+
 [[nodiscard]] bool suckInBox(WorldState& world, double minX, double minY, double minZ, double maxX, double maxY,
                              double maxZ, Slots& slots) {
     bool took = false;
@@ -524,10 +543,7 @@ void noteChange(const Around& around, const BlockChange& change) {
         if (item.count <= 0) {
             continue;
         }
-        if (item.x < minX || item.x > maxX || item.z < minZ || item.z > maxZ) {
-            continue;
-        }
-        if (item.y < minY || item.y > maxY) {
+        if (!itemCrosses(item, minX, minY, minZ, maxX, maxY, maxZ)) {
             continue;
         }
         // parity: what a dropped stack carries goes into the hopper with it.

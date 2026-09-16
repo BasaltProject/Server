@@ -57,7 +57,11 @@ using wire::common::Identifier;
         .minY = facts.chunkHeight.minY(),
         .maxY = facts.chunkHeight.maxY(),
         .random = random,
+        // parity: the `water_evaporates` attribute, which `WetSpongeBlock.onPlace` reads. Only the
+        // Nether carries it: water stays put in the End, so `!hasSkylight` is the wrong test.
+        .evaporates = world.declaration().dimension == config::WorldDimension::Nether,
         .hasSkylight = facts.hasSkylight,
+        .ultrawarm = world.declaration().dimension == config::WorldDimension::Nether,
         // parity: `PotentSulfurBlock.updateShape` is `validBlockState`, which reads the water above
         // and the block below to say what the geyser is doing now.
         .geyser =

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <limits>
 #include <map>
@@ -31,6 +32,14 @@
 namespace basalt::server::runtime::bedrock {
 
 namespace {
+
+/// parity: a waypoint with no colour of its own is drawn in one taken from its uuid, exactly as
+/// `UUID.hashCode` builds it and with the top byte thrown away.
+[[nodiscard]] std::int32_t waypointColourOf(const wire::common::Uuid& uuid) {
+    const std::uint64_t folded = uuid.high() ^ uuid.low();
+    const auto hashed = static_cast<std::uint32_t>(folded ^ (folded >> 32U));
+    return static_cast<std::int32_t>(hashed & 0xFFFFFFU);
+}
 
 /// parity: `Attributes.MOVEMENT_SPEED`'s default for a player, which is what vanilla sends.
 constexpr float kWalkSpeed = 0.1F;
@@ -484,9 +493,13 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     // parity: Geyser's own wall, which is the only way to show a border to a client that has none:
     // a patch of refusal particles at the face the player is near, six wide and five tall.
-    connection.drawBorderWall = [this](const double minX, const double maxX, const double minZ, const double maxZ,
-                                       const std::int32_t warningBlocks) {
+    connection.showBorder = [this](const double minX, const double maxX, const double minZ, const double maxZ,
+                                   const std::int32_t warningBlocks, const bool withWall) {
         if (session_ == nullptr) {
+            return;
+        }
+        showBorderColliders(minX, maxX, minZ, maxZ, warningBlocks);
+        if (!withWall) {
             return;
         }
         /// How close to a face counts as near it, on top of the border's own warning distance.
@@ -530,6 +543,62 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         if (session_->z < minZ + warning) {
             wall(session_->x, session_->y, minZ - 0.5, false);
         }
+    };
+
+    // parity: Geyser's own waypoint cache. The other edition draws its bar from a list of its own
+    // rather than from one packet per waypoint, and the dot's icon is picked here from how far
+    // away the viewer is instead of by the client from a style it was given.
+    connection.sendWaypoint = [this](const wire::common::Uuid& waypoint, const std::int32_t entityId,
+                                     const std::string&, const std::optional<std::int32_t>& color, const double x,
+                                     const double y, const double z, const bool tracked) {
+        if (session_ == nullptr) {
+            return;
+        }
+        const std::uint64_t runtime = entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
+        wire::io::ByteBuffer body;
+        // Below 944 there is no bar packet at all: the bar is built out of the player list, so
+        // only somebody already listed can be pointed at, and it is hidden while nothing is on it.
+        if (protocol_ < wire::bedrock::kLocatorBarProtocol) {
+            if (tracked) {
+                waypoints_.insert(waypoint);
+            } else {
+                waypoints_.erase(waypoint);
+            }
+            wire::bedrock::writeGameRuleFlag(body, "locatorBar", !waypoints_.empty(), protocol_);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::GameRulesChanged), body.toVector());
+            wire::io::ByteBuffer where;
+            wire::bedrock::writePlayerLocation(
+                where, static_cast<std::int64_t>(runtime),
+                tracked ? std::optional{std::array{static_cast<float>(x), static_cast<float>(y), static_cast<float>(z)}}
+                        : std::nullopt,
+                protocol_);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayerLocation), where.toVector());
+            return;
+        }
+        const double awayX = x - session_->x;
+        const double awayY = y - session_->y;
+        const double awayZ = z - session_->z;
+        const wire::bedrock::BedrockWaypoint entry{
+            .groupHigh = waypoint.high(),
+            .groupLow = waypoint.low(),
+            .x = static_cast<float>(x),
+            .y = static_cast<float>(y),
+            .z = static_cast<float>(z),
+            .dimension = dimension_,
+            .colour = color.value_or(waypointColourOf(waypoint)),
+            .distance = static_cast<float>(std::sqrt((awayX * awayX) + (awayY * awayY) + (awayZ * awayZ))),
+            .entityId = static_cast<std::int64_t>(runtime)};
+        // A waypoint the client already has is moved rather than added again, which is what keeps
+        // it from flickering while somebody walks.
+        const bool known = tracked && !waypoints_.insert(waypoint).second;
+        if (!tracked) {
+            waypoints_.erase(waypoint);
+        }
+        const auto action = !tracked ? wire::bedrock::BedrockWaypointAction::Remove
+                            : known  ? wire::bedrock::BedrockWaypointAction::Update
+                                     : wire::bedrock::BedrockWaypointAction::Add;
+        wire::bedrock::writeLocatorBar(body, entry, action, protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LocatorBar), body.toVector());
     };
 
     // parity: the other edition's client builds the name over a head out of the team packet. This
