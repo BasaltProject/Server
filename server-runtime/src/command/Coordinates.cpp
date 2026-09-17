@@ -158,7 +158,8 @@ public:
             }
             return ArgumentValue::of(ColumnCoordinates{.x = *x, .z = *second});
         }
-        const Parsed<WorldCoordinate> y = WorldCoordinate::parse(reader, centre);
+        // parity: `WorldCoordinates.parseDouble` never centres the height.
+        const Parsed<WorldCoordinate> y = WorldCoordinate::parse(reader, false);
         if (!y.has_value()) {
             return std::unexpected{y.error()};
         }

@@ -59,12 +59,12 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
             return DataHolderRef{DataHolderRef::Storage{.id = *id}};
         }
         const auto* matched = context.get<std::vector<CommandTarget>>(targetName);
-        player::PlayerSession* session =
-            matched == nullptr || matched->size() != 1 ? nullptr : matched->front().player();
-        if (session == nullptr) {
+        std::optional<DataHolderRef> holder =
+            matched == nullptr || matched->size() != 1 ? std::nullopt : entityHolderOf(matched->front());
+        if (!holder.has_value()) {
             return std::unexpected{CommandSyntaxError{.component = Component::text("No data holder was given.")}};
         }
-        return DataHolderRef{DataHolderRef::Entity{.player = session}};
+        return *holder;
     };
 
     /// parity: `/data modify ... from`, which copies whatever is at that path, compound or not.
@@ -177,10 +177,11 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
         }
         if (const auto* named = holder->as<DataHolderRef::Storage>(); named != nullptr) {
             storage_->set(named->id, *written);
-        } else if (holder->as<DataHolderRef::Entity>() != nullptr) {
-            return std::unexpected{CommandSyntaxError{
-                .component = Component::text("A player's data is a read-only view of live state in this build, so "
-                                             "writing to it would change a copy and do nothing.")}};
+        } else if (const auto* entity = holder->as<DataHolderRef::Entity>(); entity != nullptr) {
+            if (const std::optional<CommandSyntaxError> refused = writeEntityData(*entity, *written);
+                refused.has_value()) {
+                return std::unexpected{*refused};
+            }
         } else {
             const auto* block = holder->as<DataHolderRef::Block>();
             const Parsed<world::LoadedWorld*> world = context.world();
@@ -213,6 +214,9 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
             context.success(
                 Component::translatable("commands.data.storage.modified", {Component::text(named->id.toString())}),
                 true);
+        } else if (const auto* entity = holder->as<DataHolderRef::Entity>(); entity != nullptr) {
+            context.success(Component::translatable("commands.data.entity.modified", {Component::text(entity->name)}),
+                            true);
         } else {
             const auto* block = holder->as<DataHolderRef::Block>();
             context.success(Component::translatable("commands.data.block.modified",

@@ -1,6 +1,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/DataCommand.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
@@ -292,7 +293,7 @@ TEST_CASE("data modify string takes the value as text, and a slice of it") {
     CHECK(fixture.source.lastAsText().find("commands.data.modify.invalid_substring") != std::string::npos);
 }
 
-TEST_CASE("a player is a read-only holder, which the command says out loud") {
+TEST_CASE("a player's data cannot be written") {
     Fixture fixture{scratch("data-player")};
     CommandStorage storage{scratch("data-player-file") + "/command_storage.nbt"};
     PlayerSession& steve = fixture.add("Steve");
@@ -304,7 +305,34 @@ TEST_CASE("a player is a read-only holder, which the command says out loud") {
     CHECK(fixture.source.lastAsText().find("Steve") != std::string::npos);
 
     CHECK(fixture.dispatcher.execute(fixture.source, R"(data merge entity Steve {Name:"Alex"})") == 0);
-    CHECK(fixture.source.lastAsText().find("read-only view of live state") != std::string::npos);
+    CHECK(fixture.source.lastAsText().find("commands.data.entity.invalid") != std::string::npos);
+}
+
+TEST_CASE("data get reads any entity through its save codec") {
+    Fixture fixture{scratch("data-entity")};
+    CommandStorage storage{scratch("data-entity-file") + "/command_storage.nbt"};
+    const auto* cowType = basalt::server::registry::entityTypes::of(Identifier::vanilla("cow"));
+    REQUIRE(cowType != nullptr);
+    auto& cow = fixture.world->state().spawnEntity(std::make_unique<basalt::server::runtime::entity::ServerEntity>(
+        fixture.registry.allocateEntityId(), Uuid{9, 9}, cowType->id, cowType->protocolId, 5.0, 64.0, 7.0));
+    cow.health = 6.0;
+    fixture.dispatcher.registerCommand(std::make_shared<commands::DataCommand>(storage));
+
+    // parity: `saveWithoutId`, so the fields are the saved ones and the type is not among them.
+    CHECK(fixture.dispatcher.execute(fixture.source, "data get entity @e[type=cow,limit=1] Health") == 6);
+    CHECK(fixture.dispatcher.execute(fixture.source, "data get entity @e[type=cow,limit=1] Pos[2]") == 7);
+    CHECK(fixture.dispatcher.execute(fixture.source, "data get entity @e[type=cow,limit=1] id") == 0);
+    CHECK(fixture.source.lastAsText().find("arguments.nbtpath.nothing_found") != std::string::npos);
+
+    // parity: `Entity.load` on the merged tag, which keeps the UUID whatever the tag says.
+    CHECK(fixture.dispatcher.execute(
+              fixture.source, "data merge entity @e[type=cow,limit=1] {NoAI:1b,Health:3f,UUID:[I;1,2,3,4]}") == 1);
+    CHECK(cow.noAi);
+    CHECK(cow.health == doctest::Approx(3.0));
+    CHECK(cow.uuid() == Uuid{9, 9});
+    CHECK(fixture.dispatcher.execute(fixture.source, "data modify entity @e[type=cow,limit=1] Pos[1] set value 70d") ==
+          1);
+    CHECK(cow.y == doctest::Approx(70.0));
 }
 
 TEST_CASE("storage survives a save and a load") {

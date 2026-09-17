@@ -13,7 +13,8 @@ namespace basalt::server::runtime::command {
 ///
 /// The +0.5 on a bare integer is vanilla's own `WorldCoordinate.parseDouble` centre correction:
 /// `/tp 10 64 10` puts you in the middle of that block, not on its corner, and only when the number
-/// has no decimal point and no `~`. A `^` here is an error: only a whole triple can be local.
+/// has no decimal point and no `~`, and never for the height. A `^` here is an error: only a whole
+/// triple can be local.
 struct WorldCoordinate {
     bool relative = false;
     double value = 0.0;

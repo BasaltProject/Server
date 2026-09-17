@@ -218,12 +218,8 @@ void FunctionCommand::build(const CommandNodeBuilder& root) const {
                 form.argument("source", entitiesArgument(true), [pathed](const CommandNodeBuilder& source) {
                     pathed(source, [](const CommandContext& context) -> std::optional<DataHolderRef> {
                         const auto* matched = context.get<std::vector<CommandTarget>>("source");
-                        player::PlayerSession* session =
-                            matched == nullptr || matched->size() != 1 ? nullptr : matched->front().player();
-                        if (session == nullptr) {
-                            return std::nullopt;
-                        }
-                        return DataHolderRef{DataHolderRef::Entity{.player = session}};
+                        return matched == nullptr || matched->size() != 1 ? std::nullopt
+                                                                          : entityHolderOf(matched->front());
                     });
                 });
             });

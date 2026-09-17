@@ -82,9 +82,28 @@ TEST_CASE("set writes a chain of keys and leaves the original alone") {
     // A copy: the compound that was handed in still says what it said.
     CHECK_FALSE(dataPaths::resolve(NbtTag::ofCompound(root), "a.c.d").has_value());
 
-    // Only a chain of keys is writable; an index or a filter is not.
+    // An index needs a list to land in.
     CHECK_FALSE(dataPaths::set(root, "a[0]", NbtTag::ofInt(1)).has_value());
     CHECK_FALSE(dataPaths::set(root, "", NbtTag::ofInt(1)).has_value());
+}
+
+TEST_CASE("set and remove reach list elements by index, from the end, and by filter") {
+    const NbtCompound root = compoundOf(R"({Pos:[1.0d,2.0d,3.0d],Items:[{id:"a",n:1},{id:"b",n:2}]})");
+    const std::optional<NbtCompound> moved = dataPaths::set(root, "Pos[1]", NbtTag::ofDouble(70.0));
+    REQUIRE(moved.has_value());
+    CHECK(*dataPaths::resolve(NbtTag::ofCompound(*moved), "Pos[1]") == NbtTag::ofDouble(70.0));
+    CHECK(*dataPaths::resolve(NbtTag::ofCompound(*moved), "Pos[-1]") == NbtTag::ofDouble(3.0));
+    // One element type per list: an int does not go among doubles.
+    CHECK_FALSE(dataPaths::set(root, "Pos[0]", NbtTag::ofInt(1)).has_value());
+
+    const std::optional<NbtCompound> counted = dataPaths::set(root, R"(Items[{id:"b"}].n)", NbtTag::ofInt(9));
+    REQUIRE(counted.has_value());
+    CHECK(printed(*dataPaths::resolve(NbtTag::ofCompound(*counted), "Items[1].n")) == "9");
+
+    const std::optional<NbtCompound> dropped = dataPaths::remove(root, "Items[0]");
+    REQUIRE(dropped.has_value());
+    CHECK(printed(*dataPaths::resolve(NbtTag::ofCompound(*dropped), "Items[0].id")) == R"("b")");
+    CHECK_FALSE(dataPaths::remove(root, "Items[5]").has_value());
 }
 
 TEST_CASE("remove drops what the path names and refuses what was never there") {

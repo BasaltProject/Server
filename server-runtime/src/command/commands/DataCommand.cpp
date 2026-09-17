@@ -33,20 +33,20 @@ using wire::text::Component;
     return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
-/// Only a player carries data this build can read, whatever the selector matched.
-[[nodiscard]] std::expected<player::PlayerSession*, CommandSyntaxError> playerOf(const CommandContext& context,
-                                                                                 std::string_view name) {
+/// The one entity a selector matched, as a holder. An item on the floor has no data view here.
+[[nodiscard]] std::expected<DataHolderRef, CommandSyntaxError> entityOf(const CommandContext& context,
+                                                                        std::string_view name) {
     const auto* matched = context.get<std::vector<CommandTarget>>(name);
     if (matched == nullptr || matched->size() != 1) {
         return std::unexpected{CommandSyntaxError{.component = Component::text("No data holder was given.")}};
     }
-    player::PlayerSession* session = matched->front().player();
-    if (session == nullptr) {
+    std::optional<DataHolderRef> holder = entityHolderOf(matched->front());
+    if (!holder.has_value()) {
         return std::unexpected{
-            CommandSyntaxError{.component = Component::text("Only a player carries data in this build; " +
+            CommandSyntaxError{.component = Component::text("An item on the floor carries no data in this build; " +
                                                             matched->front().name() + " does not.")}};
     }
-    return session;
+    return *holder;
 }
 
 /// Which of the three holders an argument set names. Vanilla calls both the storage id and the
@@ -59,11 +59,7 @@ holderOf(const CommandContext& context, std::string_view posName, std::string_vi
     if (const auto* id = context.get<Identifier>(targetName); id != nullptr) {
         return DataHolderRef{DataHolderRef::Storage{.id = *id}};
     }
-    const auto session = playerOf(context, targetName);
-    if (!session.has_value()) {
-        return std::unexpected{session.error()};
-    }
-    return DataHolderRef{DataHolderRef::Entity{.player = *session}};
+    return entityOf(context, targetName);
 }
 
 /// parity: each holder has its own pair of strings, and the block ones take the three coordinates
@@ -75,7 +71,7 @@ holderOf(const CommandContext& context, std::string_view posName, std::string_vi
         return Component::translatable("commands.data.storage." + std::string{verb}, std::move(args));
     }
     if (const auto* entity = holder.as<DataHolderRef::Entity>(); entity != nullptr) {
-        std::vector<Component> args{Component::text(entity->player->name())};
+        std::vector<Component> args{Component::text(entity->name)};
         args.insert(args.end(), tail.begin(), tail.end());
         return Component::translatable("commands.data.entity." + std::string{verb}, std::move(args));
     }
@@ -136,10 +132,8 @@ void DataCommand::build(const CommandNodeBuilder& root) const {
             storage_->set(named->id, value);
             return std::nullopt;
         }
-        if (holder.as<DataHolderRef::Entity>() != nullptr) {
-            return CommandSyntaxError{
-                .component = Component::text("A player's data is a read-only view of live state in this build, so "
-                                             "writing to it would change a copy and do nothing.")};
+        if (const auto* entity = holder.as<DataHolderRef::Entity>(); entity != nullptr) {
+            return writeEntityData(*entity, value);
         }
         const auto* block = holder.as<DataHolderRef::Block>();
         const Parsed<world::LoadedWorld*> world = context.world();

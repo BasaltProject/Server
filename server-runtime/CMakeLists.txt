@@ -99,6 +99,7 @@ basalt_module(server-runtime-core
         src/command/commands/TestCommand.cpp
         src/command/commands/TeamCommand.cpp
         src/command/commands/TeleportCommand.cpp
+        src/command/commands/TeleportMove.cpp
         src/command/commands/TickCommand.cpp
         src/command/commands/TimeCommand.cpp
         src/command/commands/TimingsCommand.cpp

@@ -58,6 +58,8 @@ struct LoadedWorldOptions {
     /// Who hands out the regions this world is ticked in. The server passes its own, so every
     /// world shares one scheduler and one global owner.
     sched::RegionScheduler* scheduler = nullptr;
+    /// Whether this is one of the default save's three dimensions, which keep vanilla's level keys.
+    bool vanillaKey = false;
 };
 
 /// One world, and everything that belongs to exactly one world: its chunks, region files,
@@ -134,8 +136,8 @@ public:
     /// selected separately by the declaration, while the level key identifies this concrete world
     /// and tells the client when to rebuild its chunk cache.
     ///
-    /// The default world keeps `minecraft:overworld` so an unmodified single-world setup looks
-    /// exactly as before, including in the client's own debug screen.
+    /// The default world and its own Nether and End keep `minecraft:overworld`, `the_nether` and
+    /// `the_end`, so a single-world setup looks like vanilla to clients and datapacks alike.
     [[nodiscard]] const std::string& levelKey() const noexcept { return levelKey_; }
 
     /// This world's own directory, which is where `level.nbt` lives.

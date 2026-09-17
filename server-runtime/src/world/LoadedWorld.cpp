@@ -29,8 +29,8 @@ using server::world::Chunk;
 
 /// A world's own key when it is not the default one: its name, with anything a resource location
 /// cannot carry replaced.
-[[nodiscard]] std::string levelKeyOf(const config::WorldDeclaration& declaration) {
-    if (declaration.isDefault) {
+[[nodiscard]] std::string levelKeyOf(const config::WorldDeclaration& declaration, bool vanillaKey) {
+    if (vanillaKey || declaration.isDefault) {
         return config::dimensionRegistryKey(declaration.dimension);
     }
     std::string key = "basalt:";
@@ -57,7 +57,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       villageGenerator_(options.villageGenerator), strongholdGenerator_(options.strongholdGenerator),
       spawnChunkFinder_(std::move(options.spawnChunkFinder)), normalGenerator_(std::move(options.normalGenerator)),
       scheduler_(options.scheduler == nullptr ? ownScheduler_ : *options.scheduler),
-      region_(&scheduler_.regionFor(declaration_.name)), levelKey_(levelKeyOf(declaration_)),
+      region_(&scheduler_.regionFor(declaration_.name)), levelKey_(levelKeyOf(declaration_, options.vanillaKey)),
       worldRoot_(worldsRoot + "/" + declaration_.name),
       regions_(declaration_.name, std::move(worldsRoot), config::dimensionFacts(declaration_.dimension).chunkHeight),
       state_({}, [this](std::int32_t chunkX, std::int32_t chunkZ) { return loadOrGenerateChunk(chunkX, chunkZ); }),

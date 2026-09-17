@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
@@ -62,6 +63,9 @@ public:
 
     struct Entity {
         player::PlayerSession* player = nullptr;
+        /// Anything else a selector matched, when it is not a player.
+        entity::ServerEntity* mob = nullptr;
+        std::string name;
     };
 
     using Payload = std::variant<Storage, Block, Entity>;
@@ -76,6 +80,16 @@ public:
 private:
     Payload payload_;
 };
+
+/// The holder for one selected entity, or nothing for one without data here (an item on the floor).
+[[nodiscard]] std::optional<DataHolderRef> entityHolderOf(const CommandTarget& target);
+
+/// Loads a whole compound back into an entity, keeping its UUID. A player is refused.
+///
+/// parity: `EntityDataAccessor.setData`, which is `Entity.load` on the merged tag. Here that is the
+/// save codec run again, so the entity ends as a chunk reload would leave it.
+[[nodiscard]] std::optional<CommandSyntaxError> writeEntityData(const DataHolderRef::Entity& holder,
+                                                                wire::nbt::NbtCompound tag);
 
 /// The slice of `/data` that `/execute` and `/function` need: does this path exist, what compound is
 /// there, and write this number into it.
@@ -95,6 +109,10 @@ public:
 
     /// `/execute store ... storage <id> <path> <type> <scale>`, which writes the typed number.
     void store(const wire::common::Identifier& id, std::string_view path, double value, std::string_view type) const;
+
+    /// `/execute store ... entity <target> <path> <type> <scale>`.
+    void storeInEntity(const DataHolderRef::Entity& holder, std::string_view path, double value,
+                       std::string_view type) const;
 
     /// `/execute store ... block <pos> <path> <type> <scale>`, which writes into a block entity.
     void storeInBlock(const CommandContext& context, const std::array<std::int32_t, 3>& pos, std::string_view path,
