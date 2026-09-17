@@ -26,7 +26,18 @@ import org.basaltmc.bukkit.facade.NbtCodec;
 import org.basaltmc.bukkit.facade.Effects;
 
 public class LevelChunk extends ChunkAccess implements DebugValueSource {
-    public Map blockEntities = new ConcurrentHashMap<BlockPos, BlockEntity>();
+    public Map blockEntities = new java.util.AbstractMap<BlockPos, BlockEntity>() {
+        @Override
+        public java.util.Set<Map.Entry<BlockPos, BlockEntity>> entrySet() {
+            Map<BlockPos, BlockEntity> live = getBlockEntities();
+            return live.entrySet();
+        }
+
+        @Override
+        public BlockEntity get(Object key) {
+            return key instanceof BlockPos pos ? getBlockEntity(pos, EntityCreationType.CHECK) : null;
+        }
+    };
     public Map heightmaps = new EnumMap<Heightmap.Types, Heightmap>(Heightmap.Types.class);
     public int locX = 0;
     public int locZ = 0;
@@ -330,9 +341,13 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
             new int[] {state.stateId()}, Effects.ofChunkFlags(flags));
         int index = (pos.getY() >> 4) - minSection;
         synchronized (this) {
-            if (index >= 0 && index < sections.length && sections[index] == baseline[index]) {
-                hashes[index] = 0;
-                syncedVersion = -1;
+            if (index >= 0 && index < sections.length) {
+                if (blocksDirty(index)) {
+                    sections[index].setBlockState(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15, state);
+                } else {
+                    hashes[index] = 0;
+                    syncedVersion = -1;
+                }
             }
         }
         return applied > 0 ? previous : null;
