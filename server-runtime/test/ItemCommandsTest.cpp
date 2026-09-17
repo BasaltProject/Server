@@ -218,7 +218,7 @@ TEST_CASE("give names the components no client can draw rather than dropping the
     CHECK(steve.inventory.at(*where)->components.getInt("minecraft:damage") == 5);
 }
 
-TEST_CASE("give says so when the inventory could not take it all") {
+TEST_CASE("give drops what the inventory could not take at the player's feet") {
     Fixture fixture{scratch("item-commands-give-full")};
     PlayerSession& steve = fixture.add("Steve");
     for (std::int32_t slot = 0; slot < basalt::server::storage::StoredInventory::kPlayerSlots; slot++) {
@@ -226,12 +226,14 @@ TEST_CASE("give says so when the inventory could not take it all") {
     }
     fixture.dispatcher.registerCommand(std::make_shared<commands::GiveCommand>());
 
-    CHECK(fixture.dispatcher.execute(fixture.source, "give Steve minecraft:stone 5") == 1);
-    std::string all;
-    for (const Component& line : fixture.source.said) {
-        all += flatten(line);
-    }
-    CHECK(all.find("did not fit and were lost") != std::string::npos);
+    steve.worldName = "world";
+    // parity: `GiveCommand.giveItem`, a stack at a time, anybody free to pick it up at once.
+    CHECK(fixture.dispatcher.execute(fixture.source, "give Steve minecraft:stone 70") == 1);
+    const std::vector<basalt::server::runtime::world::DroppedItem> dropped = fixture.world->state().items();
+    REQUIRE(dropped.size() == 2);
+    CHECK(dropped[0].count + dropped[1].count == 70);
+    CHECK(dropped[0].item.path() == "stone");
+    CHECK(dropped[0].pickupDelay == 0);
 }
 
 TEST_CASE("clear takes everything, or only what the predicate names") {

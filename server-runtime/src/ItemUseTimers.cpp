@@ -37,6 +37,9 @@ constexpr std::string_view kEnderPearl = "ender_pearl";
 
 /// parity: `LivingEntity`'s own using-item bit.
 constexpr std::int8_t kLivingFlagUsingItem = 1;
+/// parity: `LivingEntity.LIVING_ENTITY_FLAG_OFF_HAND`, which hand the item in use is in.
+constexpr std::int8_t kLivingFlagOffhand = 2;
+constexpr std::string_view kShield = "shield";
 
 /// A stored stack's id as an identifier, or nothing when the row holds something unparseable.
 std::optional<Identifier> parsedOrNothing(const std::string& id) {
@@ -199,6 +202,41 @@ void ItemUseTimers::emitAt(std::string_view event) {
     world::vibrations::emit(world->state(), event, session->x, session->y, session->z, world->gameTime());
 }
 
+bool ItemUseTimers::startBlocking(PlayerSession& session, const Identifier& item, std::int32_t slot) {
+    if (item.path() != kShield) {
+        return false;
+    }
+    session.blockingSlot = slot;
+    session.blockingTicks = 0;
+    setUsingItem(true, item, slot == PlayerInventory::kOffhandSlot);
+    return true;
+}
+
+void ItemUseTimers::stopBlocking() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr || !session->blockingSlot.has_value()) {
+        return;
+    }
+    session->blockingSlot.reset();
+    session->blockingTicks = 0;
+    setUsingItem(false);
+}
+
+void ItemUseTimers::tickBlocking(PlayerSession& session) {
+    if (!session.blockingSlot.has_value()) {
+        return;
+    }
+    const std::int32_t slot = *session.blockingSlot;
+    const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
+    const bool inHand =
+        slot == PlayerInventory::kOffhandSlot || slot == PlayerInventory::kHotbarStart + session.inventory.heldSlot();
+    if (!held.has_value() || held->id != "minecraft:shield" || !inHand) {
+        stopBlocking();
+        return;
+    }
+    ++session.blockingTicks;
+}
+
 void ItemUseTimers::raiseUseVibration(std::string_view event, const Identifier& item) {
     // parity: `Item.Properties.spear` is the one builder that turns `interact_vibrations` off; every
     // other item carries the common component, whose default is on.
@@ -208,7 +246,7 @@ void ItemUseTimers::raiseUseVibration(std::string_view event, const Identifier& 
     emitAt(event);
 }
 
-void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item) {
+void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item, bool offhand) {
     if (usingItem_ == usingItem) {
         return;
     }
@@ -236,7 +274,9 @@ void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item)
         .entityId = session->entityId(),
         .entries = {SetEntityDataPacket::Entry{
             .index = SetEntityDataPacket::kLivingFlagsIndex,
-            .value = SetEntityDataPacket::ByteValue{.value = usingItem ? kLivingFlagUsingItem : std::int8_t{0}}}}};
+            .value = SetEntityDataPacket::ByteValue{
+                .value = static_cast<std::int8_t>((usingItem ? kLivingFlagUsingItem : 0) |
+                                                  (usingItem && offhand ? kLivingFlagOffhand : 0))}}}};
     const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
     owner_->sendPlayPacket(SetEntityDataPacket::kId, write);
     for (PlayerSession* other : owner_->playersInSameWorld()) {

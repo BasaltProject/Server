@@ -351,6 +351,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
         // parity: letting go before the animation ends eats nothing at all.
         owner_->itemUseTimers().stopEating();
         owner_->itemUseTimers().releaseBow();
+        owner_->itemUseTimers().stopBlocking();
         break;
     case Action::SwapItemWithOffhand:
         owner_->swapWithOffhand();

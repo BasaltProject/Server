@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/BlockExperience.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -131,4 +132,44 @@ TEST_CASE("an ore is worth its range unless silk touch took it, and a spawner al
     CHECK(blockExperience::onBreak(Identifier::vanilla("diamond_ore"), true, random) == 0);
     CHECK(blockExperience::onBreak(Identifier::vanilla("sculk_catalyst"), false, random) == 5);
     CHECK(blockExperience::onBreak(Identifier::vanilla("iron_ore"), false, random) == 0);
+}
+
+TEST_CASE("mending spends an orb on the damage first, two points of durability a point") {
+    PlayerRegistry registry;
+    LoadedWorld world{config::WorldDeclaration{.name = "world", .type = config::WorldType::Flat},
+                      config::WorldSettings{}, WorldMetadata{}, scratch("orbs-mending"),
+                      basalt::wire::common::Logger{"Test"}};
+    const double ground = static_cast<double>(
+        world.state().getOrGenerateChunk(0, 0).heightAt(8, 8, basalt::server::world::HeightmapType::MotionBlocking));
+    ExperienceOrbSystem orbs{registry, {.nextSeed = [] { return std::int64_t{7}; }}};
+    PlayerSession player{Uuid{1, 1}, "Steve", 1, PlayerConnection{}};
+    player.worldName = "world";
+    player.x = 8.5;
+    player.y = ground;
+    player.z = 8.5;
+    basalt::wire::nbt::NbtCompound enchantments;
+    enchantments.putInt("minecraft:mending", 1);
+    basalt::server::storage::StoredItemStack pick{.id = "minecraft:diamond_pickaxe", .count = 1, .components = {}};
+    pick.components.set("minecraft:enchantments", basalt::wire::nbt::NbtTag::ofCompound(std::move(enchantments)));
+    pick.components.putInt("minecraft:damage", 10);
+    const std::int32_t held = basalt::server::runtime::player::PlayerInventory::kHotbarStart;
+    player.inventory.set(held, pick);
+
+    const auto pickUp = [&](std::int32_t value) {
+        orbs.spawn(world, 8.5, ground + 0.5, 8.5, value);
+        for (std::int32_t tick = 0; tick < 20 && !orbsIn(world).empty(); ++tick) {
+            orbs.tickPlayers({&player});
+            for (ServerEntity* orb : orbsIn(world)) {
+                orbs.tick(world, {&player}, orbsIn(world), *orb);
+            }
+        }
+    };
+    // Three points mend six, and nothing reaches the bar.
+    pickUp(3);
+    CHECK(player.inventory.at(held)->components.getInt("minecraft:damage") == 4);
+    CHECK(player.experience.total() == 0);
+    // Seven points: two of them mend the last four, and five are left for the bar.
+    pickUp(7);
+    CHECK_FALSE(player.inventory.at(held)->components.contains("minecraft:damage"));
+    CHECK(player.experience.total() == 5);
 }

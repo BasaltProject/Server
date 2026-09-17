@@ -19,6 +19,9 @@ namespace basalt::server::runtime::world {
 namespace trades {
 
 /// One offer: what it takes, what it gives, and how its price moves.
+/// parity: `Villager.rewardTradeXp`'s `3 + random.nextInt(4)`.
+inline constexpr std::int32_t kTradeOrbBase = 3;
+
 struct Offer {
     server::world::loot::ItemStack costA;
     std::optional<server::world::loot::ItemStack> costB;

@@ -1,11 +1,16 @@
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/item/ItemDamageEffects.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -13,13 +18,16 @@
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
+#include <random>
 #include <vector>
 
 namespace basalt::server::runtime::player {
@@ -33,6 +41,121 @@ constexpr std::int32_t kHurtCooldownTicks = 20;
 constexpr std::int32_t kCooldownHalfTicks = 10;
 
 constexpr double kRadiansToDegrees = 180.0 / std::numbers::pi;
+
+/// parity: the shield's `blocks_attacks`: a quarter second up, ninety degrees either side, wear from
+/// three damage, and an axe's five seconds.
+constexpr std::int32_t kShieldDelayTicks = 5;
+constexpr float kBlockingAngleDegrees = 90.0F;
+constexpr float kShieldWearThreshold = 3.0F;
+constexpr float kAxeDisableSeconds = 5.0F;
+constexpr double kBlockedPush = 0.5;
+
+[[nodiscard]] bool tagged(const DamageContext& context, std::string_view tag,
+                          const std::optional<Identifier>& damageType) {
+    return damageType.has_value() && context.damageTypeTags != nullptr &&
+           world::realDamageTypeTags::isIn(*context.damageTypeTags, Identifier::vanilla(std::string{tag}), *damageType);
+}
+
+void playAround(const PlayerSession& session, std::string_view sound, float volume, const DamageContext& context) {
+    if (context.registry == nullptr) {
+        return;
+    }
+    random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+    const float pitch = 0.8F + (random.nextFloat() * 0.4F);
+    for (const PlayerSession* heard : context.registry->snapshot()) {
+        if (heard->worldName == session.worldName) {
+            playSoundFor(*heard, sound, wire::protocol::play::SoundSource::Players, session.x, session.y, session.z,
+                         volume, pitch, random.nextLong());
+        }
+    }
+}
+
+/// parity: `LivingEntity.getSecondsToDisableBlocking`, an axe's `weapon` component in the attacker's hand.
+[[nodiscard]] float secondsToDisable(std::int32_t attackerId, const DamageContext& context) {
+    if (context.registry != nullptr) {
+        for (const PlayerSession* attacker : context.registry->snapshot()) {
+            if (attacker->entityId() != attackerId) {
+                continue;
+            }
+            const std::optional<storage::StoredItemStack> held =
+                attacker->inventory.at(PlayerInventory::kHotbarStart + attacker->inventory.heldSlot());
+            return held.has_value() && held->id.ends_with("_axe") ? kAxeDisableSeconds : 0.0F;
+        }
+    }
+    const world::LoadedWorld* world = context.world ? context.world() : nullptr;
+    const entity::ServerEntity* mob = world == nullptr ? nullptr : world->state().entity(attackerId);
+    const wire::nbt::NbtCompound* equipment =
+        mob == nullptr || !mob->sourceNbt.has_value() ? nullptr : mob->sourceNbt->getCompound("equipment");
+    const wire::nbt::NbtCompound* hand = equipment == nullptr ? nullptr : equipment->getCompound("mainhand");
+    return hand != nullptr && hand->getString("id").ends_with("_axe") ? kAxeDisableSeconds : 0.0F;
+}
+
+struct Blocked {
+    float amount = 0.0F;
+    /// Whether the attacker was a body that the shield pushed back against.
+    bool pushed = false;
+};
+
+/// parity: `LivingEntity.applyItemBlocking` for a shield, with `hurtBlockingItem` and
+/// `Player.blockUsingItem`.
+[[nodiscard]] Blocked blockWithShield(PlayerSession& session, float damage, const std::optional<Identifier>& damageType,
+                                      const std::optional<entity::DamageSource>& source, const DamageContext& context) {
+    if (damage <= 0.0F || !session.blockingSlot.has_value() || session.blockingTicks < kShieldDelayTicks) {
+        return {};
+    }
+    const std::int32_t slot = *session.blockingSlot;
+    const std::optional<storage::StoredItemStack> shield = session.inventory.at(slot);
+    if (!shield.has_value() || shield->id != "minecraft:shield" || tagged(context, "bypasses_shield", damageType)) {
+        return {};
+    }
+    // parity: a source with no position is taken as straight behind, which nothing blocks.
+    if (!source.has_value()) {
+        return {};
+    }
+    constexpr auto kRadians = static_cast<float>(std::numbers::pi / 180.0);
+    const float yaw = -session.yaw * kRadians;
+    const double viewX = static_cast<double>(wire::common::mth::sin(yaw));
+    const double viewZ = static_cast<double>(wire::common::mth::cos(yaw));
+    double toX = source->x - session.x;
+    double toZ = source->z - session.z;
+    const double length = std::sqrt((toX * toX) + (toZ * toZ));
+    toX = length < 1.0E-5 ? 0.0 : toX / length;
+    toZ = length < 1.0E-5 ? 0.0 : toZ / length;
+    const double angle = std::acos((toX * viewX) + (toZ * viewZ));
+    if (angle > static_cast<double>(kRadians * kBlockingAngleDegrees)) {
+        return {};
+    }
+    const float blocked = damage;
+    // parity: `ItemDamageFunction`, nothing under three and the floor of one plus the hit above it.
+    if (blocked >= kShieldWearThreshold && session.gamemode != wire::protocol::play::Gamemode::Creative) {
+        random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+        const item::ItemDamageEffects effects{[&context](const Identifier& id) {
+            return context.enchantments == nullptr ? nullptr : context.enchantments->definitionOf(id);
+        }};
+        const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
+            *shield, static_cast<std::int32_t>(std::floor(1.0F + blocked)), random,
+            [&effects](const storage::StoredItemStack& stack, std::int32_t cost, random::RandomSource& source) {
+                return effects.process(stack, cost, source);
+            });
+        session.inventory.set(slot, worn);
+        if (context.slotChanged) {
+            context.slotChanged(session, slot);
+        }
+        if (!worn.has_value()) {
+            playAround(session, "item.shield.break", 0.8F, context);
+        }
+    }
+    Blocked answer{.amount = blocked, .pushed = false};
+    if (!tagged(context, "is_projectile", damageType)) {
+        answer.pushed = true;
+        const float seconds = secondsToDisable(source->entityId, context);
+        if (seconds > 0.0F && context.disableBlocking) {
+            context.disableBlocking(session, static_cast<std::int32_t>(std::lround(seconds * 20.0F)));
+            playAround(session, "item.shield.break", 0.8F, context);
+        }
+    }
+    return answer;
+}
 
 /// Tells everyone in the player's world that they were hit, through each one's own connection.
 void showDamage(const PlayerSession& session, const std::optional<Identifier>& damageType,
@@ -72,12 +195,18 @@ void showDamage(const PlayerSession& session, const std::optional<Identifier>& d
     }
 }
 
-/// parity: `LivingEntity.knockback` as it lands on a player, plus the hurt animation.
-void pushAway(const PlayerSession& session, const entity::DamageSource& source) {
+/// parity: `LivingEntity.knockback` as it lands on a player, plus the hurt animation. A blocked hit
+/// first runs `blockedByItem`, whose half-block push points the other way and is halved by the
+/// default one after it; a blocked hit also draws no hurt direction.
+void pushAway(const PlayerSession& session, const entity::DamageSource& source, bool blocked) {
     const double towardsX = source.x - session.x;
     const double towardsZ = source.z - session.z;
-    const std::array<double, 3> moved = player::combat::knockback(entity::entityCombat::kDefaultKnockback, towardsX,
-                                                                  towardsZ, 0.0, 0.0, 0.0, session.onGround);
+    std::array<double, 3> start{0.0, 0.0, 0.0};
+    if (blocked) {
+        start = player::combat::knockback(kBlockedPush, -towardsX, -towardsZ, 0.0, 0.0, 0.0, session.onGround);
+    }
+    const std::array<double, 3> moved = player::combat::knockback(
+        entity::entityCombat::kDefaultKnockback, towardsX, towardsZ, start[0], start[1], start[2], session.onGround);
     const auto angle = static_cast<float>(std::atan2(towardsZ, towardsX) * kRadiansToDegrees) - session.yaw;
     if (session.connection().pushBack) {
         session.connection().pushBack(moved[0], moved[1], moved[2], angle);
@@ -92,6 +221,9 @@ void pushAway(const PlayerSession& session, const entity::DamageSource& source) 
                 .entityId = session.entityId(), .velocityX = moved[0], .velocityY = moved[1], .velocityZ = moved[2]}
                 .write(buffer);
         });
+    if (blocked) {
+        return;
+    }
     session.connection().sendPlayPacket(
         wire::protocol::play::HurtAnimationPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::HurtAnimationPacket{.entityId = session.entityId(), .yaw = angle}.write(buffer);
@@ -183,6 +315,9 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         }
         incoming = *allowed;
     }
+    // parity: the shield takes its share before anything else looks at the hit.
+    const Blocked blocked = blockWithShield(*session, incoming, damageType, source, context);
+    incoming -= blocked.amount;
     // parity: `LivingEntity.hurt`'s cooldown: inside the half second after a hit, only a bigger one
     // lands, and only by the difference. It is what stops lava and burning stacking.
     const float dealt = incoming;
@@ -198,14 +333,19 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         session->invulnerableTicks = kHurtCooldownTicks;
     }
     const float afterArmour = damageAfterProtection(*session, incoming, damageType, context);
+    if (!cooling) {
+        // parity: `BlocksAttacks.onBlocked` plays the block instead of the damage event.
+        if (blocked.amount > 0.0F) {
+            playAround(*session, "item.shield.block", 1.0F, context);
+        } else {
+            showDamage(*session, damageType, source.has_value() ? source->entityId : -1, context);
+        }
+        if (source.has_value()) {
+            pushAway(*session, *source, blocked.pushed);
+        }
+    }
     if (afterArmour <= 0.0F) {
         return;
-    }
-    if (!cooling) {
-        showDamage(*session, damageType, source.has_value() ? source->entityId : -1, context);
-        if (source.has_value()) {
-            pushAway(*session, *source);
-        }
     }
     // parity: `LivingEntity.hurt` takes it out of absorption first, and only the rest off health.
     const float absorbed = std::min(session->absorption, afterArmour);

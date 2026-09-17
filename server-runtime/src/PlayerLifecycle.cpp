@@ -86,6 +86,7 @@ void PlayerLifecycle::tickPlayer() {
     checkEquipment(*session);
     owner_->itemUseTimers().tickEating(*session);
     owner_->itemUseTimers().tickDrawing(*session);
+    owner_->itemUseTimers().tickBlocking(*session);
     owner_->blockInteraction().tickDigging(*session);
 }
 

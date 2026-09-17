@@ -251,6 +251,8 @@ public:
         /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;
+        /// One orb of exactly that value. parity: `new ExperienceOrb`.
+        std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
         PluginHooks plugins;
     };
 

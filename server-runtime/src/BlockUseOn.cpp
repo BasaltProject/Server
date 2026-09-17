@@ -507,8 +507,17 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     });
     PlayerSession* session = owner_->playerSession();
     world::LoadedWorld* world = owner_->currentWorld();
-    if (session == nullptr || world == nullptr || useItem.hand != play::Hand::MainHand ||
-        session->gamemode == Gamemode::Spectator) {
+    if (session == nullptr || world == nullptr || session->gamemode == Gamemode::Spectator) {
+        return;
+    }
+    // parity: a client that got nothing from the main hand asks again with the off hand, and the
+    // shield is what answers there.
+    if (useItem.hand != play::Hand::MainHand) {
+        const std::optional<storage::StoredItemStack> offhand = session->inventory.at(PlayerInventory::kOffhandSlot);
+        const std::optional<Identifier> other = offhand.has_value() ? parsedOrNothing(offhand->id) : std::nullopt;
+        if (other.has_value() && !owner_->itemUseTimers().onCooldown(*other)) {
+            static_cast<void>(owner_->itemUseTimers().startBlocking(*session, *other, PlayerInventory::kOffhandSlot));
+        }
         return;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
@@ -522,6 +531,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     if (owner_->itemUseTimers().onCooldown(*item) || owner_->itemUseTimers().startEating(*session, *item, heldSlot) ||
         owner_->itemUseTimers().startDrawing(*session, *item, heldSlot) ||
         owner_->itemUseTimers().throwEnderPearl(*session, *item, heldSlot) ||
+        owner_->itemUseTimers().startBlocking(*session, *item, heldSlot) ||
         (owner_->options().fishing != nullptr &&
          owner_->options().fishing->useRod(breakContext(), *session, *world, heldSlot)) ||
         !world::buckets::isBucket(*item)) {

@@ -82,6 +82,10 @@ public:
     /// a shield up. parity: `LivingEntity.isUsingItem`, which is what draws the animation on
     /// everybody else's screen.
     bool usingItem = false;
+    /// The slot of the shield held up, and for how many ticks. parity: `useItem` with
+    /// `blocks_attacks`, which only blocks once its delay has passed.
+    std::optional<std::int32_t> blockingSlot;
+    std::int32_t blockingTicks = 0;
 
     /// What they are riding, by entity id. parity: `Entity.vehicle`.
     std::optional<std::int32_t> vehicleId;

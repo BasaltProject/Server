@@ -59,6 +59,14 @@ public:
     /// no shot at all, and a full draw flies at three times that and counts as a critical.
     void releaseBow();
 
+    /// Raises a shield from that slot, main hand or off hand. parity: `ShieldItem.use`.
+    bool startBlocking(player::PlayerSession& session, const wire::common::Identifier& item, std::int32_t slot);
+
+    void stopBlocking();
+
+    /// One tick behind the shield. Moving it out of the hand lowers it.
+    void tickBlocking(player::PlayerSession& session);
+
     /// parity: `EnderpearlItem.use`.
     bool throwEnderPearl(player::PlayerSession& session, const wire::common::Identifier& item, std::int32_t slot);
 
@@ -70,7 +78,8 @@ public:
     void startCooldown(const wire::common::Identifier& item);
 
     /// The "this one is using an item" flag, sent to everybody including its owner.
-    void setUsingItem(bool usingItem, std::optional<wire::common::Identifier> item = std::nullopt);
+    void setUsingItem(bool usingItem, std::optional<wire::common::Identifier> item = std::nullopt,
+                      bool offhand = false);
 
     /// parity: `BowItem.getPowerForTime`.
     [[nodiscard]] static float bowPower(std::int32_t ticks);

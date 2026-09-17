@@ -19,7 +19,11 @@ bool onCooldownFor(PlayerSession& session, const wire::common::Identifier& item,
 }
 
 void startCooldownFor(PlayerSession& session, const wire::common::Identifier& item, const std::int64_t gameTime) {
-    const std::int32_t ticks = server::registry::itemStacking::cooldownTicks(item);
+    startCooldownFor(session, item, gameTime, server::registry::itemStacking::cooldownTicks(item));
+}
+
+void startCooldownFor(PlayerSession& session, const wire::common::Identifier& item, const std::int64_t gameTime,
+                      const std::int32_t ticks) {
     if (ticks <= 0) {
         return;
     }

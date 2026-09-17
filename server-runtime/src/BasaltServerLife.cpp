@@ -421,6 +421,20 @@ player::DamageContext BasaltServer::damageContext() {
     context.registry = &playerRegistry_;
     context.damageTypeTags = &vanillaData_.damageTypeTags;
     context.enchantments = &vanillaData_.enchantments;
+    context.slotChanged = [](const player::PlayerSession& player, std::int32_t) {
+        if (player.connection().sendInventoryAll) {
+            player.connection().sendInventoryAll();
+        }
+    };
+    context.disableBlocking = [this](player::PlayerSession& player, std::int32_t ticks) {
+        player.blockingSlot.reset();
+        player.blockingTicks = 0;
+        const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+        const auto found = worlds.find(player.worldName);
+        player::startCooldownFor(player, wire::common::Identifier::vanilla("shield"),
+                                 found == worlds.end() || found->second == nullptr ? 0 : found->second->gameTime(),
+                                 ticks);
+    };
     context.death.registry = &playerRegistry_;
     context.death.logger = logger_;
     context.death.lang = options_.lang;
@@ -1859,6 +1873,11 @@ void BasaltServer::startBedrockListener() {
                         entity::ServerEntity* merchant = where->state().entity(*applied.tradedWith);
                         if (merchant != nullptr) {
                             merchant->villagerExperience += applied.tradeExperience;
+                            // parity: `Villager.rewardTradeXp`, three to six points at the merchant.
+                            random::RandomSource random =
+                                random::RandomSource::legacy(static_cast<std::int64_t>(scratchRandom()()));
+                            orbs_->spawn(*where, merchant->x, merchant->y + 0.5, merchant->z,
+                                         world::trades::kTradeOrbBase + random.nextInt(4));
                         }
                     }
                     if (session->connection().sendInventoryAll) {
