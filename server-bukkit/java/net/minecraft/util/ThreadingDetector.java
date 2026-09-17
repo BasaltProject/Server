@@ -1,21 +1,23 @@
 package net.minecraft.util;
 
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class ThreadingDetector {
     private final String name;
-    private Semaphore lock = new Semaphore(1);
+    private final ReentrantLock lock = new ReentrantLock();
 
     public ThreadingDetector(String name) {
         this.name = name;
     }
 
     public void checkAndLock() {
-        lock.acquireUninterruptibly();
+        lock.lock();
     }
 
     public void checkAndUnlock() {
-        lock.release();
+        if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+        }
     }
 
     @Override
