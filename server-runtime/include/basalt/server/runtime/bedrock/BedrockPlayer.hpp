@@ -377,6 +377,10 @@ public:
 
     void respawn() override;
 
+    void leaveBed() override;
+
+    void settled(bool afterDeath) override;
+
 private:
     /// Everybody else, as this client has been told about them. What the registry says now and
     /// what is in here is the whole of the difference that has to go out.

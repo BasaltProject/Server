@@ -642,11 +642,11 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
 
     // parity: the other edition's client builds the name over a head out of the team packet. This
     // one has no teams at all, so it is told the line already built.
-    connection.sendNameTag = [this](const std::int32_t entityId, const std::string& nameTag) {
+    connection.sendNameTag = [this](const std::int32_t entityId, const wire::text::Component& nameTag) {
         const std::uint64_t runtime =
             session_ != nullptr && entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
         wire::io::ByteBuffer body;
-        wire::bedrock::writeNameTag(body, runtime, nameTag, true, protocol_);
+        wire::bedrock::writeNameTag(body, runtime, wire::text::toLegacyText(nameTag), true, protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
     };
 
@@ -675,6 +675,14 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         const std::array<wire::bedrock::BedrockItemStack, 1> other{
             stackFor(inventory.at(player::PlayerInventory::kOffhandSlot))};
         sendWindow(kOffhandContainer, other, wire::bedrock::BedrockContainerSlot::Offhand);
+    };
+
+    // The hotbar is the first nine slots there, so the number is the same one either edition sends
+    // back when the player moves their own hand.
+    connection.setHeldSlot = [mailbox = joining.mailbox](const std::int32_t slot) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writePlayerHotbar(body, slot);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayerHotbar), body.toVector());
     };
 
     // Another world is another dimension as far as a Bedrock client is concerned: the sky, the fog
@@ -712,12 +720,22 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
                             protocol = joining.protocol](const std::string_view sound, const double x, const double y,
                                                          const double z, const float volume, const float pitch) {
         const std::string_view named = wire::bedrock::bedrockSoundName(sound);
-        if (named.empty()) {
+        if (!named.empty()) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writePlaySound(body, named, x, y, z, volume, pitch, protocol);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), body.toVector());
+            return;
+        }
+        // A sound with no name of its own is a numbered event over there, which is how the hits of
+        // a fight reach that client at all: none of the three has a name.
+        const std::int32_t event = wire::bedrock::bedrockSoundEvent(sound, protocol);
+        if (event < 0) {
             return;
         }
         wire::io::ByteBuffer body;
-        wire::bedrock::writePlaySound(body, named, x, y, z, volume, pitch, protocol);
-        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), body.toVector());
+        wire::bedrock::writeLevelSoundEvent(body, event, static_cast<float>(x), static_cast<float>(y),
+                                            static_cast<float>(z), protocol);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelSoundEvent), body.toVector());
     };
 
     // A particle, under the name its own edition knows it by. One that Bedrock only draws from a

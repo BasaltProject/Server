@@ -1049,6 +1049,9 @@ void BasaltServer::startBedrockListener() {
                 if (item == nullptr || !player::pickItemFor(*session, item->id.toString())) {
                     return;
                 }
+                if (session->connection().setHeldSlot) {
+                    session->connection().setHeldSlot(session->inventory.heldSlot());
+                }
                 if (session->connection().sendInventoryAll) {
                     session->connection().sendInventoryAll();
                 }
@@ -1078,6 +1081,9 @@ void BasaltServer::startBedrockListener() {
                 const std::optional<wire::common::Identifier> item = entity::entityPickResults::itemFor(target->type());
                 if (!item.has_value() || !player::pickItemFor(*session, item->toString())) {
                     return;
+                }
+                if (session->connection().setHeldSlot) {
+                    session->connection().setHeldSlot(session->inventory.heldSlot());
                 }
                 if (session->connection().sendInventoryAll) {
                     session->connection().sendInventoryAll();

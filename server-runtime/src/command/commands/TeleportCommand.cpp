@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/Coordinates.hpp>
 #include <basalt/server/runtime/command/ExecuteArguments.hpp>
 #include <basalt/server/runtime/command/commands/TeleportCommand.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
@@ -253,18 +254,8 @@ void PlaySoundCommand::build(const CommandNodeBuilder& root) const {
                 at = {target->x + (dx * scale), target->y + (dy * scale), target->z + (dz * scale)};
                 effective = minVolume;
             }
-            const play::SoundPacket packet{.sound = sound->toString(),
-                                           .source = source,
-                                           .x = at[0],
-                                           .y = at[1],
-                                           .z = at[2],
-                                           .volume = effective,
-                                           .pitch = pitch,
-                                           .seed = nextSeed_ ? nextSeed_() : 0};
-            if (target->connection().sendPlayPacket) {
-                target->connection().sendPlayPacket(play::SoundPacket::kId,
-                                                    [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-            }
+            player::playSoundFor(*target, sound->toString(), source, at[0], at[1], at[2], effective, pitch,
+                                 nextSeed_ ? nextSeed_() : 0);
             played++;
         }
         if (played == 0) {

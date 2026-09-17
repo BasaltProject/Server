@@ -228,6 +228,14 @@ public:
         /// The player pressed the button on the death screen.
         virtual void respawn() = 0;
 
+        /// The player got out of a bed of their own accord, which over there is an action rather
+        /// than the command Java sends.
+        virtual void leaveBed() = 0;
+
+        /// The client finished loading the world it was sent to, or finished respawning. Either
+        /// way it is asking to be told where it stands again.
+        virtual void settled(bool afterDeath) = 0;
+
         /// A turn of the listener's own loop, which is where anything this player has to be told
         /// about the rest of the server gets worked out. Called from the listener's thread.
         virtual void tick() {}
