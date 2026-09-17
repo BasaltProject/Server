@@ -7,7 +7,14 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
+
+namespace basalt::server::random {
+class RandomSource;
+}
 
 namespace basalt::server::runtime::world {
 
@@ -46,13 +53,18 @@ inline constexpr std::int32_t kDefaultCookTime = 200;
 /// The recipe stays the caller's: nothing here holds on to it past the call.
 using RecipeFor = std::function<const server::world::crafting::Recipe*(const server::world::loot::ItemStack&)>;
 
-/// A furnace as it stands: three slots and four counters.
+/// How many times each recipe has cooked since a player last took the experience, by recipe name.
+using RecipesUsed = std::vector<std::pair<std::string, std::int32_t>>;
+
+/// A furnace as it stands: three slots, four counters and what it has cooked.
 struct State {
     std::int32_t litTimeRemaining = 0;
     std::int32_t litTotalTime = 0;
     std::int32_t cookingTimer = 0;
     std::int32_t cookingTotalTime = 0;
     blockInventory::Slots items = blockInventory::Slots(kSize);
+    /// parity: `AbstractFurnaceBlockEntity.recipesUsed`.
+    RecipesUsed recipesUsed;
 
     [[nodiscard]] bool lit() const noexcept { return litTimeRemaining > 0; }
 };
@@ -79,6 +91,13 @@ struct Ticked {
 void inputChanged(std::string_view block, wire::nbt::NbtCompound& data,
                   const std::function<const server::world::crafting::Recipe*(
                       server::world::crafting::Cooker, const server::world::loot::ItemStack&)>& recipeFor);
+
+/// parity: `AbstractFurnaceBlockEntity.createExperience`: the whole points, and one more with the
+/// fraction as its chance.
+[[nodiscard]] std::int32_t experienceFor(std::int32_t count, float perItem, random::RandomSource& random);
+
+/// The saved `RecipesUsed` of a block entity, for a furnace that is going away.
+[[nodiscard]] RecipesUsed recipesUsedIn(const wire::nbt::NbtCompound& data);
 
 /// Reads the counters and slots a saved furnace left behind.
 [[nodiscard]] State read(const wire::nbt::NbtCompound& data);

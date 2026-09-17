@@ -46,6 +46,9 @@ public:
     /// nearby of the same size when the dice allow.
     void award(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount);
 
+    /// One orb of exactly this value, never merged. parity: `new ExperienceOrb(level, x, y, z, value)`.
+    void spawn(world::LoadedWorld& world, double x, double y, double z, std::int32_t value);
+
     void tick(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& orb);
 
@@ -56,6 +59,8 @@ public:
     void tickPlayers(const std::vector<player::PlayerSession*>& players);
 
 private:
+    void spawnLocked(world::LoadedWorld& world, double x, double y, double z, std::int32_t value);
+
     player::PlayerRegistry* players_;
     Options options_;
     random::RandomSource random_;

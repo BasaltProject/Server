@@ -61,6 +61,8 @@ struct BreakContext {
     std::function<void(const PlayerSession& player, std::int32_t slot)> slotChanged;
     /// Said the moment the block goes, before anybody is told: the Java door answers the dig here.
     std::function<void()> acknowledge;
+    /// Experience left as orbs at a point.
+    std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)> awardExperience;
     /// Stops the digging clock, which only a door that runs one has.
     std::function<void()> stopDigging;
 };

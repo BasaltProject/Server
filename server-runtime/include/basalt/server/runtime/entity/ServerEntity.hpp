@@ -20,6 +20,10 @@ namespace enderDragon {
 struct DragonState;
 }
 
+namespace fishingHooks {
+struct HookState;
+}
+
 namespace ai {
 class GoalSelector;
 }
@@ -269,6 +273,9 @@ public:
 
     /// What an ender dragon keeps beyond this, or null for anything else.
     std::shared_ptr<enderDragon::DragonState> dragon;
+
+    /// What a fishing bobber keeps beyond this, or null for anything else.
+    std::shared_ptr<fishingHooks::HookState> hook;
 
     /// Attribute base values that were changed from their default. parity: `AttributeMap`, without
     /// modifiers.

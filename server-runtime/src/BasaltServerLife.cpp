@@ -402,6 +402,11 @@ player::BreakContext BasaltServer::breakContext() {
     context.itemTags = &vanillaData_.itemTags;
     context.nextDouble = [] { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); };
     context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
+    context.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
+        if (orbs_ != nullptr) {
+            orbs_->award(world, x, y, z, amount);
+        }
+    };
     // However that edition draws one slot of a bag, which for Bedrock is the whole window.
     context.slotChanged = [](const player::PlayerSession& player, std::int32_t) {
         if (player.connection().sendInventoryAll) {
@@ -1307,6 +1312,9 @@ void BasaltServer::startBedrockListener() {
                 // parity: `ItemCooldowns` gates the throw itself, not only the icon: a pearl that is
                 // still cooling down goes nowhere on either door.
                 if (!item.has_value() || player::onCooldownFor(*session, *item, found->second->gameTime())) {
+                    return;
+                }
+                if (fishing_->useRod(breakContext(), *session, *found->second, slot)) {
                     return;
                 }
                 if (player::throwItemFor(breakContext(), *session, *found->second, *item, slot)) {

@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
@@ -19,6 +20,7 @@
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
@@ -366,6 +368,17 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                                          .velocityY = random.triangle(0.2, kSpread),
                                                                          .velocityZ = random.triangle(0.0, kSpread)}));
         }
+        // parity: `AbstractFurnaceBlockEntity.preRemoveSideEffects` pays the cooking out at the centre.
+        for (const auto& [name, count] : spilled.recipesUsed) {
+            const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+                wire::common::Identifier::parse(name);
+            const server::world::crafting::Recipe* recipe =
+                id.has_value() ? vanillaData_.recipes.recipeFor(*id) : nullptr;
+            if (recipe != nullptr) {
+                orbs_->award(world, spilled.x + 0.5, spilled.y + 0.5, spilled.z + 0.5,
+                             world::furnaces::experienceFor(count, recipe->experience, random));
+            }
+        }
     }
 
     const entity::entityNbt::AllocateEntityId allocateEntityId = [this] { return playerRegistry_.allocateEntityId(); };
@@ -548,6 +561,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         if (entity::areaEffectClouds::isCloud(entity->type())) {
             clouds_->tick(world, watchers, living, *entity);
+            continue;
+        }
+        if (FishingSystem::isHook(*entity)) {
+            fishing_->tick(world, watchers, living, *entity);
             continue;
         }
         // parity: `EndCrystal.tick`, which does nothing but keep a fire under itself, and only where

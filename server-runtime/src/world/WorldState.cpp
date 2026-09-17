@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
+#include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
@@ -509,14 +510,17 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
         const std::optional<std::int32_t> size =
             held == nullptr || keepsContents ? std::nullopt : containers::sizeOf(held->type().path());
         if (size.has_value()) {
-            Spilled falling{.x = x, .y = y, .z = z, .stacks = {}};
+            Spilled falling{.x = x, .y = y, .z = z, .stacks = {}, .recipesUsed = {}};
+            if (furnaces::cookerFor(held->type().path()).has_value()) {
+                falling.recipesUsed = furnaces::recipesUsedIn(held->data());
+            }
             for (const std::optional<server::world::loot::ItemStack>& slot :
                  blockInventory::readFor(held->type().path(), held->data(), *size)) {
                 if (slot.has_value() && slot->count > 0) {
                     falling.stacks.push_back(*slot);
                 }
             }
-            if (!falling.stacks.empty()) {
+            if (!falling.stacks.empty() || !falling.recipesUsed.empty()) {
                 spilled_.push_back(std::move(falling));
             }
         }

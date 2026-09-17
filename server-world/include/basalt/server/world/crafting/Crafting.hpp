@@ -85,6 +85,8 @@ enum class RecipeKind : std::uint8_t { Shaped, Shapeless, Cooking, Stonecutting,
 /// are the file's. One tagged struct rather than a hierarchy: a recipe is data the loader reads.
 struct Recipe {
     RecipeKind kind = RecipeKind::Shapeless;
+    /// The name it was read under, which a furnace counts its cooking by.
+    std::string id;
     std::string group;
     loot::ItemStack result;
 

@@ -133,6 +133,7 @@ void RealRecipes::load(const Jar& jar) {
             continue;
         }
         recipes_.push_back(*recipe);
+        recipes_.back().id = id.toString();
         parsedIds_.push_back(id);
     }
     logger_.info([&] {

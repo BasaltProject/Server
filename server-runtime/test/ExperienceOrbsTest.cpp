@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/world/BlockExperience.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <doctest.h>
@@ -116,4 +117,18 @@ TEST_CASE("a mob killed by a player is worth its class's reward") {
         entityCombat::tick(zombie);
     }
     CHECK_FALSE(deathDrops::dropsExperience(zombie, true));
+}
+
+TEST_CASE("an ore is worth its range unless silk touch took it, and a spawner always pays") {
+    namespace blockExperience = basalt::server::runtime::world::blockExperience;
+    basalt::server::random::RandomSource random = basalt::server::random::RandomSource::legacy(4);
+    for (std::int32_t roll = 0; roll < 50; ++roll) {
+        const std::int32_t diamond = blockExperience::onBreak(Identifier::vanilla("diamond_ore"), false, random);
+        CHECK((diamond >= 3 && diamond <= 7));
+        const std::int32_t spawner = blockExperience::onBreak(Identifier::vanilla("spawner"), true, random);
+        CHECK((spawner >= 15 && spawner <= 43));
+    }
+    CHECK(blockExperience::onBreak(Identifier::vanilla("diamond_ore"), true, random) == 0);
+    CHECK(blockExperience::onBreak(Identifier::vanilla("sculk_catalyst"), false, random) == 5);
+    CHECK(blockExperience::onBreak(Identifier::vanilla("iron_ore"), false, random) == 0);
 }

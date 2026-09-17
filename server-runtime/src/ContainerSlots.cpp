@@ -1,3 +1,4 @@
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -20,6 +21,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <random>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -267,6 +269,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
     const std::optional<server::world::loot::ItemStack>& was = slots[static_cast<std::size_t>(half->second)];
     const std::optional<server::world::loot::ItemStack> put = craftingStackOf(stack);
     const bool sameItem = was.has_value() && put.has_value() && was->item == put->item;
+    const std::int32_t hadCount = was.has_value() ? was->count : 0;
     slots[static_cast<std::size_t>(half->second)] = put;
     world::blockInventory::write(entity->data(), slots);
     // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the thing
@@ -287,12 +290,38 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             });
         world::furnaces::write(state, entity->data());
     }
+    // parity: `FurnaceResultSlot.checkTakeAchievements`: taking from the result pays out everything
+    // cooked since the last taker, at the taker's feet.
+    if (half->second == world::furnaces::kResultSlot && cooker.has_value() &&
+        (put.has_value() ? put->count : 0) < hadCount) {
+        payFurnace(*world, *entity);
+    }
     chunk->markDirty();
     if (cooking != nullptr && world::containers::setItemTellsComparators(cooking->path(), half->second, sameItem)) {
         world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), half->first.x,
                                                              half->first.y, half->first.z,
                                                              world::comparatorReading::of(world->state()));
     }
+}
+
+void ContainerMenuController::payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity) {
+    PlayerSession* session = owner_->playerSession();
+    world::RealRecipes* recipes = owner_->options().recipes;
+    world::furnaces::State state = world::furnaces::read(entity.data());
+    if (session == nullptr || recipes == nullptr || state.recipesUsed.empty()) {
+        return;
+    }
+    random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+    for (const auto& [name, count] : state.recipesUsed) {
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
+        const server::world::crafting::Recipe* recipe = id.has_value() ? recipes->recipeFor(*id) : nullptr;
+        if (recipe != nullptr && owner_->options().awardExperience) {
+            owner_->options().awardExperience(world, session->x, session->y, session->z,
+                                              world::furnaces::experienceFor(count, recipe->experience, random));
+        }
+    }
+    state.recipesUsed.clear();
+    world::furnaces::write(state, entity.data());
 }
 
 std::optional<world::furnaces::State> ContainerMenuController::furnaceState() const {

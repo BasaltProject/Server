@@ -1,5 +1,7 @@
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
+#include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
 #include <array>
@@ -23,6 +25,7 @@ constexpr std::string_view kLitRemainingKey = "lit_time_remaining";
 constexpr std::string_view kLitTotalKey = "lit_total_time";
 constexpr std::string_view kCookedKey = "cooking_time_spent";
 constexpr std::string_view kCookTotalKey = "cooking_total_time";
+constexpr std::string_view kRecipesUsedKey = "RecipesUsed";
 
 /// parity: the two ticks a cooling furnace walks its progress back by.
 constexpr std::int32_t kCoolingStep = 2;
@@ -164,6 +167,14 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize)
                             state.cookingTimer = 0;
                             state.cookingTotalTime = recipe->cookingTime;
                             burn(state, *ingredient, recipe->result);
+                            // parity: `setRecipeUsed`, one more of this recipe to pay out later.
+                            const auto used = std::ranges::find(state.recipesUsed, recipe->id,
+                                                                &std::pair<std::string, std::int32_t>::first);
+                            if (used == state.recipesUsed.end()) {
+                                state.recipesUsed.emplace_back(recipe->id, 1);
+                            } else {
+                                ++used->second;
+                            }
                             changed = true;
                         }
                     } else {
@@ -205,6 +216,29 @@ void inputChanged(std::string_view block, wire::nbt::NbtCompound& data,
     write(state, data);
 }
 
+std::int32_t experienceFor(std::int32_t count, float perItem, random::RandomSource& random) {
+    const float total = static_cast<float>(count) * perItem;
+    const std::int32_t whole = wire::common::mth::floor(static_cast<double>(total));
+    std::int32_t reward = whole;
+    const float fraction = total - static_cast<float>(whole);
+    if (fraction != 0.0F && random.nextFloat() < fraction) {
+        ++reward;
+    }
+    return reward;
+}
+
+RecipesUsed recipesUsedIn(const wire::nbt::NbtCompound& data) {
+    RecipesUsed used;
+    const wire::nbt::NbtCompound* saved = data.getCompound(kRecipesUsedKey);
+    if (saved == nullptr) {
+        return used;
+    }
+    for (const std::string& name : saved->names()) {
+        used.emplace_back(name, saved->getInt(name));
+    }
+    return used;
+}
+
 State read(const wire::nbt::NbtCompound& data) {
     State state;
     state.litTimeRemaining = data.getShort(kLitRemainingKey);
@@ -212,6 +246,7 @@ State read(const wire::nbt::NbtCompound& data) {
     state.cookingTimer = data.getShort(kCookedKey);
     state.cookingTotalTime = data.getShort(kCookTotalKey);
     state.items = blockInventory::read(data, kSize);
+    state.recipesUsed = recipesUsedIn(data);
     return state;
 }
 
@@ -221,6 +256,11 @@ void write(const State& state, wire::nbt::NbtCompound& data) {
     data.putShort(kCookedKey, static_cast<std::int16_t>(state.cookingTimer));
     data.putShort(kCookTotalKey, static_cast<std::int16_t>(state.cookingTotalTime));
     blockInventory::write(data, state.items);
+    wire::nbt::NbtCompound used;
+    for (const auto& [name, count] : state.recipesUsed) {
+        used.putInt(name, count);
+    }
+    data.set(kRecipesUsedKey, wire::nbt::NbtTag::ofCompound(std::move(used)));
 }
 
 } // namespace basalt::server::runtime::world::furnaces

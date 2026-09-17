@@ -139,13 +139,13 @@ TEST_CASE("an entity is saved with the fields its own class has and no others") 
     CHECK_FALSE(arrow.contains("Age"));
     CHECK_FALSE(arrow.contains("NoAI"));
     CHECK_FALSE(arrow.contains("Sitting"));
-    CHECK_FALSE(arrow.contains("LoveTicks"));
+    CHECK_FALSE(arrow.contains("InLove"));
 
     const NbtCompound cow = entityNbt::encode(entityOf("cow"));
     CHECK(cow.contains("Health"));
     CHECK(cow.contains("Age"));
     CHECK(cow.contains("NoAI"));
-    CHECK(cow.contains("LoveTicks"));
+    CHECK(cow.contains("InLove"));
     CHECK_FALSE(cow.contains("Sitting"));
 
     // An armor stand is alive without being a mob, and a wolf is the one that can be told to sit.
