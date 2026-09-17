@@ -30,8 +30,7 @@ using wire::text::Component;
 /// The block coordinates an argument named, resolved against whoever is running the command.
 [[nodiscard]] std::array<std::int32_t, 3> blockAt(const CommandContext& context, std::string_view name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
-    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0}
-                                  : coordinates->resolve(context.source().position());
+    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
 /// Only a player carries data this build can read, whatever the selector matched.

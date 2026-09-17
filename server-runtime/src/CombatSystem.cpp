@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -26,6 +27,12 @@
 
 namespace basalt::server::runtime {
 namespace {
+
+/// parity: `LevelEvent.PARTICLES_SPELL_POTION_SPLASH`, heard within sixty-four blocks, with the
+/// colour an experience bottle's splash is drawn in.
+constexpr std::int32_t kSplashPotionEvent = 2002;
+constexpr std::int32_t kWaterBottleColour = -13083194;
+constexpr double kLevelEventRange = 64.0;
 
 using entity::ServerEntity;
 using player::PlayerSession;
@@ -130,6 +137,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                     entity::entityCombat::hurt(*target->mob, kWindChargeDamage, fromX, fromZ, hooks_, "wind_charge",
                                                std::nullopt, firedByPlayer(watchers, entity));
                 if (result.landed) {
+                    rememberShooter(watchers, entity, *target->mob);
                     announceEntityHit(watchers, *target->mob, world::damageTypes::kWindCharge, entity.entityId(),
                                       result.died);
                     emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z);
@@ -210,6 +218,30 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     if (path == "ender_pearl") {
         if (hit.has_value() || targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
             landEnderPearl(watchers, entity);
+        }
+        return;
+    }
+    // parity: `ThrownExperienceBottle.onHit`: the splash, and three to eleven points as orbs.
+    if (path == "experience_bottle") {
+        if (!hit.has_value() && !targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
+            return;
+        }
+        entity.removed = true;
+        const std::int32_t bx = static_cast<std::int32_t>(std::floor(entity.x));
+        const std::int32_t by = static_cast<std::int32_t>(std::floor(entity.y));
+        const std::int32_t bz = static_cast<std::int32_t>(std::floor(entity.z));
+        for (PlayerSession* player : watchers) {
+            const double dx = player->x - entity.x;
+            const double dy = player->y - entity.y;
+            const double dz = player->z - entity.z;
+            if ((dx * dx) + (dy * dy) + (dz * dz) <= kLevelEventRange * kLevelEventRange &&
+                player->connection().sendLevelEvent) {
+                player->connection().sendLevelEvent(kSplashPotionEvent, bx, by, bz, kWaterBottleColour);
+            }
+        }
+        const std::int32_t amount = 3 + (options_.nextInt ? options_.nextInt(5) + options_.nextInt(5) : 0);
+        if (options_.awardExperience) {
+            options_.awardExperience(world, entity.x, entity.y, entity.z, amount);
         }
         return;
     }
@@ -357,6 +389,15 @@ bool CombatSystem::firedByPlayer(const std::vector<PlayerSession*>& watchers, co
            });
 }
 
+void CombatSystem::rememberShooter(const std::vector<PlayerSession*>& watchers, const ServerEntity& projectile,
+                                   ServerEntity& target) {
+    for (const PlayerSession* player : watchers) {
+        if (projectile.ownerId == player->entityId()) {
+            entity::entityCombat::rememberPlayer(target, player->uuid());
+        }
+    }
+}
+
 std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<PlayerSession*>& watchers,
                                                               const std::vector<ServerEntity*>& living,
                                                               const ServerEntity& projectile, double fromX,
@@ -457,6 +498,7 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
         }
         emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z);
         arrow.removed = true;
+        rememberShooter(watchers, arrow, *target->mob);
         if (arrow.ownerId.has_value()) {
             target->mob->hurtBy = *arrow.ownerId;
         }
@@ -507,6 +549,10 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         }
         if (world::endCrystals::isCrystal(entity->type())) {
             hitCrystal(world, watchers, *entity, true);
+            continue;
+        }
+        if (ExperienceOrbSystem::isOrb(*entity)) {
+            ExperienceOrbSystem::hurt(*entity, world::explosions::damageAt(distance, power, static_cast<float>(reach)));
             continue;
         }
         if (!server::registry::entityAttributes::isLiving(entity->type())) {

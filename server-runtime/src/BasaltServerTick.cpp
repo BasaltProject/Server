@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
@@ -18,6 +19,7 @@
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -286,7 +288,15 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         }
         dead->killed = false;
         // parity: `Entity.die` drops the entity's own loot table where it stood.
-        mobActions_->dropDeathLoot(world, *dead);
+        const bool mobDrops = world.gameRules().get(world::gameRules::kMobDrops);
+        const bool living = registry::entityAttributes::isLiving(dead->type());
+        if (!living || entity::deathDrops::dropsLoot(*dead, mobDrops)) {
+            mobActions_->dropDeathLoot(world, *dead);
+        }
+        if (living && entity::deathDrops::dropsExperience(*dead, mobDrops)) {
+            random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+            orbs_->award(world, dead->x, dead->y, dead->z, entity::deathDrops::experienceReward(*dead, random));
+        }
         // parity: `AbstractMinecartContainer.remove` calls `Containers.dropContents`, so what the
         // cart was carrying falls where it was killed. Measured in `vagonetacomparador`: the jar
         // leaves 192 stone and we left nothing. The drop is `dropItemStack`'s, which starts from the
@@ -450,6 +460,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
+    if (region.isPrimary()) {
+        orbs_->tickPlayers(watchers);
+    }
     // parity: `ServerLevel.tick` runs the dragon fight before any entity takes its turn.
     if (world.dragonFight() != nullptr && region.ownsPosition(0.0, 0.0)) {
         endFight_->tickFight(world, watchers, living);
@@ -529,6 +542,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             endFight_->tickDragon(world, watchers, living, *entity);
             continue;
         }
+        if (ExperienceOrbSystem::isOrb(*entity)) {
+            orbs_->tick(world, watchers, living, *entity);
+            continue;
+        }
         if (entity::areaEffectClouds::isCloud(entity->type())) {
             clouds_->tick(world, watchers, living, *entity);
             continue;
@@ -554,6 +571,21 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         const entity::projectiles::Kind* projectile = entity::projectiles::kindOf(entity->type());
         if (projectile != nullptr) {
             combat_->tickProjectile(world, watchers, living, *entity, *projectile);
+            // parity: a pearl thrown through a gateway comes out at its exit and stops dead.
+            if (!entity->removed && entity->type().path() == "ender_pearl") {
+                const double half = entity->width() / 2.0;
+                if (const std::optional<std::array<double, 3>> exit = environment_->enterGateway(
+                        world, {entity->x - half, entity->y, entity->z - half, entity->x + half,
+                                entity->y + entity->height(), entity->z + half});
+                    exit.has_value()) {
+                    entity->x = (*exit)[0];
+                    entity->y = (*exit)[1];
+                    entity->z = (*exit)[2];
+                    entity->velocityX = 0.0;
+                    entity->velocityY = 0.0;
+                    entity->velocityZ = 0.0;
+                }
+            }
             continue;
         }
         // parity: `AbstractMinecart.tick`: on a rail it follows the track, and off one it falls.

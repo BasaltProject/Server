@@ -34,7 +34,7 @@ void ParticleCommand::build(const CommandNodeBuilder& root) const {
         }
         const auto* position = positioned ? context.get<Coordinates>("pos") : nullptr;
         const std::array<double, 3> at =
-            position == nullptr ? context.source().position() : position->resolve(context.source().position());
+            position == nullptr ? context.source().position() : position->resolve(context.source());
         const auto* delta = spread ? context.get<Coordinates>("delta") : nullptr;
         const std::array<double, 3> offset =
             delta == nullptr ? std::array<double, 3>{0.0, 0.0, 0.0} : delta->resolve({0.0, 0.0, 0.0});

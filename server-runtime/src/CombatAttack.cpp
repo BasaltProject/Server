@@ -196,6 +196,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it: one sends a
     // monster after whoever swung, the other sends an animal running.
     target->hurtBy = session->entityId();
+    entity::entityCombat::rememberPlayer(*target, session->uuid());
     // parity: `Warden.hurtServer`, which adds the angry threshold plus twenty to whoever hit it.
     if (entity::wardens::isWarden(target->type())) {
         entity::wardens::anger(*target, session->entityId(), entity::wardens::kHurt);

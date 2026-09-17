@@ -51,8 +51,7 @@ stacksOf(const std::vector<server::world::loot::ItemStack>& rolled) {
 
 [[nodiscard]] std::array<std::int32_t, 3> blockAt(const CommandContext& context, const std::string& name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
-    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0}
-                                  : coordinates->resolve(context.source().position());
+    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
 } // namespace
@@ -156,7 +155,7 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
         }
         const auto* coordinates = context.get<Coordinates>("targetPos");
         const std::array<double, 3> at =
-            coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source().position());
+            coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source());
         for (const storage::StoredItemStack& stack : stacks) {
             const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(stack.id);
             if (!id.has_value()) {

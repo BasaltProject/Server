@@ -15,6 +15,7 @@ using basalt::server::runtime::command::ColumnCoordinates;
 using basalt::server::runtime::command::CommandEnvironment;
 using basalt::server::runtime::command::ConsoleCommandSource;
 using basalt::server::runtime::command::Coordinates;
+using basalt::server::runtime::command::ExecutionSource;
 using basalt::server::runtime::command::Parsed;
 using basalt::server::runtime::command::StringReader;
 using basalt::server::runtime::command::WorldCoordinate;
@@ -109,9 +110,39 @@ TEST_CASE("the separator has to be a space, not merely something that is not a n
     CHECK(keyOf(fixture.held.error().component) == "argument.pos3d.incomplete");
 }
 
-TEST_CASE("a local coordinate is refused rather than read as an absolute one") {
+TEST_CASE("a local triple turns with the source and starts from its anchor") {
     Fixture fixture;
-    CHECK(fixture.parse<Coordinates>(command::vec3Argument(), "^ ^ ^5") == nullptr);
+    const Coordinates* parsed = fixture.parse<Coordinates>(command::vec3Argument(), "^1 ^2 ^3");
+    REQUIRE(parsed != nullptr);
+    CHECK(parsed->local);
+    // Facing south, forwards is +z and left is +x.
+    const ExecutionSource south{fixture.console, ExecutionSource::Changes{.position = std::array{8.0, 64.0, 8.0},
+                                                                          .rotation = std::pair{0.0F, 0.0F}}};
+    std::array<double, 3> at = parsed->resolve(south);
+    CHECK(at[0] == doctest::Approx(9.0));
+    CHECK(at[1] == doctest::Approx(66.0));
+    CHECK(at[2] == doctest::Approx(11.0));
+    // Facing west, forwards is -x and left is +z; eyes raise the start.
+    const ExecutionSource west{south, ExecutionSource::Changes{.rotation = std::pair{90.0F, 0.0F}, .anchorEyes = true}};
+    at = parsed->resolve(west);
+    CHECK(at[0] == doctest::Approx(5.0));
+    CHECK(at[1] == doctest::Approx(67.62));
+    CHECK(at[2] == doctest::Approx(9.0));
+
+    const BlockCoordinates* block = fixture.parse<BlockCoordinates>(command::blockPosArgument(), "^ ^ ^-1");
+    REQUIRE(block != nullptr);
+    CHECK(block->resolve(south) == std::array<std::int32_t, 3>{8, 64, 7});
+}
+
+TEST_CASE("local and world coordinates do not mix") {
+    Fixture fixture;
+    CHECK(fixture.parse<Coordinates>(command::vec3Argument(), "^ ~ ^") == nullptr);
+    CHECK(keyOf(fixture.held.error().component) == "argument.pos.mixed");
+    CHECK(fixture.parse<Coordinates>(command::vec3Argument(), "~ ^ ~") == nullptr);
+    CHECK(keyOf(fixture.held.error().component) == "argument.pos.mixed");
+    CHECK(fixture.parse<ColumnCoordinates>(command::columnPosArgument(), "^ ^") == nullptr);
+    CHECK(fixture.parse<Coordinates>(command::vec3Argument(), "^ ^") == nullptr);
+    CHECK(keyOf(fixture.held.error().component) == "argument.pos3d.incomplete");
 }
 
 TEST_CASE("each shape declares the parser the client validates with") {

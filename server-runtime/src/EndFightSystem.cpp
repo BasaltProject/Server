@@ -50,6 +50,9 @@ constexpr std::string_view kDeathMob = "mob";
 constexpr std::int32_t kDragonDeathEvent = 1028;
 constexpr std::int32_t kDragonBreaksBlocksEvent = 2008;
 constexpr std::int32_t kDeathTicks = 200;
+constexpr std::int32_t kFirstDragonExperience = 12000;
+constexpr std::int32_t kDragonExperience = 500;
+constexpr std::int32_t kExperienceFromTick = 150;
 constexpr std::int32_t kDragonShootsEvent = 1017;
 constexpr float kBreathRadius = 5.0F;
 constexpr std::int32_t kBreathDuration = 200;
@@ -188,10 +191,10 @@ dragons::DragonWorld EndFightSystem::worldFor(world::LoadedWorld& world, const s
         }
         return std::nullopt;
     };
-    view.breathe = [this, &world](const dragons::Vec3& at) {
-        // parity: `DragonSittingFlamingPhase`, five blocks wide for ten seconds.
+    view.breathe = [this, &world, id = dragon.entityId()](const dragons::Vec3& at) {
+        // parity: `DragonSittingFlamingPhase`, five blocks wide for ten seconds, owned by the dragon.
         return clouds_->spawn(world, entity::areaEffectClouds::dragonBreath(kBreathRadius, kBreathDuration, 0.0F, 0),
-                              at.x, at.y, at.z);
+                              at.x, at.y, at.z, id);
     };
     view.stopBreathing = [&world](std::int32_t cloudId) {
         if (ServerEntity* cloud = world.state().entity(cloudId); cloud != nullptr) {
@@ -458,6 +461,16 @@ void EndFightSystem::tickDeath(world::LoadedWorld& world, ServerEntity& dragon, 
             }
         }
     }
+    // parity: `tickDeath`'s experience, twelve thousand for the first dragon and five hundred after,
+    // eight percent every fifth tick from 150 and a fifth at the end.
+    const world::DragonFight* fight = fightOf(world, dragon);
+    const std::int32_t worth =
+        fight != nullptr && !fight->previouslyKilled ? kFirstDragonExperience : kDragonExperience;
+    const bool drops = world.gameRules().get(world::gameRules::kMobDrops) && options_.awardExperience;
+    if (drops && state.deathTime > kExperienceFromTick && state.deathTime % 5 == 0) {
+        options_.awardExperience(world, dragon.x, dragon.y, dragon.z,
+                                 wire::common::mth::floor(static_cast<double>(static_cast<float>(worth) * 0.08F)));
+    }
     // parity: the corpse rises a tenth of a block a tick, parts and all.
     dragon.y += 0.1;
     for (dragons::Vec3& part : state.parts) {
@@ -467,6 +480,10 @@ void EndFightSystem::tickDeath(world::LoadedWorld& world, ServerEntity& dragon, 
         dragon.sourceNbt->putInt(dragons::kDeathTimeKey, state.deathTime);
     }
     if (state.deathTime >= kDeathTicks) {
+        if (drops) {
+            options_.awardExperience(world, dragon.x, dragon.y, dragon.z,
+                                     wire::common::mth::floor(static_cast<double>(static_cast<float>(worth) * 0.2F)));
+        }
         dragonKilled(world, dragon);
         dragon.removed = true;
         dragon.killed = true;

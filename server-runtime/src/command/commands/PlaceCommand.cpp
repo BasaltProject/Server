@@ -42,7 +42,7 @@ constexpr std::int32_t kMaxJigsawDepth = 20;
 [[nodiscard]] std::array<std::int32_t, 3> resolveOrigin(const CommandContext& context, std::string_view name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
     const std::array<double, 3> from = context.source().position();
-    return coordinates != nullptr ? coordinates->resolve(from)
+    return coordinates != nullptr ? coordinates->resolve(context.source())
                                   : std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(from[0])),
                                                                 static_cast<std::int32_t>(std::floor(from[1])),
                                                                 static_cast<std::int32_t>(std::floor(from[2]))};

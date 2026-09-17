@@ -56,30 +56,36 @@ toPosition(const CommandContext& context, const std::vector<player::PlayerSessio
     if (coordinates == nullptr) {
         return 0;
     }
-    // Resolved per target, because `~` means "relative to the entity being moved", not to whoever
-    // typed the command. The reported position uses the source's own frame, which is what vanilla
-    // prints.
+    // parity: `TeleportCommand.performTeleport` moves every target into the source's own level, so a
+    // console or an `execute in` takes a player across dimensions with plain coordinates.
+    world::LoadedWorld* destination = world;
+    if (destination == nullptr) {
+        const Parsed<world::LoadedWorld*> sourceWorld = context.world();
+        destination = sourceWorld.has_value() ? *sourceWorld : nullptr;
+    }
+    // parity: `TeleportCommand.teleportToPos` resolves once against the source; the relative flags
+    // it then sends land every target on that same point.
+    const std::array<double, 3> at = coordinates->resolve(context.source());
     for (player::PlayerSession* target : targets) {
-        const std::array<double, 3> at = coordinates->resolve({target->x, target->y, target->z});
         const std::pair<float, float> angles = facing.has_value()   ? *facing
                                                : lookAt.has_value() ? anglesFrom(at[0], at[1], at[2], *lookAt)
                                                                     : std::pair{target->yaw, target->pitch};
         // The world change first: it re-sends the position itself, so teleporting afterwards would
         // be a second, redundant move.
-        const bool moved = world != nullptr && target->connection().switchWorld &&
-                           target->connection().switchWorld(*world, at[0], at[1], at[2]);
+        const bool moved = destination != nullptr && destination->name() != target->worldName &&
+                           target->connection().switchWorld &&
+                           target->connection().switchWorld(*destination, at[0], at[1], at[2]);
         if (!moved && target->connection().teleportTo) {
             target->connection().teleportTo(at[0], at[1], at[2], angles.first, angles.second);
         }
     }
-    const std::array<double, 3> reported = coordinates->resolve(context.source().position());
     const Component who = targets.size() == 1 ? Component::text(targets.front()->name())
                                               : Component::text(std::to_string(targets.size()));
-    const Component message = Component::translatable(
-        targets.size() == 1 ? "commands.teleport.success.location.single"
-                            : "commands.teleport.success.location.multiple",
-        {who, Component::text(formatCoordinate(reported[0])), Component::text(formatCoordinate(reported[1])),
-         Component::text(formatCoordinate(reported[2]))});
+    const Component message =
+        Component::translatable(targets.size() == 1 ? "commands.teleport.success.location.single"
+                                                    : "commands.teleport.success.location.multiple",
+                                {who, Component::text(formatCoordinate(at[0])),
+                                 Component::text(formatCoordinate(at[1])), Component::text(formatCoordinate(at[2]))});
     context.success(world == nullptr
                         ? message
                         : Component::text("").append(message).append(Component::text(" in " + world->name())),
@@ -185,7 +191,7 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
                             return 0;
                         }
                         return toPosition(context, playersOf(context, "targets"), nullptr, std::nullopt,
-                                          target->resolve(context.source().position()));
+                                          target->resolve(context.source()));
                     });
                 });
                 /// parity: `teleport ... facing entity <entity> [<anchor>]`, aiming at its feet or
@@ -240,7 +246,7 @@ void PlaySoundCommand::build(const CommandNodeBuilder& root) const {
         const std::vector<player::PlayerSession*>& targets = named == nullptr ? caller : *named;
         const auto* coordinates = positioned ? context.get<Coordinates>("pos") : nullptr;
         const std::array<double, 3> origin =
-            coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source().position());
+            coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source());
         // parity: the sound carries 16 blocks per unit of volume, and beyond that vanilla moves it
         // to just within earshot rather than dropping it, but only if a minimum volume was given.
         const double range = static_cast<double>(volume) * kAudibleBlocksPerVolume;

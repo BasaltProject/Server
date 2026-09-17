@@ -52,6 +52,7 @@ std::vector<SweepHit> sweepAround(PlayerSession& session, world::LoadedWorld& wo
         if (!result.landed) {
             continue;
         }
+        entity::entityCombat::rememberPlayer(*nearby, session.uuid());
         world::vibrations::emit(world.state(), "entity_damage", nearby->x, nearby->y, nearby->z, world.gameTime());
         if (!result.died) {
             nearby->hurtBy = session.entityId();

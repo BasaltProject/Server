@@ -4,8 +4,12 @@
 #include <basalt/server/world/portal/PortalShape.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
+#include <map>
+#include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -84,6 +88,11 @@ public:
     /// Moves whoever has stood in a portal long enough, and counts down the wait for everyone else.
     void tickPortals(world::LoadedWorld& world);
 
+    /// Where an end gateway inside this box sends something, resting that gateway. Nothing when
+    /// the box touches no gateway that is ready. parity: `EndGatewayBlock.entityInside`.
+    [[nodiscard]] std::optional<std::array<double, 3>> enterGateway(world::LoadedWorld& world,
+                                                                    const std::array<double, 6>& box);
+
     /// Drowning, burning, and the two numbers the HUD draws them from.
     void tickSubmersion(world::LoadedWorld& world);
 
@@ -103,6 +112,15 @@ private:
 
     void travelThroughEndPortal(world::LoadedWorld& world, player::PlayerSession& player);
 
+    void travelThroughGateway(world::LoadedWorld& world, player::PlayerSession& player,
+                              const std::array<std::int32_t, 3>& gateway);
+
+    /// The first ready gateway inside the box, now resting.
+    [[nodiscard]] std::optional<std::array<std::int32_t, 3>> touchGateway(world::LoadedWorld& world,
+                                                                          const std::array<double, 6>& box);
+
+    void tickGatewayCooldowns(const world::LoadedWorld& world);
+
     /// The storm's own share of a tick: one roll per simulated chunk, and a strike where it lands.
     void strikeLightning(world::LoadedWorld& world);
 
@@ -119,6 +137,9 @@ private:
     /// Which missing dimensions have already been reported, per world: a player standing in a portal
     /// asks this twenty times a second.
     std::set<std::pair<std::string, config::WorldDimension>> warnedMissingDimensions_;
+    /// parity: `TheEndGatewayBlockEntity.teleportCooldown`, by world and position.
+    std::map<std::pair<std::string, std::array<std::int32_t, 3>>, std::int32_t> gatewayCooldowns_;
+    std::mutex gatewayLock_;
 };
 
 } // namespace basalt::server::runtime

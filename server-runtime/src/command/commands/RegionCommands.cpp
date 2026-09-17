@@ -32,8 +32,7 @@ enum class CloneMode : std::uint8_t { Normal, Force, Move };
 
 [[nodiscard]] std::array<std::int32_t, 3> resolveBlock(const CommandContext& context, std::string_view name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
-    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0}
-                                  : coordinates->resolve(context.source().position());
+    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
 /// The world an argument named, or the one the command acts on when it named none.
@@ -465,7 +464,7 @@ void ForceLoadCommand::build(const CommandNodeBuilder& root) const {
                 if (coordinates == nullptr) {
                     return 0;
                 }
-                const std::array<std::int32_t, 2> at = coordinates->resolve(context.source().position());
+                const std::array<std::int32_t, 2> at = coordinates->resolve(context.source());
                 const std::int32_t chunkX = at[0] >> 4;
                 const std::int32_t chunkZ = at[1] >> 4;
                 const bool forced =

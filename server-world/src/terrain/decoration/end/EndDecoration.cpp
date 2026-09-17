@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/DensityChunkSampler.hpp>
 #include <basalt/server/world/terrain/decoration/end/EndDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/end/EndFeatureBlocks.hpp>
 
 #include <algorithm>
 #include <array>
@@ -209,23 +210,12 @@ void generatePlant(ChorusWorld& world, const EndPos& origin, random::RandomSourc
 void placeIsland(Chunk& chunk, random::RandomSource& random, std::int32_t originX, std::int32_t originY,
                  std::int32_t originZ) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    const std::int32_t endStone = registry::blocks::named("end_stone")->stateId;
-    auto size = static_cast<float>(random.nextInt(3)) + 4.0F;
-    std::int32_t y = originY;
-    while (size > 0.5F) {
-        const auto from = static_cast<std::int32_t>(std::floor(-size));
-        const auto to = static_cast<std::int32_t>(std::ceil(size));
-        for (std::int32_t x = from; x <= to; ++x) {
-            for (std::int32_t z = from; z <= to; ++z) {
-                const auto distanceSquared = static_cast<float>(x * x + z * z);
-                if (distanceSquared <= (size + 1.0F) * (size + 1.0F) && y >= bounds.minY() && y <= bounds.maxY()) {
-                    chunk.setDecorationBlockStateId(originX + x, y, originZ + z, endStone);
-                }
-            }
-        }
-        y--;
-        size -= static_cast<float>(random.nextInt(2)) + 0.5F;
-    }
+    endIslandFeature::placeBlocks(random, originX, originY, originZ,
+                                  [&chunk, bounds](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t state) {
+                                      if (y >= bounds.minY() && y <= bounds.maxY()) {
+                                          chunk.setDecorationBlockStateId(x, y, z, state);
+                                      }
+                                  });
 }
 
 } // namespace

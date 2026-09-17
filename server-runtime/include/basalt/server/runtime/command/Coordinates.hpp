@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/command/CommandTree.hpp>
 
 #include <array>
@@ -12,8 +13,7 @@ namespace basalt::server::runtime::command {
 ///
 /// The +0.5 on a bare integer is vanilla's own `WorldCoordinate.parseDouble` centre correction:
 /// `/tp 10 64 10` puts you in the middle of that block, not on its corner, and only when the number
-/// has no decimal point and no `~`. Local (`^`) coordinates are a documented gap and are rejected
-/// outright rather than being read as absolute.
+/// has no decimal point and no `~`. A `^` here is an error: only a whole triple can be local.
 struct WorldCoordinate {
     bool relative = false;
     double value = 0.0;
@@ -26,14 +26,20 @@ struct WorldCoordinate {
 };
 
 /// A parsed `x y z`, still unresolved: `~` needs whoever runs the command to mean anything.
+///
+/// A local triple (`^left ^up ^forwards`) keeps its three numbers in x, y and z.
 struct Coordinates {
     WorldCoordinate x;
     WorldCoordinate y;
     WorldCoordinate z;
+    bool local = false;
 
-    [[nodiscard]] std::array<double, 3> resolve(const std::array<double, 3>& base) const {
-        return {x.resolve(base[0]), y.resolve(base[1]), z.resolve(base[2])};
-    }
+    /// Against a bare position, where a local triple has no facing and turns with none.
+    [[nodiscard]] std::array<double, 3> resolve(const std::array<double, 3>& base) const;
+
+    /// parity: `Coordinates.getPosition`, which a local triple reads from the source's anchor and
+    /// rotation.
+    [[nodiscard]] std::array<double, 3> resolve(const CommandSource& source) const;
 
     friend bool operator==(const Coordinates&, const Coordinates&) = default;
 };
@@ -43,9 +49,12 @@ struct BlockCoordinates {
     WorldCoordinate x;
     WorldCoordinate y;
     WorldCoordinate z;
+    bool local = false;
 
     /// parity: `WorldCoordinates.getBlockPos`, which floors rather than truncating, so -0.5 is -1.
     [[nodiscard]] std::array<std::int32_t, 3> resolve(const std::array<double, 3>& base) const;
+
+    [[nodiscard]] std::array<std::int32_t, 3> resolve(const CommandSource& source) const;
 
     friend bool operator==(const BlockCoordinates&, const BlockCoordinates&) = default;
 };
@@ -56,6 +65,10 @@ struct ColumnCoordinates {
     WorldCoordinate z;
 
     [[nodiscard]] std::array<std::int32_t, 2> resolve(const std::array<double, 3>& base) const;
+
+    [[nodiscard]] std::array<std::int32_t, 2> resolve(const CommandSource& source) const {
+        return resolve(source.position());
+    }
 
     friend bool operator==(const ColumnCoordinates&, const ColumnCoordinates&) = default;
 };

@@ -61,22 +61,19 @@ void ContainerMenuController::recomputeGrindstoneResult() {
 
 void ContainerMenuController::takeGrindstoneResult(PlayerSession& session) {
     // parity: `GrindstoneMenu.ResultSlot.onTake`: both inputs go, the experience comes out of the
-    // block and the stone grinds. The orbs themselves are not modelled yet, so the points go
-    // straight to whoever ground it rather than lying on the floor.
+    // block as orbs and the stone grinds. Whoever took it gets nothing directly.
+    static_cast<void>(session);
     const std::int32_t half = (grindstoneWorth_ + 1) / 2;
     const double roll = options_.nextDouble ? options_.nextDouble() : 0.0;
     const std::int32_t points = world::grindstones::experienceFor(
         grindstoneWorth_, static_cast<std::int32_t>(roll * static_cast<double>(half)));
-    if (points > 0) {
-        session.experience.givePoints(points);
-        if (session.connection().syncExperience) {
-            session.connection().syncExperience();
-        }
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (points > 0 && openBlock.has_value() && world != nullptr && owner_->options().awardExperience) {
+        owner_->options().awardExperience(*world, openBlock->x + 0.5, openBlock->y + 0.5, openBlock->z + 0.5, points);
     }
     grindstoneSlots_[Menu::kGrindstoneInput].reset();
     grindstoneSlots_[Menu::kGrindstoneAddition].reset();
     grindstoneWorth_ = 0;
-    world::LoadedWorld* world = owner_->currentWorld();
     if (world != nullptr && openBlock.has_value()) {
         owner_->blockInteraction().broadcastEffects(
             *openBlock, world->state().blockState(openBlock->x, openBlock->y, openBlock->z).value_or(0),

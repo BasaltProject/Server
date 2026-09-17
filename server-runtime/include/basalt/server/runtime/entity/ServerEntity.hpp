@@ -117,6 +117,10 @@ public:
 
     /// Who hit it last, waiting for `HurtByTargetGoal` to turn that into a target.
     std::optional<std::int32_t> hurtBy;
+    /// The player whose hit still counts as theirs, and for how many more ticks.
+    /// parity: `LivingEntity.lastHurtByPlayer` and `lastHurtByPlayerMemoryTime`.
+    std::optional<wire::common::Uuid> lastHurtByPlayer;
+    std::int32_t lastHurtByPlayerTime = 0;
     /// Who it is angry at, by entity id. parity: `Mob.target`.
     std::optional<std::int32_t> targetId;
 

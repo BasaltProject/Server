@@ -170,7 +170,7 @@ namespace {
     }
     const std::array<double, 3> from = context.source().position();
     const std::array<std::int32_t, 3> at =
-        coordinates != nullptr ? coordinates->resolve(from)
+        coordinates != nullptr ? coordinates->resolve(context.source())
                                : std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(from[0])),
                                                              static_cast<std::int32_t>(std::floor(from[1])),
                                                              static_cast<std::int32_t>(std::floor(from[2]))};

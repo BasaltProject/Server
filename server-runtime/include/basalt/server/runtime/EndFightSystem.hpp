@@ -37,6 +37,9 @@ public:
         std::function<std::int64_t()> nextSeed;
         /// `dragon_immune` and `dragon_transparent`, which decide what a dragon flies through.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// Experience left as orbs at a point.
+        std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
+            awardExperience;
     };
 
     EndFightSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster, CombatSystem& combat,

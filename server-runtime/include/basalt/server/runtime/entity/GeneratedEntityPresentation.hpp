@@ -39,6 +39,8 @@ struct RuntimeEntityMetadata {
     std::optional<bool> crystalBottom;
     /// parity: `EnderDragon.DATA_PHASE`, which the client animates by.
     std::optional<std::int32_t> dragonPhase;
+    /// parity: `ExperienceOrb.DATA_VALUE`, which picks the orb's size.
+    std::optional<std::int32_t> orbValue;
     /// parity: `AreaEffectCloud`'s radius, waiting flag and particle.
     std::optional<float> cloudRadius;
     std::optional<bool> cloudWaiting;

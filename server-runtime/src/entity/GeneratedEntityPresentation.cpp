@@ -17,6 +17,9 @@
 namespace basalt::server::runtime::entity {
 namespace {
 
+/// parity: `ExperienceOrb.DATA_VALUE`.
+constexpr std::uint8_t kOrbValueDataIndex = 8;
+
 using wire::nbt::NbtCompound;
 using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SetEquipmentPacket;
@@ -437,6 +440,11 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
     if (cloudParticle.has_value() && (previous == nullptr || previous->cloudParticle != cloudParticle)) {
         entries.push_back(Entry{.index = areaEffectClouds::kParticleDataIndex, .value = *cloudParticle});
     }
+    if (orbValue.has_value() && (previous == nullptr || previous->orbValue != orbValue) &&
+        (previous != nullptr || *orbValue != 0)) {
+        entries.push_back(
+            Entry{.index = kOrbValueDataIndex, .value = SetEntityDataPacket::IntValue{.value = *orbValue}});
+    }
     // parity: a fresh dragon is defined hovering, so only a different phase is news.
     if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
         (previous != nullptr || *dragonPhase != static_cast<std::int32_t>(enderDragon::Phase::Hover))) {
@@ -456,6 +464,9 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (abstractHorseTypes().contains(entity.type().path())) {
         live.horseFlags = entity.tamedHorse ? kAbstractHorseTameFlag : std::int8_t{0};
+    }
+    if (entity.type().path() == "experience_orb" && entity.sourceNbt.has_value()) {
+        live.orbValue = entity.sourceNbt->getShort("Value");
     }
     if (entity.dragon != nullptr) {
         live.dragonPhase = static_cast<std::int32_t>(entity.dragon->phase);

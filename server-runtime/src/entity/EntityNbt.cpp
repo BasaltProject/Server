@@ -303,6 +303,10 @@ NbtCompound encode(const ServerEntity& entity) {
     const std::string_view path = entity.type().path();
     if (server::registry::entityAttributes::isLiving(entity.type())) {
         tag.putFloat("Health", static_cast<float>(entity.health));
+        if (entity.lastHurtByPlayer.has_value()) {
+            tag.set("last_hurt_by_player", uuidTag(*entity.lastHurtByPlayer));
+            tag.putInt("last_hurt_by_player_memory_time", entity.lastHurtByPlayerTime);
+        }
     }
     if (mobs::isMob(entity.type())) {
         tag.putBoolean("PersistenceRequired", entity.persistent);
@@ -450,6 +454,8 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->deathTime = numericInt(tag, "DeathTime");
     entity->dying = entity->deathTime > 0;
     entity->fireTicks = numericInt(tag, "Fire");
+    entity->lastHurtByPlayer = uuidIn(tag, "last_hurt_by_player");
+    entity->lastHurtByPlayerTime = numericInt(tag, "last_hurt_by_player_memory_time");
     entity->noGravity = numericBoolean(tag, "NoGravity");
     if (const NbtCompound* held = tag.getCompound("Item"); held != nullptr) {
         const std::expected<Identifier, wire::common::IdentifierError> item = Identifier::parse(held->getString("id"));

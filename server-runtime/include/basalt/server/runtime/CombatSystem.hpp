@@ -42,6 +42,9 @@ public:
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball)>
             dragonFireballLanded;
+        /// Experience left as orbs at a point.
+        std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
+            awardExperience;
         /// A crystal went, by that player if one was behind it.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>
@@ -78,6 +81,12 @@ public:
     void announceEntityHit(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& entity,
                            const wire::common::Identifier& damageType, std::int32_t causeEntityId, bool died);
 
+    /// parity: `Projectile.getOwner`, since an arrow kills for whoever shot it. The arrow itself is
+    /// the answer once its owner is gone.
+    [[nodiscard]] static wire::text::Component shooterName(const std::vector<player::PlayerSession*>& watchers,
+                                                           const std::vector<entity::ServerEntity*>& living,
+                                                           const entity::ServerEntity& projectile);
+
 private:
     /// The nearest thing a projectile passed through this tick, as a mob or as a player.
     struct Target {
@@ -96,11 +105,9 @@ private:
     [[nodiscard]] static bool firedByPlayer(const std::vector<player::PlayerSession*>& watchers,
                                             const entity::ServerEntity& projectile);
 
-    /// parity: `Projectile.getOwner`, since an arrow kills for whoever shot it. The arrow itself is
-    /// the answer once its owner is gone.
-    [[nodiscard]] static wire::text::Component shooterName(const std::vector<player::PlayerSession*>& watchers,
-                                                           const std::vector<entity::ServerEntity*>& living,
-                                                           const entity::ServerEntity& projectile);
+    /// Marks the target as hurt by the player who fired, when a player did.
+    static void rememberShooter(const std::vector<player::PlayerSession*>& watchers,
+                                const entity::ServerEntity& projectile, entity::ServerEntity& target);
 
     bool hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& arrow, double fromX,

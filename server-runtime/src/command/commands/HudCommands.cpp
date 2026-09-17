@@ -45,9 +45,9 @@ void reportTitle(const CommandContext& context, const std::vector<player::Player
 }
 
 /// Where a block coordinate lands, or the floor of where the asker stands when none was given.
-[[nodiscard]] std::array<std::int32_t, 3> blockAt(const BlockCoordinates* coordinates,
-                                                  const std::array<double, 3>& from) {
-    return coordinates != nullptr ? coordinates->resolve(from)
+[[nodiscard]] std::array<std::int32_t, 3> blockAt(const BlockCoordinates* coordinates, const CommandSource& source) {
+    const std::array<double, 3> from = source.position();
+    return coordinates != nullptr ? coordinates->resolve(source)
                                   : std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(from[0])),
                                                                 static_cast<std::int32_t>(std::floor(from[1])),
                                                                 static_cast<std::int32_t>(std::floor(from[2]))};
@@ -238,8 +238,9 @@ namespace {
     if (!world.has_value()) {
         return std::unexpected{world.error()};
     }
+    // parity: `BlockPosArgument.getSpawnablePos` reads the source, so every target gets one point.
+    const std::array<std::int32_t, 3> at = blockAt(coordinates, context.source());
     for (const player::PlayerSession* target : targets) {
-        const std::array<std::int32_t, 3> at = blockAt(coordinates, {target->x, target->y, target->z});
         access->setSpawnPoint(
             storage::StoredSpawnPoint{.uuid = target->uuid().toString(),
                                       .world = target->worldName.empty() ? (*world)->name() : target->worldName,
@@ -249,10 +250,8 @@ namespace {
                                       .z = at[2] + 0.5,
                                       .yaw = angle});
     }
-    const std::array<std::int32_t, 3> reported = blockAt(coordinates, context.source().position());
-    std::vector<Component> args{Component::text(std::to_string(reported[0])),
-                                Component::text(std::to_string(reported[1])),
-                                Component::text(std::to_string(reported[2])), Component::text(std::to_string(angle)),
+    std::vector<Component> args{Component::text(std::to_string(at[0])), Component::text(std::to_string(at[1])),
+                                Component::text(std::to_string(at[2])), Component::text(std::to_string(angle)),
                                 Component::text((*world)->name())};
     args.push_back(targets.size() == 1 ? Component::text(targets.front()->name())
                                        : Component::text(std::to_string(targets.size())));

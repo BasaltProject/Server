@@ -12,6 +12,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace basalt::server::runtime::command {
 
@@ -66,6 +67,10 @@ public:
 
     /// Where `~` resolves from. The console stands at the world's shared spawn, as vanilla's does.
     [[nodiscard]] virtual std::array<double, 3> position() const = 0;
+
+    /// Yaw then pitch, which `^` turns with. parity: `CommandSourceStack.getRotation`, zero for the
+    /// console.
+    [[nodiscard]] virtual std::pair<float, float> rotation() const { return {0.0F, 0.0F}; }
 
     /// The player who ran this, or null for the console. Commands that need one say so themselves.
     [[nodiscard]] virtual player::PlayerSession* player() const = 0;
@@ -137,6 +142,8 @@ public:
     [[nodiscard]] std::array<double, 3> position() const override;
 
     [[nodiscard]] player::PlayerSession* player() const override { return player_; }
+
+    [[nodiscard]] std::pair<float, float> rotation() const override;
 
     void sendSystemMessage(const wire::text::Component& message) const override;
 

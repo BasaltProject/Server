@@ -10,7 +10,7 @@ ExecutionSource::ExecutionSource(const CommandSource& base, Changes changes)
       position_(changes.position.value_or(base.position())), onResult_(std::move(changes.onResult)) {
     const ExecutionSource* inner = base.asExecution();
     world_ = changes.world.value_or(inner == nullptr ? nullptr : inner->world());
-    rotation_ = changes.rotation.value_or(inner == nullptr ? std::pair{0.0F, 0.0F} : inner->rotation());
+    rotation_ = changes.rotation.value_or(base.rotation());
     anchorEyes_ = changes.anchorEyes.value_or(inner != nullptr && inner->anchorEyes());
     entity_ = changes.entity.has_value() ? changes.entity : (inner == nullptr ? std::nullopt : inner->entity());
 }

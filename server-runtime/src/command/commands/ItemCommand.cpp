@@ -32,8 +32,7 @@ constexpr std::int32_t kMaxCount = 99;
 /// The block a coordinate argument names, resolved against wherever the source stands.
 [[nodiscard]] std::array<std::int32_t, 3> blockAt(const CommandContext& context, const std::string& name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
-    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0}
-                                  : coordinates->resolve(context.source().position());
+    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
 /// parity: `/item ... <modifier>` runs a loot function over the stack.

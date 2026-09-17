@@ -53,7 +53,7 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
     const auto holderNamed = [](const CommandContext& context, std::string_view posName,
                                 std::string_view targetName) -> std::expected<DataHolderRef, CommandSyntaxError> {
         if (const auto* coordinates = context.get<BlockCoordinates>(posName); coordinates != nullptr) {
-            return DataHolderRef{DataHolderRef::Block{.pos = coordinates->resolve(context.source().position())}};
+            return DataHolderRef{DataHolderRef::Block{.pos = coordinates->resolve(context.source())}};
         }
         if (const auto* id = context.get<Identifier>(targetName); id != nullptr) {
             return DataHolderRef{DataHolderRef::Storage{.id = *id}};
