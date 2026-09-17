@@ -96,6 +96,8 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.nextBool = [] { return std::uniform_int_distribution<int>{0, 1}(scratchRandom()) == 1; };
     options.blocks = broadcaster_.get();
     options.explosions = explosions_.get();
+    options.combat = combat_.get();
+    options.endFight = endFight_.get();
     options.plugins = pluginHooks();
 
     // On the heap and handed to the registry afterwards: a session that has left is kept for a

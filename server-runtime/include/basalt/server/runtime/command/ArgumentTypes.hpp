@@ -75,6 +75,12 @@ integerArgument(std::int32_t min = std::numeric_limits<std::int32_t>::min(),
 /// `std::vector<CommandTarget>`.
 [[nodiscard]] std::shared_ptr<const ArgumentType> entitiesArgument(bool single = false);
 
+/// The same on the wire, but an empty match is an answer rather than an error, for the forms that
+/// read `EntityArgument.getOptionalEntities`/`getOptionalPlayers`.
+[[nodiscard]] std::shared_ptr<const ArgumentType> optionalEntitiesArgument();
+
+[[nodiscard]] std::shared_ptr<const ArgumentType> optionalPlayersArgument();
+
 /// `minecraft:component`: the rest of the line as a chat component in its JSON form, so styles and
 /// events survive to the client. The value is a `wire::text::Component`.
 [[nodiscard]] std::shared_ptr<const ArgumentType> componentArgument();

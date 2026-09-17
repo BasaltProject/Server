@@ -91,6 +91,8 @@ class ChunkStreamer;
 class CombatHandler;
 class BlockChangeBroadcaster;
 class ContainerMenuController;
+class CombatSystem;
+class EndFightSystem;
 class ExplosionSystem;
 class BlockInteractionHandler;
 class ItemUseTimers;
@@ -239,6 +241,10 @@ public:
         /// The block and blast machinery the server owns, shared by every session in it.
         BlockChangeBroadcaster* blocks = nullptr;
         ExplosionSystem* explosions = nullptr;
+        /// What a projectile or a melee hit on something that is not a mob goes through.
+        CombatSystem* combat = nullptr;
+        /// The dragon fight, which a crystal set down beside the exit portal may call back.
+        EndFightSystem* endFight = nullptr;
         PluginHooks plugins;
     };
 

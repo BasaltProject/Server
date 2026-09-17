@@ -1,5 +1,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -422,6 +424,25 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         entries.push_back(Entry{.index = world::endCrystals::kShowBottomDataIndex,
                                 .value = SetEntityDataPacket::BoolValue{.value = *crystalBottom}});
     }
+    if (cloudRadius.has_value() && (previous == nullptr || previous->cloudRadius != cloudRadius) &&
+        (previous != nullptr || *cloudRadius != areaEffectClouds::kDefaultRadius)) {
+        entries.push_back(Entry{.index = areaEffectClouds::kRadiusDataIndex,
+                                .value = SetEntityDataPacket::FloatValue{.value = *cloudRadius}});
+    }
+    if (cloudWaiting.has_value() && (previous == nullptr || previous->cloudWaiting != cloudWaiting) &&
+        (previous != nullptr || *cloudWaiting)) {
+        entries.push_back(Entry{.index = areaEffectClouds::kWaitingDataIndex,
+                                .value = SetEntityDataPacket::BoolValue{.value = *cloudWaiting}});
+    }
+    if (cloudParticle.has_value() && (previous == nullptr || previous->cloudParticle != cloudParticle)) {
+        entries.push_back(Entry{.index = areaEffectClouds::kParticleDataIndex, .value = *cloudParticle});
+    }
+    // parity: a fresh dragon is defined hovering, so only a different phase is news.
+    if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
+        (previous != nullptr || *dragonPhase != static_cast<std::int32_t>(enderDragon::Phase::Hover))) {
+        entries.push_back(Entry{.index = enderDragon::kPhaseDataIndex,
+                                .value = SetEntityDataPacket::IntValue{.value = *dragonPhase}});
+    }
     return entries;
 }
 
@@ -435,6 +456,29 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (abstractHorseTypes().contains(entity.type().path())) {
         live.horseFlags = entity.tamedHorse ? kAbstractHorseTameFlag : std::int8_t{0};
+    }
+    if (entity.dragon != nullptr) {
+        live.dragonPhase = static_cast<std::int32_t>(entity.dragon->phase);
+    }
+    if (areaEffectClouds::isCloud(entity.type())) {
+        const areaEffectClouds::Cloud cloud = areaEffectClouds::read(entity);
+        live.cloudRadius = cloud.radius;
+        const std::int32_t waitTime = entity.sourceNbt.has_value() ? entity.sourceNbt->getInt("WaitTime", 20) : 20;
+        live.cloudWaiting = entity.tickCount < waitTime;
+        if (cloud.particle.has_value()) {
+            const auto id = wire::common::Identifier::parse(*cloud.particle);
+            const server::registry::ParticleType* type =
+                id.has_value() ? server::registry::particleTypes::of(*id) : nullptr;
+            if (type != nullptr) {
+                // parity: only `dragon_breath` among the custom particles a cloud is given carries a power.
+                live.cloudParticle = SetEntityDataPacket::ParticleValue{
+                    .particleId = type->protocolId,
+                    .options = id->path() == "dragon_breath"
+                                   ? std::optional{wire::protocol::play::ParticleOptions{
+                                         wire::protocol::play::ParticleOptions::Number{cloud.particlePower}}}
+                                   : std::nullopt};
+            }
+        }
     }
     if (world::endCrystals::isCrystal(entity.type())) {
         const std::optional<std::array<std::int32_t, 3>> beam = world::endCrystals::beamTarget(entity);

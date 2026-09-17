@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
@@ -395,7 +396,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     // and then go. Until it goes it is still an entity, so a sculk sensor, a pressure plate and a
     // comparator all keep feeling it, and `/kill` is no exception.
     for (entity::ServerEntity* dying : world.state().entities()) {
-        if (dying->removed || !dying->dying) {
+        // parity: `EnderDragon.tickDeath` is its own two hundred ticks, run from its own turn.
+        if (dying->removed || !dying->dying || dying->dragon != nullptr) {
             continue;
         }
         ++dying->deathTime;
@@ -448,6 +450,11 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
+    // parity: `ServerLevel.tick` runs the dragon fight before any entity takes its turn.
+    if (world.dragonFight() != nullptr && region.ownsPosition(0.0, 0.0)) {
+        endFight_->tickFight(world, watchers, living);
+    }
+
     random::RandomSource random = random::RandomSource::legacy(scratchSeed());
     // Worked out on the first entity and not before, so a world with nothing alive never builds it.
     // The plain radius here: entities stop one chunk sooner than blocks (`ChunkLevel.byStatus`).
@@ -469,8 +476,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             continue;
         }
         // parity: `Mob.aiStep` stops the moment `isDeadOrDying`, so counting to twenty is the whole
-        // of a corpse's turn and that already happened above.
-        if (entity->dying) {
+        // of a corpse's turn and that already happened above. A dragon dies on its own turn.
+        if (entity->dying && !entity::enderDragon::isDragon(entity->type())) {
             continue;
         }
         // An entity is ticked by whoever owns the ground it is standing on. It may walk out of this
@@ -518,10 +525,18 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z, world.gameTime());
             continue;
         }
+        if (entity::enderDragon::isDragon(entity->type())) {
+            endFight_->tickDragon(world, watchers, living, *entity);
+            continue;
+        }
+        if (entity::areaEffectClouds::isCloud(entity->type())) {
+            clouds_->tick(world, watchers, living, *entity);
+            continue;
+        }
         // parity: `EndCrystal.tick`, which does nothing but keep a fire under itself, and only where
-        // the dimension holds a dragon fight (`DimensionType.hasEnderDragonFight`: the End alone).
+        // the level has a dragon fight.
         if (world::endCrystals::isCrystal(entity->type())) {
-            if (world.declaration().dimension == config::WorldDimension::End) {
+            if (world.dragonFight() != nullptr) {
                 const std::int32_t delay = world::fires::kMinDelay + random.nextInt(world::fires::kDelaySpread);
                 if (const std::optional<std::int32_t> lit =
                         world::endCrystals::keepFireLit(world.state(), *entity, delay);

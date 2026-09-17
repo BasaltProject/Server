@@ -2,11 +2,13 @@
 
 #include <basalt/server/plugins/PluginApi.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/runtime/AreaEffectCloudSystem.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/CommandWiring.hpp>
+#include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
@@ -241,6 +243,8 @@ private:
     std::optional<bedrock::BedrockRecipeList> bedrockRecipes_;
     std::unique_ptr<NaturalSpawningSystem> spawning_;
     std::unique_ptr<CombatSystem> combat_;
+    std::unique_ptr<AreaEffectCloudSystem> clouds_;
+    std::unique_ptr<EndFightSystem> endFight_;
     std::unique_ptr<RedstoneTickSystem> redstone_;
     std::unique_ptr<RaidSystem> raids_;
     std::unique_ptr<StatusEffectSystem> statusEffects_;

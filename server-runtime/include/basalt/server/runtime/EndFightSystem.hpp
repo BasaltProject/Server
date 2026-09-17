@@ -1,0 +1,151 @@
+#pragma once
+
+#include <basalt/server/runtime/entity/EnderDragon.hpp>
+#include <basalt/server/runtime/world/DragonFight.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
+
+#include <array>
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <vector>
+
+namespace basalt::server::runtime::player {
+class PlayerRegistry;
+class PlayerSession;
+} // namespace basalt::server::runtime::player
+
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+}
+
+namespace basalt::server::runtime {
+
+class AreaEffectCloudSystem;
+class BlockChangeBroadcaster;
+class CombatSystem;
+class ExplosionSystem;
+
+/// The ender dragon's turn in the world: its flight, what its wings and head do to whoever is in
+/// the way, the blocks it flies through and its long death.
+///
+/// parity: the half of `EnderDragon.aiStep` and `tickDeath` that reaches outside the dragon. The
+/// flight itself is `entity::enderDragon`.
+class EndFightSystem {
+public:
+    struct Options {
+        std::function<std::int64_t()> nextSeed;
+        /// `dragon_immune` and `dragon_transparent`, which decide what a dragon flies through.
+        const world::realBlockTags::TagMembers* blockTags = nullptr;
+    };
+
+    EndFightSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster, CombatSystem& combat,
+                   ExplosionSystem& explosions, AreaEffectCloudSystem& clouds, Options options);
+
+    /// One turn of one dragon. `living` is this tick's snapshot of the world's entities.
+    void tickDragon(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& dragon);
+
+    /// The End's own turn at its fight, before any entity moves. parity: `EnderDragonFight.tick`.
+    void tickFight(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                   const std::vector<entity::ServerEntity*>& living);
+
+    /// A crystal was destroyed, by that player if one was behind it.
+    ///
+    /// parity: `EnderDragonFight.onCrystalDestroyed` and `EnderDragon.onCrystalDestroyed`.
+    void crystalDestroyed(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                          const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer);
+
+    /// A crystal was set down; four round the exit portal call the dragon back.
+    /// parity: `EnderDragonFight.tryRespawn`.
+    void tryRespawn(world::LoadedWorld& world);
+
+private:
+    [[nodiscard]] entity::enderDragon::DragonState& stateOf(entity::ServerEntity& dragon);
+
+    /// The players in this world, for what a respawn shows them.
+    [[nodiscard]] std::vector<player::PlayerSession*> watchersIn(const world::LoadedWorld& world) const;
+
+    /// parity: `DragonRespawnStage.tick`, one turn of the stage the respawn is at.
+    void tickRespawn(world::LoadedWorld& world, world::DragonFight& fight,
+                     const std::vector<player::PlayerSession*>& watchers,
+                     const std::vector<entity::ServerEntity*>& crystals);
+
+    void setRespawnStage(world::LoadedWorld& world, world::DragonFight& fight, world::RespawnStage stage);
+
+    void abortRespawn(world::LoadedWorld& world, world::DragonFight& fight);
+
+    /// parity: `EnderDragonFight.resetSpikeCrystals`.
+    void resetSpikeCrystals(world::LoadedWorld& world);
+
+    void levelEvent(const std::vector<player::PlayerSession*>& watchers, std::int32_t event, std::int32_t x,
+                    std::int32_t y, std::int32_t z);
+
+    /// Rebuilds one pillar with an invulnerable crystal beaming at the summoning point.
+    void rebuildSpike(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                      std::size_t index);
+
+    /// The fight a dragon belongs to, or null for one it does not.
+    [[nodiscard]] static world::DragonFight* fightOf(world::LoadedWorld& world, const entity::ServerEntity& dragon);
+
+    void updatePlayers(world::LoadedWorld& world, world::DragonFight& fight,
+                       const std::vector<player::PlayerSession*>& watchers);
+
+    void showBar(world::DragonFight& fight, bool visible);
+
+    void updateBar(world::DragonFight& fight, float progress);
+
+    void scanState(world::LoadedWorld& world, world::DragonFight& fight,
+                   const std::vector<entity::ServerEntity*>& living);
+
+    void findOrCreateDragon(world::LoadedWorld& world, world::DragonFight& fight,
+                            const std::vector<entity::ServerEntity*>& living);
+
+    /// parity: `EnderDragonFight.createNewDragon`.
+    void createNewDragon(world::LoadedWorld& world, world::DragonFight& fight);
+
+    void updateCrystalCount(world::LoadedWorld& world, world::DragonFight& fight);
+
+    /// parity: `EnderDragonFight.updateDragon`, each turn a dragon of this fight takes.
+    void updateDragon(world::LoadedWorld& world, const entity::ServerEntity& dragon);
+
+    /// parity: `EnderDragonFight.setDragonKilled`: the portal, a gateway and the egg.
+    void dragonKilled(world::LoadedWorld& world, const entity::ServerEntity& dragon);
+
+    void spawnExitPortal(world::LoadedWorld& world, world::DragonFight& fight, bool active);
+
+    void spawnNewGateway(world::LoadedWorld& world, world::DragonFight& fight);
+
+    void syncArea(world::LoadedWorld& world, std::int32_t minX, std::int32_t minZ, std::int32_t maxX,
+                  std::int32_t maxZ);
+
+    [[nodiscard]] entity::enderDragon::DragonWorld worldFor(world::LoadedWorld& world,
+                                                            const std::vector<player::PlayerSession*>& watchers,
+                                                            const entity::ServerEntity& dragon,
+                                                            entity::enderDragon::DragonState& state);
+
+    /// parity: `EnderDragon.checkCrystals`, the nearest crystal and the health it gives back.
+    void checkCrystals(const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& dragon,
+                       entity::enderDragon::DragonState& state);
+
+    /// parity: `EnderDragon.knockBack` and `hurt`, the wings shoving and the head biting.
+    void strike(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& dragon,
+                entity::enderDragon::DragonState& state);
+
+    /// parity: `EnderDragon.checkWalls`. Answers whether something it cannot break stopped it.
+    bool checkWalls(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    entity::enderDragon::DragonState& state, const std::array<double, 6>& box);
+
+    /// parity: `EnderDragon.tickDeath`.
+    void tickDeath(world::LoadedWorld& world, entity::ServerEntity& dragon, entity::enderDragon::DragonState& state);
+
+    player::PlayerRegistry* players_;
+    BlockChangeBroadcaster* broadcaster_;
+    CombatSystem* combat_;
+    ExplosionSystem* explosions_;
+    AreaEffectCloudSystem* clouds_;
+    Options options_;
+};
+
+} // namespace basalt::server::runtime

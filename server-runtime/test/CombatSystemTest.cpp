@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/AreaEffectCloudSystem.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
@@ -243,4 +244,31 @@ TEST_CASE("an arrow sets a crystal off, and its blast hurts a mob and takes a se
     CHECK(base.sentCount(play::ExplodePacket::kId) == 1);
     CHECK(cow.health < 10.0);
     CHECK(base.hurt > 0.0F);
+}
+
+TEST_CASE("a dragon's breath waits, then burns whoever stands in it every second") {
+    CombatFixture fixture{scratch("combat-breath")};
+    basalt::server::runtime::AreaEffectCloudSystem clouds{fixture.base.registry, fixture.combat, {}};
+    namespace breath = basalt::server::runtime::entity::areaEffectClouds;
+    fixture.base.player->x = 8.0;
+    fixture.base.player->y = 64.0;
+    fixture.base.player->z = 8.0;
+    const std::optional<std::int32_t> id =
+        clouds.spawn(*fixture.base.world, breath::dragonBreath(3.0F, 600, 0.0F, 1), 8.0, 64.0, 8.0);
+    REQUIRE(id.has_value());
+    ServerEntity* cloud = fixture.base.world->state().entity(*id);
+    REQUIRE(cloud != nullptr);
+
+    std::vector<float> hits;
+    for (std::int32_t tick = 1; tick <= 40; ++tick) {
+        const float before = fixture.base.hurt;
+        clouds.tick(*fixture.base.world, fixture.base.watchers(), {}, *cloud);
+        if (fixture.base.hurt != before) {
+            hits.push_back(static_cast<float>(tick));
+        }
+    }
+    // parity: twenty ticks of waiting, then every fifth tick but only once per reapplication delay.
+    CHECK(hits == std::vector<float>{20.0F, 40.0F});
+    // parity: amplifier one at the cloud's half strength is six.
+    CHECK(fixture.base.hurt == doctest::Approx(12.0F));
 }

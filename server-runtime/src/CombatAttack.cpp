@@ -4,9 +4,12 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
+#include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/DragonState.hpp>
+#include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
@@ -81,7 +84,32 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         return;
     }
     ServerEntity* target = world->state().entity(attack.entityId);
-    if (target == nullptr || target->removed || !owner_->withinAttackReach(*session, *target)) {
+    std::optional<entity::enderDragon::Part> dragonPart;
+    if (target == nullptr) {
+        // parity: `EnderDragonPart`, an entity of its own that hands every hit to the dragon.
+        for (ServerEntity* candidate : world->state().entities()) {
+            if (candidate->dragon == nullptr) {
+                continue;
+            }
+            dragonPart = entity::enderDragon::partByEntityId(candidate->entityId(), attack.entityId);
+            if (dragonPart.has_value()) {
+                target = candidate;
+                break;
+            }
+        }
+    }
+    if (target == nullptr || target->removed) {
+        return;
+    }
+    if (dragonPart.has_value()) {
+        const entity::enderDragon::Vec3& at = target->dragon->parts[static_cast<std::size_t>(*dragonPart)];
+        const entity::enderDragon::PartBox& box =
+            entity::enderDragon::kPartBoxes[static_cast<std::size_t>(*dragonPart)];
+        if (!player::combat::withinAttackReach(session->x, session->y, session->z, at.x, at.y, at.z,
+                                               static_cast<double>(box.width), static_cast<double>(box.height))) {
+            return;
+        }
+    } else if (!owner_->withinAttackReach(*session, *target)) {
         return;
     }
     if (hooks_.attackAllowed && !hooks_.attackAllowed(*session, target->entityId())) {
@@ -99,12 +127,9 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     }
     if (world::endCrystals::isCrystal(target->type())) {
         // parity: `EndCrystal.hurtServer`: any blow that counts destroys it and sets it off.
-        if (world::endCrystals::hurt(*target, false, false) == world::endCrystals::Hit::Explodes &&
-            owner_->options().explosions != nullptr) {
-            owner_->options().explosions->blowUp(*world, owner_->playersInSameWorld(), target->x, target->y, target->z,
-                                                 world::endCrystals::kExplosionPower, "end_crystal",
-                                                 target->entityId());
-            world::vibrations::emit(world->state(), "explode", target->x, target->y, target->z, world->gameTime());
+        if (owner_->options().combat != nullptr) {
+            owner_->options().combat->hitCrystal(*world, owner_->playersInSameWorld(), *target, false, false,
+                                                 session->entityId(), session->gamemode == Gamemode::Creative);
         }
         return;
     }
@@ -142,8 +167,11 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     if (knockbackAttack) {
         owner_->broadcastSound(kSoundAttackKnockback, session->x, session->y, session->z, SoundSource::Players);
     }
+    if (target->dragon != nullptr) {
+        target->dragon->hitPart = dragonPart;
+    }
     const entity::entityCombat::Result result =
-        entity::entityCombat::hurt(*target, damage, session->x, session->z, {}, "attack", session->name());
+        entity::entityCombat::hurt(*target, damage, session->x, session->z, {}, "attack", session->name(), true);
     if (!result.landed) {
         owner_->broadcastSound(kSoundAttackNoDamage, session->x, session->y, session->z, SoundSource::Players);
         return;

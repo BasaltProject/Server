@@ -163,6 +163,10 @@ basalt_module(server-runtime-core
         src/EntityVisibilityTracker.cpp
         src/EnvironmentTickSystem.cpp
         src/ExplosionSystem.cpp
+        src/EndFightSystem.cpp
+        src/EndFightArena.cpp
+        src/EndFightRespawn.cpp
+        src/AreaEffectCloudSystem.cpp
         src/Favicon.cpp
         src/PersistenceCoordinator.cpp
         src/ServerListStatus.cpp
@@ -267,7 +271,12 @@ basalt_module(server-runtime-core
         src/world/EnchantmentAttributes.cpp
         src/world/EndPodium.cpp
         src/world/EndCrystals.cpp
+        src/world/DragonFight.cpp
         src/entity/EnderDragon.cpp
+        src/entity/DragonNavigation.cpp
+        src/entity/DragonPhases.cpp
+        src/entity/DragonFlight.cpp
+        src/entity/AreaEffectClouds.cpp
         src/world/NetherPortalGrowth.cpp
         src/world/DamageProtection.cpp
         src/world/NaturalSpawnPredicates.cpp
@@ -1299,6 +1308,21 @@ basalt_test(server-runtime-enchantment-attributes-test
 basalt_test(server-runtime-end-portals-test
     SOURCES
         test/EndPortalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-end-fight-test
+    SOURCES
+        test/EndFightTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-end-fight-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-ender-dragon-test
+    SOURCES
+        test/EnderDragonTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

@@ -319,6 +319,10 @@ TEST_CASE("if entity, dimension and loaded read the world the source acts in") {
     fixture.dispatcher.registerCommand(std::make_shared<commands::ExecuteCommand>(scoreboard));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "execute if entity @a") == 2);
+    // parity: `getOptionalEntities`: nobody matching is a failed test, not a syntax error.
+    CHECK(fixture.dispatcher.execute(fixture.source, "execute if entity @e[type=minecraft:pig]") == 0);
+    CHECK(fixture.source.lastAsText().find("commands.execute.conditional.fail") != std::string::npos);
+    CHECK(fixture.dispatcher.execute(fixture.source, "execute unless entity @e[type=minecraft:pig]") == 1);
     CHECK(fixture.dispatcher.execute(fixture.source, "execute if dimension world") == 1);
     CHECK(fixture.dispatcher.execute(fixture.source, "execute if loaded 1 40 1") == 1);
     CHECK(fixture.dispatcher.execute(fixture.source, "execute if loaded 5000 40 5000") == 0);

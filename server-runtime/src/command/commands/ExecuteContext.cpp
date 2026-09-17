@@ -69,7 +69,7 @@ using Sources = std::vector<std::shared_ptr<const CommandSource>>;
 
 void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, CommandNode& execute) const {
     root.literal("as", [&execute](const CommandNodeBuilder& form) {
-        form.argument("targets", entitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
+        form.argument("targets", optionalEntitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
             targets.redirectTo(execute, true, [](const CommandContext& context) {
                 return perTarget(context, "targets", [](const CommandTarget& target) {
                     return ExecutionSource::Changes{.player = target.player(), .entity = target};
@@ -80,7 +80,7 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
 
     /// parity: `at`, which takes the target's position, rotation and world, but not its identity.
     root.literal("at", [&execute](const CommandNodeBuilder& form) {
-        form.argument("targets", entitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
+        form.argument("targets", optionalEntitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
             targets.redirectTo(execute, true, [](const CommandContext& context) {
                 return perTarget(context, "targets", [](const CommandTarget& target) {
                     return ExecutionSource::Changes{.position =
@@ -103,7 +103,7 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
             });
         });
         form.literal("as", [&execute](const CommandNodeBuilder& as) {
-            as.argument("targets", entitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
+            as.argument("targets", optionalEntitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
                 targets.redirectTo(execute, true, [](const CommandContext& context) {
                     return perTarget(context, "targets", [](const CommandTarget& target) {
                         return ExecutionSource::Changes{.position =
@@ -130,7 +130,7 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
             });
         });
         form.literal("as", [&execute](const CommandNodeBuilder& as) {
-            as.argument("targets", entitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
+            as.argument("targets", optionalEntitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
                 targets.redirectTo(execute, true, [](const CommandContext& context) {
                     return perTarget(context, "targets", [](const CommandTarget& target) {
                         return ExecutionSource::Changes{.rotation = std::pair{target.yaw(), target.pitch()}};
@@ -152,7 +152,7 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
             });
         });
         form.literal("entity", [&execute](const CommandNodeBuilder& entity) {
-            entity.argument("targets", entitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
+            entity.argument("targets", optionalEntitiesArgument(), [&execute](const CommandNodeBuilder& targets) {
                 targets.argument("anchor", entityAnchorArgument(), [&execute](const CommandNodeBuilder& anchor) {
                     anchor.redirectTo(execute, true, [](const CommandContext& context) {
                         const auto* which = context.get<EntityAnchor>("anchor");

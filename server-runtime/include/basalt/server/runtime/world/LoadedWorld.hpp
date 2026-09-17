@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
+#include <basalt/server/runtime/world/DragonFight.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/PortalIndex.hpp>
 #include <basalt/server/runtime/world/RandomSequences.hpp>
@@ -101,6 +102,10 @@ public:
     [[nodiscard]] const WorldMetadata& metadata() const noexcept { return metadata_; }
 
     [[nodiscard]] const std::string& name() const noexcept { return declaration_.name; }
+
+    /// The dragon fight, or null for a world whose dimension has none. parity:
+    /// `DimensionType.hasEnderDragonFight`, which only the End's has.
+    [[nodiscard]] DragonFight* dragonFight() noexcept { return dragonFight_.get(); }
 
     /// The named random streams this world keeps, which is what a loot table rolls on.
     [[nodiscard]] RandomSequences& randomSequences() noexcept { return randomSequences_; }
@@ -282,6 +287,7 @@ private:
     config::WorldDeclaration declaration_;
     config::WorldSettings settings_;
     WorldMetadata metadata_;
+    std::unique_ptr<DragonFight> dragonFight_;
     RandomSequences randomSequences_{metadata_.seed};
     wire::common::Logger logger_;
     wire::common::Timings ownTimings_;

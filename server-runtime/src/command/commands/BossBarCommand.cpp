@@ -476,10 +476,12 @@ void BossBarCommand::build(const CommandNodeBuilder& root) const {
                         return static_cast<std::int32_t>(names.size());
                     };
                     form.executes([setPlayers](const CommandContext& context) { return setPlayers(context, false); });
-                    form.argument("targets", playersArgument(false), [setPlayers](const CommandNodeBuilder& targets) {
-                        targets.executes(
-                            [setPlayers](const CommandContext& context) { return setPlayers(context, true); });
-                    });
+                    form.argument("targets", optionalPlayersArgument(),
+                                  [setPlayers](const CommandNodeBuilder& targets) {
+                                      targets.executes([setPlayers](const CommandContext& context) {
+                                          return setPlayers(context, true);
+                                      });
+                                  });
                 });
             });
     });
