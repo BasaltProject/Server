@@ -38,7 +38,6 @@ public interface ExperienceOrbOps extends ExperienceOrb, Cored {
     }
 
     private java.util.UUID uuidAt(String key) {
-        String stored = core().nbtText(key);
-        return stored == null || stored.isEmpty() ? null : java.util.UUID.fromString(stored);
+        return org.basaltmc.bukkit.item.Convert.uuidOf(EntityNbt.compound(core(), "").get(key));
     }
 }
