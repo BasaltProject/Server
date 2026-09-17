@@ -34,6 +34,9 @@ struct RuntimeEntityMetadata {
     std::optional<bool> baby;
     std::optional<std::int32_t> cubeSize;
     std::optional<std::int8_t> horseFlags;
+    /// parity: `EndCrystal`'s beam and base, which change while a dragon is being called back.
+    std::optional<std::optional<wire::protocol::play::BlockPos>> crystalBeam;
+    std::optional<bool> crystalBottom;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

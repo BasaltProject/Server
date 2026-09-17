@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/world/EndCrystals.hpp>
 
 #include <array>
 #include <cstdint>
@@ -411,6 +412,16 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         entries.push_back(Entry{.index = kAbstractHorseFlagsDataIndex,
                                 .value = SetEntityDataPacket::ByteValue{.value = *horseFlags}});
     }
+    if (crystalBeam.has_value() && (previous == nullptr || previous->crystalBeam != crystalBeam) &&
+        (previous != nullptr || crystalBeam->has_value())) {
+        entries.push_back(Entry{.index = world::endCrystals::kBeamTargetDataIndex,
+                                .value = SetEntityDataPacket::OptionalBlockPosValue{.pos = *crystalBeam}});
+    }
+    if (crystalBottom.has_value() && (previous == nullptr || previous->crystalBottom != crystalBottom) &&
+        (previous != nullptr || !*crystalBottom)) {
+        entries.push_back(Entry{.index = world::endCrystals::kShowBottomDataIndex,
+                                .value = SetEntityDataPacket::BoolValue{.value = *crystalBottom}});
+    }
     return entries;
 }
 
@@ -424,6 +435,14 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (abstractHorseTypes().contains(entity.type().path())) {
         live.horseFlags = entity.tamedHorse ? kAbstractHorseTameFlag : std::int8_t{0};
+    }
+    if (world::endCrystals::isCrystal(entity.type())) {
+        const std::optional<std::array<std::int32_t, 3>> beam = world::endCrystals::beamTarget(entity);
+        live.crystalBeam =
+            beam.has_value()
+                ? std::optional{wire::protocol::play::BlockPos{.x = (*beam)[0], .y = (*beam)[1], .z = (*beam)[2]}}
+                : std::nullopt;
+        live.crystalBottom = world::endCrystals::showsBottom(entity);
     }
     return live;
 }

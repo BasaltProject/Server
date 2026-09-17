@@ -369,7 +369,7 @@ public:
         if (playersOnly_) {
             std::erase_if(matched, [](const CommandTarget& target) { return target.player() == nullptr; });
         }
-        if (matched.empty()) {
+        if (matched.empty() && !source.defersSelectors()) {
             reader.setCursor(start);
             return std::unexpected{CommandSyntaxError{
                 .component = Component::translatable(playersOnly_ ? "argument.entity.notfound.player"
@@ -377,7 +377,7 @@ public:
                 .input = reader.string(),
                 .cursor = reader.cursor()}};
         }
-        if (single_ && matched.size() > 1) {
+        if (single_ && matched.size() > 1 && !source.defersSelectors()) {
             reader.setCursor(start);
             return std::unexpected{CommandSyntaxError{
                 .component =

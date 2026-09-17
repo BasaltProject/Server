@@ -8,9 +8,11 @@
 #include <basalt/server/world/terrain/decoration/PlacedFeatures.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -102,10 +104,20 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
             return std::unexpected{world.error()};
         }
         const auto* asked = context.get<float>("integrity");
-        if (asked != nullptr && *asked < 1.0F) {
-            context.source().sendSystemMessage(
-                Component::text("Integrity is not modelled yet: the whole template goes in.", wire::text::kGray));
-        }
+        const float integrity = asked == nullptr ? 1.0F : *asked;
+        const auto* askedSeed = context.get<std::int32_t>("seed");
+        // parity: `StructureBlockEntity.createRandom`, where a zero seed means the clock.
+        const std::int64_t seed = askedSeed != nullptr && *askedSeed != 0
+                                      ? *askedSeed
+                                      : std::chrono::duration_cast<std::chrono::milliseconds>(
+                                            std::chrono::steady_clock::now().time_since_epoch())
+                                            .count();
+        // parity: `PlaceCommand.placeTemplate` adds a `BlockRotProcessor` over every block, drawing
+        // from one stream in template order after the palette pick.
+        const std::optional<structure::StructureProcessorList> rot =
+            integrity < 1.0F ? std::optional{structure::StructureProcessorList{
+                                   {}, structure::BlockRot{.integrity = integrity, .rottable = std::nullopt}}}
+                             : std::nullopt;
         const auto* rotationArgument = rotated ? context.get<StructureRotation>("rotation") : nullptr;
         const auto* mirrorArgument = mirrored ? context.get<StructureMirror>("mirror") : nullptr;
         const StructureRotation rotation = rotationArgument == nullptr ? StructureRotation::None : *rotationArgument;
@@ -124,6 +136,9 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                 if (chunk == nullptr) {
                     return std::unexpected{unloaded()};
                 }
+                // Every pass replays the same stream over the whole template, so the chunks agree on
+                // which blocks rotted.
+                random::RandomSource stream = random::RandomSource::legacy(seed);
                 found->placeInto(*chunk,
                                  structure::TemplatePlacement{
                                      .position = origin,
@@ -132,7 +147,9 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                                      .pivot = pivot,
                                      .clipTo = StructureBoundingBox{chunkX << 4, box.minY, chunkZ << 4,
                                                                     (chunkX << 4) + 15, box.maxY, (chunkZ << 4) + 15},
-                                     .ignoreStructureBlocks = true});
+                                     .processors = rot.has_value() ? &*rot : nullptr,
+                                     .settingsRandom = rot.has_value() ? &stream : nullptr,
+                                     .wholePiece = rot.has_value()});
                 chunks++;
             }
         }
@@ -358,11 +375,18 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                                         integrity.executes([placeTemplate](const CommandContext& context) {
                                             return placeTemplate(context, true, true, true);
                                         });
-                                        integrity.literal("strict", [placeTemplate](const CommandNodeBuilder& strict) {
-                                            strict.executes([placeTemplate](const CommandContext& context) {
-                                                return placeTemplate(context, true, true, true);
+                                        integrity.argument(
+                                            "seed", integerArgument(), [placeTemplate](const CommandNodeBuilder& seed) {
+                                                seed.executes([placeTemplate](const CommandContext& context) {
+                                                    return placeTemplate(context, true, true, true);
+                                                });
+                                                seed.literal(
+                                                    "strict", [placeTemplate](const CommandNodeBuilder& strict) {
+                                                        strict.executes([placeTemplate](const CommandContext& context) {
+                                                            return placeTemplate(context, true, true, true);
+                                                        });
+                                                    });
                                             });
-                                        });
                                     });
                             });
                     });

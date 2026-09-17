@@ -31,6 +31,11 @@ public:
         std::function<bool(const world::LoadedWorld& world, double x, double y, double z, float power,
                            std::string_view cause, std::int32_t sourceEntityId)>
             allowed;
+        /// Hurts the entities around the blast that this system does not own. parity: the rest of
+        /// `ServerExplosion.hurtEntities`.
+        std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
+                           double y, double z, float power, std::int32_t sourceEntityId)>
+            struck;
     };
 
     /// What the blast rolls its loot and scatters its drops with.

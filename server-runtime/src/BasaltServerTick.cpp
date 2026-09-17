@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
@@ -14,6 +15,8 @@
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
+#include <basalt/server/runtime/world/EndCrystals.hpp>
+#include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -355,6 +358,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     }
 
     const entity::entityNbt::AllocateEntityId allocateEntityId = [this] { return playerRegistry_.allocateEntityId(); };
+    const entity::entityNbt::AllocateEntityIdFor allocateEntityIdFor = [this](const wire::common::Identifier& type) {
+        return playerRegistry_.allocateEntityIds(entity::enderDragon::idSpan(type));
+    };
     const entity::entityNbt::ProtocolTypeOf protocolTypeOf =
         [](const wire::common::Identifier& type) -> std::optional<std::int32_t> {
         const registry::EntityTypeEntry* entry = registry::entityTypes::of(type);
@@ -371,7 +377,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             continue;
         }
         for (std::unique_ptr<entity::ServerEntity>& restored :
-             entity::entityNbt::decodeTree(tag, allocateEntityId, protocolTypeOf)) {
+             entity::entityNbt::decodeTree(tag, allocateEntityIdFor, protocolTypeOf)) {
             static_cast<void>(world.state().spawnEntity(std::move(restored)));
         }
     }
@@ -380,7 +386,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     // persistence and ordinary client synchronization instead of remaining scenery.
     for (const server::world::ChunkGeneratedEntity& descriptor : world.state().takePendingGeneratedEntities()) {
         for (std::unique_ptr<entity::ServerEntity>& generated :
-             entity::entityNbt::decodeGeneratedTree(descriptor, allocateEntityId, protocolTypeOf)) {
+             entity::entityNbt::decodeGeneratedTree(descriptor, allocateEntityIdFor, protocolTypeOf)) {
             static_cast<void>(world.state().spawnEntity(std::move(generated)));
         }
     }
@@ -510,6 +516,24 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                 entity::primedTnt::kExplosionPower, "tnt", entity->entityId());
             // parity: `GameEvent.EXPLODE`, which is fifteen: the top of the scale.
             world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z, world.gameTime());
+            continue;
+        }
+        // parity: `EndCrystal.tick`, which does nothing but keep a fire under itself, and only where
+        // the dimension holds a dragon fight (`DimensionType.hasEnderDragonFight`: the End alone).
+        if (world::endCrystals::isCrystal(entity->type())) {
+            if (world.declaration().dimension == config::WorldDimension::End) {
+                const std::int32_t delay = world::fires::kMinDelay + random.nextInt(world::fires::kDelaySpread);
+                if (const std::optional<std::int32_t> lit =
+                        world::endCrystals::keepFireLit(world.state(), *entity, delay);
+                    lit.has_value()) {
+                    broadcaster_->announceRedstone(world, watchers,
+                                                   world::BlockChange{static_cast<std::int32_t>(std::floor(entity->x)),
+                                                                      static_cast<std::int32_t>(std::floor(entity->y)),
+                                                                      static_cast<std::int32_t>(std::floor(entity->z)),
+                                                                      *lit,
+                                                                      {}});
+                }
+            }
             continue;
         }
         const entity::projectiles::Kind* projectile = entity::projectiles::kindOf(entity->type());

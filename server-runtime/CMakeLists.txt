@@ -266,6 +266,8 @@ basalt_module(server-runtime-core
         src/world/EndPortals.cpp
         src/world/EnchantmentAttributes.cpp
         src/world/EndPodium.cpp
+        src/world/EndCrystals.cpp
+        src/entity/EnderDragon.cpp
         src/world/NetherPortalGrowth.cpp
         src/world/DamageProtection.cpp
         src/world/NaturalSpawnPredicates.cpp

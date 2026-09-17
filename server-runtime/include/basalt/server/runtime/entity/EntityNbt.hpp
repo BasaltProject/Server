@@ -25,6 +25,9 @@ using EntityById = std::function<ServerEntity*(std::int32_t entityId)>;
 /// A fresh runtime id. A saved id is not worth keeping: every run hands out its own.
 using AllocateEntityId = std::function<std::int32_t()>;
 
+/// A fresh runtime id for an entity of that type, which may take more than one.
+using AllocateEntityIdFor = std::function<std::int32_t(const wire::common::Identifier& type)>;
+
 /// The protocol number of a type, or nothing for one this build does not know.
 using ProtocolTypeOf = std::function<std::optional<std::int32_t>(const wire::common::Identifier& type)>;
 
@@ -43,6 +46,10 @@ using ProtocolTypeOf = std::function<std::optional<std::int32_t>(const wire::com
                                                                     const AllocateEntityId& allocateEntityId,
                                                                     const ProtocolTypeOf& protocolTypeOf);
 
+[[nodiscard]] std::vector<std::unique_ptr<ServerEntity>> decodeTree(const wire::nbt::NbtCompound& tag,
+                                                                    const AllocateEntityIdFor& allocateEntityId,
+                                                                    const ProtocolTypeOf& protocolTypeOf);
+
 /// Materializes one transformed structure entity through the same decoder used on chunk load.
 [[nodiscard]] std::unique_ptr<ServerEntity> decodeGenerated(const server::world::ChunkGeneratedEntity& descriptor,
                                                             std::int32_t entityId, std::int32_t protocolType);
@@ -50,6 +57,10 @@ using ProtocolTypeOf = std::function<std::optional<std::int32_t>(const wire::com
 /// Materializes one generated vehicle root and its passenger descriptors with fresh runtime ids.
 [[nodiscard]] std::vector<std::unique_ptr<ServerEntity>>
 decodeGeneratedTree(const server::world::ChunkGeneratedEntity& descriptor, const AllocateEntityId& allocateEntityId,
+                    const ProtocolTypeOf& protocolTypeOf);
+
+[[nodiscard]] std::vector<std::unique_ptr<ServerEntity>>
+decodeGeneratedTree(const server::world::ChunkGeneratedEntity& descriptor, const AllocateEntityIdFor& allocateEntityId,
                     const ProtocolTypeOf& protocolTypeOf);
 
 /// Vanilla uses byte, int and float tags while this server's older saves used doubles for the same

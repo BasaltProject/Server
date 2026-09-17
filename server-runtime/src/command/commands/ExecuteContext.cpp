@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/ExecuteArguments.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
+#include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
@@ -226,8 +227,8 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
                     }
                     const std::array<double, 3> at = context.source().position();
                     entity::ServerEntity& spawned = world->state().spawnEntity(std::make_unique<entity::ServerEntity>(
-                        registry->allocateEntityId(), wire::common::Uuid::random(), *id, type->protocolId, at[0], at[1],
-                        at[2]));
+                        registry->allocateEntityIds(entity::enderDragon::idSpan(*id)), wire::common::Uuid::random(),
+                        *id, type->protocolId, at[0], at[1], at[2]));
                     return {wrapping(context.source(),
                                      ExecutionSource::Changes{.entity = CommandTarget{spawned, world->name()}})};
                 });

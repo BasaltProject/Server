@@ -138,6 +138,8 @@ struct Fixture {
     std::vector<std::unique_ptr<PlayerSession>> players;
     std::vector<std::unique_ptr<Client>> clients;
     std::unique_ptr<LoadedWorld> world;
+    /// A second world, for what `execute in` has to reach.
+    std::unique_ptr<LoadedWorld> other;
     std::unique_ptr<basalt::server::storage::PlayerStore> store;
     CommandEnvironment environment;
     CommandDispatcher dispatcher;
@@ -147,11 +149,14 @@ struct Fixture {
         : world(std::make_unique<LoadedWorld>(
               config::WorldDeclaration{.name = "world", .type = config::WorldType::Flat, .isDefault = true},
               config::WorldSettings{}, WorldMetadata{}, root, basalt::wire::common::Logger{"Test"})),
+          other(std::make_unique<LoadedWorld>(
+              config::WorldDeclaration{.name = "other", .type = config::WorldType::Flat}, config::WorldSettings{},
+              WorldMetadata{}, root + "/other", basalt::wire::common::Logger{"Test"})),
           store(openStore(root)), environment(registry, options()), dispatcher(environment) {}
 
     [[nodiscard]] CommandEnvironment::Options options() {
         CommandEnvironment::Options built;
-        built.worlds = {{"world", world.get()}};
+        built.worlds = {{"world", world.get()}, {"other", other.get()}};
         return built;
     }
 
@@ -197,6 +202,15 @@ TEST_CASE("execute as and at change who and where the rest of the line runs") {
     // `at` takes the target's position, so `~ ~ ~` is theirs rather than the console's.
     CHECK(fixture.dispatcher.execute(fixture.source, "execute at Steve run setblock ~ ~ ~ minecraft:stone") == 1);
     CHECK(fixture.world->state().blockState(8, 40, 8).value_or(0) == blocks::stone().stateId);
+
+    // `@s` after `as` is whoever `as` handed on, once per player, not the console that typed it.
+    PlayerSession& alex = fixture.add("Alex");
+    alex.x = 4.0;
+    alex.y = 40.0;
+    alex.z = 4.0;
+    CHECK(fixture.dispatcher.execute(fixture.source, "execute as @a at @s run setblock ~ ~2 ~ minecraft:stone") == 2);
+    CHECK(fixture.world->state().blockState(8, 42, 8).value_or(0) == blocks::stone().stateId);
+    CHECK(fixture.world->state().blockState(4, 42, 4).value_or(0) == blocks::stone().stateId);
 }
 
 TEST_CASE("execute positioned and align move the position the rest of the line sees") {
@@ -225,6 +239,12 @@ TEST_CASE("execute in runs the line in the world it names") {
 
     CHECK(fixture.dispatcher.execute(fixture.source, "execute in world run setblock 1 40 1 minecraft:stone") == 1);
     CHECK(fixture.world->state().blockState(1, 40, 1).value_or(0) == blocks::stone().stateId);
+
+    // The world the console stands in is not the one the line was told to act in.
+    static_cast<void>(fixture.other->state().getOrGenerateChunk(0, 0));
+    CHECK(fixture.dispatcher.execute(fixture.source, "execute in other run setblock 2 40 2 minecraft:stone") == 1);
+    CHECK(fixture.other->state().blockState(2, 40, 2).value_or(0) == blocks::stone().stateId);
+    CHECK(fixture.world->state().blockState(2, 40, 2).value_or(0) != blocks::stone().stateId);
 }
 
 TEST_CASE("if and unless are the same test read two ways") {

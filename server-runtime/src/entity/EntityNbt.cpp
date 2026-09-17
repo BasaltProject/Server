@@ -185,7 +185,7 @@ NbtCompound encodeTreeNode(const ServerEntity& entity, const EntityById& entityB
 
 ServerEntity* decodeTreeNode(const NbtCompound& tag, ServerEntity* vehicle,
                              std::vector<std::unique_ptr<ServerEntity>>& entities,
-                             const AllocateEntityId& allocateEntityId, const ProtocolTypeOf& protocolTypeOf) {
+                             const AllocateEntityIdFor& allocateEntityId, const ProtocolTypeOf& protocolTypeOf) {
     const std::expected<Identifier, wire::common::IdentifierError> type = Identifier::parse(tag.getString("id"));
     if (!type.has_value() || !protocolTypeOf || !allocateEntityId) {
         return nullptr;
@@ -194,7 +194,7 @@ ServerEntity* decodeTreeNode(const NbtCompound& tag, ServerEntity* vehicle,
     if (!protocolType.has_value()) {
         return nullptr;
     }
-    std::unique_ptr<ServerEntity> decoded = decode(tag, allocateEntityId(), *protocolType);
+    std::unique_ptr<ServerEntity> decoded = decode(tag, allocateEntityId(*type), *protocolType);
     if (decoded == nullptr) {
         return nullptr;
     }
@@ -216,7 +216,8 @@ ServerEntity* decodeTreeNode(const NbtCompound& tag, ServerEntity* vehicle,
 
 ServerEntity* decodeGeneratedTreeNode(const server::world::ChunkGeneratedEntity& descriptor, ServerEntity* vehicle,
                                       std::vector<std::unique_ptr<ServerEntity>>& entities,
-                                      const AllocateEntityId& allocateEntityId, const ProtocolTypeOf& protocolTypeOf) {
+                                      const AllocateEntityIdFor& allocateEntityId,
+                                      const ProtocolTypeOf& protocolTypeOf) {
     if (!protocolTypeOf || !allocateEntityId) {
         return nullptr;
     }
@@ -224,7 +225,8 @@ ServerEntity* decodeGeneratedTreeNode(const server::world::ChunkGeneratedEntity&
     if (!protocolType.has_value()) {
         return nullptr;
     }
-    std::unique_ptr<ServerEntity> decoded = decodeGenerated(descriptor, allocateEntityId(), *protocolType);
+    std::unique_ptr<ServerEntity> decoded =
+        decodeGenerated(descriptor, allocateEntityId(descriptor.type), *protocolType);
     if (decoded == nullptr) {
         return nullptr;
     }
@@ -540,11 +542,20 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     return entity;
 }
 
-std::vector<std::unique_ptr<ServerEntity>> decodeTree(const NbtCompound& tag, const AllocateEntityId& allocateEntityId,
-                                                      const ProtocolTypeOf& protocolTypeOf) {
+std::vector<std::unique_ptr<ServerEntity>>
+decodeTree(const NbtCompound& tag, const AllocateEntityIdFor& allocateEntityId, const ProtocolTypeOf& protocolTypeOf) {
     std::vector<std::unique_ptr<ServerEntity>> entities;
     (void)decodeTreeNode(tag, nullptr, entities, allocateEntityId, protocolTypeOf);
     return entities;
+}
+
+std::vector<std::unique_ptr<ServerEntity>> decodeTree(const NbtCompound& tag, const AllocateEntityId& allocateEntityId,
+                                                      const ProtocolTypeOf& protocolTypeOf) {
+    if (!allocateEntityId) {
+        return {};
+    }
+    return decodeTree(tag, AllocateEntityIdFor{[&allocateEntityId](const Identifier&) { return allocateEntityId(); }},
+                      protocolTypeOf);
 }
 
 std::unique_ptr<ServerEntity> decodeGenerated(const server::world::ChunkGeneratedEntity& descriptor,
@@ -557,11 +568,22 @@ std::unique_ptr<ServerEntity> decodeGenerated(const server::world::ChunkGenerate
 }
 
 std::vector<std::unique_ptr<ServerEntity>> decodeGeneratedTree(const server::world::ChunkGeneratedEntity& descriptor,
-                                                               const AllocateEntityId& allocateEntityId,
+                                                               const AllocateEntityIdFor& allocateEntityId,
                                                                const ProtocolTypeOf& protocolTypeOf) {
     std::vector<std::unique_ptr<ServerEntity>> entities;
     (void)decodeGeneratedTreeNode(descriptor, nullptr, entities, allocateEntityId, protocolTypeOf);
     return entities;
+}
+
+std::vector<std::unique_ptr<ServerEntity>> decodeGeneratedTree(const server::world::ChunkGeneratedEntity& descriptor,
+                                                               const AllocateEntityId& allocateEntityId,
+                                                               const ProtocolTypeOf& protocolTypeOf) {
+    if (!allocateEntityId) {
+        return {};
+    }
+    return decodeGeneratedTree(
+        descriptor, AllocateEntityIdFor{[&allocateEntityId](const Identifier&) { return allocateEntityId(); }},
+        protocolTypeOf);
 }
 
 } // namespace basalt::server::runtime::entity::entityNbt

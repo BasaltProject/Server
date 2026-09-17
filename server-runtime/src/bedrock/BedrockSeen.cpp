@@ -100,6 +100,22 @@ void lookFrom(const wire::nbt::NbtCompound& data, const std::string_view path, S
     if (data.getBoolean("NoAI")) {
         line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::NoAi);
     }
+    if (data.getBoolean("Silent")) {
+        line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Silent);
+    }
+    // An owner is what being tamed is saved as, and without the flag a wolf wears no collar there.
+    if (data.contains("Owner")) {
+        line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Tamed);
+    }
+    // 26.2 made a saddle a slot rather than a boolean, so what says a pig is saddled is the slot
+    // being filled at all.
+    const wire::nbt::NbtCompound* worn = data.getCompound("equipment");
+    if (worn != nullptr && worn->contains("saddle")) {
+        line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Saddled);
+    }
+    if (data.getBoolean("ChestedHorse")) {
+        line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Chested);
+    }
 
     if (path == "sheep") {
         // The dye is numbered the same on both editions; being shorn is a flag here and a bit of

@@ -229,18 +229,28 @@ private:
         SourceModifier modifier;
         bool forks = false;
         CommandExecutor executor;
+        /// Where a modifier link was parsed from, so what follows it is parsed again for every
+        /// source it hands on.
+        const CommandNode* node = nullptr;
+        std::int32_t cursor = 0;
     };
 
     void registerCustom();
 
     CommandNode* registerBuilt(const Command& command);
 
+    /// `resolveTail` parses what follows this node's modifier for `source` itself rather than as a
+    /// stand-in, which is what running a tail again for one of its sources needs.
     [[nodiscard]] Parsed<std::vector<Link>> parse(StringReader& reader, const CommandNode& node,
-                                                  const CommandSource& source, const Arguments& arguments) const;
+                                                  const CommandSource& source, const Arguments& arguments,
+                                                  bool resolveTail = false) const;
 
     [[nodiscard]] Parsed<std::int32_t> runChain(const std::vector<Link>& links, std::size_t index,
                                                 const CommandSource& source, const std::string& input,
                                                 StringReader& reader, std::int32_t& successes) const;
+
+    [[nodiscard]] Parsed<std::int32_t> runTail(const Link& link, const CommandSource& source, const std::string& input,
+                                               std::int32_t& successes) const;
 
     void collect(StringReader& reader, const CommandNode& node, const CommandSource& source, const Arguments& arguments,
                  std::vector<std::pair<std::int32_t, wire::protocol::play::CommandSuggestion>>& out) const;

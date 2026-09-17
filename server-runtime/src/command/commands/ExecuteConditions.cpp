@@ -245,7 +245,7 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
 
     builder.literal("biome", [&execute, positive](const CommandNodeBuilder& form) {
         form.argument("pos", blockPosArgument(), [&execute, positive](const CommandNodeBuilder& pos) {
-            pos.argument("biome", resourceOrTagArgument("worldgen/biome"),
+            pos.argument("biome", resourceOrTagArgument("minecraft:worldgen/biome"),
                          [&execute, positive](const CommandNodeBuilder& biome) {
                              conditional(biome, execute, positive, matchesBiome);
                          });
@@ -254,15 +254,18 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
 
     builder.literal("function", [this, &execute, positive](const CommandNodeBuilder& form) {
         form.argument("name", functionArgument(), [this, &execute, positive](const CommandNodeBuilder& named) {
-            conditional(named, execute, positive, [this](const CommandContext& context) -> std::optional<std::int32_t> {
-                const auto* id = context.get<Identifier>("name");
-                if (hooks_.functions == nullptr || id == nullptr) {
-                    return std::nullopt;
-                }
-                const Parsed<std::int32_t> ran = hooks_.functions->run(context.dispatcher(), context.source(), *id);
-                const std::int32_t result = ran.value_or(0);
-                return result > 0 ? std::optional{result} : std::nullopt;
-            });
+            conditional(
+                named, execute, positive,
+                [this](const CommandContext& context) -> std::optional<std::int32_t> {
+                    const auto* id = context.get<Identifier>("name");
+                    if (hooks_.functions == nullptr || id == nullptr) {
+                        return std::nullopt;
+                    }
+                    const Parsed<std::int32_t> ran = hooks_.functions->run(context.dispatcher(), context.source(), *id);
+                    const std::int32_t result = ran.value_or(0);
+                    return result > 0 ? std::optional{result} : std::nullopt;
+                },
+                false);
         });
     });
 

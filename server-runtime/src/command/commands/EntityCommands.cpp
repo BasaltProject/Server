@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/EntityCommands.hpp>
+#include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
@@ -147,8 +148,8 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
         // (`EntityType.loadEntityRecursive`), so every tag a saved entity understands works here too.
         // Doing it by hand read two fields out of thirty: measured in `flechavibra`, where an arrow
         // summoned with `Motion` simply hung in the air because nothing applied it.
-        std::unique_ptr<entity::ServerEntity> entity =
-            entity::entityNbt::decode(tag, players_->allocateEntityId(), type->protocolId);
+        std::unique_ptr<entity::ServerEntity> entity = entity::entityNbt::decode(
+            tag, players_->allocateEntityIds(entity::enderDragon::idSpan(type->id)), type->protocolId);
         if (entity == nullptr) {
             return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.summon.failed")}};
         }
@@ -385,7 +386,17 @@ SwingCommand::SwingCommand() : Command("swing", permissionLevel::kGamemasters) {
 
 void SwingCommand::build(const CommandNodeBuilder& root) const {
     const auto swing = [](const CommandContext& context, bool offhand) -> Parsed<std::int32_t> {
-        const std::vector<CommandTarget>& targets = targetsOf(context, "targets");
+        // parity: the bare form swings whoever ran it, and needs that to be an entity.
+        std::vector<CommandTarget> caller;
+        const auto* named = context.get<std::vector<CommandTarget>>("targets");
+        if (named == nullptr) {
+            const Parsed<player::PlayerSession*> self = context.requireEntity();
+            if (!self.has_value()) {
+                return std::unexpected{self.error()};
+            }
+            caller.emplace_back(**self);
+        }
+        const std::vector<CommandTarget>& targets = named == nullptr ? caller : *named;
         const std::uint8_t action = offhand ? play::AnimatePacket::kSwingOffHand : play::AnimatePacket::kSwingMainHand;
         for (const CommandTarget& target : targets) {
             const play::AnimatePacket packet{.entityId = target.entityId(), .action = action};
@@ -412,6 +423,7 @@ void SwingCommand::build(const CommandNodeBuilder& root) const {
             true);
         return static_cast<std::int32_t>(targets.size());
     };
+    root.executes([swing](const CommandContext& context) { return swing(context, false); });
     root.argument("targets", entitiesArgument(false), [swing](const CommandNodeBuilder& targets) {
         targets.executes([swing](const CommandContext& context) { return swing(context, false); });
         for (const bool offhand : {false, true}) {

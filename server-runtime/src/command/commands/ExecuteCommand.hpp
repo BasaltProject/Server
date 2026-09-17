@@ -36,7 +36,9 @@ inline constexpr double kDegreesPerRadian = 57.2957795130823;
 /// there. parity: `ExecuteCommand.addConditional`, which declares both on the same node.
 using Test = std::function<std::optional<std::int32_t>(const CommandContext&)>;
 
-void conditional(const CommandNodeBuilder& builder, CommandNode& execute, bool positive, Test test);
+/// `terminal` false leaves only the fork, so the line cannot end there. parity: `if function`.
+void conditional(const CommandNodeBuilder& builder, CommandNode& execute, bool positive, Test test,
+                 bool terminal = true);
 
 /// A store node: wraps the source so whatever the chain ends up running reports back here.
 ///

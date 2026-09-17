@@ -201,3 +201,46 @@ TEST_CASE("a killing hit tells everyone watching and starts the death the entity
     CHECK(fixture.base.sentCount(play::EntityEventPacket::kId) == 1);
     CHECK(fixture.base.sentCount(play::DamageEventPacket::kId) == 1);
 }
+
+TEST_CASE("an arrow sets a crystal off, and its blast hurts a mob and takes a second crystal quietly") {
+    Fixture base{scratch("combat-crystal")};
+    RealLootTables tables{base.jar()};
+    BlockChangeBroadcaster broadcaster{base.registry, tables, {}, {.nextSeed = [] { return std::int64_t{3}; }}};
+    CombatSystem* combatPointer = nullptr;
+    ExplosionSystem explosions{base.registry,
+                               tables,
+                               {.struck =
+                                    [&combatPointer](LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                                     double x, double y, double z, float power, std::int32_t source) {
+                                        combatPointer->hurtByExplosion(world, watchers, x, y, z, power, source);
+                                    }},
+                               {.nextSeed = [] { return std::int64_t{3}; }}};
+    CombatSystem combat{broadcaster,
+                        explosions,
+                        {},
+                        {.nextInt = [](std::int32_t) { return 0; }, .nextSeed = [] { return std::int64_t{3}; }}};
+    combatPointer = &combat;
+
+    ServerEntity& crystal = spawnAt(base, 40, "end_crystal", 8.0, 64.0, 10.0);
+    ServerEntity& neighbour = spawnAt(base, 42, "end_crystal", 8.0, 64.0, 14.0);
+    ServerEntity& cow = spawnAt(base, 43, "cow", 10.0, 64.0, 10.0);
+    ServerEntity& arrow = spawnAt(base, 41, "arrow", 8.0, 64.0, 8.0);
+    arrow.ownerId = 1;
+    arrow.velocityZ = 3.0;
+
+    base.player->x = 12.0;
+    base.player->y = 64.0;
+    base.player->z = 10.0;
+    const std::vector<ServerEntity*> living{&crystal, &neighbour, &cow};
+    base.packets.clear();
+    combat.tickProjectile(*base.world, base.watchers(), living, arrow,
+                          basalt::server::runtime::entity::projectiles::arrow());
+
+    CHECK(arrow.removed);
+    CHECK(crystal.removed);
+    // parity: `EndCrystal.hurtServer` sets off nothing when the hit is itself an explosion.
+    CHECK(neighbour.removed);
+    CHECK(base.sentCount(play::ExplodePacket::kId) == 1);
+    CHECK(cow.health < 10.0);
+    CHECK(base.hurt > 0.0F);
+}

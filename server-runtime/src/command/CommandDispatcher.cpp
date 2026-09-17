@@ -13,6 +13,36 @@
 namespace basalt::server::runtime::command {
 namespace {
 
+/// The source a line is parsed against past an `/execute` modifier. Everything is the typist's; it
+/// only lets a selector come up empty, since the sources that will really run are not known yet.
+class DeferredSource final : public CommandSource {
+public:
+    explicit DeferredSource(const CommandSource& typist) : typist_(&typist) {}
+
+    [[nodiscard]] std::string name() const override { return typist_->name(); }
+
+    [[nodiscard]] wire::text::Component displayName() const override { return typist_->displayName(); }
+
+    [[nodiscard]] std::int32_t permissionLevel() const override { return typist_->permissionLevel(); }
+
+    [[nodiscard]] std::array<double, 3> position() const override { return typist_->position(); }
+
+    [[nodiscard]] player::PlayerSession* player() const override { return typist_->player(); }
+
+    void sendSystemMessage(const wire::text::Component& message) const override { typist_->sendSystemMessage(message); }
+
+    [[nodiscard]] bool hasPermission(std::optional<std::string_view> node) const override {
+        return typist_->hasPermission(node);
+    }
+
+    [[nodiscard]] const ExecutionSource* asExecution() const override { return typist_->asExecution(); }
+
+    [[nodiscard]] bool defersSelectors() const override { return true; }
+
+private:
+    const CommandSource* typist_;
+};
+
 using wire::protocol::play::CommandNodeData;
 using wire::protocol::play::CommandsPacket;
 using wire::protocol::play::CommandSuggestion;
@@ -88,19 +118,12 @@ Parsed<player::PlayerSession*> CommandContext::requirePlayer() const {
 }
 
 Parsed<world::LoadedWorld*> CommandContext::world() const {
-    const std::map<std::string, world::LoadedWorld*, std::less<>>& worlds = environment().options().worlds;
-    if (const player::PlayerSession* player = source_->player(); player != nullptr) {
-        if (const auto found = worlds.find(player->worldName); found != worlds.end()) {
-            return found->second;
-        }
-    }
-    if (const auto found = worlds.find(environment().options().defaultWorldName); found != worlds.end()) {
-        return found->second;
-    }
-    if (worlds.empty()) {
+    // parity: `CommandSourceStack.getLevel`, which is the world `/execute in` chose when it chose one.
+    world::LoadedWorld* found = worldIn(*source_, environment());
+    if (found == nullptr) {
         return std::unexpected{CommandSyntaxError{.component = Component::text("No world is loaded.")}};
     }
-    return worlds.begin()->second;
+    return found;
 }
 
 Parsed<player::PlayerSession*> CommandContext::requireEntity() const {
@@ -202,12 +225,8 @@ CommandNode* CommandDispatcher::registerBuilt(const Command& command) {
     if (!override.enabled) {
         return nullptr;
     }
-    // A second registration of the same name takes the first one's place rather than standing
-    // beside it. The wiring does exactly that on purpose: the plain `/whitelist` goes in first and
-    // the one that can reach the running server goes in after it, and leaving both in the tree
-    // gives every client two root children with one name. Safe because `registerCommand` holds the
-    // one the nodes were built from: the nodes keep references into it, so letting it go here would
-    // leave the tree reading freed memory.
+    // A second registration replaces the first so clients do not see two roots with one name.
+    // `registerCommand` keeps the old one alive because the nodes still reference it.
     const CommandNode* replaced = nullptr;
     for (const std::unique_ptr<CommandNode>& child : root_.children()) {
         if (child->kind() == NodeKind::Literal && child->redirect == nullptr && child->name() == command.name()) {
@@ -335,12 +354,12 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
         if (sources.size() != 1) {
             return 0;
         }
-        return runChain(links, index + 1, *sources.front(), input, reader, successes);
+        return runTail(link, *sources.front(), input, successes);
     }
     std::int32_t worked = 0;
     for (const std::shared_ptr<const CommandSource>& next : sources) {
         // One branch failing is not the others' problem: vanilla runs the rest and counts.
-        const Parsed<std::int32_t> result = runChain(links, index + 1, *next, input, reader, successes);
+        const Parsed<std::int32_t> result = runTail(link, *next, input, successes);
         if (result.has_value() && *result > 0) {
             worked++;
         }
@@ -348,10 +367,27 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
     return worked;
 }
 
+Parsed<std::int32_t> CommandDispatcher::runTail(const Link& link, const CommandSource& source, const std::string& input,
+                                                std::int32_t& successes) const {
+    // The tail was parsed for whoever typed the line; `@s` and `~` mean the source it reaches now.
+    StringReader reader{input};
+    reader.setCursor(link.cursor);
+    const Parsed<std::vector<Link>> reparsed = parse(reader, *link.node, source, {}, true);
+    if (!reparsed.has_value()) {
+        return std::unexpected{reparsed.error()};
+    }
+    return runChain(*reparsed, 1, source, input, reader, successes);
+}
+
 Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringReader& reader, const CommandNode& node,
-                                                                      const CommandSource& source,
-                                                                      const Arguments& arguments) const {
+                                                                      const CommandSource& typist,
+                                                                      const Arguments& arguments,
+                                                                      const bool resolveTail) const {
     CommandNode* redirect = node.redirect;
+    const std::int32_t entry = reader.cursor();
+    // Past a modifier the line is only checked for shape: it runs, and resolves, once per source.
+    const DeferredSource deferred{typist};
+    const CommandSource& source = redirect != nullptr && node.modifier && !resolveTail ? deferred : typist;
     if (!reader.canRead()) {
         return std::vector<Link>{Link{.arguments = arguments, .executor = node.executor}};
     }
@@ -403,7 +439,11 @@ Parsed<std::vector<CommandDispatcher::Link>> CommandDispatcher::parse(StringRead
                 if (redirect == nullptr) {
                     return tail;
                 }
-                std::vector<Link> chained{Link{.arguments = arguments, .modifier = node.modifier, .forks = node.forks}};
+                std::vector<Link> chained{Link{.arguments = arguments,
+                                               .modifier = node.modifier,
+                                               .forks = node.forks,
+                                               .node = &node,
+                                               .cursor = entry}};
                 chained.insert(chained.end(), tail->begin(), tail->end());
                 return chained;
             }

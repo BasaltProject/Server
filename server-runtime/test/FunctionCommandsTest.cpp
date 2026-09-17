@@ -300,6 +300,27 @@ TEST_CASE("return only works inside a function, and stops the rest of it") {
     CHECK(all.find("never") == std::string::npos);
 }
 
+TEST_CASE("return run hands the nested command's result back as the function's") {
+    Fixture fixture{scratch("function-return-run")};
+    const std::string root =
+        packWith(scratch("function-return-run-packs"), "forwarded", {"return run say first", "say never"});
+    FunctionLibrary library{root};
+    library.reload();
+    commands::FunctionRunner runner{library};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(library, runner));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::ReturnCommand>(runner));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
+
+    fixture.add("Steve");
+    CHECK(fixture.dispatcher.execute(fixture.source, "function test:forwarded") == 1);
+    std::string all;
+    for (const Component& line : fixture.clients[0]->messages) {
+        all += flatten(line);
+    }
+    CHECK(all.find("first") != std::string::npos);
+    CHECK(all.find("never") == std::string::npos);
+}
+
 TEST_CASE("a function that calls itself is stopped rather than left to recurse") {
     Fixture fixture{scratch("function-recursion")};
     const std::string root = packWith(scratch("function-recursion-packs"), "loop", {"function test:loop"});

@@ -52,6 +52,18 @@ public:
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& entity,
                         const entity::projectiles::Kind& kind);
 
+    /// A hit on an end crystal, which destroys it whatever the damage. `byExplosion` leaves it
+    /// gone without a blast of its own. parity: `EndCrystal.hurtServer`.
+    void hitCrystal(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    entity::ServerEntity& crystal, bool byExplosion, bool byDragon = false);
+
+    /// What a blast does to the entities around it that are not players or items.
+    ///
+    /// parity: `ServerExplosion.hurtEntities`, which reaches twice the power and skips the entity
+    /// that went off.
+    void hurtByExplosion(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
+                         double y, double z, float power, std::int32_t sourceEntityId);
+
     /// The flash, the push and the sound of an entity being hit by something that is not a player.
     void announceEntityHit(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& entity,
                            const wire::common::Identifier& damageType, std::int32_t causeEntityId, bool died);

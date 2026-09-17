@@ -75,6 +75,9 @@ struct TemplatePlacement {
     std::optional<std::int64_t> worldSeed;
     bool ignoreStructureBlocks = false;
     bool ignoreAir = false;
+    /// Runs the processors over every block and clips only the write, so a pass per chunk draws
+    /// the same stream. parity: `processBlockInfos` with no bounding box.
+    bool wholePiece = false;
     std::optional<std::int32_t> gravityOffset;
 };
 

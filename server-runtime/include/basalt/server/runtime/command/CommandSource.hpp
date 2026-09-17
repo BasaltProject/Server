@@ -80,6 +80,11 @@ public:
     /// Asked rather than cast: there is no RTTI here, so a source that wants to be recognised says
     /// so itself. `/execute` is the only thing that asks.
     [[nodiscard]] virtual const ExecutionSource* asExecution() const { return nullptr; }
+
+    /// Whether this source only stands in for the ones an `/execute` link will hand on, so a
+    /// selector that matches nobody here is no error yet. parity: brigadier resolves a selector
+    /// when the command runs, once per source, not when it parses.
+    [[nodiscard]] virtual bool defersSelectors() const { return false; }
 };
 
 /// The console. Permission `kOwners`, like vanilla's own `MinecraftServer` source: whoever can type

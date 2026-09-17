@@ -118,6 +118,10 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         static_cast<void>(world.state().hurtItem(item.entityId, static_cast<std::int32_t>(damage)));
     }
 
+    if (hooks_.struck) {
+        hooks_.struck(world, watchers, x, y, z, power, sourceEntityId);
+    }
+
     for (const world::explosions::Broken& block : broken) {
         sendBlock(watchers, block.x, block.y, block.z, reg::blocks::air().stateId);
         if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(block.stateId); state.has_value()) {
