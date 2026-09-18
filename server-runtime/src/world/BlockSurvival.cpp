@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockConnections.hpp>
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
@@ -113,16 +114,19 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
 /// Sugar cane asks about the last of those and kelp about the first, and neither can be answered
 /// from the block alone. Asking generously is deliberate: it can only keep a block standing.
 [[nodiscard]] bool waterAbout(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    // The block's own square: today no block that needs support and cares about water is itself a
-    // water-holding state, so this only ever says yes where the neighbours would too.
-    if (registry::blockSupport::holdsWater(stateAt(world, x, y, z))) {
+    // parity: the jar asks `getFluidState(...).is(FluidTags.WATER)`, the **fluid**, so seagrass, kelp
+    // and a bubble column count. `holdsWater` only knows water and the waterlogged, and the block's own
+    // square is exactly where that failed: `TallSeagrassBlock.canSurvive` wants full water where it
+    // stands, and once it stands there the square is tall seagrass. Measured in `plantasagua`, whose
+    // control column was never placed.
+    if (registry::blockFluids::hasWaterFluid(stateAt(world, x, y, z))) {
         return true;
     }
     for (const std::int32_t level : {y, y - 1}) {
-        if (registry::blockSupport::holdsWater(stateAt(world, x - 1, level, z)) ||
-            registry::blockSupport::holdsWater(stateAt(world, x + 1, level, z)) ||
-            registry::blockSupport::holdsWater(stateAt(world, x, level, z - 1)) ||
-            registry::blockSupport::holdsWater(stateAt(world, x, level, z + 1))) {
+        if (registry::blockFluids::hasWaterFluid(stateAt(world, x - 1, level, z)) ||
+            registry::blockFluids::hasWaterFluid(stateAt(world, x + 1, level, z)) ||
+            registry::blockFluids::hasWaterFluid(stateAt(world, x, level, z - 1)) ||
+            registry::blockFluids::hasWaterFluid(stateAt(world, x, level, z + 1))) {
             return true;
         }
     }

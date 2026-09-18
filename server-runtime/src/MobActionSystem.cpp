@@ -202,6 +202,9 @@ void MobActionSystem::hurtPlayer(ServerEntity& mob, std::int32_t playerId, float
     if (world == nullptr || !player->connection().hurt) {
         return;
     }
+    if (!wardenSwings(*world, mob)) {
+        return;
+    }
     // parity: `Player.hurtServer`, where the difficulty decides how much of it lands.
     player->connection().hurt(
         player::combat::afterDifficulty(damage, world->difficulty()), kDeathMob, world::damageTypes::kMobAttack,
@@ -217,7 +220,7 @@ void MobActionSystem::hurtPlayer(ServerEntity& mob, std::int32_t playerId, float
 
 void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float damage) {
     world::LoadedWorld* world = worldOf(target);
-    if (world == nullptr) {
+    if (world == nullptr || !wardenSwings(*world, mob)) {
         return;
     }
     const entity::entityCombat::Result result =

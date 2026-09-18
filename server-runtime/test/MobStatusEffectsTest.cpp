@@ -87,3 +87,21 @@ TEST_CASE("effects survive a save") {
     CHECK(copy.effects.at(mobEffects::haste()).amplifier == 2);
     CHECK(copy.effects.at(mobEffects::haste()).remainingTicks == 77);
 }
+
+TEST_CASE("strength and speed change the mob's own attributes while they last") {
+    ServerEntity zombie = mobOf("zombie");
+    const double damage = zombie.attributeWithModifiers("minecraft:attack_damage");
+    const double speed = zombie.attributeWithModifiers("minecraft:movement_speed");
+    REQUIRE(effects::add(zombie,
+                         ActiveEffect{.effect = Identifier::vanilla("strength"), .amplifier = 1, .remainingTicks = 2}));
+    REQUIRE(effects::add(zombie, ActiveEffect{.effect = Identifier::vanilla("slowness"), .remainingTicks = 20}));
+    CHECK(zombie.attributeWithModifiers("minecraft:attack_damage") == doctest::Approx(damage + 6.0));
+    CHECK(zombie.attributeWithModifiers("minecraft:movement_speed") ==
+          doctest::Approx(speed * (1.0 + static_cast<double>(-0.15F))));
+    std::vector<Identifier> expired;
+    static_cast<void>(effects::tick(zombie, expired));
+    static_cast<void>(effects::tick(zombie, expired));
+    CHECK(zombie.attributeWithModifiers("minecraft:attack_damage") == doctest::Approx(damage));
+    effects::clear(zombie);
+    CHECK(zombie.attributeWithModifiers("minecraft:movement_speed") == doctest::Approx(speed));
+}

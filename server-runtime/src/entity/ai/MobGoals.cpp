@@ -294,6 +294,7 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         // parity: `Warden.registerGoals` has no target goal at all: the anger it has heard is what
         // decides who it walks to, and there is nobody until it has heard somebody.
         add<FloatGoal>(selector, 0);
+        add<WardenBusyGoal>(selector, 0);
         add<MeleeAttackGoal>(selector, 4, 1.0);
         monsterTail(selector);
         add<AngerTargetGoal>(selector, 1);

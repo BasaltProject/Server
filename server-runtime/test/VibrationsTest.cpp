@@ -552,3 +552,44 @@ TEST_CASE("a sensor the terrain wrote counts too, block entity or not") {
     CHECK(world.hasSculkSensorNear(8.5, 64.5, 8.5, vibrations::kRange));
     CHECK_FALSE(world.hasSculkSensorNear(30.5, 64.5, 8.5, vibrations::kRange));
 }
+
+TEST_CASE("a sensor's click reaches a shrieker only when a player made the noise") {
+    // parity: `SculkSensorBlock.activate` raises `sculk_sensor_tendrils_clicking` with the first
+    // noise's source, and `SculkShriekerBlockEntity.VibrationUser` hears it only through a player.
+    const basalt::wire::common::Uuid player{1, 2};
+    const std::int32_t quietShrieker =
+        stateOf("sculk_shrieker", {{"shrieking", "false"}, {"can_summon", "false"}, {"waterlogged", "false"}});
+    for (const bool byPlayer : {true, false}) {
+        CAPTURE(byPlayer);
+        Bench bench;
+        // parity: a shrieker only takes a noise while the three by three chunks around it run.
+        for (std::int32_t chunkX = -1; chunkX <= 1; ++chunkX) {
+            for (std::int32_t chunkZ = -1; chunkZ <= 1; ++chunkZ) {
+                bench.world.getOrGenerateChunk(chunkX, chunkZ);
+            }
+        }
+        bench.world.setPlayerCheck([player](const basalt::wire::common::Uuid& entity) { return entity == player; });
+        REQUIRE(bench.world.setBlockState(2, 64, 8, sleepingSensor()));
+        REQUIRE(bench.world.setBlockState(6, 64, 8, quietShrieker));
+
+        const vibrations::Source source = byPlayer ? vibrations::Source{.entity = player}
+                                                   : vibrations::Source{.entity = basalt::wire::common::Uuid{7, 7}};
+        vibrations::emit(bench.world, "eat", 2.5, 64.5, 8.5, bench.now, source);
+        std::vector<vibrations::ShriekerArrival> arrivals;
+        for (std::int32_t turn = 0; turn < 8; ++turn) {
+            bench.advance();
+            if (const std::optional<vibrations::ShriekerArrival> arrival =
+                    vibrations::shriekerTravelTick(bench.world, 6, 64, 8, bench.now);
+                arrival.has_value()) {
+                arrivals.push_back(*arrival);
+            }
+        }
+        REQUIRE(propertyOf(*bench.world.blockState(2, 64, 8), "sculk_sensor_phase") != "inactive");
+        if (byPlayer) {
+            REQUIRE(arrivals.size() == 1);
+            CHECK(arrivals.front().source.entity == player);
+        } else {
+            CHECK(arrivals.empty());
+        }
+    }
+}

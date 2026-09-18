@@ -5,7 +5,10 @@
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
@@ -538,6 +541,19 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
             return true;
         }
         emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z);
+        // parity: `Warden.hurtServer` angers it at whoever shot, and fights them within five blocks.
+        if (arrow.ownerId.has_value() && entity::wardens::isWarden(target->mob->type())) {
+            static_cast<void>(entity::wardens::anger(*target->mob, *arrow.ownerId, entity::wardens::kHurt));
+            for (const PlayerSession* shooter : watchers) {
+                if (shooter->entityId() == *arrow.ownerId) {
+                    const double dx = shooter->x - target->mob->x;
+                    const double dy = shooter->y - target->mob->y;
+                    const double dz = shooter->z - target->mob->z;
+                    MobActionSystem::wardenStruck(*target->mob, *arrow.ownerId, false,
+                                                  (dx * dx) + (dy * dy) + (dz * dz));
+                }
+            }
+        }
         arrow.removed = true;
         rememberShooter(watchers, arrow, *target->mob);
         if (arrow.ownerId.has_value()) {
@@ -590,6 +606,10 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         }
         if (world::endCrystals::isCrystal(entity->type())) {
             hitCrystal(world, watchers, *entity, true);
+            continue;
+        }
+        // parity: `Warden.ignoreExplosion` while it is rising or burrowing.
+        if (entity::wardenBrain::isDiggingOrEmerging(*entity)) {
             continue;
         }
         if (ExperienceOrbSystem::isOrb(*entity)) {

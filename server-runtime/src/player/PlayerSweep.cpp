@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -59,6 +60,7 @@ std::vector<SweepHit> sweepAround(PlayerSession& session, world::LoadedWorld& wo
             // parity: `Warden.hurtServer`, which adds the angry threshold plus twenty to whoever hit it.
             if (entity::wardens::isWarden(nearby->type())) {
                 entity::wardens::anger(*nearby, session.entityId(), entity::wardens::kHurt);
+                MobActionSystem::wardenStruck(*nearby, session.entityId(), true, 0.0);
             }
             nearby->panicTicks = kPanicTicks;
         }

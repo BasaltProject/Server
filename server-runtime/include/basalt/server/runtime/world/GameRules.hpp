@@ -87,6 +87,9 @@ inline constexpr GameRule kSpawnPhantoms = GameRule::boolean("spawn_phantoms", t
 /// parity: the custom pillager patrol spawner's independent switch.
 inline constexpr GameRule kSpawnPatrols = GameRule::boolean("spawn_patrols", true);
 
+/// parity: `GameRules.SPAWN_WARDENS`, which a shrieker asks before it answers.
+inline constexpr GameRule kSpawnWardens = GameRule::boolean("spawn_wardens", true);
+
 /// parity: the periodic trader spawner's independent switch.
 inline constexpr GameRule kSpawnWanderingTraders = GameRule::boolean("spawn_wandering_traders", true);
 

@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/WardenBrain.hpp>
 
 #include <algorithm>
 #include <array>
@@ -283,6 +284,12 @@ Identifier wardens::type() { return Identifier::vanilla("warden"); }
 bool wardens::isWarden(const Identifier& type) { return type == wardens::type(); }
 
 std::int32_t wardens::anger(ServerEntity& warden, std::int32_t suspectId, std::int32_t amount) {
+    // parity: a burrowing or rising warden hears nothing and minds no hit.
+    if (wardenBrain::isDiggingOrEmerging(warden) || warden.noAi) {
+        return angerAt(warden, suspectId);
+    }
+    // parity: `increaseAngerAt` keeps a running dig cooldown running.
+    wardenBrain::refreshDigCooldown(warden);
     if (!warden.anger.has_value()) {
         warden.anger.emplace();
     }

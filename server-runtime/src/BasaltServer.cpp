@@ -527,7 +527,22 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         RedstoneTickSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                     .jukeboxes = &vanillaData_.jukeboxSongs,
                                     .itemTags = &vanillaData_.itemTags,
-                                    .blockTags = &vanillaData_.blockTags});
+                                    .blockTags = &vanillaData_.blockTags,
+                                    .steppedOn =
+                                        [this](world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x,
+                                               std::int32_t y, std::int32_t z) {
+                                            if (shriekers_ != nullptr) {
+                                                shriekers_->steppedOn(world, player, x, y, z);
+                                            }
+                                        },
+                                    .foreignTick =
+                                        [this](world::LoadedWorld& world,
+                                               const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                                               std::int32_t y, std::int32_t z) {
+                                            if (shriekers_ != nullptr) {
+                                                shriekers_->scheduledTick(world, watchers, x, y, z);
+                                            }
+                                        }});
     raids_ = std::make_unique<RaidSystem>(playerRegistry_, *broadcaster_, *spawning_, RaidSystem::Hooks{},
                                           RaidSystem::Options{.nextSeed = [] { return scratchSeed(); }}, logger_);
     statusEffects_ = std::make_unique<StatusEffectSystem>(
@@ -561,6 +576,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                           vanillaData_.lootTables, model.allWorlds, std::move(mobHooks),
                                           MobActionSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                                                    .nextDouble = [] { return scratchDouble(); }});
+    shriekers_ = std::make_unique<ShriekerSystem>(playerRegistry_, *broadcaster_, *spawning_, *mobActions_,
+                                                  ShriekerSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_);
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_);
 

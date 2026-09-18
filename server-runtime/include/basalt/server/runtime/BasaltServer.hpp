@@ -22,6 +22,7 @@
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/ServerListStatus.hpp>
 #include <basalt/server/runtime/ServerMetrics.hpp>
+#include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/StatusEffectSystem.hpp>
 #include <basalt/server/runtime/SubstituteLabels.hpp>
 #include <basalt/server/runtime/TickLoop.hpp>
@@ -250,6 +251,7 @@ private:
     std::unique_ptr<FishingSystem> fishing_;
     std::unique_ptr<WitherSystem> withers_;
     std::unique_ptr<LightningBoltSystem> lightning_;
+    std::unique_ptr<ShriekerSystem> shriekers_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
     std::unique_ptr<EndFightSystem> endFight_;

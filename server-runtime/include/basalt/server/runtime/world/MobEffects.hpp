@@ -36,6 +36,12 @@ namespace mobEffects {
 
 [[nodiscard]] std::vector<wire::common::Identifier> ids();
 
+/// parity: the colour an effect is registered with, which its `entity_effect` swirl is drawn in.
+[[nodiscard]] std::optional<std::int32_t> colorOf(const wire::common::Identifier& effect);
+
+/// The particle an effect is drawn with instead of the coloured swirl, for the two omens that have one.
+[[nodiscard]] std::optional<std::string_view> ownParticleOf(const wire::common::Identifier& effect);
+
 /// parity: the four that act on a tick rather than by being present.
 [[nodiscard]] const wire::common::Identifier& regeneration();
 [[nodiscard]] const wire::common::Identifier& poison();
@@ -47,6 +53,7 @@ namespace mobEffects {
 [[nodiscard]] const wire::common::Identifier& instantDamage();
 
 [[nodiscard]] const wire::common::Identifier& haste();
+[[nodiscard]] const wire::common::Identifier& darkness();
 [[nodiscard]] const wire::common::Identifier& miningFatigue();
 
 /// parity: the three a raid runs on: the omen, what it turns into, and what winning gives.

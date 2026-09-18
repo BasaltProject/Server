@@ -201,6 +201,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // parity: `Warden.hurtServer`, which adds the angry threshold plus twenty to whoever hit it.
     if (entity::wardens::isWarden(target->type())) {
         entity::wardens::anger(*target, session->entityId(), entity::wardens::kHurt);
+        MobActionSystem::wardenStruck(*target, session->entityId(), true, 0.0);
     }
     target->panicTicks = kPanicTicks;
     // parity: `OwnerHurtTargetGoal`, which sends a pet after whatever its owner just hit.
