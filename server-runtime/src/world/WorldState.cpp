@@ -514,13 +514,19 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
             if (furnaces::cookerFor(held->type().path()).has_value()) {
                 falling.recipesUsed = furnaces::recipesUsedIn(held->data());
             }
-            for (const std::optional<server::world::loot::ItemStack>& slot :
-                 blockInventory::readFor(held->type().path(), held->data(), *size)) {
-                if (slot.has_value() && slot->count > 0) {
-                    falling.stacks.push_back(*slot);
+            blockInventory::Slots slots = blockInventory::readFor(held->type().path(), held->data(), *size);
+            if (const std::string_view table = held->data().getString("LootTable"); !table.empty()) {
+                falling.lootTable = std::string{table};
+                falling.lootSeed = held->data().getLong("LootTableSeed");
+                falling.lootSlots = std::move(slots);
+            } else {
+                for (const std::optional<server::world::loot::ItemStack>& slot : slots) {
+                    if (slot.has_value() && slot->count > 0) {
+                        falling.stacks.push_back(*slot);
+                    }
                 }
             }
-            if (!falling.stacks.empty() || !falling.recipesUsed.empty()) {
+            if (!falling.stacks.empty() || !falling.recipesUsed.empty() || falling.lootTable.has_value()) {
                 spilled_.push_back(std::move(falling));
             }
         }

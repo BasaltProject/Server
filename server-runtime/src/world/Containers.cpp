@@ -331,6 +331,8 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     if (!size.has_value()) {
         return std::nullopt;
     }
+    // parity: `getRedstoneSignalFromContainer` reads every slot, which unpacks a pending table.
+    world.unpackLoot(x, y, z);
     const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     if (chunk == nullptr) {
         return 0;

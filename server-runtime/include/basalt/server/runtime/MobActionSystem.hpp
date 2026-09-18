@@ -5,6 +5,9 @@
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
+#include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 
@@ -23,6 +26,10 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 class RealLootTables;
 } // namespace basalt::server::runtime::world
+
+namespace basalt::server::runtime::world {
+class RealRecipes;
+}
 
 namespace basalt::server::runtime {
 
@@ -56,12 +63,22 @@ public:
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
         /// A wither's middle head firing at its target, which is its ranged attack.
         std::function<void(world::LoadedWorld& world, entity::ServerEntity& wither)> witherShoots;
+        /// A chest's viewer count changed because a golem opened or left it: the lid and its sound.
+        std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t openers)>
+            openersChanged;
     };
 
     /// The rolls a mob's turn needs, none of which is part of the level's own stream.
     struct Options {
         std::function<std::int64_t()> nextSeed;
+        /// The entity type tags, which a death roll asks about its killer.
+        const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
         std::function<double()> nextDouble;
+        /// What a furnace makes of an item, which a mob that burned to death drops.
+        const world::RealRecipes* recipes = nullptr;
+        /// The damage type tags, which a death roll asks about what killed it.
+        const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
     };
 
     /// Which worlds a mob might be in, since a goal only ever hands over the mob itself.
@@ -110,6 +127,32 @@ public:
     void shootArrow(entity::ServerEntity& mob, double targetX, double targetY, double targetZ, float power) override;
 
     void wardenRoar(entity::ServerEntity& warden, std::int32_t targetId) override;
+
+    void golemOpensChest(entity::ServerEntity& golem, std::int32_t x, std::int32_t y, std::int32_t z,
+                         bool open) override;
+
+    [[nodiscard]] bool chestInUse(const entity::ServerEntity& mob, std::int32_t x, std::int32_t y,
+                                  std::int32_t z) override;
+
+    void mobSound(entity::ServerEntity& mob, std::string_view sound) override;
+
+    void heldItemChanged(entity::ServerEntity& mob) override;
+
+    void containerChanged(entity::ServerEntity& mob, std::int32_t x, std::int32_t y, std::int32_t z) override;
+
+    /// The copper golem's own turn: its weathering, the statue it may become and the cooldown its
+    /// chest rounds wait on. parity: `CopperGolem.tick` and the brain's core countdown.
+    void tickCopperGolem(world::LoadedWorld& world, entity::ServerEntity& golem, random::RandomSource& random);
+
+    /// What using an item on a copper golem did to the item. parity: `CopperGolem.mobInteract`.
+    enum class GolemUse : std::uint8_t { Pass, Done, ConsumeOne, DamageTool };
+
+    [[nodiscard]] GolemUse useOnCopperGolem(world::LoadedWorld& world, player::PlayerSession& player,
+                                            entity::ServerEntity& golem,
+                                            const std::optional<wire::common::Identifier>& held);
+
+    /// parity: `CopperGolem.thunderHit`.
+    void golemStruckByLightning(entity::ServerEntity& golem, std::int32_t boltId);
 
     /// parity: a warden summoned by a shrieker, which rises out of the ground.
     void wardenEmerges(world::LoadedWorld& world, entity::ServerEntity& warden);
@@ -217,9 +260,16 @@ private:
     void runWardenActions(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                           entity::ServerEntity& warden, const std::vector<entity::wardenBrain::Action>& actions);
 
+    /// parity: `CopperGolem.turnToStatue`.
+    void turnToStatue(world::LoadedWorld& world, entity::ServerEntity& golem, random::RandomSource& random);
+
     /// parity: `SonicBoom.tick`'s blast.
     void sonicBlast(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                     entity::ServerEntity& warden);
+
+    /// What a death roll knows about the one that died and whoever killed it.
+    [[nodiscard]] ::basalt::server::world::loot::LootContext deathLootContext(world::LoadedWorld& world,
+                                                                              const entity::ServerEntity& dead) const;
 
     [[nodiscard]] std::int32_t cureProgress(world::LoadedWorld& world, const entity::ServerEntity& mob);
 

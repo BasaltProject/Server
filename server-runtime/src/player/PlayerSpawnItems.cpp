@@ -83,7 +83,7 @@ bool placeMinecartFor(const BreakContext& context, PlayerSession& player, world:
         return false;
     }
     // parity: `MinecartItem` raises `ENTITY_PLACE` at the rail's own square, not at the cart.
-    heardBySculk(context, world, "entity_place", hit.x, hit.y, hit.z);
+    heardBySculk(context, world, "entity_place", hit.x, hit.y, hit.z, {.entity = player.uuid()});
     return true;
 }
 
@@ -98,7 +98,7 @@ bool placeBoatFor(const BreakContext& context, PlayerSession& player, world::Loa
     // parity: `BoatItem` raises `ENTITY_PLACE` at the exact point clicked, not at the square.
     world::vibrations::emit(world.state(), "entity_place", hit.x + static_cast<double>(hit.clickX),
                             hit.y + static_cast<double>(hit.clickY), hit.z + static_cast<double>(hit.clickZ),
-                            world.gameTime());
+                            world.gameTime(), {.entity = player.uuid()});
     return true;
 }
 
@@ -149,7 +149,7 @@ bool placeEndCrystalFor(const BreakContext& context, PlayerSession& player, worl
                                                entry->id, entry->protocolId, x + 0.5, static_cast<double>(y), z + 0.5);
     world::endCrystals::setShowBottom(*crystal, false);
     world.state().spawnEntity(std::move(crystal));
-    heardBySculk(context, world, "entity_place", x, y, z);
+    heardBySculk(context, world, "entity_place", x, y, z, {.entity = player.uuid()});
     if (player.gamemode != Gamemode::Creative) {
         storage::StoredItemStack left = held;
         left.count = held.count - 1;
@@ -213,7 +213,7 @@ bool useSpawnEggFor(const BreakContext& context, PlayerSession& player, world::L
         return false;
     }
     // parity: `SpawnEggItem.spawnsFrom` raises `ENTITY_PLACE` at the square the mob lands on.
-    heardBySculk(context, world, "entity_place", at[0], at[1], at[2]);
+    heardBySculk(context, world, "entity_place", at[0], at[1], at[2], {.entity = player.uuid()});
     return true;
 }
 

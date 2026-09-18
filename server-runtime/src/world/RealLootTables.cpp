@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/world/LootRegistries.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/world/loot/LootTableJson.hpp>
 
@@ -56,6 +57,19 @@ const LootTable* RealLootTables::forBlock(const Identifier& block) {
     const std::string& path = standing.value_or(block.path());
     return read(standing.has_value() ? Identifier::vanilla(path) : block,
                 std::string{kPrefix} + "blocks/" + path + std::string{kJsonSuffix}, "drops nothing");
+}
+
+void RealLootTables::prepare(server::world::loot::LootContext& context) {
+    if (!context.tables) {
+        context.tables = [this](const Identifier& id) { return byId(id); };
+    }
+    if (registries_ == nullptr) {
+        return;
+    }
+    context.enchanting = &registries_->enchanting();
+    context.tagMembers = [registries = registries_](std::string_view registry, const Identifier& tag) {
+        return registries->tagMembers(registry, tag);
+    };
 }
 
 std::vector<Identifier> RealLootTables::ids() const {

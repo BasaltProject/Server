@@ -15,6 +15,8 @@
 
 namespace basalt::server::runtime::world {
 
+class LootRegistries;
+
 /// Resolves a block's break drops from the real `data/minecraft/loot_table/blocks/<path>.json` the
 /// operator's own downloaded jar carries, never embedded in this repo.
 ///
@@ -54,6 +56,11 @@ public:
     /// Every table the jar ships, for the completions the client asks for.
     [[nodiscard]] std::vector<wire::common::Identifier> ids() const;
 
+    void useRegistries(const LootRegistries* registries) { registries_ = registries; }
+
+    /// Fills in what every roll asks outside the table: nested tables, enchantments and ordered tags.
+    void prepare(server::world::loot::LootContext& context);
+
 private:
     /// `verb` is how the log names what the caller wanted, since a block drops and a table rolls.
     const server::world::loot::LootTable* read(const wire::common::Identifier& key, const std::string& path,
@@ -61,6 +68,7 @@ private:
 
     Jar jar_;
     wire::common::Logger logger_;
+    const LootRegistries* registries_ = nullptr;
     // Several connection threads can break a block at once, so the cache has one owner and it is
     // this lock. Map nodes never move, so a table handed out stays valid while another thread reads.
     std::mutex mutex_;

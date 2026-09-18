@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
+#include <basalt/server/runtime/world/LootRegistries.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealBannerPatterns.hpp>
 #include <basalt/server/runtime/world/RealBiomeSpawns.hpp>
@@ -78,6 +79,8 @@ public:
     /// Which enchantments will not sit beside each other, which is what an anvil asks. Declared
     /// after the registry it is resolved against, because that is the order they are built in.
     world::realEnchantmentTags::TagMembers enchantmentTags;
+    /// The enchantments and ordered tags a loot roll draws from.
+    world::LootRegistries lootRegistries;
     world::RealDialogs dialogs;
     world::RealTimelines timelines;
     world::RealTestInstances testInstances;

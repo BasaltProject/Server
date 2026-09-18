@@ -109,6 +109,25 @@ public:
 
     /// parity: `Roar.start`, the warden's roar at somebody it is about to fight.
     virtual void wardenRoar(ServerEntity& /*warden*/, std::int32_t /*targetId*/) {}
+
+    /// parity: `Container.startOpen` and `stopOpen` from a copper golem: the lid and its sound.
+    virtual void golemOpensChest(ServerEntity& /*golem*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/,
+                                 bool /*open*/) {}
+
+    /// parity: `getEntitiesWithContainerOpen`, whether anybody has this chest open now.
+    [[nodiscard]] virtual bool chestInUse(const ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/,
+                                          std::int32_t /*z*/) {
+        return false;
+    }
+
+    /// parity: `Entity.playSound` from the mob itself.
+    virtual void mobSound(ServerEntity& /*mob*/, std::string_view /*sound*/) {}
+
+    /// What the mob holds changed, so everyone watching has to see it.
+    virtual void heldItemChanged(ServerEntity& /*mob*/) {}
+
+    /// parity: `Container.setChanged`: the chunk is saved and a comparator reads it again.
+    virtual void containerChanged(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/) {}
 };
 
 /// Everything one mob's goals are allowed to see this tick.

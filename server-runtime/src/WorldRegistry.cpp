@@ -1,6 +1,8 @@
+#include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
+#include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <algorithm>
@@ -90,6 +92,17 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
     std::unique_ptr<world::LoadedWorld> world =
         std::make_unique<world::LoadedWorld>(declaration, worldsConfig_->settingsFor(declaration), std::move(metadata),
                                              options_.worldsRoot, logger_, std::move(options));
+    // parity: `SculkShriekerBlockEntity.tryGetPlayer`, which only the runtime can answer.
+    world->state().setPlayerCheck([players = players_, holder = world.get()](const wire::common::Uuid& entity) {
+        return ShriekerSystem::playerBehind(*holder, *players, entity) != nullptr;
+    });
+    if (options_.lootTables != nullptr) {
+        world->state().setLootUnpacker(
+            [tables = options_.lootTables, holder = world.get()](std::int32_t x, std::int32_t y, std::int32_t z,
+                                                                 const std::optional<wire::common::Uuid>& player) {
+                world::containerLoot::unpack(*holder, *tables, x, y, z, player);
+            });
+    }
     if (options_.jukeboxes != nullptr) {
         world->state().setSongOutput([songs = options_.jukeboxes](const std::string& song) { return songs->of(song); });
     }

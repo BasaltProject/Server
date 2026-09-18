@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/FishingHooks.hpp>
@@ -507,6 +508,19 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         entries.push_back(Entry{.index = wardenBrain::kAngerDataIndex,
                                 .value = SetEntityDataPacket::IntValue{.value = *wardenAnger}});
     }
+    const auto copperEntry = [&](const std::optional<std::int32_t> RuntimeEntityMetadata::* field, std::uint8_t index,
+                                 wire::protocol::play::RegistryHolder holder) {
+        const std::optional<std::int32_t>& value = this->*field;
+        if (value.has_value() && (previous == nullptr || previous->*field != value) &&
+            (previous != nullptr || *value != 0)) {
+            entries.push_back(Entry{
+                .index = index, .value = SetEntityDataPacket::RegistryIdValue{.value = *value, .registry = holder}});
+        }
+    };
+    copperEntry(&RuntimeEntityMetadata::copperWeather, copperGolems::kWeatherDataIndex,
+                wire::protocol::play::RegistryHolder::WeatheringCopperState);
+    copperEntry(&RuntimeEntityMetadata::copperPose, copperGolems::kStateDataIndex,
+                wire::protocol::play::RegistryHolder::CopperGolemState);
     // parity: a fresh dragon is defined hovering, so only a different phase is news.
     if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
         (previous != nullptr || *dragonPhase != static_cast<std::int32_t>(enderDragon::Phase::Hover))) {
@@ -558,6 +572,10 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
             live.wardenAnger =
                 entity.anger.has_value() && entity.anger->size() == 1 ? entity.anger->begin()->second : 0;
         }
+    }
+    if (entity.copperGolem != nullptr) {
+        live.copperWeather = static_cast<std::int32_t>(entity.copperGolem->weather);
+        live.copperPose = static_cast<std::int32_t>(entity.copperGolem->pose);
     }
     if (entity.hook != nullptr) {
         live.hookedEntity = entity.hook->hookedIn.has_value() ? *entity.hook->hookedIn + 1 : 0;

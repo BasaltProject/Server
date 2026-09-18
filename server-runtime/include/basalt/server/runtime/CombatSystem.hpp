@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -65,7 +66,8 @@ public:
     /// One tick of something in flight, and whatever it hits on the way.
     ///
     /// One game event, sent from a place rather than from a block. parity: `Level.gameEvent`.
-    void emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z);
+    void emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z,
+                       const wire::common::Uuid& source);
 
     /// parity: `Projectile.hitTargetOrDeflectSelf`: what sticks stays where it landed, what does not
     /// is gone the moment it lands. What the block itself does about it is `onProjectileHit`.

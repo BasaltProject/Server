@@ -142,13 +142,15 @@ bool FishingSystem::useRod(const player::BreakContext& context, PlayerSession& p
         wearRod(context, player, slot, wear, random.nextLong());
         playSound(heard, "entity.fishing_bobber.retrieve", player.x, player.y, player.z, 1.0F, soundPitch(random),
                   random.nextLong());
-        world::vibrations::emit(world.state(), "item_interact_finish", player.x, player.y, player.z, world.gameTime());
+        world::vibrations::emit(world.state(), "item_interact_finish", player.x, player.y, player.z, world.gameTime(),
+                                {.entity = player.uuid()});
         return true;
     }
     playSound(heard, "entity.fishing_bobber.throw", player.x, player.y, player.z, 0.5F, soundPitch(random),
               random.nextLong());
     cast(context, player, world);
-    world::vibrations::emit(world.state(), "item_interact_start", player.x, player.y, player.z, world.gameTime());
+    world::vibrations::emit(world.state(), "item_interact_start", player.x, player.y, player.z, world.gameTime(),
+                            {.entity = player.uuid()});
     return true;
 }
 

@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
@@ -10,6 +11,10 @@
 #include <optional>
 #include <string>
 #include <string_view>
+
+namespace basalt::server::storage {
+struct StoredItemStack;
+}
 
 namespace basalt::server::runtime {
 class BlockChangeBroadcaster;
@@ -85,7 +90,7 @@ void reshapeAround(const BreakContext& context, world::LoadedWorld& world, std::
 
 /// What a vibration-sensitive block hears, and whatever that shakes loose.
 void heardBySculk(const BreakContext& context, world::LoadedWorld& world, std::string_view event, std::int32_t x,
-                  std::int32_t y, std::int32_t z);
+                  std::int32_t y, std::int32_t z, const world::vibrations::Source& source = {});
 
 /// Puts a stack into the world. Telling anyone about it belongs to each connection's own thread.
 void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, const wire::common::Identifier& item,
@@ -95,7 +100,7 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
 /// What the block leaves on the ground.
 void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const wire::common::Identifier& block,
                  std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z,
-                 const wire::nbt::NbtCompound* carried);
+                 const wire::nbt::NbtCompound* carried, const storage::StoredItemStack* tool = nullptr);
 
 /// What ice leaves behind where it melts rather than breaks, or nothing when it simply breaks.
 [[nodiscard]] std::optional<std::int32_t> meltedIce(const BreakContext& context, world::LoadedWorld& world,
@@ -108,6 +113,9 @@ void refreshSnowAt(const BreakContext& context, world::LoadedWorld& world, std::
 
 /// Wears the pick down by what this block costs it.
 void wearHeldItemOnBreak(const BreakContext& context, PlayerSession& player, const wire::common::Identifier& block);
+
+/// parity: `ItemStack.hurtAndBreak` on the held item, for a tool used on something other than a block.
+void wearHeldItem(const BreakContext& context, PlayerSession& player, std::int32_t cost);
 
 /// Takes a block away as a player breaking it does: the loot, the neighbours, the statistics and
 /// everything that hears it go. Answers whether the block actually went.

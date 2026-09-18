@@ -21,6 +21,10 @@ namespace basalt::server::runtime::player {
 class PlayerRegistry;
 }
 
+namespace basalt::server::runtime::world {
+class RealLootTables;
+}
+
 namespace basalt::server::runtime {
 
 /// Every world this server knows about: what builds one, what makes a new one at runtime, the
@@ -47,6 +51,9 @@ public:
         /// The jar's song table, which every world hands to its own state so a comparator can read a
         /// jukebox. Null in a test, and then every jukebox reads zero.
         world::jukeboxes::SongOutputs* jukeboxes = nullptr;
+        /// What a structure chest rolls the first time it is read. Null in a test, and then such a
+        /// chest stays empty.
+        world::RealLootTables* lootTables = nullptr;
     };
 
     WorldRegistry(const config::BasaltConfig& config, const config::WorldsConfig& worlds,

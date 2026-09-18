@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/DragonState.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -178,7 +179,8 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         return;
     }
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
-    world::vibrations::emit(world->state(), "entity_damage", target->x, target->y, target->z, world->gameTime());
+    world::vibrations::emit(world->state(), "entity_damage", target->x, target->y, target->z, world->gameTime(),
+                            {.entity = target->uuid()});
     // parity: `causeExtraKnockback`, which is the half a sprinting hit adds and nothing else without
     // enchantments: the 0.4 every hit is worth was already taken inside the hit.
     if (knockbackAttack) {
@@ -275,6 +277,30 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     }
     if (tameOrSit(*session, *entity)) {
         return;
+    }
+    // parity: `CopperGolem.mobInteract`: the carried item back, shears, wax and a scrape.
+    if (MobActionSystem* mobs = owner_->options().mobs;
+        mobs != nullptr && entity::copperGolems::isCopperGolem(entity->type())) {
+        const std::int32_t slot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+        const std::optional<storage::StoredItemStack> inHand = session->inventory.at(slot);
+        switch (mobs->useOnCopperGolem(*world, *session, *entity,
+                                       inHand.has_value() ? parsedOrNothing(inHand->id) : std::nullopt)) {
+        case MobActionSystem::GolemUse::Pass:
+            break;
+        case MobActionSystem::GolemUse::Done:
+            return;
+        case MobActionSystem::GolemUse::DamageTool:
+            owner_->blockInteraction().wearHeldItem(1);
+            return;
+        case MobActionSystem::GolemUse::ConsumeOne:
+            if (session->gamemode != Gamemode::Creative && inHand.has_value()) {
+                storage::StoredItemStack left = *inHand;
+                left.count -= 1;
+                session->inventory.set(slot, left.count <= 0 ? std::nullopt : std::optional{left});
+                owner_->sendInventorySlot(slot);
+            }
+            return;
+        }
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
     const std::optional<storage::StoredItemStack>& held = session->inventory.at(heldSlot);

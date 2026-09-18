@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/entity/SwimPath.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
@@ -346,7 +347,8 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears. Measured in
         // `sensormuerte`: waiting for the next turn to raise it made the sensor wake a tick late,
         // because a `/kill` runs while the world is frozen and the jar stamps it with that turn.
-        world::vibrations::emit(world.state(), "entity_die", dead->x, dead->y, dead->z, world.gameTime());
+        world::vibrations::emit(world.state(), "entity_die", dead->x, dead->y, dead->z, world.gameTime(),
+                                {.entity = dead->uuid()});
     }
 }
 
@@ -361,7 +363,16 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     // parity: `BlockEntity.preRemoveSideEffects` over `Containers.dropItemStack`: what a container
     // held falls out where its block stood. The block write queues it because it holds the world's
     // lock; this is where it becomes items, on the same thread that owns them.
-    for (const world::WorldState::Spilled& spilled : world.state().takeSpilledContents()) {
+    for (world::WorldState::Spilled& spilled : world.state().takeSpilledContents()) {
+        if (spilled.lootTable.has_value()) {
+            world::containerLoot::fill(world, vanillaData_.lootTables, *spilled.lootTable, spilled.lootSeed,
+                                       spilled.lootSlots, false);
+            for (std::optional<server::world::loot::ItemStack>& slot : spilled.lootSlots) {
+                if (slot.has_value() && slot->count > 0) {
+                    spilled.stacks.push_back(std::move(*slot));
+                }
+            }
+        }
         random::RandomSource random = random::RandomSource::legacy(scratchSeed());
         for (const server::world::loot::ItemStack& stack : spilled.stacks) {
             // parity: the scatter is the item's own width taken off each side, and the drop is
@@ -382,7 +393,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                                          .z = z,
                                                                          .velocityX = random.triangle(0.0, kSpread),
                                                                          .velocityY = random.triangle(0.2, kSpread),
-                                                                         .velocityZ = random.triangle(0.0, kSpread)}));
+                                                                         .velocityZ = random.triangle(0.0, kSpread),
+                                                                         .components = stack.components}));
         }
         // parity: `AbstractFurnaceBlockEntity.preRemoveSideEffects` pays the cooking out at the centre.
         for (const auto& [name, count] : spilled.recipesUsed) {
@@ -548,7 +560,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             explosions_->blowUp(world, watchers, entity->x, entity->y + entity::primedTnt::kExplosionOffset, entity->z,
                                 entity::primedTnt::kExplosionPower, "tnt", entity->entityId());
             // parity: `GameEvent.EXPLODE`, which is fifteen: the top of the scale.
-            world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z, world.gameTime());
+            world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z, world.gameTime(),
+                                    {.entity = entity->uuid()});
             continue;
         }
         if (entity::enderDragon::isDragon(entity->type())) {
@@ -666,7 +679,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                         explosions_->blowUp(world, watchers, entity->x, entity->y, entity->z, static_cast<float>(power),
                                             "tnt", entity->entityId(), world::explosions::sparesRails);
                         world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z,
-                                                world.gameTime());
+                                                world.gameTime(), {.entity = entity->uuid()});
                     }
                     continue;
                 }

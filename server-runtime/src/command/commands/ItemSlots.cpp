@@ -146,6 +146,8 @@ std::vector<std::pair<std::int32_t, storage::StoredItemStack>> containerItems(co
     if (!world.has_value()) {
         return held;
     }
+    // parity: `Container.getItem`, which unpacks a pending loot table first.
+    (*world)->state().unpackLoot(at[0], at[1], at[2]);
     const server::world::Chunk* chunk = (*world)->state().chunkIfLoaded(at[0] >> 4, at[2] >> 4);
     if (chunk == nullptr) {
         return held;
@@ -175,6 +177,7 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
     if (!world.has_value()) {
         return world.error();
     }
+    (*world)->state().unpackLoot(at[0], at[1], at[2]);
     server::world::Chunk* chunk = (*world)->state().chunkIfLoaded(at[0] >> 4, at[2] >> 4);
     if (chunk == nullptr) {
         return CommandSyntaxError{.component = Component::translatable("argument.pos.unloaded")};

@@ -1,20 +1,33 @@
 #include <basalt/server/registry/Tags.hpp>
 
+#include <algorithm>
+
 namespace basalt::server::registry::tags {
 namespace {
 
 using wire::common::Identifier;
 
 using Resolved = std::map<Identifier, std::set<Identifier>>;
+using ResolvedOrder = std::map<Identifier, std::vector<Identifier>>;
+
+void addTo(std::set<Identifier>& values, const Identifier& id) { values.insert(id); }
+
+/// parity: the jar's `LinkedHashSet`, first occurrence wins.
+void addTo(std::vector<Identifier>& values, const Identifier& id) {
+    if (std::ranges::find(values, id) == values.end()) {
+        values.push_back(id);
+    }
+}
 
 /// Depth-first with the answer remembered, which is what makes each tag resolve exactly once.
+template <typename Values>
 struct Resolver {
     const std::map<Identifier, TagFile>& files;
     const ElementExists& elementExists;
-    Resolved resolved;
+    std::map<Identifier, Values> resolved;
     std::set<Identifier> inProgress;
 
-    [[nodiscard]] std::expected<const std::set<Identifier>*, TagError> resolve(const Identifier& id) {
+    [[nodiscard]] std::expected<const Values*, TagError> resolve(const Identifier& id) {
         if (const auto done = resolved.find(id); done != resolved.end()) {
             return &done->second;
         }
@@ -26,7 +39,7 @@ struct Resolver {
             return std::unexpected(TagError{TagError::Kind::UnknownTag, id, id});
         }
         inProgress.insert(id);
-        std::set<Identifier> values;
+        Values values;
         for (const TagEntry& entry : file->second.entries) {
             if (entry.isTag) {
                 if (!files.contains(entry.id)) {
@@ -35,11 +48,13 @@ struct Resolver {
                     }
                     continue;
                 }
-                const std::expected<const std::set<Identifier>*, TagError> referenced = resolve(entry.id);
+                const std::expected<const Values*, TagError> referenced = resolve(entry.id);
                 if (!referenced.has_value()) {
                     return std::unexpected(referenced.error());
                 }
-                values.insert((*referenced)->begin(), (*referenced)->end());
+                for (const Identifier& member : **referenced) {
+                    addTo(values, member);
+                }
             } else {
                 if (!elementExists(entry.id)) {
                     if (entry.required) {
@@ -47,7 +62,7 @@ struct Resolver {
                     }
                     continue;
                 }
-                values.insert(entry.id);
+                addTo(values, entry.id);
             }
         }
         inProgress.erase(id);
@@ -70,16 +85,31 @@ std::string TagError::message() const {
     }
 }
 
-std::expected<Resolved, TagError> resolve(const std::map<Identifier, TagFile>& files,
-                                          const ElementExists& elementExists) {
-    Resolver resolver{files, elementExists, {}, {}};
+namespace {
+
+template <typename Values>
+[[nodiscard]] std::expected<std::map<Identifier, Values>, TagError>
+resolveAll(const std::map<Identifier, TagFile>& files, const ElementExists& elementExists) {
+    Resolver<Values> resolver{files, elementExists, {}, {}};
     for (const auto& [id, unused] : files) {
-        const std::expected<const std::set<Identifier>*, TagError> one = resolver.resolve(id);
+        const std::expected<const Values*, TagError> one = resolver.resolve(id);
         if (!one.has_value()) {
             return std::unexpected(one.error());
         }
     }
     return std::move(resolver.resolved);
+}
+
+} // namespace
+
+std::expected<Resolved, TagError> resolve(const std::map<Identifier, TagFile>& files,
+                                          const ElementExists& elementExists) {
+    return resolveAll<std::set<Identifier>>(files, elementExists);
+}
+
+std::expected<ResolvedOrder, TagError> resolveOrdered(const std::map<Identifier, TagFile>& files,
+                                                      const ElementExists& elementExists) {
+    return resolveAll<std::vector<Identifier>>(files, elementExists);
 }
 
 namespace tagFileJson {

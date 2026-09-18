@@ -48,10 +48,12 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       enchantmentTags(world::realEnchantmentTags::load(
           readerOf<world::realEnchantmentTags::JarReader>(jar),
           [this](const Identifier& id) { return enchantments.contains(id); }, logger)),
+      lootRegistries({.entriesUnder = jar.entriesUnder, .readText = jar.readText}, enchantments, logger),
       dialogs({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       timelines({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       testInstances({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       structureTemplates({.readEntry = jar.readEntry, .dataIds = jar.dataIds}) {
+    lootTables.useRegistries(&lootRegistries);
     // Loud on purpose: a client whose overworld timeline tag is empty renders a sky that never
     // moves, and nothing else in the log would say why.
     const std::set<Identifier>& overworld =

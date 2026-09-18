@@ -65,7 +65,7 @@ void PlayerLifecycle::checkEquipment(player::PlayerSession& session) {
         // armour slot, which only a command or creative can manage, is `UNEQUIP` there and `EQUIP`
         // here: this build has no equippable component to ask.
         world::vibrations::emit(world->state(), worn[slot].has_value() ? "equip" : "unequip", session.x, session.y,
-                                session.z, world->gameTime());
+                                session.z, world->gameTime(), {.entity = session.uuid()});
     }
 }
 

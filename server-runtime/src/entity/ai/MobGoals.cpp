@@ -1,4 +1,6 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/ai/CopperGolemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
@@ -255,6 +257,14 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<LookAtPlayerGoal>(selector, 5, kLookNear);
         add<RandomLookAroundGoal>(selector, 6);
         add<HurtByTargetGoal>(selector, 1);
+        return true;
+    }
+    // parity: `CopperGolemAi`: panic, the chest round, and a short stroll or a wait between rounds.
+    if (path == "copper_golem") {
+        add<PanicGoal>(selector, 0, copperGolems::kPanicSpeed);
+        add<CopperGolemTransportGoal>(selector, 1);
+        add<CopperGolemIdleGoal>(selector, 2);
+        add<LookAtPlayerGoal>(selector, 3, kLookNear);
         return true;
     }
     if (path == "iron_golem" || path == "snow_golem") {

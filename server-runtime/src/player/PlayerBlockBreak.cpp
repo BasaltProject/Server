@@ -135,9 +135,10 @@ void refreshSnowAt(const BreakContext& context, world::LoadedWorld& world, const
 }
 
 void heardBySculk(const BreakContext& context, world::LoadedWorld& world, const std::string_view event,
-                  const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+                  const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                  const world::vibrations::Source& source) {
     std::vector<world::BlockChange> changes;
-    world::vibrations::emit(world.state(), event, x + 0.5, y + 0.5, z + 0.5, world.gameTime());
+    world::vibrations::emit(world.state(), event, x + 0.5, y + 0.5, z + 0.5, world.gameTime(), source);
     for (const world::BlockChange& change : changes) {
         announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
         for (const world::BlockChange& settled :
@@ -179,7 +180,7 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
 
 void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const Identifier& block,
                  const std::int32_t stateId, const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                 const wire::nbt::NbtCompound* carried) {
+                 const wire::nbt::NbtCompound* carried, const storage::StoredItemStack* tool) {
     // parity: `Block.popResource` reads the `block_drops` rule, so with it off a block broken by hand
     // leaves nothing behind either.
     if (!world.gameRules().get(world::gameRules::kBlockDrops)) {
@@ -196,10 +197,24 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     // parity: `LootContextParams.BLOCK_STATE`: the lower half of a door is what carries the drop,
     // and `THIS_ENTITY`, which a block broken by hand always has.
-    const server::world::loot::LootContext lootContext{.blockState = reg::blockStateDefinitions::propertiesOf(stateId),
-                                                       .hasEntity = true};
+    server::world::loot::LootContext lootContext{.blockState = reg::blockStateDefinitions::propertiesOf(stateId),
+                                                 .hasEntity = true};
+    // parity: `LootContextParams.TOOL`, which is what silk touch, shears and fortune are read from.
+    if (tool != nullptr) {
+        lootContext.tool = parsedOrNothing(tool->id);
+        for (const auto& [enchantment, level] : enchantmentLevels(*tool)) {
+            lootContext.toolEnchantments.emplace(enchantment.toString(), level);
+        }
+    } else {
+        lootContext.tool = Identifier::vanilla("air");
+    }
+    const world::realItemTags::TagMembers* itemTags = context.itemTags;
+    lootContext.tags = [itemTags](std::string_view registry, const Identifier& id, std::string_view tag) {
+        return registry == "item" && itemTags != nullptr && world::realItemTags::contains(*itemTags, tag, id);
+    };
+    context.lootTables->prepare(lootContext);
     for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, lootContext)) {
-        wire::nbt::NbtCompound components;
+        wire::nbt::NbtCompound components = stack.components;
         if (carried != nullptr && stack.item == block) {
             components.set(world::shulkers::kContainer, wire::nbt::NbtTag::ofCompound(*carried));
         }
@@ -245,8 +260,14 @@ void wearHeldItemOnBreak(const BreakContext& context, PlayerSession& player, con
     if (!held.has_value()) {
         return;
     }
-    const std::int32_t cost = item::itemWear::costPerBlock(*held);
-    if (cost <= 0) {
+    wearHeldItem(context, player, item::itemWear::costPerBlock(*held));
+}
+
+void wearHeldItem(const BreakContext& context, PlayerSession& player, const std::int32_t cost) {
+    PlayerSession* session = &player;
+    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+    const std::optional<storage::StoredItemStack> held = session->inventory.at(heldSlot);
+    if (session->gamemode == Gamemode::Creative || !held.has_value() || cost <= 0) {
         return;
     }
     random::RandomSource random = random::RandomSource::legacy(seedFrom(context));
@@ -307,7 +328,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
                 disarmed.has_value()) {
                 static_cast<void>(world.state().setBlockState(x, y, z, *disarmed));
                 removed = *disarmed;
-                heardBySculk(context, world, "shear", x, y, z);
+                heardBySculk(context, world, "shear", x, y, z, {.entity = player.uuid()});
             }
         }
     }
@@ -359,7 +380,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     refreshSnowAt(context, world, x, y - 1, z);
     notifyAround(context, world, x, y, z, removed);
     // parity: `GameEvent.BLOCK_DESTROY`, which a sculk sensor hears as twelve.
-    heardBySculk(context, world, "block_destroy", x, y, z);
+    heardBySculk(context, world, "block_destroy", x, y, z, {.entity = player.uuid()});
     // Breaking the frame puts the portal out, which is the other half of lighting one.
     for (const std::array<std::int32_t, 3>& block : world::netherPortals::extinguishAround(world, x, y, z)) {
         announceBlock(context, world.name(), block[0], block[1], block[2], reg::blocks::air().stateId);
@@ -380,7 +401,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
                                      });
         if (correctTool) {
             dropLootFor(context, world, *brokenBlock, broken.value_or(0), x, y, z,
-                        carried.has_value() ? &*carried : nullptr);
+                        carried.has_value() ? &*carried : nullptr, held.has_value() ? &*held : nullptr);
             // parity: `spawnAfterBreak(..., true)` right after the drops, and `popExperience` reads
             // `block_drops` like the items do.
             const bool silkTouch = held.has_value() && enchantmentLevel(*held, Identifier::vanilla("silk_touch")) > 0;
