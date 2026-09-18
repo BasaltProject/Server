@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
+#include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
@@ -13,6 +14,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/entity/SwimPath.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -63,6 +65,13 @@ constexpr double kFullTurn = 6.283185307179586;
     // parity: `TargetingConditions.forCombat`, which skips whoever cannot be fought.
     return !player.dead && player.gamemode != wire::protocol::play::Gamemode::Creative &&
            player.gamemode != wire::protocol::play::Gamemode::Spectator;
+}
+
+/// parity: `Player.updateSwimming`, near enough: sprinting with its feet in water.
+[[nodiscard]] bool inWater(world::LoadedWorld& world, const player::PlayerSession& player) {
+    const std::optional<std::int32_t> state = world.state().blockState(
+        wire::common::mth::floor(player.x), wire::common::mth::floor(player.y), wire::common::mth::floor(player.z));
+    return state.has_value() && entity::swimPath::holdsWater(*state);
 }
 
 } // namespace
@@ -474,6 +483,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                    .targetable = isTargetable(*player),
                                                    .heldItem = std::move(heldItem),
                                                    .sneaking = player->sneaking,
+                                                   .swimming = player->sprinting && inWater(world, *player),
                                                    .yaw = player->yaw,
                                                    .pitch = player->pitch});
         }
@@ -525,25 +535,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         if (!ticking(entity->x, entity->z)) {
             continue;
         }
-        // parity: `LightningBolt.tick` does everything on the turn its life is still two: it powers
-        // the rod under it, lights the ground on normal and hard, and is heard as fourteen. Nothing
-        // of it is saved, so the bench sees the rod and never the bolt. Measured in `pararrayos`,
-        // where a summoned bolt did nothing at all here.
         if (entity->type() == world::lightning::bolt()) {
-            entity->removed = true;
-            // parity: `getStrikePosition`, which nudges down by a millionth so a bolt standing on a
-            // whole number hits the block under its feet and not the air it is in.
-            const auto strikeX = static_cast<std::int32_t>(std::floor(entity->x));
-            const auto strikeY = static_cast<std::int32_t>(std::floor(entity->y - 1.0e-6));
-            const auto strikeZ = static_cast<std::int32_t>(std::floor(entity->z));
-            std::vector<world::BlockChange> struck;
-            const bool lightFires = world.difficulty() == "normal" || world.difficulty() == "hard";
-            world::lightning::strike(world.state(), strikeX, strikeY, strikeZ, lightFires, random, struck);
-            world::vibrations::emit(world.state(), "lightning_strike", entity->x, entity->y, entity->z,
-                                    world.gameTime());
-            for (const world::BlockChange& change : struck) {
-                broadcaster_->announceRedstone(world, watchers, change);
-            }
+            lightning_->tick(world, watchers, living, *entity, random);
             continue;
         }
         if (entity->type() == entity::primedTnt::type()) {

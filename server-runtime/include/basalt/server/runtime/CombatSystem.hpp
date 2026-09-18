@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/DragonState.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
@@ -42,6 +43,10 @@ public:
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball)>
             dragonFireballLanded;
+        /// A status effect given to a mob, instant ones included. `sourceId` is what threw it.
+        std::function<bool(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId)>
+            mobEffect;
         /// Where a wither skull struck, and who if anyone.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            entity::ServerEntity& skull, entity::ServerEntity* mob, player::PlayerSession* player)>
@@ -84,6 +89,10 @@ public:
     /// The flash, the push and the sound of an entity being hit by something that is not a player.
     void announceEntityHit(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& entity,
                            const wire::common::Identifier& damageType, std::int32_t causeEntityId, bool died);
+
+    /// Gives a mob an effect through the server's own rules. Answers whether it took.
+    bool giveMobEffect(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId = -1) const;
 
     /// Tells a wither the hit about to land comes from an undead, through its projectile or blast.
     static void markWitherFriend(world::LoadedWorld& world, entity::ServerEntity& target,
@@ -130,7 +139,8 @@ private:
                             const entity::BlockHit& hit);
 
     /// What a bottle leaves where it broke.
-    void splashPotion(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& bottle);
+    void splashPotion(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                      const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& bottle);
 
     /// Where a thrown pearl puts whoever threw it.
     void landEnderPearl(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& pearl);

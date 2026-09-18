@@ -48,6 +48,9 @@ void stop(ServerEntity& mob);
 
 void tick(world::WorldState& world, ServerEntity& mob, double speed);
 
+/// parity: `SmoothSwimmingMoveControl.tick` with the travel it drives.
+void tickSwimming(world::WorldState& world, ServerEntity& mob, double speed);
+
 /// parity: `MoveControl.rotlerp`, the shortest way round capped at `max` degrees.
 [[nodiscard]] float rotlerp(float from, float to, float max);
 
@@ -65,7 +68,13 @@ void lookAt(ServerEntity& mob, double x, double y, double z, float maxYaw = 10.0
 
 void tick(ServerEntity& mob);
 
+/// parity: `SmoothSwimmingLookControl.tick`.
+void tickSwimming(ServerEntity& mob);
+
 } // namespace lookControl
+
+/// Whether it swims with `SmoothSwimmingMoveControl` along a `WaterBoundPathNavigation`.
+[[nodiscard]] bool swimsSmoothly(const ServerEntity& mob);
 
 /// parity: `Entity.isInWater`, which is the block its feet are in.
 [[nodiscard]] bool inWater(world::WorldState& world, const ServerEntity& mob);

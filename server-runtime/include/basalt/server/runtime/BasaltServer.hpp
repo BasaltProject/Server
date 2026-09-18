@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
+#include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
@@ -248,6 +249,7 @@ private:
     std::unique_ptr<ExperienceOrbSystem> orbs_;
     std::unique_ptr<FishingSystem> fishing_;
     std::unique_ptr<WitherSystem> withers_;
+    std::unique_ptr<LightningBoltSystem> lightning_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
     std::unique_ptr<EndFightSystem> endFight_;

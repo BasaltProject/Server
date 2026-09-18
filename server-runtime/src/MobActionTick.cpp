@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
@@ -8,6 +9,7 @@
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -18,6 +20,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -89,6 +92,89 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
                                                        .value = SetEntityDataPacket::ByteValue{.value = flags}}}}
                 .write(buffer);
         });
+    }
+}
+
+void MobActionSystem::tickBreath(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                 ServerEntity& mob, random::RandomSource& random) {
+    constexpr std::int32_t kAirIndex = 1;
+    constexpr std::int32_t kMoistnessIndex = 19;
+    constexpr std::int32_t kFullMoistness = 2400;
+    const std::int32_t air = mob.airSupply;
+    const std::int32_t moistness = mob.moistness;
+    const auto hurt = [&](float amount, std::string_view cause) {
+        const entity::entityCombat::Result result =
+            entity::entityCombat::hurt(mob, amount, std::nullopt, std::nullopt, hooks_.combat, cause);
+        if (result.landed) {
+            combat_->announceEntityHit(watchers, mob,
+                                       cause == "drown" ? world::damageTypes::kDrown : world::damageTypes::kDryOut, -1,
+                                       result.died);
+        }
+    };
+    const auto stateAt = [&world](double x, double y, double z) {
+        return world.state()
+            .blockState(wire::common::mth::floor(x), wire::common::mth::floor(y), wire::common::mth::floor(z))
+            .value_or(0);
+    };
+    const auto isWater = [](std::int32_t state) { return world::fluidFlow::kindOf(state) == world::FluidKind::Water; };
+    // parity: `isEyeInFluid`, which also asks whether the eye is under the water's own surface.
+    const double eyeY = mob.y + entity::mobBreathing::eyeHeightOf(mob);
+    const std::int32_t eyeBlockY = wire::common::mth::floor(eyeY);
+    const std::int32_t eyeState = stateAt(mob.x, eyeY, mob.z);
+    const wire::common::Identifier* eyeBlock = registry::blockStateDefinitions::blockOf(eyeState);
+    const bool eyeInWater = isWater(eyeState) && eyeY < eyeBlockY + static_cast<double>(world::fluidFlow::heightAt(
+                                                                        world.state(), wire::common::mth::floor(mob.x),
+                                                                        eyeBlockY, wire::common::mth::floor(mob.z)));
+    const bool inWater = isWater(stateAt(mob.x, mob.y, mob.z));
+    // parity: `isInRain`, where the sky is open above the feet. Biome precipitation is not asked.
+    const std::int32_t bx = wire::common::mth::floor(mob.x);
+    const std::int32_t bz = wire::common::mth::floor(mob.z);
+    const server::world::Chunk* column = world.state().chunkIfLoaded(bx >> 4, bz >> 4);
+    const bool inRain = world.weather().raining && column != nullptr &&
+                        column->heightAt(bx & 15, bz & 15, server::world::HeightmapType::MotionBlocking) <=
+                            wire::common::mth::floor(mob.y);
+    const entity::mobBreathing::Surroundings at{.eyeInWater = eyeInWater,
+                                                .eyeInBubbles =
+                                                    eyeBlock != nullptr && eyeBlock->path() == "bubble_column",
+                                                .inWater = inWater,
+                                                .inRain = inRain};
+    for (const entity::mobBreathing::Hurt& owed : entity::mobBreathing::tick(mob, at)) {
+        hurt(owed.amount, owed.cause);
+    }
+    // parity: `Dolphin.tick`: two minutes of moisture, and the flop on dry ground.
+    if (mob.type().path() == "dolphin" && !mob.noAi) {
+        if (inWater || inRain) {
+            mob.moistness = kFullMoistness;
+        } else {
+            mob.moistness--;
+            if (mob.moistness <= 0) {
+                hurt(1.0F, "dry_out");
+            }
+            if (mob.onGround) {
+                mob.velocityX += static_cast<double>((random.nextFloat() * 2.0F - 1.0F) * 0.2F);
+                mob.velocityY += 0.5;
+                mob.velocityZ += static_cast<double>((random.nextFloat() * 2.0F - 1.0F) * 0.2F);
+                mob.yaw = random.nextFloat() * 360.0F;
+                mob.onGround = false;
+            }
+        }
+    }
+    std::vector<SetEntityDataPacket::Entry> entries;
+    if (mob.airSupply != air) {
+        entries.push_back({.index = kAirIndex, .value = SetEntityDataPacket::IntValue{.value = mob.airSupply}});
+    }
+    if (mob.moistness != moistness) {
+        entries.push_back({.index = kMoistnessIndex, .value = SetEntityDataPacket::IntValue{.value = mob.moistness}});
+    }
+    if (entries.empty()) {
+        return;
+    }
+    const SetEntityDataPacket packet{.entityId = mob.entityId(), .entries = std::move(entries)};
+    for (PlayerSession* player : watchers) {
+        if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(SetEntityDataPacket::kId,
+                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
     }
 }
 

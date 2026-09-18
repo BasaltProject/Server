@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
+#include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
 #include <basalt/server/world/LeafDistances.hpp>
@@ -131,12 +132,8 @@ void LoadedWorld::updateSkyBrightness() {
 }
 
 bool LoadedWorld::tickTime(random::RandomSource& random) {
-    // parity: the day clock is **not** the level's. `MinecraftServer.tickChildren` runs
-    // `clockManager.tick()` before the loop over the levels, so by the time a level reaches
-    // `updateSkyBrightness()` the clock has already moved this turn. What `ServerLevel.tickTime`
-    // still advances is `gameTime` and nothing else. Advancing ours last left every reading of the
-    // sky a turn behind, which at dusk is a step too bright: measured in `detectorluzfase2`.
-    // parity: only a dimension with a clock of its own has time to advance.
+    // parity: `MinecraftServer.tickChildren` moves the day clock before any level ticks, so the sky
+    // reading sees this turn's clock. Only a dimension with a clock of its own advances it.
     const bool advanced =
         config::hasClock(declaration_.dimension) && clock_.tick(gameRules_.get(gameRules::kAdvanceTime));
     // parity: `ServerLevel.advanceWeatherCycle` runs only where the dimension can have weather, and
@@ -302,7 +299,8 @@ void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {
         }
         std::vector<wire::nbt::NbtCompound> saved;
         for (entity::ServerEntity* entity : entities) {
-            if (entity->removed || entity->vehicleId.has_value()) {
+            // parity: `EntityType.LIGHTNING_BOLT` is `noSave`.
+            if (entity->removed || entity->vehicleId.has_value() || entity->type() == lightning::bolt()) {
                 continue;
             }
             saved.push_back(entity::entityNbt::encodeTree(

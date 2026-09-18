@@ -483,6 +483,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball) {
                     clouds_->fireballLanded(world, watchers, living, fireball);
                 },
+            .mobEffect =
+                [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId) {
+                    return mobActions_ != nullptr && mobActions_->addMobEffect(world, watchers, mob, effect, sourceId);
+                },
             .witherSkullLanded =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        entity::ServerEntity& skull, entity::ServerEntity* mob,
@@ -537,7 +542,14 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     MobActionSystem::Hooks mobHooks;
     withers_ = std::make_unique<WitherSystem>(
         playerRegistry_, *broadcaster_, *explosions_,
-        WitherSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
+        WitherSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                              .blockTags = &vanillaData_.blockTags,
+                              .mobEffect =
+                                  [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                                         entity::ServerEntity& mob, const world::ActiveEffect& effect) {
+                                      return mobActions_ != nullptr &&
+                                             mobActions_->addMobEffect(world, watchers, mob, effect);
+                                  }});
     mobHooks.witherShoots = [this](world::LoadedWorld& world, entity::ServerEntity& wither) {
         withers_->shootAtTarget(world, wither);
     };
@@ -549,6 +561,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                           vanillaData_.lootTables, model.allWorlds, std::move(mobHooks),
                                           MobActionSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                                                    .nextDouble = [] { return scratchDouble(); }});
+    lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_);
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_);
 
     // The online count comes from the registry rather than from a counter kept alongside it: a

@@ -233,7 +233,9 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
         }
     }
     target.panicTicks = kPanicTicks;
-    combat_->announceEntityHit(watchersOf(*world), target, world::damageTypes::kMobAttack, mob.entityId(), result.died);
+    const bool infected = result.died && infectVillager(*world, mob, target);
+    combat_->announceEntityHit(watchersOf(*world), target, world::damageTypes::kMobAttack, mob.entityId(),
+                               result.died && !infected);
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
     world::vibrations::emit(world->state(), "entity_damage", target.x, target.y, target.z, world->gameTime());
 }
@@ -459,7 +461,9 @@ void MobActionSystem::explodeCreeper(ServerEntity& mob) {
     }
     const std::vector<PlayerSession*> watchers = watchersOf(*world);
     mob.removed = true;
-    explosions_->blowUp(*world, watchers, mob.x, mob.y, mob.z, kCreeperExplosionPower, "creeper", mob.entityId());
+    // parity: `Creeper.explodeCreeper`, twice as hard when it is charged.
+    explosions_->blowUp(*world, watchers, mob.x, mob.y, mob.z, kCreeperExplosionPower * (mob.powered ? 2.0F : 1.0F),
+                        "creeper", mob.entityId());
 }
 
 void MobActionSystem::shootArrow(ServerEntity& mob, double targetX, double targetY, double targetZ, float power) {

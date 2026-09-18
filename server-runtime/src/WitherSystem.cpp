@@ -515,6 +515,11 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
                                        owner != nullptr ? std::optional{owner->type().toString()} : std::nullopt);
         if (result.died && ownedByLiving && owner != nullptr) {
             heal(*owner, kKillHeal);
+        } else if (result.landed && witherSeconds > 0 && options_.mobEffect) {
+            static_cast<void>(options_.mobEffect(world, watchers, *mob,
+                                                 world::ActiveEffect{.effect = world::mobEffects::wither(),
+                                                                     .amplifier = kWitherEffectAmplifier,
+                                                                     .remainingTicks = 20 * witherSeconds}));
         }
     }
     if (player != nullptr && player->connection().hurt) {

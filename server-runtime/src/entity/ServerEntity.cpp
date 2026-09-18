@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 
@@ -107,7 +108,7 @@ ServerEntity::ServerEntity(std::int32_t entityId, wire::common::Uuid uuid, wire:
     : x(x), y(y), z(z), yaw(yaw), pitch(pitch), entityId_(entityId), uuid_(uuid), type_(std::move(type)),
       protocolType_(protocolType) {
     const bool dolphin = type_.path() == "dolphin";
-    airSupply = dolphin ? kDolphinMaxAir : kDefaultMaxAir;
+    airSupply = mobBreathing::maxAirOf(type_.path());
     canPickUpLoot = dolphin;
     despawnDelay = type_.path() == "trader_llama" ? kTraderLlamaDespawnDelay : 0;
     const std::optional<double> maxHealth =

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 
 #include <cstdint>
@@ -40,6 +41,10 @@ public:
         std::function<std::int64_t()> nextSeed;
         /// `wither_summon_base_blocks` and `wither_immune`.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// A status effect given to a mob.
+        std::function<bool(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           entity::ServerEntity& mob, const world::ActiveEffect& effect)>
+            mobEffect;
     };
 
     WitherSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions,

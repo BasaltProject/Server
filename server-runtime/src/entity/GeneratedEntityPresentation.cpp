@@ -269,6 +269,28 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
     }
     if (type == "armor_stand") {
         addArmorStandMetadata(entries, data);
+    } else if ((type == "zombie" || type == "husk") && data.contains("DrownedConversionTime") &&
+               data.getInt("DrownedConversionTime") >= 0) {
+        entries.push_back(Entry{.index = 18, .value = SetEntityDataPacket::BoolValue{.value = true}});
+    } else if (type == "skeleton" && data.contains("StrayConversionTime") && data.getInt("StrayConversionTime") >= 0) {
+        entries.push_back(Entry{.index = 16, .value = SetEntityDataPacket::BoolValue{.value = true}});
+    } else if ((type == "piglin" || type == "piglin_brute" || type == "hoglin") &&
+               data.getBoolean("IsImmuneToZombification")) {
+        // parity: `AbstractPiglin`'s flag comes right after `Mob`'s, and the hoglin's after `AgeableMob`'s.
+        entries.push_back(Entry{.index = static_cast<std::uint8_t>(type == "hoglin" ? 18 : 16),
+                                .value = SetEntityDataPacket::BoolValue{.value = true}});
+    } else if (type == "creeper" && data.getBoolean("powered")) {
+        entries.push_back(Entry{.index = 17, .value = SetEntityDataPacket::BoolValue{.value = true}});
+    } else if (type == "mooshroom" && data.getString("Type") == "brown") {
+        entries.push_back(Entry{.index = 18, .value = SetEntityDataPacket::IntValue{.value = 1}});
+    } else if (type == "dolphin") {
+        if (data.getBoolean("GotFish")) {
+            entries.push_back(Entry{.index = 18, .value = SetEntityDataPacket::BoolValue{.value = true}});
+        }
+        if (data.contains("Moistness") && data.getInt("Moistness") != 2400) {
+            entries.push_back(
+                Entry{.index = 19, .value = SetEntityDataPacket::IntValue{.value = data.getInt("Moistness")}});
+        }
     } else if (type == "wither") {
         addIntIfSet(entries, data, "Invul", 19);
     } else if (type == "wither_skull" && data.getBoolean("dangerous")) {

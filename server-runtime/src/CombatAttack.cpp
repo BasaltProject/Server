@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/DragonState.hpp>
@@ -280,6 +281,18 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         return;
     }
     const std::optional<Identifier> item = parsedOrNothing(held->id);
+    // parity: `ZombieVillager.mobInteract`, where the apple is taken only when the cure starts.
+    if (item.has_value() && item->path() == "golden_apple" && entity->type().path() == "zombie_villager") {
+        MobActionSystem* mobs = owner_->options().mobs;
+        if (mobs != nullptr && mobs->startCure(*world, *entity, session->uuid()) &&
+            session->gamemode != Gamemode::Creative) {
+            storage::StoredItemStack left = *held;
+            left.count = held->count - 1;
+            session->inventory.set(heldSlot, left.count <= 0 ? std::nullopt : std::optional{left});
+            owner_->sendInventorySlot(heldSlot);
+        }
+        return;
+    }
     if (!item.has_value() || !entity::breeding::isFood(entity->type(), *item) ||
         !entity::breeding::canFallInLove(*entity)) {
         return;
