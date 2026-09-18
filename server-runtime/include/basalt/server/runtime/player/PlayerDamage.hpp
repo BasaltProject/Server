@@ -45,6 +45,10 @@ struct DamageContext {
     DeathContext death;
 };
 
+/// Whether a raised shield faces a hit coming from there, which is what turns an arrow back.
+/// parity: `LivingEntity.resolveBlockingItem` with `BlocksAttacks`' own ninety degrees.
+[[nodiscard]] bool shieldFaces(const PlayerSession& session, double fromX, double fromZ);
+
 /// What is left of a hit after armour, resistance, protection and the tags that bypass them.
 [[nodiscard]] float damageAfterProtection(const PlayerSession& session, float amount,
                                           const std::optional<wire::common::Identifier>& damageType,

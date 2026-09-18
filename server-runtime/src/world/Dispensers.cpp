@@ -199,6 +199,25 @@ constexpr std::int32_t kGrowthSparkles = 15;
     return found == properties.end() ? std::string{} : found->second;
 }
 
+[[nodiscard]] const wire::common::Identifier& witherSkull() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("wither_skeleton_skull");
+    return instance;
+}
+
+/// parity: `RotationSegment.convertToSegment(Direction)`: north 0, east 4, south 8, west 12.
+[[nodiscard]] std::int32_t rotationOf(registry::BlockFace face) {
+    switch (face) {
+    case registry::BlockFace::East:
+        return 4;
+    case registry::BlockFace::South:
+        return 8;
+    case registry::BlockFace::West:
+        return 12;
+    default:
+        return 0;
+    }
+}
+
 [[nodiscard]] bool isDispenser(std::string_view path) { return path == "dispenser" || path == "dropper"; }
 
 [[nodiscard]] std::optional<BlockFace> faceOf(std::string_view facing) {
@@ -445,6 +464,37 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
         return Special{.handled = true,
                        .left = minusOne(stack),
                        .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = pumpkin->stateId}};
+    }
+    // parity: the wither skeleton skull entry, another `OptionalDispenseItemBehavior`: the skull goes
+    // down only on an empty square that completes the soul sand T, and the boss is checked for right
+    // after. A refusal keeps the skull rather than throwing it. The jar tries `dispenseEquipment`
+    // first, putting the skull on the head of a mob standing in front; nothing here wears one, so a
+    // square that does not complete the T is a plain refusal.
+    if (stack.item == witherSkull()) {
+        const std::optional<std::int32_t> front = context.world.blockState(tx, ty, tz);
+        if (!front.has_value() || !registry::blocks::isAir(*front) ||
+            !witherPatterns::canComplete(context.world, tx, ty, tz, hooks.isWitherBase)) {
+            return Special{.refused = true};
+        }
+        const std::optional<std::int32_t> placed = registry::blockStateDefinitions::stateIdOf(
+            witherSkull(), {{"rotation", std::to_string(rotationOf(out))}}, std::nullopt);
+        if (!placed.has_value() || !context.world.setBlockState(tx, ty, tz, *placed)) {
+            return Special{.refused = true};
+        }
+        // parity: `Level.setBlock` gives the skull its own block entity, which is what the jar then
+        // looks for before it checks the pattern.
+        if (server::world::Chunk* chunk = context.world.chunkIfLoaded(tx >> 4, tz >> 4); chunk != nullptr) {
+            chunk->setBlockEntity(server::world::ChunkBlockEntity{tx & 15, ty, tz & 15, stack.item,
+                                                                  blockEntityDefaults::of(stack.item, *placed)});
+            chunk->markDirty();
+        }
+        heard(context.world, "block_place", tx, ty, tz, hooks.gameTime);
+        if (hooks.skullPlaced) {
+            hooks.skullPlaced(tx, ty, tz);
+        }
+        return Special{.handled = true,
+                       .left = minusOne(stack),
+                       .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *placed}};
     }
     // parity: the brush entry, which brushes an armadillo standing in the square in front and
     // refuses when there is none. Brushing is not implemented anywhere in this build, not even by

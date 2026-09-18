@@ -128,7 +128,8 @@ std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t m
 }
 
 std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,
-                            float power, random::RandomSource& random, const Spares& spares) {
+                            float power, random::RandomSource& random, const Spares& spares,
+                            const Resistance& resistance) {
     // A set rather than a hash: the order the blocks come out in is the order they are broken, and a
     // stable one keeps what the caller sends to clients stable too.
     std::set<std::int64_t> hit;
@@ -167,7 +168,9 @@ std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t m
                     }
                     const bool spared = spares && spares(world, blockX, blockY, blockZ, *stateId);
                     if (*stateId != registry::blocks::air().stateId) {
-                        remaining -= ((spared ? 0.0F : resistanceOf(*stateId)) + kResistanceBias) * kStep;
+                        const float base = resistanceOf(*stateId);
+                        const float held = resistance ? resistance(*stateId, base) : base;
+                        remaining -= ((spared ? 0.0F : held) + kResistanceBias) * kStep;
                     }
                     if (remaining > 0.0F && !spared && canBreak(*stateId)) {
                         hit.insert(packed(blockX, blockY, blockZ));

@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -111,8 +112,17 @@ void ItemUseTimers::tickEating(PlayerSession& session) {
     if (world == nullptr) {
         return;
     }
-    static_cast<void>(player::eatHeldItem(owner_->blockInteraction().breakContext(), session, *world, slot,
-                                          [this] { return options_.nextFloat ? options_.nextFloat() : 0.5F; }));
+    const std::optional<storage::StoredItemStack> eaten = session.inventory.at(slot);
+    if (!player::eatHeldItem(owner_->blockInteraction().breakContext(), session, *world, slot,
+                             [this] { return options_.nextFloat ? options_.nextFloat() : 0.5F; })) {
+        return;
+    }
+    // parity: `Consumable.onConsume` ends in `CONSUME_ITEM.trigger` with the stack that was eaten.
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    const std::optional<Identifier> item = eaten.has_value() ? parsedOrNothing(eaten->id) : std::nullopt;
+    if (triggers != nullptr && item.has_value()) {
+        triggers->onConsumedItem(session.name(), session.uuid().toString(), *item);
+    }
 }
 
 bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item, std::int32_t slot) {

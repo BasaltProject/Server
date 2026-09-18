@@ -162,8 +162,9 @@ TEST_CASE("an arrow that arrives inside the hurt cooldown bounces off") {
 
     CHECK(cow.health == doctest::Approx(healthBefore));
     CHECK_FALSE(arrow.removed);
-    // parity: the arrow keeps a fifth of the speed it had after the tick's own drag.
-    CHECK(arrow.velocityZ == doctest::Approx(3.0 * 0.99 * 0.2));
+    // parity: `ProjectileDeflection.REVERSE` halves it and turns it round, and the hit then keeps a
+    // fifth of that: a tenth of the speed it had after the tick's own drag, going back the way it came.
+    CHECK(arrow.velocityZ == doctest::Approx(3.0 * 0.99 * -0.1));
 }
 
 TEST_CASE("a splash potion reaches less far than four blocks and no further") {

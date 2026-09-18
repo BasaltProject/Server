@@ -74,6 +74,8 @@ public:
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            std::int32_t x, std::int32_t y, std::int32_t z)>
             foreignTick;
+        /// A wither skull a dispenser put down, for whoever knows how to raise the boss.
+        std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> skullPlaced;
         /// A noise that reached a shrieker, handed to whoever knows the players.
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
     };

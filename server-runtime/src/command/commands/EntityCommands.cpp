@@ -191,6 +191,14 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
                                            std::nullopt);
             }
         } else if (entity::ServerEntity* what = target->entity(); what != nullptr) {
+            // parity: `/damage ... by <entity>` builds a source with that entity in it, so the hit is
+            // remembered and the kill is credited to a player who dealt it.
+            if (const CommandTarget* by = only(context, "entity"); by != nullptr) {
+                if (const player::PlayerSession* dealt = by->player(); dealt != nullptr) {
+                    entity::entityCombat::rememberPlayer(*what, dealt->uuid());
+                    what->hurtBy = dealt->entityId();
+                }
+            }
             what->health -= static_cast<double>(*amount);
             if (what->health <= 0.0) {
                 what->killed = true;
@@ -216,9 +224,8 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
                         return context.matchingIds(damageTypes_ ? damageTypes_() : std::vector<Identifier>{});
                     });
                     type.executes(damage);
-                    // Where it came from and who dealt it. Neither changes the damage in
-                    // this build, which has no knockback or attribution: they are
-                    // accepted, not acted on.
+                    // Where it came from and who dealt it. The place is accepted and not acted on;
+                    // who dealt it is remembered, which is what decides the kill credit.
                     type.literal("at", [damage](const CommandNodeBuilder& at) {
                         at.argument("location", vec3Argument(),
                                     [damage](const CommandNodeBuilder& location) { location.executes(damage); });

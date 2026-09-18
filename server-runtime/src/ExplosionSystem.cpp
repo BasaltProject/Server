@@ -62,7 +62,7 @@ double ExplosionSystem::jitter() const {
 
 void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
                              double y, double z, float power, std::string_view cause, std::int32_t sourceEntityId,
-                             const world::explosions::Spares& spares) {
+                             const world::explosions::Spares& spares, const world::explosions::Resistance& resistance) {
     if (hooks_.allowed && !hooks_.allowed(world, x, y, z, power, cause, sourceEntityId)) {
         return;
     }
@@ -70,7 +70,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
     random::RandomSource random = random::RandomSource::legacy(seed);
     const std::vector<world::explosions::Broken> broken = world::explosions::explode(
-        world.state(), facts.chunkHeight.minY(), facts.chunkHeight.maxY(), x, y, z, power, random, spares);
+        world.state(), facts.chunkHeight.minY(), facts.chunkHeight.maxY(), x, y, z, power, random, spares, resistance);
 
     // parity: `ServerExplosion.createDrops`, which gathers everything the blast broke and only then
     // drops it: what an explosion leaves is a handful of merged stacks, not one item per block, and

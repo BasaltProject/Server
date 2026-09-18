@@ -157,6 +157,7 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.blockTags = owner_->options().blockTags;
     context.enchantments = owner_->options().enchantments;
     context.itemTags = owner_->options().itemTags;
+    context.triggers = owner_->options().advancementTriggers;
     context.nextDouble = options_.nextDouble;
     context.nextSeed = options_.nextSeed;
     context.breakAllowed = hooks_.breakAllowed;

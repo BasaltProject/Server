@@ -37,6 +37,10 @@ struct Broken {
 using Spares =
     std::function<bool(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)>;
 
+/// What a source makes of a block's blast resistance. parity: the other half of
+/// `ExplosionDamageCalculator`: a blue wither skull answers at most `0.8` for anything it may break.
+using Resistance = std::function<float(std::int32_t stateId, float resistance)>;
+
 /// parity: `MinecartTNT.getBlockExplosionResistance` and `MinecartTNT.shouldBlockExplode`: a primed
 /// cart spares the rails it was running on and whatever is holding them up.
 [[nodiscard]] bool sparesRails(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
@@ -45,7 +49,7 @@ using Spares =
 /// drop is the caller's business, as it is in vanilla.
 [[nodiscard]] std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y,
                                           double z, float power, random::RandomSource& random,
-                                          const Spares& spares = {});
+                                          const Spares& spares = {}, const Resistance& resistance = {});
 
 /// Which squares a blast reaches without taking any of them out. parity:
 /// `calculateExplodedPositions` on its own, which is all a `TRIGGER_BLOCK` explosion uses: the wind

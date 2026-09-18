@@ -508,6 +508,13 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         entries.push_back(Entry{.index = wardenBrain::kAngerDataIndex,
                                 .value = SetEntityDataPacket::IntValue{.value = *wardenAnger}});
     }
+    // parity: `DATA_DANGEROUS`, the first index a `WitherSkull` adds after `Entity`'s own.
+    constexpr std::uint8_t kDangerousSkullIndex = 8;
+    if (dangerousSkull.has_value() && (previous == nullptr || previous->dangerousSkull != dangerousSkull) &&
+        (previous != nullptr || *dangerousSkull)) {
+        entries.push_back(
+            Entry{.index = kDangerousSkullIndex, .value = SetEntityDataPacket::BoolValue{.value = *dangerousSkull}});
+    }
     const auto copperEntry = [&](const std::optional<std::int32_t> RuntimeEntityMetadata::* field, std::uint8_t index,
                                  wire::protocol::play::RegistryHolder holder) {
         const std::optional<std::int32_t>& value = this->*field;
@@ -572,6 +579,9 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
             live.wardenAnger =
                 entity.anger.has_value() && entity.anger->size() == 1 ? entity.anger->begin()->second : 0;
         }
+    }
+    if (entity.type().path() == "wither_skull") {
+        live.dangerousSkull = entity.dangerousSkull;
     }
     if (entity.copperGolem != nullptr) {
         live.copperWeather = static_cast<std::int32_t>(entity.copperGolem->weather);

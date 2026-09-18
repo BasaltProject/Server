@@ -32,6 +32,11 @@ using IsBase = std::function<bool(std::int32_t stateId)>;
 
 [[nodiscard]] bool isWitherSkull(std::int32_t stateId);
 
+/// Whether the soul sand T is already there, which is what a dispenser asks before it puts a skull
+/// down. parity: `WitherSkullBlock.getOrCreateWitherBase`, the full pattern with its top row open.
+[[nodiscard]] bool canComplete(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                               const IsBase& isBase);
+
 } // namespace witherPatterns
 
 } // namespace basalt::server::runtime::world

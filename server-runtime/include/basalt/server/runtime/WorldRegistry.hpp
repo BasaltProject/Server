@@ -22,8 +22,9 @@ class PlayerRegistry;
 }
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class RealLootTables;
-}
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -54,6 +55,8 @@ public:
         /// What a structure chest rolls the first time it is read. Null in a test, and then such a
         /// chest stays empty.
         world::RealLootTables* lootTables = nullptr;
+        /// What a chest a player opened grants. Null in a test, and then nothing is granted.
+        world::AdvancementTriggers* triggers = nullptr;
     };
 
     WorldRegistry(const config::BasaltConfig& config, const config::WorldsConfig& worlds,

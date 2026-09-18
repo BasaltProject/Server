@@ -64,6 +64,11 @@ void settle(const BreakContext& context, PlayerSession& player, world::LoadedWor
     player.inventory.set(
         heldSlot,
         storage::StoredItemStack{.id = result.replacement->toString(), .count = 1, .components = held.components});
+    // parity: `BucketItem.use` and `Bucketable.bucketMobPickup` both end in `FILLED_BUCKET.trigger`,
+    // which is the bucket that came back full and never the empty one.
+    if (context.triggers != nullptr && result.replacement->path() != "bucket") {
+        context.triggers->onFilledBucket(player.name(), player.uuid().toString(), *result.replacement);
+    }
     if (context.slotChanged) {
         context.slotChanged(player, heldSlot);
     }

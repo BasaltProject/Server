@@ -91,6 +91,10 @@ void BasaltServer::tickScoreCriteria() {
         return nullptr;
     };
     for (PlayerSession* player : online) {
+        // parity: `LivingEntity.baseTick`, the memory counting down once a tick.
+        if (player->lastHurtByPlayerTime.load() > 0) {
+            player->lastHurtByPlayerTime.fetch_sub(1);
+        }
         for (std::int32_t deaths = player->deathsToScore.exchange(0); deaths > 0; --deaths) {
             updateCriterion("deathCount", player->name(), increment);
             if (player->killerEntityId.has_value()) {
@@ -151,6 +155,10 @@ void BasaltServer::tickScoreCriteria() {
     for (const PendingKill& kill : kills) {
         if (const PlayerSession* killer = playerRegistry_.get(kill.killer); killer != nullptr) {
             awardKillScore(*killer, kill.victim, false);
+            // parity: `ServerPlayer.awardKillScore` ends in `PLAYER_KILLED_ENTITY.trigger`.
+            if (advancementTriggers_ != nullptr) {
+                advancementTriggers_->onKilledEntity(killer->name(), kill.killer.toString(), kill.victimType);
+            }
         }
     }
 }

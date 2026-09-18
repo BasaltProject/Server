@@ -96,6 +96,9 @@ struct DamageSource {
     double z = 0.0;
     /// Travels with the hit because only where it comes from knows it: below there is just an id.
     std::optional<wire::text::Component> name;
+    /// Who shot it, when the hit is a projectile's. parity: `DamageSource.getEntity`, which is the
+    /// owner rather than the arrow.
+    std::optional<std::int32_t> ownerId;
 };
 
 } // namespace basalt::server::runtime::entity

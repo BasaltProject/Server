@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
@@ -154,7 +155,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                                                   entity::DamageSource{.entityId = entity.entityId(),
                                                                        .x = fromX,
                                                                        .z = fromZ,
-                                                                       .name = shooterName(watchers, living, entity)});
+                                                                       .name = shooterName(watchers, living, entity),
+                                                                       .ownerId = entity.ownerId});
             }
         }
         if (!hit.has_value()) {
@@ -205,7 +207,8 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                                               entity::DamageSource{.entityId = entity.entityId(),
                                                                    .x = fromX,
                                                                    .z = fromZ,
-                                                                   .name = shooterName(watchers, living, entity)});
+                                                                   .name = shooterName(watchers, living, entity),
+                                                                   .ownerId = entity.ownerId});
         }
         return;
     }
@@ -506,6 +509,24 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
     return found;
 }
 
+void CombatSystem::deflectArrow(ServerEntity& arrow) {
+    // parity: `ProjectileDeflection.REVERSE` then `scale(0.2)`: back at a tenth of the speed, turned
+    // round by a little over half a turn either way.
+    constexpr double kReverse = -0.5;
+    arrow.velocityX *= kReverse * kArrowBounce;
+    arrow.velocityY *= kReverse * kArrowBounce;
+    arrow.velocityZ *= kReverse * kArrowBounce;
+    const float spin = 170.0F + (static_cast<float>(options_.nextInt ? options_.nextInt(1000) : 0) / 1000.0F * 20.0F);
+    arrow.yaw += spin;
+    // parity: an arrow left with almost no speed is gone.
+    constexpr double kStopped = 1.0E-7;
+    if ((arrow.velocityX * arrow.velocityX) + (arrow.velocityY * arrow.velocityY) +
+            (arrow.velocityZ * arrow.velocityZ) <
+        kStopped) {
+        arrow.removed = true;
+    }
+}
+
 bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                   const std::vector<ServerEntity*>& living, ServerEntity& arrow, double fromX,
                                   double fromY, double fromZ) {
@@ -538,9 +559,7 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
                                        std::nullopt, firedByPlayer(watchers, arrow));
         if (!result.landed) {
             // parity: an arrow that found somebody still inside their hurt cooldown bounces off.
-            arrow.velocityX *= kArrowBounce;
-            arrow.velocityY *= kArrowBounce;
-            arrow.velocityZ *= kArrowBounce;
+            deflectArrow(arrow);
             return true;
         }
         emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z, target->mob->uuid());
@@ -566,12 +585,20 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
         announceEntityHit(watchers, *target->mob, world::damageTypes::kArrow, arrow.entityId(), result.died);
         return true;
     }
-    arrow.removed = true;
+    // parity: a raised shield makes `hurtServer` answer false, and the arrow turns back.
+    const bool shielded = target->player != nullptr && player::shieldFaces(*target->player, fromX, fromZ);
     if (target->player != nullptr && target->player->connection().hurt) {
-        target->player->connection().hurt(
-            static_cast<float>(damage), kDeathArrow, world::damageTypes::kArrow,
-            entity::DamageSource{
-                .entityId = arrow.entityId(), .x = fromX, .z = fromZ, .name = shooterName(watchers, living, arrow)});
+        target->player->connection().hurt(static_cast<float>(damage), kDeathArrow, world::damageTypes::kArrow,
+                                          entity::DamageSource{.entityId = arrow.entityId(),
+                                                               .x = fromX,
+                                                               .z = fromZ,
+                                                               .name = shooterName(watchers, living, arrow),
+                                                               .ownerId = arrow.ownerId});
+    }
+    if (shielded) {
+        deflectArrow(arrow);
+    } else {
+        arrow.removed = true;
     }
     return true;
 }

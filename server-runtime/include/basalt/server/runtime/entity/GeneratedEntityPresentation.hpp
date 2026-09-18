@@ -56,6 +56,8 @@ struct RuntimeEntityMetadata {
     std::optional<wire::protocol::play::Pose> pose;
     std::optional<std::int32_t> wardenAnger;
     /// parity: `CopperGolem`'s weathering and the pose it works a chest in.
+    /// parity: `WitherSkull.DATA_DANGEROUS`, which is what the client draws blue.
+    std::optional<bool> dangerousSkull;
     std::optional<std::int32_t> copperWeather;
     std::optional<std::int32_t> copperPose;
 

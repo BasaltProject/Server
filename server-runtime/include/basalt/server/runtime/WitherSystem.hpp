@@ -81,6 +81,10 @@ public:
     /// parity: `WitherBoss.dropCustomDeathLoot`, the star that never despawns.
     void dropStar(world::LoadedWorld& world, const entity::ServerEntity& wither);
 
+    /// parity: the bar of a wither that is already dying, which stays up for its twenty turns of
+    /// death because the boss event only goes when the entity does.
+    void keepBar(world::LoadedWorld& world, entity::ServerEntity& wither);
+
     /// Takes the bars of withers that took no turn since the last call from whoever saw them.
     void sweepBars();
 
