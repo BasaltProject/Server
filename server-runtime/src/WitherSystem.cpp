@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/SummonAwards.hpp>
 #include <basalt/server/runtime/world/WitherPatterns.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -163,6 +164,10 @@ void WitherSystem::placed(world::LoadedWorld& world, std::int32_t x, std::int32_
     boss::WitherState& state = stateOf(*wither);
     state.random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     boss::makeInvulnerable(*wither, state);
+    // parity: `WitherSkullBlock.checkSpawn` awards it before the wither is in the world, to every
+    // player within fifty blocks of where it is about to stand.
+    world::summonAwards::award(options_.advancementTriggers, watchers, world.name(), *wither,
+                               world::summonAwards::kWitherRange);
     static_cast<void>(world.state().spawnEntity(std::move(wither)));
     // parity: `CarvedPumpkinBlock.updatePatternBlocks`, the neighbours told once the wither is in.
     for (std::size_t index = 0; index < match->cells.size(); ++index) {

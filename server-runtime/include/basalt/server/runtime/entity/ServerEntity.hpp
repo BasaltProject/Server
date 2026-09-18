@@ -101,6 +101,8 @@ public:
 
     /// parity: `Animal.inLove`, the thirty seconds a fed animal spends looking for a partner.
     std::int32_t loveTicks = 0;
+    /// Who fed it, since the advancement and the stat are that player's. parity: `loveCause`.
+    std::optional<std::string> loveCause;
     /// parity: `BreedGoal.loveTime`, the three seconds two of them have to stay together.
     std::int32_t courtshipTicks = 0;
     /// parity: `PARENT_AGE_AFTER_BREEDING`, the five minutes before either can breed again.

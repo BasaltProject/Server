@@ -512,7 +512,7 @@ void act(const randomTicks::Context& context, std::int32_t x, std::int32_t y, st
                                                    context.allocateEntityId);
         }
     } else if (path.ends_with("eyeblossom")) {
-        miscGrowth::eyeblossom(context.world, context.clock, x, y, z, stateId, changes);
+        miscGrowth::eyeblossom(context.world, context.clock, x, y, z, stateId, random, changes);
     } else if (path == "pointed_dripstone" || path == "sulfur_spike") {
         dripstoneGrowth::dripstone(context.world, x, y, z, stateId, random, changes);
     } else if (path == "vine") {

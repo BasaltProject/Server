@@ -171,8 +171,40 @@ void AdvancementTriggers::onSummonedEntity(std::string_view player, std::string_
     });
 }
 
-void AdvancementTriggers::onBredAnimals(std::string_view player, std::string_view uuid) {
-    fire(player, uuid, adv::ConditionKind::BredAnimals, [](const adv::CriterionCondition&) { return true; });
+void AdvancementTriggers::onBredAnimals(std::string_view player, std::string_view uuid, const Identifier& child,
+                                        const Identifier& parent, const Identifier& partner) {
+    fire(player, uuid, adv::ConditionKind::BredAnimals,
+         [this, &child, &parent, &partner](const adv::CriterionCondition& condition) {
+             // parity: the parents are tried both ways round before the criterion is refused.
+             const bool pair =
+                 (matchesType(condition.parentTypes, parent) && matchesType(condition.partnerTypes, partner)) ||
+                 (matchesType(condition.parentTypes, partner) && matchesType(condition.partnerTypes, parent));
+             return matchesType(condition.entityTypes, child) && pair;
+         });
+}
+
+void AdvancementTriggers::onEnteredBlock(std::string_view player, std::string_view uuid, const Identifier& block) {
+    fire(player, uuid, adv::ConditionKind::EnteredBlock, [&block](const adv::CriterionCondition& condition) {
+        return condition.block.has_value() && *condition.block == block;
+    });
+}
+
+void AdvancementTriggers::onRecipeCrafted(std::string_view player, std::string_view uuid, const Identifier& recipe) {
+    fire(player, uuid, adv::ConditionKind::RecipeCrafted, [&recipe](const adv::CriterionCondition& condition) {
+        return condition.recipe.has_value() && *condition.recipe == recipe;
+    });
+}
+
+void AdvancementTriggers::onLocation(std::string_view player, std::string_view uuid,
+                                     const std::optional<Identifier>& biome,
+                                     const std::function<bool(const Identifier&)>& insideStructure) {
+    fire(player, uuid, adv::ConditionKind::AtLocation,
+         [&biome, &insideStructure](const adv::CriterionCondition& condition) {
+             if (condition.biome.has_value()) {
+                 return biome.has_value() && *biome == *condition.biome;
+             }
+             return condition.structure.has_value() && insideStructure && insideStructure(*condition.structure);
+         });
 }
 
 void AdvancementTriggers::onContainerLoot(std::string_view player, std::string_view uuid, const Identifier& table) {

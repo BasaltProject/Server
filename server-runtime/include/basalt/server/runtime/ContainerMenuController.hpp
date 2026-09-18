@@ -192,6 +192,10 @@ private:
 
     void recomputeSmithingResult();
 
+    /// parity: `ResultSlot.checkTakeAchievements`, which hands the criteria the recipe the result
+    /// slot was filled from.
+    void awardRecipeCrafted();
+
     void takeSmithingResult();
 
     /// parity: `EnchantmentMenu.slotsChanged`, which rolls all three rows off the player's seed.
@@ -291,6 +295,8 @@ private:
     std::optional<storage::StoredItemStack> stonecutterResult_;
 
     bool openSmithing_ = false;
+    /// parity: `ResultContainer.recipeUsed`, the recipe that filled the result slot.
+    std::optional<wire::common::Identifier> recipeUsed_;
     std::array<std::optional<storage::StoredItemStack>, 4> smithingSlots_;
 
     bool openEnchantment_ = false;

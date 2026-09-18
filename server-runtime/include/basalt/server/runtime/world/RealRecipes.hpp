@@ -89,6 +89,10 @@ public:
     smithingFor(const server::world::loot::ItemStack* templateStack, const server::world::loot::ItemStack* baseStack,
                 const server::world::loot::ItemStack* additionStack) const;
 
+    /// The name a recipe was read under, for the criteria that watch what was crafted. Only a
+    /// pointer this object owns has one.
+    [[nodiscard]] const wire::common::Identifier* nameOf(const server::world::crafting::Recipe* recipe) const;
+
     /// The recipe this grid matches, with its name.
     [[nodiscard]] std::optional<Match> recipeMatching(const server::world::crafting::CraftingInput& input) const;
 

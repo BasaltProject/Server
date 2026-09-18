@@ -318,3 +318,38 @@ TEST_CASE("the dimension, the chest and the bucket each grant their own") {
     triggers.onFilledBucket("Steve", "uuid-1", Identifier::vanilla("tadpole_bucket"));
     CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/tadpole_in_a_bucket")).size() == 1);
 }
+
+TEST_CASE("a newborn grants the criterion of its kind, and the pair matches either way round") {
+    std::map<Identifier, Advancement> definitions;
+    definitions.emplace(Identifier::vanilla("husbandry/breed_an_animal"),
+                        waitingFor("bred", Identifier::vanilla("bred_animals"),
+                                   CriterionCondition{.kind = ConditionKind::BredAnimals}));
+    definitions.emplace(
+        Identifier::vanilla("husbandry/bred_all_animals"),
+        waitingFor("sheep", Identifier::vanilla("bred_animals"),
+                   CriterionCondition{.kind = ConditionKind::BredAnimals, .entityTypes = {"minecraft:sheep"}}));
+    // parity: the frog pair, whose tadpole is not an animal, so the trigger names the parents.
+    definitions.emplace(Identifier::vanilla("husbandry/froglights"),
+                        waitingFor("frogs", Identifier::vanilla("bred_animals"),
+                                   CriterionCondition{.kind = ConditionKind::BredAnimals,
+                                                      .parentTypes = {"minecraft:frog"},
+                                                      .partnerTypes = {"minecraft:frog"}}));
+    const RealAdvancements advancements{std::move(definitions)};
+    PlayerProgress progress;
+    Told told;
+    AdvancementTriggers triggers{advancements, progress, told.hooks()};
+
+    triggers.onBredAnimals("Steve", "uuid-1", Identifier::vanilla("cow"), Identifier::vanilla("cow"),
+                           Identifier::vanilla("cow"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/breed_an_animal")).size() == 1);
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/bred_all_animals")).empty());
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/froglights")).empty());
+
+    triggers.onBredAnimals("Steve", "uuid-1", Identifier::vanilla("sheep"), Identifier::vanilla("sheep"),
+                           Identifier::vanilla("sheep"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/bred_all_animals")).size() == 1);
+
+    triggers.onBredAnimals("Steve", "uuid-1", Identifier::vanilla("tadpole"), Identifier::vanilla("frog"),
+                           Identifier::vanilla("frog"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/froglights")).size() == 1);
+}

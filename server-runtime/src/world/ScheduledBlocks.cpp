@@ -50,7 +50,6 @@ constexpr std::int32_t kFrostedFirstLow = 60;
 constexpr std::int32_t kFrostedFirstHigh = 120;
 constexpr std::int32_t kMeltLight = 11;
 constexpr std::int32_t kDriedGhastMax = 3;
-constexpr std::int32_t kDriedGhastDelay = 5000;
 
 /// parity: `SnifferEggBlock`'s own three numbers.
 constexpr std::int32_t kSnifferMaxHatch = 2;
@@ -535,7 +534,8 @@ void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
         vibrations::emit(world, "block_change", static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
                          static_cast<double>(z) + 0.5, gameTime);
     }
-    world.scheduleBlockTick(x, y, z, driedGhastTickType(), kDriedGhastDelay);
+    // parity: `DriedGhastBlock.tick` books nothing. The next step of the clock is armed by
+    // `randomTick`, so the block waits for a random tick again instead of running free.
 }
 
 void scheduleHatch(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed) {

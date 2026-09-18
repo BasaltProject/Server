@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MiscGrowth.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
@@ -126,6 +127,11 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         }
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);
         world::scheduledBlocks::driedGhast(world.state(), x, y, z, world.gameTime(), scheduled);
+        // parity: `EyeblossomBlock.tick`, the booked half of the same flip the random tick does. One
+        // flower that turns books the ones around it, so a field flips as a wave.
+        if (world::miscGrowth::isEyeblossom(here)) {
+            world::miscGrowth::eyeblossom(world.state(), world.clock(), x, y, z, here, random, scheduled);
+        }
         // parity: `RedstoneLampBlock.tick`, the four ticks a lamp waits before going dark.
         if (const std::optional<world::BlockChange> lamp =
                 world::redstoneReactors::lampTick(world.state(), world.name(), x, y, z);

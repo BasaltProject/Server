@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <map>
+#include <utility>
 
 namespace basalt::server::runtime::entity::breeding {
 namespace {
@@ -53,7 +54,10 @@ bool isFood(const wire::common::Identifier& type, const wire::common::Identifier
 
 bool canFallInLove(const ServerEntity& animal) { return animal.loveTicks <= 0 && animal.age == 0; }
 
-void feed(ServerEntity& animal) { animal.loveTicks = kLoveTicks; }
+void feed(ServerEntity& animal, std::optional<std::string> cause) {
+    animal.loveTicks = kLoveTicks;
+    animal.loveCause = std::move(cause);
+}
 
 bool canMate(const ServerEntity& animal, const ServerEntity& other) {
     return animal.entityId() != other.entityId() && animal.type() == other.type() && animal.loveTicks > 0 &&
@@ -110,6 +114,7 @@ ServerEntity* tick(ServerEntity& animal, const std::vector<ServerEntity*>& nearb
 void afterBreeding(ServerEntity& animal, ServerEntity& partner) {
     for (ServerEntity* parent : {&animal, &partner}) {
         parent->loveTicks = 0;
+        parent->loveCause.reset();
         parent->courtshipTicks = 0;
         parent->age = kParentCooldown;
         parent->breedCooldown = kParentCooldown;

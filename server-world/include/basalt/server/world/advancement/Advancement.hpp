@@ -39,8 +39,14 @@ enum class ConditionKind : std::uint8_t {
     ConsumedItem,
     /// parity: `FilledBucketTrigger`.
     FilledBucket,
-    /// parity: `BredAnimalsTrigger`, which the only two advancements using it ask nothing else of.
+    /// parity: `BredAnimalsTrigger`, which names the newborn or the two parents.
     BredAnimals,
+    /// parity: `EnterBlockTrigger`, the block a player is standing in.
+    EnteredBlock,
+    /// parity: `PlayerTrigger` as `location`: where the player is standing, every second.
+    AtLocation,
+    /// parity: `RecipeCraftedTrigger`, the recipe behind a result the player took.
+    RecipeCrafted,
     Unsupported,
 };
 
@@ -50,12 +56,21 @@ struct CriterionCondition {
     ConditionKind kind = ConditionKind::Unsupported;
     /// `minecraft:inventory_changed`: every matcher must be satisfied by something in the inventory.
     std::vector<ItemMatcher> matchers;
-    /// `minecraft:recipe_unlocked`: the recipe whose entering the book grants this.
+    /// `minecraft:recipe_unlocked` and `minecraft:recipe_crafted`: the recipe learnt or used.
     std::optional<wire::common::Identifier> recipe;
-    /// The entity types a kill, a taming or a summon asks for, ids or a single `#tag`. Empty is any.
+    /// The entity types a kill, a taming, a summon or a newborn asks for, ids or a single `#tag`.
+    /// Empty is any.
     std::vector<std::string> entityTypes;
+    /// `minecraft:bred_animals`: the two parents, which the trigger matches either way round.
+    std::vector<std::string> parentTypes;
+    std::vector<std::string> partnerTypes;
     /// `minecraft:player_generates_container_loot`: the table that was rolled.
     std::optional<wire::common::Identifier> lootTable;
+    /// `minecraft:enter_block`: the block the player has to be standing in.
+    std::optional<wire::common::Identifier> block;
+    /// `minecraft:location`: the biome or the structure the player has to be standing in.
+    std::optional<wire::common::Identifier> biome;
+    std::optional<wire::common::Identifier> structure;
     /// `minecraft:changed_dimension`: where the player came from and went to, either optional.
     std::optional<wire::common::Identifier> fromDimension;
     std::optional<wire::common::Identifier> toDimension;

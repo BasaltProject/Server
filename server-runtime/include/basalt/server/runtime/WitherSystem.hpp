@@ -22,8 +22,9 @@ class PlayerSession;
 } // namespace basalt::server::runtime::player
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class LoadedWorld;
-}
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -41,6 +42,8 @@ public:
         std::function<std::int64_t()> nextSeed;
         /// `wither_summon_base_blocks` and `wither_immune`.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// Where the advancement for raising one goes, which is to whoever is near it.
+        world::AdvancementTriggers* advancementTriggers = nullptr;
         /// A status effect given to a mob.
         std::function<bool(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            entity::ServerEntity& mob, const world::ActiveEffect& effect)>
