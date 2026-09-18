@@ -994,11 +994,22 @@ void BasaltServer::startBedrockListener() {
                     }
                     return;
                 }
-                if (!item.has_value() || !entity::breeding::isFood(target->type(), *item) ||
-                    !entity::breeding::canFallInLove(*target)) {
+                if (!item.has_value() || !entity::breeding::isFood(target->type(), *item)) {
                     return;
                 }
-                entity::breeding::feed(*target, session->uuid().toString());
+                // parity: `Animal.mobInteract`: love for a grown one, a faster childhood for a calf.
+                const bool baby = target->age < 0;
+                if (entity::breeding::canFallInLove(*target)) {
+                    entity::breeding::feed(*target, session->uuid().toString());
+                } else if (entity::breeding::canAgeUp(*target)) {
+                    entity::breeding::feedBaby(*target);
+                } else {
+                    return;
+                }
+                if (advancementTriggers_ != nullptr) {
+                    advancementTriggers_->onInteractedWithEntity(session->name(), session->uuid().toString(),
+                                                                 target->type(), baby, *item);
+                }
                 if (session->gamemode == wire::protocol::play::Gamemode::Creative) {
                     return;
                 }

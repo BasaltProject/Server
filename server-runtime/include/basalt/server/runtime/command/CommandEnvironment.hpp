@@ -32,6 +32,10 @@ namespace basalt::server::plugins {
 class PluginEventBus;
 } // namespace basalt::server::plugins
 
+namespace basalt::server::runtime::entity {
+class ServerEntity;
+}
+
 namespace basalt::server::runtime::command {
 
 /// The clock update a world would send right now, for a join or a change.
@@ -85,6 +89,10 @@ public:
         /// parity: `CarvedPumpkinBlock.trySpawnGolem`'s `addFreshEntity`. Null where there is no
         /// entity side to put a golem into, which is how the dispatcher's own tests run.
         std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
+        /// parity: `EnderDragon.kill`, which is the one entity whose `kill` skips the death it
+        /// would otherwise play out: it goes on the spot and the fight is told it was killed.
+        /// Answers whether it took the entity. Null where there is no fight, tests included.
+        std::function<bool(world::LoadedWorld& world, entity::ServerEntity& entity)> killOutright;
         /// What the console reads messages with. Clients resolve translation keys themselves
         /// against their own language, so this exists only so the log shows sentences instead of
         /// keys; an empty table degrades to printing the keys rather than failing.

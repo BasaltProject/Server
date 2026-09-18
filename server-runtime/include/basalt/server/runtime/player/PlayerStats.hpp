@@ -24,13 +24,6 @@ public:
     /// parity: `ServerStatsCounter.setValue`, used when sleep or death resets a timer stat.
     void reset(std::string_view key);
 
-    /// Adds a distance in blocks, counted in centimetres as vanilla does.
-    ///
-    /// The remainder is kept rather than rounded away: a player moves a few centimetres per tick,
-    /// so rounding each one to the nearest centimetre would lose most of the distance at a walk and
-    /// all of it when standing almost still.
-    void addWalked(double blocks);
-
     /// Fallen distance, in centimetres like the walked one.
     void addFallen(double blocks);
 
@@ -61,7 +54,6 @@ private:
     std::map<std::string, std::int64_t, std::less<>> counters_;
 
     /// Fractions of a block walked, kept until they add up to a whole centimetre.
-    double walkRemainder_ = 0.0;
 };
 
 } // namespace basalt::server::runtime::player

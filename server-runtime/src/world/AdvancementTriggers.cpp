@@ -1,14 +1,17 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 
 #include <algorithm>
 #include <expected>
 #include <functional>
+#include <map>
 #include <utility>
 
 namespace basalt::server::runtime::world {
 namespace {
 
 namespace adv = server::world::advancement;
+namespace registry = server::registry;
 
 using wire::common::Identifier;
 using wire::text::Component;
@@ -223,6 +226,56 @@ void AdvancementTriggers::onChangedDimension(std::string_view player, std::strin
 
 void AdvancementTriggers::onConsumedItem(std::string_view player, std::string_view uuid, const Identifier& item) {
     fire(player, uuid, adv::ConditionKind::ConsumedItem, [this, &item](const adv::CriterionCondition& condition) {
+        return condition.matchers.empty() || matches(condition.matchers.front(), item);
+    });
+}
+
+bool AdvancementTriggers::matchesBlock(const adv::BlockMatcher& matcher, const std::int32_t stateId) {
+    const Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return false;
+    }
+    if (!matcher.blocks.empty() && std::ranges::find(matcher.blocks, *block) == matcher.blocks.end()) {
+        return false;
+    }
+    if (matcher.properties.empty()) {
+        return true;
+    }
+    const std::map<std::string, std::string> values = registry::blockStateDefinitions::propertiesOf(stateId);
+    return std::ranges::all_of(matcher.properties, [&values](const auto& wanted) {
+        const auto found = values.find(wanted.first);
+        return found != values.end() && found->second == wanted.second;
+    });
+}
+
+void AdvancementTriggers::onPlacedBlock(std::string_view player, std::string_view uuid, const std::int32_t stateId) {
+    fire(player, uuid, adv::ConditionKind::PlacedBlock, [stateId](const adv::CriterionCondition& condition) {
+        return condition.blockMatcher.has_value() && matchesBlock(*condition.blockMatcher, stateId);
+    });
+}
+
+void AdvancementTriggers::onItemUsedOnBlock(std::string_view player, std::string_view uuid, const std::int32_t stateId,
+                                            const Identifier& item) {
+    fire(player, uuid, adv::ConditionKind::ItemUsedOnBlock,
+         [this, stateId, &item](const adv::CriterionCondition& condition) {
+             return condition.blockMatcher.has_value() && matchesBlock(*condition.blockMatcher, stateId) &&
+                    (condition.matchers.empty() || matches(condition.matchers.front(), item));
+         });
+}
+
+void AdvancementTriggers::onInteractedWithEntity(std::string_view player, std::string_view uuid,
+                                                 const Identifier& target, const bool targetIsBaby,
+                                                 const Identifier& item) {
+    fire(player, uuid, adv::ConditionKind::InteractedWithEntity,
+         [this, &target, targetIsBaby, &item](const adv::CriterionCondition& condition) {
+             return matchesType(condition.entityTypes, target) &&
+                    (!condition.baby.has_value() || *condition.baby == targetIsBaby) &&
+                    (condition.matchers.empty() || matches(condition.matchers.front(), item));
+         });
+}
+
+void AdvancementTriggers::onFishingHooked(std::string_view player, std::string_view uuid, const Identifier& item) {
+    fire(player, uuid, adv::ConditionKind::FishingHooked, [this, &item](const adv::CriterionCondition& condition) {
         return condition.matchers.empty() || matches(condition.matchers.front(), item);
     });
 }

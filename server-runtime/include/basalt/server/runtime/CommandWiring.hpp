@@ -78,6 +78,8 @@ struct CommandWiring {
     /// parity: `CarvedPumpkinBlock.trySpawnGolem`. Handed over for the same reason: the command tree
     /// has no business knowing how a mob is made.
     std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
+    /// What `/kill` hands the one entity whose death is not played out. See `CommandEnvironment`.
+    std::function<bool(world::LoadedWorld& world, entity::ServerEntity& entity)> killOutright;
     std::function<void()> requestRestart;
     std::function<void()> onConfigsReloaded;
     std::function<std::int64_t()> nowNanos;

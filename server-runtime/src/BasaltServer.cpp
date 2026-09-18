@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
+#include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/placeholder/AnimationPlaceholders.hpp>
@@ -350,6 +351,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                          "triggered", {}),
                      advancementTriggers_.get(), playerRegistry_.snapshot(), world.name());
     };
+    wiring.killOutright = [this](world::LoadedWorld& world, entity::ServerEntity& entity) {
+        return endFight_ != nullptr && endFight_->killOutright(world, entity);
+    };
     wiring.requestRestart = [this] { requestRestart(); };
     wiring.onConfigsReloaded = [this] { worldRegistry_->onConfigsReloaded(); };
     wiring.nowNanos = [this] {
@@ -576,6 +580,21 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     if (withers_ != nullptr) {
                         withers_->placed(world, x, y, z);
                     }
+                },
+            .spawnHatchling =
+                [this](world::LoadedWorld& world, const world::scheduledBlocks::Hatchling& hatched) {
+                    if (spawning_ == nullptr) {
+                        return;
+                    }
+                    // parity: all three hatch with `EntitySpawnReason.BREEDING`.
+                    spawning_->spawnMob(world, hatched.type, hatched.x, hatched.y, hatched.z, hatched.yaw, "breeding",
+                                        [&hatched](entity::ServerEntity& born) {
+                                            if (hatched.baby) {
+                                                born.age = entity::breeding::kBabyAge;
+                                            }
+                                            born.persistent = hatched.persistent;
+                                            born.headYaw = hatched.yaw;
+                                        });
                 },
             .shriekerHeard =
                 [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {

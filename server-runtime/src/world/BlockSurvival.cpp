@@ -249,12 +249,8 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         path == "dirt_path" || path == "farmland") {
         return only(BlockFace::Up);
     }
-    // parity: `RepeaterBlock.updateShape` and `ComparatorBlock.updateShape` are both
-    // `directionToNeighbour == Direction.DOWN && !canSurviveOn(...)`, and `RedStoneWireBlock`'s opens
-    // the same way. All three fall only for the square under them; this build let any side take them.
-    // `ComparatorBlock` declares its `updateShape` **public** where the rest are `protected`, which is
-    // why a grep for the narrower form says the comparator has none. `DiodeBlock` itself has none: the
-    // repeater and the comparator each write their own.
+    // parity: `RepeaterBlock`, `ComparatorBlock` and `RedStoneWireBlock` only fall when the square
+    // below changes (`directionToNeighbour == Direction.DOWN`).
     if (path == "repeater" || path == "comparator" || path == "redstone_wire") {
         return only(BlockFace::Down);
     }
@@ -430,6 +426,15 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
         const std::int32_t below = stateAt(world, x, y - 1, z);
         return registry::blockShapes::supportsRigid(below, registry::BlockFace::Up) ||
                registry::blockShapes::supportsCentre(below, registry::BlockFace::Up);
+    }
+    // parity: `HangingMossBlock.canStayAtPosition` is `MultifaceBlock.canAttachTo(UP)` or more moss,
+    // and `canAttachTo` takes the collision box as well as the support shape. The table answers this
+    // one with a set of **block** ids, so a top slab held it up here the way a bottom one does: the
+    // set was built from each block's default state and `stone_slab`'s default is the bottom half.
+    if (path == "pale_hanging_moss") {
+        const std::int32_t above = stateAt(world, x, y + 1, z);
+        return registry::blockShapes::canAttachTo(above, registry::BlockFace::Down) ||
+               pathOf(above) == "pale_hanging_moss";
     }
     // Nothing the table skips is refused by it either, so this is a shortcut rather than a rule of
     // its own: it is here because "the table does not model this" and "this stands anywhere" are

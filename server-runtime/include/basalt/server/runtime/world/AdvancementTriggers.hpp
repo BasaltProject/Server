@@ -96,6 +96,22 @@ public:
     /// parity: `ConsumeItemTrigger`, an item eaten or drunk.
     void onConsumedItem(std::string_view player, std::string_view uuid, const wire::common::Identifier& item);
 
+    /// parity: `ItemUsedOnLocationTrigger` as `placed_block`, read off the block that is now there
+    /// rather than off the item that put it there.
+    void onPlacedBlock(std::string_view player, std::string_view uuid, std::int32_t stateId);
+
+    /// parity: the same trigger as `item_used_on_block`, fired when using the item did something.
+    void onItemUsedOnBlock(std::string_view player, std::string_view uuid, std::int32_t stateId,
+                           const wire::common::Identifier& item);
+
+    /// parity: `PlayerInteractTrigger`, fired only when the interaction did something and the item
+    /// is what did it.
+    void onInteractedWithEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& target,
+                                bool targetIsBaby, const wire::common::Identifier& item);
+
+    /// parity: `FishingRodHookedTrigger`, one call per item the rod brought up.
+    void onFishingHooked(std::string_view player, std::string_view uuid, const wire::common::Identifier& item);
+
     /// parity: `FilledBucketTrigger`, the bucket that came back full.
     void onFilledBucket(std::string_view player, std::string_view uuid, const wire::common::Identifier& bucket);
 
@@ -113,6 +129,10 @@ private:
 
     [[nodiscard]] bool matches(const server::world::advancement::ItemMatcher& matcher,
                                const wire::common::Identifier& item) const;
+
+    /// Whether a block state is one a criterion names, properties included.
+    [[nodiscard]] static bool matchesBlock(const server::world::advancement::BlockMatcher& matcher,
+                                           std::int32_t stateId);
 
     const RealAdvancements* advancements_;
     PlayerProgress* progress_;

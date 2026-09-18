@@ -321,11 +321,22 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         }
         return;
     }
-    if (!item.has_value() || !entity::breeding::isFood(entity->type(), *item) ||
-        !entity::breeding::canFallInLove(*entity)) {
+    if (!item.has_value() || !entity::breeding::isFood(entity->type(), *item)) {
         return;
     }
-    entity::breeding::feed(*entity, session->uuid().toString());
+    // parity: `Animal.mobInteract` feeds a grown one into love and a calf into growing faster, and
+    // does nothing at all to one that is neither.
+    const bool baby = entity->age < 0;
+    if (entity::breeding::canFallInLove(*entity)) {
+        entity::breeding::feed(*entity, session->uuid().toString());
+    } else if (entity::breeding::canAgeUp(*entity)) {
+        entity::breeding::feedBaby(*entity);
+    } else {
+        return;
+    }
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
+        triggers->onInteractedWithEntity(session->name(), session->uuid().toString(), entity->type(), baby, *item);
+    }
     if (session->gamemode != Gamemode::Creative) {
         if (held->count <= 1) {
             session->inventory.set(heldSlot, std::nullopt);

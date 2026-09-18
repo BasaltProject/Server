@@ -604,9 +604,10 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     if (here == faces.end() || here->second != "true") {
         return std::nullopt;
     }
-    // parity: `canAttachTo` asks the neighbour for a full face on the side that looks back here.
+    // parity: `canAttachTo` asks the neighbour for a full face on the side that looks back here, and
+    // takes the collision box as well as the support shape: leaves hold a vine and hold no torch.
     const std::int32_t neighbour = stateAt(world, x + offsetX(*towards), y + offsetY(*towards), z + offsetZ(*towards));
-    if (registry::blockShapes::isFaceSturdy(neighbour, facing(*towards))) {
+    if (registry::blockShapes::canAttachTo(neighbour, facing(*towards))) {
         return std::nullopt;
     }
     here->second = "false";

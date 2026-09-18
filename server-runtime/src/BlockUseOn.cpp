@@ -158,6 +158,15 @@ void BlockInteractionHandler::placeEnderEye(PlayerSession& session, const BlockP
     owner_->sendInventorySlot(heldSlot);
 }
 
+void BlockInteractionHandler::awardItemUsedOn(const PlayerSession& session,
+                                              const std::optional<std::int32_t>& clickedState,
+                                              const Identifier& item) const {
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    if (triggers != nullptr && clickedState.has_value()) {
+        triggers->onItemUsedOnBlock(session.name(), session.uuid().toString(), *clickedState, item);
+    }
+}
+
 void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPacket& useItemOn) {
     const auto ack = [this, &useItemOn] {
         owner_->sendCompressed(play::BlockChangedAckPacket::kId, [&useItemOn](wire::io::ByteBuffer& buffer) {
@@ -426,12 +435,16 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         return;
     }
     // parity: `HoneycombItem.useOn` and `AxeItem.useOn`, both of which change the block clicked.
+    // Both raise the criterion **before** writing the new state, so what it reads is the block the
+    // player clicked: waxing is earned on the bare copper, not on the waxed one it becomes.
     if (held.has_value() && heldBlock == Identifier::vanilla("honeycomb") &&
         useHoneycomb(*session, hit.pos, heldSlot, *held)) {
+        awardItemUsedOn(*session, clickedState, *heldBlock);
         ack();
         return;
     }
     if (held.has_value() && heldBlock->path().ends_with("_axe") && useAxe(*session, hit.pos, heldSlot, *held)) {
+        awardItemUsedOn(*session, clickedState, *heldBlock);
         ack();
         return;
     }

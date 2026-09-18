@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -281,6 +282,14 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
                 dropped.pickupDelay = 0;
                 static_cast<void>(world.state().spawnItem(std::move(dropped)));
                 orbs_->spawn(world, player.x, player.y + 0.5, player.z + 0.5, state->random.nextInt(6) + 1);
+                if (context.triggers != nullptr) {
+                    context.triggers->onFishingHooked(player.name(), player.uuid().toString(), stack.item);
+                }
+                // parity: `Stats.FISH_CAUGHT` counts what the `fishes` tag holds, not every catch.
+                if (context.itemTags != nullptr &&
+                    world::realItemTags::membersOf(*context.itemTags, "minecraft:fishes").contains(stack.item)) {
+                    player.stats.increment(storage::stats::fishCaught());
+                }
             }
         }
         wear = 1;

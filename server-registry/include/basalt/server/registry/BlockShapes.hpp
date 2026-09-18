@@ -108,6 +108,12 @@ inline constexpr int kCorners = 6;
 /// Whether this collision shape completely covers `face`. parity: `Block.isFaceFull`.
 [[nodiscard]] bool isCollisionFaceFull(std::int32_t stateId, BlockFace face);
 
+/// Whether a block hanging on `face` of this one would hold. parity: `MultifaceBlock.canAttachTo`,
+/// which takes the support shape **or** the collision shape: leaves have an empty support shape and
+/// a full collision box, so they hold a vine or a hanging moss even though they hold no torch.
+/// `face` points from this block back towards the one hanging on it.
+[[nodiscard]] bool canAttachTo(std::int32_t stateId, BlockFace face);
+
 /// parity: `SupportType.CENTER`, the middle of a face, which is all a torch or a rail asks for.
 [[nodiscard]] bool supportsCentre(std::int32_t stateId, BlockFace face);
 

@@ -120,6 +120,14 @@ void KillCommand::build(const CommandNodeBuilder& root) const {
                 continue;
             }
             if (entity::ServerEntity* entity = target.entity(); entity != nullptr) {
+                // parity: `EnderDragon.kill` overrides the living one: it is removed where it
+                // stands, with none of the two hundred ticks of dying, and the fight is told.
+                const auto& environmentWorlds = context.environment().options().worlds;
+                const auto inWorld = environmentWorlds.find(target.worldName());
+                if (context.environment().options().killOutright && inWorld != environmentWorlds.end() &&
+                    context.environment().options().killOutright(*inWorld->second, *entity)) {
+                    continue;
+                }
                 // parity: `/kill` kills, so what it kills drops what it would have dropped. Only a
                 // living thing then lies there for the twenty ticks of `tickDeath`: `Entity.kill`
                 // removes a minecart or a boat on the spot, and `LivingEntity.kill` does not.

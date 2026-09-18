@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/FoodData.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
+#include <basalt/server/runtime/player/PlayerMovementStats.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -44,6 +45,29 @@ void sendTo(const std::vector<PlayerSession*>& players, std::int32_t packetId,
         if (player->connection().sendPlayPacket) {
             player->connection().sendPlayPacket(packetId, write);
         }
+    }
+}
+
+/// parity: `ServerPlayer.checkMovementStatistics` and `checkRidingStatistics`. The facts come off the
+/// session because this build has no poses: sneaking stands in for crouching and sprinting in water
+/// for swimming, which is what `updateSwimming` asks anyway.
+void countMovement(player::PlayerSession& session, double dx, double dy, double dz, bool onGround,
+                   const std::optional<std::int32_t>& feet, const std::optional<std::int32_t>& atEye) {
+    const bool riding = session.vehicleId.has_value();
+    const bool inWater = feet.has_value() && world::fluids::of(*feet) == world::Submersion::Water;
+    const player::playerMovement::Facts facts{
+        .riding = riding,
+        .swimming = session.sprinting && inWater && !riding,
+        .eyeInWater = atEye.has_value() && world::fluids::of(*atEye) == world::Submersion::Water,
+        .inWater = inWater,
+        .climbing = feet.has_value() && player::playerMovement::isClimbable(*feet),
+        .onGround = onGround,
+        .sprinting = session.sprinting,
+        .crouching = session.sneaking};
+    const std::optional<player::playerMovement::Counted> counted =
+        player::playerMovement::movementStat(dx, dy, dz, facts);
+    if (counted.has_value()) {
+        session.stats.increment(counted->key, counted->centimetres);
     }
 }
 
@@ -318,14 +342,17 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
         session->stats.increment(storage::stats::jump());
     }
     combat_->trackFall(*session, y, onGround, feet);
-    // Horizontal only, and only on the ground, which is how vanilla tells walking apart from falling
-    // and from being moved by something else.
+    const double dx = x - session->x;
+    const double dy = y - session->y;
+    const double dz = z - session->z;
     if (onGround) {
-        const double dx = x - session->x;
-        const double dz = z - session->z;
-        session->stats.addWalked(std::sqrt((dx * dx) + (dz * dz)));
         lastStepSquared = (dx * dx) + (dz * dz);
     }
+    const std::optional<std::int32_t> atEye =
+        world().blockState(static_cast<std::int32_t>(std::floor(x)),
+                           static_cast<std::int32_t>(std::floor(y + world::fluids::eyeHeight(session->sneaking))),
+                           static_cast<std::int32_t>(std::floor(z)));
+    countMovement(*session, dx, dy, dz, onGround, feet, atEye);
     session->x = x;
     session->y = y;
     session->z = z;

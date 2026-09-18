@@ -72,6 +72,16 @@ void RedstoneTickSystem::openTurn(world::LoadedWorld& world, const sched::Region
     world.state().openTurn(tickingChunks(world, region, 1));
 }
 
+void RedstoneTickSystem::releaseHatchlings(world::LoadedWorld& world,
+                                           std::vector<world::scheduledBlocks::Hatchling>& hatched) {
+    for (const world::scheduledBlocks::Hatchling& one : hatched) {
+        if (options_.spawnHatchling) {
+            options_.spawnHatchling(world, one);
+        }
+    }
+    hatched.clear();
+}
+
 void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sched::Region& region) {
     const std::vector<world::WorldState::DueTick> due =
         world.state().dueBlockTicksTyped(tickingChunks(world, region, 1));
@@ -115,6 +125,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             continue;
         }
         std::vector<world::BlockChange> scheduled;
+        std::vector<world::scheduledBlocks::Hatchling> hatched;
         random::RandomSource random = freshRandom();
         // parity: `LeavesBlock.tick`, which is where the distance really moves: the shape update only
         // books this turn.
@@ -126,7 +137,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);
-        world::scheduledBlocks::driedGhast(world.state(), x, y, z, world.gameTime(), scheduled);
+        world::scheduledBlocks::driedGhast(world.state(), x, y, z, world.gameTime(), scheduled, hatched);
+        releaseHatchlings(world, hatched);
         // parity: `EyeblossomBlock.tick`, the booked half of the same flip the random tick does. One
         // flower that turns books the ones around it, so a field flips as a wave.
         if (world::miscGrowth::isEyeblossom(here)) {
@@ -536,7 +548,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 }
             }
         }
-        world::scheduledBlocks::frogspawn(world.state(), x, y, z, scheduled);
+        world::scheduledBlocks::frogspawn(world.state(), x, y, z, random, scheduled, hatched);
+        releaseHatchlings(world, hatched);
         // parity: `SugarCaneBlock.tick` and `CactusBlock.tick` both end in
         // `level.destroyBlock(pos, true)`, and the `true` is the drop. What was standing there is
         // read before, because after it is air.
@@ -569,14 +582,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                         static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, world.gameTime());
             }
         }
-        // parity: `LiquidBlock.tick` and `BubbleColumnBlock.tick`, both of which end in
-        // `BubbleColumnBlock.updateColumn`: the column is built, carried on or taken apart here and
-        // not inside the shape cascade. Measured in `columnaburbujas`.
-        // parity: `updateColumn` writes every square of the column with `setBlock(..., 2)`, and a
-        // flag two write still runs the three shape walks: bit one only carries the neighbour notice.
-        // That walk is where `BubbleColumnBlock.updateShape` books the water's turn for the whole
-        // column, and without it the turns never appear on our side however well the booking itself
-        // is written. It goes square by square, because the jar's does. Measured in `columnaburbujas`.
+        // parity: `LiquidBlock.tick` and `BubbleColumnBlock.tick` end in `updateColumn`, whose
+        // flag two writes still run the shape walk square by square; that walk books the column.
         world::scheduledBlocks::bubbleColumn(
             world.state(), x, y, z, scheduled,
             [this, &world, &watchers](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
@@ -663,7 +670,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world::BlockChange{.x = x, .y = y, .z = z, .stateId = server::registry::blocks::air().stateId});
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
-        world::scheduledBlocks::snifferEgg(world.state(), x, y, z, random, scheduled);
+        world::scheduledBlocks::snifferEgg(world.state(), x, y, z, random, scheduled, hatched);
+        releaseHatchlings(world, hatched);
         if (!scheduled.empty()) {
             sendBlockUpdates(watchers, scheduled);
             continue;

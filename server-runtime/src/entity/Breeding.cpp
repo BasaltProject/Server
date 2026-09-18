@@ -59,6 +59,15 @@ void feed(ServerEntity& animal, std::optional<std::string> cause) {
     animal.loveCause = std::move(cause);
 }
 
+bool canAgeUp(const ServerEntity& animal) { return animal.age < 0; }
+
+void feedBaby(ServerEntity& animal) {
+    // parity: the jar divides by twenty as whole ticks *before* taking the tenth, so the last few
+    // seconds of growing left give nothing at all.
+    const auto seconds = static_cast<std::int32_t>(static_cast<float>(-animal.age / 20) * 0.1F);
+    animal.age = std::min(0, animal.age + (seconds * 20));
+}
+
 bool canMate(const ServerEntity& animal, const ServerEntity& other) {
     return animal.entityId() != other.entityId() && animal.type() == other.type() && animal.loveTicks > 0 &&
            other.loveTicks > 0;

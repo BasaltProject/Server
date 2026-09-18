@@ -311,31 +311,42 @@ TEST_CASE("a dried ghast fills up in water and dries out of it") {
                        {{"hydration", std::to_string(hydration)}, {"waterlogged", waterlogged}, {"facing", "north"}});
     };
     std::vector<BlockChange> changes;
+    std::vector<scheduledBlocks::Hatchling> hatched;
 
     REQUIRE(world.setBlockState(8, 64, 8, ghast(0, "true")));
-    scheduledBlocks::driedGhast(world, 8, 64, 8, 0, changes);
+    scheduledBlocks::driedGhast(world, 8, 64, 8, 0, changes, hatched);
     CHECK(world.blockState(8, 64, 8) == ghast(1, "true"));
-    CHECK(world.hasScheduledBlockTick(8, 64, 8, scheduledBlocks::driedGhastTickType()));
-
-    // And the turn it books is five thousand ticks out.
-    CHECK(bookedIn(world, 8, 64, 8, 6000) == 5000);
+    // parity: `DriedGhastBlock.tick` books nothing at all. The next step of the clock comes from a
+    // random tick, so a block that armed its own turn here would run faster than the jar's.
+    CHECK_FALSE(world.hasScheduledBlockTick(8, 64, 8, scheduledBlocks::driedGhastTickType()));
 
     REQUIRE(world.setBlockState(4, 64, 4, ghast(2, "false")));
-    scheduledBlocks::driedGhast(world, 4, 64, 4, 0, changes);
+    scheduledBlocks::driedGhast(world, 4, 64, 4, 0, changes, hatched);
     CHECK(world.blockState(4, 64, 4) == ghast(1, "false"));
 
     // Two steps in and still soaking, it keeps filling to the top.
     REQUIRE(world.setBlockState(7, 64, 7, ghast(2, "true")));
-    scheduledBlocks::driedGhast(world, 7, 64, 7, 0, changes);
+    scheduledBlocks::driedGhast(world, 7, 64, 7, 0, changes, hatched);
     CHECK(world.blockState(7, 64, 7) == ghast(3, "true"));
 
-    // Full in water and empty out of it are both the end of the road.
-    REQUIRE(world.setBlockState(5, 64, 5, ghast(3, "true")));
+    // Empty out of water is the end of the road, and full in it is a ghastling.
     REQUIRE(world.setBlockState(6, 64, 6, ghast(0, "false")));
     const std::size_t before = changes.size();
-    scheduledBlocks::driedGhast(world, 5, 64, 5, 0, changes);
-    scheduledBlocks::driedGhast(world, 6, 64, 6, 0, changes);
+    scheduledBlocks::driedGhast(world, 6, 64, 6, 0, changes, hatched);
     CHECK(changes.size() == before);
+    CHECK(hatched.empty());
+
+    REQUIRE(world.setBlockState(5, 64, 5, ghast(3, "true")));
+    scheduledBlocks::driedGhast(world, 5, 64, 5, 0, changes, hatched);
+    CHECK(world.blockState(5, 64, 5) == air());
+    REQUIRE(hatched.size() == 1);
+    CHECK(hatched.front().type.path() == "happy_ghast");
+    CHECK(hatched.front().baby);
+    // parity: `Vec3.atBottomCenterOf`, and the yaw the block was facing.
+    CHECK(hatched.front().x == doctest::Approx(5.5));
+    CHECK(hatched.front().y == doctest::Approx(64.0));
+    CHECK(hatched.front().z == doctest::Approx(5.5));
+    CHECK(hatched.front().yaw == doctest::Approx(180.0F));
 }
 
 TEST_CASE("a sniffer egg hatches sooner on moss") {
@@ -364,26 +375,49 @@ TEST_CASE("frogspawn is booked for an hour or so and then goes") {
     CHECK(bookedIn(world, 8, 64, 8, 13000) == 10934);
 
     std::vector<BlockChange> changes;
-    scheduledBlocks::frogspawn(world, 8, 64, 8, changes);
+    std::vector<scheduledBlocks::Hatchling> hatched;
+    rng::RandomSource random = rng::RandomSource::legacy(9);
+    scheduledBlocks::frogspawn(world, 8, 64, 8, random, changes, hatched);
     REQUIRE(changes.size() == 1);
     CHECK(world.blockState(8, 64, 8) == air());
+    // parity: `spawnTadpoles`, two to five of them inside the square and half a block down.
+    CHECK(hatched.size() >= 2);
+    CHECK(hatched.size() <= 5);
+    for (const scheduledBlocks::Hatchling& tadpole : hatched) {
+        CHECK(tadpole.type.path() == "tadpole");
+        CHECK(tadpole.persistent);
+        CHECK(tadpole.y == doctest::Approx(63.5));
+        CHECK(tadpole.x >= 8.2);
+        CHECK(tadpole.x <= 8.8);
+        CHECK(tadpole.z >= 8.2);
+        CHECK(tadpole.z <= 8.8);
+    }
 }
 
-TEST_CASE("a sniffer egg cracks twice and then is gone") {
+TEST_CASE("a sniffer egg cracks twice and then hatches a calf") {
     Loaded loaded;
     WorldState& world = loaded.state;
     REQUIRE(world.setBlockState(8, 63, 8, stateOf("stone")));
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("sniffer_egg", {{"hatch", "0"}})));
     rng::RandomSource random = rng::RandomSource::legacy(5);
     std::vector<BlockChange> changes;
+    std::vector<scheduledBlocks::Hatchling> hatched;
 
-    scheduledBlocks::snifferEgg(world, 8, 64, 8, random, changes);
+    scheduledBlocks::snifferEgg(world, 8, 64, 8, random, changes, hatched);
     CHECK(propertyOf(*world.blockState(8, 64, 8), "hatch") == "1");
-    scheduledBlocks::snifferEgg(world, 8, 64, 8, random, changes);
+    scheduledBlocks::snifferEgg(world, 8, 64, 8, random, changes, hatched);
     CHECK(propertyOf(*world.blockState(8, 64, 8), "hatch") == "2");
-    scheduledBlocks::snifferEgg(world, 8, 64, 8, random, changes);
+    CHECK(hatched.empty());
+    scheduledBlocks::snifferEgg(world, 8, 64, 8, random, changes, hatched);
     CHECK(world.blockState(8, 64, 8) == air());
     CHECK(changes.size() == 3);
+    // parity: `Vec3.atCenterOf`, so the calf starts half a block up inside the square it hatched in.
+    REQUIRE(hatched.size() == 1);
+    CHECK(hatched.front().type.path() == "sniffer");
+    CHECK(hatched.front().baby);
+    CHECK(hatched.front().x == doctest::Approx(8.5));
+    CHECK(hatched.front().y == doctest::Approx(64.5));
+    CHECK(hatched.front().z == doctest::Approx(8.5));
 }
 
 TEST_CASE("soul sand pushes a column up and magma drags one down") {

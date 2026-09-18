@@ -19,6 +19,16 @@ struct ItemMatcher {
     std::optional<wire::common::Identifier> tag;
 };
 
+/// A block as a criterion names it: which blocks count, and the state values that must match.
+///
+/// parity: `BlockPredicate` cut down to what the criteria in the jar actually ask for, which is a
+/// set of blocks or one tag, plus a handful of property values.
+struct BlockMatcher {
+    std::vector<wire::common::Identifier> blocks;
+    std::optional<wire::common::Identifier> tag;
+    std::vector<std::pair<std::string, std::string>> properties;
+};
+
 /// parity: `CriterionTriggerInstance`. Deliberately incomplete: a trigger with no case here is
 /// `Unsupported` and never fires, which is the honest answer while the gameplay event behind it does
 /// not exist. The two that do exist cover 3299 of vanilla's 3500-odd criteria.
@@ -47,6 +57,14 @@ enum class ConditionKind : std::uint8_t {
     AtLocation,
     /// parity: `RecipeCraftedTrigger`, the recipe behind a result the player took.
     RecipeCrafted,
+    /// parity: `FishingRodHookedTrigger`, what came out of the water.
+    FishingHooked,
+    /// parity: `PlayerInteractTrigger` as `player_interacted_with_entity`.
+    InteractedWithEntity,
+    /// parity: `ItemUsedOnLocationTrigger` as `placed_block`: the block that is now there.
+    PlacedBlock,
+    /// parity: `ItemUsedOnLocationTrigger` as `item_used_on_block`: what was used on what.
+    ItemUsedOnBlock,
     Unsupported,
 };
 
@@ -61,11 +79,16 @@ struct CriterionCondition {
     /// The entity types a kill, a taming, a summon or a newborn asks for, ids or a single `#tag`.
     /// Empty is any.
     std::vector<std::string> entityTypes;
+    /// Whether the entity has to be a baby or a grown one. parity: the `minecraft:flags` predicate,
+    /// of which only `is_baby` is read.
+    std::optional<bool> baby;
     /// `minecraft:bred_animals`: the two parents, which the trigger matches either way round.
     std::vector<std::string> parentTypes;
     std::vector<std::string> partnerTypes;
     /// `minecraft:player_generates_container_loot`: the table that was rolled.
     std::optional<wire::common::Identifier> lootTable;
+    /// `minecraft:placed_block` and `minecraft:item_used_on_block`: the block it happened on.
+    std::optional<BlockMatcher> blockMatcher;
     /// `minecraft:enter_block`: the block the player has to be standing in.
     std::optional<wire::common::Identifier> block;
     /// `minecraft:location`: the biome or the structure the player has to be standing in.

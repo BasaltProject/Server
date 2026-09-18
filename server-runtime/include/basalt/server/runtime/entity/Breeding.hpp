@@ -49,6 +49,13 @@ inline constexpr double kBreedDistanceSquared = 9.0;
 /// advancement and stat the calf will be, kept as `loveCause` is.
 void feed(ServerEntity& animal, std::optional<std::string> cause = std::nullopt);
 
+/// parity: `AgeableMob.canAgeUp`: a baby that is not age locked, and nothing in this build locks one.
+[[nodiscard]] bool canAgeUp(const ServerEntity& animal);
+
+/// parity: `getSpeedUpSecondsWhenFeeding` plus `ageUp`: feeding a calf takes a tenth of the wait it
+/// has left, counted in whole seconds, and never carries it past grown.
+void feedBaby(ServerEntity& animal);
+
 /// parity: `canMate`: both in love, the same kind, and not the same animal twice.
 [[nodiscard]] bool canMate(const ServerEntity& animal, const ServerEntity& other);
 

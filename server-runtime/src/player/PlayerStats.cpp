@@ -59,26 +59,6 @@ void PlayerStats::reset(std::string_view key) {
     }
 }
 
-void PlayerStats::addWalked(double blocks) {
-    if (blocks <= 0.0) {
-        return;
-    }
-    const std::lock_guard<std::mutex> guard{lock_};
-    walkRemainder_ += blocks * 100.0;
-    const std::int64_t whole = static_cast<std::int64_t>(walkRemainder_);
-    if (whole <= 0) {
-        return;
-    }
-    walkRemainder_ -= static_cast<double>(whole);
-    noteChange(storage::stats::walkOneCm(), whole, false);
-    const auto found = counters_.find(storage::stats::walkOneCm());
-    if (found == counters_.end()) {
-        counters_.emplace(storage::stats::walkOneCm(), whole);
-        return;
-    }
-    found->second += whole;
-}
-
 void PlayerStats::addFallen(double blocks) {
     if (blocks <= 0.0) {
         return;

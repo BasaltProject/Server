@@ -92,10 +92,26 @@ void frostedIceChain(WorldState& world, std::int32_t x, std::int32_t y, std::int
 void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
                 std::vector<BlockChange>& changes, bool hasSkylight = true);
 
-/// parity: `DriedGhastBlock.tick`: soaked it fills up, dry it dries out, and it keeps asking for the
-/// next turn while there is anything left to change.
+/// What a block left behind when its turn hatched it.
+///
+/// parity: `DriedGhastBlock.spawnGhastling`, `SnifferEggBlock.tick` and `FrogspawnBlock.spawnTadpoles`
+/// all make their entity inside the block's own turn. The block turn decides; who puts the entity in
+/// the world is the caller's business, because this layer knows nothing about entities.
+struct Hatchling {
+    wire::common::Identifier type;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    float yaw = 0.0F;
+    bool baby = false;
+    /// parity: a tadpole comes out `setPersistenceRequired`; the other two do not.
+    bool persistent = false;
+};
+
+/// parity: `DriedGhastBlock.tick`: soaked it fills up, dry it dries out, and at the top it is gone
+/// and a ghastling is standing there.
 void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                std::vector<BlockChange>& changes);
+                std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched);
 
 /// parity: `SnifferEggBlock.onPlace`: three turns of a hatch that halves on moss, each one asked for
 /// as the last one lands, plus its own random spread.
@@ -163,35 +179,23 @@ void scheduleBreakIfLoose(WorldState& world, std::int32_t x, std::int32_t y, std
 void breakIfStillLoose(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported,
                        std::vector<BlockChange>& changes);
 
-/// parity: `FrogspawnBlock.tick`, which either breaks the spawn or hatches it away.
-///
-/// The tadpoles that swim out wait for entities: what this owns is the block going.
-void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes);
+/// parity: `FrogspawnBlock.tick`, which either breaks the spawn or hatches it into two to five
+/// tadpoles.
+void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
+               std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched);
 
-/// parity: `SnifferEggBlock.tick`: it cracks twice and then goes.
-///
-/// The sniffer that walks out of it waits for entities, like a turtle egg's turtle.
+/// parity: `SnifferEggBlock.tick`: it cracks twice and the third turn hatches a calf out of it.
 void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
-                std::vector<BlockChange>& changes);
+                std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched);
 
-/// parity: `LiquidBlock.tryScheduleBubbleBlockColumn`, twenty ticks booked on the water over soul
-/// sand or magma, and `BubbleColumnBlock.updateShape`'s five for a column that is already there.
-///
-/// That second one is **not** booked on every shape update: only when the column has lost its
-/// footing, when the news came from below, or when it came from above and the square up there is
-/// occupiable but not already a column. `towards` is what the news came from, and nothing means the
-/// arriving block reshaping itself, which walks all six sides and so always books.
+/// parity: `LiquidBlock.tryScheduleBubbleBlockColumn` (twenty ticks) and
+/// `BubbleColumnBlock.updateShape` (five), which books only on lost footing, news from below, or an
+/// occupiable non-column square above. No `towards` means the block's own pre-shape, which books.
 void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                           std::optional<registry::BlockFace> towards);
 
-/// parity: `BubbleColumnBlock.updateColumn`: soul sand pushes a column up through the water above it
-/// and magma drags one down, and the column climbs while there is water to fill.
-///
-/// What the column then does to whoever swims into it is `entityInside`, which waits for entities.
-///
-/// `written` runs right after each square lands, because the jar's `setBlock(..., 2)` does its shape
-/// walk there and not once the whole column is up: the square above is still water when the one below
-/// is written, so it never hears a bubble column arriving underneath it.
+/// parity: `BubbleColumnBlock.updateColumn`. `written` runs after each square lands, because the
+/// jar's `setBlock(..., 2)` walks the shapes there, before the square above is written.
 void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes,
                   const std::function<void(std::int32_t, std::int32_t, std::int32_t)>& written = {});
 

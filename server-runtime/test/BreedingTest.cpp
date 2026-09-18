@@ -119,3 +119,26 @@ TEST_CASE("a wander stays on ground it could actually stand on") {
     CHECK(world.blockState(x, y - 1, z).has_value());
     CHECK(mobBrain::distanceTo(*cow, (*target)[0], (*target)[1], (*target)[2]) <= 20.0);
 }
+
+TEST_CASE("feeding a calf takes a tenth of the childhood it has left") {
+    const std::unique_ptr<ServerEntity> calf = animal(1, "cow", 0.5, 0.5);
+    calf->age = breeding::kBabyAge;
+
+    // parity: `getSpeedUpSecondsWhenFeeding` is (int)(ticks / 20 * 0.1F), so 24000 ticks left give
+    // a hundred and twenty seconds, which is two thousand four hundred ticks.
+    REQUIRE(breeding::canAgeUp(*calf));
+    breeding::feedBaby(*calf);
+    CHECK(calf->age == breeding::kBabyAge + 2400);
+
+    // Close to grown, the tenth rounds down to nothing and the last seconds are waited out.
+    calf->age = -100;
+    breeding::feedBaby(*calf);
+    CHECK(calf->age == -100);
+
+    // It never carries past grown, and a grown one is not a calf at all.
+    calf->age = -20;
+    breeding::feedBaby(*calf);
+    CHECK(calf->age == -20);
+    calf->age = 0;
+    CHECK_FALSE(breeding::canAgeUp(*calf));
+}
