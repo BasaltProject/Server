@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/Paintings.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
@@ -170,6 +171,37 @@ bool hangFrameFor(const BreakContext& context, PlayerSession& player, world::Loa
     const std::array<std::int32_t, 3> at = beyond(hit);
     // The two enums are both in vanilla's `Direction` order, which is what makes this a cast.
     const auto facing = static_cast<reg::BlockFace>(static_cast<std::uint8_t>(hit.direction));
+    // parity: `PaintingItem.useOn` picks the art rather than the player: the biggest that fits the
+    // wall, at random among ties, and nothing at all when none does.
+    if (type.path() == "painting") {
+        random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
+        const std::optional<registry::vanillaRegistryData::Painting> art =
+            world::paintings::fitting(world.state(), at[0], at[1], at[2], facing, random);
+        if (!art.has_value()) {
+            return false;
+        }
+        const std::array<double, 3> middle =
+            world::paintings::hangingAt(at[0], at[1], at[2], facing, art->width, art->height);
+        auto painting =
+            std::make_unique<entity::ServerEntity>(context.registry->allocateEntityId(), wire::common::Uuid::random(),
+                                                   type, entry->protocolId, middle[0], middle[1], middle[2]);
+        wire::nbt::NbtCompound tag = world::itemFrames::freshTag(facing);
+        tag.putString("variant", "minecraft:" + std::string{art->id});
+        painting->sourceNbt = std::move(tag);
+        painting->objectData = static_cast<std::int32_t>(facing);
+        world.state().spawnEntity(std::move(painting));
+        world::vibrations::emit(world.state(), "entity_place", middle[0], middle[1], middle[2], world.gameTime());
+        if (player.gamemode == Gamemode::Creative) {
+            return true;
+        }
+        storage::StoredItemStack spent = held;
+        spent.count = held.count - 1;
+        player.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{spent});
+        if (context.slotChanged) {
+            context.slotChanged(player, heldSlot);
+        }
+        return true;
+    }
     if (!world::itemFrames::canHang(world.state(), at[0], at[1], at[2], facing)) {
         return false;
     }

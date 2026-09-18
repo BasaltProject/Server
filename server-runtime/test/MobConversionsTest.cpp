@@ -142,3 +142,28 @@ TEST_CASE("a zombie villager being cured turns back once its countdown is spent"
     CHECK(cured->nausea);
     CHECK_FALSE(cured->keepEquipment);
 }
+
+TEST_CASE("a tadpole becomes a frog after twenty minutes, wherever it is") {
+    ServerEntity tadpole = mobOf("tadpole");
+    // parity: `Tadpole.aiStep` counts every turn, so the clock is the age and nothing gates it.
+    const std::optional<std::int32_t> grown = ticksUntil(tadpole, {}, conversions::kTadpoleTicks + 10);
+    REQUIRE(grown.has_value());
+    CHECK(*grown == conversions::kTadpoleTicks);
+
+    ServerEntity another = mobOf("tadpole");
+    for (std::int32_t tick = 1; tick < conversions::kTadpoleTicks; ++tick) {
+        static_cast<void>(conversions::tick(another, {}));
+    }
+    const std::optional<conversions::Conversion> due = conversions::tick(another, {});
+    REQUIRE(due.has_value());
+    CHECK(due->into == Identifier::vanilla("frog"));
+    // parity: `ConversionParams.single(this, false, false)` plus `setPersistenceRequired`.
+    CHECK_FALSE(due->keepEquipment);
+    CHECK_FALSE(due->keepCanPickUpLoot);
+    CHECK(due->persistent);
+
+    // parity: a dead one stops counting; `remove` is what ends it, not the clock.
+    ServerEntity dying = mobOf("tadpole");
+    dying.dying = true;
+    CHECK_FALSE(ticksUntil(dying, {}, conversions::kTadpoleTicks + 10).has_value());
+}

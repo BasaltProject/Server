@@ -78,9 +78,11 @@ std::vector<RegistryDataPacket> packets() {
     all.push_back(variants("minecraft:zombie_nautilus_variant", vanillaRegistryData::zombieNautilusVariants(),
                            vanillaRegistryData::zombieNautilusVariant));
 
-    // The one registry with a single entry, and its name is not the id it is looked up by.
-    all.push_back(RegistryDataPacket{.registryId = "minecraft:painting_variant",
-                                     .entries = {entryOf("humble", vanillaRegistryData::paintingVariant())}});
+    RegistryDataPacket paintings{.registryId = "minecraft:painting_variant", .entries = {}};
+    for (const vanillaRegistryData::Painting& painting : vanillaRegistryData::paintingVariants()) {
+        paintings.entries.push_back(entryOf(painting.id, vanillaRegistryData::paintingVariant(painting)));
+    }
+    all.push_back(std::move(paintings));
 
     RegistryDataPacket trims{.registryId = "minecraft:trim_material", .entries = {}};
     for (const auto& [id, color] : vanillaRegistryData::trimMaterials()) {

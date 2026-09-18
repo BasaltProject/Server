@@ -120,6 +120,17 @@ std::optional<Conversion> tick(ServerEntity& mob, const Around& around) {
         }
         return std::nullopt;
     }
+    // parity: `Tadpole.aiStep` counts its age up every turn, AI or not, and `setAge` turns it into a
+    // frog at twenty minutes. The frog is persistent: one that grew up is not despawned.
+    if (path == "tadpole") {
+        if (alive && ++mob.conversionClock >= kTadpoleTicks) {
+            return Conversion{.into = Identifier::vanilla("frog"),
+                              .keepEquipment = false,
+                              .keepCanPickUpLoot = false,
+                              .persistent = true};
+        }
+        return std::nullopt;
+    }
     if (zombifies(path)) {
         const bool converting = !mob.immuneToZombification && !mob.noAi && around.piglinsZombify;
         mob.conversionClock = converting ? mob.conversionClock + 1 : 0;

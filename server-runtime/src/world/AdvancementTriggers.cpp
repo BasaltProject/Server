@@ -263,6 +263,26 @@ void AdvancementTriggers::onItemUsedOnBlock(std::string_view player, std::string
          });
 }
 
+void AdvancementTriggers::onSleptInBed(std::string_view player, std::string_view uuid) {
+    fire(player, uuid, adv::ConditionKind::SleptInBed, [](const adv::CriterionCondition&) { return true; });
+}
+
+void AdvancementTriggers::onVillagerTrade(std::string_view player, std::string_view uuid) {
+    fire(player, uuid, adv::ConditionKind::VillagerTrade, [](const adv::CriterionCondition&) { return true; });
+}
+
+void AdvancementTriggers::onEnchantedItem(std::string_view player, std::string_view uuid) {
+    fire(player, uuid, adv::ConditionKind::EnchantedItem, [](const adv::CriterionCondition&) { return true; });
+}
+
+void AdvancementTriggers::onConstructedBeacon(std::string_view player, std::string_view uuid,
+                                              const std::int32_t levels) {
+    fire(player, uuid, adv::ConditionKind::ConstructedBeacon, [levels](const adv::CriterionCondition& condition) {
+        return (!condition.minLevel.has_value() || levels >= *condition.minLevel) &&
+               (!condition.maxLevel.has_value() || levels <= *condition.maxLevel);
+    });
+}
+
 void AdvancementTriggers::onInteractedWithEntity(std::string_view player, std::string_view uuid,
                                                  const Identifier& target, const bool targetIsBaby,
                                                  const Identifier& item) {

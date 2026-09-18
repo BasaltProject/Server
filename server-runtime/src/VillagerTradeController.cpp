@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealVillagerTrades.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
@@ -141,6 +142,10 @@ void VillagerTradeController::selectTrade(std::int32_t index) {
         owner_->spawnDroppedItem(offer.result.item, given, session->x, session->y, session->z);
     }
     world::trades::take(offer);
+    // parity: `AbstractVillager.notifyTrade` ends in `TRADE.trigger`, once per offer taken.
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
+        triggers->onVillagerTrade(session->name(), session->uuid().toString());
+    }
     if (owner_->currentWorld() != nullptr) {
         entity::ServerEntity* villager =
             openTradingWith_.has_value() ? owner_->currentWorld()->state().entity(*openTradingWith_) : nullptr;

@@ -461,9 +461,21 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             continue;
         }
         ++dying->deathTime;
-        if (dying->deathTime >= entity::kDeathTicks) {
-            dying->removed = true;
+        if (dying->deathTime < entity::kDeathTicks) {
+            continue;
         }
+        // parity: `AbstractCubeMob.remove` splits inside the removal, so a slime killed any way at
+        // all leaves its halves behind: the death animation is not what makes them.
+        random::RandomSource splitRandom = random::RandomSource::legacy(scratchSeed());
+        for (const entity::cubeMobs::Split& split : entity::cubeMobs::splitsOf(*dying, splitRandom)) {
+            if (spawning_ == nullptr) {
+                break;
+            }
+            static_cast<void>(spawning_->spawnMob(
+                world, dying->type(), split.x, split.y, split.z, split.yaw, "triggered",
+                [&split](entity::ServerEntity& half) { entity::cubeMobs::applySize(half, split.size); }));
+        }
+        dying->removed = true;
     }
 
     // One snapshot for the whole tick: `entities()` takes the world's lock and copies the list, and

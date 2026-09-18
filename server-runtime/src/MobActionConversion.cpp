@@ -193,6 +193,7 @@ bool MobActionSystem::convertMob(world::LoadedWorld& world, const std::vector<Pl
     if (converted == nullptr) {
         return false;
     }
+    converted->persistent = converted->persistent || conversion.persistent;
     converted->sourceNbt = tag;
     // parity: the nausea a zombified piglin or a zoglin wakes up with.
     if (conversion.nausea) {

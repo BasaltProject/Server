@@ -52,6 +52,19 @@ void applySize(ServerEntity& entity);
 
 void applySize(ServerEntity& entity, std::int32_t size);
 
+/// One of the cubes a dying one leaves behind: where it stands and how big it is.
+struct Split {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    float yaw = 0.0F;
+    std::int32_t size = 1;
+};
+
+/// parity: `AbstractCubeMob.remove`, which splits a dead cube bigger than the smallest into two to
+/// four halves, each one offset by a quarter of the width it had. Empty for anything else.
+[[nodiscard]] std::vector<Split> splitsOf(const ServerEntity& cube, random::RandomSource& random);
+
 } // namespace cubeMobs
 
 /// Entity types that inherit 26.2's `AgeableMob` synchronized baby state.

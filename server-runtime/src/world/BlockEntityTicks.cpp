@@ -267,6 +267,11 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     },
                     x, y, z, server::world::worldHeight::kMinY);
                 const bool moved = levels != beacon.levels;
+                // parity: the criterion is raised on the dark-to-lit edge only, before the new count
+                // is written down.
+                if (beacon.levels <= 0 && levels > 0 && hooks.beaconLit) {
+                    hooks.beaconLit(x, y, z, levels);
+                }
                 beacon.levels = levels;
                 beacons::write(beacon, entity->data());
                 if (moved) {

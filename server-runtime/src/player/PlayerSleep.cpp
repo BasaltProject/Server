@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/text/Component.hpp>
@@ -88,6 +89,11 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     player.sleepingBed = head;
     player.sleepTicks = 0;
     player.stats.reset(storage::stats::timeSinceRest());
+    // parity: `ServerPlayer.startSleepInBed` raises it on the success branch, so a bed that refused
+    // the player grants nothing.
+    if (context.blocks.triggers != nullptr) {
+        context.blocks.triggers->onSleptInBed(player.name(), player.uuid().toString());
+    }
     showSleeping(context.blocks, player, world, head);
     return std::nullopt;
 }

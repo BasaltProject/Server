@@ -338,6 +338,9 @@ void EntityVisibilityTracker::syncGeneratedEntities() {
             continue;
         }
         const bool isFrame = descriptor.type.path() == "item_frame";
+        // parity: `Painting.recreateFromPacket` reads its direction off the spawn packet's data, the
+        // same place a frame does; only the rounding of the position differs between the two.
+        const bool hangs = isFrame || descriptor.type.path() == "painting";
         owner_->sendPlayPacket(SpawnEntityPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             SpawnEntityPacket{.entityId = entity.entityId,
                               .uuid = entity.uuid,
@@ -348,7 +351,7 @@ void EntityVisibilityTracker::syncGeneratedEntities() {
                               .pitch = descriptor.pitch,
                               .yaw = descriptor.yaw,
                               .headYaw = descriptor.yaw,
-                              .objectData = isFrame ? frameDirectionData(descriptor.data.getString("facing")) : 0}
+                              .objectData = hangs ? frameDirectionData(descriptor.data.getString("facing")) : 0}
                 .write(buffer);
         });
         const std::vector<SetEntityDataPacket::Entry> metadata =

@@ -205,6 +205,7 @@ basalt_module(server-runtime-core
         src/item/ItemComponentPayloads.cpp
         src/function/FunctionLibrary.cpp
         src/player/FoodData.cpp
+        src/player/PlayerArrowPickup.cpp
         src/player/PlayerMovementStats.cpp
         src/player/PlayerSession.cpp
         src/player/PlayerPersistence.cpp
@@ -259,6 +260,7 @@ basalt_module(server-runtime-core
         src/ui/PlayerUi.cpp
         src/timings/TimingsReport.cpp
         src/world/ChorusFlowerGrowth.cpp
+        src/world/Paintings.cpp
         src/world/SummonAwards.cpp
         src/world/RealBannerPatterns.cpp
         src/world/RealBiomeSpawns.cpp
@@ -1312,6 +1314,12 @@ basalt_test(server-runtime-player-session-test
 basalt_test(server-runtime-player-stats-test
     SOURCES
         test/PlayerStatsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-player-arrow-pickup-test
+    SOURCES
+        test/PlayerArrowPickupTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
