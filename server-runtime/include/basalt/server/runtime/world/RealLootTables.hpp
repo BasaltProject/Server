@@ -15,6 +15,7 @@
 
 namespace basalt::server::runtime::world {
 
+class LoadedWorld;
 class LootRegistries;
 
 /// Resolves a block's break drops from the real `data/minecraft/loot_table/blocks/<path>.json` the
@@ -60,6 +61,9 @@ public:
 
     /// Fills in what every roll asks outside the table: nested tables, enchantments and ordered tags.
     void prepare(server::world::loot::LootContext& context);
+
+    /// The same, plus where the roll happens. parity: `LootContextParams.ORIGIN`.
+    void prepareAt(server::world::loot::LootContext& context, LoadedWorld& world, double x, double y, double z);
 
 private:
     /// `verb` is how the log names what the caller wanted, since a block drops and a table rolls.

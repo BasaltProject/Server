@@ -70,10 +70,17 @@ void ScoreboardCommand::buildObjectives(const CommandNodeBuilder& root) const {
                     CommandSyntaxError{.component = Component::text("An objective name may be at most " +
                                                                     std::to_string(kMaxNameLength) + " characters.")}};
             }
+            // parity: `ObjectiveCriteriaArgument.parse`, which refuses a name it cannot resolve.
+            const std::optional<std::string> criterion = Objective::canonical(*criteria);
+            if (!criterion.has_value()) {
+                return std::unexpected{CommandSyntaxError{
+                    .component = Component::translatable("argument.criteria.invalid", {Component::text(*criteria)})}};
+            }
             const auto* label = named ? context.get<Component>("displayName") : nullptr;
             Objective objective{.name = *name,
-                                .criterion = *criteria,
-                                .displayName = label == nullptr ? Component::text(*name) : *label};
+                                .criterion = *criterion,
+                                .displayName = label == nullptr ? Component::text(*name) : *label,
+                                .renderType = Objective::defaultRenderType(*criterion)};
             const std::string created = objective.name;
             if (!scoreboard_->add(std::move(objective))) {
                 return std::unexpected{CommandSyntaxError{

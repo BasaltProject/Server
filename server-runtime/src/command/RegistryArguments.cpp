@@ -72,6 +72,17 @@ private:
     return reader.string().substr(static_cast<std::size_t>(start), static_cast<std::size_t>(reader.cursor() - start));
 }
 
+/// parity: `ObjectiveCriteriaArgument.parse`, everything up to the next space, colons included.
+class CriteriaArgument final : public ArgumentType {
+public:
+    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
+                                              const CommandEnvironment&) const override {
+        return ArgumentValue::of(readWord(reader));
+    }
+
+    [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kObjectiveCriteria}; }
+};
+
 class IntRangeArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
@@ -220,7 +231,7 @@ std::shared_ptr<const ArgumentType> objectiveArgument() {
 }
 
 std::shared_ptr<const ArgumentType> objectiveCriteriaArgument() {
-    static const auto type = std::make_shared<const NameArgument>(parserId::kObjectiveCriteria);
+    static const auto type = std::make_shared<const CriteriaArgument>();
     return type;
 }
 

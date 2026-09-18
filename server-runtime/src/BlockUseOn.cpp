@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
+#include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
@@ -363,7 +364,23 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         // that hand through rather than turn a pose.
         const std::optional<Identifier> inHand = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
         const bool axeInHand = inHand.has_value() && inHand->path().ends_with("_axe");
-        if (clickedState.has_value() && world::blockInteractions::isCycleable(*clickedState) &&
+        const wire::common::Identifier* clickedBlock =
+            clickedState.has_value() ? reg::blockStateDefinitions::blockOf(*clickedState) : nullptr;
+        // parity: `WeatheringCopperGolemStatueBlock.useItemOn`: an axe on one that never weathered
+        // wakes the golem, and a honeycomb is left to wax it.
+        if (axeInHand && clickedBlock != nullptr && clickedBlock->path() == "copper_golem_statue") {
+            MobActionSystem* mobs = owner_->options().mobs;
+            world::LoadedWorld* here = owner_->currentWorld();
+            if (mobs != nullptr && here != nullptr && mobs->awakenStatue(*here, hit.pos.x, hit.pos.y, hit.pos.z)) {
+                wearHeldItem(1);
+            }
+            ack();
+            return;
+        }
+        const bool waxesStatue = inHand == Identifier::vanilla("honeycomb") && clickedBlock != nullptr &&
+                                 clickedBlock->path().ends_with("copper_golem_statue") &&
+                                 !clickedBlock->path().starts_with("waxed_");
+        if (clickedState.has_value() && world::blockInteractions::isCycleable(*clickedState) && !waxesStatue &&
             !(axeInHand && world::blockInteractions::cycleYieldsToAxe(*clickedState))) {
             cycleBlock(hit.pos);
             ack();

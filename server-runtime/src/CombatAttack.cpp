@@ -226,7 +226,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     if (result.died) {
         killEntity(*target);
     } else {
-        owner_->broadcastSound(entity::entityCombat::hurtSound(target->type()), target->x, target->y, target->z,
+        owner_->broadcastSound(entity::entityCombat::hurtSound(*target), target->x, target->y, target->z,
                                SoundSource::Hostile);
     }
 }
@@ -501,7 +501,7 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
 }
 
 void CombatHandler::killEntity(ServerEntity& entity) {
-    owner_->broadcastSound(entity::entityCombat::deathSound(entity.type()), entity.x, entity.y, entity.z,
+    owner_->broadcastSound(entity::entityCombat::deathSound(entity), entity.x, entity.y, entity.z,
                            SoundSource::Hostile);
     broadcastEntityEvent(entity.entityId(), wire::protocol::play::EntityEventPacket::kLivingDeath);
     entity.killed = true;

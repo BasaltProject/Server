@@ -43,7 +43,20 @@ public:
 
     void restore(const storage::StoredStats& stored);
 
+    /// What changed since the last call, for the objectives that count a statistic. `reset` means
+    /// the counter went back to zero before `delta` was added.
+    struct Change {
+        bool reset = false;
+        std::int64_t delta = 0;
+    };
+
+    [[nodiscard]] std::map<std::string, Change, std::less<>> takeChanges();
+
 private:
+    void noteChange(std::string_view key, std::int64_t delta, bool reset);
+
+    std::map<std::string, Change, std::less<>> changes_;
+
     mutable std::mutex lock_;
     std::map<std::string, std::int64_t, std::less<>> counters_;
 

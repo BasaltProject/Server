@@ -72,6 +72,25 @@ struct EntityPredicate {
     [[nodiscard]] bool test(const std::optional<EntityFacts>& entity, const TagLookup& tags) const;
 };
 
+/// What a location predicate can see of one square.
+struct PlaceFacts {
+    std::optional<wire::common::Identifier> biome;
+    std::optional<wire::common::Identifier> block;
+    std::map<std::string, std::string> properties;
+};
+
+/// parity: `LocationPredicate`, the parts the loot tables use: the biome, and the block with its state.
+struct LocationPredicate {
+    /// Ids, or a single `#tag`; empty means any biome.
+    std::vector<std::string> biomes;
+    bool hasBlock = false;
+    std::vector<std::string> blocks;
+    std::map<std::string, std::string, std::less<>> state;
+    bool unsupported = false;
+
+    [[nodiscard]] bool test(const PlaceFacts& place, const TagLookup& tags) const;
+};
+
 /// Whether an id matches a list of ids or a `#tag`.
 [[nodiscard]] bool matchesIdsOrTag(const std::vector<std::string>& wanted, std::string_view registry,
                                    const wire::common::Identifier& id, const TagLookup& tags);

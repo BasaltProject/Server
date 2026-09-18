@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -129,6 +130,9 @@ struct LootContext {
     /// A tag's members in the order the tag lists them, for a `tag` entry and `set_instrument`.
     std::function<std::vector<wire::common::Identifier>(std::string_view registry, const wire::common::Identifier& tag)>
         tagMembers;
+    /// parity: `LootContextParams.ORIGIN`, and what a `location_check` sees at a square.
+    std::optional<std::array<double, 3>> origin;
+    std::function<PlaceFacts(std::int32_t x, std::int32_t y, std::int32_t z)> placeAt;
     /// parity: the damage type's tags, for `damage_source_properties`.
     std::function<bool(std::string_view tag)> damageTagged;
 };
@@ -192,6 +196,8 @@ public:
     [[nodiscard]] static LootCondition randomChanceWithEnchantedBonus(float chance);
     [[nodiscard]] static LootCondition blockStateProperty(std::map<std::string, std::string> expected);
     [[nodiscard]] static LootCondition locationCheck();
+    /// parity: `LocationCheck`, the predicate at the origin moved by the offsets.
+    [[nodiscard]] static LootCondition locationCheck(LocationPredicate predicate, std::array<double, 3> offset);
     [[nodiscard]] static LootCondition fishingHookOpenWater(bool expected);
     [[nodiscard]] static LootCondition matchTool(ItemPredicate predicate);
     [[nodiscard]] static LootCondition entityMatches(Target target, EntityPredicate predicate);
@@ -222,6 +228,8 @@ private:
     LevelBasedValue enchanted_;
     std::vector<std::pair<std::string, bool>> damageTags_;
     std::shared_ptr<const EntityPredicate> direct_;
+    std::shared_ptr<const LocationPredicate> location_;
+    std::array<double, 3> offset_{};
 };
 
 /// A post-processing step applied to a generated stack. parity: `LootItemFunction`.

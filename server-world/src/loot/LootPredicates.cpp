@@ -61,4 +61,25 @@ bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLo
     return !mainhand.has_value() || mainhand->test(entity->mainhand, entity->mainhandEnchantments, tags);
 }
 
+bool LocationPredicate::test(const PlaceFacts& place, const TagLookup& tags) const {
+    if (unsupported) {
+        return false;
+    }
+    if (!biomes.empty() &&
+        (!place.biome.has_value() || !matchesIdsOrTag(biomes, "worldgen/biome", *place.biome, tags))) {
+        return false;
+    }
+    if (!hasBlock) {
+        return true;
+    }
+    // parity: `BlockPredicate`, the block and every named property with the value asked for.
+    if (!place.block.has_value() || !matchesIdsOrTag(blocks, "block", *place.block, tags)) {
+        return false;
+    }
+    return std::ranges::all_of(state, [&place](const auto& wanted) {
+        const auto found = place.properties.find(wanted.first);
+        return found != place.properties.end() && found->second == wanted.second;
+    });
+}
+
 } // namespace basalt::server::world::loot

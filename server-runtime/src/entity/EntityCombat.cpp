@@ -151,6 +151,16 @@ std::string hurtSound(const wire::common::Identifier& type) { return "entity." +
 
 std::string deathSound(const wire::common::Identifier& type) { return "entity." + type.path() + ".death"; }
 
+std::string hurtSound(const ServerEntity& entity) {
+    return entity.copperGolem != nullptr ? std::string{copperGolems::hurtSound(entity.copperGolem->weather)}
+                                         : hurtSound(entity.type());
+}
+
+std::string deathSound(const ServerEntity& entity) {
+    return entity.copperGolem != nullptr ? std::string{copperGolems::deathSound(entity.copperGolem->weather)}
+                                         : deathSound(entity.type());
+}
+
 void rememberPlayer(ServerEntity& entity, const wire::common::Uuid& player) {
     entity.lastHurtByPlayer = player;
     entity.lastHurtByPlayerTime = kPlayerHitMemoryTicks;

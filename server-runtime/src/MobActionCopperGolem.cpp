@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -288,6 +289,44 @@ MobActionSystem::GolemUse MobActionSystem::useOnCopperGolem(world::LoadedWorld& 
         }
     }
     return GolemUse::Pass;
+}
+
+bool MobActionSystem::awakenStatue(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return false;
+    }
+    std::map<std::string, std::string> properties = server::registry::blockStateDefinitions::propertiesOf(*stateId);
+    std::optional<std::string> name;
+    if (const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
+        if (const server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+            entity != nullptr) {
+            if (const wire::nbt::NbtCompound* components = entity->data().getCompound("components");
+                components != nullptr && !components->getString("minecraft:custom_name").empty()) {
+                name = std::string{components->getString("minecraft:custom_name")};
+            }
+        }
+    }
+    // parity: `Direction.toYRot`, the golem facing the way the statue did.
+    const auto facing = std::ranges::find(kFacings, properties["facing"]);
+    const float yaw =
+        facing == kFacings.end() ? 0.0F : 90.0F * static_cast<float>(std::distance(kFacings.begin(), facing));
+    ServerEntity* golem = spawning_->spawnMob(world, wire::common::Identifier::vanilla("copper_golem"), x + 0.5,
+                                              static_cast<double>(y), z + 0.5, yaw, "triggered", {});
+    if (golem == nullptr) {
+        return false;
+    }
+    golem->headYaw = yaw;
+    golem->customName = name;
+    mobSound(*golem, "entity.copper_golem.spawn");
+    // parity: `level.removeBlock(pos, false)`, air written with flag three.
+    const std::int32_t air = server::registry::blocks::air().stateId;
+    if (world.state().setBlockState(x, y, z, air)) {
+        const std::vector<PlayerSession*> watchers = watchersOf(world);
+        broadcaster_->announceBlock(watchers, world::BlockChange{.x = x, .y = y, .z = z, .stateId = air});
+        broadcaster_->notifyAround(world, watchers, x, y, z, *stateId);
+    }
+    return true;
 }
 
 void MobActionSystem::golemStruckByLightning(ServerEntity& golem, std::int32_t boltId) {

@@ -17,7 +17,9 @@
 #include <basalt/wire/text/Component.hpp>
 
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -182,6 +184,24 @@ public:
     std::int32_t airSupply = world::fluids::kMaxAir;
 
     std::int32_t fireTicks = 0;
+
+    /// What the criteria objectives were last told. parity: `ServerPlayer.lastRecorded*`, which start
+    /// where no real value is so the first tick reports every one.
+    struct RecordedScores {
+        float health = std::numeric_limits<float>::denorm_min();
+        std::int32_t food = std::numeric_limits<std::int32_t>::min();
+        std::int32_t air = std::numeric_limits<std::int32_t>::min();
+        std::int32_t armor = std::numeric_limits<std::int32_t>::min();
+        std::int32_t level = std::numeric_limits<std::int32_t>::min();
+        std::int32_t experience = std::numeric_limits<std::int32_t>::min();
+    };
+
+    RecordedScores recordedScores;
+
+    /// Deaths the scoreboard has not counted yet, and whose hit caused the last, by entity id. A
+    /// counter rather than the dead flag: a player can respawn before the scoring pass runs.
+    std::atomic<std::int32_t> deathsToScore{0};
+    std::optional<std::int32_t> killerEntityId;
 
     /// What this player may not use yet, and the turn of the world each one frees up on.
     ///

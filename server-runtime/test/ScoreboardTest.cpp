@@ -27,7 +27,14 @@ TEST_CASE("the criteria a `/scoreboard objectives add` accepts, and what they me
     const std::vector<std::string> expected = {"dummy",          "trigger", "deathCount", "playerKillCount",
                                                "totalKillCount", "health",  "food",       "air",
                                                "armor",          "xp",      "level"};
-    CHECK(Objective::criteria() == expected);
+    const std::vector<std::string>& criteria = Objective::criteria();
+    REQUIRE(criteria.size() == expected.size() + 32);
+    CHECK(std::vector<std::string>(criteria.begin(), criteria.begin() + 11) == expected);
+    // parity: `registerForEveryTeamColor`, every team kill before every killed-by-team.
+    CHECK(criteria[11] == "teamkill.black");
+    CHECK(criteria[26] == "teamkill.white");
+    CHECK(criteria[27] == "killedByTeam.black");
+    CHECK(criteria.back() == "killedByTeam.white");
 
     // The six the server writes itself, which a command may not set. `trigger` is not one of them:
     // it is writable, and gated by the score's lock instead.
@@ -326,4 +333,27 @@ TEST_CASE("a removed team is handed back, members and all") {
     REQUIRE(teams.all().size() == 1);
     CHECK(teams.all()[0]->name == "blue");
     CHECK(teams.remove("red") == nullptr);
+}
+
+TEST_CASE("a criterion reaches every objective that counts it, and only those") {
+    Scoreboard board;
+    REQUIRE(board.add(Objective{.name = "deaths", .criterion = "deathCount", .displayName = Component::text("d")}));
+    REQUIRE(board.add(Objective{.name = "more", .criterion = "deathCount", .displayName = Component::text("m")}));
+    REQUIRE(board.add(dummy("plain")));
+    const auto touched = board.forAllObjectives("deathCount", "Steve", [](std::int32_t value) { return value + 1; });
+    CHECK(touched.size() == 2);
+    CHECK(board.score("Steve", "deaths") == std::optional<std::int32_t>{1});
+    CHECK(board.score("Steve", "more") == std::optional<std::int32_t>{1});
+    CHECK_FALSE(board.score("Steve", "plain").has_value());
+}
+
+TEST_CASE("a statistic criterion is resolved the way the jar reads it") {
+    // parity: `ObjectiveCriteria.byName` over `Identifier.bySeparator(name, '.')`.
+    CHECK(Objective::canonical("deathCount") == std::optional<std::string>{"deathCount"});
+    CHECK(Objective::canonical("custom:jump") == std::optional<std::string>{"minecraft.custom:minecraft.jump"});
+    CHECK(Objective::canonical("minecraft.mined:minecraft.stone") ==
+          std::optional<std::string>{"minecraft.mined:minecraft.stone"});
+    CHECK_FALSE(Objective::canonical("nonsense").has_value());
+    CHECK_FALSE(Objective::canonical("minecraft.nothing:minecraft.stone").has_value());
+    CHECK(Objective::criterionOfStat("minecraft:custom/minecraft:jump") == "minecraft.custom:minecraft.jump");
 }
