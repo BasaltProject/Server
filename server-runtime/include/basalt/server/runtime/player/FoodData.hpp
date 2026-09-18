@@ -43,10 +43,9 @@ public:
     /// One tick. `health` is the player's current health, `heal` restores it, `hurt` applies
     /// starvation damage; all three keep this class free of the rest of the player.
     ///
-    /// parity: `FoodData.tick`. `naturalRegeneration` is assumed on (vanilla's own game rule
-    /// default) rather than read from the world's rules.
+    /// parity: `FoodData.tick`, with the world's `natural_health_regeneration` passed in.
     void tick(Difficulty difficulty, float health, float maxHealth, const std::function<void(float)>& heal,
-              const std::function<void(float)>& hurt);
+              const std::function<void(float)>& hurt, bool naturalRegeneration = true);
 
     /// What moving this far costs in exhaustion.
     ///

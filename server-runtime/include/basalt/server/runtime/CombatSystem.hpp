@@ -42,6 +42,10 @@ public:
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball)>
             dragonFireballLanded;
+        /// Where a wither skull struck, and who if anyone.
+        std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           entity::ServerEntity& skull, entity::ServerEntity* mob, player::PlayerSession* player)>
+            witherSkullLanded;
         /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;
@@ -80,6 +84,10 @@ public:
     /// The flash, the push and the sound of an entity being hit by something that is not a player.
     void announceEntityHit(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& entity,
                            const wire::common::Identifier& damageType, std::int32_t causeEntityId, bool died);
+
+    /// Tells a wither the hit about to land comes from an undead, through its projectile or blast.
+    static void markWitherFriend(world::LoadedWorld& world, entity::ServerEntity& target,
+                                 std::optional<std::int32_t> sourceId);
 
     /// parity: `Projectile.getOwner`, since an arrow kills for whoever shot it. The arrow itself is
     /// the answer once its owner is gone.

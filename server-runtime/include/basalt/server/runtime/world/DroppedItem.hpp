@@ -14,6 +14,10 @@ inline constexpr std::int32_t kItemLifetimeTicks = 6000;
 
 /// parity: what a player's own toss gets, so it does not immediately fly back into their inventory.
 inline constexpr std::int32_t kDefaultPickupDelay = 40;
+/// parity: `ItemEntity.setDefaultPickUpDelay`, what `spawnAtLocation` gives a drop.
+inline constexpr std::int32_t kSpawnedPickupDelay = 10;
+/// parity: `ItemEntity.setExtendedLifetime`: an age that never counts up, so it never despawns.
+inline constexpr std::int32_t kUnlimitedLifetimeAge = -32768;
 
 /// parity: `ItemEntity.health`, five for every stack.
 inline constexpr std::int32_t kItemHealth = 5;

@@ -245,6 +245,9 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 static_cast<void>(region.owner().runEndOfTick(onTaskFailure));
             });
         });
+    if (worldRuns && !shuttingDown_.load()) {
+        withers_->sweepBars();
+    }
     shutdownIfSignalled();
 }
 
@@ -294,6 +297,9 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         const bool living = registry::entityAttributes::isLiving(dead->type());
         if (!living || entity::deathDrops::dropsLoot(*dead, mobDrops)) {
             mobActions_->dropDeathLoot(world, *dead);
+            if (WitherSystem::isWither(*dead)) {
+                withers_->dropStar(world, *dead);
+            }
         }
         if (living && entity::deathDrops::dropsExperience(*dead, mobDrops)) {
             random::RandomSource random = random::RandomSource::legacy(scratchSeed());
@@ -561,6 +567,12 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         if (entity::areaEffectClouds::isCloud(entity->type())) {
             clouds_->tick(world, watchers, living, *entity);
+            continue;
+        }
+        if (WitherSystem::isWither(*entity) && !entity->dying) {
+            withers_->beforeTurn(world, living, *entity);
+            mobTicks_->tickTree(world, *entity, watchers, views, living, random);
+            withers_->afterTurn(world, watchers, living, *entity);
             continue;
         }
         if (FishingSystem::isHook(*entity)) {

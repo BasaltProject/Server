@@ -244,3 +244,12 @@ TEST_CASE("a jump costs four times as much while sprinting") {
     CHECK(FoodData::jumpExhaustion(false) == doctest::Approx(0.05F));
     CHECK(FoodData::jumpExhaustion(true) == doctest::Approx(0.2F));
 }
+
+TEST_CASE("with natural regeneration off a full belly heals nothing") {
+    FoodData food;
+    food.set(20, 5.0F);
+    for (std::int32_t tick = 0; tick < 200; ++tick) {
+        food.tick(Difficulty::Normal, 10.0F, 20.0F, [](float) { FAIL("the rule is off"); }, [](float) {}, false);
+    }
+    CHECK(food.foodLevel() == 20);
+}

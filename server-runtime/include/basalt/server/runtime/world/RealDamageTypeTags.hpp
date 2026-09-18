@@ -59,6 +59,7 @@ inline const wire::common::Identifier kLava = wire::common::Identifier::vanilla(
 inline const wire::common::Identifier kOnFire = wire::common::Identifier::vanilla("on_fire");
 inline const wire::common::Identifier kMagic = wire::common::Identifier::vanilla("magic");
 inline const wire::common::Identifier kWither = wire::common::Identifier::vanilla("wither");
+inline const wire::common::Identifier kWitherSkull = wire::common::Identifier::vanilla("wither_skull");
 inline const wire::common::Identifier kStarve = wire::common::Identifier::vanilla("starve");
 inline const wire::common::Identifier kFall = wire::common::Identifier::vanilla("fall");
 

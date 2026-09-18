@@ -58,6 +58,9 @@ struct Context {
 /// parity: `FluidState.getHeight`: a full block under the same fluid, else its amount over nine.
 [[nodiscard]] float heightAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
+/// The same, from the two states already in hand.
+[[nodiscard]] float heightOf(std::int32_t stateId, std::int32_t aboveStateId);
+
 /// Like `kindOf`, but only for a square that **is** the liquid: a waterlogged stair holds water and
 /// answers `kindOf`, and it is not a `LiquidBlock`, so the hooks that hang off that class skip it.
 [[nodiscard]] std::optional<FluidKind> liquidBlockKindOf(std::int32_t stateId);

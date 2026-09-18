@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/BlockPatterns.hpp>
 #include <basalt/server/runtime/world/GolemPatterns.hpp>
 
 #include <algorithm>
@@ -51,35 +52,7 @@ constexpr std::array<Shape, 3> kShapes{
           .spawnDown = 0},
 };
 
-constexpr std::array<BlockFace, 6> kDirections{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
-                                               BlockFace::South, BlockFace::West, BlockFace::East};
-
-struct Vec {
-    std::int32_t x = 0;
-    std::int32_t y = 0;
-    std::int32_t z = 0;
-};
-
-[[nodiscard]] constexpr Vec vectorOf(const BlockFace face) noexcept {
-    return Vec{registry::stepX(face), registry::stepY(face), registry::stepZ(face)};
-}
-
-[[nodiscard]] constexpr Vec cross(const Vec& a, const Vec& b) noexcept {
-    return Vec{(a.y * b.z) - (a.z * b.y), (a.z * b.x) - (a.x * b.z), (a.x * b.y) - (a.y * b.x)};
-}
-
-/// parity: `BlockPattern.translateAndRotate`: right is forwards crossed with up, and `down` walks
-/// against up, which is what makes the aisle read top row first.
-[[nodiscard]] constexpr std::array<std::int32_t, 3>
-translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace forwards, const BlockFace up,
-                   const std::int32_t right, const std::int32_t down, const std::int32_t ahead) noexcept {
-    const Vec forwardsVector = vectorOf(forwards);
-    const Vec upVector = vectorOf(up);
-    const Vec rightVector = cross(forwardsVector, upVector);
-    return {origin[0] + (upVector.x * -down) + (rightVector.x * right) + (forwardsVector.x * ahead),
-            origin[1] + (upVector.y * -down) + (rightVector.y * right) + (forwardsVector.y * ahead),
-            origin[2] + (upVector.z * -down) + (rightVector.z * right) + (forwardsVector.z * ahead)};
-}
+using blockPatterns::translateAndRotate;
 
 [[nodiscard]] bool isPumpkin(const std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -168,25 +141,13 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
                                           const std::int32_t z, const IsCopper& isCopper,
                                           const std::optional<std::array<std::int32_t, 3>>& asPumpkin) {
     for (const Shape& shape : kShapes) {
-        // parity: `BlockPattern.find` walks a cube as wide as the pattern's longest side, and only
-        // towards positive x, y and z: a pumpkin is never the bottom right of what it completes.
         const std::int32_t dist = std::max(std::max(shape.width, shape.height), 1);
-        for (std::int32_t dz = 0; dz < dist; ++dz) {
-            for (std::int32_t dy = 0; dy < dist; ++dy) {
-                for (std::int32_t dx = 0; dx < dist; ++dx) {
-                    const std::array<std::int32_t, 3> origin{x + dx, y + dy, z + dz};
-                    for (const BlockFace forwards : kDirections) {
-                        for (const BlockFace up : kDirections) {
-                            if (up == forwards || up == registry::opposite(forwards)) {
-                                continue;
-                            }
-                            if (matches(world, shape, origin, forwards, up, isCopper, asPumpkin)) {
-                                return matchOf(world, shape, origin, forwards, up);
-                            }
-                        }
-                    }
-                }
-            }
+        const std::optional<blockPatterns::Found> found = blockPatterns::find(
+            {x, y, z}, dist, [&](const std::array<std::int32_t, 3>& origin, BlockFace forwards, BlockFace up) {
+                return matches(world, shape, origin, forwards, up, isCopper, asPumpkin);
+            });
+        if (found.has_value()) {
+            return matchOf(world, shape, found->origin, found->forwards, found->up);
         }
     }
     return std::nullopt;

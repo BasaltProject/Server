@@ -14,6 +14,8 @@ class PlayerSession;
 /// What one tick of a player's own body needs from the server around it.
 struct VitalsContext {
     Difficulty difficulty = Difficulty::Easy;
+    /// parity: `GameRules.NATURAL_HEALTH_REGENERATION`, read from the player's world.
+    bool naturalRegeneration = true;
 
     /// What a plugin says about a food level that has just changed on its own. Unset means nobody
     /// objects; a number is the level to use instead.

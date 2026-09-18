@@ -63,6 +63,7 @@ void EnvironmentTickSystem::tickPlayers(world::LoadedWorld& world) {
     player::VitalsContext vitals;
     vitals.difficulty = player::difficultyOf(options_.difficulty ? options_.difficulty() : std::string{"easy"});
     vitals.foodChanged = hooks_.foodChanged;
+    vitals.naturalRegeneration = world.gameRules().get(world::gameRules::kNaturalHealthRegeneration);
     for (PlayerSession* player : players_->snapshot()) {
         if (player->worldName == world.name()) {
             player::tickVitals(*player, vitals);

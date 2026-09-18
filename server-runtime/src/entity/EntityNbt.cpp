@@ -2,6 +2,8 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WitherBoss.hpp>
 
 #include <algorithm>
 #include <array>
@@ -340,6 +342,12 @@ NbtCompound encode(const ServerEntity& entity) {
     if (cubeMobs::isCube(entity.type())) {
         tag.putInt("Size", std::max(entity.cubeSize, 1) - 1);
     }
+    if (entity.wither != nullptr) {
+        tag.putInt(std::string{witherBoss::kInvulnerableKey}, entity.wither->invulnerableTicks);
+    }
+    if (path == "wither_skull") {
+        tag.putBoolean("dangerous", entity.dangerousSkull);
+    }
     if (patrols(path)) {
         if (entity.patrolTarget.has_value()) {
             tag.putIntArray("patrol_target", {entity.patrolTarget->begin(), entity.patrolTarget->end()});
@@ -478,6 +486,12 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->noAi = numericBoolean(tag, "NoAI");
     entity->canPickUpLoot = tag.getBoolean("CanPickUpLoot");
     entity->loveTicks = numericInt(tag, "InLove");
+    if (path == "wither") {
+        entity->wither = std::make_shared<witherBoss::WitherState>();
+        entity->wither->invulnerableTicks = numericInt(tag, witherBoss::kInvulnerableKey);
+        entity->wither->random = random::RandomSource::legacy(entity->entityId());
+    }
+    entity->dangerousSkull = path == "wither_skull" && numericBoolean(tag, "dangerous");
     entity->breedCooldown = std::max(entity->age, 0);
     if (patrols(path)) {
         if (const std::span<const std::int32_t> target = tag.getIntArray("patrol_target"); target.size() >= 3) {

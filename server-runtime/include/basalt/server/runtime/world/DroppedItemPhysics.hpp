@@ -10,6 +10,8 @@
 
 namespace basalt::server::runtime::world {
 
+enum class FluidKind : std::uint8_t;
+
 /// Dropped items in this world, and their physics.
 ///
 /// Behind the same lock as blocks: a break spawning one and a nearby player picking one up are
@@ -88,6 +90,9 @@ public:
     [[nodiscard]] std::vector<std::int32_t> tickItems(const sched::Region* region = nullptr);
 
 private:
+    /// parity: `Entity.getFluidHeight`, how deep the box sits in that fluid, from its bottom.
+    [[nodiscard]] double fluidHeight(const DroppedItem& item, FluidKind kind) const;
+
     void moveItem(DroppedItem& item);
     void mergeWithNeighbours(std::size_t index, std::vector<std::int32_t>& despawned,
                              std::vector<std::int32_t>& absorbed);

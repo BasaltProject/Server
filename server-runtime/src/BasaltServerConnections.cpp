@@ -99,6 +99,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.combat = combat_.get();
     options.endFight = endFight_.get();
     options.fishing = fishing_.get();
+    options.withers = withers_.get();
     options.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         orbs_->award(world, x, y, z, amount);
     };

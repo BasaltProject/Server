@@ -1695,6 +1695,9 @@ void BasaltServer::startBedrockListener() {
                             who.connection().sendInventoryAll();
                         }
                     };
+                    placing.placed = [this](world::LoadedWorld& at, std::int32_t x, std::int32_t y, std::int32_t z) {
+                        withers_->placed(at, x, y, z);
+                    };
                     // TEMPORARY: whether the world took it, which is what tells a refused placement
                     // from one that never reached here.
                     const bool placed =

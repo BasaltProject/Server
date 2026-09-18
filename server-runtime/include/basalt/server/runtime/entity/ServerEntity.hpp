@@ -24,6 +24,10 @@ namespace fishingHooks {
 struct HookState;
 }
 
+namespace witherBoss {
+struct WitherState;
+}
+
 namespace ai {
 class GoalSelector;
 }
@@ -215,6 +219,9 @@ public:
     /// How hard a fireball goes off where it lands. parity: `LargeFireball.explosionPower`.
     float explosionPower = 0.0F;
 
+    /// A blue wither skull, which keeps more of its speed. parity: `WitherSkull.isDangerous`.
+    bool dangerousSkull = false;
+
     /// How far a creeper's fuse has burned. parity: `Creeper.swell`, which goes off at thirty.
     std::int32_t swell = 0;
 
@@ -276,6 +283,9 @@ public:
 
     /// What a fishing bobber keeps beyond this, or null for anything else.
     std::shared_ptr<fishingHooks::HookState> hook;
+
+    /// What a wither keeps beyond this, or null for anything else.
+    std::shared_ptr<witherBoss::WitherState> wither;
 
     /// Attribute base values that were changed from their default. parity: `AttributeMap`, without
     /// modifiers.

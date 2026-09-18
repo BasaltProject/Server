@@ -301,6 +301,9 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     refreshSnowAt(context.blocks, world, placeAt.x, placeAt.y - 1, placeAt.z);
     refreshSnowAt(context.blocks, world, placeAt.x, placeAt.y, placeAt.z);
     notifyAround(context.blocks, world, placeAt.x, placeAt.y, placeAt.z, std::nullopt);
+    if (context.placed) {
+        context.placed(world, placeAt.x, placeAt.y, placeAt.z);
+    }
     // parity: `GameEvent.BLOCK_PLACE`, thirteen: a block going down is louder than one coming up.
     heardBySculk(context.blocks, world, "block_place", placeAt.x, placeAt.y, placeAt.z);
     if (world::signs::isSign(blockStateId) && context.openSign) {
