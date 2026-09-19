@@ -56,8 +56,8 @@ WorldState::WorldState(std::vector<Chunk> initialChunks, LoadOrGenerate loadOrGe
                                                              PendingChunkDecorations::WritePhase::AfterDecoration);
         pendingDecorations_.applyPendingGeneratedBlockEntityWrites(*chunk);
         pendingDecorations_.applyPendingGeneratedBlockTicks(*chunk);
-        pendingDecorations_.deliverGeneratedBlockWrites(chunk->takeGeneratedBlockWrites(), chunk->chunkX(),
-                                                        chunk->chunkZ(), chunkAt);
+        pendingDecorations_.deliverGeneratedBlockWrites(chunk->takeGeneratedBlockWrites(), chunk->decorationSequence(),
+                                                        chunkAt);
         pendingDecorations_.deliverGeneratedBlockEntityWrites(chunk->takeGeneratedBlockEntityWrites(), chunkAt);
         pendingDecorations_.deliverGeneratedBlockTicks(chunk->takeGeneratedBlockTicks(), chunkAt);
     }
@@ -360,8 +360,8 @@ Chunk& WorldState::installLocked(Chunk chunk) {
                                                          PendingChunkDecorations::WritePhase::AfterDecoration);
     pendingDecorations_.applyPendingGeneratedBlockEntityWrites(installed);
     pendingDecorations_.applyPendingGeneratedBlockTicks(installed);
-    pendingDecorations_.deliverGeneratedBlockWrites(installed.takeGeneratedBlockWrites(), installed.chunkX(),
-                                                    installed.chunkZ(), chunkAt);
+    pendingDecorations_.deliverGeneratedBlockWrites(installed.takeGeneratedBlockWrites(),
+                                                    installed.decorationSequence(), chunkAt);
     pendingDecorations_.deliverGeneratedBlockEntityWrites(installed.takeGeneratedBlockEntityWrites(), chunkAt);
     const auto chunkAtPos = [this](std::int32_t otherX, std::int32_t otherZ) {
         return chunkAtLocked(key(otherX, otherZ));

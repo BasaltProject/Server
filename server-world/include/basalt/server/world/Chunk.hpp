@@ -233,6 +233,13 @@ public:
     /// Hands deferred cross-chunk decoration writes to the runtime exactly once.
     [[nodiscard]] std::vector<ChunkGeneratedBlockWrite> takeGeneratedBlockWrites();
 
+    /// When this chunk decorated, counted by the world. parity: vanilla has no precedence rule for a
+    /// cell two chunks write, the one that decorates later simply lands on top. Zero means it has
+    /// not decorated yet, which is earlier than anything that has.
+    [[nodiscard]] std::uint64_t decorationSequence() const noexcept { return decorationSequence_; }
+
+    void setDecorationSequence(std::uint64_t sequence) noexcept { decorationSequence_ = sequence; }
+
     /// Keeps a decoration's block entity beside an external block until the target chunk arrives.
     /// `expectedStateId` is the block the feature just placed, so a rejected block write cannot
     /// leave an orphaned block entity in real neighbour terrain.
@@ -347,6 +354,7 @@ private:
     std::vector<ChunkShapeUpdate> shapeUpdates_;
     std::vector<ChunkShapeUpdate> fluidUpdates_;
     std::vector<ChunkGeneratedBlockWrite> generatedBlockWrites_;
+    std::uint64_t decorationSequence_ = 0;
     std::vector<ChunkGeneratedBlockEntityWrite> generatedBlockEntityWrites_;
     std::vector<ChunkGeneratedBlockTick> generatedBlockTicks_;
     std::function<void(std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t)> blockWriteObserver_;

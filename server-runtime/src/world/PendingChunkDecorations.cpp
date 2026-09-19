@@ -24,14 +24,6 @@ using server::world::GeneratedBlockWritePolicy;
     return y >= chunk.verticalBounds().minY() && y <= chunk.verticalBounds().maxY();
 }
 
-/// parity: vanilla gets through a region's chunks in a raster, x outermost and ascending and z
-/// within it. Measured on the jar over 441 chunks and two different load shapes: it is the pattern
-/// the great majority of them follow, and it is what decides whose decoration sits on top where two
-/// chunks write the same cell.
-[[nodiscard]] bool decoratesBefore(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t otherX, std::int32_t otherZ) {
-    return chunkX != otherX ? chunkX < otherX : chunkZ < otherZ;
-}
-
 using server::world::generatedBlockWrites::BatchWritten;
 using server::world::generatedBlockWrites::cellKey;
 
@@ -84,23 +76,19 @@ void PendingChunkDecorations::addPendingGeneratedEntities(std::vector<server::wo
 }
 
 bool PendingChunkDecorations::sourceMayWrite(const std::int64_t chunkKey, const std::int64_t cellKey,
-                                             const std::int32_t sourceChunkX, const std::int32_t sourceChunkZ) {
-    const std::pair<std::int32_t, std::int32_t> source{sourceChunkX, sourceChunkZ};
+                                             const std::uint64_t sourceSequence) {
     auto& cells = writeSourceByCell_[chunkKey];
     const auto found = cells.find(cellKey);
     if (found == cells.end()) {
-        cells.emplace(cellKey, source);
+        cells.emplace(cellKey, sourceSequence);
         return true;
     }
-    if (found->second == source) {
-        return true;
-    }
-    // The one that decorates last wins, whichever arrived first. Reading the winner off the cell
+    // The one that decorated last wins, whichever arrived first. Reading the winner off the cell
     // instead made the result depend on which generation thread got there first.
-    if (decoratesBefore(sourceChunkX, sourceChunkZ, found->second.first, found->second.second)) {
+    if (sourceSequence < found->second) {
         return false;
     }
-    found->second = source;
+    found->second = sourceSequence;
     return true;
 }
 
@@ -130,42 +118,38 @@ void PendingChunkDecorations::forgetGeneratedEntities(std::int64_t chunkKey) {
 }
 
 void PendingChunkDecorations::deliverGeneratedBlockWrites(std::span<const ChunkGeneratedBlockWrite> writes,
-                                                          const std::int32_t sourceChunkX,
-                                                          const std::int32_t sourceChunkZ, const ChunkAt& chunkAt) {
+                                                          const std::uint64_t sourceSequence, const ChunkAt& chunkAt) {
     for (const ChunkGeneratedBlockWrite& write : writes) {
-        const std::int32_t targetChunkX = write.x >> 4;
-        const std::int32_t targetChunkZ = write.z >> 4;
-        const std::int64_t targetKey = key(targetChunkX, targetChunkZ);
+        const std::int64_t targetKey = key(write.x >> 4, write.z >> 4);
         Chunk* target = chunkAt(targetKey);
         if (target == nullptr) {
             pendingGeneratedBlockWrites_[targetKey].push_back(
-                QueuedBlockWrite{.write = write, .sourceChunkX = sourceChunkX, .sourceChunkZ = sourceChunkZ});
-        } else if (sourceMayWrite(targetKey, cellKey(write), sourceChunkX, sourceChunkZ)) {
-            applyGeneratedBlockWrite(*target, write,
-                                     decoratesBefore(targetChunkX, targetChunkZ, sourceChunkX, sourceChunkZ));
+                QueuedBlockWrite{.write = write, .sourceSequence = sourceSequence});
+        } else if (sourceMayWrite(targetKey, cellKey(write), sourceSequence)) {
+            applyGeneratedBlockWrite(*target, write, sourceSequence > target->decorationSequence());
         }
     }
 }
 
 void PendingChunkDecorations::applyPendingGeneratedBlockWrites(Chunk& chunk, const WritePhase phase) {
-    const auto found = pendingGeneratedBlockWrites_.find(key(chunk.chunkX(), chunk.chunkZ()));
+    const std::int64_t chunkKey = key(chunk.chunkX(), chunk.chunkZ());
+    const auto found = pendingGeneratedBlockWrites_.find(chunkKey);
     if (found == pendingGeneratedBlockWrites_.end()) {
         return;
     }
-    std::vector<QueuedBlockWrite> writes = std::move(found->second);
+    const std::vector<QueuedBlockWrite> writes = std::move(found->second);
     pendingGeneratedBlockWrites_.erase(found);
     std::vector<QueuedBlockWrite> notYet;
     BatchWritten queued;
     for (const QueuedBlockWrite& entry : writes) {
-        const bool onTop = decoratesBefore(chunk.chunkX(), chunk.chunkZ(), entry.sourceChunkX, entry.sourceChunkZ);
+        const bool onTop = entry.sourceSequence > chunk.decorationSequence();
         // What a later chunk wrote has to wait for this one to decorate, or its decoration would
         // cover a write that in vanilla went on last.
         if (phase == WritePhase::BeforeDecoration && onTop) {
             notYet.push_back(entry);
             continue;
         }
-        if (!sourceMayWrite(key(chunk.chunkX(), chunk.chunkZ()), cellKey(entry.write), entry.sourceChunkX,
-                            entry.sourceChunkZ)) {
+        if (!sourceMayWrite(chunkKey, cellKey(entry.write), entry.sourceSequence)) {
             continue;
         }
         if (applyGeneratedBlockWrite(chunk, entry.write, onTop, &queued)) {
@@ -173,7 +157,7 @@ void PendingChunkDecorations::applyPendingGeneratedBlockWrites(Chunk& chunk, con
         }
     }
     if (!notYet.empty()) {
-        pendingGeneratedBlockWrites_[key(chunk.chunkX(), chunk.chunkZ())] = std::move(notYet);
+        pendingGeneratedBlockWrites_[chunkKey] = std::move(notYet);
     }
 }
 

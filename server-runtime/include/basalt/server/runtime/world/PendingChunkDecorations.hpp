@@ -48,7 +48,7 @@ public:
     [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
                                                             std::int32_t worldZ) const;
 
-    /// Forgets which source chunk won each cell of this now-evicted chunk.
+    /// Forgets which write won each cell of this now-evicted chunk.
     void forgetGeneratedWriteSources(std::int64_t chunkKey);
 
     /// Forgets the generated-entity identities that belonged to this now-evicted chunk.
@@ -65,8 +65,9 @@ public:
 
     /// Delivers decorations that crossed out of their source chunk without ever wrapping them back
     /// into it. A target that has not arrived yet keeps the write until its own install.
+    /// `sourceSequence` is when the source decorated, which is what decides a contested cell.
     void deliverGeneratedBlockWrites(std::span<const server::world::ChunkGeneratedBlockWrite> writes,
-                                     std::int32_t sourceChunkX, std::int32_t sourceChunkZ, const ChunkAt& chunkAt);
+                                     std::uint64_t sourceSequence, const ChunkAt& chunkAt);
 
     void applyPendingGeneratedBlockWrites(server::world::Chunk& chunk, WritePhase phase);
 
@@ -107,24 +108,21 @@ private:
     std::map<GeneratedEntityKey, GeneratedWorldEntity> generatedEntitiesByKey_;
     std::vector<server::world::ChunkGeneratedEntity> pendingGeneratedEntities_;
 
-    /// A queued write plus where it came from: which of the two chunks decorates first decides
-    /// whether it lands under the receiver's own decoration or over it.
+    /// A queued write plus when its source decorated, which is what decides whether it lands under
+    /// the receiver's own decoration or over it.
     struct QueuedBlockWrite {
         server::world::ChunkGeneratedBlockWrite write;
-        std::int32_t sourceChunkX = 0;
-        std::int32_t sourceChunkZ = 0;
+        std::uint64_t sourceSequence = 0;
     };
 
     std::map<std::int64_t, std::vector<QueuedBlockWrite>> pendingGeneratedBlockWrites_;
 
-    /// Which source chunk last wrote each cell, so two neighbours competing for one cell resolve the
-    /// same way whatever order the generation threads deliver them in. Without it the last write to
-    /// arrive won and the same seed produced different worlds.
-    std::map<std::int64_t, std::unordered_map<std::int64_t, std::pair<std::int32_t, std::int32_t>>> writeSourceByCell_;
+    /// The latest decoration that wrote each cell, so two neighbours competing for one resolve by
+    /// which decorated last rather than by which generation thread delivered first.
+    std::map<std::int64_t, std::unordered_map<std::int64_t, std::uint64_t>> writeSourceByCell_;
 
     /// Answers whether this source may write the cell, remembering it when it may.
-    [[nodiscard]] bool sourceMayWrite(std::int64_t chunkKey, std::int64_t cellKey, std::int32_t sourceChunkX,
-                                      std::int32_t sourceChunkZ);
+    [[nodiscard]] bool sourceMayWrite(std::int64_t chunkKey, std::int64_t cellKey, std::uint64_t sourceSequence);
 
     std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockEntityWrite>>
         pendingGeneratedBlockEntityWrites_;
