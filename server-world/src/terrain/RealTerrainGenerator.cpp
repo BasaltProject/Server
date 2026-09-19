@@ -8,6 +8,7 @@
 #include <basalt/server/world/terrain/OverworldAquifer.hpp>
 #include <basalt/server/world/terrain/OverworldOreVeinifier.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
+#include <basalt/server/world/terrain/decoration/tree/LeafDistances.hpp>
 #include <basalt/server/world/terrain/carver/OverworldCarvers.hpp>
 #include <basalt/server/world/terrain/decoration/CaveLocalModificationDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/CaveSpeleothemDecoration.hpp>

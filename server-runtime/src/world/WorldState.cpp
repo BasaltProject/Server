@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
+#include <basalt/server/world/terrain/decoration/tree/LeafDistances.hpp>
 
 #include <algorithm>
 #include <array>
@@ -370,6 +371,19 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     // Every sculk sensor the chunk brought with it, so a footstep next to one that nobody has ever
     // touched is still heard.
     sculkSensors_.rememberChunk(installed);
+    // The leaf distances settle once every write aimed at this chunk has landed, which is here and
+    // not at the end of its own decoration: a neighbour's leaf arrives later and carries a stale one.
+    const server::world::terrain::decoration::tree::leafDistances::BlockAt worldBlockAt =
+        [this](std::int32_t x, std::int32_t y, std::int32_t z) -> std::int32_t {
+        return blockStateLocked(x, y, z).value_or(0);
+    };
+    server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
+    for (const auto& [dx, dz] :
+         std::array<std::pair<std::int32_t, std::int32_t>, 4>{{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}}) {
+        if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz); neighbour != nullptr) {
+            server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
+        }
+    }
     // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked, which is what
     // starts a lake running. Scheduling is this world's way of saying the same thing.
     for (const server::world::ChunkShapeUpdate& mark : installed.fluidUpdates()) {
