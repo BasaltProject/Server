@@ -129,6 +129,13 @@ public:
                 return stateId;
             }
         }
+        // parity: what this chunk already queued for the neighbour is in the neighbour's proto chunk
+        // as far as vanilla is concerned, so it beats whatever the neighbour view still reports.
+        if (const std::optional<std::int32_t> queued =
+                chunk_->queuedDecorationStateId(position.x, position.y, position.z);
+            queued.has_value()) {
+            return queued;
+        }
         if (externalBlockState_) {
             if (const std::optional<std::int32_t> observed = externalBlockState_(position.x, position.y, position.z);
                 observed.has_value()) {
@@ -466,7 +473,9 @@ bool placeCluster(SpeleothemRegion& region, random::RandomSource& random, const 
                               ? config.wetnessMean
                               : clampedNormalFloat(random, config.wetnessMean, config.wetnessDeviation,
                                                    config.minWetness, config.maxWetness);
-    const float density = 0.3F + random.nextFloat() * 0.4F;
+    // parity: `Mth.randomBetween` is `nextFloat() * (max - min) + min`, and `0.7F - 0.3F` is not
+    // `0.4F`: written with the span precomputed, every density comes out one ulp high.
+    const float density = random.nextFloat() * (0.7F - 0.3F) + 0.3F;
     const std::int32_t xRadius = 2 + random.nextInt(7);
     const std::int32_t zRadius = 2 + random.nextInt(7);
     for (std::int32_t dx = -xRadius; dx <= xRadius; ++dx) {
