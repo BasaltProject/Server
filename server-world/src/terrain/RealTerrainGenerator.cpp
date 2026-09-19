@@ -369,7 +369,7 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         decoration::overworldOreDecoration::decorateInfested(chunk, seed, environment, externalOceanFloor,
                                                              externalState);
         decoration::overworldSpringDecoration::decorate(chunk, seed, environment, externalState);
-        decoration::overworldVegetalDecoration::decorate(chunk, seed, environment);
+        decoration::overworldVegetalDecoration::decorate(chunk, seed, environment, externalState);
     });
     // The water over a magma block or soul sand carries its column in the saved chunk, so this runs
     // once decoration has put both of them down.
